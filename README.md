@@ -180,3 +180,6 @@ public class LoggingRemoteAgent extends RemoteAgent {
    // ... further phases
 }
 ```
+
+[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/noctarius/jenesis/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
+
