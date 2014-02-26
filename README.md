@@ -17,8 +17,8 @@ Jenesis
 
 #### Disclaimer
 This project is not sponsored or started by nor affiliated to Hazelcast, Inc in any possible way.
-It is a personal project started to prevent people from always reinventing the wheel as we 
-currently do again at Hazelcast, because there is not yet a solution to be ready-to-use.
+It is a personal, spare-time project started to prevent people from always reinventing the wheel
+as we currently do again at Hazelcast, because there is not yet a solution to be ready-to-use.
 
 #### Goals
 Jenesis is meant to be a foundation for application or framework vendors to provide a solution for
@@ -48,6 +48,18 @@ A lot of middleware / application frameworks provide support for running distrib
 but there are mostly no frameworks for a general purpose or they seem to have stopped development
 a long time ago.
 To provide developers and vendors to build reliable but distributed unit tests and applications.
+
+#### License
+As the license of the contributed sourcecode the Apache License 2 is chosen. This means that all
+code base is permitted to be used in closed source applications and can be bundled with those, too.
+In addition to that it also is possible to mix it up with other licenses, open and closed source
+ones.
+
+For documentation a suitable license will be chosen from the Creative Commons licenses. A possible
+candidate would be: CC BY
+I permits commercial usage and distributing changed documentations but does not prevent relicensing.
+This is pretty much the same terms as AL2 for software but I'm free for suggestions on documentation
+licensing :-)
 
 #### Description
 This is a fast written, mindmap-alike list of thoughts / ideas. At the moment this is not meant to
