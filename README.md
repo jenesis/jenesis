@@ -15,6 +15,11 @@ Jenesis
    - Testing distributed / scalable applications
    - Testing cluster solutions
 
+#### Disclaimer
+This project is not sponsored or started by nor affiliated to Hazelcast, Inc in any possible way.
+It is a personal project started to prevent people from always reinventing the wheel as we 
+currently do again at Hazelcast, because there is not yet a solution to be ready-to-use.
+
 #### Goals
 Jenesis is meant to be a foundation for application or framework vendors to provide a solution for
 distributed unit tests. It will not be limited to be used with a single framework underneath but
