@@ -56,7 +56,7 @@ be complete or all those things have to be implemented.
 This API is not meant to be a full thought through thinggy it is more like a basic idea on how such
 stuff could look like:
 ```java
-@RemoteAgent(class = LoggingRemoteAgent.class)
+@RemoteAgent(agentClass = LoggingRemoteAgent.class)
 public class DistributedExmapleTestCase {
    
    @Test(timeout = 60000)
