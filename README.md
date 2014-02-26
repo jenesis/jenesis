@@ -50,13 +50,13 @@ a long time ago.
 To provide developers and vendors to build reliable but distributed unit tests and applications.
 
 #### License
-As the license of the contributed sourcecode the Apache License 2 is chosen. This means that all
-code base is permitted to be used in closed source applications and can be bundled with those, too.
-In addition to that it also is possible to mix it up with other licenses, open and closed source
-ones.
+As the license of the contributed sourcecode the [Apache License 2](http://www.apache.org/licenses/LICENSE-2.0.html)
+is chosen. This means that all code base is permitted to be used in closed source applications and 
+can be bundled with those, too. In addition to that it also is possible to mix it up with other 
+licenses, open and closed source ones.
 
 For documentation a suitable license will be chosen from the Creative Commons licenses. A possible
-candidate would be: CC BY
+candidate would be: [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/).
 I permits commercial usage and distributing changed documentations but does not prevent relicensing.
 This is pretty much the same terms as AL2 for software but I'm free for suggestions on documentation
 licensing :-)
