@@ -40,7 +40,7 @@ in the future.
 #### Non Goals
 At the moment the goal is not to build a solution to speed up tests by running standard JUnit tests
 in parallel on multiple test slaves. There are interesting / working solutions for that already
-(like Test Load-Balancer TLB - http://test-load-balancer.github.io) but it might be possible to
+(like [Test Load-Balancer TLB](http://test-load-balancer.github.io)) but it might be possible to
 implement those features on top of the goals of this proposal.
 
 #### Motivation
