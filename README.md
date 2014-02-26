@@ -63,6 +63,30 @@ be complete or all those things have to be implemented.
    - Some kind of remote classloading
    - Piping console / logger output to file / test runner console / null
 
+#### Status?
+I started an implementation a few days ago and all basic ideas seem to work. The "prototype" is
+an implementation to distribute Hazelcast tests on multiple JVMs but currently only on the local
+machine of the test runner. It forks out JVMs, make them building a cluster and executes cluster
+operations on those cluster nodes.
+
+The idea was to have a small version of our heartattack solution and to eventually integrate both
+but eventually it will be another highly vendor integrated solution. At Hazelcast we are currently
+going this way because we need to have those tests now.
+
+For a more general purpose I want to start this project to give other the chance to benefit from this.
+
+#### You want to contribute?
+Due to the fact it's not cool to make those kind of projects alone and since there are a lot of
+different requirements I'm looking for people that want to help and work on this together.
+
+To start you can contribute by adding ideas, requirements, recommendations as a ticket to the Github
+issue tracker, you can also contribute by adding code via Pull Requests.
+In addition to that there might be a mailing list (Google Group) if there is enough interest in the
+project itself.
+Even commit rights to this repository may be granted for highly interested people.
+
+Let's do this together!
+
 #### API ideas
 This API is not meant to be a fully thought-through thing it is more like a basic idea on how such
 stuff could look like:
