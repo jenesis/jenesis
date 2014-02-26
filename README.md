@@ -73,7 +73,7 @@ public class DistributedExmapleTestCase {
    }
 }
 
-public class SomeRemoteAction extends RemoteAction<Void> {
+public class SomeRemoteAction extends SynchronousRemoteAction<Void> {
    
    @Override
    public Void evaluate(CommandContext commandContext) throws Exception {
@@ -86,6 +86,7 @@ public class SomeRemoteAction extends RemoteAction<Void> {
          TimeUnit.SECONDS.sleep(1);
       }
       System.out.println(" done.");
+      return null;
    }
 }
 
