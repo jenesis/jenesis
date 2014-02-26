@@ -120,6 +120,8 @@ Even commit rights to this repository may be granted for highly interested peopl
 
 Let's do this together! If you want to contact me you can do this via Twitter 
 [@noctarius2k](https://twitter.com/noctarius2k) or using the mail address me[at]noctariusDOTcom.
+You can also either add your name to this [ticket](https://github.com/noctarius/jenesis/issues/1)
+or editing the [wiki](https://github.com/noctarius/jenesis/wiki).
 
 #### API ideas
 This API is not meant to be a fully thought-through thing it is more like a basic idea on how such
