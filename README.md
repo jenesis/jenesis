@@ -114,8 +114,8 @@ different requirements I'm looking for people that want to help and work on this
 
 To start you can contribute by adding ideas, requirements, recommendations as a ticket to the Github
 issue tracker, you can also contribute by adding code via Pull Requests.
-In addition to that there might be a mailing list (Google Group) if there is enough interest in the
-project itself.
+In addition to that there is a mailing list (Google Group) which can be found 
+[here](https://groups.google.com/forum/#!forum/jenesis-dev).
 Even commit rights to this repository may be granted for highly interested people.
 
 Let's do this together! If you want to contact me you can do this via Twitter 
