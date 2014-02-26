@@ -90,7 +90,9 @@ The idea was to have a small version of our heartattack solution and to eventual
 but eventually it will be another highly vendor integrated solution. At Hazelcast we are currently
 going this way because we need to have those tests now.
 
-For a more general purpose I want to start this project to give other the chance to benefit from this.
+For a more general purpose I want to start this project to give other the chance to benefit from
+this. That means there is not yet any sourcecode to share on this project since I want to find out
+if there is any interest in such a project or not.
 
 #### You want to contribute?
 Due to the fact it's not cool to make those kind of projects alone and since there are a lot of
