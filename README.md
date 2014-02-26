@@ -65,6 +65,16 @@ I permits commercial usage and distributing changed documentations but does not 
 This is pretty much the same terms as AL2 for software but I'm free for suggestions on documentation
 licensing :-)
 
+#### Project name
+Jenesis is a pun of the "Tree of Life" from the "Book of Genesis" and the typical Java J-beginning
+project names. The "tree of life" is common a symbol for knowledge but as a tree it also stands for
+stableness (stability) and a long life.
+
+Additionally if a tree grows more branches will come up and so goes to any application. Those branches
+need to be tested and for a distributed or scalable application it means the bigger it get over time,
+by acquiring the more users for example, the more nodes you eventually will have. Even those needs to
+be tested to make sure scaling works for your case and here we are on Jenesis again.
+
 #### Description
 This is a fast written, mindmap-alike list of thoughts / ideas. At the moment this is not meant to
 be complete or all those things have to be implemented.
