@@ -3,7 +3,7 @@ Jenesis
 
 ## Distributed Unit Testing for JUnit
 
-#### Meanings
+#### Possible Meanings to You
    - Running multiple unit tests in parallel on multiple hosts / JVMs / OS'
    - Running the same unit test in parallel on multiple hosts / JVMs / OS'
    - Running a multi-node unit test on multiple hosts / JVMs
@@ -21,6 +21,8 @@ a common lifecycle for those tests and an API to hook in your own lifecycle exte
 take place to set up, execute and tear down tests.
 It will also provide a transparent communication layer where you can integrate special serialization
 strategies and to communicate between the test runner and the remote test agents.
+The current approach is to integrate it with JUnit but possibly TestNG or other frameworks are added
+in the future.
 
 #### Non Goals
 At the moment the goal is not to build a solution to speed up tests by running them in parallel on
@@ -53,7 +55,7 @@ be complete or all those things have to be implemented.
    - Piping console / logger output to file / test runner console / null
 
 #### API ideas
-This API is not meant to be a full thought through thinggy it is more like a basic idea on how such
+This API is not meant to be a fully thought-through thing it is more like a basic idea on how such
 stuff could look like:
 ```java
 @RemoteAgent(agentClass = LoggingRemoteAgent.class)
