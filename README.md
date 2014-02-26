@@ -104,7 +104,8 @@ In addition to that there might be a mailing list (Google Group) if there is eno
 project itself.
 Even commit rights to this repository may be granted for highly interested people.
 
-Let's do this together!
+Let's do this together! If you want to contact me you can do this via Twitter @noctarius2k or
+using the mail address me[at]noctariusDOTcom.
 
 #### API ideas
 This API is not meant to be a fully thought-through thing it is more like a basic idea on how such
