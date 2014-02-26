@@ -9,29 +9,38 @@ Jenesis
    - Running a multi-node unit test on multiple hosts / JVMs
    - Benchmarking the same unit test in parallel on multiple hosts / JVMs / OS'
 
-#### Use cases
+#### Use cases for above Meanings
    - Speed up of huge test suites by parallelizing execution of the tests
    - Stress- and / or Load-testing
    - Testing distributed / scalable applications
    - Testing cluster solutions
 
 #### Goals
-This framework will offer a basic framework to make distributed unit tests possible. It'll provides
-a common lifecycle for those tests and an API to hook in your own lifecycle extensions that need to
-take place to set up, execute and tear down tests.
+Jenesis is meant to be a foundation for application or framework vendors to provide a solution for
+distributed unit tests. It will not be limited to be used with a single framework underneath but
+to provide a common API that is extensible to the vendors needs.
+It'll provides a common lifecycle for those tests and an API to hook in your own lifecycle extensions 
+that need to take place to set up, execute and tear down tests or tested applications or frameworks.
+This is very much what the Maven plugin concept looks like. A lifecycle is a basic set of phases and
+the vendor can extend phases to add additional functionality like adding special dependencies or
+adding virtual machines to be started up before running tests.
+
 It will also provide a transparent communication layer where you can integrate special serialization
-strategies and to communicate between the test runner and the remote test agents.
+strategies and to communicate between the test runner and the remote test agents. This layer is meant
+to be immune to network failures and my communicate on a different network to the general tests.
+
 The current approach is to integrate it with JUnit but possibly TestNG or other frameworks are added
 in the future.
 
 #### Non Goals
-At the moment the goal is not to build a solution to speed up tests by running them in parallel on
-multiple test slaves. There are interesting / working solutions for that already (like Test Load-
-Balancer TLB - http://test-load-balancer.github.io).
+At the moment the goal is not to build a solution to speed up tests by running standard JUnit tests
+in parallel on multiple test slaves. There are interesting / working solutions for that already
+(like Test Load-Balancer TLB - http://test-load-balancer.github.io) but it might be possible to
+implement those features on top of the goals of this proposal.
 
 #### Motivation
 A lot of middleware / application frameworks provide support for running distributed unit tests
-but there are nearly no frameworks for a general purpose or they seem to have stopped development
+but there are mostly no frameworks for a general purpose or they seem to have stopped development
 a long time ago.
 To provide developers and vendors to build reliable but distributed unit tests and applications.
 
