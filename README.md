@@ -50,5 +50,61 @@ be complete or all those things have to be implemented.
    - Resolving artifacts from Maven repositories
    - Packaging API to wrap classes / dependencies in custom packages
    - Some kind of remote classloading
+   - Piping console / logger output to file / test runner console / null
 
+#### API ideas
+This API is not meant to be a full thought through thinggy it is more like a basic idea on how such
+stuff could look like:
+```java
+@RemoteAgent(class = LoggingRemoteAgent.class)
+public class DistributedExmapleTestCase {
+   
+   @Test(timeout = 60000)
+   @RemoteTest(initialForks = 5, identification = "Node-${forkId}")
+   public void testDistributed(RemoteContext remoteContext) {
+      RemoteProcess remoteProcess = remoteContext.startJVM(); // Using defaults from this JVM
+      remoteProcess.waitForStartup(10, TimeUnit.SECONDS);
 
+      remoteContext.sendAction(new SomeRemoteAction(), 10); // To all processes
+
+      remoteProcess.sigkill(); // Kill hard
+
+      // ...
+   }
+}
+
+public class SomeRemoteAction extends RemoteAction<Void> {
+   
+   @Override
+   public Void evaluate(CommandContext commandContext) throws Exception {
+      Object[] arguments = commandContext.getArguments();
+      int seconds = (Integer) arguments[0];
+
+      System.out.print("Waiting ");
+      for (int i = 0; i < seconds; i++) {
+         System.out.print(".");
+         TimeUnit.SECONDS.sleep(1);
+      }
+      System.out.println(" done.");
+   }
+}
+
+public class LoggingRemoteAgent extends RemoteAgent {
+   
+   private final Logger logger = LoggerFactory.getLogger(LoggingRemoteAgent.class);
+
+   @Override
+   public void preparationPhase(ExecutionContext executionContext) {
+      logger.info("Preparation phase started: " + executionContext.getIdentification());
+      super.preparationPhase(executionContext);
+   }
+
+   @Override
+   public List<Dependency> resolveDependencyPhase(ExecutionContext executionContext) {
+      logger.info("Resolving dependencies: " + executionContext.getIdentification());
+      return super.resolveDependencyPhase(executionContext);
+   }
+
+   // ... further phases
+}
+```
