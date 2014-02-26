@@ -49,6 +49,10 @@ but there are mostly no frameworks for a general purpose or they seem to have st
 a long time ago.
 To provide developers and vendors to build reliable but distributed unit tests and applications.
 
+Even if foundation itself is depending on JUnit and is build on Java there are lots of other JVM
+based languages that can be used to write tests or if you have an external system but a Java client
+you'll be able to build stress tests on top of those solutions.
+
 #### License
 As the license of the contributed sourcecode the [Apache License 2](http://www.apache.org/licenses/LICENSE-2.0.html)
 is chosen. This means that all code base is permitted to be used in closed source applications and 
