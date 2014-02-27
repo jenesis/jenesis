@@ -3,6 +3,8 @@ Jenesis
 
 ## Distributed Unit Testing for JUnit
 
+### Introduction
+
 #### Possible Meanings to You
    - Running multiple unit tests in parallel on multiple hosts / JVMs / OS'
    - Running the same unit test in parallel on multiple hosts / JVMs / OS'
@@ -19,6 +21,8 @@ Jenesis
 This project is not sponsored or started by nor affiliated to Hazelcast, Inc in any possible way.
 It is a personal, spare-time project started to prevent people from always reinventing the wheel
 as we currently do again at Hazelcast, because there is not yet a solution to be ready-to-use.
+
+### About this Proposal
 
 #### Goals
 Jenesis is meant to be a foundation for application or framework vendors to provide a solution for
@@ -108,7 +112,7 @@ For a more general purpose I want to start this project to give other the chance
 this. That means there is not yet any sourcecode to share on this project since I want to find out
 if there is any interest in such a project or not.
 
-#### You want to contribute?
+### You want to contribute?
 Due to the fact it's not cool to make those kind of projects alone and since there are a lot of
 different requirements I'm looking for people that want to help and work on this together.
 
@@ -123,7 +127,7 @@ Let's do this together! If you want to contact me you can do this via Twitter
 You can also either add your name to this [ticket](https://github.com/noctarius/jenesis/issues/1)
 or editing the [wiki](https://github.com/noctarius/jenesis/wiki).
 
-#### API ideas
+### API ideas
 This API is not meant to be a fully thought-through thing it is more like a basic idea on how such
 stuff could look like:
 ```java
@@ -133,7 +137,7 @@ public class DistributedExmapleTestCase {
    @Test(timeout = 60000)
    @RemoteTest(initialForks = 5, identification = "Node-${forkId}")
    public void testDistributed(RemoteContext remoteContext) {
-      RemoteProcess remoteProcess = remoteContext.startJVM(); // Using defaults from this JVM
+      RemoteProcess remoteProcess = remoteContext.forkProcess(); // Using defaults from this JVM
       remoteProcess.waitForStartup(10, TimeUnit.SECONDS);
 
       remoteContext.sendAction(new SomeRemoteAction(), 10); // To all processes
