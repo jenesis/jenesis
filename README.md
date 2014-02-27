@@ -24,6 +24,9 @@ as we currently do again at Hazelcast, because there is not yet a solution to be
 
 ### About this Proposal
 
+#### Mailing List
+Please find the Google Groups for Jenesis [here](https://groups.google.com/forum/#!forum/jenesis-dev).
+
 #### Goals
 Jenesis is meant to be a foundation for application or framework vendors to provide a solution for
 distributed unit tests. It will not be limited to be used with a single framework underneath but
