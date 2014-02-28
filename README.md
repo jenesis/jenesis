@@ -1,7 +1,7 @@
 Jenesis
 ======= 
 
-## Distributed Unit Testing for JUnit
+## Distributed Unit Testing Foundation
 
 ### Introduction
 
