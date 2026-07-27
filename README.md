@@ -812,9 +812,14 @@ Two callbacks govern how the build is assembled, and they are pluggable independ
   in `module-info.java` lets the module `requires <module-name>;` even when the artifact is non-modular and
   would otherwise only be addressable through a filename-derived automatic module name. The
   `MavenAliasResolver` synthesizes the aliased module locally - a discovery POM whose only dependency is the
-  target, and an empty jar carrying just an `Automatic-Module-Name` manifest entry - so requiring the alias
-  resolves the target and its dependency graph, with automatic-module implied readability making the
-  target's packages visible. The target follows the Maven pin token grammar (`<groupId>/<artifactId>` is the
+  target, plus a jar carrying an `Automatic-Module-Name` manifest entry naming the alias - so requiring the
+  alias resolves the target and its dependency graph. For a target that owns a module identity (a module
+  descriptor or an `Automatic-Module-Name` of its own) the alias jar stays empty and automatic-module implied
+  readability makes the target's packages visible under its own name. A target without any module identity
+  would land on the classpath, unreadable from a named module, so the alias jar is instead a copy of the
+  target with the alias injected as its `Automatic-Module-Name`, carrying the target's packages onto the
+  module path directly - minus signature entries (the altered manifest invalidates them) and minus any package
+  another resolved module already exports, which stays with its owner and is read from there instead. The target follows the Maven pin token grammar (`<groupId>/<artifactId>` is the
   shortcut, a type or classifier is written in full), and its version resolves like any Maven coordinate's:
   a `@jenesis.pin` or BOM entry for the coordinate wins - and is the only place a checksum can be declared -
   then the inline version, and without either the latest release is negotiated implicitly, so an alias

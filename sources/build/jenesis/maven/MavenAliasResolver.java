@@ -4,6 +4,7 @@ import module java.base;
 import module java.xml;
 import java.util.jar.Attributes;
 import build.jenesis.DependencyScope;
+import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
@@ -12,9 +13,15 @@ import build.jenesis.Resolver;
  * Resolves module aliases declared as {@code @jenesis.alias <module-name>
  * <groupId>/<artifactId>[/<type>[/<classifier>]] [<version>]} over a Maven-backed module
  * resolver. An aliased module is synthesized locally: its discovery POM declares the target as
- * its only dependency, and its jar is empty apart from an {@code Automatic-Module-Name} manifest
- * entry carrying the alias. Requiring the alias thereby grants implied readability of the
- * (typically non-modular) target under a stable module name. The target follows the Maven pin
+ * its only dependency, and its jar carries an {@code Automatic-Module-Name} manifest entry
+ * naming the alias. For a target that owns a module identity - a module descriptor or an
+ * {@code Automatic-Module-Name} of its own - that jar stays empty, and requiring the alias
+ * grants implied readability of the target under its own module name. A target without any
+ * module identity would resolve onto the class path, where no named module can read it, so the
+ * alias jar is instead a copy of the target whose manifest names the alias as its
+ * {@code Automatic-Module-Name}: requiring the alias then reads the target's own packages on
+ * the module path, apart from any package the target duplicates from another resolved module,
+ * which stays with its owner and is dropped from the copy. The target follows the Maven pin
  * token grammar. Its version resolves like any Maven coordinate's: a pin or BOM entry for the
  * coordinate wins - and is the only place a checksum can be declared - then the inline version,
  * and without either the latest release is negotiated implicitly. The synthetic artifacts are
@@ -62,6 +69,7 @@ public class MavenAliasResolver implements Resolver {
         }
         String base = Resolver.base(prefix);
         SequencedMap<String, byte[]> poms = new LinkedHashMap<>();
+        SequencedMap<String, Target> targets = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : aliases.entrySet()) {
             String alias = entry.getKey(), declaration = entry.getValue();
             int space = declaration.indexOf(' ');
@@ -96,6 +104,7 @@ public class MavenAliasResolver implements Resolver {
                         "RELEASE");
             }
             poms.put(alias, pom(alias, key, version));
+            targets.put(alias, new Target(key, version));
         }
         Map<String, Repository> wrapped = new LinkedHashMap<>(repositories);
         Repository discovery = (_, coordinate) -> {
@@ -135,8 +144,42 @@ public class MavenAliasResolver implements Resolver {
         };
         wrapped.merge(mavenPrefix, artifacts, (existing, overlay) -> MavenRepository.of(existing).prepend(overlay));
         Resolver.Resolution resolution = delegate.dependencies(executor, prefix, wrapped, coordinates, versions, scope);
+        SequencedMap<String, Resolver.Resolved> swapped = new LinkedHashMap<>(resolution.artifacts());
+        for (Map.Entry<String, Target> entry : targets.entrySet()) {
+            String alias = entry.getKey();
+            String synthetic = mavenPrefix + "/" + GROUP + "/" + alias + "/" + VERSION;
+            String targetPrefix = entry.getValue().key().coordinate(mavenPrefix, null) + "/";
+            Resolver.Resolved target = swapped.entrySet().stream()
+                    .filter(candidate -> candidate.getKey().startsWith(targetPrefix)
+                            && candidate.getKey().indexOf('/', targetPrefix.length()) < 0)
+                    .map(Map.Entry::getValue)
+                    .findFirst()
+                    .orElse(null);
+            if (!swapped.containsKey(synthetic)
+                    || target == null
+                    || PathPlacement.moduleDescriptor(target.file()) != null) {
+                // A target that owns a module identity lands on the module path by itself and stays
+                // readable through the empty alias module's implied readability - the former shape.
+                continue;
+            }
+            // The target has no module identity, so it would land on the class path, unreadable
+            // from any named module: the alias jar becomes a copy of the target instead, carrying
+            // the target's packages onto the module path under the alias name.
+            Set<String> occupied = new HashSet<>();
+            for (Map.Entry<String, Resolver.Resolved> other : swapped.entrySet()) {
+                if (other.getKey().startsWith(mavenPrefix + "/" + GROUP + "/")
+                        || other.getKey().startsWith(targetPrefix)) {
+                    continue;
+                }
+                occupied.addAll(exportedPackages(other.getValue().file()));
+            }
+            Path copy = renamedJar(alias, target.file(), occupied);
+            if (copy != null) {
+                swapped.put(synthetic, new Resolver.Resolved(copy, "", true));
+            }
+        }
         SequencedMap<String, Resolver.Resolved> renamed = new LinkedHashMap<>();
-        resolution.artifacts().forEach((coordinate, resolved) ->
+        swapped.forEach((coordinate, resolved) ->
                 renamed.put(rename(coordinate, base, poms.sequencedKeySet()), resolved));
         List<Resolver.Edge> edges = new ArrayList<>();
         for (Resolver.Edge edge : resolution.edges()) {
@@ -226,6 +269,133 @@ public class MavenAliasResolver implements Resolver {
         Element child = document.createElementNS(POM_NAMESPACE, name);
         child.setTextContent(value);
         parent.appendChild(child);
+    }
+
+    /**
+     * The packages a modular jar contributes to a module path: an explicit module's unqualified
+     * exports, or every class-bearing package of an automatic one. An artifact without a module
+     * identity - or one that cannot be read as a jar - contributes nothing.
+     */
+    private static Set<String> exportedPackages(Path file) {
+        ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(file);
+        if (descriptor == null) {
+            return Set.of();
+        }
+        if (!descriptor.isAutomatic()) {
+            return descriptor.exports().stream()
+                    .filter(export -> !export.isQualified())
+                    .map(ModuleDescriptor.Exports::source)
+                    .collect(Collectors.toSet());
+        }
+        try (JarFile jar = new JarFile(file.toFile(), false, ZipFile.OPEN_READ)) {
+            Set<String> packages = new HashSet<>();
+            Enumeration<JarEntry> entries = jar.entries();
+            while (entries.hasMoreElements()) {
+                String name = versionless(entries.nextElement().getName());
+                if (name == null || !name.endsWith(".class") || name.startsWith("META-INF/")) {
+                    continue;
+                }
+                int slash = name.lastIndexOf('/');
+                if (slash > 0) {
+                    packages.add(name.substring(0, slash).replace('/', '.'));
+                }
+            }
+            return packages;
+        } catch (IOException _) {
+            return Set.of();
+        }
+    }
+
+    /**
+     * Copies the target jar with the alias injected into its manifest as the
+     * {@code Automatic-Module-Name}, or returns {@code null} for a target that cannot be read as
+     * a jar, keeping the empty alias jar in place. Signature entries are dropped since the
+     * altered manifest invalidates them. Class entries in an occupied package - one another
+     * resolved module already exports onto the module path - are left out as well: an automatic
+     * module exports every package it carries, a module reading the same package from two others
+     * is rejected, and the alias module reads the occupied package from its owner instead. As for
+     * the empty jar, the manifest entry is written with a fixed time stamp and the remaining
+     * entries keep their own, so the copy's bytes - and with them the containing build step's
+     * output checksums - only vary with its inputs'.
+     */
+    private static Path renamedJar(String alias, Path target, Set<String> occupied) throws IOException {
+        JarFile source;
+        try {
+            source = new JarFile(target.toFile(), false, ZipFile.OPEN_READ);
+        } catch (IOException _) {
+            return null;
+        }
+        try (source) {
+            Manifest manifest = source.getManifest() == null ? new Manifest() : new Manifest(source.getManifest());
+            Attributes attributes = manifest.getMainAttributes();
+            if (!attributes.containsKey(Attributes.Name.MANIFEST_VERSION)) {
+                attributes.put(Attributes.Name.MANIFEST_VERSION, "1.0");
+            }
+            attributes.putValue("Automatic-Module-Name", alias);
+            Path file = Files.createTempFile("alias-" + alias, ".jar");
+            file.toFile().deleteOnExit();
+            try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(file))) {
+                JarEntry entry = new JarEntry(JarFile.MANIFEST_NAME);
+                entry.setTime(0L);
+                output.putNextEntry(entry);
+                manifest.write(output);
+                output.closeEntry();
+                Set<String> written = new HashSet<>();
+                Enumeration<JarEntry> entries = source.entries();
+                while (entries.hasMoreElements()) {
+                    JarEntry original = entries.nextElement();
+                    String name = original.getName();
+                    String bare = versionless(name);
+                    if (bare == null
+                            || name.equals(JarFile.MANIFEST_NAME)
+                            || bare.equals("module-info.class")
+                            || signature(name)
+                            || !written.add(name)) {
+                        continue;
+                    }
+                    if (bare.endsWith(".class")) {
+                        int slash = bare.lastIndexOf('/');
+                        if (slash > 0 && occupied.contains(bare.substring(0, slash).replace('/', '.'))) {
+                            continue;
+                        }
+                    }
+                    JarEntry copy = new JarEntry(name);
+                    copy.setTime(original.getTime());
+                    output.putNextEntry(copy);
+                    if (!original.isDirectory()) {
+                        try (InputStream input = source.getInputStream(original)) {
+                            input.transferTo(output);
+                        }
+                    }
+                    output.closeEntry();
+                }
+            }
+            return file;
+        }
+    }
+
+    /** A multi-release overlay entry's base-rooted name, an ordinary entry's own, or {@code null} for a bare overlay root. */
+    private static String versionless(String name) {
+        if (!name.startsWith("META-INF/versions/")) {
+            return name;
+        }
+        int slash = name.indexOf('/', "META-INF/versions/".length());
+        return slash < 0 ? null : name.substring(slash + 1);
+    }
+
+    private static boolean signature(String name) {
+        if (!name.startsWith("META-INF/")) {
+            return false;
+        }
+        String tail = name.substring("META-INF/".length()).toUpperCase(Locale.ROOT);
+        return !tail.contains("/") && (tail.endsWith(".SF")
+                || tail.endsWith(".RSA")
+                || tail.endsWith(".DSA")
+                || tail.endsWith(".EC")
+                || tail.startsWith("SIG-"));
+    }
+
+    private record Target(MavenDependencyKey key, String version) {
     }
 
     private static Path emptyJar(String alias) throws IOException {

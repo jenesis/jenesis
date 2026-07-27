@@ -3,6 +3,7 @@ package build.jenesis.test.maven;
 import module java.base;
 import module org.junit.jupiter.api;
 import build.jenesis.DependencyScope;
+import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
@@ -375,17 +376,27 @@ public class MavenAliasResolverTest {
                     }
                 }
                 """);
-        String modulePath = resolution.artifacts().values().stream()
-                .map(resolved -> resolved.file().toString())
-                .collect(Collectors.joining(File.pathSeparator));
+        // Mirrors PathPlacement.INFERRED: jars with a module identity go onto the module path, the
+        // rest onto the class path - so the identity-less target lands where the product build puts
+        // it, and only the alias jar (carrying the target's packages) is module-path-visible.
+        Map<Boolean, String> paths = resolution.artifacts().values().stream()
+                .map(Resolver.Resolved::file)
+                .collect(Collectors.partitioningBy(
+                        file -> PathPlacement.moduleDescriptor(file) != null,
+                        Collectors.mapping(Path::toString, Collectors.joining(File.pathSeparator))));
+        List<String> arguments = new ArrayList<>(List.of(
+                "-d", Files.createDirectories(work.resolve("app-classes")).toString(),
+                "-p", paths.get(true)));
+        if (!paths.get(false).isEmpty()) {
+            arguments.addAll(List.of("-cp", paths.get(false)));
+        }
+        arguments.add(sources.resolve("module-info.java").toString());
+        arguments.add(sources.resolve("myapp/Main.java").toString());
         StringWriter errors = new StringWriter();
         int result = ToolProvider.findFirst("javac").orElseThrow().run(
                 new PrintWriter(Writer.nullWriter()),
                 new PrintWriter(errors),
-                "-d", Files.createDirectories(work.resolve("app-classes")).toString(),
-                "-p", modulePath,
-                sources.resolve("module-info.java").toString(),
-                sources.resolve("myapp/Main.java").toString());
+                arguments.toArray(String[]::new));
         assertThat(result).withFailMessage(() -> "Compilation failed: " + errors).isEqualTo(0);
     }
 
