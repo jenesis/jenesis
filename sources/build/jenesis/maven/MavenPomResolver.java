@@ -116,6 +116,49 @@ public class MavenPomResolver implements MavenResolver {
     }
 
     @Override
+    public Resolver.Bom bom(Executor executor,
+                            String prefix,
+                            Map<String, Repository> repositories,
+                            String coordinate,
+                            String version,
+                            String checksum,
+                            boolean latest) throws IOException {
+        if (checksum != null && !checksum.isEmpty()) {
+            throw new IllegalArgumentException("A Maven BOM cannot carry a checksum: " + coordinate);
+        }
+        int slash = coordinate.indexOf('/');
+        if (slash < 1 || slash == coordinate.length() - 1 || coordinate.indexOf('/', slash + 1) >= 0) {
+            throw new IllegalArgumentException("Malformed Maven BOM coordinate '"
+                    + coordinate
+                    + "': expected <groupId>/<artifactId>");
+        }
+        String groupId = coordinate.substring(0, slash), artifactId = coordinate.substring(slash + 1);
+        MavenRepository repository = MavenRepository.of(
+                repositories.getOrDefault(Resolver.base(prefix), Repository.empty()));
+        String resolved = version.isEmpty() || latest
+                ? negotiatorSupplier.get().resolve(executor, repository, groupId, artifactId, "pom", null, "RELEASE")
+                : isFloating(version)
+                        ? negotiatorSupplier.get().resolve(executor, repository, groupId, artifactId, "pom", null, version)
+                        : version;
+        RepositoryItem item = repository.fetch(executor, groupId, artifactId, resolved, "pom", null, null)
+                .orElseThrow(() -> new IllegalStateException("Unresolved: " + coordinate + "/" + resolved));
+        Map<DependencyCoordinate, UnresolvedPom> unresolved = new HashMap<>();
+        UnresolvedPom assembled;
+        try (InputStream stream = item.toInputStream()) {
+            assembled = assemble(executor, repository, stream, false, false, null, null, new HashSet<>(), unresolved);
+        } catch (SAXException | ParserConfigurationException e) {
+            throw new IllegalStateException("Failed to parse BOM " + coordinate + "/" + resolved, e);
+        }
+        SequencedMap<String, String> entries = new TreeMap<>();
+        resolve(executor, repository, assembled, unresolved).managedDependencies().forEach((key, value) -> {
+            if (value.version() != null && !value.version().isEmpty()) {
+                entries.put(prefix + "/" + key.coordinate(null, null), value.version());
+            }
+        });
+        return new Resolver.Bom(item.file().orElse(null), item.internal(), false, resolved, entries);
+    }
+
+    @Override
     public MavenResolver.Closure dependencies(
             Executor executor,
             MavenRepository repository,

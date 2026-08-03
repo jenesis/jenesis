@@ -47,6 +47,17 @@ public class MavenAliasResolver implements Resolver {
     }
 
     @Override
+    public Resolver.Bom bom(Executor executor,
+                            String prefix,
+                            Map<String, Repository> repositories,
+                            String coordinate,
+                            String version,
+                            String checksum,
+                            boolean latest) throws IOException {
+        return delegate.bom(executor, prefix, repositories, coordinate, version, checksum, latest);
+    }
+
+    @Override
     public Resolver.Resolution dependencies(Executor executor,
                                             String prefix,
                                             Map<String, Repository> repositories,

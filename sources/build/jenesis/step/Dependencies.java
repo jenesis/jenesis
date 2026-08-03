@@ -42,38 +42,7 @@ public class Dependencies implements BuildStep {
 
     public static SequencedMap<String, String> bomEntries(SequencedProperties properties, String group) {
         SequencedMap<String, String> entries = new LinkedHashMap<>();
-        for (String key : properties.stringPropertyNames()) {
-            String value = properties.getProperty(key).trim();
-            if (value.endsWith("]")) {
-                throw new IllegalArgumentException("Malformed BOM entry '"
-                        + key
-                        + "': platform guards are not supported in BOM files,"
-                        + " guard the @jenesis.bom declaration instead");
-            }
-            int firstSlash = key.indexOf('/');
-            int secondSlash = firstSlash < 0 ? -1 : key.indexOf('/', firstSlash + 1);
-            String expanded;
-            if (firstSlash < 0) {
-                expanded = "module/" + key;
-            } else if (secondSlash < 0) {
-                if (firstSlash < 1 || firstSlash == key.length() - 1) {
-                    throw new IllegalArgumentException("Malformed BOM entry '"
-                            + key
-                            + "': expected <module>, <groupId>/<artifactId>,"
-                            + " or <repository>/<coordinate>");
-                }
-                expanded = "maven/" + key;
-            } else {
-                if (firstSlash < 1 || secondSlash == firstSlash + 1 || secondSlash == key.length() - 1) {
-                    throw new IllegalArgumentException("Malformed BOM entry '"
-                            + key
-                            + "': expected <module>, <groupId>/<artifactId>,"
-                            + " or <repository>/<coordinate>");
-                }
-                expanded = key;
-            }
-            entries.put(group + "/" + expanded, value);
-        }
+        Resolver.bomEntries(properties).forEach((key, value) -> entries.put(group + "/" + key, value));
         return entries;
     }
 
@@ -233,12 +202,18 @@ public class Dependencies implements BuildStep {
             }
             wrapped.put(name, effective.materialized(libs));
         });
+        SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> managed = new LinkedHashMap<>();
         if (!bomTokens.isEmpty()) {
-            SequencedMap<String, String> managed = new LinkedHashMap<>();
+            SequencedMap<String, String> merged = new LinkedHashMap<>();
+            SequencedMap<String, String> covering = new LinkedHashMap<>();
+            SequencedMap<String, String> materializing = new LinkedHashMap<>();
             SequencedProperties resolvedBoms = new SequencedProperties();
             for (Map.Entry<String, String> token : bomTokens.entrySet()) {
                 if (token.getKey().startsWith("entry/")) {
-                    managed.putIfAbsent(token.getKey().substring(6), token.getValue());
+                    String key = token.getKey().substring(6);
+                    if (merged.putIfAbsent(key, token.getValue()) == null) {
+                        covering.put(key, token.getValue());
+                    }
                     continue;
                 }
                 String reference = token.getKey().substring(4);
@@ -251,40 +226,54 @@ public class Dependencies implements BuildStep {
                 int space = value.indexOf(' ');
                 String version = space < 0 ? value : value.substring(0, space);
                 String checksum = space < 0 ? "" : value.substring(space + 1).trim();
-                Repository repository = wrapped.get(Resolver.base(repo));
-                if (repository == null) {
+                if (wrapped.get(Resolver.base(repo)) == null) {
                     throw new IllegalArgumentException("Unknown repository for BOM: " + reference);
                 }
                 boolean verify = pinning != Pinning.VERSIONS && pinning != Pinning.IGNORE;
-                Resolver.Resolved bom;
+                Resolver.Bom bom;
                 try {
-                    bom = Resolver.materialize(executor,
-                            repository,
-                            version.isEmpty()
-                                    ? coordinate + ":properties"
-                                    : coordinate + "/" + version + ":properties",
-                            verify ? checksum : null);
+                    bom = resolvers.getOrDefault(Resolver.base(repo), Resolver.identity()).bom(executor,
+                            repo,
+                            wrapped,
+                            coordinate,
+                            version,
+                            verify ? checksum : null,
+                            pinning == Pinning.IGNORE);
                 } catch (RuntimeException e) {
                     throw new IllegalStateException("Failed to fetch BOM " + reference, e);
                 }
-                if (pinning == Pinning.STRICT && checksum.isEmpty() && !bom.internal()) {
+                if (pinning == Pinning.STRICT && bom.verifiable() && checksum.isEmpty() && !bom.internal()) {
                     throw new IllegalStateException("No checksum pinned for BOM "
                             + reference
                             + " (strict pinning is enabled)");
                 }
-                if (!version.isEmpty()) {
-                    resolvedBoms.setProperty("bom/" + reference + "/" + version,
-                            context.next().toAbsolutePath().relativize(bom.file().toAbsolutePath())
-                                    .toString().replace(File.separatorChar, '/'));
+                if (!version.isEmpty() && !bom.version().isEmpty()) {
+                    if (bom.verifiable()) {
+                        resolvedBoms.setProperty("bom/" + reference + "/" + bom.version(),
+                                context.next().toAbsolutePath().relativize(bom.file().toAbsolutePath())
+                                        .toString().replace(File.separatorChar, '/'));
+                    } else {
+                        resolvedBoms.setProperty("version/" + reference, bom.version());
+                    }
                 }
-                bomEntries(SequencedProperties.ofFiles(bom.file()), group).forEach(managed::putIfAbsent);
+                for (Map.Entry<String, String> entry : bom.entries().entrySet()) {
+                    String key = group + "/" + entry.getKey();
+                    if (merged.putIfAbsent(key, entry.getValue()) == null) {
+                        (bom.verifiable() ? covering : materializing).put(key, entry.getValue());
+                    }
+                }
             }
-            for (Map.Entry<String, String> entry : managed.entrySet()) {
+            for (Map.Entry<String, String> entry : covering.entrySet()) {
+                resolvedBoms.setProperty("entry/" + entry.getKey(), entry.getValue());
+            }
+            for (Map.Entry<String, String> entry : materializing.entrySet()) {
+                resolvedBoms.setProperty("pin/" + entry.getKey(), entry.getValue());
+            }
+            for (Map.Entry<String, String> entry : merged.entrySet()) {
                 String key = entry.getKey();
                 int first = key.indexOf('/');
                 int second = key.indexOf('/', first + 1);
-                resolvedBoms.setProperty("entry/" + key, entry.getValue());
-                versions.computeIfAbsent(key.substring(0, first), _ -> new LinkedHashMap<>())
+                managed.computeIfAbsent(key.substring(0, first), _ -> new LinkedHashMap<>())
                         .computeIfAbsent(key.substring(first + 1, second), _ -> new LinkedHashMap<>())
                         .putIfAbsent(key.substring(second + 1), entry.getValue());
             }
@@ -314,12 +303,27 @@ public class Dependencies implements BuildStep {
                     }
                     SequencedMap<String, SequencedMap<String, String>> groupVersions = versions
                             .getOrDefault(group, new LinkedHashMap<>());
+                    SequencedMap<String, SequencedMap<String, String>> groupManaged = managed
+                            .getOrDefault(group, new LinkedHashMap<>());
                     List<SequencedMap<String, String>> scoped = new ArrayList<>();
+                    List<SequencedMap<String, String>> scopedManaged = new ArrayList<>();
                     scoped.add(groupVersions.getOrDefault(repo, new LinkedHashMap<>()));
-                    for (String managed : resolver.managedPrefixes()) {
-                        scoped.add(groupVersions.getOrDefault(managed, new LinkedHashMap<>()));
+                    scopedManaged.add(groupManaged.getOrDefault(repo, new LinkedHashMap<>()));
+                    for (String managedPrefix : resolver.managedPrefixes()) {
+                        scoped.add(groupVersions.getOrDefault(managedPrefix, new LinkedHashMap<>()));
+                        scopedManaged.add(groupManaged.getOrDefault(managedPrefix, new LinkedHashMap<>()));
                     }
                     SequencedMap<String, String> bom = new LinkedHashMap<>();
+                    if (!pinned) {
+                        // The floated BOM's entries outrank an ignored pin: the pin below only
+                        // survives as the version source of last resort for a versionless declaration.
+                        for (SequencedMap<String, String> entries : scopedManaged) {
+                            entries.forEach((coordinate, value) -> {
+                                int space = value.indexOf(' ');
+                                bom.putIfAbsent(coordinate, space < 0 ? value : value.substring(0, space));
+                            });
+                        }
+                    }
                     for (SequencedMap<String, String> pins : scoped) {
                         if (pinning == Pinning.VERSIONS) {
                             pins.forEach((coordinate, value) -> {
@@ -343,6 +347,18 @@ public class Dependencies implements BuildStep {
                                             : qualified.substring(0, divider));
                                 }
                             });
+                        }
+                    }
+                    if (pinned) {
+                        for (SequencedMap<String, String> entries : scopedManaged) {
+                            if (pinning == Pinning.VERSIONS) {
+                                entries.forEach((coordinate, value) -> {
+                                    int space = value.indexOf(' ');
+                                    bom.putIfAbsent(coordinate, space < 0 ? value : value.substring(0, space));
+                                });
+                            } else {
+                                entries.forEach(bom::putIfAbsent);
+                            }
                         }
                     }
                     Resolver.Resolution resolution = resolver.dependencies(executor,

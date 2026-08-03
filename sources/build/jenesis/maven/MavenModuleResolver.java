@@ -1,11 +1,13 @@
 package build.jenesis.maven;
 
 import module java.base;
+import module java.xml;
 import build.jenesis.DependencyScope;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.PathPlacement;
 import build.jenesis.Resolver;
+import build.jenesis.SequencedProperties;
 
 public class MavenModuleResolver implements Resolver {
 
@@ -22,6 +24,73 @@ public class MavenModuleResolver implements Resolver {
     @Override
     public SequencedSet<String> managedPrefixes() {
         return new LinkedHashSet<>(Set.of(mavenPrefix));
+    }
+
+    @Override
+    public Resolver.Bom bom(Executor executor,
+                            String prefix,
+                            Map<String, Repository> repositories,
+                            String coordinate,
+                            String version,
+                            String checksum,
+                            boolean latest) throws IOException {
+        if (!latest || version.isEmpty()) {
+            return Resolver.super.bom(executor, prefix, repositories, coordinate, version, checksum, latest);
+        }
+        Repository repository = repositories.getOrDefault(Resolver.base(prefix), discovery);
+        RepositoryItem item = repository.fetch(executor, coordinate + ":pom").orElse(null);
+        if (item == null) {
+            return Resolver.super.bom(executor, prefix, repositories, coordinate, version, checksum, latest);
+        }
+        String discovered = pomVersion(item.toInputStream(), coordinate);
+        Resolver.Resolved resolved = Resolver.materialize(executor,
+                repository,
+                coordinate + "/" + discovered + ":properties",
+                null);
+        return new Resolver.Bom(resolved.file(),
+                resolved.internal(),
+                true,
+                discovered,
+                Resolver.bomEntries(SequencedProperties.ofFiles(resolved.file())));
+    }
+
+    private static String pomVersion(InputStream stream, String coordinate) throws IOException {
+        Document document;
+        try (stream) {
+            document = MavenDefaultVersionNegotiator.toDocumentBuilderFactory().newDocumentBuilder().parse(stream);
+        } catch (SAXException | ParserConfigurationException e) {
+            throw new IllegalStateException("Failed to parse discovery POM for " + coordinate, e);
+        }
+        NodeList children = document.getDocumentElement().getChildNodes();
+        String parent = null;
+        for (int index = 0; index < children.getLength(); index++) {
+            Node node = children.item(index);
+            if (node.getNodeType() != Node.ELEMENT_NODE) {
+                continue;
+            }
+            String name = node.getLocalName() == null ? node.getNodeName() : node.getLocalName();
+            if (name.equals("version")) {
+                return node.getTextContent().trim();
+            } else if (name.equals("parent")) {
+                NodeList nested = node.getChildNodes();
+                for (int inner = 0; inner < nested.getLength(); inner++) {
+                    Node candidate = nested.item(inner);
+                    if (candidate.getNodeType() != Node.ELEMENT_NODE) {
+                        continue;
+                    }
+                    String nestedName = candidate.getLocalName() == null
+                            ? candidate.getNodeName()
+                            : candidate.getLocalName();
+                    if (nestedName.equals("version")) {
+                        parent = candidate.getTextContent().trim();
+                    }
+                }
+            }
+        }
+        if (parent == null) {
+            throw new IllegalStateException("No version in discovery POM for " + coordinate);
+        }
+        return parent;
     }
 
     @Override

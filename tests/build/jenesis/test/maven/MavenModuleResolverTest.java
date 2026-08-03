@@ -309,6 +309,56 @@ public class MavenModuleResolverTest {
         assertThat(fetched).containsOnlyKeys("foo.bar:pom", "lib.module/2.0:pom");
     }
 
+    @Test
+    public void bom_floats_to_discovery_pom_version() throws IOException {
+        Path properties = Files.writeString(mavenRepoFolder.resolve("acme.platform-2.0.properties"), "bar = 2.0\n");
+        Map<String, String> fetched = new LinkedHashMap<>();
+        Repository repository = (_, coordinate) -> {
+            fetched.put(coordinate, "");
+            return switch (coordinate) {
+                case "acme.platform:pom" -> Optional.of((RepositoryItem) () -> new ByteArrayInputStream("""
+                        <project xmlns="http://maven.apache.org/POM/4.0.0">
+                            <groupId>org.example</groupId>
+                            <artifactId>example-platform</artifactId>
+                            <version>2.0</version>
+                        </project>""".getBytes(StandardCharsets.UTF_8)));
+                case "acme.platform/2.0:properties" -> Optional.of(RepositoryItem.ofFile(properties));
+                default -> Optional.empty();
+            };
+        };
+        Resolver.Bom bom = new MavenModuleResolver("maven", mavenPomResolver, null).bom(
+                Runnable::run,
+                "module",
+                Map.of("module", repository),
+                "acme.platform",
+                "1.0",
+                null,
+                true);
+        assertThat(bom.verifiable()).isTrue();
+        assertThat(bom.version()).isEqualTo("2.0");
+        assertThat(bom.entries()).containsExactly(Map.entry("module/bar", "2.0"));
+        assertThat(fetched).containsOnlyKeys("acme.platform:pom", "acme.platform/2.0:properties");
+    }
+
+    @Test
+    public void bom_without_discovery_pom_keeps_declared_version() throws IOException {
+        Path properties = Files.writeString(mavenRepoFolder.resolve("acme.platform-1.0.properties"), "bar = 1.0\n");
+        Repository repository = (_, coordinate) -> switch (coordinate) {
+            case "acme.platform/1.0:properties" -> Optional.of(RepositoryItem.ofFile(properties));
+            default -> Optional.empty();
+        };
+        Resolver.Bom bom = new MavenModuleResolver("maven", mavenPomResolver, null).bom(
+                Runnable::run,
+                "module",
+                Map.of("module", repository),
+                "acme.platform",
+                "1.0",
+                null,
+                true);
+        assertThat(bom.version()).isEqualTo("1.0");
+        assertThat(bom.entries()).containsExactly(Map.entry("module/bar", "1.0"));
+    }
+
     private static Repository stubRepository(Map<String, String> fetched, Map<String, String> bodies) {
         return (_, coordinate) -> {
             fetched.put(coordinate, "");

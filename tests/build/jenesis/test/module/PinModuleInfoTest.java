@@ -121,6 +121,22 @@ public class PinModuleInfoTest {
         return file;
     }
 
+    private void writeBomPins(Map<String, String> entries) throws IOException {
+        SequencedProperties properties = loadInventory();
+        int index = count(properties, "module.bom.");
+        for (Map.Entry<String, String> entry : entries.entrySet()) {
+            properties.setProperty("module.bom." + index++, "pin/" + entry.getKey() + " " + entry.getValue());
+        }
+        properties.store(input.resolve(Inventory.INVENTORY));
+    }
+
+    private void writeBomVersion(String coordinate, String version) throws IOException {
+        SequencedProperties properties = loadInventory();
+        int index = count(properties, "module.bom.");
+        properties.setProperty("module.bom." + index, "version/" + coordinate + " " + version);
+        properties.store(input.resolve(Inventory.INVENTORY));
+    }
+
     @Test
     public void renders_dependencies_under_their_resolved_group() throws IOException {
         Path file = root.resolve("module-info.java");
@@ -725,6 +741,81 @@ public class PinModuleInfoTest {
         String result = run(file);
         assertThat(result).contains("@jenesis.bom acme.platform\n");
         assertThat(result).contains("@jenesis.bom bom-team.properties");
+    }
+
+    @Test
+    public void maven_bom_entries_materialize_as_pins() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                module foo {
+                }
+                """);
+        writeBomPins(Map.of("main/maven/org.acme/lib", "2.0"));
+        String result = run(file);
+        assertThat(result).contains("@jenesis.pin org.acme/lib 2.0\n");
+    }
+
+    @Test
+    public void closure_pin_wins_over_maven_bom_entry() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.acme/lib", "2.0 SHA-256/cafebabe"));
+        writeBomPins(Map.of("main/maven/org.acme/lib", "2.0"));
+        String result = run(file);
+        assertThat(result).contains("@jenesis.pin org.acme/lib 2.0 SHA-256/cafebabe");
+        assertThat(result.split("@jenesis\\.pin ", -1)).hasSize(2);
+    }
+
+    @Test
+    public void maven_bom_entries_do_not_cover() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.pin org.acme/lib 2.0 SHA-256/cafebabe
+                 */
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.acme/lib", "2.0 SHA-256/cafebabe"));
+        writeBomPins(Map.of("main/maven/org.acme/lib", "2.0"));
+        String result = run(file);
+        assertThat(result).contains("@jenesis.pin org.acme/lib 2.0 SHA-256/cafebabe");
+    }
+
+    @Test
+    public void maven_bom_reference_is_pinned_version_only() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.bom org.acme/platform-bom 1.0
+                 */
+                module foo {
+                }
+                """);
+        writeBomVersion("main/maven/org.acme/platform-bom", "2.0");
+        String result = run(file);
+        assertThat(result).contains("@jenesis.bom org.acme/platform-bom 2.0\n");
+        assertThat(result).doesNotContain("SHA-256");
+    }
+
+    @Test
+    public void flatten_removes_maven_bom_declaration_and_entry_pins() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.bom org.acme/platform-bom 1.0
+                 */
+                module foo {
+                }
+                """);
+        writeBomPins(Map.of("main/maven/org.acme/lib", "2.0"));
+        writeBomVersion("main/maven/org.acme/platform-bom", "1.0");
+        String result = run(file, step -> step.flatten(true));
+        assertThat(result).doesNotContain("@jenesis.bom");
+        assertThat(result).doesNotContain("org.acme/lib");
     }
 
     @Test

@@ -154,11 +154,6 @@ public class ModuleInfoParser {
                                     key = expand("jenesis.bom", token);
                                     int first = key.indexOf('/');
                                     int second = key.indexOf('/', first + 1);
-                                    if (!key.substring(first + 1, second).equals("module")) {
-                                        throw new IllegalArgumentException("Malformed @jenesis.bom token '"
-                                                + token
-                                                + "': BOM artifacts are fetched from the module repository");
-                                    }
                                     if (words.length > 3) {
                                         throw new IllegalArgumentException("Malformed @jenesis.bom declaration '"
                                                 + bom
@@ -171,6 +166,11 @@ public class ModuleInfoParser {
                                                 + "': a BOM cannot carry a classifier");
                                     }
                                     String checksum = words.length > 2 ? words[2] : "";
+                                    if (!checksum.isEmpty() && !key.substring(first + 1, second).equals("module")) {
+                                        throw new IllegalArgumentException("Malformed @jenesis.bom declaration '"
+                                                + bom
+                                                + "': a Maven BOM cannot carry a checksum");
+                                    }
                                     if (!checksum.isEmpty() && checksum.indexOf('/') < 1) {
                                         throw new IllegalArgumentException("Malformed @jenesis.bom checksum '"
                                                 + checksum

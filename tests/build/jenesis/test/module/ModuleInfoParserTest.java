@@ -766,7 +766,7 @@ public class ModuleInfoParserTest {
     }
 
     @Test
-    public void bom_tag_rejects_maven_tokens() throws IOException {
+    public void bom_tag_resolves_maven_tokens() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
                  * @jenesis.bom com.acme/acme-bom 2.1.0
@@ -775,13 +775,12 @@ public class ModuleInfoParserTest {
                   requires bar;
                 }
                 """);
-        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("BOM artifacts are fetched from the module repository");
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.boms()).containsExactly(Map.entry("main/maven/com.acme/acme-bom", "2.1.0"));
     }
 
     @Test
-    public void bom_tag_rejects_qualified_non_module_repository() throws IOException {
+    public void bom_tag_resolves_qualified_non_module_repository() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
                  * @jenesis.bom kotlinc/maven/com.acme/acme-bom 2.1.0
@@ -790,9 +789,23 @@ public class ModuleInfoParserTest {
                   requires bar;
                 }
                 """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.boms()).containsExactly(Map.entry("kotlinc/maven/com.acme/acme-bom", "2.1.0"));
+    }
+
+    @Test
+    public void bom_tag_rejects_checksum_on_maven_token() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.bom com.acme/acme-bom 2.1.0 SHA256/cafebabe
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
         assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("BOM artifacts are fetched from the module repository");
+                .hasMessageContaining("a Maven BOM cannot carry a checksum");
     }
 
     @Test

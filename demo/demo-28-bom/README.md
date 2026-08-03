@@ -1,11 +1,12 @@
 Bill of materials demo
 ======================
 
-A curated set of versions and checksums, shared as one properties file instead
-of repeated `@jenesis.pin` tags. The module declares only *what* it requires;
-the BOM says *which version* and *which bytes*:
+A curated set of versions, shared as a bill of materials instead of repeated
+`@jenesis.pin` tags. The module declares only *what* it requires; the BOMs
+say *which version*:
 
     /**
+     * @jenesis.bom org.slf4j/slf4j-bom 2.0.16
      * @jenesis.bom bom-platform.properties
      */
     module demo.bom {
@@ -13,14 +14,22 @@ the BOM says *which version* and *which bytes*:
         exports sample;
     }
 
-Local BOMs are files named `bom-<name>.properties` in the project's BOM
-location - by default the configuration location, i.e. `build.jenesis/` under the project root. A
-dash can never occur in a Java module name, so the file reference is
-structurally distinct from a module coordinate. Here `bom-platform.properties`
-carries the pins:
+The first declaration is a **Maven BOM**: the one-slash token follows the pin
+grammar's `<groupId>/<artifactId>` shorthand, so the dependencies step fetches
+`org.slf4j:slf4j-bom:2.0.16` from Maven Central and imports its effective
+`<dependencyManagement>` as if it were declared in the root POM - parent
+chains and properties resolved, nested `<scope>import</scope>` BOMs flattened
+recursively with Maven's first-wins rules. Here it manages every `org.slf4j`
+artifact at `2.0.16`.
+
+The second declaration is a **local file**: files named `bom-<name>.properties`
+in the project's BOM location - by default the configuration location, i.e.
+`build.jenesis/` under the project root. A dash can never occur in a Java
+module name, so the file reference is structurally distinct from a module
+coordinate. Here `bom-platform.properties` pins what a Maven BOM cannot
+express, the bare module coordinate:
 
     org.slf4j = 2.0.16
-    org.slf4j/slf4j-api = 2.0.16 SHA-256/a12578dde1ba00bd9b816d388a0b879928d00bab3c83c240f7013bf4196c579a
 
 The location is fixed per project (`-Djenesis.project.boms=<paths>` or the
 `boms(...)` builder method to relocate; multiple locations are searched in
@@ -34,9 +43,14 @@ From this directory:
 
     java build/jenesis/Project.java
 
-The BOM's checksums count as pins, so the build also passes strict pinning
-without a single `@jenesis.pin` tag:
+A Maven BOM carries versions, never hashes - POM bytes are not stable across
+repositories, so its reference takes no checksum and checksum comments inside
+the fetched BOM are not read. Strict pinning therefore needs the `pin` goal
+first, which materializes every version the BOM declares as a `@jenesis.pin`
+line (the resolved closure with artifact hashes, the rest version-only), so
+the pinned build no longer depends on the BOM's unverifiable content:
 
+    java build/jenesis/Project.java pin
     java -Djenesis.dependency.pin=strict build/jenesis/Project.java
 
 The BOM file format
@@ -60,6 +74,7 @@ The `@jenesis.bom` tag mirrors `@jenesis.pin`:
 
     @jenesis.bom acme.platform                          floating latest from the module repository
     @jenesis.bom acme.platform 2.1.0 SHA-256/ab12...    fetched at a version, content-verified
+    @jenesis.bom org.slf4j/slf4j-bom 2.0.16             a Maven BOM's dependencyManagement (this demo)
     @jenesis.bom kotlinc/module/acme.platform 2.1.0     entries merge into the kotlinc group
     @jenesis.bom acme.platform 1.9.0 [legacy]           platform-guarded, like a guarded pin
     @jenesis.bom bom-platform.properties                a local file (this demo)
@@ -95,21 +110,28 @@ Precedence
 
 Local pins always win: an explicit `@jenesis.pin` overrides any BOM entry.
 Between BOMs, the first declared wins a conflicting coordinate. Under
-`-Djenesis.dependency.pin=strict` the BOM reference itself needs a checksum
-when fetched from a repository (a local file is covered by the build's own
-content tracking), and BOM-provided hashes satisfy the strict closure check,
-as this demo shows.
+`-Djenesis.dependency.pin=strict` a module-repository BOM reference needs a
+checksum (its byte-stable properties file is content-verified before the
+entries are trusted, and its hashed entries satisfy the strict closure
+check); a Maven BOM reference is exempt, since it cannot carry one, and its
+safety comes from the materialized pins instead.
 
 Repinning
 ---------
 
 The `pin` goal is BOM-aware. By default (`-Djenesis.pin.bom=keep`) it writes
-no `@jenesis.pin` for a dependency the BOM already supplies - running
-`java build/jenesis/Project.java pin` on this demo leaves `module-info.java`
-untouched - and removes a pin line that became redundant when a BOM took over
-its coordinate; versioned repository `@jenesis.bom` references get their
-content hash written onto the declaration, so the BOM itself is pinned.
-The inverse migration is
+no `@jenesis.pin` for a dependency a module BOM already supplies and removes
+a pin line that became redundant when such a BOM took over its coordinate;
+versioned module-repository references get their content hash written onto
+the declaration, so the BOM itself is pinned. A Maven BOM inverts this:
+running `java build/jenesis/Project.java pin` on this demo writes a pin line
+for every version `slf4j-bom` declares - the resolved `slf4j-api` with its
+artifact hash, the other `org.slf4j` artifacts version-only - while the
+declaration itself stays hash-free. Under `-Djenesis.dependency.pin=ignore`
+a versioned BOM reference floats to the latest published BOM and its entries
+keep managing resolution while the pins float, so a repin upgrades the whole
+curation in one step and rewrites the pins it entails. The inverse migration
+is
 
     java -Djenesis.pin.bom=flatten build/jenesis/Project.java pin
 

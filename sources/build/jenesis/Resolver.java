@@ -8,6 +8,13 @@ public interface Resolver extends Serializable {
     record Resolved(Path file, String checksum, boolean internal) implements Serializable {
     }
 
+    record Bom(Path file,
+               boolean internal,
+               boolean verifiable,
+               String version,
+               SequencedMap<String, String> entries) implements Serializable {
+    }
+
     record Resolution(SequencedMap<String, Resolved> artifacts,
                       List<Edge> edges,
                       SequencedMap<String, Vertex> vertices) {
@@ -48,6 +55,62 @@ public interface Resolver extends Serializable {
 
     default SequencedSet<String> managedPrefixes() {
         return Collections.emptyNavigableSet();
+    }
+
+    default Bom bom(Executor executor,
+                    String prefix,
+                    Map<String, Repository> repositories,
+                    String coordinate,
+                    String version,
+                    String checksum,
+                    boolean latest) throws IOException {
+        Repository repository = repositories.getOrDefault(base(prefix), Repository.empty());
+        Resolved resolved = materialize(executor,
+                repository,
+                version.isEmpty() ? coordinate + ":properties" : coordinate + "/" + version + ":properties",
+                checksum);
+        return new Bom(resolved.file(),
+                resolved.internal(),
+                true,
+                version,
+                bomEntries(SequencedProperties.ofFiles(resolved.file())));
+    }
+
+    static SequencedMap<String, String> bomEntries(SequencedProperties properties) {
+        SequencedMap<String, String> entries = new LinkedHashMap<>();
+        for (String key : properties.stringPropertyNames()) {
+            String value = properties.getProperty(key).trim();
+            if (value.endsWith("]")) {
+                throw new IllegalArgumentException("Malformed BOM entry '"
+                        + key
+                        + "': platform guards are not supported in BOM files,"
+                        + " guard the @jenesis.bom declaration instead");
+            }
+            int firstSlash = key.indexOf('/');
+            int secondSlash = firstSlash < 0 ? -1 : key.indexOf('/', firstSlash + 1);
+            String expanded;
+            if (firstSlash < 0) {
+                expanded = "module/" + key;
+            } else if (secondSlash < 0) {
+                if (firstSlash < 1 || firstSlash == key.length() - 1) {
+                    throw new IllegalArgumentException("Malformed BOM entry '"
+                            + key
+                            + "': expected <module>, <groupId>/<artifactId>,"
+                            + " or <repository>/<coordinate>");
+                }
+                expanded = "maven/" + key;
+            } else {
+                if (firstSlash < 1 || secondSlash == firstSlash + 1 || secondSlash == key.length() - 1) {
+                    throw new IllegalArgumentException("Malformed BOM entry '"
+                            + key
+                            + "': expected <module>, <groupId>/<artifactId>,"
+                            + " or <repository>/<coordinate>");
+                }
+                expanded = key;
+            }
+            entries.put(expanded, value);
+        }
+        return entries;
     }
 
     static String base(String prefix) {

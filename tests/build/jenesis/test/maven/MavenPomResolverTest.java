@@ -4449,6 +4449,159 @@ public class MavenPomResolverTest {
                 .containsExactly(new License(null, null, "MIT", "https://opensource.org/license/mit"));
     }
 
+    @Test
+    public void bom_flattens_dependency_management() throws IOException {
+        addToRepository("group", "bom", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>other</groupId>
+                                <artifactId>artifact</artifactId>
+                                <version>2</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>other</groupId>
+                                <artifactId>windows</artifactId>
+                                <version>2</version>
+                                <classifier>win</classifier>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        Resolver.Bom bom = mavenPomResolver.bom(Runnable::run,
+                "maven",
+                Map.of("maven", mavenRepository),
+                "group/bom",
+                "1",
+                null,
+                false);
+        assertThat(bom.verifiable()).isFalse();
+        assertThat(bom.version()).isEqualTo("1");
+        assertThat(bom.entries()).containsExactly(
+                Map.entry("maven/other/artifact", "2"),
+                Map.entry("maven/other/windows/jar/win", "2"));
+    }
+
+    @Test
+    public void bom_drops_managed_scope_and_exclusions() throws IOException {
+        addToRepository("group", "bom", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>other</groupId>
+                                <artifactId>artifact</artifactId>
+                                <version>2</version>
+                                <scope>test</scope>
+                                <exclusions>
+                                    <exclusion>
+                                        <groupId>excluded</groupId>
+                                        <artifactId>artifact</artifactId>
+                                    </exclusion>
+                                </exclusions>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        Resolver.Bom bom = mavenPomResolver.bom(Runnable::run,
+                "maven",
+                Map.of("maven", mavenRepository),
+                "group/bom",
+                "1",
+                null,
+                false);
+        assertThat(bom.entries()).containsExactly(Map.entry("maven/other/artifact", "2"));
+    }
+
+    @Test
+    public void bom_skips_versionless_managed_entry() throws IOException {
+        addToRepository("group", "bom", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>other</groupId>
+                                <artifactId>artifact</artifactId>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        Resolver.Bom bom = mavenPomResolver.bom(Runnable::run,
+                "maven",
+                Map.of("maven", mavenRepository),
+                "group/bom",
+                "1",
+                null,
+                false);
+        assertThat(bom.entries()).isEmpty();
+    }
+
+    @Test
+    public void bom_negotiates_release_when_floating() throws IOException {
+        addToRepository("group", "bom", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>other</groupId>
+                                <artifactId>artifact</artifactId>
+                                <version>2</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        Files.writeString(repository.resolve("group/bom").resolve("maven-metadata.xml"),
+                "<metadata><versioning><release>1</release></versioning></metadata>");
+        Resolver.Bom bom = mavenPomResolver.bom(Runnable::run,
+                "maven",
+                Map.of("maven", mavenRepository),
+                "group/bom",
+                "",
+                null,
+                false);
+        assertThat(bom.version()).isEqualTo("1");
+        assertThat(bom.entries()).containsExactly(Map.entry("maven/other/artifact", "2"));
+    }
+
+    @Test
+    public void bom_rejects_checksum() {
+        assertThatThrownBy(() -> mavenPomResolver.bom(Runnable::run,
+                "maven",
+                Map.of("maven", mavenRepository),
+                "group/bom",
+                "1",
+                "SHA-256/abcd",
+                false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot carry a checksum");
+    }
+
+    @Test
+    public void bom_rejects_qualified_coordinate() {
+        assertThatThrownBy(() -> mavenPomResolver.bom(Runnable::run,
+                "maven",
+                Map.of("maven", mavenRepository),
+                "group/bom/pom",
+                "1",
+                null,
+                false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expected <groupId>/<artifactId>");
+    }
+
     private void addToRepository(String groupId, String artifactId, String version, String pom) throws IOException {
         Files.writeString(Files
                 .createDirectories(repository.resolve(groupId + "/" + artifactId + "/" + version))

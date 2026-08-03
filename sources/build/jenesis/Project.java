@@ -488,8 +488,10 @@ public record Project(
                     %{header}Pinning (-Djenesis.dependency.pin=<mode>):%{reset}
                       %{name}strict%{reset} fails the build on any unpinned artifact; %{name}ignore%{reset} floats
                       versions to the latest and skips checksum verification, keeping a
-                      managed version only where the declaration itself has none (refresh
-                      the pins by running the %{name}pin%{reset} step under it); %{name}versions%{reset} keeps the
+                      managed version only where the declaration itself has none, while a
+                      versioned @jenesis.bom reference floats to the latest published BOM
+                      whose entries keep managing resolution (refresh the pins by running
+                      the %{name}pin%{reset} step under it); %{name}versions%{reset} keeps the
                       pinned versions but skips checksum verification. Unset keeps existing
                       pins but tolerates missing ones.
 
@@ -499,7 +501,10 @@ public record Project(
                       %{name}bom%{reset} <keep|flatten>             %{name}keep%{reset} (default) writes no pin for a dependency a
                                                        BOM already supplies (removing a now-redundant
                                                        pin line) and pins each versioned @jenesis.bom
-                                                       reference with its file hash; %{name}flatten%{reset} removes
+                                                       reference with its file hash; a Maven BOM takes
+                                                       no hash, so its reference is pinned by version
+                                                       and every version it declares is written as a
+                                                       pin line; %{name}flatten%{reset} removes
                                                        the @jenesis.bom declarations and pins the
                                                        resolved closure in full
 
@@ -593,11 +598,15 @@ public record Project(
                                                        for a checksum, and without any version the latest release
                                                        is negotiated implicitly
                       %{name}@jenesis.bom%{reset} <token> [<ver> [<algo>/<hex>]] [<guard>]
-                                                       Import a BOM properties file of version and checksum pins;
-                                                       the token follows the pin grammar (bare <module> is short for
-                                                       <group>/module/<module>) and names a BOM in the module
-                                                       repository, fetched at <ver> or floating latest without one;
-                                                       a token of [<group>/]bom-<name>.properties reads that file
+                                                       Import managed versions from a BOM; the token follows the
+                                                       pin grammar: a bare <module> (short for <group>/module/<module>)
+                                                       names a BOM properties file in the module repository, fetched
+                                                       at <ver> or floating latest without one, and
+                                                       <groupId>/<artifactId> (short for <group>/maven/...) names a
+                                                       Maven BOM whose pom's <dependencyManagement> is imported with
+                                                       nested import-scoped BOMs flattened (no checksum: pom bytes
+                                                       are not stable across repositories); a token of
+                                                       [<group>/]bom-<name>.properties reads that file
                                                        from the project's BOM locations (jenesis.project.boms,
                                                        default: the configuration locations) instead; local
                                                        @jenesis.pin lines override BOM entries
@@ -933,17 +942,28 @@ public record Project(
                                                         release is negotiated
                                                         implicitly.
                       @jenesis.bom <token> [<ver> [<algo>/<hex>]] [<guard>]
-                                                        Import a BOM properties
-                                                        file of version and
-                                                        checksum pins. The token
-                                                        follows the pin grammar
-                                                        (a bare <module>
-                                                        abbreviates
+                                                        Import managed versions
+                                                        from a BOM. The token
+                                                        follows the pin grammar:
+                                                        a bare <module>
+                                                        (abbreviating
                                                         <group>/module/<module>)
-                                                        and names a BOM in the
-                                                        module repository, fetched
+                                                        names a BOM properties
+                                                        file in the module
+                                                        repository, fetched
                                                         at <ver> or floating
-                                                        latest without one. A
+                                                        latest without one;
+                                                        <groupId>/<artifactId>
+                                                        (abbreviating
+                                                        <group>/maven/...) names
+                                                        a Maven BOM whose pom's
+                                                        <dependencyManagement> is
+                                                        imported, nested
+                                                        import-scoped BOMs
+                                                        flattened; it takes no
+                                                        checksum, as pom bytes
+                                                        are not stable across
+                                                        repositories. A
                                                         token of
                                                         [<group>/]bom-<name>.properties
                                                         (a dash never occurs in a
@@ -1073,7 +1093,11 @@ public record Project(
                                                   artifact; ignore floats to the
                                                   latest and skips checksums,
                                                   keeping a managed version only
-                                                  where the declaration has none
+                                                  where the declaration has none,
+                                                  while a versioned @jenesis.bom
+                                                  reference floats to the latest
+                                                  published BOM whose entries
+                                                  keep managing resolution
                                                   (refresh pins via the pin step);
                                                   versions keeps pinned versions
                                                   but skips checksum verification.
@@ -1090,7 +1114,11 @@ public record Project(
                                                   line is removed) and pins each
                                                   versioned @jenesis.bom
                                                   reference with its file hash;
-                                                  flatten removes the
+                                                  a Maven BOM takes no hash, so
+                                                  its reference is pinned by
+                                                  version and every version it
+                                                  declares is written as a pin
+                                                  line; flatten removes the
                                                   @jenesis.bom declarations and
                                                   pins the resolved closure in
                                                   full (platform-guarded BOM

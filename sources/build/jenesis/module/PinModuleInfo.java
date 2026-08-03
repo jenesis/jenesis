@@ -106,12 +106,27 @@ public class PinModuleInfo implements BuildStep {
                     it.remove();
                 }
             }
+            for (Map.Entry<String, String> pin : Inventory.bomPins(arguments.values(), path).entrySet()) {
+                int slash = pin.getKey().indexOf('/');
+                String group = pin.getKey().substring(0, slash);
+                String coordinate = pin.getKey().substring(slash + 1);
+                String maven = group.equals("main") && coordinate.startsWith("maven/")
+                        ? coordinate.substring("maven/".length())
+                        : null;
+                boolean shortcut = maven != null
+                        && maven.indexOf('/') > 0
+                        && maven.indexOf('/') == maven.lastIndexOf('/');
+                entries.putIfAbsent(shortcut ? maven : group + "/" + coordinate, pin.getValue());
+            }
             for (Map.Entry<String, Path> reference : Inventory.bomReferences(arguments.values(), path).entrySet()) {
                 int lastSlash = reference.getKey().lastIndexOf('/');
                 String version = reference.getKey().substring(lastSlash + 1);
                 references.put(reference.getKey().substring(0, lastSlash), checksum
                         ? version + " " + hashFunction.encodedHash(reference.getValue())
                         : version);
+            }
+            for (Map.Entry<String, String> reference : Inventory.bomVersions(arguments.values(), path).entrySet()) {
+                references.putIfAbsent(reference.getKey(), reference.getValue());
             }
         }
         for (Path file : moduleInfoFiles) {
