@@ -101,6 +101,7 @@ Quick index
 | 42 | [`build-cache`](demo-42-build-cache/README.md)               | A content-addressed build cache serving step outputs across builds - project-local (`-Djenesis.project.cache`), shared via a URI (`-Djenesis.cache.uri=`), or local layered in front of a remote; shown by bootstrapping it then serving a full `-Djenesis.executor.rebuild=true` from it | `java build/jenesis/Project.java`  |
 | 43 | [`bom`](demo-43-bom/README.md)                               | A bill of materials: one properties file of version and checksum pins imported via `@jenesis.bom` (a local `bom-<name>.properties` here, a module-repository coordinate in general), overridable by local `@jenesis.pin` tags and strong enough for strict pinning | `java build/jenesis/Project.java`  |
 | 44 | [`agents`](demo-44-agents/README.md)                         | Attach libraries as Java agents with `@jenesis.attach`: Mockito as a dependency that also attaches to the test JVM, and the OpenTelemetry agent attached to the main run without ever joining a compile or runtime path | `java build/Demo.java`             |
+| 45 | [`module-alias`](demo-45-module-alias/README.md)             | Give a plain jar with no module identity (no `module-info`, no `Automatic-Module-Name`) a stable name with `@jenesis.alias`, so it can be `requires`d and `opens`d like any module - shown with args4j 2.33 | `java build/jenesis/Execute.java`  |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -857,6 +858,31 @@ project-level `<!--jenesis.attach ... -->` comment block, where a `test`-scoped
 match attaches to the test run only. The demo's `build/Demo.java` runs the build
 (Mockito attaches to the tests) and then the application (OpenTelemetry attaches
 to the run) in one go.
+
+## 30. Aliasing a plain library - [`module-alias`](demo-45-module-alias/README.md)
+
+The MODULAR_TO_MAVEN layout resolves dependencies by module name, but plenty of
+common libraries carry no module identity: no `module-info`, and not even an
+`Automatic-Module-Name` manifest entry. On the module path such a jar becomes an
+automatic module named after its *file*, which is unstable and cannot be
+`requires`d reliably. `module-alias` gives one a name the project chooses.
+args4j - a small command-line parser - is aliased with
+`@jenesis.alias org.kohsuke.args4j args4j/args4j`, and the module then
+`requires org.kohsuke.args4j;` as if it were a real module. Because args4j
+declares no identity of its own, the alias resolver synthesizes the module: it
+copies the jar with `Automatic-Module-Name: org.kohsuke.args4j` injected and puts
+that copy on the module path under the aliased name (the original, nameless jar
+stays on the class path, shadowed). The name is a first-class module name, so the
+demo also `opens demo.cli to org.kohsuke.args4j;` - args4j sets the `@Option`
+fields by reflection, and delete that `opens` and the run fails with an
+`InaccessibleObjectException` naming `org.kohsuke.args4j`, which is the proof the
+aliased library runs as the module the project declared. The alias target is
+pinned like any Maven coordinate; args4j is held at `2.33`, the last release
+before it grew an `Automatic-Module-Name` of its own (a newer one already has a
+name, so the alias would read it under that instead - aliasing is for the
+artifacts with no name to offer). Run it with
+`java build/jenesis/Execute.java -name Ada -shout`, which builds the module,
+launches its `@jenesis.main`, and prints `HELLO, ADA!`.
 
 Cross-cutting concepts
 ----------------------
