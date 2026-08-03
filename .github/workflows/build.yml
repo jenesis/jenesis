@@ -54,22 +54,22 @@ jobs:
           - { name: groovy-documentation, dir: demo-21-groovy, entry: build/jenesis/Project.java, flags: -Djenesis.project.documentation=true, verify: 'find target -type d -name documentation | grep -q .' }
           - { name: groovy-quality, dir: demo-22-groovy-quality, entry: build/jenesis/Project.java, verify: 'find target -type d -name codenarc | grep -q .' }
           - { name: code-coverage, dir: demo-23-code-coverage, entry: build/jenesis/Project.java, verify: 'find target -type d -path "*jacoco*" | grep -q .' }
-          - { name: maven-exclusions, dir: demo-26-maven-exclusions, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q . && ! find target -path "*resolved*" -name "commons-lang3*" | grep -q .' }
-          - { name: module-layout, dir: demo-27-module-layout, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
-          - { name: module-classifier, dir: demo-28-module-classifier, entry: build/jenesis/Execute.java }
-          - { name: platform-guard, dir: demo-29-platform-guard, entry: build/jenesis/Execute.java }
-          - { name: platform-guard-legacy, dir: demo-29-platform-guard, entry: build/jenesis/Execute.java, flags: -Djenesis.platform.legacy=true }
-          - { name: platform-guard-pom, dir: demo-30-platform-guard-pom, entry: build/jenesis/Execute.java }
-          - { name: platform-guard-pom-legacy, dir: demo-30-platform-guard-pom, entry: build/jenesis/Execute.java, flags: -Djenesis.platform.legacy=true }
-          - { name: custom-assembler, dir: demo-31-custom-assembler, entry: build/Demo.java }
-          - { name: custom-jmod, dir: demo-32-custom-jmod, entry: build/Demo.java }
-          - { name: internal-module, dir: demo-33-internal-module, entry: build/Demo.java }
-          - { name: external-module, dir: demo-34-external-module, entry: build/Demo.java }
-          - { name: custom-maven, dir: demo-35-custom-maven, entry: build/Demo.java }
-          - { name: custom-modular, dir: demo-36-custom-modular, entry: build/Demo.java }
-          - { name: custom-build, dir: demo-37-custom-build, entry: build/Demo.java }
-          - { name: supply-chain-security, dir: demo-39-supply-chain-security, entry: build/Demo.java }
-          - { name: publishing, dir: demo-40-publishing, entry: build/Demo.java }
+          - { name: maven-exclusions, dir: demo-27-maven-exclusions, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q . && ! find target -path "*resolved*" -name "commons-lang3*" | grep -q .' }
+          - { name: module-layout, dir: demo-29-module-layout, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
+          - { name: module-classifier, dir: demo-30-module-classifier, entry: build/jenesis/Execute.java }
+          - { name: platform-guard, dir: demo-32-platform-guard, entry: build/jenesis/Execute.java }
+          - { name: platform-guard-legacy, dir: demo-32-platform-guard, entry: build/jenesis/Execute.java, flags: -Djenesis.platform.legacy=true }
+          - { name: platform-guard-pom, dir: demo-33-platform-guard-pom, entry: build/jenesis/Execute.java }
+          - { name: platform-guard-pom-legacy, dir: demo-33-platform-guard-pom, entry: build/jenesis/Execute.java, flags: -Djenesis.platform.legacy=true }
+          - { name: custom-assembler, dir: demo-34-custom-assembler, entry: build/Demo.java }
+          - { name: custom-jmod, dir: demo-35-custom-jmod, entry: build/Demo.java }
+          - { name: internal-module, dir: demo-36-internal-module, entry: build/Demo.java }
+          - { name: external-module, dir: demo-37-external-module, entry: build/Demo.java }
+          - { name: custom-maven, dir: demo-38-custom-maven, entry: build/Demo.java }
+          - { name: custom-modular, dir: demo-39-custom-modular, entry: build/Demo.java }
+          - { name: custom-build, dir: demo-40-custom-build, entry: build/Demo.java }
+          - { name: supply-chain-security, dir: demo-42-supply-chain-security, entry: build/Demo.java }
+          - { name: publishing, dir: demo-43-publishing, entry: build/Demo.java }
           - { name: kotlin-plugin, dir: demo-18-kotlin-plugin, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: sbom, dir: demo-12-sbom, entry: build/jenesis/Project.java, verify: 'find target -name "*.cdx.json" | grep -q .' }
           - { name: compliance, dir: demo-13-compliance, entry: build/Demo.java }
@@ -77,6 +77,11 @@ jobs:
           - { name: profiles, dir: demo-15-profiles, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=release, verify: 'find target -type d -path "*assemble/sources*" | grep -q .' }
           - { name: test-selection, dir: demo-24-test-selection, entry: build/Demo.java }
           - { name: pitest, dir: demo-25-pitest, entry: build/jenesis/Project.java, verify: 'find target -type d -name mutate | grep -q .' }
+          - { name: agents, dir: demo-26-agents, entry: build/Demo.java, verify: 'find target -name classes.jar | grep -q .' }
+          - { name: bom, dir: demo-28-bom, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
+          - { name: module-alias, dir: demo-31-module-alias, entry: 'build/jenesis/Execute.java -name Ada -shout', verify: 'find target -name classes.jar | grep -q .' }
+          - { name: docker-isolation, dir: demo-41-docker-isolation, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
+          - { name: build-cache, dir: demo-45-build-cache, entry: build/jenesis/Project.java, flags: -Djenesis.project.cache, verify: 'find target -name classes.jar | grep -q . && find .jenesis/cache -type d | grep -q .' }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -104,6 +109,44 @@ jobs:
         with:
           name: target-demo-${{ matrix.os }}-${{ matrix.demo.name }}
           path: demo/${{ matrix.demo.dir }}/target/
+          retention-days: 3
+          if-no-files-found: ignore
+
+  # native-image needs the GraalVM toolchain (the `native-image` tool and its
+  # tracing agent), which the plain JDK runners do not carry, so it runs in its
+  # own job on a GraalVM distribution rather than in the demo matrix above.
+  native-image:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up GraalVM 25
+        uses: graalvm/setup-graalvm@0def53c0fd8534bc13416c9469f5be45265824fd # v1.6.3
+        with:
+          java-version: '25'
+          distribution: graalvm
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Native image demo
+        shell: bash
+        working-directory: demo/demo-44-native-image
+        run: java build/jenesis/Project.java stage
+
+      - name: Verify native image
+        shell: bash
+        working-directory: demo/demo-44-native-image
+        run: find target -path "*stage/native*" -type f | grep -q .
+
+      - name: Upload target on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: target-native-image-${{ matrix.os }}
+          path: demo/demo-44-native-image/target/
           retention-days: 3
           if-no-files-found: ignore
 
