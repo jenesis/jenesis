@@ -66,12 +66,6 @@ public record Jpx(Path storage,
         }
     }
 
-    /**
-     * An installed target below {@link #storage()}: the closure's jars in one flat folder beside
-     * a {@value #PROPERTIES} descriptor. Installations are yielded by {@link #install(Command)}
-     * and carry the operations over that folder - reading the descriptor, verifying the recorded
-     * jars against a checksum and launching the entry point, locally or in a Docker container.
-     */
     public record Installation(Path folder, HashDigestFunction hashFunction) {
 
         public SequencedProperties properties() throws IOException {
@@ -352,12 +346,6 @@ public record Jpx(Path storage,
         }
     }
 
-    /**
-     * Wraps a Maven repository so stream-only artifacts are spilled to the given folder under
-     * their Maven file names, which the installation adopts in place. POMs are graph input that
-     * resolvers parse off the stream and checksum items guard other fetches - neither is part
-     * of an installation, so both pass through unspilled, as do file-backed items.
-     */
     private static MavenRepository spilling(MavenRepository repository, Path folder) {
         return new MavenRepository() {
             @Override

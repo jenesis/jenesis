@@ -20,6 +20,7 @@ public interface BuildStep extends Serializable {
             MODULE = "module.properties",
             METADATA = "metadata.properties",
             EXCLUSIONS = "exclusions.properties",
+            ATTACHMENTS = "attachments.properties",
             DEPENDENCIES = "dependencies.properties";
 
     default BuildExecutorModule asModule(String name) {

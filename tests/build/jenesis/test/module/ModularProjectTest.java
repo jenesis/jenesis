@@ -126,6 +126,59 @@ public class ModularProjectTest {
     }
 
     @Test
+    public void emits_agent_requires_and_attachments_from_javadoc_declarations() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.attach org.mockito/mockito-core
+                 * @jenesis.attach io.opentelemetry.javaagent/opentelemetry-javaagent otel.option=value
+                 * @jenesis.pin org.mockito/mockito-core 5.11.0 SHA-256/cafebabe
+                 * @jenesis.attach some.agent.module plain
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path module = results.get("module/module-/manifests");
+        SequencedProperties requires = SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES));
+        assertThat(requires).containsOnlyKeys("main/compile/module/bar",
+                "main/runtime/module/bar",
+                "main/agent/maven/org.mockito/mockito-core/5.11.0",
+                "main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent/RELEASE",
+                "main/agent/module/some.agent.module");
+        assertThat(requires.getProperty("main/agent/maven/org.mockito/mockito-core/5.11.0")).isEmpty();
+        Path attachmentsFile = module.resolve(BuildStep.ATTACHMENTS);
+        assertThat(attachmentsFile).exists();
+        assertThat(SequencedProperties.ofFiles(attachmentsFile)).containsOnly(
+                Map.entry("main/agent/maven/org.mockito/mockito-core", ""),
+                Map.entry("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=value"),
+                Map.entry("main/agent/module/some.agent.module", "plain"));
+    }
+
+    @Test
+    public void omits_attachments_properties_without_declarations() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                module foo {
+                  requires bar;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results.get("module/module-/manifests").resolve(BuildStep.ATTACHMENTS)).doesNotExist();
+    }
+
+    @Test
     public void emits_aliases_properties_from_javadoc_declarations() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**

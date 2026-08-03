@@ -475,6 +475,7 @@ public class MavenPomResolver implements MavenResolver {
                     dependencies,
                     managedDependencies,
                     pom.qualifiedDependencies(),
+                    pom.attachments(),
                     property(pom.properties().get("mainClass"), pom.properties())));
         }
         return results;
@@ -640,6 +641,9 @@ public class MavenPomResolver implements MavenResolver {
                         extended
                                 ? toQualifiedDependencies(document.getDocumentElement())
                                 : new LinkedHashMap<>(),
+                        extended
+                                ? toAttachments(document.getDocumentElement())
+                                : new LinkedHashMap<>(),
                         ownLicenses.isEmpty() ? parentLicenses : ownLicenses);
             }
             default -> throw new IllegalArgumentException("Unknown namespace: " + namespace);
@@ -678,6 +682,7 @@ public class MavenPomResolver implements MavenResolver {
                             Map.of(),
                             Map.of(),
                             Collections.emptyNavigableMap(),
+                            new LinkedHashMap<>(),
                             new LinkedHashMap<>(),
                             List.of());
                 } else {
@@ -966,6 +971,65 @@ public class MavenPomResolver implements MavenResolver {
         return entries;
     }
 
+    private static SequencedMap<String, String> toAttachments(Node node) {
+        SequencedMap<String, String> entries = new LinkedHashMap<>();
+        toChildren(node)
+                .filter(child -> child.getNodeType() == Node.COMMENT_NODE)
+                .map(Node::getNodeValue)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(text -> text.startsWith("jenesis.attach"))
+                .forEach(text -> {
+                    for (String line : text.substring("jenesis.attach".length()).replace("&#45;", "-").split("\n")) {
+                        String trimmed = line.trim().replaceAll("\\s+", " ");
+                        if (trimmed.isEmpty()) {
+                            continue;
+                        }
+                        int space = trimmed.indexOf(' ');
+                        String token = space < 0 ? trimmed : trimmed.substring(0, space);
+                        String arguments = space < 0 ? "" : trimmed.substring(space + 1).trim();
+                        if (token.startsWith("java.") || token.startsWith("jdk.")) {
+                            throw new IllegalArgumentException("Illegal jenesis.attach token '"
+                                    + token
+                                    + "': platform modules cannot be attached");
+                        }
+                        String key;
+                        int firstSlash = token.indexOf('/');
+                        int secondSlash = firstSlash < 0 ? -1 : token.indexOf('/', firstSlash + 1);
+                        if (firstSlash < 0) {
+                            key = "main/module/" + token;
+                        } else if (secondSlash < 0) {
+                            if (firstSlash < 1 || firstSlash == token.length() - 1) {
+                                throw new IllegalArgumentException("Malformed jenesis.attach token '"
+                                        + token
+                                        + "': expected <module>, <groupId>/<artifactId>,"
+                                        + " or <group>/<repository>/<coordinate>");
+                            }
+                            key = "main/maven/" + token;
+                        } else {
+                            if (firstSlash < 1 || secondSlash == firstSlash + 1 || secondSlash == token.length() - 1) {
+                                throw new IllegalArgumentException("Malformed jenesis.attach token '"
+                                        + token
+                                        + "': expected <module>, <groupId>/<artifactId>,"
+                                        + " or <group>/<repository>/<coordinate>");
+                            }
+                            key = token;
+                        }
+                        String previous = entries.putIfAbsent(key, arguments);
+                        if (previous != null && !previous.equals(arguments)) {
+                            throw new IllegalArgumentException("Duplicate jenesis.attach for "
+                                    + key
+                                    + ": '"
+                                    + previous
+                                    + "' and '"
+                                    + arguments
+                                    + "'");
+                        }
+                    }
+                });
+        return entries;
+    }
+
     private static String property(String text, Map<String, String> properties) {
         return property(text, properties, Set.of());
     }
@@ -1085,6 +1149,7 @@ public class MavenPomResolver implements MavenResolver {
                                  Map<DependencyKey, DependencyValue> managedDependencies,
                                  SequencedMap<DependencyKey, DependencyValue> dependencies,
                                  SequencedMap<String, String> qualifiedDependencies,
+                                 SequencedMap<String, String> attachments,
                                  List<License> licenses) {
     }
 

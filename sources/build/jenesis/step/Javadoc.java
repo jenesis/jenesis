@@ -60,7 +60,8 @@ public class Javadoc extends JdkProcessBuildStep {
                 "-tag", "jenesis.main:a:Main class:",
                 "-tag", "jenesis.test:a:Tests the module:",
                 "-tag", "jenesis.pin:a:Pinned dependencies:",
-                "-tag", "jenesis.alias:a:Module aliases:"));
+                "-tag", "jenesis.alias:a:Module aliases:",
+                "-tag", "jenesis.attach:a:Attached agents:"));
         for (BuildStepArgument argument : arguments.values()) {
             Path sources = argument.folder().resolve(BuildStep.SOURCES),
                     classes = argument.folder().resolve(BuildStep.CLASSES);

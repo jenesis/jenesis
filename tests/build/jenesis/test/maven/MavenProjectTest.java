@@ -104,6 +104,187 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void attach_of_declared_dependency_seeds_versioned_agent_requires() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.attach
+                    org.mockito/mockito-core
+                    -->
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.mockito</groupId>
+                            <artifactId>mockito-core</artifactId>
+                            <version>5.11.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        for (String manifests : List.of("maven/module-/manifests", "maven/test-module-/manifests")) {
+            Path module = results.get(manifests);
+            SequencedProperties requires = SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES));
+            assertThat(requires.stringPropertyNames())
+                    .contains("main/agent/maven/org.mockito/mockito-core/5.11.0");
+            assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.ATTACHMENTS))).containsOnly(
+                    Map.entry("main/agent/maven/org.mockito/mockito-core", ""));
+        }
+    }
+
+    @Test
+    public void test_scoped_attach_is_routed_to_test_module_only() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.attach
+                    org.mockito/mockito-core
+                    -->
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.mockito</groupId>
+                            <artifactId>mockito-core</artifactId>
+                            <version>5.11.0</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path module = results.get("maven/module-/manifests");
+        SequencedProperties requires = SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES));
+        assertThat(requires.stringPropertyNames()).noneMatch(key -> key.startsWith("main/agent/"));
+        assertThat(module.resolve(BuildStep.ATTACHMENTS)).doesNotExist();
+        Path testModule = results.get("maven/test-module-/manifests");
+        SequencedProperties testRequires = SequencedProperties.ofFiles(testModule.resolve(BuildStep.REQUIRES));
+        assertThat(testRequires.stringPropertyNames())
+                .contains("main/agent/maven/org.mockito/mockito-core/5.11.0");
+        assertThat(SequencedProperties.ofFiles(testModule.resolve(BuildStep.ATTACHMENTS))).containsOnly(
+                Map.entry("main/agent/maven/org.mockito/mockito-core", ""));
+    }
+
+    @Test
+    public void attach_of_managed_dependency_uses_managed_version() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.attach
+                    org.example/agent
+                    -->
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.example</groupId>
+                                <artifactId>agent</artifactId>
+                                <version>2.0</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        for (String manifests : List.of("maven/module-/manifests", "maven/test-module-/manifests")) {
+            Path module = results.get(manifests);
+            SequencedProperties requires = SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES));
+            assertThat(requires.stringPropertyNames()).contains("main/agent/maven/org.example/agent/2.0");
+        }
+    }
+
+    @Test
+    public void attach_without_matching_dependency_seeds_versionless() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.attach
+                    io.opentelemetry.javaagent/opentelemetry-javaagent otel.option=value
+                    -->
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        for (String manifests : List.of("maven/module-/manifests", "maven/test-module-/manifests")) {
+            Path module = results.get(manifests);
+            SequencedProperties requires = SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES));
+            assertThat(requires.stringPropertyNames())
+                    .contains("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent");
+            assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.ATTACHMENTS))).containsOnly(
+                    Map.entry("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=value"));
+        }
+    }
+
+    @Test
+    public void attach_with_classifier_without_version_fails() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.attach
+                    main/maven/org.example/agent/jar/all
+                    -->
+                </project>
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .hasRootCauseMessage("Cannot determine version for jenesis.attach main/maven/org.example/agent/jar/all:"
+                        + " declare it as a dependency or manage its version");
+    }
+
+    @Test
     public void scopes_are_routed_to_correct_requires_files() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

@@ -54,6 +54,7 @@ public class ModuleInfoParser {
             SequencedMap<String, String> boms = new LinkedHashMap<>();
             SequencedMap<String, SequencedMap<String, String>> bomVariants = new LinkedHashMap<>();
             SequencedMap<String, String> plugins = new LinkedHashMap<>();
+            SequencedMap<String, String> attachments = new LinkedHashMap<>();
             String release = null;
             String name = null;
             String description = null;
@@ -242,6 +243,31 @@ public class ModuleInfoParser {
                                             + value);
                                 }
                             }
+                            case "jenesis.attach" -> {
+                                String attach = content.replaceAll("\\s+", " ").trim();
+                                if (attach.isEmpty()) {
+                                    continue;
+                                }
+                                int split = attach.indexOf(' ');
+                                String token = split < 0 ? attach : attach.substring(0, split);
+                                String arguments = split < 0 ? "" : attach.substring(split + 1).trim();
+                                if (token.startsWith("java.") || token.startsWith("jdk.")) {
+                                    throw new IllegalArgumentException("Illegal @jenesis.attach token '"
+                                            + token
+                                            + "': platform modules cannot be attached");
+                                }
+                                String key = expand("jenesis.attach", token);
+                                String previous = attachments.putIfAbsent(key, arguments);
+                                if (previous != null && !previous.equals(arguments)) {
+                                    throw new IllegalArgumentException("Duplicate @jenesis.attach for "
+                                            + key
+                                            + ": '"
+                                            + previous
+                                            + "' and '"
+                                            + arguments
+                                            + "'");
+                                }
+                            }
                             case "jenesis.release" -> {
                                 if (!content.isEmpty()) {
                                     release = content;
@@ -266,6 +292,7 @@ public class ModuleInfoParser {
                     dependencies,
                     runtimeDependencies,
                     plugins,
+                    attachments,
                     aliases,
                     versions,
                     variants,

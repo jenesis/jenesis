@@ -600,6 +600,25 @@ public class TestModule implements BuildExecutorModule {
             for (ObservabilityEngine observer : observers) {
                 commands.addAll(observer.commands(agentJars(arguments, observer, group), context.next()));
             }
+            SequencedMap<String, String> attachments = attachments(arguments);
+            SequencedMap<String, Path> attached = attachedJars(arguments, attachments.sequencedKeySet());
+            for (Map.Entry<String, String> attachment : attachments.entrySet()) {
+                Path jar = attached.get(attachment.getKey());
+                if (jar == null) {
+                    throw new IllegalStateException("No resolved artifact for attached agent " + attachment.getKey());
+                }
+                try (JarFile file = new JarFile(jar.toFile())) {
+                    Manifest manifest = file.getManifest();
+                    if (manifest == null || manifest.getMainAttributes().getValue("Premain-Class") == null) {
+                        throw new IllegalStateException("Attached agent "
+                                + attachment.getKey()
+                                + " does not declare Premain-Class: "
+                                + jar);
+                    }
+                }
+                commands.add("-javaagent:" + jar.toAbsolutePath()
+                        + (attachment.getValue().isEmpty() ? "" : "=" + attachment.getValue()));
+            }
             for (Map.Entry<String, String> entry : resolved.properties().entrySet()) {
                 commands.add("-D" + entry.getKey() + "=" + entry.getValue());
             }
@@ -752,6 +771,51 @@ public class TestModule implements BuildExecutorModule {
                 }
             }
             return result;
+        }
+
+        private static SequencedMap<String, String> attachments(SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            SequencedMap<String, String> attachments = new LinkedHashMap<>();
+            for (BuildStepArgument argument : arguments.values()) {
+                Path file = argument.folder().resolve(BuildStep.ATTACHMENTS);
+                if (!Files.isRegularFile(file)) {
+                    continue;
+                }
+                SequencedProperties properties = SequencedProperties.ofFiles(file);
+                for (String key : properties.stringPropertyNames()) {
+                    attachments.putIfAbsent(key, properties.getProperty(key));
+                }
+            }
+            return attachments;
+        }
+
+        private static SequencedMap<String, Path> attachedJars(SequencedMap<String, BuildStepArgument> arguments,
+                                                               SequencedSet<String> keys) throws IOException {
+            SequencedMap<String, Path> resolved = new LinkedHashMap<>();
+            for (BuildStepArgument argument : arguments.values()) {
+                Path file = argument.folder().resolve(BuildStep.DEPENDENCIES);
+                if (!Files.isRegularFile(file)) {
+                    continue;
+                }
+                SequencedProperties properties = SequencedProperties.ofFiles(file);
+                for (String key : keys) {
+                    for (String candidate : properties.stringPropertyNames()) {
+                        if (candidate.equals(key)
+                                || candidate.startsWith(key + "/")
+                                && candidate.indexOf('/', key.length() + 1) < 0) {
+                            String value = properties.getProperty(candidate);
+                            int space = value.indexOf(' ');
+                            Path jar = argument.folder()
+                                    .resolve(space < 0 ? value : value.substring(0, space))
+                                    .normalize();
+                            if (Files.isRegularFile(jar)) {
+                                resolved.putIfAbsent(key, jar);
+                            }
+                        }
+                    }
+                }
+            }
+            return resolved;
         }
 
         private static SequencedMap<String, Path> agentJars(SequencedMap<String, BuildStepArgument> arguments,

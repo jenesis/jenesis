@@ -601,6 +601,19 @@ public record Project(
                                                        from the project's BOM locations (jenesis.project.boms,
                                                        default: the configuration locations) instead; local
                                                        @jenesis.pin lines override BOM entries
+                      %{name}@jenesis.attach%{reset} <token> [<arguments...>]
+                                                       Attach a library as a Java agent (-javaagent) to the java
+                                                       commands of the declaring module: an Execute run of its
+                                                       @jenesis.main class and its test executions; the token
+                                                       follows the pin grammar without a version (the version
+                                                       comes from a declared dependency, @jenesis.pin, or a BOM,
+                                                       or floats latest), and everything after the token is
+                                                       passed verbatim as the agent options; a coordinate that
+                                                       is also required stays on the class or module path and
+                                                       attaches as the same artifact; MAVEN modules declare the
+                                                       same lines in a project-level %{name}<!--jenesis.attach ... -->%{reset}
+                                                       comment, where a test-scoped match attaches to test runs
+                                                       only and %{name}&#45;&#45;%{reset} escapes a double dash
 
                     %{header}Build-configuration files (in a module's build.jenesis config location; presence activates, contents configure;
                     MAVEN modules also read src/main/build.jenesis and src/test/build.jenesis for main- or test-scoped configuration):%{reset}
@@ -950,6 +963,37 @@ public record Project(
                                                         override BOM entries, and
                                                         the first declared BOM
                                                         wins a conflict.
+                      @jenesis.attach <token> [<arguments...>]
+                                                        Attach a library as a
+                                                        Java agent (-javaagent)
+                                                        to the java commands of
+                                                        the declaring module: an
+                                                        Execute run of its
+                                                        @jenesis.main class and
+                                                        its test executions. The
+                                                        token follows the pin
+                                                        grammar without a
+                                                        version; the version
+                                                        comes from a declared
+                                                        dependency, @jenesis.pin
+                                                        or a BOM entry, or floats
+                                                        latest. Everything after
+                                                        the token is passed
+                                                        verbatim as the agent
+                                                        options. A coordinate
+                                                        that is also required
+                                                        stays on the class or
+                                                        module path and attaches
+                                                        as the same artifact.
+                                                        MAVEN modules declare the
+                                                        same lines in a
+                                                        project-level
+                                                        <!--jenesis.attach ... -->
+                                                        comment; there a
+                                                        test-scoped dependency
+                                                        match attaches to test
+                                                        runs only, and &#45;&#45;
+                                                        escapes a double dash.
 
                     Build-configuration files (in a module's build.jenesis config
                     location - a module's META-INF/build.jenesis/ folder, plus the

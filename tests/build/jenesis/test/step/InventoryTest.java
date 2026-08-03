@@ -10,6 +10,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class InventoryTest {
 
@@ -66,6 +67,72 @@ public class InventoryTest {
         assertThat(inventory.getProperty("module-foo.runtime.1")).isEqualTo(relativize(lib));
         assertThat(inventory.getProperty("module-foo.dependency.0")).startsWith("maven/org.example/lib/1.0 ");
         assertThat(inventory.getProperty("module-foo.dependency.0.scope")).isEqualTo("runtime");
+    }
+
+    @Test
+    public void emits_agent_entries_joined_from_attachments_and_closure() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        SequencedProperties attachments = new SequencedProperties();
+        attachments.setProperty("main/agent/maven/org.example/agent", "x=y");
+        attachments.store(manifests.resolve(BuildStep.ATTACHMENTS));
+        Path runtime = Files.createDirectory(root.resolve("runtime"));
+        Path runtimeDeps = Files.createDirectory(runtime.resolve("dependencies"));
+        Path agent = Files.writeString(runtimeDeps.resolve("maven-org.example-agent-1.0.jar"), "agent");
+        Files.writeString(runtimeDeps.resolve("maven-org.example-transitive-2.0.jar"), "transitive");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/runtime/maven/org.example/agent/1.0", "dependencies/maven-org.example-agent-1.0.jar");
+        index.setProperty("main/agent/maven/org.example/agent/1.0", "dependencies/maven-org.example-agent-1.0.jar");
+        index.setProperty("main/agent/maven/org.example/transitive/2.0", "dependencies/maven-org.example-transitive-2.0.jar");
+        index.store(runtime.resolve(BuildStep.DEPENDENCIES));
+
+        run(args("manifests", manifests, "runtime", runtime));
+
+        SequencedProperties inventory = read(next.resolve(Inventory.INVENTORY));
+        assertThat(inventory.getProperty("module-foo.agent.0")).isEqualTo(relativize(agent));
+        assertThat(inventory.getProperty("module-foo.agent.0")).isEqualTo(inventory.getProperty("module-foo.runtime.0"));
+        assertThat(inventory.getProperty("module-foo.agent.0.arguments")).isEqualTo("x=y");
+        assertThat(inventory.getProperty("module-foo.agent.0.coordinate")).isEqualTo("main/agent/maven/org.example/agent");
+        assertThat(inventory.getProperty("module-foo.agent.1")).isNull();
+    }
+
+    @Test
+    public void agent_join_rejects_multi_segment_remainders() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        SequencedProperties attachments = new SequencedProperties();
+        attachments.setProperty("main/agent/maven/org.example/agent", "");
+        attachments.store(manifests.resolve(BuildStep.ATTACHMENTS));
+        Path runtime = Files.createDirectory(root.resolve("runtime"));
+        Path runtimeDeps = Files.createDirectory(runtime.resolve("dependencies"));
+        Files.writeString(runtimeDeps.resolve("maven-org.example-agent-jar-tests-1.0.jar"), "agent");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/agent/maven/org.example/agent/jar/tests/1.0",
+                "dependencies/maven-org.example-agent-jar-tests-1.0.jar");
+        index.store(runtime.resolve(BuildStep.DEPENDENCIES));
+
+        assertThatThrownBy(() -> run(args("manifests", manifests, "runtime", runtime)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("No resolved artifact for attached agent main/agent/maven/org.example/agent");
+    }
+
+    @Test
+    public void missing_agent_resolution_throws() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        SequencedProperties attachments = new SequencedProperties();
+        attachments.setProperty("main/agent/maven/org.example/agent", "");
+        attachments.store(manifests.resolve(BuildStep.ATTACHMENTS));
+
+        assertThatThrownBy(() -> run(args("manifests", manifests)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("No resolved artifact for attached agent main/agent/maven/org.example/agent");
     }
 
     @Test

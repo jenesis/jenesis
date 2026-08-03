@@ -48,7 +48,8 @@ executable demos (`java-pom-executable`, `java-modular-executable`), which stage
 `build/DemoNative.java` sibling that builds a native installer and a
 `build/DemoLauncher.java` sibling that builds a single `java -jar`-able executable jar
 with the `build.jenesis.launcher` and runs it. The `bundle` demo unpacks its
-`bundle.zip` and runs it on a stock JRE. Each demo writes
+`bundle.zip` and runs it on a stock JRE, and `agents` builds (attaching Mockito to
+the tests) and then runs the application (attaching the OpenTelemetry agent). Each demo writes
 to a local `target/` directory; delete it to rebuild from scratch.
 
 Quick index
@@ -99,6 +100,7 @@ Quick index
 | 41 | [`native-image`](demo-41-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Project.java`  |
 | 42 | [`build-cache`](demo-42-build-cache/README.md)               | A content-addressed build cache serving step outputs across builds - project-local (`-Djenesis.project.cache`), shared via a URI (`-Djenesis.cache.uri=`), or local layered in front of a remote; shown by bootstrapping it then serving a full `-Djenesis.executor.rebuild=true` from it | `java build/jenesis/Project.java`  |
 | 43 | [`bom`](demo-43-bom/README.md)                               | A bill of materials: one properties file of version and checksum pins imported via `@jenesis.bom` (a local `bom-<name>.properties` here, a module-repository coordinate in general), overridable by local `@jenesis.pin` tags and strong enough for strict pinning | `java build/jenesis/Project.java`  |
+| 44 | [`agents`](demo-44-agents/README.md)                         | Attach libraries as Java agents with `@jenesis.attach`: Mockito as a dependency that also attaches to the test JVM, and the OpenTelemetry agent attached to the main run without ever joining a compile or runtime path | `java build/Demo.java`             |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -827,6 +829,34 @@ versioned and checksummed, or floating to the latest published file - and the
 demo shows the precedence rules: a local `@jenesis.pin` overrides any BOM
 entry, the first declared BOM wins a conflict, and BOM-provided checksums
 satisfy `-Djenesis.dependency.pin=strict` with no per-dependency tags at all.
+
+## 29. Attaching Java agents - [`agents`](demo-44-agents/README.md)
+
+Some libraries have to run as a `-javaagent` rather than be called through an
+API. `agents` attaches two of them with the `@jenesis.attach` tag, each next to
+the execution it belongs to, and shows the two shapes an agent takes. The test
+module declares `@jenesis.attach org.mockito` beside its `@jenesis.test` tag,
+the same module name it `requires`: Mockito is both a test dependency
+(`Mockito.mock(...)` has to compile) *and* an agent, because its mock maker
+instruments classes at run time and self-attachment is deprecated on JDK 21+.
+Because the attachment and the `requires` resolve through the same repository at
+the same coordinate, the jar on the test module path and the jar passed as
+`-javaagent` to the test JVM are the same file - one resolved artifact, both
+roles. The main
+module declares `@jenesis.attach io.opentelemetry.javaagent/opentelemetry-javaagent`
+beside its `@jenesis.main`: the OpenTelemetry agent is required by nothing,
+compiled against nothing, and never on any path - it is resolved in a dedicated
+`agent` scope and attached only to the `Execute` run of the entry point, where
+its version banner is the proof that it loaded. The token follows the
+`@jenesis.pin` grammar without a version (a module name resolves through the
+module repository like a `requires`, a `groupId/artifactId` from Maven Central),
+anything after it is the agent's own option string, and the resolved jar must
+carry a `Premain-Class`. Agents pin like any dependency, so a strict build
+covers them too; a `pom.xml` project declares the same attachments in a
+project-level `<!--jenesis.attach ... -->` comment block, where a `test`-scoped
+match attaches to the test run only. The demo's `build/Demo.java` runs the build
+(Mockito attaches to the tests) and then the application (OpenTelemetry attaches
+to the run) in one go.
 
 Cross-cutting concepts
 ----------------------

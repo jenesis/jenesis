@@ -91,6 +91,31 @@ public class PinPomTest {
     }
 
     @Test
+    public void pin_rewrite_preserves_attach_comments() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.attach
+                    org.mockito/mockito-core
+                    io.opentelemetry.javaagent/opentelemetry-javaagent otel.option=value
+                    -->
+                </project>
+                """);
+        writeResolved(Map.of("maven/org.mockito/mockito-core", "5.11.0 SHA-256/cafebabe"));
+        String result = run(pom);
+        assertThat(result).contains("""
+                <!--jenesis.attach
+                    org.mockito/mockito-core
+                    io.opentelemetry.javaagent/opentelemetry-javaagent otel.option=value
+                    -->""");
+    }
+
+    @Test
     public void updates_matched_guarded_comment_line_and_preserves_others() throws IOException {
         Path pom = root.resolve("pom.xml");
         Files.writeString(pom, """

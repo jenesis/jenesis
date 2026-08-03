@@ -31,6 +31,7 @@ public class Inventory implements BuildStep {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(MODULE),
                 Path.of(METADATA),
+                Path.of(ATTACHMENTS),
                 Path.of(POM),
                 Path.of(ARTIFACTS),
                 Path.of(Bom.BOM),
@@ -78,6 +79,7 @@ public class Inventory implements BuildStep {
         SequencedMap<String, String> closureChecksums = new LinkedHashMap<>();
         SequencedMap<String, Path> bomFiles = new LinkedHashMap<>();
         SequencedMap<String, String> bomValues = new LinkedHashMap<>();
+        SequencedMap<String, String> attachments = new LinkedHashMap<>();
         SequencedSet<String> identity = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             Path folder = argument.folder();
@@ -155,6 +157,13 @@ public class Inventory implements BuildStep {
             if (metadataImage == null && Files.isDirectory(metadata)) {
                 metadataImage = metadata;
             }
+            Path attachmentsFile = folder.resolve(ATTACHMENTS);
+            if (Files.isRegularFile(attachmentsFile)) {
+                SequencedProperties loaded = SequencedProperties.ofFiles(attachmentsFile);
+                for (String key : loaded.stringPropertyNames()) {
+                    attachments.putIfAbsent(key, loaded.getProperty(key));
+                }
+            }
             collectClosure(folder, closureJars, closureScopes, closureChecksums);
             Path bomsFile = folder.resolve(BOMS);
             if (Files.isRegularFile(folder.resolve(DEPENDENCIES)) && Files.isRegularFile(bomsFile)) {
@@ -197,6 +206,34 @@ public class Inventory implements BuildStep {
             }
             inventory.setProperty(prefix + "dependency." + dependencyIndex + ".group", group);
             dependencyIndex++;
+        }
+        int agentIndex = 0;
+        for (Map.Entry<String, String> attachment : attachments.entrySet()) {
+            String key = attachment.getKey();
+            int slash = key.indexOf('/');
+            String candidate = key.substring(0, slash) + key.substring(key.indexOf('/', slash + 1));
+            Path jar = null;
+            for (Map.Entry<String, Path> closure : closureJars.entrySet()) {
+                String coordinate = closure.getKey();
+                if (coordinate.equals(candidate)
+                        || coordinate.startsWith(candidate + "/")
+                        && coordinate.indexOf('/', candidate.length() + 1) < 0) {
+                    String scope = closureScopes.get(coordinate);
+                    if (scope != null && List.of(scope.split(",")).contains("agent")) {
+                        jar = closure.getValue();
+                        break;
+                    }
+                }
+            }
+            if (jar == null) {
+                throw new IllegalStateException("No resolved artifact for attached agent " + key);
+            }
+            inventory.setProperty(prefix + "agent." + agentIndex, relativize(context, jar));
+            if (!attachment.getValue().isEmpty()) {
+                inventory.setProperty(prefix + "agent." + agentIndex + ".arguments", attachment.getValue());
+            }
+            inventory.setProperty(prefix + "agent." + agentIndex + ".coordinate", key);
+            agentIndex++;
         }
         int bomIndex = 0;
         for (Map.Entry<String, Path> entry : bomFiles.entrySet()) {

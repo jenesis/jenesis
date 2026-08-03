@@ -83,7 +83,8 @@ public record Execute(Project project, String mainClass, String module) {
             }
             throw new IllegalStateException(message.toString());
         }
-        Candidate candidate = candidates.values().iterator().next();
+        Map.Entry<String, Candidate> selected = candidates.firstEntry();
+        Candidate candidate = selected.getValue();
         if (candidate.runtime == null || candidate.runtime.isEmpty()) {
             throw new IllegalStateException("No runtime artifacts for module: "
                     + (candidate.path.isEmpty() ? "<root>" : candidate.path));
@@ -98,6 +99,28 @@ public record Execute(Project project, String mainClass, String module) {
             jars.add(resolved.toString());
         }
         List<String> javaArgs = new ArrayList<>();
+        for (int index = 0; ; index++) {
+            String agent = merged.getProperty(selected.getKey() + ".agent." + index);
+            if (agent == null) {
+                break;
+            }
+            String coordinate = merged.getProperty(selected.getKey() + ".agent." + index + ".coordinate");
+            Path jar = candidate.folder.resolve(agent).normalize();
+            if (!Files.isRegularFile(jar)) {
+                throw new IllegalStateException("Missing agent artifact " + coordinate + ": " + jar);
+            }
+            try (JarFile file = new JarFile(jar.toFile())) {
+                Manifest manifest = file.getManifest();
+                if (manifest == null || manifest.getMainAttributes().getValue("Premain-Class") == null) {
+                    throw new IllegalStateException("Attached agent "
+                            + coordinate
+                            + " does not declare Premain-Class: "
+                            + jar);
+                }
+            }
+            String options = merged.getProperty(selected.getKey() + ".agent." + index + ".arguments");
+            javaArgs.add("-javaagent:" + jar.toAbsolutePath() + (options == null ? "" : "=" + options));
+        }
         if (candidate.module != null) {
             boolean selfContainedModuleGraph = true;
             List<String> modulePath = new ArrayList<>(), classPath = new ArrayList<>();

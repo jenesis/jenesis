@@ -245,13 +245,6 @@ public class ModularProject implements BuildExecutorModule {
             }
             info.plugins().forEach((coordinate, group) ->
                     requires.setProperty(group + "/plugin/" + coordinate, ""));
-            requires.store(context.next().resolve(BuildStep.REQUIRES));
-            if (!info.aliases().isEmpty()) {
-                SequencedProperties aliases = new SequencedProperties();
-                info.aliases().forEach((alias, target) ->
-                        aliases.setProperty(group + "/" + prefix + "/" + alias, target));
-                aliases.store(context.next().resolve(BuildStep.ALIASES));
-            }
             SequencedMap<String, String> versions = new LinkedHashMap<>(info.versions());
             for (Map.Entry<String, SequencedMap<String, String>> variant : info.variants().entrySet()) {
                 String selected = platform.select(variant.getKey(),
@@ -260,6 +253,33 @@ public class ModularProject implements BuildExecutorModule {
                 if (selected != null) {
                     versions.put(variant.getKey(), selected);
                 }
+            }
+            info.attachments().forEach((key, _) -> {
+                int slash = key.indexOf('/');
+                String repository = key.substring(slash + 1, key.indexOf('/', slash + 1));
+                String suffix = "";
+                if (!repository.equals("module")) {
+                    String pinned = versions.get(key);
+                    int space = pinned == null ? -1 : pinned.indexOf(' ');
+                    String bare = pinned == null ? "" : space < 0 ? pinned : pinned.substring(0, space);
+                    suffix = "/" + (bare.isEmpty() || bare.startsWith(":") ? "RELEASE" : bare);
+                }
+                requires.setProperty(key.substring(0, slash) + "/agent/" + key.substring(slash + 1) + suffix, "");
+            });
+            requires.store(context.next().resolve(BuildStep.REQUIRES));
+            if (!info.attachments().isEmpty()) {
+                SequencedProperties attachments = new SequencedProperties();
+                info.attachments().forEach((key, options) -> {
+                    int slash = key.indexOf('/');
+                    attachments.setProperty(key.substring(0, slash) + "/agent/" + key.substring(slash + 1), options);
+                });
+                attachments.store(context.next().resolve(BuildStep.ATTACHMENTS));
+            }
+            if (!info.aliases().isEmpty()) {
+                SequencedProperties aliases = new SequencedProperties();
+                info.aliases().forEach((alias, target) ->
+                        aliases.setProperty(group + "/" + prefix + "/" + alias, target));
+                aliases.store(context.next().resolve(BuildStep.ALIASES));
             }
             if (!versions.isEmpty()) {
                 SequencedProperties properties = new SequencedProperties();

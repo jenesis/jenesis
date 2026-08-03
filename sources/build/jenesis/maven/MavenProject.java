@@ -292,7 +292,23 @@ public class MavenProject implements BuildExecutorModule {
                                     requires.setProperty(group + "/compile/" + dependency, value);
                                     requires.setProperty(group + "/runtime/" + dependency, value);
                                 }
+                                String attach = properties.getProperty("attachments", "");
+                                SequencedProperties attachments = new SequencedProperties();
+                                for (String entry : attach.isEmpty() ? new String[0] : attach.split("\t")) {
+                                    int split = entry.indexOf('=');
+                                    String left = entry.substring(0, split), arguments = entry.substring(split + 1);
+                                    int space = left.indexOf(' ');
+                                    String key = space < 0 ? left : left.substring(0, space);
+                                    String version = space < 0 ? null : left.substring(space + 1);
+                                    int slash = key.indexOf('/');
+                                    String seeded = key.substring(0, slash) + "/agent/" + key.substring(slash + 1);
+                                    requires.setProperty(seeded + (version == null ? "" : "/" + version), "");
+                                    attachments.setProperty(seeded, arguments);
+                                }
                                 requires.store(context.next().resolve(BuildStep.REQUIRES));
+                                if (!attachments.isEmpty()) {
+                                    attachments.store(context.next().resolve(BuildStep.ATTACHMENTS));
+                                }
                                 SequencedProperties exclusionsProperties = new SequencedProperties();
                                 for (String key : requires.stringPropertyNames()) {
                                     int scopeSlash = key.indexOf('/', key.indexOf('/') + 1);
@@ -556,10 +572,52 @@ public class MavenProject implements BuildExecutorModule {
                 String qualifiedDependencies = value.qualifiedDependencies() == null ? "" : value.qualifiedDependencies().entrySet().stream()
                         .map(requires -> requires.getKey() + "=" + requires.getValue())
                         .collect(Collectors.joining("\t"));
-                writeModule(maven, value, relativePath, coordinate, selfPom, false, qualifiedDependencies);
-                writeModule(maven, value, relativePath, coordinate, selfPom, true, qualifiedDependencies);
+                writeModule(maven, value, relativePath, coordinate, selfPom, false, qualifiedDependencies, attachments(value, false));
+                writeModule(maven, value, relativePath, coordinate, selfPom, true, qualifiedDependencies, attachments(value, true));
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+
+        private String attachments(MavenLocalPom value, boolean test) {
+            if (value.attachments() == null || value.attachments().isEmpty()) {
+                return "";
+            }
+            List<String> entries = new ArrayList<>();
+            for (Map.Entry<String, String> attachment : value.attachments().entrySet()) {
+                String key = attachment.getKey();
+                String spec = key.substring(key.indexOf('/') + 1);
+                String version = null;
+                MavenDependencyScope scope = null;
+                if (value.dependencies() != null) {
+                    for (Map.Entry<MavenDependencyKey, MavenDependencyValue> dependency : value.dependencies().entrySet()) {
+                        if (dependency.getKey().coordinate(prefix, null).equals(spec)) {
+                            version = dependency.getValue().version();
+                            scope = dependency.getValue().scope();
+                            break;
+                        }
+                    }
+                }
+                if (version == null && value.managedDependencies() != null) {
+                    for (Map.Entry<MavenDependencyKey, MavenDependencyValue> dependency : value.managedDependencies().entrySet()) {
+                        if (dependency.getKey().coordinate(prefix, null).equals(spec)) {
+                            version = dependency.getValue().version();
+                            break;
+                        }
+                    }
+                }
+                if (scope == MavenDependencyScope.TEST && !test) {
+                    continue;
+                }
+                if (version == null
+                        && spec.startsWith(prefix + "/")
+                        && spec.chars().filter(character -> character == '/').count() > 2) {
+                    throw new IllegalArgumentException("Cannot determine version for jenesis.attach "
+                            + key
+                            + ": declare it as a dependency or manage its version");
+                }
+                entries.add(key + (version == null ? "" : " " + version) + "=" + attachment.getValue());
+            }
+            return String.join("\t", entries);
         }
 
         private void writeModule(Path maven,
@@ -568,7 +626,8 @@ public class MavenProject implements BuildExecutorModule {
                                  String coordinate,
                                  MavenDependencyKey selfPom,
                                  boolean test,
-                                 String qualifiedDependencies) throws IOException {
+                                 String qualifiedDependencies,
+                                 String attachments) throws IOException {
             SequencedProperties properties = new SequencedProperties();
             properties.setProperty("coordinate", test
                     ? new MavenDependencyKey(value.groupId(), value.artifactId(), "jar", "tests")
@@ -629,6 +688,9 @@ public class MavenProject implements BuildExecutorModule {
             properties.setProperty("managedDependencies", managed);
             if (!qualifiedDependencies.isEmpty()) {
                 properties.setProperty("qualifiedDependencies", qualifiedDependencies);
+            }
+            if (!attachments.isEmpty()) {
+                properties.setProperty("attachments", attachments);
             }
             properties.setProperty("checksums",
                     value.dependencies() == null ? "" : value.dependencies().entrySet().stream()

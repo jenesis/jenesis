@@ -154,6 +154,122 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void jenesis_attach_expands_tokens_and_captures_arguments() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.attach org.mockito/mockito-core
+                 * @jenesis.attach other/maven/io.opentelemetry.javaagent/opentelemetry-javaagent otel.option=value second option
+                 */
+                module foo {
+                    requires org.mockito;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.attachments()).containsExactly(
+                Map.entry("main/maven/org.mockito/mockito-core", ""),
+                Map.entry("other/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=value second option"));
+    }
+
+    @Test
+    public void jenesis_attach_bare_token_expands_to_module_repository() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.attach net.bytebuddy.agent experimental
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.attachments()).containsExactly(
+                Map.entry("main/module/net.bytebuddy.agent", "experimental"));
+    }
+
+    @Test
+    public void jenesis_attach_normalizes_argument_whitespace() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.attach org.example/agent   first=1
+                 *     second=2
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.attachments()).containsExactly(
+                Map.entry("main/maven/org.example/agent", "first=1 second=2"));
+    }
+
+    @Test
+    public void jenesis_attach_rejects_platform_modules() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.attach java.instrument
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("platform modules cannot be attached");
+    }
+
+    @Test
+    public void jenesis_attach_rejects_malformed_tokens() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.attach org.example/
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.attach token");
+    }
+
+    @Test
+    public void jenesis_attach_rejects_conflicting_duplicates() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.attach org.example/agent first
+                 * @jenesis.attach org.example/agent second
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Duplicate @jenesis.attach for main/maven/org.example/agent");
+    }
+
+    @Test
+    public void jenesis_attach_collapses_identical_duplicates() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.attach org.example/agent option
+                 * @jenesis.attach org.example/agent option
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.attachments()).containsExactly(Map.entry("main/maven/org.example/agent", "option"));
+    }
+
+    @Test
+    public void jenesis_attach_without_content_is_ignored() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.attach
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.attachments()).isEmpty();
+    }
+
+    @Test
     public void can_identify_module_info() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 module foo {
