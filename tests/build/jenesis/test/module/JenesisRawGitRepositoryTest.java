@@ -157,6 +157,14 @@ public class JenesisRawGitRepositoryTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test
+    public void rejects_tsv_derived_coordinates_with_path_traversal() throws IOException {
+        writeTsv("widget", "modules.tsv", "1.0\t../../../../secret\twidget-core\t1.0");
+
+        assertThatThrownBy(() -> named().fetch(Runnable::run, "widget"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     private JenesisRawGitRepository named() {
         return new JenesisRawGitRepository(JenesisRepository.Scope.MODULE, data.toUri(), maven.toUri());
     }

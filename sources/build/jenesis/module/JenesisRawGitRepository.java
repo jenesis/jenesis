@@ -171,12 +171,21 @@ public class JenesisRawGitRepository implements JenesisRepository {
         if (resolved == null || !predicate.test(resolved.groupId())) {
             return Optional.empty();
         }
+        requireSafeSegment("resolved groupId", resolved.groupId());
+        requireSafeSegment("resolved artifactId", resolved.artifactId());
+        requireSafeSegment("resolved version", resolved.version());
         String path = resolved.groupId().replace('.', '/')
                 + "/" + resolved.artifactId()
                 + "/" + resolved.version()
                 + "/" + resolved.artifactId() + "-" + resolved.version()
                 + (classifier == null ? "" : "-" + classifier) + "." + type;
-        return open(repository.resolve(path), token, retry).map(stream -> (RepositoryItem) () -> stream);
+        URI base = repository.normalize();
+        URI location = base.resolve(path).normalize();
+        URI contained = base.relativize(location);
+        if (contained.isAbsolute() || contained.getPath().startsWith("..")) {
+            throw new IllegalArgumentException("Resolved location " + location + " escapes repository root " + repository);
+        }
+        return open(location, token, retry).map(stream -> (RepositoryItem) () -> stream);
     }
 
     private Coordinate resolve(String moduleName, String classifier, String version) throws IOException {
