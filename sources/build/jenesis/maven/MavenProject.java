@@ -531,9 +531,6 @@ public class MavenProject implements BuildExecutorModule {
 
         @Override
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
-            // depends on root but also all files within the root. The easiest is to trigger
-            // this build step each time to scan for possible changes of POMs and analyze them
-            // in a subsequent (cached) build step.
             return true;
         }
     }

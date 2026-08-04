@@ -34,10 +34,6 @@ public record MultiProjectModule(BuildExecutorModule identifier,
 
     public static final String IDENTIFIER_PATH = PREVIOUS.repeat(3) + IDENTIFIER + "/";
 
-    /**
-     * Resolves a module's original on-disk directory from the {@code path} property that
-     * the scan records in its manifests, or {@code null} if it cannot be determined.
-     */
     public static Path location(Path root, SequencedMap<String, Path> arguments) throws IOException {
         for (Map.Entry<String, Path> entry : arguments.entrySet()) {
             if (entry.getKey().endsWith("/" + MANIFESTS)) {

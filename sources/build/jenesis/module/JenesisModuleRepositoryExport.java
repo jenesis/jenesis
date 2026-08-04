@@ -43,8 +43,6 @@ public class JenesisModuleRepositoryExport implements BuildStep {
                     Path relative = folder.relativize(file);
                     link(file, target.resolve(relative.toString()), cleaned);
                     if (relative.getNameCount() == 3) {
-                        // Versioned shape <module>/<version>/<file>: also mirror to <module>/<file>
-                        // so the module root always reflects the most recently built version.
                         link(file,
                                 target.resolve(relative.getName(0).toString())
                                         .resolve(relative.getName(2).toString()),

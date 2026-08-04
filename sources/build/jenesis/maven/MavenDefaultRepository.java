@@ -364,8 +364,6 @@ public class MavenDefaultRepository implements MavenRepository {
                 ? Files.createTempFile(prefix, suffix)
                 : Files.createTempFile(directory, prefix, suffix);
         try {
-            // The opened response retries internally; this loop additionally covers a
-            // connection that drops while the body is being copied.
             for (int attempt = 0; ; attempt++) {
                 try (InputStream stream = openStream(uri, token, retry)) {
                     Files.copy(stream, temporary, StandardCopyOption.REPLACE_EXISTING);

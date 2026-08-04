@@ -2280,8 +2280,6 @@ public record Project(
                     : Path.of(mavenRepositoryLocal)).toAbsolutePath().normalize();
             if (Files.isDirectory(mavenLocal)) {
                 docker = docker.mount(mavenLocal, mavenLocal.toString(), true);
-                // Always forwarded: the container's user.home differs from the host's, so without the
-                // variable the default local repository would not be found despite being mounted.
                 docker = docker.env("MAVEN_REPOSITORY_LOCAL", mavenLocal.toString());
             }
             String jenesisRepositoryLocal = System.getProperty("jenesis.module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));

@@ -138,8 +138,6 @@ public class LicenseCheck implements BuildStep {
         return jarLicenses(jar);
     }
 
-    // Overrides are keyed by the internal dependency coordinate, with the maven/ repository
-    // prefix, either fully (maven/<groupId>/<artifactId>/<version>) or version-agnostically.
     private static String override(String coordinate, Map<String, String> overrides) {
         String full = "maven/" + coordinate;
         if (overrides.containsKey(full)) {
@@ -153,8 +151,6 @@ public class LicenseCheck implements BuildStep {
         }
     }
 
-    // A dependency is acceptable if any one of its licenses passes the policy (Maven lists
-    // multiple licenses disjunctively: the consumer may pick any).
     private boolean acceptable(List<String[]> licenses) {
         for (String[] license : licenses) {
             Set<String> tokens = tokens(license[0], license[1]);
@@ -195,8 +191,6 @@ public class LicenseCheck implements BuildStep {
         return tokens;
     }
 
-    // A small map of common declared name/URL forms to a canonical SPDX identifier and a
-    // license category, ordered most-specific first so the GPL family resolves correctly.
     private static String[] identify(String name, String url) {
         String text = ((name == null ? "" : name) + " " + (url == null ? "" : url)).toLowerCase(Locale.ROOT);
         if (text.isBlank()) {

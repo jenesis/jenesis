@@ -338,8 +338,6 @@ public record Jpx(Path storage,
             }
             return installation;
         } finally {
-            // The staging folder was either adopted as the installation folder or - on failure,
-            // or when a concurrent installation won the lock - its remains are discarded.
             if (Files.exists(staging)) {
                 clear(staging);
                 Files.delete(staging);

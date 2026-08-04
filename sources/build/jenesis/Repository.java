@@ -71,11 +71,6 @@ public interface Repository {
                         }
                         Path file = item.file().orElse(null);
                         if (file != null && (item.internal() || !snapshot && item.local())) {
-                            // A cache references a local item in place so a republished artifact is picked
-                            // up on the next resolution, while a snapshot links it into the folder so a
-                            // build output stays deterministic and copyable; the local flag is not
-                            // propagated, so an outer snapshot still materializes a cached item. Internal
-                            // items always stay in place and propagate to keep their pinning exemption.
                             if (item.internal()) {
                                 internal.add(key);
                             }
@@ -143,8 +138,6 @@ public interface Repository {
                     }
                     http.setInstanceFollowRedirects(false);
                     http.setRequestProperty("User-Agent", "Jenesis");
-                    // Redirects are followed by hand so the credential is only ever sent to the
-                    // origin it was configured for, never to whatever host a redirect points at.
                     if (token != null && sameOrigin(uri, current)) {
                         http.setRequestProperty("Authorization", token);
                     }
@@ -170,7 +163,6 @@ public interface Repository {
                         if (after != null) {
                             String trimmed = after.trim();
                             try {
-                                // The advertised wait is capped so a hostile server cannot stall the build.
                                 delay = Math.min(Long.parseLong(trimmed), 30) * 1000;
                             } catch (NumberFormatException _) {
                                 try {
@@ -270,9 +262,6 @@ public interface Repository {
                 if (slash > 0) {
                     URI base = uris.get(coordinate.substring(0, slash));
                     if (base != null) {
-                        // For a versioned request, the rewriter must produce a version-specific URL.
-                        // If it can't (e.g. the registered URL isn't in Maven layout), treat it as a
-                        // miss rather than silently serving whichever version the bare-name URL points at.
                         candidate = versionResolver.apply(base, coordinate.substring(slash + 1)).orElse(null);
                     }
                 }

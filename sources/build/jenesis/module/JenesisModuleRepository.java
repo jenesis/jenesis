@@ -49,8 +49,6 @@ public class JenesisModuleRepository implements JenesisRepository {
             if (location.isEmpty()) {
                 throw new IllegalStateException("No URI in Jenesis module repository entry: " + candidate);
             }
-            // The credential is scoped to the primary repository only, so a private token is
-            // never attached to a public mirror or fallback declared later in the same chain.
             String entryToken = repository == null ? token : null;
             JenesisRepository current;
             if (location.startsWith("@")) {

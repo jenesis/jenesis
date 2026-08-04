@@ -1119,17 +1119,12 @@ public class MavenPomResolver implements MavenResolver {
                     replacement = System.getProperty(property);
                 }
                 if (replacement == null) {
-                    // Maven leaves an undefined property as a literal rather than failing model assembly;
-                    // it only errors if the value is actually used to fetch an artifact.
                     matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group()));
                 } else {
                     HashSet<String> duplicates = new HashSet<>(previous);
                     if (!duplicates.add(property)) {
                         throw new IllegalStateException("Circular property definition of: " + property);
                     }
-                    // Quote the resolved value: a property may expand to text containing '$' or '\'
-                    // (or a bare '${'), which appendReplacement would otherwise read as a group
-                    // reference. Mirrors the undefined-property branch above.
                     matcher.appendReplacement(sb, Matcher.quoteReplacement(property(replacement, properties, duplicates)));
                 }
             }
@@ -1187,8 +1182,6 @@ public class MavenPomResolver implements MavenResolver {
                                    String optional,
                                    String checksum) {
         private MavenDependencyValue resolve(Map<String, String> properties) {
-            // A dependency without a scope must keep it undefined until the managed scopes have been merged,
-            // where an explicit management entry wins over the compile default.
             String resolvedScope = property(scope, properties);
             String resolvedVersion = property(version, properties);
             MavenDependencyKey.validate("version", resolvedVersion);

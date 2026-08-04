@@ -141,8 +141,6 @@ class BuildExecutorDefault implements BuildExecutor {
                         location + identity,
                         new LinkedHashSet<>(summaries.keySet()));
                 if (!consistent || step.shouldRun(arguments)) {
-                    // The tilde suffix cannot collide with a step folder since URLEncoder never emits a
-                    // bare tilde; a stale staging folder left by a crashed run is replaced.
                     Path next = target.resolve(BuildExecutorModule.encode(identity) + "~");
                     if (Files.exists(next)) {
                         Files.walkFileTree(next, new RecursiveFolderDeletion(null));

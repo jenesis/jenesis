@@ -33,12 +33,6 @@ public interface Resolver extends Serializable {
                             SequencedMap<String, String> versions,
                             DependencyScope scope) throws IOException;
 
-    /**
-     * Resolves dependencies with module aliases: each entry maps a module name to a Maven
-     * coordinate declaration, {@code <groupId>/<artifactId>[/<type>[/<classifier>]] [<version>]}.
-     * Only resolvers that support aliasing override this method; by default, any alias
-     * declaration is rejected.
-     */
     default Resolution dependencies(Executor executor,
                                     String prefix,
                                     Map<String, Repository> repositories,

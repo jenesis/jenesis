@@ -193,8 +193,6 @@ public class PinModuleInfo implements BuildStep {
             boolean mavenShortcut = mavenCoordinate != null
                     && mavenCoordinate.indexOf('/') > 0
                     && mavenCoordinate.indexOf('/') == mavenCoordinate.lastIndexOf('/');
-            // A module root in a Maven-resolved layout pins only the version: the root pom
-            // it stands for is not hashed, and the jar it points at is hashed by its Maven entry.
             String checksum = hashFunction == null
                     || (moduleRoot
                     && dependency.getValue().jar() != null
@@ -205,8 +203,6 @@ public class PinModuleInfo implements BuildStep {
             String entry;
             if (coordinate.startsWith("module/")) {
                 String module = coordinate.substring("module/".length());
-                // Module names cannot contain a dash, so a dash always introduces a classifier,
-                // which pins as part of the version value to keep the pin keyed by module name.
                 int dash = module.indexOf('-');
                 if (dash >= 0) {
                     value = ":" + module.substring(dash + 1) + ":" + value;
@@ -300,9 +296,6 @@ public class PinModuleInfo implements BuildStep {
             }
             pins.add(new PinLine(lineIndex, matcher.group(1), guard));
         }
-        // A key with platform guards keeps every line in place; only the line whose guard
-        // matched the local platform (or the unguarded fallback) is refreshed from the
-        // resolved closure, since this resolution only reflects the local variant.
         SequencedMap<String, String> expanded = new LinkedHashMap<>();
         entries.forEach((key, value) -> expanded.put(expand(key), key + " " + value));
         for (Map.Entry<String, List<PinLine>> entry : guarded.entrySet()) {
@@ -344,12 +337,7 @@ public class PinModuleInfo implements BuildStep {
         for (String key : entries.keySet()) {
             regenerated.add(expand(key));
         }
-        // A coordinate covered by a BOM is regenerated as no pin at all: its stale unguarded
-        // line is dropped rather than preserved, since the BOM entry now supplies the value.
         regenerated.addAll(covered);
-        // An unguarded line whose coordinate is not in the resolved closure is a manual override
-        // (for example a transitively required module name) and is preserved as-is; only lines the
-        // closure regenerates are rewritten, so a repin never discards a hand-set version.
         SequencedMap<String, String> merged = new TreeMap<>();
         int insertAt = -1;
         Iterator<String> it = lines.iterator();

@@ -186,10 +186,6 @@ public class PinPom implements BuildStep {
         if (guarded.isEmpty()) {
             return List.of();
         }
-        // A coordinate with platform guards keeps every line in place; only the line whose
-        // guard matched the local platform (or the unguarded fallback) is refreshed from the
-        // resolved closure, since this resolution only reflects the local variant. Lines are
-        // matched by their expanded coordinate, so short and full forms refer to the same key.
         for (String key : guarded) {
             String resolved = key.startsWith("main/maven/")
                     ? managed.remove(key.substring("main/maven/".length()))

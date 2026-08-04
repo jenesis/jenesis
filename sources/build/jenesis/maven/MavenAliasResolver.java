@@ -9,24 +9,6 @@ import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
 
-/**
- * Resolves module aliases declared as {@code @jenesis.alias <module-name>
- * <groupId>/<artifactId>[/<type>[/<classifier>]] [<version>]} over a Maven-backed module
- * resolver. An aliased module is synthesized locally: its discovery POM declares the target as
- * its only dependency, and its jar carries an {@code Automatic-Module-Name} manifest entry
- * naming the alias. For a target that owns a module identity - a module descriptor or an
- * {@code Automatic-Module-Name} of its own - that jar stays empty, and requiring the alias
- * grants implied readability of the target under its own module name. A target without any
- * module identity would resolve onto the class path, where no named module can read it, so the
- * alias jar is instead a copy of the target whose manifest names the alias as its
- * {@code Automatic-Module-Name}: requiring the alias then reads the target's own packages on
- * the module path, apart from any package the target duplicates from another resolved module,
- * which stays with its owner and is dropped from the copy. The target follows the Maven pin
- * token grammar. Its version resolves like any Maven coordinate's: a pin or BOM entry for the
- * coordinate wins - and is the only place a checksum can be declared - then the inline version,
- * and without either the latest release is negotiated implicitly. The synthetic artifacts are
- * internal and never published.
- */
 public class MavenAliasResolver implements Resolver {
 
     public static final String GROUP = "jenesis.alias";
@@ -96,9 +78,6 @@ public class MavenAliasResolver implements Resolver {
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("Malformed alias target for " + alias + ": " + token, e);
             }
-            // A pin or BOM entry for the target coordinate wins - and is where a checksum is
-            // declared - then the inline version; without either, the latest release is
-            // negotiated, as for any Maven coordinate that names no version.
             String pinned = versions.get(token);
             String version;
             if (pinned != null) {
@@ -169,13 +148,8 @@ public class MavenAliasResolver implements Resolver {
             if (!swapped.containsKey(synthetic)
                     || target == null
                     || PathPlacement.moduleDescriptor(target.file()) != null) {
-                // A target that owns a module identity lands on the module path by itself and stays
-                // readable through the empty alias module's implied readability - the former shape.
                 continue;
             }
-            // The target has no module identity, so it would land on the class path, unreadable
-            // from any named module: the alias jar becomes a copy of the target instead, carrying
-            // the target's packages onto the module path under the alias name.
             Set<String> occupied = new HashSet<>();
             for (Map.Entry<String, Resolver.Resolved> other : swapped.entrySet()) {
                 if (other.getKey().startsWith(mavenPrefix + "/" + GROUP + "/")
@@ -206,11 +180,6 @@ public class MavenAliasResolver implements Resolver {
         return new Resolver.Resolution(renamed, edges, vertices);
     }
 
-    /**
-     * Maps a synthetic alias coordinate back to a module coordinate: the synthetic Maven identity
-     * is a resolution detail that must not leak into descriptors, reports or published POMs. The
-     * renamed coordinate carries no version, so a repin never generates a pin for the alias.
-     */
     private String rename(String coordinate, String base, SequencedCollection<String> aliases) {
         if (coordinate == null) {
             return null;
@@ -237,9 +206,6 @@ public class MavenAliasResolver implements Resolver {
     private static final String POM_NAMESPACE = "http://maven.apache.org/POM/4.0.0";
 
     private static byte[] pom(String alias, MavenDependencyKey key, String version) {
-        // The POM is assembled through the DOM so setTextContent escapes every value: the target
-        // version can be a RELEASE string negotiated from a remote maven-metadata.xml, and raw
-        // interpolation would let a hostile repository inject additional <dependency> elements.
         Document document;
         try {
             document = MavenDefaultVersionNegotiator.toDocumentBuilderFactory().newDocumentBuilder().newDocument();
@@ -282,11 +248,6 @@ public class MavenAliasResolver implements Resolver {
         parent.appendChild(child);
     }
 
-    /**
-     * The packages a modular jar contributes to a module path: an explicit module's unqualified
-     * exports, or every class-bearing package of an automatic one. An artifact without a module
-     * identity - or one that cannot be read as a jar - contributes nothing.
-     */
     private static Set<String> exportedPackages(Path file) {
         ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(file);
         if (descriptor == null) {
@@ -317,18 +278,6 @@ public class MavenAliasResolver implements Resolver {
         }
     }
 
-    /**
-     * Copies the target jar with the alias injected into its manifest as the
-     * {@code Automatic-Module-Name}, or returns {@code null} for a target that cannot be read as
-     * a jar, keeping the empty alias jar in place. Signature entries are dropped since the
-     * altered manifest invalidates them. Class entries in an occupied package - one another
-     * resolved module already exports onto the module path - are left out as well: an automatic
-     * module exports every package it carries, a module reading the same package from two others
-     * is rejected, and the alias module reads the occupied package from its owner instead. As for
-     * the empty jar, the manifest entry is written with a fixed time stamp and the remaining
-     * entries keep their own, so the copy's bytes - and with them the containing build step's
-     * output checksums - only vary with its inputs'.
-     */
     private static Path renamedJar(String alias, Path target, Set<String> occupied) throws IOException {
         JarFile source;
         try {
@@ -385,7 +334,6 @@ public class MavenAliasResolver implements Resolver {
         }
     }
 
-    /** A multi-release overlay entry's base-rooted name, an ordinary entry's own, or {@code null} for a bare overlay root. */
     private static String versionless(String name) {
         if (!name.startsWith("META-INF/versions/")) {
             return name;
@@ -416,8 +364,6 @@ public class MavenAliasResolver implements Resolver {
         manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
         manifest.getMainAttributes().putValue("Automatic-Module-Name", alias);
         try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(file))) {
-            // The jar is written deterministically so its bytes - and with them the containing
-            // build step's output checksums - are stable across builds.
             JarEntry entry = new JarEntry(JarFile.MANIFEST_NAME);
             entry.setTime(0L);
             output.putNextEntry(entry);

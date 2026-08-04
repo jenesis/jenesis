@@ -316,8 +316,6 @@ public class Dependencies implements BuildStep {
                     }
                     SequencedMap<String, String> bom = new LinkedHashMap<>();
                     if (!pinned) {
-                        // The floated BOM's entries outrank an ignored pin: the pin below only
-                        // survives as the version source of last resort for a versionless declaration.
                         for (SequencedMap<String, String> entries : scopedManaged) {
                             entries.forEach((coordinate, value) -> {
                                 int space = value.indexOf(' ');
@@ -338,8 +336,6 @@ public class Dependencies implements BuildStep {
                                 int space = value.indexOf(' ');
                                 String qualified = space < 0 ? value : value.substring(0, space);
                                 if (coordinates.containsKey(coordinate)) {
-                                    // A declaration without a version of its own has the managed version as its
-                                    // only source, so ignoring it cannot float anything and only breaks resolution.
                                     bom.putIfAbsent(coordinate, qualified);
                                 } else if (qualified.startsWith(":")) {
                                     int divider = qualified.indexOf(':', 1);

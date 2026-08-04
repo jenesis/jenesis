@@ -20,7 +20,6 @@ public interface JenesisRepository extends Repository {
         int slash = identifier.indexOf('/');
         String module = slash < 0 ? identifier : identifier.substring(0, slash);
         String version = slash < 0 ? null : identifier.substring(slash + 1);
-        // Module names cannot contain a dash, so a dash always introduces a classifier.
         int dash = module.indexOf('-');
         String classifier = dash < 0 ? null : module.substring(dash + 1);
         if (dash >= 0) {

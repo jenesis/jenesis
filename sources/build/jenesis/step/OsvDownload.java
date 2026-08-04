@@ -152,8 +152,6 @@ public class OsvDownload implements BuildStep {
         return score >= 0.1 ? "LOW" : "";
     }
 
-    // CVSS v2 and v3.0/v3.1 are closed-form base-score formulas; v4.0 (table-based)
-    // is left unscored and falls through to the GitHub severity word when present.
     private static double cvss(String vector) {
         String trimmed = vector.trim();
         if (trimmed.startsWith("CVSS:3.")) {

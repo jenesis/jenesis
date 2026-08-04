@@ -90,9 +90,6 @@ public class Assign implements BuildStep {
                     .replace(File.separatorChar, '/'));
         });
         if (!jmods.isEmpty()) {
-            // Publish the produced module's link-time form alongside the jar, so a consumer
-            // can resolve <coordinate>:jmod the way it resolves the jar (falling back to the
-            // jar in the repository when no jmod was produced).
             String archive = context.next()
                     .relativize(jmods.getFirst())
                     .toString()
