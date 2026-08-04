@@ -272,6 +272,22 @@ public class InferredMultiProjectAssemblerTest {
                 .hasMessage("Unknown selector: test/resolved");
     }
 
+    @Test
+    public void editing_a_process_override_reruns_prepare_on_the_next_build() throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("process-javac.properties"), "-g=\n");
+        Path first = fixture.execute("sub/prepare").get("sub/prepare");
+        assertThat(readProperties(first.resolve(ProcessBuildStep.PROCESS).resolve("javac.properties")).stringPropertyNames())
+                .contains("-g");
+
+        Files.writeString(fixture.configuration().resolve("process-javac.properties"), "-verbose=\n");
+        Path second = fixture.execute("sub/prepare").get("sub/prepare");
+        assertThat(readProperties(second.resolve(ProcessBuildStep.PROCESS).resolve("javac.properties")).stringPropertyNames())
+                .as("editing only a process override must re-run prepare, not serve the stale one")
+                .contains("-verbose")
+                .doesNotContain("-g");
+    }
+
     private Fixture setUp(String moduleProperties,
                           boolean tests,
                           boolean source,
@@ -370,26 +386,32 @@ public class InferredMultiProjectAssemblerTest {
             }
         };
         ProjectModuleDescriptor descriptor = new ProjectModuleDescriptor(base, new LinkedHashSet<>(List.of(profile, configuration)), tests, source, documentation, null, PathPlacement.INFERRED);
-        AssemblyDescriptor assembled = new InferredMultiProjectAssembler().apply(descriptor, Map.of(), Map.of());
-        BuildExecutor executor = BuildExecutor.of(build,
-                Duration.ZERO,
-                new HashDigestFunction("MD5"),
-                BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false);
-        executor.addSource("manifests", manifests);
-        executor.addSource("sources", sources);
-        executor.addSource("artifacts", artifacts);
-        executor.addModule("sub", assembled.build(),
-                "manifests", "sources", "artifacts");
-        for (Map.Entry<String, BuildExecutorModule> phase : assembled.tail().entrySet()) {
-            executor.addModule(phase.getKey(), phase.getValue(), "sub");
-        }
-        return new Fixture(executor, manifests, sources, configuration, profile);
+        return new Fixture(descriptor, build, manifests, sources, artifacts, configuration, profile);
     }
 
-    private record Fixture(BuildExecutor executor, Path manifests, Path sources, Path configuration, Path profile) {
+    private record Fixture(ProjectModuleDescriptor descriptor,
+                           Path build,
+                           Path manifests,
+                           Path sources,
+                           Path artifacts,
+                           Path configuration,
+                           Path profile) {
 
-        SequencedMap<String, Path> execute(String selector) {
+        SequencedMap<String, Path> execute(String selector) throws IOException {
+            AssemblyDescriptor assembled = new InferredMultiProjectAssembler().apply(descriptor, Map.of(), Map.of());
+            BuildExecutor executor = BuildExecutor.of(build,
+                    Duration.ZERO,
+                    new HashDigestFunction("MD5"),
+                    BuildStepHashFunction.ofSerializationDigest("MD5"),
+                    BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false);
+            executor.addSource("manifests", manifests);
+            executor.addSource("sources", sources);
+            executor.addSource("artifacts", artifacts);
+            executor.addModule("sub", assembled.build(),
+                    "manifests", "sources", "artifacts");
+            for (Map.Entry<String, BuildExecutorModule> phase : assembled.tail().entrySet()) {
+                executor.addModule(phase.getKey(), phase.getValue(), "sub");
+            }
             return executor.execute(Runnable::run, selector).toCompletableFuture().join();
         }
     }

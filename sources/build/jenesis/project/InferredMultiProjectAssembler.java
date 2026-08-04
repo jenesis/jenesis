@@ -66,15 +66,17 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                     Map<String, Repository> repositories,
                                     Map<String, Resolver> resolvers) {
         Packaging packaging;
+        SequencedMap<String, SequencedMap<String, String>> overrides;
         try {
             packaging = Packaging.configured(BuildStep.locate(descriptor.configuration(), "packaging.properties"));
+            overrides = overridesOf(descriptor.configuration());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
         ProcessHandler.Factory factory = ProcessHandler.Factory.of();
         AssemblyDescriptor assembly = new AssemblyDescriptor((sub, outerInherited) -> {
             sub.addStep("prepare",
-                    new Prepare(descriptor.pathPlacement(), descriptor.configuration()),
+                    new Prepare(descriptor.pathPlacement(), overrides),
                     outerInherited.sequencedKeySet().stream());
             sub.addModule("check",
                     check.apply(new InferredSourceCodeQualityModule(descriptor.configuration(), repositories, resolvers)
@@ -232,7 +234,35 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 descriptor.spdx()).flatMap(SequencedSet::stream);
     }
 
-    private record Prepare(PathPlacement pathPlacement, SequencedSet<Path> configuration) implements BuildStep {
+    private static SequencedMap<String, SequencedMap<String, String>> overridesOf(SequencedSet<Path> configuration)
+            throws IOException {
+        SequencedMap<String, Path> files = new LinkedHashMap<>();
+        for (Path folder : configuration) {
+            if (!Files.isDirectory(folder)) {
+                continue;
+            }
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(folder, "process-*.properties")) {
+                for (Path file : stream) {
+                    String fileName = file.getFileName().toString();
+                    String command = fileName.substring("process-".length(), fileName.length() - ".properties".length());
+                    files.putIfAbsent(command, file);
+                }
+            }
+        }
+        SequencedMap<String, SequencedMap<String, String>> overrides = new LinkedHashMap<>();
+        for (String command : new TreeSet<>(files.keySet())) {
+            SequencedProperties properties = SequencedProperties.ofFiles(files.get(command));
+            SequencedMap<String, String> values = new LinkedHashMap<>();
+            for (String key : properties.stringPropertyNames()) {
+                values.put(key, properties.getProperty(key));
+            }
+            overrides.put(command, values);
+        }
+        return overrides;
+    }
+
+    private record Prepare(PathPlacement pathPlacement,
+                           SequencedMap<String, SequencedMap<String, String>> overrides) implements BuildStep {
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
@@ -326,32 +356,15 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 javac.setProperty("--module-version", version);
                 javac.store(processFolder.resolve("javac.properties"));
             }
-            SequencedMap<String, SequencedProperties> overrides = new LinkedHashMap<>();
-            for (Path folder : configuration) {
-                if (!Files.isDirectory(folder)) {
-                    continue;
-                }
-                try (DirectoryStream<Path> files = Files.newDirectoryStream(folder, "process-*.properties")) {
-                    for (Path file : files) {
-                        String fileName = file.getFileName().toString();
-                        String command = fileName.substring("process-".length(), fileName.length() - ".properties".length());
-                        if (!overrides.containsKey(command)) {
-                            overrides.put(command, SequencedProperties.ofFiles(file));
-                        }
-                    }
-                }
-            }
             if (!overrides.isEmpty() && processFolder == null) {
                 processFolder = Files.createDirectories(context.next().resolve(ProcessBuildStep.PROCESS));
             }
-            for (Map.Entry<String, SequencedProperties> override : overrides.entrySet()) {
+            for (Map.Entry<String, SequencedMap<String, String>> override : overrides.entrySet()) {
                 Path target = processFolder.resolve(override.getKey() + ".properties");
                 SequencedProperties merged = Files.isRegularFile(target)
                         ? SequencedProperties.ofFiles(target)
                         : new SequencedProperties();
-                for (String key : override.getValue().stringPropertyNames()) {
-                    merged.setProperty(key, override.getValue().getProperty(key));
-                }
+                override.getValue().forEach(merged::setProperty);
                 merged.store(target);
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
