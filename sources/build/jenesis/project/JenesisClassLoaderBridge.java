@@ -11,6 +11,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 
 class JenesisClassLoaderBridge implements AutoCloseable {
@@ -33,7 +34,7 @@ class JenesisClassLoaderBridge implements AutoCloseable {
     private Class<? extends Annotation> foreignBuildModuleName;
     private MethodHandle foreignBuildModuleNameValue;
 
-    private Map<String, Object> foreignChecksumValues;
+    private Map<String, Object> foreignChecksums;
 
     JenesisClassLoaderBridge(Collection<Path> artifacts) throws ReflectiveOperationException {
         ModuleFinder finder = ModuleFinder.of(artifacts.toArray(Path[]::new));
@@ -79,12 +80,14 @@ class JenesisClassLoaderBridge implements AutoCloseable {
                 .asSubclass(Annotation.class);
         foreignBuildModuleNameValue = lookup.findVirtual(foreignBuildModuleName, "value",
                 MethodType.methodType(String.class));
+        Class<?> foreignChecksum = Class.forName(Checksum.class.getName(), false, loader);
+        Method foreignChecksumOf = foreignChecksum.getMethod("of", foreignChecksumStatus);
         Map<String, Object> values = new HashMap<>();
         for (ChecksumStatus status : ChecksumStatus.values()) {
             Field field = foreignChecksumStatus.getField(status.name());
-            values.put(status.name(), field.get(null));
+            values.put(status.name(), foreignChecksumOf.invoke(null, field.get(null)));
         }
-        foreignChecksumValues = Map.copyOf(values);
+        foreignChecksums = Map.copyOf(values);
     }
 
     @Override
@@ -101,7 +104,7 @@ class JenesisClassLoaderBridge implements AutoCloseable {
         foreignBuildExecutor = null;
         foreignBuildModuleName = null;
         foreignBuildModuleNameValue = null;
-        foreignChecksumValues = null;
+        foreignChecksums = null;
     }
 
     Object findProvider(String name) {
@@ -170,7 +173,7 @@ class JenesisClassLoaderBridge implements AutoCloseable {
         arguments.forEach((key, value) -> {
             Map<Path, Object> foreignFiles = new LinkedHashMap<>();
             value.files().forEach((path, checksum) ->
-                    foreignFiles.put(path, foreignChecksumValues.get(checksum.status().name())));
+                    foreignFiles.put(path, foreignChecksums.get(checksum.status().name())));
             try {
                 foreign.put(key, foreignArgumentCtor.invoke(value.folder(), foreignFiles));
             } catch (RuntimeException | Error e) {
