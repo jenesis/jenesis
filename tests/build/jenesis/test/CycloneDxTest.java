@@ -138,4 +138,26 @@ public class CycloneDxTest {
                 .contains("<reference type=\"website\">")
                 .contains("<url>https://example.com/demo</url>");
     }
+
+    @Test
+    public void serial_number_hashes_the_serial_less_document() {
+        String json = emitter.emit(CycloneDx.Format.JSON, PROJECT, COMPONENTS, DEPENDENCIES);
+        String jsonSerial = between(json, "\"serialNumber\": \"", "\"");
+        String jsonSerialLess = json.replace("  \"serialNumber\": \"" + jsonSerial + "\",\n", "");
+        assertThat(jsonSerial).isEqualTo(uuidOf(jsonSerialLess));
+
+        String xml = emitter.emit(CycloneDx.Format.XML, PROJECT, COMPONENTS, DEPENDENCIES);
+        String xmlSerial = between(xml, "serialNumber=\"", "\"");
+        String xmlSerialLess = xml.replace(" serialNumber=\"" + xmlSerial + "\"", "");
+        assertThat(xmlSerial).isEqualTo(uuidOf(xmlSerialLess));
+    }
+
+    private static String between(String text, String open, String close) {
+        int start = text.indexOf(open) + open.length();
+        return text.substring(start, text.indexOf(close, start));
+    }
+
+    private static String uuidOf(String serialLess) {
+        return "urn:uuid:" + UUID.nameUUIDFromBytes(serialLess.getBytes(StandardCharsets.UTF_8));
+    }
 }

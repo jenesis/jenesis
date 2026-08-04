@@ -77,23 +77,26 @@ public class CycloneDx {
             sortedDependencies.add(new Dependency(dependency.ref(), dependsOn));
         }
         sortedDependencies.sort(Comparator.comparing(Dependency::ref));
-        String serialLess = format == Format.XML
-                ? emitXml(null, metadata, sortedComponents, sortedDependencies)
-                : emitJson(null, metadata, sortedComponents, sortedDependencies);
+        if (format == Format.XML) {
+            Document document = buildXml(metadata, sortedComponents, sortedDependencies);
+            String serialLess = transformXml(document);
+            document.getDocumentElement().setAttribute("serialNumber",
+                    "urn:uuid:" + UUID.nameUUIDFromBytes(serialLess.getBytes(StandardCharsets.UTF_8)));
+            return transformXml(document);
+        }
+        String serialLess = emitJson(metadata, sortedComponents, sortedDependencies);
         String serialNumber = "urn:uuid:" + UUID.nameUUIDFromBytes(serialLess.getBytes(StandardCharsets.UTF_8));
-        return format == Format.XML
-                ? emitXml(serialNumber, metadata, sortedComponents, sortedDependencies)
-                : emitJson(serialNumber, metadata, sortedComponents, sortedDependencies);
+        int insert = serialLess.indexOf("  \"version\": 1,\n");
+        return serialLess.substring(0, insert)
+                + "  \"serialNumber\": \"" + escapeJson(serialNumber) + "\",\n"
+                + serialLess.substring(insert);
     }
 
-    private String emitJson(String serialNumber, Component metadata, List<Component> components, List<Dependency> dependencies) {
+    private String emitJson(Component metadata, List<Component> components, List<Dependency> dependencies) {
         StringBuilder builder = new StringBuilder();
         builder.append("{\n");
         builder.append("  \"bomFormat\": \"CycloneDX\",\n");
         builder.append("  \"specVersion\": \"").append(SPEC_VERSION).append("\",\n");
-        if (serialNumber != null) {
-            builder.append("  \"serialNumber\": \"").append(escapeJson(serialNumber)).append("\",\n");
-        }
         builder.append("  \"version\": 1,\n");
         builder.append("  \"metadata\": {\n");
         builder.append("    \"tools\": {\n      \"components\": [\n        { \"type\": \"application\", \"name\": \"Jenesis\" }\n      ]\n    }");
@@ -205,7 +208,7 @@ public class CycloneDx {
         builder.append("\n").append(pad).append("}");
     }
 
-    private String emitXml(String serialNumber, Component metadata, List<Component> components, List<Dependency> dependencies) {
+    private Document buildXml(Component metadata, List<Component> components, List<Dependency> dependencies) {
         Document document;
         try {
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -216,9 +219,6 @@ public class CycloneDx {
         }
         Element bom = (Element) document.appendChild(document.createElementNS(NAMESPACE, "bom"));
         bom.setAttribute("version", "1");
-        if (serialNumber != null) {
-            bom.setAttribute("serialNumber", serialNumber);
-        }
         Element meta = (Element) bom.appendChild(document.createElementNS(NAMESPACE, "metadata"));
         Element tools = (Element) meta.appendChild(document.createElementNS(NAMESPACE, "tools"));
         Element toolComponents = (Element) tools.appendChild(document.createElementNS(NAMESPACE, "components"));
@@ -245,6 +245,10 @@ public class CycloneDx {
                 }
             }
         }
+        return document;
+    }
+
+    private String transformXml(Document document) {
         Transformer transformer;
         try {
             transformer = TransformerFactory.newInstance().newTransformer();
