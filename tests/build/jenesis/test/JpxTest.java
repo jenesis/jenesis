@@ -7,6 +7,8 @@ import build.jenesis.docker.DockerizedJava;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Jpx;
 import build.jenesis.Repository;
+import build.jenesis.RepositoryItem;
+import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenModuleResolver;
@@ -315,6 +317,169 @@ public class JpxTest {
         Path marker = work.resolve("marker.txt");
         assertThat(installation.launch(command.mainClass(), List.of(marker.toString()))).isEqualTo(9);
         assertThat(marker).hasContent("from-lib");
+    }
+
+    @Test
+    public void installs_modular_without_materializing_repository() throws IOException, InterruptedException {
+        addModularJars(true);
+        Repository streaming = streaming(new JenesisModuleRepository(jenesisRepoFolder.toUri()));
+        Jpx jpx = new Jpx(storage,
+                Map.of("modular", streaming),
+                Map.of("modular", new ModularJarResolver(false)),
+                new HashDigestFunction("SHA-256"));
+
+        Jpx.Installation installation = jpx.install(Jpx.Command.parse("tool.main@1.0"), true);
+
+        assertThat(installation.properties().getProperty("modulepath")).isNotNull();
+        try (Stream<Path> entries = Files.list(storage)) {
+            assertThat(entries.filter(entry -> entry.getFileName().toString().startsWith("staging-"))).isEmpty();
+        }
+        Path marker = work.resolve("marker.txt");
+        assertThat(installation.launch(List.of(marker.toString()))).isEqualTo(7);
+        assertThat(marker).hasContent("from-lib");
+    }
+
+    @Test
+    public void skips_materialization_when_installation_appears_during_resolution() throws IOException {
+        addMavenTool();
+        Path folder = storage.resolve("org.example--tool-main@1.0");
+        Repository mavenRepository = new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {});
+        Resolver delegate = new MavenPomResolver();
+        Resolver racing = (executor, prefix, repositories, coordinates, versions, scope) -> {
+            Files.createDirectories(folder);
+            Files.writeString(folder.resolve(Jpx.PROPERTIES), "name=SENTINEL\n");
+            return delegate.dependencies(executor, prefix, repositories, coordinates, versions, scope);
+        };
+        Jpx jpx = new Jpx(storage,
+                Map.of("maven", mavenRepository),
+                Map.of("maven", racing),
+                new HashDigestFunction("SHA-256"));
+
+        Jpx.Installation installation = jpx.install(Jpx.Command.parse("org.example:tool-main@1.0"));
+
+        assertThat(installation.folder()).isEqualTo(folder);
+        assertThat(installation.properties().getProperty("name")).isEqualTo("SENTINEL");
+        try (Stream<Path> entries = Files.list(storage)) {
+            assertThat(entries.filter(entry -> entry.getFileName().toString().startsWith("staging-"))).isEmpty();
+        }
+    }
+
+    @Test
+    public void spill_deletes_temporary_and_rethrows_on_failure() throws IOException {
+        Path folder = Files.createDirectories(work.resolve("spill-failure"));
+        Path target = folder.resolve("failing.jar");
+        RepositoryItem failing = () -> {
+            throw new IOException("boom");
+        };
+
+        assertThatThrownBy(() -> failing.spill(target))
+                .isInstanceOf(IOException.class)
+                .hasMessage("boom");
+        assertThat(target).doesNotExist();
+        try (Stream<Path> entries = Files.list(folder)) {
+            assertThat(entries).isEmpty();
+        }
+    }
+
+    @Test
+    public void docker_launch_mounts_installation_read_only_and_forwards_java_arguments()
+            throws IOException, InterruptedException {
+        addMavenTool();
+        Jpx jpx = jpx();
+        Jpx.Installation installation = jpx.install(Jpx.Command.parse("org.example:tool-main@1.0"));
+        RecordingDocker docker = new RecordingDocker(work);
+
+        int code = installation.launch(null, List.of("argument"), docker);
+
+        assertThat(code).isEqualTo(42);
+        assertThat(docker.host).isEqualTo(installation.folder());
+        assertThat(docker.container).isEqualTo(installation.folder().toString());
+        assertThat(docker.readOnly).isTrue();
+        assertThat(docker.javaArgs).containsSubsequence("-p", "-m", "tool.main/toolmain.Main", "argument");
+        assertThat(docker.javaArgs).doesNotContain("--add-modules");
+    }
+
+    @Test
+    public void java_arguments_add_all_module_path_for_non_self_contained_graph() throws IOException {
+        Path folder = Files.createDirectories(work.resolve("crafted@1.0"));
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("mainModule", "tool.main");
+        properties.setProperty("mainClass", "toolmain.Main");
+        properties.setProperty("modulepath", "tool-main.jar");
+        properties.setProperty("selfContainedModuleGraph", "false");
+        properties.setProperty("classpath", "legacy.jar");
+        properties.store(folder.resolve(Jpx.PROPERTIES));
+        Jpx.Installation installation = new Jpx.Installation(folder, new HashDigestFunction("SHA-256"));
+
+        List<String> arguments = installation.javaArguments(null, List.of("run"));
+
+        assertThat(arguments).containsSubsequence(
+                "-p", folder.resolve("tool-main.jar").toString(),
+                "--add-modules", "ALL-MODULE-PATH",
+                "-cp", folder.resolve("legacy.jar").toString(),
+                "-m", "tool.main/toolmain.Main",
+                "run");
+    }
+
+    @Test
+    public void command_parse_rejects_malformed_targets() {
+        assertThatThrownBy(() -> Jpx.Command.parse("tool@"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Empty version");
+        assertThatThrownBy(() -> Jpx.Command.parse("@1.0"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Empty name");
+        assertThatThrownBy(() -> Jpx.Command.parse("tool/bad.class."))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Not a class name");
+        assertThatThrownBy(() -> Jpx.Command.parse("tool/not identifier"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Not a class name");
+    }
+
+    @Test
+    public void latest_installed_is_empty_without_storage_directory() throws IOException {
+        Jpx jpx = new Jpx(storage.resolve("absent"));
+
+        assertThat(jpx.latestInstalled("tool.main")).isEmpty();
+    }
+
+    private static Repository streaming(Repository delegate) {
+        return (executor, coordinate) -> {
+            Optional<RepositoryItem> candidate = delegate.fetch(executor, coordinate);
+            RepositoryItem item = candidate.orElse(null);
+            if (item == null || item.file().isEmpty()) {
+                return candidate;
+            }
+            Path file = item.file().get();
+            return Optional.of(() -> Files.newInputStream(file));
+        };
+    }
+
+    private static final class RecordingDocker extends DockerizedJava {
+
+        private Path host;
+        private String container;
+        private boolean readOnly;
+        private List<String> javaArgs;
+
+        private RecordingDocker(Path workingDirectory) {
+            super(workingDirectory, "recording-image");
+        }
+
+        @Override
+        public DockerizedJava mount(Path host, String container, boolean readOnly) {
+            this.host = host;
+            this.container = container;
+            this.readOnly = readOnly;
+            return this;
+        }
+
+        @Override
+        public int execute(List<String> javaArgs) {
+            this.javaArgs = javaArgs;
+            return 42;
+        }
     }
 
     private Jpx jpx() {
