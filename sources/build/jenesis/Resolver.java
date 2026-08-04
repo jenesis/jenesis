@@ -130,6 +130,10 @@ public interface Resolver extends Serializable {
 
     static void validate(Path file, String checksum, String coordinate) throws IOException {
         int slash = checksum.indexOf('/');
+        if (slash < 0) {
+            throw new IllegalStateException("Malformed checksum '" + checksum
+                    + "' for " + coordinate + ", expected <algorithm>/<hex>");
+        }
         MessageDigest digest;
         try {
             digest = MessageDigest.getInstance(checksum.substring(0, slash));
