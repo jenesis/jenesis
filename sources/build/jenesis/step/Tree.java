@@ -19,22 +19,18 @@ public class Tree implements BuildStep {
     }
 
     public Tree(PrintStream out) {
-        this(out, compactFromProperty());
+        String format = System.getProperty("jenesis.tree.format", "full");
+        this(out, switch (format) {
+            case "full" -> false;
+            case "compact" -> true;
+            default -> throw new IllegalArgumentException(
+                    "Unknown jenesis.tree.format '" + format + "', expected 'full' or 'compact'");
+        });
     }
 
     public Tree(PrintStream out, boolean compact) {
         this.out = out;
         this.compact = compact;
-    }
-
-    private static boolean compactFromProperty() {
-        String format = System.getProperty("jenesis.tree.format", "full");
-        return switch (format) {
-            case "full" -> false;
-            case "compact" -> true;
-            default -> throw new IllegalArgumentException(
-                    "Unknown jenesis.tree.format '" + format + "', expected 'full' or 'compact'");
-        };
     }
 
     @Override
@@ -55,10 +51,18 @@ public class Tree implements BuildStep {
                 continue;
             }
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
-            String prefix = inventoryPrefix(inventory);
-            if (prefix == null) {
+            String candidate = null;
+            for (String key : inventory.stringPropertyNames()) {
+                int dot = key.indexOf('.');
+                if (dot > 0) {
+                    candidate = key.substring(0, dot);
+                    break;
+                }
+            }
+            if (candidate == null) {
                 continue;
             }
+            String prefix = candidate;
             List<Path> graphs = Inventory.paths(inventory, argument.folder(), prefix + ".graph");
             List<Path> licenses = Inventory.paths(inventory, argument.folder(), prefix + ".licenses");
             SequencedMap<String, Resolver.Resolution> resolutions = Dependencies.graph(graphs, licenses);
@@ -69,15 +73,5 @@ public class Tree implements BuildStep {
         }
         report.summary(aggregated);
         return CompletableFuture.completedStage(new BuildStepResult(true));
-    }
-
-    private static String inventoryPrefix(SequencedProperties inventory) {
-        for (String key : inventory.stringPropertyNames()) {
-            int dot = key.indexOf('.');
-            if (dot > 0) {
-                return key.substring(0, dot);
-            }
-        }
-        return null;
     }
 }
