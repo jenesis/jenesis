@@ -183,7 +183,7 @@ public class DependenciesResolutionTest {
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
                     SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
                     vertices.put(prefix + "/qux", new Resolver.Vertex(null, null, false,
-                            List.of(new License(null, null, "Apache License 2.0", "https://www.apache.org/licenses/LICENSE-2.0.txt"))));
+                            false, List.of(new License(null, null, "Apache License 2.0", "https://www.apache.org/licenses/LICENSE-2.0.txt"))));
                     return new Resolver.Resolution(
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
@@ -223,7 +223,7 @@ public class DependenciesResolutionTest {
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
                     SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
                     vertices.put(prefix + "/qux", new Resolver.Vertex(null, null, false,
-                            List.of(new License(null, null, "Acme-License", null))));
+                            false, List.of(new License(null, null, "Acme-License", null))));
                     return new Resolver.Resolution(
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
@@ -259,7 +259,7 @@ public class DependenciesResolutionTest {
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
                     SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
                     vertices.put(prefix + "/qux", new Resolver.Vertex(null, null, false,
-                            List.of(new License("Apache-2.0", null, null, null))));
+                            false, List.of(new License("Apache-2.0", null, null, null))));
                     return new Resolver.Resolution(
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
@@ -317,7 +317,7 @@ public class DependenciesResolutionTest {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
                     SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
-                    vertices.put("foo/qux", new Resolver.Vertex("1", "qux.module", false, List.of()));
+                    vertices.put("foo/qux", new Resolver.Vertex("1", "qux.module", false, false, List.of()));
                     return new Resolver.Resolution(
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(new Resolver.Edge(null, "foo/qux/1", "1", "compile", true)),
@@ -332,7 +332,7 @@ public class DependenciesResolutionTest {
         assertThat(result.next()).isTrue();
         SequencedProperties graph = SequencedProperties.ofFiles(next.resolve("graph.properties"));
         assertThat(graph.getProperty("edge/0")).isEqualTo("main\tcompile\tfoo\ttrue\tcompile\t1\t\tfoo/qux/1");
-        assertThat(graph.getProperty("vertex/main/compile/foo/qux")).isEqualTo("1\tqux.module\tfalse");
+        assertThat(graph.getProperty("vertex/main/compile/foo/qux")).isEqualTo("1\tqux.module\tfalse\tfalse");
     }
 
     @Test

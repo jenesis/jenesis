@@ -8,13 +8,19 @@ public final class DependencyTreeReport {
             39, 44, 48, 83, 113, 148, 184, 214, 208, 203, 168, 134};
 
     private final PrintStream out;
+    private final boolean compact;
 
     public DependencyTreeReport() {
         this(System.out);
     }
 
     public DependencyTreeReport(PrintStream out) {
+        this(out, false);
+    }
+
+    public DependencyTreeReport(PrintStream out, boolean compact) {
         this.out = out;
+        this.compact = compact;
     }
 
     public void render(Resolver.Resolution resolution) {
@@ -36,10 +42,22 @@ public final class DependencyTreeReport {
             builder.append(System.lineSeparator())
                     .append(BuildExecutorCallback.YELLOW).append("Resolved dependencies:").append(BuildExecutorCallback.RESET)
                     .append(System.lineSeparator());
-            nodes.forEach((coordinate, node) -> builder.append("  ")
-                    .append(coordinate)
-                    .append(paint(245, " -> " + node.resolvedVersion()))
-                    .append(System.lineSeparator()));
+            int[] external = {0};
+            nodes.forEach((coordinate, node) -> {
+                if (compact && !node.internal()) {
+                    external[0]++;
+                    return;
+                }
+                builder.append("  ")
+                        .append(coordinate)
+                        .append(paint(245, " -> " + node.resolvedVersion()))
+                        .append(System.lineSeparator());
+            });
+            if (external[0] > 0) {
+                builder.append("  ")
+                        .append(paint(245, external[0] + " external " + (external[0] == 1 ? "dependency" : "dependencies")))
+                        .append(System.lineSeparator());
+            }
         }
         synchronized (out) {
             out.print(builder);
@@ -178,13 +196,33 @@ public final class DependencyTreeReport {
                 children.computeIfAbsent(edge.parent(), _ -> new ArrayList<>()).add(edge);
             }
         }
+        if (compact) {
+            Map<String, Integer> weight = new HashMap<>();
+            for (Resolver.Edge root : roots) {
+                weight.put(root.coordinate(), reachableInternal(root.coordinate(), children, nodes, new HashSet<>()));
+            }
+            roots.sort(Comparator.comparingInt((Resolver.Edge root) -> weight.get(root.coordinate()))
+                    .reversed()
+                    .thenComparing(Resolver.Edge::coordinate));
+        }
         StringBuilder builder = new StringBuilder();
         Set<String> seen = new HashSet<>();
         int[] colorIndex = {0};
+        Set<String> externalRoots = new LinkedHashSet<>();
         for (Resolver.Edge root : roots) {
+            if (compact && !isInternal(root, nodes)) {
+                externalRoots.add(vertexKey(root));
+                continue;
+            }
+            if (compact && !seen.add(root.coordinate())) {
+                continue;
+            }
             int treeColor = GRADIENT[colorIndex[0]++ % GRADIENT.length];
             builder.append(label(root, nodes, treeColor, true)).append(System.lineSeparator());
             children(builder, root.coordinate(), children, nodes, "", seen, treeColor);
+        }
+        if (!externalRoots.isEmpty()) {
+            builder.append(externalSummary(externalRoots.size())).append(System.lineSeparator());
         }
         return builder.toString();
     }
@@ -197,16 +235,76 @@ public final class DependencyTreeReport {
                           Set<String> seen,
                           int treeColor) {
         List<Resolver.Edge> next = children.getOrDefault(coordinate, List.of());
-        for (int index = 0; index < next.size(); index++) {
-            boolean last = index == next.size() - 1;
-            Resolver.Edge edge = next.get(index);
+        List<Resolver.Edge> visible = new ArrayList<>();
+        Set<String> external = new LinkedHashSet<>();
+        if (compact) {
+            List<Resolver.Edge> internal = new ArrayList<>();
+            for (Resolver.Edge edge : next) {
+                if (isInternal(edge, nodes)) {
+                    internal.add(edge);
+                } else {
+                    external.add(vertexKey(edge));
+                }
+            }
+            internal.sort(Comparator.comparingInt((Resolver.Edge edge) ->
+                            reachableInternal(edge.coordinate(), children, nodes, new HashSet<>()))
+                    .reversed()
+                    .thenComparing(Resolver.Edge::coordinate));
+            for (Resolver.Edge edge : internal) {
+                if (seen.add(edge.coordinate())) {
+                    visible.add(edge);
+                }
+            }
+        } else {
+            visible.addAll(next);
+        }
+        for (int index = 0; index < visible.size(); index++) {
+            boolean last = index == visible.size() - 1 && external.isEmpty();
+            Resolver.Edge edge = visible.get(index);
             builder.append(paint(treeColor, indent + (last ? "└─ " : "├─ ")))
                     .append(label(edge, nodes, treeColor, false))
                     .append(System.lineSeparator());
-            if (edge.followed() && seen.add(edge.coordinate())) {
+            if (compact || (edge.followed() && seen.add(edge.coordinate()))) {
                 children(builder, edge.coordinate(), children, nodes, indent + (last ? "   " : "│  "), seen, treeColor);
             }
         }
+        if (!external.isEmpty()) {
+            builder.append(paint(treeColor, indent + "└─ "))
+                    .append(externalSummary(external.size()))
+                    .append(System.lineSeparator());
+        }
+    }
+
+    private static String externalSummary(int count) {
+        return paint(245, count + " external " + (count == 1 ? "dependency" : "dependencies"));
+    }
+
+    private static String vertexKey(Resolver.Edge edge) {
+        String coordinate = edge.coordinate(), version = edge.version();
+        return version != null && !version.isEmpty() && coordinate.endsWith("/" + version)
+                ? coordinate.substring(0, coordinate.length() - version.length() - 1)
+                : coordinate;
+    }
+
+    private static boolean isInternal(Resolver.Edge edge, SequencedMap<String, Resolver.Vertex> nodes) {
+        Resolver.Vertex node = nodes.get(vertexKey(edge));
+        return node != null && node.internal();
+    }
+
+    private static int reachableInternal(String coordinate,
+                                         SequencedMap<String, List<Resolver.Edge>> children,
+                                         SequencedMap<String, Resolver.Vertex> nodes,
+                                         Set<String> visited) {
+        if (!visited.add(coordinate)) {
+            return 0;
+        }
+        int count = 1;
+        for (Resolver.Edge edge : children.getOrDefault(coordinate, List.of())) {
+            if (isInternal(edge, nodes)) {
+                count += reachableInternal(edge.coordinate(), children, nodes, visited);
+            }
+        }
+        return count;
     }
 
     private String label(Resolver.Edge edge, SequencedMap<String, Resolver.Vertex> nodes, int treeColor, boolean root) {
@@ -244,8 +342,11 @@ public final class DependencyTreeReport {
             } else if (node.automatic()) {
                 meta.append("automatic module");
             }
+            if (node.internal()) {
+                meta.append(meta.isEmpty() ? "local" : ", local");
+            }
             if (!meta.isEmpty()) {
-                line.append(' ').append(paint(109, "(" + meta + ")"));
+                line.append(' ').append(paint(node.internal() ? 84 : 109, "(" + meta + ")"));
             }
             String names = node.licenses().stream()
                     .map(license -> license.id() != null ? license.id()

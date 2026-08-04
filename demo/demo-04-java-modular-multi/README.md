@@ -197,7 +197,7 @@ node carrying its resolved module name and declared license:
     java build/jenesis/Project.java dependencies
 
     main/compile (module-greeter-test)
-    maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (module demo.greeter)
+    maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (module demo.greeter, local)
     └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT License}
     maven/org.junit.jupiter/junit-jupiter 5.11.3 [compile] (module org.junit.jupiter) {Eclipse Public License v2.0}
     ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (module org.junit.jupiter.api) {Eclipse Public License v2.0}
@@ -209,3 +209,25 @@ MODULAR_TO_MAVEN layout resolves each `requires` through Maven, so the tree show
 Maven coordinates and their transitive Maven closure - the same shape as the
 POM-based `../demo-03-java-pom-multi`. The pure MODULAR layout shows the same
 dependencies as Java module names instead.
+
+Local modules and a compact view
+--------------------------------
+
+Every module the build produces itself is tagged `local`, so a first-party
+module stands out from a downloaded one at a glance - `demo.greeter` above
+carries it. When a graph grows large and the external closure is just noise, pass
+`-Djenesis.tree.format=compact` to keep only the local modules and fold the
+external dependencies into counts:
+
+    java -Djenesis.tree.format=compact build/jenesis/Project.java dependencies
+
+    main/compile (module-greeter-test)
+    maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (module demo.greeter, local)
+    └─ 1 external dependency
+    1 external dependency
+
+`demo.greeter` keeps its place with its lone external dependency collapsed
+beneath it, while the purely external `junit-jupiter` root and its closure become
+the trailing count. When several trees share the same local module, it is printed
+once inside the largest tree that reaches it and collapsed in the others. The
+default `full` format prints the whole graph; any other value is rejected.

@@ -187,7 +187,7 @@ public class ModularJarResolver implements Resolver {
                 dependencies.put(currentCoordinate, new Resolver.Resolved(jar, checksum == null ? "" : checksum, item.internal()));
                 resolved.add(current);
                 moduleCoordinates.put(current, currentCoordinate);
-                nodes.put(prefix + "/" + current, new Resolver.Vertex(version, descriptor.name(), descriptor.isAutomatic(), List.of()));
+                nodes.put(prefix + "/" + current, new Resolver.Vertex(version, descriptor.name(), descriptor.isAutomatic(), item.internal(), List.of()));
                 String parent = parents.get(current);
                 edges.add(new Resolver.Edge(
                         parent == null ? null : moduleCoordinates.get(parent),

@@ -114,10 +114,12 @@ public class MavenPomResolver implements MavenResolver {
         traversal.dependencies().forEach((key, value) -> {
             String withVersion = key.coordinate(prefix, value.version());
             ModuleDescriptor descriptor = descriptors.get(withVersion);
+            Resolver.Resolved artifact = artifacts.get(withVersion);
             nodes.put(key.coordinate(prefix, null), new Resolver.Vertex(
                     value.version(),
                     descriptor == null ? null : descriptor.name(),
                     descriptor != null && descriptor.isAutomatic(),
+                    artifact != null && artifact.internal(),
                     traversal.licenses().getOrDefault(withVersion, List.of())));
         });
         return new Resolver.Resolution(artifacts, traversal.edges(), nodes);

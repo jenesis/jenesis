@@ -390,7 +390,8 @@ public class Dependencies implements BuildStep {
                         graph.setProperty("vertex/" + group + "/" + scope + "/" + entry.getKey(), String.join("\t",
                                 text(node.resolvedVersion()),
                                 text(node.module()),
-                                Boolean.toString(node.automatic())));
+                                Boolean.toString(node.automatic()),
+                                Boolean.toString(node.internal())));
                         if (!node.licenses().isEmpty()) {
                             String licenseKey = node.resolvedVersion() == null
                                     ? entry.getKey()
@@ -710,6 +711,7 @@ public class Dependencies implements BuildStep {
                                     resolvedVersion,
                                     parts.length > 1 && !parts[1].isEmpty() ? parts[1] : null,
                                     parts.length > 2 && Boolean.parseBoolean(parts[2]),
+                                    parts.length > 3 && Boolean.parseBoolean(parts[3]),
                                     declared));
                 }
             }

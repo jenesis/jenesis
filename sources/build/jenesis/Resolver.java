@@ -23,7 +23,7 @@ public interface Resolver extends Serializable {
     record Edge(String parent, String coordinate, String version, String scope, boolean followed) {
     }
 
-    record Vertex(String resolvedVersion, String module, boolean automatic, List<License> licenses) {
+    record Vertex(String resolvedVersion, String module, boolean automatic, boolean internal, List<License> licenses) {
     }
 
     Resolution dependencies(Executor executor,
@@ -189,7 +189,7 @@ public interface Resolver extends Serializable {
             SequencedMap<String, Vertex> vertices = new LinkedHashMap<>();
             artifacts.sequencedKeySet().forEach(coordinate -> {
                 edges.add(new Edge(null, coordinate, null, null, true));
-                vertices.put(coordinate, new Vertex(null, null, false, List.of()));
+                vertices.put(coordinate, new Vertex(null, null, false, artifacts.get(coordinate).internal(), List.of()));
             });
             return new Resolution(artifacts, edges, vertices);
         };

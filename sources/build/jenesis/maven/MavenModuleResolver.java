@@ -222,10 +222,12 @@ public class MavenModuleResolver implements Resolver {
         closure.forEach((key, value) -> {
             String withVersion = key.coordinate(mavenPrefix, value.version());
             ModuleDescriptor descriptor = descriptors.get(withVersion);
+            Resolver.Resolved artifact = materialized.get(withVersion);
             nodes.put(key.coordinate(mavenPrefix, null), new Resolver.Vertex(
                     value.version(),
                     descriptor == null ? null : descriptor.name(),
                     descriptor != null && descriptor.isAutomatic(),
+                    artifact != null && artifact.internal(),
                     resolution.licenses().getOrDefault(withVersion, List.of())));
         });
         return new Resolver.Resolution(materialized, resolution.edges(), nodes);

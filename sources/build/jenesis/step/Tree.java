@@ -12,13 +12,29 @@ import build.jenesis.SequencedProperties;
 public class Tree implements BuildStep {
 
     private final transient PrintStream out;
+    private final transient boolean compact;
 
     public Tree() {
         this(System.out);
     }
 
     public Tree(PrintStream out) {
+        this(out, compactFromProperty());
+    }
+
+    public Tree(PrintStream out, boolean compact) {
         this.out = out;
+        this.compact = compact;
+    }
+
+    private static boolean compactFromProperty() {
+        String format = System.getProperty("jenesis.tree.format", "full");
+        return switch (format) {
+            case "full" -> false;
+            case "compact" -> true;
+            default -> throw new IllegalArgumentException(
+                    "Unknown jenesis.tree.format '" + format + "', expected 'full' or 'compact'");
+        };
     }
 
     @Override
@@ -31,7 +47,7 @@ public class Tree implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        DependencyTreeReport report = new DependencyTreeReport(out);
+        DependencyTreeReport report = new DependencyTreeReport(out, compact);
         SequencedMap<String, Resolver.Vertex> aggregated = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             Path inventoryFile = argument.folder().resolve(Inventory.INVENTORY);
