@@ -4707,6 +4707,29 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void inline_version_still_enforces_a_managed_checksum() throws IOException {
+        addToRepository("other", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                </project>
+                """);
+        addJarToRepository("other", "artifact", "1");
+        SequencedMap<String, SequencedSet<String>> coordinates = new LinkedHashMap<>();
+        coordinates.put("other/artifact/1", new LinkedHashSet<>());
+        SequencedMap<String, String> versions = new LinkedHashMap<>();
+        versions.put("other/artifact", "1 SHA-256/deadbeef");
+        assertThatThrownBy(() -> mavenPomResolver.dependencies(
+                Runnable::run,
+                "group",
+                Map.of("group", mavenRepository),
+                coordinates,
+                versions,
+                DependencyScope.COMPILE))
+                .hasStackTraceContaining("Mismatched digest");
+    }
+
+    @Test
     public void parent_pom_checksum_is_ignored() throws IOException {
         addToRepository("parent", "artifact", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>

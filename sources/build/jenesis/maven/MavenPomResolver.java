@@ -59,8 +59,20 @@ public class MavenPomResolver implements MavenResolver {
             MavenDependencyValue managed = managedDependencies.get(parsed.key());
             String declared = parsed.version();
             if (declared != null && !isFloating(declared)) {
+                String checksum = null;
+                if (managed != null && managed.checksum() != null) {
+                    if (!declared.equals(managed.version())) {
+                        throw new IllegalStateException("Inline version "
+                                + declared
+                                + " for "
+                                + coordinate
+                                + " conflicts with managed version "
+                                + managed.version());
+                    }
+                    checksum = managed.checksum();
+                }
                 dependencies.put(parsed.key(),
-                        new MavenDependencyValue(declared, MavenDependencyScope.COMPILE, null, exclusions, null));
+                        new MavenDependencyValue(declared, MavenDependencyScope.COMPILE, null, exclusions, null, checksum));
             } else if (managed != null) {
                 dependencies.put(parsed.key(), new MavenDependencyValue(
                         managed.version(), MavenDependencyScope.COMPILE, null, exclusions, null, managed.checksum()));
