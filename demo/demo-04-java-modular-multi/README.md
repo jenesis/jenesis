@@ -198,17 +198,30 @@ node carrying its resolved module name and declared license:
 
     main/compile (module-greeter-test)
     maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (module demo.greeter, local)
-    └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT License}
-    maven/org.junit.jupiter/junit-jupiter 5.11.3 [compile] (module org.junit.jupiter) {Eclipse Public License v2.0}
-    ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (module org.junit.jupiter.api) {Eclipse Public License v2.0}
-    │  └─ maven/org.junit.platform/junit-platform-commons 1.11.3 [compile] (module org.junit.platform.commons) {Eclipse Public License v2.0}
-    └─ maven/org.junit.jupiter/junit-jupiter-engine 5.11.3 [runtime] (module org.junit.jupiter.engine) {Eclipse Public License v2.0}
+    └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT}
+    maven/org.junit.jupiter/junit-jupiter 5.11.3 [compile] (module org.junit.jupiter) {EPL-2.0}
+    ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (module org.junit.jupiter.api) {EPL-2.0}
+    │  ├─ maven/org.opentest4j/opentest4j 1.3.0 [compile] (module org.opentest4j) {Apache-2.0}
+    │  ├─ maven/org.junit.platform/junit-platform-commons 1.11.3 [compile] (module org.junit.platform.commons) {EPL-2.0}
+    │  │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (*)
+    │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (module org.apiguardian.api) {Apache-2.0}
+    ├─ maven/org.junit.jupiter/junit-jupiter-params 5.11.3 [compile] (module org.junit.jupiter.params) {EPL-2.0}
+    │  ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (*)
+    │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (*)
+    └─ maven/org.junit.jupiter/junit-jupiter-engine 5.11.3 [runtime] (module org.junit.jupiter.engine) {EPL-2.0}
+       ├─ maven/org.junit.platform/junit-platform-engine 1.11.3 [runtime] (module org.junit.platform.engine) {EPL-2.0}
+       │  ├─ maven/org.opentest4j/opentest4j 1.3.0 [compile] (*)
+       │  ├─ maven/org.junit.platform/junit-platform-commons 1.11.3 [compile] (*)
+       │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (*)
+       ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (*)
+       └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (*)
 
 Even though every descriptor here is a `module-info.java`, the default
 MODULAR_TO_MAVEN layout resolves each `requires` through Maven, so the tree shows
 Maven coordinates and their transitive Maven closure - the same shape as the
-POM-based `../demo-03-java-pom-multi`. The pure MODULAR layout shows the same
-dependencies as Java module names instead.
+POM-based `../demo-03-java-pom-multi`. A node marked `(*)` was already expanded in
+full earlier in the graph and is not repeated. The pure MODULAR layout shows the
+same dependencies as Java module names instead.
 
 Local modules and a compact view
 --------------------------------
