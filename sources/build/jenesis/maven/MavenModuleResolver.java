@@ -204,6 +204,22 @@ public class MavenModuleResolver implements Resolver {
             }
         });
         CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new)).join();
+        resolution.roots().forEach((module, key) -> {
+            MavenDependencyValue value = closure.get(key);
+            if (value == null) {
+                return;
+            }
+            String withVersion = key.coordinate(mavenPrefix, value.version());
+            Resolver.Resolved artifact = materialized.get(withVersion);
+            if (artifact == null || artifact.internal()) {
+                return;
+            }
+            ModuleDescriptor descriptor = descriptors.get(withVersion);
+            if (descriptor != null && !descriptor.name().equals(module)) {
+                throw new IllegalStateException("Expected module " + module
+                        + " but the resolved jar for " + withVersion + " declares module " + descriptor.name());
+            }
+        });
         SequencedMap<String, Resolver.Vertex> nodes = new LinkedHashMap<>();
         closure.forEach((key, value) -> {
             String withVersion = key.coordinate(mavenPrefix, value.version());

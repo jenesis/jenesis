@@ -51,6 +51,49 @@ public class MavenModuleResolverTest {
     }
 
     @Test
+    public void rejects_a_jar_that_declares_a_different_module() throws IOException {
+        addModuleJarToMavenRepository("org.example", "example-core", "1.2.3", "evil.other");
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>1.2.3</version>
+                </project>"""));
+
+        assertThatThrownBy(() -> new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
+                Runnable::run,
+                "module",
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Expected module foo.bar")
+                .hasMessageContaining("evil.other");
+    }
+
+    @Test
+    public void accepts_a_jar_that_declares_the_requested_module() throws IOException {
+        addModuleJarToMavenRepository("org.example", "example-core", "1.2.3", "foo.bar");
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>1.2.3</version>
+                </project>"""));
+
+        SequencedMap<String, Resolver.Resolved> resolved = new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
+                Runnable::run,
+                "module",
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE).artifacts();
+
+        assertThat(resolved).containsKey("module/foo.bar/1.2.3");
+    }
+
+    @Test
     public void pinned_version_forces_versioned_fetch() throws IOException {
         addJarToMavenRepository("org.example", "example-core", "9.9");
         Map<String, String> fetched = new LinkedHashMap<>();
@@ -374,6 +417,18 @@ public class MavenModuleResolverTest {
         Files.writeString(Files
                 .createDirectories(mavenRepoFolder.resolve(groupId.replace('.', '/') + "/" + artifactId + "/" + version))
                 .resolve(artifactId + "-" + version + ".pom"), pom);
+    }
+
+    private void addModuleJarToMavenRepository(String groupId, String artifactId, String version, String module) throws IOException {
+        Path jar = Files.createDirectories(mavenRepoFolder.resolve(groupId.replace('.', '/') + "/" + artifactId + "/" + version))
+                .resolve(artifactId + "-" + version + ".jar");
+        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
+            out.putNextEntry(new JarEntry("module-info.class"));
+            out.write(ClassFile.of().buildModule(ModuleAttribute.of(
+                    ModuleDesc.of(module),
+                    builder -> builder.requires(ModuleRequireInfo.of(ModuleDesc.of("java.base"), 0, null)))));
+            out.closeEntry();
+        }
     }
 
     private String addJarToMavenRepository(String groupId, String artifactId, String version) throws IOException {
