@@ -133,6 +133,86 @@ public class BuildExecutorCacheTest implements Serializable {
         assertThat(bytes.toString()).isEmpty();
     }
 
+    @Test
+    public void swallows_rejected_store_submission_and_completes_build() throws IOException {
+        Files.writeString(source.resolve("file"), "foo");
+        OneShotRejectingExecutor executor = new OneShotRejectingExecutor();
+        RejectingStoreCache cache = new RejectingStoreCache(executor);
+        BuildExecutor buildExecutor = BuildExecutor.of(root,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                cache,
+                false);
+        BuildStep buildStep = (_, context, arguments) -> {
+            Files.writeString(
+                    context.next().resolve("file"),
+                    Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        };
+        buildExecutor.addSource("source", source);
+        buildExecutor.addStep("step", buildStep, "source");
+        Map<String, ?> build = buildExecutor.execute(executor).toCompletableFuture().join();
+        assertThat(build).containsOnlyKeys("source", "step");
+        assertThat(root.resolve("step").resolve("output").resolve("file")).content().isEqualTo("foobar");
+        assertThat(executor.rejected).hasValue(1);
+        assertThat(cache.stores).hasValue(0);
+    }
+
+    @Test
+    public void persists_supplement_locally_and_stores_only_output() throws IOException {
+        Files.writeString(source.resolve("file"), "foo");
+        RecordingCache cache = new RecordingCache(false);
+        BuildExecutor buildExecutor = BuildExecutor.of(root,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                cache,
+                false);
+        BuildStep buildStep = (_, context, arguments) -> {
+            Files.writeString(
+                    context.next().resolve("file"),
+                    Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
+            Files.writeString(context.supplement().resolve("note"), "scratch");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        };
+        buildExecutor.addSource("source", source);
+        buildExecutor.addStep("step", buildStep, "source");
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(root.resolve("step").resolve("output").resolve("file")).content().isEqualTo("foobar");
+        assertThat(root.resolve("step").resolve("supplement").resolve("note")).content().isEqualTo("scratch");
+        assertThat(cache.stores).hasValue(1);
+        assertThat(cache.storeOutput.resolve("file")).content().isEqualTo("foobar");
+        assertThat(cache.storeOutput.resolve("note")).doesNotExist();
+    }
+
+    @Test
+    public void serves_empty_supplement_on_cache_hit() throws IOException {
+        Files.writeString(source.resolve("file"), "foo");
+        RecordingCache cache = new RecordingCache(true);
+        BuildExecutor buildExecutor = BuildExecutor.of(root,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                cache,
+                false);
+        BuildStep buildStep = (_, _, _) -> {
+            throw new AssertionError("Did not expect that step is executed");
+        };
+        buildExecutor.addSource("source", source);
+        buildExecutor.addStep("step", buildStep, "source");
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(root.resolve("step").resolve("output").resolve("file")).content().isEqualTo("cached");
+        Path supplement = root.resolve("step").resolve("supplement");
+        assertThat(supplement).isDirectory();
+        try (Stream<Path> entries = Files.list(supplement)) {
+            assertThat(entries.toList()).isEmpty();
+        }
+    }
+
     private static final class RecordingCache implements BuildExecutorCache {
 
         private final boolean hit;
@@ -190,6 +270,59 @@ public class BuildExecutorCacheTest implements Serializable {
             storeStep = step;
             storeInputs = inputs;
             storeOutput = output;
+        }
+    }
+
+    private static final class OneShotRejectingExecutor implements Executor {
+
+        private final AtomicBoolean armed = new AtomicBoolean();
+        private final AtomicInteger rejected = new AtomicInteger();
+
+        private void arm() {
+            armed.set(true);
+        }
+
+        @Override
+        public void execute(Runnable command) {
+            if (armed.compareAndSet(true, false)) {
+                rejected.incrementAndGet();
+                throw new RejectedExecutionException("store submission rejected");
+            }
+            command.run();
+        }
+    }
+
+    private static final class RejectingStoreCache implements BuildExecutorCache {
+
+        private final OneShotRejectingExecutor executor;
+        private final AtomicInteger stores = new AtomicInteger();
+
+        private RejectingStoreCache(OneShotRejectingExecutor executor) {
+            this.executor = executor;
+        }
+
+        @Override
+        public boolean stores() {
+            executor.arm();
+            return true;
+        }
+
+        @Override
+        public Optional<BuildStepResult> fetch(Executor executor,
+                                               String identity,
+                                               byte[] step,
+                                               SequencedMap<String, Map<Path, byte[]>> inputs,
+                                               Path target) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void store(Executor executor,
+                          String identity,
+                          byte[] step,
+                          SequencedMap<String, Map<Path, byte[]>> inputs,
+                          Path output) {
+            stores.incrementAndGet();
         }
     }
 }
