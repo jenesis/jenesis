@@ -36,18 +36,30 @@ public class DownloadModuleUris implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        try (BufferedWriter writer = Files.newBufferedWriter(context.next().resolve(URIS))) {
-            for (URI location : locations.get()) {
-                try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                        Repository.open(location, null),
-                        StandardCharsets.UTF_8))) {
-                    Iterator<String> it = reader.lines().iterator();
-                    while (it.hasNext()) {
-                        writer.write((prefix == null ? "" : (prefix + "/")) + it.next());
-                        writer.newLine();
+        Path target = context.next().resolve(URIS);
+        Path temporary = Files.createTempFile(context.next(), "uris", ".tmp");
+        try {
+            try (BufferedWriter writer = Files.newBufferedWriter(temporary)) {
+                for (URI location : locations.get()) {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                            Repository.open(location, null),
+                            StandardCharsets.UTF_8))) {
+                        Iterator<String> it = reader.lines().iterator();
+                        while (it.hasNext()) {
+                            writer.write((prefix == null ? "" : (prefix + "/")) + it.next());
+                            writer.newLine();
+                        }
                     }
                 }
             }
+            try {
+                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException _) {
+                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (Throwable t) {
+            Files.deleteIfExists(temporary);
+            throw t;
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
