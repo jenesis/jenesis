@@ -567,7 +567,7 @@ public class MavenPomResolver implements MavenResolver {
                                         : value).orElse("../") : null))
                         .orElse(null);
                 Map<String, String> properties = new HashMap<>();
-                Map<DependencyKey, DependencyValue> managedDependencies = new HashMap<>();
+                Map<DependencyKey, DependencyValue> managedDependencies = new LinkedHashMap<>();
                 SequencedMap<DependencyKey, DependencyValue> dependencies = new LinkedHashMap<>();
                 List<License> parentLicenses = List.of();
                 String groupId = null, artifactId = null, version = null;
@@ -799,7 +799,7 @@ public class MavenPomResolver implements MavenResolver {
                                 MavenRepository repository,
                                 UnresolvedPom pom,
                                 Map<DependencyCoordinate, UnresolvedPom> unresolved) throws IOException {
-        Map<MavenDependencyKey, MavenDependencyValue> managedDependencies = new HashMap<>();
+        Map<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>();
         SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = new LinkedHashMap<>();
         for (Map.Entry<DependencyKey, DependencyValue> entry : pom.managedDependencies().entrySet()) {
             MavenDependencyKey key = entry.getKey().resolve(pom.properties());
