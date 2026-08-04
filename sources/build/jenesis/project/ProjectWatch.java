@@ -38,6 +38,14 @@ public final class ProjectWatch {
                         rebuild = true;
                         if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE && Files.isDirectory(changed)) {
                             register(service, changed, keys);
+                        } else if (event.kind() == StandardWatchEventKinds.ENTRY_DELETE) {
+                            keys.entrySet().removeIf(entry -> {
+                                if (entry.getValue().equals(changed)) {
+                                    entry.getKey().cancel();
+                                    return true;
+                                }
+                                return false;
+                            });
                         }
                     }
                     if (!key.reset()) {
