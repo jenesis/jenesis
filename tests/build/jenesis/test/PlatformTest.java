@@ -59,6 +59,24 @@ public class PlatformTest {
     }
 
     @Test
+    public void select_prefers_specific_guard_over_two_less_specific_matches() {
+        SequencedMap<String, String> guarded = new LinkedHashMap<>();
+        guarded.put("windows", ":win:1.0");
+        guarded.put("x86_64", ":x64:1.0");
+        guarded.put("windows,x86_64", ":win-x64:1.0");
+        assertThat(Platform.of("windows,x86_64").select("key", null, guarded)).isEqualTo(":win-x64:1.0");
+    }
+
+    @Test
+    public void select_result_is_independent_of_guard_declaration_order() {
+        SequencedMap<String, String> guarded = new LinkedHashMap<>();
+        guarded.put("windows,x86_64", ":win-x64:1.0");
+        guarded.put("windows", ":win:1.0");
+        guarded.put("x86_64", ":x64:1.0");
+        assertThat(Platform.of("windows,x86_64").select("key", null, guarded)).isEqualTo(":win-x64:1.0");
+    }
+
+    @Test
     public void select_rejects_equally_specific_distinct_guards() {
         SequencedMap<String, String> guarded = new LinkedHashMap<>();
         guarded.put("windows", ":win:1.0");

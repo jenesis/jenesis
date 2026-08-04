@@ -63,19 +63,26 @@ public record Platform(SequencedSet<String> tokens) implements Serializable {
     }
 
     public String select(String key, String fallback, SequencedMap<String, String> guarded) {
-        String selected = fallback;
-        String winner = null;
         int specificity = 0;
         for (Map.Entry<String, String> entry : guarded.entrySet()) {
             Platform guard = of(entry.getKey());
-            if (!matches(guard)) {
+            if (matches(guard) && guard.tokens().size() > specificity) {
+                specificity = guard.tokens().size();
+            }
+        }
+        if (specificity == 0) {
+            return fallback;
+        }
+        String selected = null, winner = null;
+        for (Map.Entry<String, String> entry : guarded.entrySet()) {
+            Platform guard = of(entry.getKey());
+            if (!matches(guard) || guard.tokens().size() != specificity) {
                 continue;
             }
-            if (guard.tokens().size() > specificity) {
+            if (selected == null) {
                 selected = entry.getValue();
                 winner = entry.getKey();
-                specificity = guard.tokens().size();
-            } else if (guard.tokens().size() == specificity && winner != null && !entry.getValue().equals(selected)) {
+            } else if (!entry.getValue().equals(selected)) {
                 throw new IllegalStateException("Ambiguous platform guards for " + key
                         + ": [" + winner + "] and [" + entry.getKey() + "] both match " + tokens);
             }
