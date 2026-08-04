@@ -51,7 +51,7 @@ distributions:
     scoop:
       active: ALWAYS
       packageName: jenesis
-      bucket:
+      repository:
         owner: raphw
         name: scoop-bucket
     sdkman:
