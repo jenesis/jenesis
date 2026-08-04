@@ -40,6 +40,10 @@ public class MavenPomResolver implements MavenResolver {
             MavenDependencyKey key = MavenDependencyKey.parseKey(coordinate);
             int split = value.indexOf(' ');
             String version = split < 0 ? value : value.substring(0, split);
+            if (version.startsWith(":")) {
+                throw new IllegalArgumentException("Module classifiers are not supported when resolving "
+                        + coordinate + " through Maven: " + version);
+            }
             String checksum = split < 0 ? null : value.substring(split + 1).trim();
             managedDependencies.put(key, new MavenDependencyValue(
                     version, null, null, null, null, checksum));

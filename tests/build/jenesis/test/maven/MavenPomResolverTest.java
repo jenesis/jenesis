@@ -424,6 +424,23 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void rejects_a_module_classifier_pin_on_the_maven_path() {
+        SequencedMap<String, String> versions = new LinkedHashMap<>();
+        versions.put("other/artifact", ":sources");
+        assertThatThrownBy(() -> mavenPomResolver.dependencies(
+                Runnable::run,
+                "maven",
+                Map.of(),
+                new LinkedHashMap<>(),
+                versions,
+                DependencyScope.COMPILE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Module classifiers are not supported")
+                .hasMessageContaining("other/artifact")
+                .hasMessageContaining(":sources");
+    }
+
+    @Test
     public void can_resolve_dependencies_with_nested_property() throws IOException {
         addToRepository("group", "artifact", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>
