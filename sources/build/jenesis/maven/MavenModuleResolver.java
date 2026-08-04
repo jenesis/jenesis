@@ -189,11 +189,25 @@ public class MavenModuleResolver implements Resolver {
                         new Resolver.Resolved(root.file(), "", root.internal()));
             }
         });
-        SequencedMap<String, Resolver.Vertex> nodes = new LinkedHashMap<>();
+        Map<String, ModuleDescriptor> descriptors = new ConcurrentHashMap<>();
+        List<CompletableFuture<?>> pending = new ArrayList<>();
         closure.forEach((key, value) -> {
             String withVersion = key.coordinate(mavenPrefix, value.version());
             Resolver.Resolved artifact = materialized.get(withVersion);
-            ModuleDescriptor descriptor = artifact == null ? null : PathPlacement.moduleDescriptor(artifact.file());
+            if (artifact != null) {
+                pending.add(CompletableFuture.runAsync(() -> {
+                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(artifact.file());
+                    if (descriptor != null) {
+                        descriptors.put(withVersion, descriptor);
+                    }
+                }, executor));
+            }
+        });
+        CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new)).join();
+        SequencedMap<String, Resolver.Vertex> nodes = new LinkedHashMap<>();
+        closure.forEach((key, value) -> {
+            String withVersion = key.coordinate(mavenPrefix, value.version());
+            ModuleDescriptor descriptor = descriptors.get(withVersion);
             nodes.put(key.coordinate(mavenPrefix, null), new Resolver.Vertex(
                     value.version(),
                     descriptor == null ? null : descriptor.name(),

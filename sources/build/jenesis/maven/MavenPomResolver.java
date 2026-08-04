@@ -95,11 +95,25 @@ public class MavenPomResolver implements MavenResolver {
                 key.coordinate(prefix, value.version()),
                 value.checksum() == null ? "" : value.checksum()));
         SequencedMap<String, Resolver.Resolved> artifacts = Resolver.materializeAll(executor, repositories, prefix, resolved);
-        SequencedMap<String, Resolver.Vertex> nodes = new LinkedHashMap<>();
+        Map<String, ModuleDescriptor> descriptors = new ConcurrentHashMap<>();
+        List<CompletableFuture<?>> pending = new ArrayList<>();
         traversal.dependencies().forEach((key, value) -> {
             String withVersion = key.coordinate(prefix, value.version());
             Resolver.Resolved artifact = artifacts.get(withVersion);
-            ModuleDescriptor descriptor = artifact == null ? null : PathPlacement.moduleDescriptor(artifact.file());
+            if (artifact != null) {
+                pending.add(CompletableFuture.runAsync(() -> {
+                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(artifact.file());
+                    if (descriptor != null) {
+                        descriptors.put(withVersion, descriptor);
+                    }
+                }, executor));
+            }
+        });
+        CompletableFuture.allOf(pending.toArray(CompletableFuture[]::new)).join();
+        SequencedMap<String, Resolver.Vertex> nodes = new LinkedHashMap<>();
+        traversal.dependencies().forEach((key, value) -> {
+            String withVersion = key.coordinate(prefix, value.version());
+            ModuleDescriptor descriptor = descriptors.get(withVersion);
             nodes.put(key.coordinate(prefix, null), new Resolver.Vertex(
                     value.version(),
                     descriptor == null ? null : descriptor.name(),
