@@ -171,7 +171,7 @@ public abstract class Java extends JdkProcessBuildStep {
                 prefixes.add(String.join(File.pathSeparator, paths.getValue()));
             }
         }
-        if (!selfContainedModuleGraph) {
+        if (!selfContainedModuleGraph && !modulePath.isEmpty()) {
             prefixes.add("--add-modules");
             prefixes.add("ALL-MODULE-PATH");
         }

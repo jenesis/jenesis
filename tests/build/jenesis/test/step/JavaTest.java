@@ -10,6 +10,7 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.PathPlacement;
 import build.jenesis.step.Java;
 import build.jenesis.step.Javac;
+import build.jenesis.step.ProcessHandler;
 import sample.Sample;
 
 import static java.util.Objects.requireNonNull;
@@ -44,5 +45,30 @@ public class JavaTest {
         assertThat(result.next()).isTrue();
         assertThat(supplement.resolve("output")).content().isEqualTo("Hello world!");
         assertThat(supplement.resolve("error")).isEmptyFile();
+    }
+
+    @Test
+    public void classpath_only_run_does_not_add_all_module_path() throws IOException {
+        Path folder = Files.createDirectories(classes.resolve(Javac.CLASSES + "sample"));
+        try (InputStream input = Sample.class.getResourceAsStream(Sample.class.getSimpleName() + ".class")) {
+            Files.copy(requireNonNull(input), folder.resolve("Sample.class"));
+        }
+        AtomicReference<List<String>> captured = new AtomicReference<>();
+        Function<List<String>, ProcessHandler.OfProcess> base = ProcessHandler.OfProcess.ofJavaHome("bin/java");
+        Function<List<String>, ProcessHandler.OfProcess> factory = arguments -> {
+            captured.set(arguments);
+            return base.apply(arguments);
+        };
+        BuildStepResult result = Java.of(factory, PathPlacement.CLASS_PATH, false, "sample.Sample").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(
+                        classes,
+                        Map.of(Path.of("sample/Sample.class"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(captured.get())
+                .as("a classpath-only run has no module path, so ALL-MODULE-PATH must not be emitted")
+                .contains("--class-path")
+                .doesNotContain("--add-modules", "ALL-MODULE-PATH");
     }
 }
