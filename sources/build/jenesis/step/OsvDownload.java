@@ -298,27 +298,60 @@ public class OsvDownload implements BuildStep {
     }
 
     private static String post(URI uri, String body) throws IOException {
-        requireSecure(uri);
-        HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
-        http.setRequestMethod("POST");
-        http.setRequestProperty("User-Agent", "Jenesis");
-        http.setRequestProperty("Content-Type", "application/json");
-        http.setConnectTimeout(10_000);
-        http.setReadTimeout(30_000);
-        http.setDoOutput(true);
-        try (OutputStream out = http.getOutputStream()) {
-            out.write(body.getBytes(StandardCharsets.UTF_8));
-        }
-        return read(http);
+        return request(uri, body);
     }
 
     private static String get(URI uri) throws IOException {
+        return request(uri, null);
+    }
+
+    private static String request(URI uri, String body) throws IOException {
         requireSecure(uri);
-        HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
-        http.setRequestProperty("User-Agent", "Jenesis");
-        http.setConnectTimeout(10_000);
-        http.setReadTimeout(30_000);
-        return read(http);
+        for (int attempt = 0; ; attempt++) {
+            HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
+            http.setRequestProperty("User-Agent", "Jenesis");
+            http.setConnectTimeout(10_000);
+            http.setReadTimeout(30_000);
+            if (body != null) {
+                http.setRequestMethod("POST");
+                http.setRequestProperty("Content-Type", "application/json");
+                http.setDoOutput(true);
+                try (OutputStream out = http.getOutputStream()) {
+                    out.write(body.getBytes(StandardCharsets.UTF_8));
+                }
+            }
+            int status = http.getResponseCode();
+            if (status == 200) {
+                try (InputStream in = http.getInputStream()) {
+                    return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                }
+            }
+            long delay = 500L << Math.min(attempt, 10);
+            String after = http.getHeaderField("Retry-After");
+            if (after != null) {
+                try {
+                    delay = Math.min(Long.parseLong(after.trim()), 30) * 1000;
+                } catch (NumberFormatException _) {
+                }
+            }
+            InputStream error = http.getErrorStream();
+            if (error != null) {
+                try (error) {
+                    error.readAllBytes();
+                } catch (IOException _) {
+                }
+            }
+            if ((status == 429 || status >= 500) && attempt < 3) {
+                try {
+                    Thread.sleep(delay);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new IOException("Interrupted while backing off from OSV " + uri, e);
+                }
+                continue;
+            }
+            throw new IOException("OSV request to " + uri + " failed with status " + status);
+        }
     }
 
     private static void requireSecure(URI uri) {
@@ -329,16 +362,6 @@ public class OsvDownload implements BuildStep {
                     + "': "
                     + uri
                     + " (set -Djenesis.repository.insecure=true to allow plaintext endpoints)");
-        }
-    }
-
-    private static String read(HttpURLConnection http) throws IOException {
-        int status = http.getResponseCode();
-        if (status != 200) {
-            throw new IOException("OSV request to " + http.getURL() + " failed with status " + status);
-        }
-        try (InputStream in = http.getInputStream()) {
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
         }
     }
 
