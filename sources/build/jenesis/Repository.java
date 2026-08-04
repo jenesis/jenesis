@@ -158,22 +158,8 @@ public interface Repository {
                         }
                     }
                     if ((status == 429 || status >= 500) && attempt < retry.retries()) {
-                        long delay = retry.backoff().toMillis() << Math.min(attempt, 20);
-                        String after = http.getHeaderField("Retry-After");
-                        if (after != null) {
-                            String trimmed = after.trim();
-                            try {
-                                delay = Math.min(Long.parseLong(trimmed), 30) * 1000;
-                            } catch (NumberFormatException _) {
-                                try {
-                                    long seconds = Duration.between(Instant.now(),
-                                            ZonedDateTime.parse(trimmed, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant())
-                                            .toSeconds();
-                                    delay = Math.min(Math.max(seconds, 0), 30) * 1000;
-                                } catch (DateTimeParseException _) {
-                                }
-                            }
-                        }
+                        long delay = retryAfterMillis(http.getHeaderField("Retry-After"),
+                                retry.backoff().toMillis() << Math.min(attempt, 20));
                         InputStream error = http.getErrorStream();
                         if (error != null) {
                             error.close();
@@ -199,6 +185,24 @@ public interface Repository {
         } catch (InterruptedException _) {
             Thread.currentThread().interrupt();
             throw new InterruptedIOException("Interrupted while retrying " + uri);
+        }
+    }
+
+    static long retryAfterMillis(String header, long fallback) {
+        if (header == null) {
+            return fallback;
+        }
+        String trimmed = header.trim();
+        try {
+            return Math.min(Long.parseLong(trimmed), 30) * 1000;
+        } catch (NumberFormatException _) {
+            try {
+                long seconds = Duration.between(Instant.now(),
+                        ZonedDateTime.parse(trimmed, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant()).toSeconds();
+                return Math.min(Math.max(seconds, 0), 30) * 1000;
+            } catch (DateTimeParseException _) {
+                return fallback;
+            }
         }
     }
 

@@ -6,6 +6,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Json;
+import build.jenesis.Repository;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDependencyKey;
 
@@ -341,14 +342,7 @@ public class OsvDownload implements BuildStep {
                     return new String(in.readAllBytes(), StandardCharsets.UTF_8);
                 }
             }
-            long delay = 500L << Math.min(attempt, 10);
-            String after = http.getHeaderField("Retry-After");
-            if (after != null) {
-                try {
-                    delay = Math.min(Long.parseLong(after.trim()), 30) * 1000;
-                } catch (NumberFormatException _) {
-                }
-            }
+            long delay = Repository.retryAfterMillis(http.getHeaderField("Retry-After"), 500L << Math.min(attempt, 10));
             InputStream error = http.getErrorStream();
             if (error != null) {
                 try (error) {

@@ -228,6 +228,16 @@ public class RepositoryTest {
     }
 
     @Test
+    public void retry_after_millis_parses_seconds_http_date_and_falls_back() {
+        assertThat(Repository.retryAfterMillis("5", 999)).isEqualTo(5_000);
+        assertThat(Repository.retryAfterMillis("120", 999)).isEqualTo(30_000);
+        assertThat(Repository.retryAfterMillis(null, 777)).isEqualTo(777);
+        assertThat(Repository.retryAfterMillis("garbage", 777)).isEqualTo(777);
+        String past = DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now(ZoneOffset.UTC).minusMinutes(1));
+        assertThat(Repository.retryAfterMillis(past, 777)).isEqualTo(0);
+    }
+
+    @Test
     public void ofProperties_passes_folder_to_resolver_for_relative_values() throws IOException {
         Path target = folder.resolve("artifact.jar");
         Files.writeString(target, "bytes");
