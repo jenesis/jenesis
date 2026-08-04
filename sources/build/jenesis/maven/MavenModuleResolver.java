@@ -123,20 +123,38 @@ public class MavenModuleResolver implements Resolver {
         });
         Repository repository = repositories.getOrDefault(Resolver.base(prefix), discovery);
         List<MavenResolver.RootPom> rootPoms = new ArrayList<>();
-        for (String coordinate : coordinates.sequencedKeySet()) {
-            rootPoms.add(toRootPom(executor, repository, coordinate, versions.get(coordinate), coordinate));
-        }
         List<MavenResolver.RootPom> managedPoms = new ArrayList<>();
         SequencedMap<String, String> mavenPins = new LinkedHashMap<>();
-        for (Map.Entry<String, String> pin : versions.entrySet()) {
-            if (coordinates.containsKey(pin.getKey())) {
-                continue;
+        try {
+            for (String coordinate : coordinates.sequencedKeySet()) {
+                rootPoms.add(toRootPom(executor, repository, coordinate, versions.get(coordinate), coordinate));
             }
-            if (pin.getKey().indexOf('/') < 0) {
-                managedPoms.add(toRootPom(executor, repository, pin.getKey(), pin.getValue(), null));
-            } else {
-                mavenPins.put(pin.getKey(), pin.getValue());
+            for (Map.Entry<String, String> pin : versions.entrySet()) {
+                if (coordinates.containsKey(pin.getKey())) {
+                    continue;
+                }
+                if (pin.getKey().indexOf('/') < 0) {
+                    managedPoms.add(toRootPom(executor, repository, pin.getKey(), pin.getValue(), null));
+                } else {
+                    mavenPins.put(pin.getKey(), pin.getValue());
+                }
             }
+        } catch (RuntimeException | IOException e) {
+            for (MavenResolver.RootPom opened : rootPoms) {
+                try {
+                    opened.pom().close();
+                } catch (IOException suppressed) {
+                    e.addSuppressed(suppressed);
+                }
+            }
+            for (MavenResolver.RootPom opened : managedPoms) {
+                try {
+                    opened.pom().close();
+                } catch (IOException suppressed) {
+                    e.addSuppressed(suppressed);
+                }
+            }
+            throw e;
         }
         MavenRepository mavenRepo = MavenRepository.of(repositories.getOrDefault(mavenPrefix, Repository.empty()));
         MavenResolver.Closure resolution = delegate.dependencies(

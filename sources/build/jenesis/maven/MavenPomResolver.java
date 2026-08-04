@@ -744,7 +744,6 @@ public class MavenPomResolver implements MavenResolver {
                             new LinkedHashMap<>(),
                             List.of());
                 } else {
-                    InputStream stream = candidate.toInputStream();
                     Path localPath = candidate.file().map(Path::getParent).orElse(null);
                     Map<Path, UnresolvedPom> localPaths = localPath == null ? null : new HashMap<>();
                     if (checksum != null) {
@@ -762,11 +761,11 @@ public class MavenPomResolver implements MavenResolver {
                         } catch (NoSuchAlgorithmException e) {
                             throw new IllegalStateException(e);
                         }
-                        DigestInputStream digestStream = new DigestInputStream(stream, digest);
+                        DigestInputStream digestStream = new DigestInputStream(candidate.toInputStream(), digest);
                         pom = assemble(executor, repository, drainAndValidate(digestStream, digest, expected,
                                 groupId, artifactId, version), false, false, localPath, localPaths, children, poms);
                     } else {
-                        pom = assemble(executor, repository, stream, false, false, localPath, localPaths, children, poms);
+                        pom = assemble(executor, repository, candidate.toInputStream(), false, false, localPath, localPaths, children, poms);
                     }
                 }
             } catch (RuntimeException | SAXException | ParserConfigurationException e) {
