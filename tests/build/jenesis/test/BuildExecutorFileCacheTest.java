@@ -535,6 +535,27 @@ public class BuildExecutorFileCacheTest implements Serializable {
         assertThat(cache.fetch(Runnable::run, "step", step, inputPath(Path.of("a\\b")), target)).isPresent();
     }
 
+    @Test
+    public void folds_inputs_independent_of_file_iteration_order() throws IOException {
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        Files.writeString(output.resolve("file"), "result");
+        byte[] step = {1};
+        Map<Path, byte[]> forward = new LinkedHashMap<>();
+        forward.put(Path.of("a"), new byte[]{1});
+        forward.put(Path.of("b"), new byte[]{2});
+        SequencedMap<String, Map<Path, byte[]>> stored = new LinkedHashMap<>();
+        stored.put("source", forward);
+        cache.store(Runnable::run, "step", step, stored, output);
+
+        Map<Path, byte[]> reversed = new LinkedHashMap<>();
+        reversed.put(Path.of("b"), new byte[]{2});
+        reversed.put(Path.of("a"), new byte[]{1});
+        SequencedMap<String, Map<Path, byte[]>> fetched = new LinkedHashMap<>();
+        fetched.put("source", reversed);
+        assertThat(cache.fetch(Runnable::run, "step", step, fetched, target)).isPresent();
+        assertThat(target.resolve("file")).content().isEqualTo("result");
+    }
+
     private static SequencedMap<String, Map<Path, byte[]>> inputPath(Path path) {
         Map<Path, byte[]> files = new LinkedHashMap<>();
         files.put(path, new byte[]{9});

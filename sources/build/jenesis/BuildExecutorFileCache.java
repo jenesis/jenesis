@@ -165,11 +165,13 @@ public record BuildExecutorFileCache(Path root,
         inputs.forEach((argument, files) -> {
             message.update(argument.getBytes(StandardCharsets.UTF_8));
             message.update((byte) 0);
-            files.forEach((path, hash) -> {
-                message.update(path.toString().replace('\\', '/').getBytes(StandardCharsets.UTF_8));
+            List<Map.Entry<Path, byte[]>> ordered = new ArrayList<>(files.entrySet());
+            ordered.sort(Comparator.comparing(entry -> entry.getKey().toString().replace('\\', '/')));
+            for (Map.Entry<Path, byte[]> entry : ordered) {
+                message.update(entry.getKey().toString().replace('\\', '/').getBytes(StandardCharsets.UTF_8));
                 message.update((byte) 0);
-                message.update(hash);
-            });
+                message.update(entry.getValue());
+            }
         });
         return message.digest();
     }
