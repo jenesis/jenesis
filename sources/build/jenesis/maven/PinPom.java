@@ -173,7 +173,7 @@ public class PinPom implements BuildStep {
             String guard = null;
             if (value.endsWith("]")) {
                 int bracket = value.lastIndexOf('[');
-                if (bracket >= 0) {
+                if (bracket > 0 && !value.substring(0, bracket).trim().isEmpty()) {
                     guard = value.substring(bracket + 1, value.length() - 1);
                     value = value.substring(0, bracket).trim();
                 }

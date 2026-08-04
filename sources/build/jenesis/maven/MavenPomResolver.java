@@ -993,9 +993,12 @@ public class MavenPomResolver implements MavenResolver {
                                         + value
                                         + "': expected <value> [<token>,<token>...]");
                             }
-                            guard = Platform.of(
-                                    value.substring(bracket + 1, value.length() - 1)).canonical();
-                            value = value.substring(0, bracket).trim();
+                            String guarded = value.substring(0, bracket).trim();
+                            if (!guarded.isEmpty()) {
+                                guard = Platform.of(
+                                        value.substring(bracket + 1, value.length() - 1)).canonical();
+                                value = guarded;
+                            }
                         }
                         if (value.isEmpty()) {
                             continue;

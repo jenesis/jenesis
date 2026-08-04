@@ -101,9 +101,12 @@ public class ModuleInfoParser {
                                                 + version
                                                 + "': expected <value> [<token>,<token>...]");
                                     }
-                                    guard = Platform.of(
-                                            version.substring(bracket + 1, version.length() - 1)).canonical();
-                                    version = version.substring(0, bracket).trim();
+                                    String guarded = version.substring(0, bracket).trim();
+                                    if (!guarded.isEmpty()) {
+                                        guard = Platform.of(
+                                                version.substring(bracket + 1, version.length() - 1)).canonical();
+                                        version = guarded;
+                                    }
                                 }
                                 if (token.isEmpty() || version.isEmpty()
                                         || token.startsWith("java.") || token.startsWith("jdk.")) {
@@ -126,8 +129,11 @@ public class ModuleInfoParser {
                                                 + bom
                                                 + "': expected <value> [<token>,<token>...]");
                                     }
-                                    guard = Platform.of(bom.substring(bracket + 1, bom.length() - 1)).canonical();
-                                    bom = bom.substring(0, bracket).trim();
+                                    String guarded = bom.substring(0, bracket).trim();
+                                    if (!guarded.isEmpty()) {
+                                        guard = Platform.of(bom.substring(bracket + 1, bom.length() - 1)).canonical();
+                                        bom = guarded;
+                                    }
                                 }
                                 if (bom.isEmpty()) {
                                     continue;

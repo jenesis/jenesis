@@ -294,7 +294,7 @@ public class PinModuleInfo implements BuildStep {
             String guard = null;
             if (rest.endsWith("]")) {
                 int bracket = rest.lastIndexOf('[');
-                if (bracket >= 0) {
+                if (bracket > 0 && !rest.substring(0, bracket).trim().isEmpty()) {
                     guard = rest.substring(bracket + 1, rest.length() - 1);
                 }
             }
@@ -408,8 +408,11 @@ public class PinModuleInfo implements BuildStep {
                 }
                 String rest = matcher.group(2) == null ? "" : matcher.group(2).trim();
                 if (rest.endsWith("]")) {
-                    throw new IllegalStateException("Cannot flatten platform-guarded BOM declaration: "
-                            + line.trim());
+                    int bracket = rest.lastIndexOf('[');
+                    if (bracket > 0 && !rest.substring(0, bracket).trim().isEmpty()) {
+                        throw new IllegalStateException("Cannot flatten platform-guarded BOM declaration: "
+                                + line.trim());
+                    }
                 }
                 it.remove();
             }
@@ -430,7 +433,7 @@ public class PinModuleInfo implements BuildStep {
             String guard = null;
             if (rest.endsWith("]")) {
                 int bracket = rest.lastIndexOf('[');
-                if (bracket >= 0) {
+                if (bracket > 0 && !rest.substring(0, bracket).trim().isEmpty()) {
                     guard = rest.substring(bracket + 1, rest.length() - 1);
                 }
             }

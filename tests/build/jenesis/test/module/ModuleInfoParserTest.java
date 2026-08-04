@@ -48,6 +48,37 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void jenesis_pin_keeps_inclusive_version_range_as_the_version() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.pin org.slf4j/slf4j-api [1.7,2.0]
+                 */
+                module foo {
+                    requires org.slf4j;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.versions())
+                .containsEntry("main/maven/org.slf4j/slf4j-api", "[1.7,2.0]");
+        assertThat(info.variants()).doesNotContainKey("main/maven/org.slf4j/slf4j-api");
+    }
+
+    @Test
+    public void jenesis_pin_keeps_range_as_version_when_platform_guarded() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.pin org.slf4j/slf4j-api [1.7,2.0] [windows]
+                 */
+                module foo {
+                    requires org.slf4j;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.variants().get("main/maven/org.slf4j/slf4j-api"))
+                .containsEntry("windows", "[1.7,2.0]");
+    }
+
+    @Test
     public void jenesis_pin_expands_maven_coordinate_shortcut() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
