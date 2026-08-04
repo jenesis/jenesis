@@ -207,7 +207,8 @@ public record Jpx(Path storage,
                 default -> {
                     if (arguments[target].startsWith("--docker=")) {
                         dockerized = true;
-                        image = arguments[target].substring("--docker=".length());
+                        String value = arguments[target].substring("--docker=".length());
+                        image = value.isBlank() ? null : value;
                     } else if (arguments[target].startsWith("--hash=")) {
                         checksum = requireValidChecksum(arguments[target].substring("--hash=".length()));
                     } else {
