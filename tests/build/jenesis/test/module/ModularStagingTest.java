@@ -179,6 +179,15 @@ public class ModularStagingTest {
         assertThat(next.resolve("foo/foo-javadoc.jar")).doesNotExist();
     }
 
+    @Test
+    public void rejects_module_name_with_path_traversal() throws IOException {
+        Path inv = inventory("foo", "../escape", null, null, "classes.jar");
+        writeArtifact(inv, "classes.jar", "c");
+
+        assertThatThrownBy(() -> run(false, inv))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     private Path inventory(String path,
                            String moduleName,
                            String testsOf,

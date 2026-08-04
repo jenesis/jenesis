@@ -40,6 +40,7 @@ public class ModularStaging implements BuildStep {
             if (moduleName == null) {
                 continue;
             }
+            requireSafeSegment("module name", moduleName);
             Path artifact = single(Inventory.paths(inventory, argument.folder(), prefix + ".artifacts"),
                     prefix, "artifacts", true, ".jar", inventoryFile);
             Path sources = single(Inventory.paths(inventory, argument.folder(), prefix + ".sources"),
@@ -52,10 +53,19 @@ public class ModularStaging implements BuildStep {
                     prefix, "bomfile", false, ".properties", inventoryFile);
             String pomRelative = inventory.getProperty(prefix + ".pom");
             Path pom = pomRelative == null ? null : argument.folder().resolve(pomRelative).normalize();
+            if (pom != null && !pom.startsWith(argument.folder().normalize())) {
+                throw new IllegalStateException("Resolved pom escapes the module folder: " + pom);
+            }
             String version = inventory.getProperty(prefix + ".version");
+            if (version != null) {
+                requireSafeSegment("version", version);
+            }
             Path target = version == null
                     ? context.next().resolve(moduleName)
                     : context.next().resolve(moduleName).resolve(version);
+            if (!target.normalize().startsWith(context.next().normalize())) {
+                throw new IllegalStateException("Resolved path escapes the staging root: " + target);
+            }
             Files.createDirectories(target);
             link(artifact, target.resolve(moduleName + ".jar"));
             link(sources, target.resolve(moduleName + "-sources.jar"));
@@ -128,6 +138,31 @@ public class ModularStaging implements BuildStep {
                     + inventoryFile);
         }
         return matches.getFirst();
+    }
+
+    private static void requireSafeSegment(String role, String value) {
+        if (value.isEmpty()) {
+            throw new IllegalArgumentException("Blank " + role + " is not a valid coordinate");
+        }
+        for (String segment : value.split("/", -1)) {
+            if (segment.equals("..")) {
+                throw new IllegalArgumentException("Illegal " + role + " '" + value + "': path traversal is not permitted");
+            }
+        }
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            boolean permitted = character >= 'a' && character <= 'z'
+                    || character >= 'A' && character <= 'Z'
+                    || character >= '0' && character <= '9'
+                    || character == '.'
+                    || character == '-'
+                    || character == '_'
+                    || character == '+';
+            if (!permitted) {
+                throw new IllegalArgumentException(
+                        "Illegal " + role + " '" + value + "': character '" + character + "' is not permitted");
+            }
+        }
     }
 
     private static void link(Path source, Path target) throws IOException {
