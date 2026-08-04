@@ -2,11 +2,22 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.Json;
 import build.jenesis.step.OsvDownload;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class OsvDownloadTest {
+
+    @Test
+    public void query_batch_escapes_json_metacharacters_in_coordinates() {
+        String body = OsvDownload.queryBatch(List.of("org.example/lib/1.0\",\"x\":\"y"));
+        Object parsed = Json.parse(body);
+        Object query = ((List<?>) ((Map<?, ?>) parsed).get("queries")).getFirst();
+        assertThat(((Map<?, ?>) query).get("version"))
+                .as("a quote in the version stays inside the version string instead of reshaping the query")
+                .isEqualTo("1.0\",\"x\":\"y");
+    }
 
     @Test
     public void parses_query_batch_results_positionally() {
