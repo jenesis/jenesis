@@ -298,6 +298,7 @@ public class OsvDownload implements BuildStep {
     }
 
     private static String post(URI uri, String body) throws IOException {
+        requireSecure(uri);
         HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
         http.setRequestMethod("POST");
         http.setRequestProperty("User-Agent", "Jenesis");
@@ -312,11 +313,23 @@ public class OsvDownload implements BuildStep {
     }
 
     private static String get(URI uri) throws IOException {
+        requireSecure(uri);
         HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
         http.setRequestProperty("User-Agent", "Jenesis");
         http.setConnectTimeout(10_000);
         http.setReadTimeout(30_000);
         return read(http);
+    }
+
+    private static void requireSecure(URI uri) {
+        String scheme = uri.getScheme();
+        if (scheme != null && !scheme.equals("https") && !Boolean.getBoolean("jenesis.repository.insecure")) {
+            throw new IllegalStateException("Refusing to query OSV over insecure scheme '"
+                    + scheme
+                    + "': "
+                    + uri
+                    + " (set -Djenesis.repository.insecure=true to allow plaintext endpoints)");
+        }
     }
 
     private static String read(HttpURLConnection http) throws IOException {

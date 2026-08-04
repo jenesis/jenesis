@@ -2,12 +2,39 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.BuildStep;
+import build.jenesis.BuildStepArgument;
+import build.jenesis.BuildStepContext;
+import build.jenesis.Checksum;
+import build.jenesis.ChecksumStatus;
 import build.jenesis.Json;
+import build.jenesis.SequencedProperties;
 import build.jenesis.step.OsvDownload;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class OsvDownloadTest {
+
+    @TempDir
+    private Path root;
+
+    @Test
+    public void refuses_to_query_an_insecure_endpoint() throws IOException {
+        Path next = Files.createDirectory(root.resolve("next"));
+        Path argument = Files.createDirectory(root.resolve("argument"));
+        SequencedProperties dependencies = new SequencedProperties();
+        dependencies.setProperty("main/compile/maven/org.example/lib/1.2.3", "resolved/lib.jar");
+        dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+        OsvDownload step = new OsvDownload().endpoint(URI.create("http://osv.invalid"));
+        assertThatThrownBy(() -> step.apply(Runnable::run,
+                new BuildStepContext(root.resolve("previous"), next, root.resolve("supplement")),
+                new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                        argument,
+                        Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED)))))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("insecure scheme");
+    }
 
     @Test
     public void query_batch_escapes_json_metacharacters_in_coordinates() {
