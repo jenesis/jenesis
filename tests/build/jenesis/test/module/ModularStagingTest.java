@@ -62,6 +62,28 @@ public class ModularStagingTest {
     }
 
     @Test
+    public void resolves_pom_that_navigates_to_a_sibling_step_output() throws IOException {
+        Path module = source.resolve("mod");
+        Path inventoryDir = Files.createDirectories(module.resolve("inventory/output"));
+        Path pomDir = Files.createDirectories(module.resolve("produce/describe/pom/output"));
+        Path artifactDir = Files.createDirectories(module.resolve("produce/assemble/binary/artifacts/jar/output/artifacts"));
+        Files.writeString(pomDir.resolve("pom.xml"), "<project/>");
+        Files.writeString(artifactDir.resolve("classes.jar"), "classes-bytes");
+
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-mod.module", "demo.foo");
+        inventory.setProperty("module-mod.artifacts.0",
+                "../../produce/assemble/binary/artifacts/jar/output/artifacts/classes.jar");
+        inventory.setProperty("module-mod.pom", "../../produce/describe/pom/output/pom.xml");
+        inventory.store(inventoryDir.resolve(Inventory.INVENTORY));
+
+        run(false, inventoryDir);
+
+        assertThat(next.resolve("demo.foo/demo.foo.jar")).hasContent("classes-bytes");
+        assertThat(next.resolve("demo.foo/demo.foo.pom")).hasContent("<project/>");
+    }
+
+    @Test
     public void stages_bom_as_module_properties() throws IOException {
         Path folder = Files.createDirectory(source.resolve("foo"));
         SequencedProperties inventory = new SequencedProperties();

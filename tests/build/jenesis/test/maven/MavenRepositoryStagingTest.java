@@ -46,6 +46,32 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
+    public void resolves_inventory_paths_that_navigate_to_sibling_step_outputs() throws IOException {
+        Path module = source.resolve("mod");
+        Path inventoryDir = Files.createDirectories(module.resolve("inventory/output"));
+        Path pomDir = Files.createDirectories(module.resolve("produce/describe/pom/output"));
+        Path artifactDir = Files.createDirectories(module.resolve("produce/assemble/binary/artifacts/jar/output/artifacts"));
+        Path sbomDir = Files.createDirectories(module.resolve("produce/assemble/sbom/output/reports/sbom"));
+        Files.writeString(pomDir.resolve("pom.xml"), buildPom("com.example", "foo", "1.2.3", List.of()));
+        Files.writeString(artifactDir.resolve("classes.jar"), "classes-bytes");
+        Files.writeString(sbomDir.resolve("sbom.json"), "{}");
+
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-foo.pom", "../../produce/describe/pom/output/pom.xml");
+        inventory.setProperty("module-foo.artifacts.0",
+                "../../produce/assemble/binary/artifacts/jar/output/artifacts/classes.jar");
+        inventory.setProperty("module-foo.report.sbom", "../../produce/assemble/sbom/output/reports/sbom");
+        inventory.store(inventoryDir.resolve(Inventory.INVENTORY));
+
+        BuildStepResult result = run(true, inventoryDir);
+
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).hasContent("classes-bytes");
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.pom")).exists();
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-cyclonedx.json")).exists();
+    }
+
+    @Test
     public void only_existing_artifacts_are_linked() throws IOException {
         Path inv = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
         writeArtifact(inv, "classes.jar", "c");

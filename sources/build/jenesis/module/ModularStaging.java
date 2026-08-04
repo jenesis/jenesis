@@ -56,9 +56,6 @@ public class ModularStaging implements BuildStep {
                     prefix, "bomfile", false, ".properties", inventoryFile);
             String pomRelative = inventory.getProperty(prefix + ".pom");
             Path pom = pomRelative == null ? null : argument.folder().resolve(pomRelative).normalize();
-            if (pom != null && !pom.startsWith(argument.folder().normalize())) {
-                throw new IllegalStateException("Resolved pom escapes the module folder: " + pom);
-            }
             String version = inventory.getProperty(prefix + ".version");
             if (version != null) {
                 SAFE_SEGMENT.accept("version", version);

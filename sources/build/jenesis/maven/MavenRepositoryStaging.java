@@ -222,9 +222,6 @@ public class MavenRepositoryStaging implements BuildStep {
             return null;
         }
         Path resolved = base.resolve(relative).normalize();
-        if (!resolved.startsWith(base.normalize())) {
-            throw new IllegalStateException("Resolved path escapes the module folder: " + resolved);
-        }
         return Files.isRegularFile(resolved) ? resolved : null;
     }
 
@@ -234,9 +231,6 @@ public class MavenRepositoryStaging implements BuildStep {
             return null;
         }
         Path folder = base.resolve(value).normalize();
-        if (!folder.startsWith(base.normalize())) {
-            throw new IllegalStateException("Resolved path escapes the module folder: " + folder);
-        }
         if (!Files.isDirectory(folder)) {
             return null;
         }
