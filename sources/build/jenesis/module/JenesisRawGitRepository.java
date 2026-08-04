@@ -14,6 +14,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
     private final String token;
     private final Predicate<String> predicate;
     private final Repository.Retry retry;
+    private final Map<String, Optional<String>> tsvCache = new ConcurrentHashMap<>();
 
     public JenesisRawGitRepository(Scope scope, URI data, URI repository) {
         this(scope, data, repository, null);
@@ -195,15 +196,19 @@ public class JenesisRawGitRepository implements JenesisRepository {
         String tsvName = (scope == Scope.MODULE ? "modules" : "artifacts")
                 + (classifier == null ? "" : "-" + classifier) + ".tsv";
         URI tsvUri = data.resolve(moduleName.replace('.', '/') + "/" + tsvName);
-        Optional<InputStream> stream = open(tsvUri, null, retry);
-        if (stream.isEmpty()) {
-            return null;
+        Optional<String> tsv = tsvCache.get(tsvUri.toString());
+        if (tsv == null) {
+            Optional<InputStream> stream = open(tsvUri, null, retry);
+            if (stream.isEmpty()) {
+                tsv = Optional.empty();
+            } else {
+                try (InputStream open = stream.get()) {
+                    tsv = Optional.of(new String(open.readAllBytes(), StandardCharsets.UTF_8));
+                }
+            }
+            tsvCache.put(tsvUri.toString(), tsv);
         }
-        String tsv;
-        try (InputStream open = stream.get()) {
-            tsv = new String(open.readAllBytes(), StandardCharsets.UTF_8);
-        }
-        return pickRow(tsv, version);
+        return tsv.isEmpty() ? null : pickRow(tsv.get(), version);
     }
 
     private Coordinate pickRow(String tsv, String version) {
