@@ -93,6 +93,34 @@ public class MultiProjectDependenciesTest {
     }
 
     @Test
+    public void merges_aliases_across_sibling_modules_first_wins() throws IOException {
+        SequencedProperties first = new SequencedProperties();
+        first.setProperty("toolkit.lib", "org.example/plain-lib 1.0");
+        first.store(module.resolve(BuildStep.ALIASES));
+        new SequencedProperties().store(module.resolve(BuildStep.REQUIRES));
+        SequencedProperties second = new SequencedProperties();
+        second.setProperty("toolkit.lib", "org.other/other-lib 2.0");
+        second.store(dependency.resolve(BuildStep.ALIASES));
+        new SequencedProperties().store(dependency.resolve(BuildStep.REQUIRES));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("foo", new BuildStepArgument(
+                module,
+                Map.of(Path.of(BuildStep.ALIASES), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("bar", new BuildStepArgument(
+                dependency,
+                Map.of(Path.of(BuildStep.ALIASES), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new MultiProjectDependencies(_ -> true).apply(
+                        Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        arguments)
+                .toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        SequencedProperties properties = SequencedProperties.ofFiles(next.resolve(BuildStep.ALIASES));
+        assertThat(properties.stringPropertyNames()).containsExactly("toolkit.lib");
+        assertThat(properties.getProperty("toolkit.lib")).isEqualTo("org.example/plain-lib 1.0");
+    }
+
+    @Test
     public void preserves_pinned_checksum_for_external_dep() throws IOException {
         SequencedProperties dependencies = new SequencedProperties();
         dependencies.setProperty("baz", "SHA256/cafebabe");

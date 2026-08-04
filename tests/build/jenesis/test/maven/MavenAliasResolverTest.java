@@ -400,6 +400,94 @@ public class MavenAliasResolverTest {
         assertThat(result).withFailMessage(() -> "Compilation failed: " + errors).isEqualTo(0);
     }
 
+    @Test
+    public void rejects_chained_alias_whose_target_is_another_alias() {
+        SequencedMap<String, String> aliases = new LinkedHashMap<>();
+        aliases.put("toolkit.lib", "org.example/plain-lib 1.0");
+        aliases.put("toolkit.chain", "toolkit.lib");
+        assertThatThrownBy(() -> resolver.dependencies(
+                Runnable::run,
+                "module",
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                new LinkedHashMap<>(Map.of("toolkit.chain", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                aliases,
+                DependencyScope.COMPILE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed alias target for toolkit.chain: toolkit.lib");
+    }
+
+    @Test
+    public void alias_wrapper_surfaces_module_exclusion_rejection() {
+        SequencedMap<String, SequencedSet<String>> coordinates = new LinkedHashMap<>();
+        coordinates.put("toolkit.lib", new LinkedHashSet<>(List.of("org.foo/bar")));
+        assertThatThrownBy(() -> resolver.dependencies(
+                Runnable::run,
+                "module",
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                coordinates,
+                new LinkedHashMap<>(),
+                new LinkedHashMap<>(Map.of("toolkit.lib", "org.example/plain-lib 1.0")),
+                DependencyScope.COMPILE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Module system does not support exclusions");
+    }
+
+    @Test
+    public void module_resolver_rejects_aliases_without_alias_resolver_wrapper() {
+        Resolver bare = new MavenModuleResolver("maven",
+                new MavenPomResolver(MavenDefaultVersionNegotiator.maven()),
+                (_, _) -> Optional.empty());
+        assertThatThrownBy(() -> bare.dependencies(
+                Runnable::run,
+                "module",
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                new LinkedHashMap<>(Map.of("toolkit.lib", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                new LinkedHashMap<>(Map.of("toolkit.lib", "org.example/plain-lib 1.0")),
+                DependencyScope.COMPILE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("require wrapping this resolver in a MavenAliasResolver");
+    }
+
+    @Test
+    public void rejects_malformed_alias_version() {
+        assertThatThrownBy(() -> resolver.dependencies(
+                Runnable::run,
+                "module",
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                new LinkedHashMap<>(Map.of("toolkit.lib", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                new LinkedHashMap<>(Map.of("toolkit.lib", "org.example/plain-lib :bad")),
+                DependencyScope.COMPILE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed version");
+    }
+
+    @Test
+    public void resolves_classified_target_with_managed_version() throws IOException {
+        addToMavenRepository("org.example", "plain-lib", "1.0", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>plain-lib</artifactId>
+                    <version>1.0</version>
+                </project>""");
+        Files.write(mavenRepoFolder.resolve("org/example/plain-lib/1.0/plain-lib-1.0-natives.jar"),
+                "natives".getBytes(StandardCharsets.UTF_8));
+
+        Resolver.Resolution resolution = resolver.dependencies(
+                Runnable::run,
+                "module",
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                new LinkedHashMap<>(Map.of("toolkit.natives", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(Map.of("org.example/plain-lib/jar/natives", "1.0")),
+                new LinkedHashMap<>(Map.of("toolkit.natives", "org.example/plain-lib/jar/natives")),
+                DependencyScope.COMPILE);
+
+        assertThat(resolution.artifacts().sequencedKeySet())
+                .contains("maven/org.example/plain-lib/jar/natives/1.0", "module/toolkit.natives");
+    }
+
     private void addToMavenRepository(String groupId, String artifactId, String version, String pom) throws IOException {
         Files.writeString(Files
                 .createDirectories(mavenRepoFolder.resolve(groupId.replace('.', '/') + "/" + artifactId + "/" + version))

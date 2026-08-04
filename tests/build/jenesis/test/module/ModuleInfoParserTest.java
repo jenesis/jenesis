@@ -185,6 +185,34 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void jenesis_alias_rejects_slash_in_name() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias toolkit/lib org.example/plain-lib
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expected a module name");
+    }
+
+    @Test
+    public void jenesis_alias_rejects_slash_in_version() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias toolkit.lib org.example/plain-lib 1.0/beta
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.alias version");
+    }
+
+    @Test
     public void jenesis_attach_expands_tokens_and_captures_arguments() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
