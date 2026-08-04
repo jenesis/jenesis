@@ -81,7 +81,7 @@ jobs:
           - { name: bom, dir: demo-28-bom, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: module-alias, dir: demo-31-module-alias, entry: 'build/jenesis/Execute.java -name Ada -shout', verify: 'find target -name classes.jar | grep -q .' }
           - { name: docker-isolation, dir: demo-41-docker-isolation, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
-          - { name: build-cache, dir: demo-45-build-cache, entry: build/jenesis/Project.java, flags: -Djenesis.project.cache, verify: 'find target -name classes.jar | grep -q . && find .jenesis/cache -type d | grep -q .' }
+          - { name: build-cache, dir: demo-45-build-cache, entry: build/jenesis/Project.java, flags: -Djenesis.project.cache, verify: 'find target -name classes.jar -print -quit | grep -q . && find .jenesis/cache -type d -print -quit | grep -q .' }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
