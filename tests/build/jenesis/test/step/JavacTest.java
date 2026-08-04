@@ -74,7 +74,40 @@ public class JavacTest {
                 Path.of("metadata.properties"), Checksum.of(ChecksumStatus.ADDED)));
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
         arguments.put("input", argument);
-        assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(arguments)).isFalse();
+        assertThat(new Javac(ProcessHandler.Factory.TOOL).includeResources(false).shouldRun(arguments)).isFalse();
+    }
+
+    @Test
+    public void shouldRun_fires_when_a_resource_changed_and_resources_are_included() {
+        BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/messages.properties"), Checksum.of(ChecksumStatus.ADDED)));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("input", argument);
+        assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(arguments)).isTrue();
+    }
+
+    @Test
+    public void shouldRun_skips_resource_change_when_resources_are_excluded() {
+        BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
+                Path.of("sources/sample/messages.properties"), Checksum.of(ChecksumStatus.ADDED)));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("input", argument);
+        assertThat(new Javac(ProcessHandler.Factory.TOOL).includeResources(false).shouldRun(arguments)).isFalse();
+    }
+
+    @Test
+    public void shouldRun_ignores_meta_inf_versions_and_build_jenesis_resources() {
+        for (Path ignored : List.of(
+                Path.of("sources/META-INF/versions/17/messages.properties"),
+                Path.of("sources/META-INF/build.jenesis/marker.properties"))) {
+            BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
+                    ignored, Checksum.of(ChecksumStatus.ADDED)));
+            SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+            arguments.put("input", argument);
+            assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(arguments))
+                    .as("change to " + ignored + " is not copied by process and must not trigger Javac")
+                    .isFalse();
+        }
     }
 
     @Test

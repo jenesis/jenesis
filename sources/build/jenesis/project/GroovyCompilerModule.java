@@ -174,7 +174,8 @@ public class GroovyCompilerModule implements BuildExecutorModule {
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
             return Javac.hasRelevantChange(arguments,
                     Set.of(".groovy", ".java"),
-                    Set.of("groovyc.properties", "javac.properties"));
+                    Set.of("groovyc.properties", "javac.properties"),
+                    includeResources);
         }
 
         @Override

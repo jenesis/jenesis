@@ -174,7 +174,8 @@ public class KotlinCompilerModule implements BuildExecutorModule {
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
             return Javac.hasRelevantChange(arguments,
                     Set.of(".kt", ".java"),
-                    Set.of("kotlinc.properties", "javac.properties"));
+                    Set.of("kotlinc.properties", "javac.properties"),
+                    includeResources);
         }
 
         @Override

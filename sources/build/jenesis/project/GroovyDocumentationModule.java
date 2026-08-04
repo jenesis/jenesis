@@ -175,7 +175,8 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
             return Javac.hasRelevantChange(arguments,
                     Set.of(".groovy", ".java"),
-                    Set.of("groovydoc.properties"));
+                    Set.of("groovydoc.properties"),
+                    false);
         }
 
         @Override

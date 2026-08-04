@@ -152,7 +152,8 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
             return Javac.hasRelevantChange(arguments,
                     Set.of(".kt"),
-                    Set.of("dokka.properties"));
+                    Set.of("dokka.properties"),
+                    false);
         }
 
         @Override

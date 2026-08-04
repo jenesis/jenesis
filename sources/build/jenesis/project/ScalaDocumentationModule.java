@@ -169,7 +169,8 @@ public class ScalaDocumentationModule implements BuildExecutorModule {
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
             return Javac.hasRelevantChange(arguments,
                     Set.of(".scala"),
-                    Set.of("scaladoc.properties"));
+                    Set.of("scaladoc.properties"),
+                    false);
         }
 
         @Override

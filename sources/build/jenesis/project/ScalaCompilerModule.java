@@ -174,7 +174,8 @@ public class ScalaCompilerModule implements BuildExecutorModule {
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
             return Javac.hasRelevantChange(arguments,
                     Set.of(".scala", ".java"),
-                    Set.of("scalac.properties", "javac.properties"));
+                    Set.of("scalac.properties", "javac.properties"),
+                    includeResources);
         }
 
         @Override

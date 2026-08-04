@@ -62,12 +62,13 @@ public class Javac extends JdkProcessBuildStep {
 
     @Override
     public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
-        return hasRelevantChange(arguments, Set.of(".java"), Set.of("javac.properties"));
+        return hasRelevantChange(arguments, Set.of(".java"), Set.of("javac.properties"), includeResources);
     }
 
     public static boolean hasRelevantChange(SequencedMap<String, BuildStepArgument> arguments,
                                             Set<String> sourceExtensions,
-                                            Set<String> processProperties) {
+                                            Set<String> processProperties,
+                                            boolean includeResources) {
         Path sourcesDir = Path.of(SOURCES);
         Path classesDir = Path.of(CLASSES);
         Path artifactsDir = Path.of(ARTIFACTS);
@@ -96,6 +97,12 @@ public class Javac extends JdkProcessBuildStep {
                         String name = leaf.toString();
                         for (String extension : sourceExtensions) {
                             if (name.endsWith(extension)) {
+                                return true;
+                            }
+                        }
+                        if (includeResources) {
+                            Path relative = sourcesDir.relativize(path);
+                            if (!BuildStep.underMetaInfVersions(relative) && !BuildStep.underBuildJenesis(relative)) {
                                 return true;
                             }
                         }
