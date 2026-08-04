@@ -29,7 +29,7 @@ public interface Repository {
             if (item == null || item.file().isPresent()) {
                 return candidate;
             }
-            return Optional.of(item.spill(folder.resolve(coordinate.replace('/', '-') + ".jar")));
+            return Optional.of(item.spill(folder.resolve(BuildExecutorModule.encode(coordinate) + ".jar")));
         };
     }
 

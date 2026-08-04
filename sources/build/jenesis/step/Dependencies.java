@@ -434,30 +434,30 @@ public class Dependencies implements BuildStep {
             if (first < 0 || second < 0) {
                 continue;
             }
-            String dependency = key.substring(second + 1), name = dependency.replace('/', '-') + ".jar";
+            String dependency = key.substring(second + 1);
             Resolver.Resolved artifact = entry.getValue();
             String value = resolved.getProperty(key);
-            Path file = placed.get(name);
+            Path file = placed.get(dependency);
             if (file == null) {
                 if (artifact.internal()) {
-                    file = libs.resolve(name);
+                    file = libs.resolve(BuildExecutorModule.encode(dependency) + ".jar");
                     if (!Files.exists(file)) {
                         BuildStep.linkOrCopy(file, artifact.file());
                     }
                 } else {
                     file = artifact.file();
                 }
-                placed.put(name, file);
-                internals.put(name, artifact.internal());
+                placed.put(dependency, file);
+                internals.put(dependency, artifact.internal());
             }
             String relative = context.next().relativize(file).toString().replace(File.separatorChar, '/');
             index.setProperty(key, value.isEmpty() ? relative : relative + " " + value);
-            checksums.merge(name, value, (left, right) -> {
+            checksums.merge(dependency, value, (left, right) -> {
                 if (right.isEmpty()) {
                     return left;
                 }
                 if (!left.isEmpty() && !left.equals(right)) {
-                    throw new IllegalStateException("Conflicting checksums pinned for " + name + ": " + left + " and " + right);
+                    throw new IllegalStateException("Conflicting checksums pinned for " + dependency + ": " + left + " and " + right);
                 }
                 return left.isEmpty() ? right : left;
             });

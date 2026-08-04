@@ -576,7 +576,7 @@ public class DependenciesResolutionTest {
                         dependencies,
                         Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join())
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("No checksum pinned for foo-bar.jar")
+                .hasMessageContaining("No checksum pinned for foo/bar")
                 .hasMessageContaining("strict pinning");
     }
 
@@ -672,7 +672,7 @@ public class DependenciesResolutionTest {
                 new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
                         dependencies,
                         Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join())
-                .hasStackTraceContaining("Conflicting checksums pinned for foo-bar.jar");
+                .hasStackTraceContaining("Conflicting checksums pinned for foo/bar");
     }
 
     private Resolver versioning() {
