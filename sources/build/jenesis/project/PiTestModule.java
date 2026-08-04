@@ -226,10 +226,7 @@ public class PiTestModule implements BuildExecutorModule {
                     if (!entryName.endsWith(".class") || entryName.equals("module-info.class") || entryName.startsWith("META-INF/")) {
                         continue;
                     }
-                    Path file = code.resolve(entryName).normalize();
-                    if (!file.startsWith(code.normalize())) {
-                        throw new IOException("Jar entry escapes the extraction root: " + entryName);
-                    }
+                    Path file = BuildStep.resolveContained(code, entryName);
                     Files.createDirectories(file.getParent());
                     try (InputStream input = archive.getInputStream(entry)) {
                         Files.copy(input, file, StandardCopyOption.REPLACE_EXISTING);

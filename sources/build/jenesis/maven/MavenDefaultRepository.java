@@ -2,6 +2,7 @@ package build.jenesis.maven;
 
 import module java.base;
 import build.jenesis.BuildExecutorCallback;
+import build.jenesis.BuildStep;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 
@@ -249,10 +250,7 @@ public class MavenDefaultRepository implements MavenRepository {
     }
 
     private LazyRepositoryItem fetch(URI repository, String path, boolean validate) throws IOException {
-        Path cached = local == null ? null : local.resolve(path);
-        if (cached != null && !cached.normalize().startsWith(local.normalize())) {
-            throw new IllegalStateException("Resolved path escapes the local repository root: " + path);
-        }
+        Path cached = local == null ? null : BuildStep.resolveContained(local, path);
         if (cached != null) {
             if (Files.exists(cached)) {
                 boolean valid = true;

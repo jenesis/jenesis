@@ -103,7 +103,7 @@ public class PiTestModuleTest {
                 "project");
 
         assertThatThrownBy(() -> executor.execute("pitest/mutate"))
-                .hasStackTraceContaining("escapes the extraction root");
+                .hasStackTraceContaining("Resolved path escapes");
     }
 
     private Repository files() {

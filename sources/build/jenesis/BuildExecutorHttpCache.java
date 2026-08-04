@@ -241,10 +241,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
             if (entry.isDirectory()) {
                 continue;
             }
-            Path destination = base.resolve(entry.getName()).normalize();
-            if (!destination.startsWith(base)) {
-                throw new IOException("Bad cache entry: " + entry.getName());
-            }
+            Path destination = BuildStep.resolveContained(base, entry.getName());
             Files.createDirectories(destination.getParent());
             Files.copy(zip, destination, StandardCopyOption.REPLACE_EXISTING);
         }

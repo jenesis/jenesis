@@ -53,6 +53,14 @@ public interface BuildStep extends Serializable {
         }
     }
 
+    static Path resolveContained(Path base, String relative) throws IOException {
+        Path resolved = base.resolve(relative).normalize();
+        if (!resolved.startsWith(base.normalize())) {
+            throw new IOException("Resolved path escapes " + base + ": " + relative);
+        }
+        return resolved;
+    }
+
     static boolean underMetaInfVersions(Path path) {
         return path.getNameCount() >= 2
                 && path.getName(0).toString().equals("META-INF")

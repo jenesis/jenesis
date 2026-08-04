@@ -356,8 +356,8 @@ public class MavenDefaultRepositoryTest {
                 "jar",
                 null,
                 null))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("escapes the local repository root");
+                .isInstanceOf(IOException.class)
+                .hasMessageContaining("Resolved path escapes");
     }
 
     @Test
