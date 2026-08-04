@@ -4931,6 +4931,39 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void first_party_checksum_pinned_bom_that_cannot_be_fetched_fails() {
+        String rootPom = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>bom</groupId>
+                                <artifactId>artifact</artifactId>
+                                <version>1</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                                <!--Checksum/SHA-256/cafebabe-->
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """;
+        assertThatThrownBy(() -> mavenPomResolver.dependencies(
+                Runnable::run, mavenRepository,
+                List.of(new MavenResolver.RootPom(new ByteArrayInputStream(rootPom.getBytes(StandardCharsets.UTF_8)))),
+                List.of(),
+                MavenDependencyScope.COMPILE,
+                "main"))
+                .hasStackTraceContaining("could not be fetched")
+                .hasStackTraceContaining("bom:artifact:1");
+    }
+
+    @Test
     public void spi_external_versions_pin_transitive() throws IOException {
         addToRepository("group", "artifact", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>
