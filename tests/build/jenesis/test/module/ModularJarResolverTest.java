@@ -220,6 +220,20 @@ public class ModularJarResolverTest {
     }
 
     @Test
+    public void rejects_module_info_version_with_path_traversal() {
+        assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
+                Runnable::run,
+                "foo",
+                Map.of("foo", (_, coordinate) -> Optional.of(toJar("root", "../evil"))),
+                new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("unsafe version")
+                .hasMessageContaining("../evil");
+    }
+
+    @Test
     public void unversioned_module_info_yields_unversioned_coordinate() throws IOException {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,

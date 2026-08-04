@@ -169,7 +169,8 @@ public class ModularJarResolver implements Resolver {
                             "Expected module " + current + " but jar declares " + descriptor.name());
                 }
                 String declared = descriptor.rawVersion().orElse(null);
-                if (declared != null && declared.startsWith(":")) {
+                if (declared != null && (declared.isEmpty() || declared.equals("..")
+                        || declared.indexOf('/') >= 0 || declared.indexOf('\\') >= 0 || declared.startsWith(":"))) {
                     throw new IllegalArgumentException(
                             "Module " + current + " declares an unsafe version '" + declared + "'");
                 }
