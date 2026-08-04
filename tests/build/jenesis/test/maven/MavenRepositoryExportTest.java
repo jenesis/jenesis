@@ -11,6 +11,7 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.maven.MavenRepositoryExport;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class MavenRepositoryExportTest {
 
@@ -174,6 +175,23 @@ public class MavenRepositoryExportTest {
         assertThat(pom).contains("<groupId>com.example</groupId>");
         assertThat(pom).contains("<artifactId>foo</artifactId>");
         assertThat(pom).contains("<version>1.2.3</version>");
+    }
+
+    @Test
+    public void rejects_path_traversal_in_pom_coordinates() throws IOException {
+        Path versionDir = Files.createDirectories(source.resolve("com/example/foo/1.0"));
+        Files.writeString(versionDir.resolve("foo-1.0.jar"), "jar bytes");
+        Files.writeString(versionDir.resolve("foo-1.0.pom"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>foo</artifactId>
+                    <version>../../../../../../tmp/evil</version>
+                </project>
+                """);
+
+        assertThatThrownBy(this::run).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
