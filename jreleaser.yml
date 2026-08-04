@@ -1,6 +1,7 @@
 project:
   name: jenesis
   description: A Java-native build tool.
+  copyright: 2024 Rafael Winterhalter
   authors: [Rafael Winterhalter]
   license: Apache-2.0
   links:
