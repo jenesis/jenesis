@@ -3,7 +3,10 @@ package build.jenesis.module;
 import module java.base;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
+import build.jenesis.SafeSegment;
 public class JenesisRawGitRepository implements JenesisRepository {
+
+    private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
 
     private static final String GITHUB_DATA =
             "https://raw.githubusercontent.com/raphw/jenesis-modules/main/data/modules/";
@@ -164,20 +167,20 @@ public class JenesisRawGitRepository implements JenesisRepository {
                                           String classifier,
                                           String version,
                                           String type) throws IOException {
-        requireSafeSegment("module name", module);
+        SAFE_SEGMENT.accept("module name", module);
         if (classifier != null) {
-            requireSafeSegment("classifier", classifier);
+            SAFE_SEGMENT.accept("classifier", classifier);
         }
         if (version != null) {
-            requireSafeSegment("version", version);
+            SAFE_SEGMENT.accept("version", version);
         }
         Coordinate resolved = resolve(module, classifier, version);
         if (resolved == null || !predicate.test(resolved.groupId())) {
             return Optional.empty();
         }
-        requireSafeSegment("resolved groupId", resolved.groupId());
-        requireSafeSegment("resolved artifactId", resolved.artifactId());
-        requireSafeSegment("resolved version", resolved.version());
+        SAFE_SEGMENT.accept("resolved groupId", resolved.groupId());
+        SAFE_SEGMENT.accept("resolved artifactId", resolved.artifactId());
+        SAFE_SEGMENT.accept("resolved version", resolved.version());
         String path = resolved.groupId().replace('.', '/')
                 + "/" + resolved.artifactId()
                 + "/" + resolved.version()
@@ -189,7 +192,13 @@ public class JenesisRawGitRepository implements JenesisRepository {
         if (contained.isAbsolute() || contained.getPath().startsWith("..")) {
             throw new IllegalArgumentException("Resolved location " + location + " escapes repository root " + repository);
         }
-        return open(location, token, retry).map(stream -> reopening(location, token, retry, stream));
+        return open(location, token, retry).map(stream -> {
+            AtomicReference<InputStream> first = new AtomicReference<>(stream);
+            return (RepositoryItem) () -> {
+                InputStream reopened = first.getAndSet(null);
+                return reopened != null ? reopened : Repository.open(location, token, retry);
+            };
+        });
     }
 
     private Coordinate resolve(String moduleName, String classifier, String version) throws IOException {
@@ -242,39 +251,6 @@ public class JenesisRawGitRepository implements JenesisRepository {
             return Optional.of(Repository.open(uri, token, retry));
         } catch (FileNotFoundException _) {
             return Optional.empty();
-        }
-    }
-
-    private static RepositoryItem reopening(URI uri, String token, Repository.Retry retry, InputStream initial) {
-        AtomicReference<InputStream> first = new AtomicReference<>(initial);
-        return () -> {
-            InputStream stream = first.getAndSet(null);
-            return stream != null ? stream : Repository.open(uri, token, retry);
-        };
-    }
-
-    private static void requireSafeSegment(String role, String value) {
-        if (value.isEmpty()) {
-            throw new IllegalArgumentException("Blank " + role + " is not a valid coordinate");
-        }
-        for (String segment : value.split("/", -1)) {
-            if (segment.equals("..")) {
-                throw new IllegalArgumentException("Illegal " + role + " '" + value + "': path traversal is not permitted");
-            }
-        }
-        for (int index = 0; index < value.length(); index++) {
-            char character = value.charAt(index);
-            boolean permitted = character >= 'a' && character <= 'z'
-                    || character >= 'A' && character <= 'Z'
-                    || character >= '0' && character <= '9'
-                    || character == '.'
-                    || character == '-'
-                    || character == '_'
-                    || character == '+';
-            if (!permitted) {
-                throw new IllegalArgumentException(
-                        "Illegal " + role + " '" + value + "': character '" + character + "' is not permitted");
-            }
         }
     }
 

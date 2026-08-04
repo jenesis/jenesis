@@ -3,8 +3,11 @@ package build.jenesis.module;
 import module java.base;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
+import build.jenesis.SafeSegment;
 
 public class JenesisModuleRepository implements JenesisRepository {
+
+    private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
 
     private final URI root;
     private final String token;
@@ -141,12 +144,12 @@ public class JenesisModuleRepository implements JenesisRepository {
                                           String classifier,
                                           String version,
                                           String type) throws IOException {
-        requireSafeSegment("module name", module);
+        SAFE_SEGMENT.accept("module name", module);
         if (classifier != null) {
-            requireSafeSegment("classifier", classifier);
+            SAFE_SEGMENT.accept("classifier", classifier);
         }
         if (version != null) {
-            requireSafeSegment("version", version);
+            SAFE_SEGMENT.accept("version", version);
         }
         String fileName = (classifier == null ? module : module + "-" + classifier) + "." + type;
         String relative = version == null
@@ -170,39 +173,11 @@ public class JenesisModuleRepository implements JenesisRepository {
         } catch (FileNotFoundException _) {
             return Optional.empty();
         }
-        return Optional.of(reopening(uri, token, retry, stream));
+        AtomicReference<InputStream> first = new AtomicReference<>(stream);
+        return Optional.of(() -> {
+            InputStream reopened = first.getAndSet(null);
+            return reopened != null ? reopened : Repository.open(uri, token, retry);
+        });
     }
 
-    private static RepositoryItem reopening(URI uri, String token, Repository.Retry retry, InputStream initial) {
-        AtomicReference<InputStream> first = new AtomicReference<>(initial);
-        return () -> {
-            InputStream stream = first.getAndSet(null);
-            return stream != null ? stream : Repository.open(uri, token, retry);
-        };
-    }
-
-    private static void requireSafeSegment(String role, String value) {
-        if (value.isEmpty()) {
-            throw new IllegalArgumentException("Blank " + role + " is not a valid coordinate");
-        }
-        for (String segment : value.split("/", -1)) {
-            if (segment.equals("..")) {
-                throw new IllegalArgumentException("Illegal " + role + " '" + value + "': path traversal is not permitted");
-            }
-        }
-        for (int index = 0; index < value.length(); index++) {
-            char character = value.charAt(index);
-            boolean permitted = character >= 'a' && character <= 'z'
-                    || character >= 'A' && character <= 'Z'
-                    || character >= '0' && character <= '9'
-                    || character == '.'
-                    || character == '-'
-                    || character == '_'
-                    || character == '+';
-            if (!permitted) {
-                throw new IllegalArgumentException(
-                        "Illegal " + role + " '" + value + "': character '" + character + "' is not permitted");
-            }
-        }
-    }
 }

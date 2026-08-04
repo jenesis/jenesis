@@ -19,6 +19,8 @@ public record Jpx(Path storage,
 
     private static final int MINIMUM_CHECKSUM_LENGTH = 32;
 
+    private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
+
     public Jpx() {
         this(Path.of(System.getProperty("user.home")).resolve(".jenesis").resolve("jpx"));
     }
@@ -266,7 +268,7 @@ public record Jpx(Path storage,
             String version = command.version(), root;
             int colon = command.name().indexOf(':');
             if (colon < 0) {
-                requireSafeSegment("module name", command.name());
+                SAFE_SEGMENT.accept("module name", command.name());
                 String prefix = modular ? "modular" : "module";
                 SequencedMap<String, String> versions = new LinkedHashMap<>();
                 if (version != null) {
@@ -305,8 +307,8 @@ public record Jpx(Path storage,
                             + "not Maven coordinates: " + command.name());
                 }
                 String groupId = command.name().substring(0, colon), artifactId = command.name().substring(colon + 1);
-                requireSafeSegment("group", groupId);
-                requireSafeSegment("artifact", artifactId);
+                SAFE_SEGMENT.accept("group", groupId);
+                SAFE_SEGMENT.accept("artifact", artifactId);
                 if (version == null) {
                     version = MavenDefaultVersionNegotiator.maven().get().resolve(executor,
                             MavenRepository.of(repositories.get("maven")),
@@ -323,7 +325,7 @@ public record Jpx(Path storage,
                     throw new IllegalStateException("Resolution did not retain a root entry for " + command.name());
                 }
             }
-            requireSafeSegment("version", version);
+            SAFE_SEGMENT.accept("version", version);
             Installation installation = new Installation(storage.resolve(command.folder(version)), hashFunction);
             if (!Files.isRegularFile(installation.folder().resolve(PROPERTIES))) {
                 try (FileChannel channel = FileChannel.open(storage.resolve(command.folder(version) + ".lock"),
@@ -464,30 +466,5 @@ public record Jpx(Path storage,
             throw new IllegalArgumentException("Not a hexadecimal checksum: " + normalized);
         }
         return normalized;
-    }
-
-    private static void requireSafeSegment(String role, String value) {
-        if (value.isEmpty()) {
-            throw new IllegalArgumentException("Blank " + role + " is not a valid coordinate");
-        }
-        for (int index = 0; index < value.length(); index++) {
-            char character = value.charAt(index);
-            boolean permitted = character >= 'a' && character <= 'z'
-                    || character >= 'A' && character <= 'Z'
-                    || character >= '0' && character <= '9'
-                    || character == '.'
-                    || character == '-'
-                    || character == '_'
-                    || character == '+';
-            if (!permitted) {
-                throw new IllegalArgumentException(
-                        "Illegal " + role + " '" + value + "': character '" + character + "' is not permitted");
-            }
-        }
-        for (String segment : value.split("\\.", -1)) {
-            if (segment.equals("..") || segment.isEmpty()) {
-                throw new IllegalArgumentException("Illegal " + role + " '" + value + "'");
-            }
-        }
     }
 }
