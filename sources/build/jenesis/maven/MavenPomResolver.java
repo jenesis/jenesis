@@ -448,7 +448,10 @@ public class MavenPomResolver implements MavenResolver {
             return checksum;
         }
         if (resolution.checksums.size() == 1) {
-            return resolution.checksums.values().iterator().next();
+            Map.Entry<String, String> only = resolution.checksums.entrySet().iterator().next();
+            if (isFloating(only.getKey())) {
+                return only.getValue();
+            }
         }
         return null;
     }
