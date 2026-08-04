@@ -6,6 +6,8 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Checksum;
+import build.jenesis.ChecksumStatus;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
 
@@ -23,6 +25,15 @@ public class InventoryTest {
         previous = root.resolve("previous");
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
+    }
+
+    @Test
+    public void shouldRun_fires_when_identity_properties_changed() {
+        BuildStepArgument argument = new BuildStepArgument(root, Map.of(
+                Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED)));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("input", argument);
+        assertThat(new Inventory().shouldRun(arguments)).isTrue();
     }
 
     @Test

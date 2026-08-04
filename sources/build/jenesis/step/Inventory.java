@@ -31,6 +31,7 @@ public class Inventory implements BuildStep {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(MODULE),
                 Path.of(METADATA),
+                Path.of(IDENTITY),
                 Path.of(ATTACHMENTS),
                 Path.of(POM),
                 Path.of(ARTIFACTS),
