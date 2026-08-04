@@ -84,7 +84,7 @@ Quick index
 | 25 | [`pitest`](demo-25-pitest/README.md)                         | Mutation testing: a `pitest.properties` config file makes the build run PIT, which seeds faults into the code and checks the tests catch them | `java build/jenesis/Project.java`  |
 | 26 | [`agents`](demo-26-agents/README.md)                         | Attach libraries as Java agents with `@jenesis.attach`: Mockito as a dependency that also attaches to the test JVM, and the OpenTelemetry agent attached to the main run without ever joining a compile or runtime path | `java build/Demo.java`             |
 | 27 | [`maven-exclusions`](demo-27-maven-exclusions/README.md)     | Maven only: a dependency with an `<exclusions>` block; a test asserts the excluded transitive is absent | `java build/jenesis/Project.java`  |
-| 28 | [`bom`](demo-28-bom/README.md)                               | A bill of materials: one properties file of version and checksum pins imported via `@jenesis.bom` (a local `bom-<name>.properties` here, a module-repository coordinate in general), overridable by local `@jenesis.pin` tags and strong enough for strict pinning | `java build/jenesis/Project.java`  |
+| 28 | [`bom`](demo-28-bom/README.md)                               | Bills of materials: a Maven BOM's `dependencyManagement` imported via `@jenesis.bom` with its hashes brought in by the `pin` goal, next to a local `pin-<name>.properties` whose hashed entries need no pins at all; both overridable by local `@jenesis.pin` tags and strong enough for strict pinning | `java build/jenesis/Project.java`  |
 | 29 | [`module-layout`](demo-29-module-layout/README.md)           | Explicitly select the pure MODULAR layout (via `jenesis.properties`): resolve by module name, emit a modular jar with no `pom.xml` | `java build/jenesis/Project.java`  |
 | 30 | [`module-classifier`](demo-30-module-classifier/README.md)   | Pin a classified variant of a module (`:jdk-flow:0.4.3`): the build fetches the classifier artifact, validated by checksum and asserted at runtime | `java build/jenesis/Execute.java`  |
 | 31 | [`module-alias`](demo-31-module-alias/README.md)             | Give a plain jar with no module identity (no `module-info`, no `Automatic-Module-Name`) a stable name with `@jenesis.alias`, so it can be `requires`d and `opens`d like any module - shown with args4j 2.33 | `java build/jenesis/Execute.java`  |
@@ -526,26 +526,29 @@ missing Commons Lang), and - exactly as in Maven, where test scope extends
 compile scope - the exclusion applies to the test class path too, not just the
 main one.
 
-## 17. A bill of materials - [`bom`](demo-28-bom/README.md)
+## 17. Bills of materials - [`bom`](demo-28-bom/README.md)
 
 Where per-dependency `@jenesis.pin` tags pin each artifact in place, `bom`
-moves the pins into one shared properties file: the
-module declares `requires org.slf4j;` and a single
-`@jenesis.bom bom-platform.properties` tag, and the BOM file - found in the
-project's BOM locations (`jenesis.project.boms`, defaulting to the
-configuration location, i.e. the project root), which profiles never
-touch - carries the version
-and `SHA-256` checksum for both the module name and its Maven coordinate. BOM
-keys follow the pin token grammar without the group (bare module name, Maven
-`groupId/artifactId`, or explicit `repository/coordinate`); the group, and an
-optional platform guard, sit on the `@jenesis.bom` declaration instead
-(`kotlinc/bom-platform.properties` merges the entries into the `kotlinc`
-group). A BOM
-can equally be fetched from the module repository by naming its coordinate -
-versioned and checksummed, or floating to the latest published file - and the
-demo shows the precedence rules: a local `@jenesis.pin` overrides any BOM
-entry, the first declared BOM wins a conflict, and BOM-provided checksums
-satisfy `-Djenesis.dependency.pin=strict` with no per-dependency tags at all.
+moves version curation into bills of materials, one per integrity model. An
+`@jenesis.bom org.slf4j/slf4j-bom 2.0.16` tag imports a Maven BOM's
+effective `dependencyManagement` from Maven Central; since POM bytes are not
+stable across repositories, the reference carries no hash, and the `pin`
+goal instead pins each artifact resolved through it with a computed
+checksum. An `@jenesis.bom pin-lang3.properties` tag reads a local
+properties file - found in the project's BOM locations
+(`jenesis.project.boms`, defaulting to the configuration location), which
+profiles never touch - whose byte-stable entries carry the version and
+`SHA-256` checksum for both the module name and its Maven coordinate, so no
+pin lines are needed at all. BOM keys follow the pin token grammar without
+the group (bare module name, Maven `groupId/artifactId`, or explicit
+`repository/coordinate`); the group, and an optional platform guard, sit on
+the `@jenesis.bom` declaration instead (`kotlinc/pin-lang3.properties`
+merges the entries into the `kotlinc` group). A BOM can equally be fetched
+from the module repository by naming its coordinate - versioned and
+checksummed, or floating to the latest published file - and the demo shows
+the precedence rules: a local `@jenesis.pin` overrides any BOM entry, the
+last declared BOM wins a conflict, and both models satisfy
+`-Djenesis.dependency.pin=strict`.
 
 ## 18. Choosing the pure modular layout - [`module-layout`](demo-29-module-layout/README.md)
 

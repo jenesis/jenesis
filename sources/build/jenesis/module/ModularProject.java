@@ -300,7 +300,7 @@ public class ModularProject implements BuildExecutorModule {
                 for (Map.Entry<String, String> entry : declared.entrySet()) {
                     int slash = entry.getKey().indexOf('/');
                     String name = entry.getKey().substring(slash + 1);
-                    if (name.indexOf('/') >= 0 || !name.startsWith("bom-") || !name.endsWith(".properties")) {
+                    if (name.indexOf('/') >= 0 || !name.startsWith("pin-") || !name.endsWith(".properties")) {
                         boms.setProperty("bom/" + entry.getKey(), entry.getValue());
                         continue;
                     }
@@ -391,7 +391,7 @@ public class ModularProject implements BuildExecutorModule {
                 files.filter(Files::isRegularFile)
                         .filter(file -> {
                             String name = file.getFileName().toString();
-                            return name.startsWith("bom-") && name.endsWith(".properties");
+                            return name.startsWith("pin-") && name.endsWith(".properties");
                         })
                         .sorted()
                         .forEach(file -> bomFiles.putIfAbsent(file.getFileName().toString(), file));

@@ -90,7 +90,7 @@ public class Bom implements BuildStep {
             SequencedProperties bom = new SequencedProperties();
             entries.forEach(bom::setProperty);
             bom.store(Files.createDirectories(context.next().resolve(BOM))
-                    .resolve("bom-" + module + ".properties"));
+                    .resolve("pin-" + module + ".properties"));
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }

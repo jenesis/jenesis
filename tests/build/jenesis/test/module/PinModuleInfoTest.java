@@ -723,7 +723,7 @@ public class PinModuleInfoTest {
         Files.writeString(file, """
                 /**
                  * @jenesis.bom acme.platform
-                 * @jenesis.bom bom-team.properties
+                 * @jenesis.bom pin-team.properties
                  */
                 module foo {
                   requires bar;
@@ -731,7 +731,7 @@ public class PinModuleInfoTest {
                 """);
         String result = run(file);
         assertThat(result).contains("@jenesis.bom acme.platform\n");
-        assertThat(result).contains("@jenesis.bom bom-team.properties");
+        assertThat(result).contains("@jenesis.bom pin-team.properties");
     }
 
     @Test
@@ -771,7 +771,7 @@ public class PinModuleInfoTest {
         Files.writeString(file, """
                 /**
                  * @jenesis.bom acme.platform 1.0 SHA-256/cccc
-                 * @jenesis.bom bom-team.properties
+                 * @jenesis.bom pin-team.properties
                  */
                 module foo {
                   requires bar;

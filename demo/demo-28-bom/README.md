@@ -7,7 +7,7 @@ dependency, because they come with different integrity models:
 
     /**
      * @jenesis.bom org.slf4j/slf4j-bom 2.0.16
-     * @jenesis.bom bom-lang3.properties
+     * @jenesis.bom pin-lang3.properties
      * @jenesis.pin org.slf4j 2.0.16
      * @jenesis.pin org.slf4j/slf4j-api 2.0.16 SHA-256/a125...   (written by the pin goal)
      */
@@ -25,11 +25,11 @@ chains and properties resolved, nested `<scope>import</scope>` BOMs flattened
 recursively with Maven's first-wins rules. Here it manages every `org.slf4j`
 artifact at `2.0.16`.
 
-The second declaration is a **local file**: files named `bom-<name>.properties`
+The second declaration is a **local file**: files named `pin-<name>.properties`
 in the project's BOM location - by default the configuration location, i.e.
 `build.jenesis/` under the project root. A dash can never occur in a Java
 module name, so the file reference is structurally distinct from a module
-coordinate. Here `bom-lang3.properties` supplies `org.apache.commons.lang3`, as both
+coordinate. Here `pin-lang3.properties` supplies `org.apache.commons.lang3`, as both
 the module coordinate a Maven BOM cannot express and the hashed artifact:
 
     org.apache.commons.lang3 = 3.20.0
@@ -102,8 +102,8 @@ The `@jenesis.bom` tag mirrors `@jenesis.pin`:
     @jenesis.bom org.slf4j/slf4j-bom 2.0.16             a Maven BOM's dependencyManagement (this demo)
     @jenesis.bom kotlinc/module/acme.platform 2.1.0     entries merge into the kotlinc group
     @jenesis.bom acme.platform 1.9.0 [legacy]           platform-guarded, like a guarded pin
-    @jenesis.bom bom-lang3.properties                a local file (this demo)
-    @jenesis.bom kotlinc/bom-lang3.properties        the same file, entries in the kotlinc group
+    @jenesis.bom pin-lang3.properties                a local file (this demo)
+    @jenesis.bom kotlinc/pin-lang3.properties        the same file, entries in the kotlinc group
 
 A repository BOM is a properties file published at the module repository's
 standard versioned path, `<module>/<version>/<module>.properties`; without a
@@ -125,7 +125,7 @@ switches the modular layouts to emit the closure as a properties file, which
 The file is the module's full closure with a version and checksum per
 coordinate, keyed group-less exactly like a hand-written BOM, so another
 project consumes it with `@jenesis.bom demo.bom` the same way this one
-consumes `bom-lang3.properties`. It is published only into the Jenesis
+consumes `pin-lang3.properties`. It is published only into the Jenesis
 repository; the Maven `export` never emits it. Emission is off unless
 `bom.properties` is present, mirroring how `packaging.properties` gates
 `jpackage`; the file is otherwise empty and reserved for future options.

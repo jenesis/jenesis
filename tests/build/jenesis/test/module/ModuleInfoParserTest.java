@@ -722,8 +722,8 @@ public class ModuleInfoParserTest {
     public void bom_tag_resolves_local_files() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
-                 * @jenesis.bom bom-team.properties
-                 * @jenesis.bom kotlinc/bom-other.properties
+                 * @jenesis.bom pin-team.properties
+                 * @jenesis.bom kotlinc/pin-other.properties
                  */
                 module foo {
                   requires bar;
@@ -731,15 +731,15 @@ public class ModuleInfoParserTest {
                 """);
         ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
         assertThat(info.boms()).containsExactly(
-                Map.entry("main/bom-team.properties", ""),
-                Map.entry("kotlinc/bom-other.properties", ""));
+                Map.entry("main/pin-team.properties", ""),
+                Map.entry("kotlinc/pin-other.properties", ""));
     }
 
     @Test
     public void bom_tag_rejects_version_on_local_file() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
-                 * @jenesis.bom bom-team.properties 1.0
+                 * @jenesis.bom pin-team.properties 1.0
                  */
                 module foo {
                   requires bar;
@@ -754,7 +754,7 @@ public class ModuleInfoParserTest {
     public void bom_tag_rejects_nested_local_token() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
-                 * @jenesis.bom kotlinc/module/bom-team.properties
+                 * @jenesis.bom kotlinc/module/pin-team.properties
                  */
                 module foo {
                   requires bar;
@@ -762,7 +762,7 @@ public class ModuleInfoParserTest {
                 """);
         assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("expected [<group>/]bom-<name>.properties");
+                .hasMessageContaining("expected [<group>/]pin-<name>.properties");
     }
 
     @Test

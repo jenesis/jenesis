@@ -135,7 +135,7 @@ public class ModuleInfoParser {
                                 String[] words = bom.split(" ");
                                 String token = words[0], key, value;
                                 String last = token.substring(token.lastIndexOf('/') + 1);
-                                if (last.startsWith("bom-") && last.endsWith(".properties")) {
+                                if (last.startsWith("pin-") && last.endsWith(".properties")) {
                                     if (words.length > 1) {
                                         throw new IllegalArgumentException("Malformed @jenesis.bom declaration '"
                                                 + bom
@@ -146,7 +146,7 @@ public class ModuleInfoParser {
                                     if (qualifier.isEmpty() || first != token.lastIndexOf('/')) {
                                         throw new IllegalArgumentException("Malformed @jenesis.bom token '"
                                                 + token
-                                                + "': expected [<group>/]bom-<name>.properties");
+                                                + "': expected [<group>/]pin-<name>.properties");
                                     }
                                     key = qualifier + "/" + last;
                                     value = "";

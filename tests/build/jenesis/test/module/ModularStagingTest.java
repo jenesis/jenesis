@@ -68,10 +68,10 @@ public class ModularStagingTest {
         inventory.setProperty("module-foo.module", "demo.foo");
         inventory.setProperty("module-foo.version", "1.0.0");
         inventory.setProperty("module-foo.artifacts.0", "artifacts/classes.jar");
-        inventory.setProperty("module-foo.bomfile.0", "bom/bom-demo.foo.properties");
+        inventory.setProperty("module-foo.bomfile.0", "bom/pin-demo.foo.properties");
         inventory.store(folder.resolve(Inventory.INVENTORY));
         Files.writeString(Files.createDirectory(folder.resolve("artifacts")).resolve("classes.jar"), "jar");
-        Files.writeString(Files.createDirectory(folder.resolve("bom")).resolve("bom-demo.foo.properties"), "a = 1.0\n");
+        Files.writeString(Files.createDirectory(folder.resolve("bom")).resolve("pin-demo.foo.properties"), "a = 1.0\n");
 
         run(false, folder);
 

@@ -122,7 +122,7 @@ public class BomTest {
     }
 
     private SequencedProperties read() throws IOException {
-        return SequencedProperties.ofFiles(next.resolve(Bom.BOM).resolve("bom-demo.mod.properties"));
+        return SequencedProperties.ofFiles(next.resolve(Bom.BOM).resolve("pin-demo.mod.properties"));
     }
 
     private BuildStepResult run(SequencedMap<String, Path> argumentFolders) throws IOException {

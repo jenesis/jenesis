@@ -464,7 +464,7 @@ public record Project(
                       %{name}sources%{reset}, %{name}documentation%{reset}           Assemble source/javadoc jars
                       %{name}metadata%{reset}                         Path-separated list of extra metadata files
                       %{name}configuration%{reset}                    Directories the inferred tools search for config files (default: build.jenesis/ under the root; empty skips them; @ splices the default)
-                      %{name}boms%{reset}                             Path-separated locations of local bom-<name>.properties files (default: configuration)
+                      %{name}boms%{reset}                             Path-separated locations of local pin-<name>.properties files (default: configuration)
                       %{name}version%{reset}                          Project version
                       %{name}digest%{reset}                           Algorithm for pin and dependency checksums (default: SHA-256)
                       %{name}watch%{reset}                            Rebuild the selected target whenever a source file changes (Ctrl+C to stop)
@@ -607,7 +607,7 @@ public record Project(
                                                        Maven BOM whose pom's <dependencyManagement> is imported with
                                                        nested import-scoped BOMs flattened (no checksum: pom bytes
                                                        are not stable across repositories); a token of
-                                                       [<group>/]bom-<name>.properties reads that file
+                                                       [<group>/]pin-<name>.properties reads that file
                                                        from the project's BOM locations (jenesis.project.boms,
                                                        default: the configuration locations) instead; local
                                                        @jenesis.pin lines override BOM entries
@@ -966,7 +966,7 @@ public record Project(
                                                         are not stable across
                                                         repositories. A
                                                         token of
-                                                        [<group>/]bom-<name>.properties
+                                                        [<group>/]pin-<name>.properties
                                                         (a dash never occurs in a
                                                         module name) reads that
                                                         file from the project's
@@ -1073,7 +1073,7 @@ public record Project(
                                                   @<name> a property or env
                                                   value.
                       boms                        Path-separated locations of
-                                                  local bom-<name>.properties
+                                                  local pin-<name>.properties
                                                   files (default: configuration;
                                                   never profile-resolved). An @
                                                   entry splices the configuration

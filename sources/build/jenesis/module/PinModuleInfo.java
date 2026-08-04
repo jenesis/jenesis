@@ -423,7 +423,7 @@ public class PinModuleInfo implements BuildStep {
             }
             String token = matcher.group(1);
             String last = token.substring(token.lastIndexOf('/') + 1);
-            if (last.startsWith("bom-") && last.endsWith(".properties")) {
+            if (last.startsWith("pin-") && last.endsWith(".properties")) {
                 continue;
             }
             String rest = matcher.group(2) == null ? "" : matcher.group(2).trim();
