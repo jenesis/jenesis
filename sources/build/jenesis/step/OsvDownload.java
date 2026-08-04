@@ -48,13 +48,30 @@ public class OsvDownload implements BuildStep {
         SequencedProperties feed = new SequencedProperties();
         if (!coordinates.isEmpty()) {
             List<List<String>> identifiers = identifiers(post(endpoint.resolve("/v1/querybatch"), queryBatch(coordinates)));
-            SequencedMap<String, String> severityById = new LinkedHashMap<>();
+            SequencedSet<String> distinct = new LinkedHashSet<>();
             for (List<String> ids : identifiers) {
-                for (String id : ids) {
-                    if (!severityById.containsKey(id)) {
-                        severityById.put(id, severity(get(endpoint.resolve("/v1/vulns/" + id))));
+                distinct.addAll(ids);
+            }
+            SequencedMap<String, CompletableFuture<String>> pending = new LinkedHashMap<>();
+            for (String id : distinct) {
+                pending.put(id, CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return severity(get(endpoint.resolve("/v1/vulns/" + id)));
+                    } catch (IOException e) {
+                        throw new CompletionException(e);
                     }
+                }, executor));
+            }
+            SequencedMap<String, String> severityById = new LinkedHashMap<>();
+            try {
+                for (Map.Entry<String, CompletableFuture<String>> entry : pending.entrySet()) {
+                    severityById.put(entry.getKey(), entry.getValue().join());
                 }
+            } catch (CompletionException e) {
+                if (e.getCause() instanceof IOException cause) {
+                    throw cause;
+                }
+                throw e;
             }
             for (int index = 0; index < coordinates.size(); index++) {
                 List<String> ids = index < identifiers.size() ? identifiers.get(index) : List.of();
