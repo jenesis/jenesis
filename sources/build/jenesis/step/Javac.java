@@ -72,6 +72,7 @@ public class Javac extends JdkProcessBuildStep {
         Path sourcesDir = Path.of(SOURCES);
         Path classesDir = Path.of(CLASSES);
         Path artifactsDir = Path.of(ARTIFACTS);
+        Path resolvedDir = Path.of("resolved");
         Path dependencyIndex = Path.of(DEPENDENCIES);
         Set<Path> processFiles = new LinkedHashSet<>();
         for (String name : processProperties) {
@@ -88,6 +89,7 @@ public class Javac extends JdkProcessBuildStep {
                 }
                 if (path.startsWith(classesDir)
                         || path.startsWith(artifactsDir)
+                        || path.startsWith(resolvedDir)
                         || path.startsWith(dependencyIndex)) {
                     return true;
                 }

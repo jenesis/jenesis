@@ -121,7 +121,7 @@ public class JavacTest {
 
     @Test
     public void shouldRun_fires_when_upstream_classpath_or_dependencies_changed() {
-        for (Path changed : List.of(Path.of("classes/x.jar"), Path.of("artifacts/x.jar"), Path.of(BuildStep.DEPENDENCIES))) {
+        for (Path changed : List.of(Path.of("classes/x.jar"), Path.of("artifacts/x.jar"), Path.of("resolved/dep.jar"), Path.of(BuildStep.DEPENDENCIES))) {
             BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
                     changed, Checksum.of(ChecksumStatus.ADDED)));
             SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
