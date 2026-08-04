@@ -164,13 +164,13 @@ public class DockerizedJava {
         }
         docker.add("-w");
         docker.add(workingDirectory.toString());
-        docker.add("--mount");
-        docker.add("type=bind,src=" + workingDirectory + ",dst=" + workingDirectory);
-        docker.add("--mount");
-        docker.add("type=bind,src=" + javaHome + ",dst=" + javaHomeMount + ",readonly");
+        docker.add("-v");
+        docker.add(workingDirectory + ":" + workingDirectory);
+        docker.add("-v");
+        docker.add(javaHome + ":" + javaHomeMount + ":ro");
         for (Map.Entry<Path, String> mount : mounts.entrySet()) {
-            docker.add("--mount");
-            docker.add("type=bind,src=" + mount.getKey() + ",dst=" + mount.getValue());
+            docker.add("-v");
+            docker.add(mount.getKey() + ":" + mount.getValue());
         }
         for (Map.Entry<String, String> variable : environment.entrySet()) {
             docker.add("-e");
