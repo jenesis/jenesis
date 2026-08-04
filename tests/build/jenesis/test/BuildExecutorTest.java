@@ -19,6 +19,7 @@ import build.jenesis.SequencedProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 
 public class BuildExecutorTest implements Serializable {
 
@@ -29,7 +30,7 @@ public class BuildExecutorTest implements Serializable {
     }
 
     @TempDir
-    private Path root, source, source2;
+    private Path root, source, source2, root2;
     private transient HashDigestFunction hash;
     private transient BuildExecutor buildExecutor;
 
@@ -40,7 +41,7 @@ public class BuildExecutorTest implements Serializable {
                 Duration.ZERO,
                 hash,
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
     }
 
     @Test
@@ -69,7 +70,7 @@ public class BuildExecutorTest implements Serializable {
                 Duration.ZERO,
                 hash,
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
         Files.writeString(source.resolve("file"), "foo");
         second.addSource("source", source);
         second.addStep("step", (_, context, _) -> {
@@ -111,7 +112,7 @@ public class BuildExecutorTest implements Serializable {
                     Duration.ZERO,
                     hash,
                     BuildStepHashFunction.ofSerializationDigest("MD5"),
-                    BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false))
+                    BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Another build process is already building");
         } finally {
@@ -187,6 +188,55 @@ public class BuildExecutorTest implements Serializable {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("baz");
         assertThat(root.resolve("step")).doesNotExist();
+    }
+
+    @Test
+    public void fails_fast_by_default_without_aggregating_independent_failures() {
+        buildExecutor.addStep("step1", (_, _, _) -> {
+            throw new RuntimeException("one");
+        });
+        buildExecutor.addStep("step2", (_, _, _) -> {
+            throw new RuntimeException("two");
+        });
+        Throwable thrown = catchThrowable(() -> buildExecutor.execute(Runnable::run).toCompletableFuture().join());
+        assertThat(thrown).isInstanceOf(BuildExecutorException.class);
+        assertThat(thrown.getSuppressed()).isEmpty();
+    }
+
+    @Test
+    public void reports_every_independent_failure_when_aggregating() throws IOException {
+        BuildExecutor executor = BuildExecutor.of(root2,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, true);
+        executor.addStep("step1", (_, _, _) -> {
+            throw new RuntimeException("one");
+        });
+        executor.addStep("step2", (_, _, _) -> {
+            throw new RuntimeException("two");
+        });
+        Throwable thrown = catchThrowable(() -> executor.execute(Runnable::run).toCompletableFuture().join());
+        assertThat(thrown).isInstanceOf(BuildExecutorException.class);
+        assertThat(thrown.getSuppressed()).hasSize(1);
+        List<String> messages = new ArrayList<>();
+        messages.add(thrown.getMessage());
+        for (Throwable suppressed : thrown.getSuppressed()) {
+            messages.add(suppressed.getMessage());
+        }
+        assertThat(messages).containsExactlyInAnyOrder("Failed to execute step1", "Failed to execute step2");
+    }
+
+    @Test
+    public void aggregate_configuration_defaults_from_property_and_is_overridable() {
+        assertThat(new BuildExecutor.Configuration().aggregate()).isFalse();
+        assertThat(new BuildExecutor.Configuration().aggregate(true).aggregate()).isTrue();
+        System.setProperty("jenesis.executor.aggregate", "true");
+        try {
+            assertThat(new BuildExecutor.Configuration().aggregate()).isTrue();
+        } finally {
+            System.clearProperty("jenesis.executor.aggregate");
+        }
     }
 
     @Test

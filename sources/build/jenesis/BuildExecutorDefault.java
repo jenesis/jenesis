@@ -14,6 +14,7 @@ class BuildExecutorDefault implements BuildExecutor {
     private final BuildStepHashFunction stepHash;
     private final BuildExecutorCallback callback;
     private final BuildExecutorCache cache;
+    private final boolean aggregate;
     private final String location;
 
     private final Map<String, StepSummary> inherited;
@@ -25,6 +26,7 @@ class BuildExecutorDefault implements BuildExecutor {
                          BuildStepHashFunction stepHash,
                          BuildExecutorCallback callback,
                          BuildExecutorCache cache,
+                         boolean aggregate,
                          String location,
                          Map<String, StepSummary> inherited) throws IOException {
         this.target = Files.isDirectory(target) ? target : Files.createDirectory(target);
@@ -33,6 +35,7 @@ class BuildExecutorDefault implements BuildExecutor {
         this.stepHash = stepHash;
         this.callback = callback;
         this.cache = cache;
+        this.aggregate = aggregate;
         this.location = location;
         this.inherited = inherited;
     }
@@ -304,6 +307,7 @@ class BuildExecutorDefault implements BuildExecutor {
                             stepHash,
                             callback,
                             cache,
+                            aggregate,
                             location + prefix + "/",
                             inherited);
                     module.accept(buildExecutor, folders);
@@ -533,15 +537,40 @@ class BuildExecutorDefault implements BuildExecutor {
                 }
             }
         }
-        CompletionStage<Map<String, StepSummary>> result = CompletableFuture.completedStage(Map.of());
-        for (String identity : scheduled) {
-            result = result.thenCombineAsync(dispatched.get(identity), (left, right) -> {
-                SequencedMap<String, StepSummary> merged = new LinkedHashMap<>(left);
-                right.values().forEach(merged::putAll);
-                return merged;
-            }, executor);
+        if (!aggregate) {
+            CompletionStage<Map<String, StepSummary>> result = CompletableFuture.completedStage(Map.of());
+            for (String identity : scheduled) {
+                result = result.thenCombineAsync(dispatched.get(identity), (left, right) -> {
+                    SequencedMap<String, StepSummary> merged = new LinkedHashMap<>(left);
+                    right.values().forEach(merged::putAll);
+                    return merged;
+                }, executor);
+            }
+            return result;
         }
-        return result;
+        List<CompletableFuture<Map<String, Map<String, StepSummary>>>> futures = new ArrayList<>();
+        for (String identity : scheduled) {
+            futures.add(dispatched.get(identity).toCompletableFuture());
+        }
+        return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).handleAsync((_, _) -> {
+            Map<String, StepSummary> merged = new LinkedHashMap<>();
+            CompletionException aggregate = null;
+            for (CompletableFuture<Map<String, Map<String, StepSummary>>> future : futures) {
+                try {
+                    future.join().values().forEach(merged::putAll);
+                } catch (CompletionException e) {
+                    if (aggregate == null) {
+                        aggregate = e;
+                    } else {
+                        aggregate.addSuppressed(e);
+                    }
+                }
+            }
+            if (aggregate != null) {
+                throw aggregate;
+            }
+            return merged;
+        }, executor);
     }
 
     private static String validated(String identity, Pattern pattern) {

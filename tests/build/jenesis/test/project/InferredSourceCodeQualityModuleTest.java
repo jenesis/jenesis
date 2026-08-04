@@ -50,6 +50,6 @@ public class InferredSourceCodeQualityModuleTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
     }
 }

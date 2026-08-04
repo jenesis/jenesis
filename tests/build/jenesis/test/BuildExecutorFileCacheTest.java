@@ -139,6 +139,7 @@ public class BuildExecutorFileCacheTest implements Serializable {
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(),
                 cache,
+                false,
                 false);
         first.addSource("source", source);
         first.addStep("step", buildStep, "source");
@@ -152,6 +153,7 @@ public class BuildExecutorFileCacheTest implements Serializable {
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(),
                 cache,
+                false,
                 false);
         second.addSource("source", source);
         second.addStep("step", buildStep, "source");
@@ -197,6 +199,7 @@ public class BuildExecutorFileCacheTest implements Serializable {
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(),
                 cache,
+                false,
                 false);
         first.addSource("source", source);
         first.addStep("step", buildStep, "source");
@@ -212,6 +215,7 @@ public class BuildExecutorFileCacheTest implements Serializable {
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(),
                 cache,
+                false,
                 false);
         second.addSource("source", source);
         second.addStep("step", buildStep, "source");

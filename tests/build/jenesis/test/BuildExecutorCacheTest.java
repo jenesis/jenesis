@@ -33,6 +33,7 @@ public class BuildExecutorCacheTest implements Serializable {
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(),
                 cache,
+                false,
                 false);
         BuildStep buildStep = (_, _, _) -> {
             throw new AssertionError("Did not expect that step is executed");
@@ -61,6 +62,7 @@ public class BuildExecutorCacheTest implements Serializable {
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(),
                 cache,
+                false,
                 false);
         BuildStep buildStep = (_, context, arguments) -> {
             Files.writeString(
@@ -108,6 +110,7 @@ public class BuildExecutorCacheTest implements Serializable {
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(),
                 cache,
+                false,
                 false);
         buildExecutor.addSource("source", source);
         buildExecutor.addStep("step", buildStep, "source");
@@ -144,6 +147,7 @@ public class BuildExecutorCacheTest implements Serializable {
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(),
                 cache,
+                false,
                 false);
         BuildStep buildStep = (_, context, arguments) -> {
             Files.writeString(
@@ -170,6 +174,7 @@ public class BuildExecutorCacheTest implements Serializable {
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(),
                 cache,
+                false,
                 false);
         BuildStep buildStep = (_, context, arguments) -> {
             Files.writeString(
@@ -198,6 +203,7 @@ public class BuildExecutorCacheTest implements Serializable {
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(),
                 cache,
+                false,
                 false);
         BuildStep buildStep = (_, _, _) -> {
             throw new AssertionError("Did not expect that step is executed");

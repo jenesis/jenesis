@@ -231,6 +231,7 @@ public class TestEngineAdapterTest {
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(),
                 BuildExecutorCache.nop(),
+                false,
                 false);
     }
 

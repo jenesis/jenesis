@@ -10,7 +10,7 @@ public interface BuildExecutor {
         return new Configuration().of(target);
     }
 
-    record Configuration(Duration timeout, String digest, boolean verbose, boolean rebuild, BuildExecutorCache cache) {
+    record Configuration(Duration timeout, String digest, boolean verbose, boolean rebuild, boolean aggregate, BuildExecutorCache cache) {
 
         private static final ConcurrentMap<Path, FileChannel> LOCKS = new ConcurrentHashMap<>();
 
@@ -32,27 +32,32 @@ public interface BuildExecutor {
                     System.getProperty("jenesis.executor.digest", "MD5"),
                     Boolean.getBoolean("jenesis.print.checksum"),
                     Boolean.getBoolean("jenesis.executor.rebuild"),
+                    Boolean.getBoolean("jenesis.executor.aggregate"),
                     cache);
         }
 
         public Configuration timeout(Duration timeout) {
-            return new Configuration(timeout, digest, verbose, rebuild, cache);
+            return new Configuration(timeout, digest, verbose, rebuild, aggregate, cache);
         }
 
         public Configuration digest(String digest) {
-            return new Configuration(timeout, digest, verbose, rebuild, cache);
+            return new Configuration(timeout, digest, verbose, rebuild, aggregate, cache);
         }
 
         public Configuration verbose(boolean verbose) {
-            return new Configuration(timeout, digest, verbose, rebuild, cache);
+            return new Configuration(timeout, digest, verbose, rebuild, aggregate, cache);
         }
 
         public Configuration rebuild(boolean rebuild) {
-            return new Configuration(timeout, digest, verbose, rebuild, cache);
+            return new Configuration(timeout, digest, verbose, rebuild, aggregate, cache);
+        }
+
+        public Configuration aggregate(boolean aggregate) {
+            return new Configuration(timeout, digest, verbose, rebuild, aggregate, cache);
         }
 
         public Configuration cache(BuildExecutorCache cache) {
-            return new Configuration(timeout, digest, verbose, rebuild, cache);
+            return new Configuration(timeout, digest, verbose, rebuild, aggregate, cache);
         }
 
         public BuildExecutor of(Path target) throws IOException {
@@ -64,7 +69,8 @@ public interface BuildExecutor {
                             ? BuildExecutorCallback.printing(System.out, verbose, Boolean.getBoolean("jenesis.print.cache"), target)
                             : BuildExecutorCallback.nop(),
                     cache == null ? BuildExecutorCache.nop() : cache,
-                    rebuild);
+                    rebuild,
+                    aggregate);
         }
     }
 
@@ -74,7 +80,8 @@ public interface BuildExecutor {
                             BuildStepHashFunction stepHash,
                             BuildExecutorCallback callback,
                             BuildExecutorCache cache,
-                            boolean rebuild) throws IOException {
+                            boolean rebuild,
+                            boolean aggregate) throws IOException {
         if (rebuild && Files.isDirectory(target)) {
             Files.walkFileTree(target, new SimpleFileVisitor<>() {
                 @Override
@@ -93,7 +100,7 @@ public interface BuildExecutor {
                 }
             });
         }
-        BuildExecutor executor = new BuildExecutorDefault(target, timeout, hash, stepHash, callback, cache, "", Map.of());
+        BuildExecutor executor = new BuildExecutorDefault(target, timeout, hash, stepHash, callback, cache, aggregate, "", Map.of());
         Path canonical = target.toAbsolutePath().normalize();
         FileChannel channel = FileChannel.open(target.resolve(LOCK_MARKER),
                 StandardOpenOption.CREATE,

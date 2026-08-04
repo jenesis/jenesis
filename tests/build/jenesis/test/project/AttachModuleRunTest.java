@@ -143,7 +143,7 @@ public class AttachModuleRunTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
         executor.addSource("dependencies", dependencies);
         executor.addSource("classes", classes);
         Map<String, Repository> repositories = Map.of(

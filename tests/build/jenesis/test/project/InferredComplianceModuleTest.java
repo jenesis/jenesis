@@ -89,7 +89,7 @@ public class InferredComplianceModuleTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
         executor.addSource("input", input);
         executor.addModule("compliance", module, "input");
         return executor.execute(Runnable::run, selector).toCompletableFuture().join();
