@@ -161,6 +161,157 @@ public class BuildExecutorFileCacheTest implements Serializable {
     }
 
     @Test
+    public void changed_input_misses_and_leaves_target_empty() throws IOException {
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        byte[] step = {1};
+        Files.writeString(output.resolve("file"), "result");
+        cache.store(Runnable::run, "step", step, inputs("source", "file", new byte[]{9}), output);
+        Optional<BuildStepResult> result = cache.fetch(
+                Runnable::run,
+                "step",
+                step,
+                inputs("source", "file", new byte[]{8}),
+                target);
+        assertThat(result).isEmpty();
+        try (Stream<Path> entries = Files.list(target)) {
+            assertThat(entries.toList()).isEmpty();
+        }
+    }
+
+    @Test
+    public void changed_source_re_executes_past_a_populated_cache() throws IOException {
+        EXECUTIONS.set(0);
+        Files.writeString(source.resolve("file"), "foo");
+        BuildExecutorCache cache = new BuildExecutorFileCache(cacheRoot);
+        BuildStep buildStep = (_, context, arguments) -> {
+            EXECUTIONS.incrementAndGet();
+            Files.writeString(
+                    context.next().resolve("file"),
+                    Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        };
+
+        BuildExecutor first = BuildExecutor.of(firstTarget,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                cache,
+                false);
+        first.addSource("source", source);
+        first.addStep("step", buildStep, "source");
+        first.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(firstTarget.resolve("step").resolve("output").resolve("file")).content().isEqualTo("foobar");
+        assertThat(EXECUTIONS).hasValue(1);
+
+        Files.writeString(source.resolve("file"), "baz");
+
+        BuildExecutor second = BuildExecutor.of(secondTarget,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                cache,
+                false);
+        second.addSource("source", source);
+        second.addStep("step", buildStep, "source");
+        second.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(secondTarget.resolve("step").resolve("output").resolve("file")).content().isEqualTo("bazbar");
+        assertThat(EXECUTIONS).hasValue(2);
+    }
+
+    @Test
+    public void corrupt_cache_entry_leaves_the_target_empty() throws IOException {
+        Files.writeString(cacheRoot.resolve("cache.properties"), "compressed=true\n");
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("file"), "result");
+        cache.store(Runnable::run, "step", step, in, output);
+        Path entry;
+        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
+            entry = entries.findFirst().orElseThrow();
+        }
+        ByteArrayOutputStream malicious = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(malicious)) {
+            zip.putNextEntry(new ZipEntry("../escape"));
+            zip.write(new byte[]{1});
+            zip.closeEntry();
+        }
+        Files.write(entry, malicious.toByteArray());
+        Files.writeString(target.resolve("stale"), "leftover");
+        assertThat(cache.fetch(Runnable::run, "step", step, in, target)).isEmpty();
+        try (Stream<Path> contents = Files.list(target)) {
+            assertThat(contents.findAny()).isEmpty();
+        }
+    }
+
+    @Test
+    public void serves_a_tampered_entry_without_verifying_its_checksum() throws IOException {
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("file"), "result");
+        cache.store(Runnable::run, "step", step, in, output);
+        Path cached;
+        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
+            cached = entries.findFirst().orElseThrow().resolve("file");
+        }
+        Files.writeString(cached, "tampered");
+        Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", step, in, target);
+        assertThat(result).isPresent();
+        assertThat(target.resolve("file")).content().isEqualTo("tampered");
+    }
+
+    @Test
+    public void store_is_idempotent_and_keeps_the_first_entry() throws IOException {
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("file"), "first");
+        cache.store(Runnable::run, "step", step, in, output);
+        Files.writeString(output.resolve("file"), "second");
+        cache.store(Runnable::run, "step", step, in, output);
+        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
+            assertThat(entries.toList()).hasSize(1);
+        }
+        Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", step, in, target);
+        assertThat(result).isPresent();
+        assertThat(target.resolve("file")).content().isEqualTo("first");
+    }
+
+    @Test
+    public void concurrent_stores_of_one_key_settle_on_a_single_entry() throws Exception {
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("file"), "result");
+        int threads = 8;
+        ExecutorService service = Executors.newFixedThreadPool(threads);
+        CountDownLatch latch = new CountDownLatch(1);
+        List<Future<?>> futures = new ArrayList<>();
+        for (int index = 0; index < threads; index++) {
+            futures.add(service.submit(() -> {
+                latch.await();
+                cache.store(Runnable::run, "step", step, in, output);
+                return null;
+            }));
+        }
+        latch.countDown();
+        for (Future<?> future : futures) {
+            future.get();
+        }
+        service.shutdown();
+        try (Stream<Path> entries = Files.list(cacheRoot.resolve(HexFormat.of().formatHex(step)))) {
+            List<Path> list = entries.toList();
+            assertThat(list).hasSize(1);
+            assertThat(list.getFirst().getFileName().toString()).hasSize(64);
+        }
+        assertThat(cache.fetch(Runnable::run, "step", step, in, target)).isPresent();
+        assertThat(target.resolve("file")).content().isEqualTo("result");
+    }
+
+    @Test
     public void evicts_least_recently_updated_step_folder() throws IOException {
         Files.writeString(cacheRoot.resolve("cache.properties"), "steps=2\n");
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
