@@ -143,10 +143,16 @@ public class MavenRepositoryStaging implements BuildStep {
                                      Pairings pairings) throws IOException {
         for (Module main : mainsByArtifactId.values()) {
             Coordinates coordinates = main.coordinates();
+            requireSafeSegment("groupId", coordinates.groupId());
+            requireSafeSegment("artifactId", coordinates.artifactId());
+            requireSafeSegment("version", coordinates.version());
             Path baseDir = target
                     .resolve(coordinates.groupId().replace('.', '/'))
                     .resolve(coordinates.artifactId())
                     .resolve(coordinates.version());
+            if (!baseDir.normalize().startsWith(target.normalize())) {
+                throw new IllegalStateException("Resolved path escapes the staging root: " + baseDir);
+            }
             Files.createDirectories(baseDir);
             String prefix = coordinates.artifactId() + "-" + coordinates.version();
             link(main.artifact(), baseDir.resolve(prefix + ".jar"));
@@ -283,6 +289,31 @@ public class MavenRepositoryStaging implements BuildStep {
                     + inventoryFile);
         }
         return jars.getFirst();
+    }
+
+    private static void requireSafeSegment(String role, String value) {
+        if (value.isEmpty()) {
+            throw new IllegalArgumentException("Blank " + role + " is not a valid coordinate");
+        }
+        for (String segment : value.split("/", -1)) {
+            if (segment.equals("..")) {
+                throw new IllegalArgumentException("Illegal " + role + " '" + value + "': path traversal is not permitted");
+            }
+        }
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            boolean permitted = character >= 'a' && character <= 'z'
+                    || character >= 'A' && character <= 'Z'
+                    || character >= '0' && character <= '9'
+                    || character == '.'
+                    || character == '-'
+                    || character == '_'
+                    || character == '+';
+            if (!permitted) {
+                throw new IllegalArgumentException(
+                        "Illegal " + role + " '" + value + "': character '" + character + "' is not permitted");
+            }
+        }
     }
 
     private static void link(Path source, Path target) throws IOException {

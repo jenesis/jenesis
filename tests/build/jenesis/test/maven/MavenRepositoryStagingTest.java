@@ -309,6 +309,15 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
+    public void rejects_path_traversal_in_pom_coordinates() throws IOException {
+        Path main = mainInventory("foo", "com.example", "foo", "../../../../../../tmp/evil", "classes.jar");
+        writeArtifact(main, "classes.jar", "main");
+
+        assertThatThrownBy(() -> run(true, main))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     public void arguments_without_inventory_are_skipped() throws IOException {
         Path stray = Files.createDirectory(source.resolve("stray"));
         writeArtifact(stray, "classes.jar", "stray");
