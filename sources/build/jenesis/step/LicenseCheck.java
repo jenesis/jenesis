@@ -71,6 +71,7 @@ public class LicenseCheck implements BuildStep {
             SequencedProperties licenses = Files.exists(sidecar)
                     ? SequencedProperties.ofFiles(sidecar)
                     : new SequencedProperties();
+            Map<String, List<String[]>> licensesByKey = bucketLicenses(licenses);
             for (String key : dependencies.stringPropertyNames()) {
                 int first = key.indexOf('/'), second = key.indexOf('/', first + 1), third = key.indexOf('/', second + 1);
                 if (third < 0 || !key.substring(0, first).equals("main")) {
@@ -81,7 +82,8 @@ public class LicenseCheck implements BuildStep {
                         || licensesByCoordinate.containsKey(coordinate)) {
                     continue;
                 }
-                licensesByCoordinate.put(coordinate, licenses(licenses, key.substring(second + 1)));
+                licensesByCoordinate.put(coordinate,
+                        licensesByKey.getOrDefault(key.substring(second + 1), new ArrayList<>()));
                 if (key.substring(second + 1, third).equals("maven")) {
                     strict.add(coordinate);
                 }
@@ -279,7 +281,7 @@ public class LicenseCheck implements BuildStep {
         }
         Object document;
         try (InputStream in = file.getInputStream(entry)) {
-            document = Json.parse(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+            document = Json.parse(new String(in.readNBytes(1 << 24), StandardCharsets.UTF_8));
         } catch (IOException | RuntimeException _) {
             return List.of();
         }
@@ -330,7 +332,7 @@ public class LicenseCheck implements BuildStep {
             }
             String[] spdx;
             try (InputStream in = file.getInputStream(entry)) {
-                spdx = identify(new String(in.readAllBytes(), StandardCharsets.UTF_8), null);
+                spdx = identify(new String(in.readNBytes(1 << 20), StandardCharsets.UTF_8), null);
             }
             if (spdx != null) {
                 return spdx[0];
@@ -355,32 +357,34 @@ public class LicenseCheck implements BuildStep {
         return String.join("; ", rendered);
     }
 
-    private static List<String[]> licenses(SequencedProperties licenses, String licenseKey) {
-        SequencedMap<Integer, String[]> byIndex = new TreeMap<>();
-        String prefix = licenseKey + "#";
+    private static Map<String, List<String[]>> bucketLicenses(SequencedProperties licenses) {
+        Map<String, SequencedMap<Integer, String[]>> byKey = new HashMap<>();
         for (String key : licenses.stringPropertyNames()) {
-            if (!key.startsWith(prefix)) {
+            int fieldHash = key.lastIndexOf('#');
+            if (fieldHash < 0) {
                 continue;
             }
-            String rest = key.substring(prefix.length());
-            int hash = rest.indexOf('#');
-            if (hash < 0) {
+            int indexHash = key.lastIndexOf('#', fieldHash - 1);
+            if (indexHash < 0) {
                 continue;
             }
             int index;
             try {
-                index = Integer.parseInt(rest.substring(0, hash));
+                index = Integer.parseInt(key.substring(indexHash + 1, fieldHash));
             } catch (NumberFormatException _) {
                 continue;
             }
-            String[] entry = byIndex.computeIfAbsent(index, _ -> new String[2]);
-            String field = rest.substring(hash + 1);
+            String[] entry = byKey.computeIfAbsent(key.substring(0, indexHash), _ -> new TreeMap<>())
+                    .computeIfAbsent(index, _ -> new String[2]);
+            String field = key.substring(fieldHash + 1);
             if (field.equals("name")) {
                 entry[0] = licenses.getProperty(key);
             } else if (field.equals("url")) {
                 entry[1] = licenses.getProperty(key);
             }
         }
-        return new ArrayList<>(byIndex.values());
+        Map<String, List<String[]>> result = new HashMap<>();
+        byKey.forEach((licenseKey, byIndex) -> result.put(licenseKey, new ArrayList<>(byIndex.values())));
+        return result;
     }
 }
