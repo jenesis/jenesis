@@ -358,8 +358,11 @@ public class MavenDefaultRepository implements MavenRepository {
                                            String prefix,
                                            String suffix,
                                            String token,
-                                           Repository.Retry retry) throws IOException {
-        Path temporary = Files.createTempFile(prefix, suffix);
+                                           Repository.Retry retry,
+                                           Path directory) throws IOException {
+        Path temporary = directory == null
+                ? Files.createTempFile(prefix, suffix)
+                : Files.createTempFile(directory, prefix, suffix);
         try {
             // The opened response retries internally; this loop additionally covers a
             // connection that drops while the body is being copied.
@@ -439,6 +442,14 @@ public class MavenDefaultRepository implements MavenRepository {
         return Optional.of(temporary);
     }
 
+    private static Path move(Path source, Path target) throws IOException {
+        try {
+            return Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException _) {
+            return Files.move(source, target);
+        }
+    }
+
     private interface LazyRepositoryItem {
 
         default void deleteIfPresent() throws IOException {
@@ -500,7 +511,8 @@ public class MavenDefaultRepository implements MavenRepository {
             if (path == null) {
                 return;
             }
-            Path temporary = Files.createTempFile(prefix, suffix);
+            Files.createDirectories(path.getParent());
+            Path temporary = Files.createTempFile(path.getParent(), prefix, suffix);
             try (OutputStream outputStream = Files.newOutputStream(temporary)) {
                 outputStream.write(bytes);
             } catch (Throwable t) {
@@ -508,7 +520,7 @@ public class MavenDefaultRepository implements MavenRepository {
                 throw t;
             }
             try {
-                Files.move(temporary, path);
+                move(temporary, path);
             } catch (IOException _) {
                 Files.deleteIfExists(temporary);
             }
@@ -516,7 +528,7 @@ public class MavenDefaultRepository implements MavenRepository {
 
         @Override
         public Optional<InputStream> toLazyInputStream() throws IOException {
-            Optional<Path> temporary = download(uri, digests, prefix, suffix, token, retry);
+            Optional<Path> temporary = download(uri, digests, prefix, suffix, token, retry, null);
             if (temporary.isEmpty()) {
                 return Optional.empty();
             }
@@ -545,12 +557,13 @@ public class MavenDefaultRepository implements MavenRepository {
             if (path == null) {
                 return LazyRepositoryItem.super.materialize();
             }
-            Optional<Path> temporary = download(uri, digests, prefix, suffix, token, retry);
+            Files.createDirectories(path.getParent());
+            Optional<Path> temporary = download(uri, digests, prefix, suffix, token, retry, path.getParent());
             if (temporary.isEmpty()) {
                 return Optional.empty();
             }
             try {
-                return Optional.of(new StoredRepositoryItem(Files.move(temporary.get(), path)));
+                return Optional.of(new StoredRepositoryItem(move(temporary.get(), path)));
             } catch (IOException _) {
                 return Optional.of(new StoredRepositoryItem(temporary.get()));
             }
