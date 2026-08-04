@@ -71,8 +71,8 @@ public class Versions implements BuildStep {
                 merged.write(out);
             }
         }
-        boolean requiresChanged = arguments.values().stream().anyMatch(arg -> {
-            Checksum status = arg.files().get(Path.of(REQUIRES));
+        boolean dependenciesChanged = arguments.values().stream().anyMatch(arg -> {
+            Checksum status = arg.files().get(Path.of(DEPENDENCIES));
             return status != null && status.status() != ChecksumStatus.RETAINED;
         });
         for (BuildStepArgument argument : arguments.values()) {
@@ -91,7 +91,7 @@ public class Versions implements BuildStep {
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                     Path destination = target.resolve(source.relativize(file));
                     if (file.getFileName().toString().equals("module-info.class")) {
-                        if (!requiresChanged && context.previous() != null) {
+                        if (!dependenciesChanged && context.previous() != null) {
                             Path argumentRelative = argument.folder().relativize(file);
                             Checksum status = argument.files().get(argumentRelative);
                             if (status != null && status.status() == ChecksumStatus.RETAINED) {

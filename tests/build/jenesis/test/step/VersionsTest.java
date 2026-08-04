@@ -257,7 +257,7 @@ public class VersionsTest {
     }
 
     @Test
-    public void restamps_module_info_when_requires_changed() throws IOException {
+    public void restamps_module_info_when_dependencies_changed() throws IOException {
         writeModuleInfo("foo", null, false, require("bar"));
         writeRequires(Map.of("module/bar/1.0", ""));
         Path priorClasses = Files.createDirectories(previous.resolve(BuildStep.CLASSES));
@@ -271,7 +271,7 @@ public class VersionsTest {
                                                 Checksum.of(ChecksumStatus.RETAINED))),
                                 "requires", new BuildStepArgument(
                                         requiresInput,
-                                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ALTERED))))))
+                                        Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ALTERED))))))
                 .toCompletableFuture()
                 .join();
         assertThat(result.next()).isTrue();
