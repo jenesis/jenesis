@@ -77,19 +77,23 @@ public class CycloneDx {
             sortedDependencies.add(new Dependency(dependency.ref(), dependsOn));
         }
         sortedDependencies.sort(Comparator.comparing(Dependency::ref));
-        if (format == Format.XML) {
-            Document document = buildXml(metadata, sortedComponents, sortedDependencies);
-            String serialLess = transformXml(document);
-            document.getDocumentElement().setAttribute("serialNumber",
-                    "urn:uuid:" + UUID.nameUUIDFromBytes(serialLess.getBytes(StandardCharsets.UTF_8)));
-            return transformXml(document);
-        }
-        String serialLess = emitJson(metadata, sortedComponents, sortedDependencies);
-        String serialNumber = "urn:uuid:" + UUID.nameUUIDFromBytes(serialLess.getBytes(StandardCharsets.UTF_8));
-        int insert = serialLess.indexOf("  \"version\": 1,\n");
-        return serialLess.substring(0, insert)
-                + "  \"serialNumber\": \"" + escapeJson(serialNumber) + "\",\n"
-                + serialLess.substring(insert);
+        return switch (format) {
+            case XML -> {
+                Document document = buildXml(metadata, sortedComponents, sortedDependencies);
+                String serialLess = transformXml(document);
+                document.getDocumentElement().setAttribute("serialNumber",
+                        "urn:uuid:" + UUID.nameUUIDFromBytes(serialLess.getBytes(StandardCharsets.UTF_8)));
+                yield transformXml(document);
+            }
+            case JSON -> {
+                String serialLess = emitJson(metadata, sortedComponents, sortedDependencies);
+                String serialNumber = "urn:uuid:" + UUID.nameUUIDFromBytes(serialLess.getBytes(StandardCharsets.UTF_8));
+                int insert = serialLess.indexOf("  \"version\": 1,\n");
+                yield serialLess.substring(0, insert)
+                        + "  \"serialNumber\": \"" + escapeJson(serialNumber) + "\",\n"
+                        + serialLess.substring(insert);
+            }
+        };
     }
 
     private String emitJson(Component metadata, List<Component> components, List<Dependency> dependencies) {
