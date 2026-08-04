@@ -1,5 +1,6 @@
 package sample;
 
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,6 +10,6 @@ public class Sample {
 
     public String greet() {
         LOGGER.info("greeting requested");
-        return "Hello from a BOM-pinned modular project, compiled by Jenesis!";
+        return StringUtils.capitalize("hello from a BOM-pinned modular project, compiled by Jenesis!");
     }
 }

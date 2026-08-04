@@ -773,7 +773,7 @@ public class DependenciesResolutionTest {
     }
 
     @Test
-    public void first_declared_bom_wins() throws IOException {
+    public void last_declared_bom_wins() throws IOException {
         SequencedProperties requires = new SequencedProperties();
         requires.setProperty("main/compile/module/qux", "");
         requires.store(dependencies.resolve(BuildStep.REQUIRES));
@@ -794,7 +794,7 @@ public class DependenciesResolutionTest {
                                 Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
-        assertThat(index.stringPropertyNames()).containsExactly("main/compile/module/qux/1.0");
+        assertThat(index.stringPropertyNames()).containsExactly("main/compile/module/qux/2.0");
     }
 
     @Test

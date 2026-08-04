@@ -116,8 +116,8 @@ public class DependenciesMavenBomTest {
         assertThat(index.stringPropertyNames()).contains("main/compile/maven/org.acme/lib/2.0");
         SequencedProperties resolvedBoms = SequencedProperties.ofFiles(next.resolve(BuildStep.BOMS));
         assertThat(resolvedBoms.getProperty("version/main/maven/org.acme/platform-bom")).isEqualTo("1.0");
-        assertThat(resolvedBoms.getProperty("pin/main/maven/org.acme/lib")).isEqualTo("2.0");
         assertThat(resolvedBoms.stringPropertyNames()).noneMatch(key -> key.startsWith("bom/"));
+        assertThat(resolvedBoms.stringPropertyNames()).noneMatch(key -> key.startsWith("entry/"));
     }
 
     @Test
@@ -169,6 +169,9 @@ public class DependenciesMavenBomTest {
 
     @Test
     public void checksum_comments_in_maven_bom_are_ignored() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.acme/lib", "");
+        requires.store(dependencies.resolve(BuildStep.REQUIRES));
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
@@ -189,12 +192,16 @@ public class DependenciesMavenBomTest {
                         """))),
                 Map.of("maven", new MavenPomResolver())));
         assertThat(result.next()).isTrue();
-        SequencedProperties resolvedBoms = SequencedProperties.ofFiles(next.resolve(BuildStep.BOMS));
-        assertThat(resolvedBoms.getProperty("pin/main/maven/org.acme/lib")).isEqualTo("2.0");
+        SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
+        assertThat(index.getProperty("main/compile/maven/org.acme/lib/2.0")).doesNotContain("SHA");
     }
 
     @Test
     public void nested_import_scoped_bom_flattens_first_wins() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.acme/lib", "");
+        requires.setProperty("main/compile/maven/org.acme/extra", "");
+        requires.store(dependencies.resolve(BuildStep.REQUIRES));
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
@@ -242,13 +249,49 @@ public class DependenciesMavenBomTest {
                                 """))),
                 Map.of("maven", new MavenPomResolver())));
         assertThat(result.next()).isTrue();
+        SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
+        assertThat(index.stringPropertyNames()).contains(
+                "main/compile/maven/org.acme/lib/2.0",
+                "main/compile/maven/org.acme/extra/1.5");
+    }
+
+    @Test
+    public void later_maven_bom_overrides_earlier_entry() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.acme/lib", "");
+        requires.store(dependencies.resolve(BuildStep.REQUIRES));
+        SequencedProperties boms = new SequencedProperties();
+        boms.setProperty("entry/main/maven/org.acme/lib", "1.0 SHA-256/aaaa");
+        boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
+        boms.store(dependencies.resolve(BuildStep.BOMS));
+        BuildStepResult result = apply(new Dependencies(
+                Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", """
+                        <project xmlns="http://maven.apache.org/POM/4.0.0">
+                            <modelVersion>4.0.0</modelVersion>
+                            <dependencyManagement>
+                                <dependencies>
+                                    <dependency>
+                                        <groupId>org.acme</groupId>
+                                        <artifactId>lib</artifactId>
+                                        <version>2.0</version>
+                                    </dependency>
+                                </dependencies>
+                            </dependencyManagement>
+                        </project>
+                        """))),
+                Map.of("maven", new MavenPomResolver())));
+        assertThat(result.next()).isTrue();
+        SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
+        assertThat(index.stringPropertyNames()).contains("main/compile/maven/org.acme/lib/2.0");
         SequencedProperties resolvedBoms = SequencedProperties.ofFiles(next.resolve(BuildStep.BOMS));
-        assertThat(resolvedBoms.getProperty("pin/main/maven/org.acme/lib")).isEqualTo("2.0");
-        assertThat(resolvedBoms.getProperty("pin/main/maven/org.acme/extra")).isEqualTo("1.5");
+        assertThat(resolvedBoms.stringPropertyNames()).noneMatch(key -> key.startsWith("entry/"));
     }
 
     @Test
     public void versionless_maven_bom_negotiates_release_and_stays_floating() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.acme/lib", "");
+        requires.store(dependencies.resolve(BuildStep.REQUIRES));
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "");
         boms.store(dependencies.resolve(BuildStep.BOMS));
@@ -270,9 +313,13 @@ public class DependenciesMavenBomTest {
                         "<metadata><versioning><release>1.0</release></versioning></metadata>")),
                 Map.of("maven", new MavenPomResolver())));
         assertThat(result.next()).isTrue();
-        SequencedProperties resolvedBoms = SequencedProperties.ofFiles(next.resolve(BuildStep.BOMS));
-        assertThat(resolvedBoms.getProperty("pin/main/maven/org.acme/lib")).isEqualTo("2.0");
-        assertThat(resolvedBoms.stringPropertyNames()).noneMatch(key -> key.startsWith("version/"));
+        SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
+        assertThat(index.stringPropertyNames()).contains("main/compile/maven/org.acme/lib/2.0");
+        Path resolvedBoms = next.resolve(BuildStep.BOMS);
+        if (Files.exists(resolvedBoms)) {
+            assertThat(SequencedProperties.ofFiles(resolvedBoms).stringPropertyNames())
+                    .noneMatch(key -> key.startsWith("version/"));
+        }
     }
 
     @Test
@@ -323,6 +370,5 @@ public class DependenciesMavenBomTest {
         assertThat(index.stringPropertyNames()).contains("main/compile/maven/org.acme/lib/2.5");
         SequencedProperties resolvedBoms = SequencedProperties.ofFiles(next.resolve(BuildStep.BOMS));
         assertThat(resolvedBoms.getProperty("version/main/maven/org.acme/platform-bom")).isEqualTo("2.0");
-        assertThat(resolvedBoms.getProperty("pin/main/maven/org.acme/lib")).isEqualTo("2.5");
     }
 }

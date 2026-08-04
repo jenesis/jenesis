@@ -206,14 +206,12 @@ public class Dependencies implements BuildStep {
         if (!bomTokens.isEmpty()) {
             SequencedMap<String, String> merged = new LinkedHashMap<>();
             SequencedMap<String, String> covering = new LinkedHashMap<>();
-            SequencedMap<String, String> materializing = new LinkedHashMap<>();
             SequencedProperties resolvedBoms = new SequencedProperties();
             for (Map.Entry<String, String> token : bomTokens.entrySet()) {
                 if (token.getKey().startsWith("entry/")) {
                     String key = token.getKey().substring(6);
-                    if (merged.putIfAbsent(key, token.getValue()) == null) {
-                        covering.put(key, token.getValue());
-                    }
+                    merged.put(key, token.getValue());
+                    covering.put(key, token.getValue());
                     continue;
                 }
                 String reference = token.getKey().substring(4);
@@ -258,16 +256,16 @@ public class Dependencies implements BuildStep {
                 }
                 for (Map.Entry<String, String> entry : bom.entries().entrySet()) {
                     String key = group + "/" + entry.getKey();
-                    if (merged.putIfAbsent(key, entry.getValue()) == null) {
-                        (bom.verifiable() ? covering : materializing).put(key, entry.getValue());
+                    merged.put(key, entry.getValue());
+                    if (bom.verifiable()) {
+                        covering.put(key, entry.getValue());
+                    } else {
+                        covering.remove(key);
                     }
                 }
             }
             for (Map.Entry<String, String> entry : covering.entrySet()) {
                 resolvedBoms.setProperty("entry/" + entry.getKey(), entry.getValue());
-            }
-            for (Map.Entry<String, String> entry : materializing.entrySet()) {
-                resolvedBoms.setProperty("pin/" + entry.getKey(), entry.getValue());
             }
             for (Map.Entry<String, String> entry : merged.entrySet()) {
                 String key = entry.getKey();

@@ -503,8 +503,9 @@ public record Project(
                                                        pin line) and pins each versioned @jenesis.bom
                                                        reference with its file hash; a Maven BOM takes
                                                        no hash, so its reference is pinned by version
-                                                       and every version it declares is written as a
-                                                       pin line; %{name}flatten%{reset} removes
+                                                       and its entries never cover - each resolved
+                                                       artifact it manages is pinned with its computed
+                                                       checksum instead; %{name}flatten%{reset} removes
                                                        the @jenesis.bom declarations and pins the
                                                        resolved closure in full
 
@@ -981,7 +982,7 @@ public record Project(
                                                         <repo>/<coordinate>);
                                                         local @jenesis.pin lines
                                                         override BOM entries, and
-                                                        the first declared BOM
+                                                        the last declared BOM
                                                         wins a conflict.
                       @jenesis.attach <token> [<arguments...>]
                                                         Attach a library as a
@@ -1116,9 +1117,11 @@ public record Project(
                                                   reference with its file hash;
                                                   a Maven BOM takes no hash, so
                                                   its reference is pinned by
-                                                  version and every version it
-                                                  declares is written as a pin
-                                                  line; flatten removes the
+                                                  version and its entries never
+                                                  cover - each resolved artifact
+                                                  it manages is pinned with its
+                                                  computed checksum instead;
+                                                  flatten removes the
                                                   @jenesis.bom declarations and
                                                   pins the resolved closure in
                                                   full (platform-guarded BOM

@@ -171,7 +171,7 @@ public class Inventory implements BuildStep {
                 for (String key : resolvedBoms.stringPropertyNames()) {
                     if (key.startsWith("bom/")) {
                         bomFiles.putIfAbsent(key, folder.resolve(resolvedBoms.getProperty(key)).normalize());
-                    } else if (key.startsWith("entry/") || key.startsWith("pin/") || key.startsWith("version/")) {
+                    } else if (key.startsWith("entry/") || key.startsWith("version/")) {
                         bomValues.putIfAbsent(key, resolvedBoms.getProperty(key));
                     }
                 }
@@ -380,17 +380,6 @@ public class Inventory implements BuildStep {
             }
         });
         return entries;
-    }
-
-    public static SequencedMap<String, String> bomPins(Iterable<BuildStepArgument> arguments, String path)
-            throws IOException {
-        SequencedMap<String, String> pins = new LinkedHashMap<>();
-        forEachBom(arguments, path, (key, value, _) -> {
-            if (key.startsWith("pin/")) {
-                pins.putIfAbsent(key.substring(4), value);
-            }
-        });
-        return pins;
     }
 
     public static SequencedMap<String, String> bomVersions(Iterable<BuildStepArgument> arguments, String path)

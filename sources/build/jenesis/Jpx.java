@@ -253,10 +253,6 @@ public record Jpx(Path storage,
             }
         }
         Files.createDirectories(storage);
-        // Stream-only fetches - for example Maven downloads without a local ~/.m2 repository
-        // to materialize into - are spilled into a staging folder that becomes the installation
-        // folder once the resolved version names it, so downloaded jars are written exactly once
-        // and retained. File-backed items are referenced in place and linked or copied in later.
         Path staging = Files.createTempDirectory(storage, "staging-");
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             Map<String, Repository> repositories = new LinkedHashMap<>();
@@ -421,8 +417,6 @@ public record Jpx(Path storage,
             clear(folder);
             Files.delete(folder);
         }
-        // The staging folder already contains all spilled artifacts and becomes the
-        // installation folder as-is; only file-backed items still need to be linked in.
         Files.move(staging, folder);
         if (root.startsWith(staging)) {
             root = folder.resolve(root.getFileName());
