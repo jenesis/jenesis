@@ -158,13 +158,21 @@ public interface Repository {
                         }
                     }
                     if ((status == 429 || status >= 500) && attempt < retry.retries()) {
-                        long delay = retry.backoff().toMillis() << attempt;
+                        long delay = retry.backoff().toMillis() << Math.min(attempt, 20);
                         String after = http.getHeaderField("Retry-After");
                         if (after != null) {
+                            String trimmed = after.trim();
                             try {
                                 // The advertised wait is capped so a hostile server cannot stall the build.
-                                delay = Math.min(Long.parseLong(after.trim()), 30) * 1000;
+                                delay = Math.min(Long.parseLong(trimmed), 30) * 1000;
                             } catch (NumberFormatException _) {
+                                try {
+                                    long seconds = Duration.between(Instant.now(),
+                                            ZonedDateTime.parse(trimmed, DateTimeFormatter.RFC_1123_DATE_TIME).toInstant())
+                                            .toSeconds();
+                                    delay = Math.min(Math.max(seconds, 0), 30) * 1000;
+                                } catch (DateTimeParseException _) {
+                                }
                             }
                         }
                         InputStream error = http.getErrorStream();

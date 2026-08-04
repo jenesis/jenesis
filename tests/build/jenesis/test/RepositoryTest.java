@@ -130,6 +130,28 @@ public class RepositoryTest {
     }
 
     @Test
+    public void open_honors_the_retry_after_http_date_form() throws IOException {
+        System.setProperty("jenesis.repository.insecure", "true");
+        AtomicInteger hits = new AtomicInteger();
+        String past = DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now(ZoneOffset.UTC).minusMinutes(1));
+        HttpServer server = serve(hit -> hit < 2 ? 429 : 200, Map.of("Retry-After", past), hits);
+        try {
+            URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
+            long start = System.nanoTime();
+            try (InputStream stream = Repository.open(uri, null, new Repository.Retry(2, Duration.ofSeconds(30)))) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("payload");
+            }
+            long elapsedMillis = (System.nanoTime() - start) / 1_000_000;
+            assertThat(elapsedMillis)
+                    .as("a past HTTP-date Retry-After yields no wait, overriding the 30s backoff")
+                    .isLessThan(5_000);
+            assertThat(hits.get()).isEqualTo(2);
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     public void retry_defaults_read_the_system_properties() {
         System.setProperty("jenesis.repository.retries", "7");
         System.setProperty("jenesis.repository.backoff", "9");
