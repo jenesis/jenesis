@@ -17,6 +17,50 @@ public class JenesisModuleRepositoryTest {
     private Path root;
 
     @Test
+    public void credential_is_not_leaked_to_a_fallback_repository() throws IOException {
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.module.token", "Bearer secret");
+        List<String> firstAuth = new ArrayList<>();
+        List<String> secondAuth = new ArrayList<>();
+        HttpServer first = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        first.createContext("/", exchange -> {
+            firstAuth.add(exchange.getRequestHeaders().getFirst("Authorization"));
+            exchange.sendResponseHeaders(404, -1);
+            exchange.close();
+        });
+        HttpServer second = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        second.createContext("/", exchange -> {
+            secondAuth.add(exchange.getRequestHeaders().getFirst("Authorization"));
+            byte[] body = "classes".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+        first.start();
+        second.start();
+        try {
+            System.setProperty("jenesis.module.uri",
+                    "http://localhost:" + first.getAddress().getPort() + "/,"
+                            + "http://localhost:" + second.getAddress().getPort() + "/");
+            RepositoryItem item = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)
+                    .fetch(Runnable::run, "build.jenesis")
+                    .orElseThrow();
+            assertThat(read(item)).isEqualTo("classes");
+            assertThat(firstAuth).containsOnly("Bearer secret");
+            assertThat(secondAuth)
+                    .as("the private token must not reach the fallback mirror")
+                    .containsOnlyNulls();
+        } finally {
+            first.stop(0);
+            second.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.module.token");
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
     public void network_item_can_be_read_more_than_once() throws IOException {
         System.setProperty("jenesis.repository.insecure", "true");
         HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);

@@ -46,6 +46,9 @@ public class JenesisModuleRepository implements JenesisRepository {
             if (location.isEmpty()) {
                 throw new IllegalStateException("No URI in Jenesis module repository entry: " + candidate);
             }
+            // The credential is scoped to the primary repository only, so a private token is
+            // never attached to a public mirror or fallback declared later in the same chain.
+            String entryToken = repository == null ? token : null;
             JenesisRepository current;
             if (location.startsWith("@")) {
                 String name = location.substring(1);
@@ -68,7 +71,7 @@ public class JenesisModuleRepository implements JenesisRepository {
                         throw new IllegalStateException("Circular repository reference: @" + name);
                     }
                 }
-                current = chain(value, visited, scope, token, null);
+                current = chain(value, visited, scope, entryToken, null);
                 if (name != null) {
                     visited.remove(name);
                 }
@@ -79,7 +82,7 @@ public class JenesisModuleRepository implements JenesisRepository {
                 current = new JenesisModuleRepository(
                         URI.create((location.endsWith("/") ? location : location + "/")
                                 + (scope == Scope.MODULE ? "module/" : "artifact/")),
-                        token);
+                        entryToken);
             }
             List<String> modules = new ArrayList<>();
             if (separator >= 0) {

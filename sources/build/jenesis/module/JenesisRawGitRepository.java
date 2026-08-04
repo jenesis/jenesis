@@ -108,6 +108,9 @@ public class JenesisRawGitRepository implements JenesisRepository {
                 Predicate<String> combining = own;
                 effective = value -> inherited.test(value) && combining.test(value);
             }
+            // The credential is scoped to the primary repository only, so a private token is
+            // never attached to a public mirror or fallback declared later in the same chain.
+            String entryToken = repository == null ? token : null;
             JenesisRepository current;
             if (location.startsWith("@")) {
                 String name = location.substring(1);
@@ -130,7 +133,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
                         throw new IllegalStateException("Circular repository reference: @" + name);
                     }
                 }
-                current = chain(value, visited, scope, token, effective, null);
+                current = chain(value, visited, scope, entryToken, effective, null);
                 if (name != null) {
                     visited.remove(name);
                 }
@@ -141,7 +144,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
                 JenesisRawGitRepository base = new JenesisRawGitRepository(scope,
                         URI.create(GITHUB_DATA),
                         URI.create(location),
-                        token);
+                        entryToken);
                 current = effective == null ? base : base.groups(effective);
             }
             repository = repository == null ? current : current.prepend(repository);
