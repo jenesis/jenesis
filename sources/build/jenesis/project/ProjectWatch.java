@@ -16,28 +16,33 @@ public final class ProjectWatch {
 
     public void watch(Runnable build) throws IOException {
         try (WatchService service = root.getFileSystem().newWatchService()) {
-            register(service, root);
+            Map<WatchKey, Path> keys = new HashMap<>();
+            register(service, root, keys);
             build.run();
             System.out.println("Watching " + root + " for changes (press Ctrl+C to stop).");
             while (!Thread.interrupted()) {
                 WatchKey key = service.take();
                 boolean rebuild = false;
                 while (key != null) {
+                    Path directory = keys.get(key);
                     for (WatchEvent<?> event : key.pollEvents()) {
                         if (event.kind() == StandardWatchEventKinds.OVERFLOW) {
                             rebuild = true;
                             continue;
                         }
-                        Path changed = ((Path) key.watchable()).resolve((Path) event.context());
+                        Path base = directory != null ? directory : (Path) key.watchable();
+                        Path changed = base.resolve((Path) event.context());
                         if (isExcluded(changed)) {
                             continue;
                         }
                         rebuild = true;
                         if (event.kind() == StandardWatchEventKinds.ENTRY_CREATE && Files.isDirectory(changed)) {
-                            register(service, changed);
+                            register(service, changed, keys);
                         }
                     }
-                    key.reset();
+                    if (!key.reset()) {
+                        keys.remove(key);
+                    }
                     key = service.poll(debounceMillis, TimeUnit.MILLISECONDS);
                 }
                 if (rebuild) {
@@ -49,17 +54,17 @@ public final class ProjectWatch {
         }
     }
 
-    private void register(WatchService service, Path start) throws IOException {
+    private void register(WatchService service, Path start, Map<WatchKey, Path> keys) throws IOException {
         Files.walkFileTree(start, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) throws IOException {
                 if (isExcluded(directory)) {
                     return FileVisitResult.SKIP_SUBTREE;
                 }
-                directory.register(service,
+                keys.put(directory.register(service,
                         StandardWatchEventKinds.ENTRY_CREATE,
                         StandardWatchEventKinds.ENTRY_MODIFY,
-                        StandardWatchEventKinds.ENTRY_DELETE);
+                        StandardWatchEventKinds.ENTRY_DELETE), directory);
                 return FileVisitResult.CONTINUE;
             }
         });
