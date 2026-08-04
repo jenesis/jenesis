@@ -19,6 +19,22 @@ public interface RepositoryItem {
 
     InputStream toInputStream() throws IOException;
 
+    default RepositoryItem spill(Path target) throws IOException {
+        if (!Files.exists(target)) {
+            Path temporary = Files.createTempFile(target.getParent(), "spill", ".tmp");
+            try (InputStream inputStream = toInputStream()) {
+                Files.copy(inputStream, temporary, StandardCopyOption.REPLACE_EXISTING);
+                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
+            } catch (FileAlreadyExistsException _) {
+                Files.deleteIfExists(temporary);
+            } catch (Throwable t) {
+                Files.deleteIfExists(temporary);
+                throw t;
+            }
+        }
+        return ofFile(target);
+    }
+
     static RepositoryItem ofFile(Path file) {
         return ofFile(file, false);
     }

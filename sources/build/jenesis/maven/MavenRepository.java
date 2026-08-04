@@ -96,6 +96,44 @@ public interface MavenRepository extends Repository {
         };
     }
 
+    @Override
+    default MavenRepository spilled(Path folder) {
+        return new MavenRepository() {
+            @Override
+            public Optional<RepositoryItem> fetch(Executor executor,
+                                                  String groupId,
+                                                  String artifactId,
+                                                  String version,
+                                                  String type,
+                                                  String classifier,
+                                                  String checksum) throws IOException {
+                Optional<RepositoryItem> candidate = MavenRepository.this.fetch(executor,
+                        groupId,
+                        artifactId,
+                        version,
+                        type,
+                        classifier,
+                        checksum);
+                RepositoryItem item = candidate.orElse(null);
+                if (item == null || checksum != null || "pom".equals(type) || item.file().isPresent()) {
+                    return candidate;
+                }
+                return Optional.of(item.spill(folder.resolve(artifactId
+                        + "-" + version
+                        + (classifier == null ? "" : "-" + classifier)
+                        + "." + (type == null ? "jar" : type))));
+            }
+
+            @Override
+            public Optional<RepositoryItem> fetchMetadata(Executor executor,
+                                                          String groupId,
+                                                          String artifactId,
+                                                          String checksum) throws IOException {
+                return MavenRepository.this.fetchMetadata(executor, groupId, artifactId, checksum);
+            }
+        };
+    }
+
     default MavenRepository filter(Predicate<String> predicate) {
         return new MavenRepository() {
             @Override

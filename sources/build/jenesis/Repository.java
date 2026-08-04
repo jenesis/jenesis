@@ -22,6 +22,17 @@ public interface Repository {
         return cached(folder, true);
     }
 
+    default Repository spilled(Path folder) {
+        return (executor, coordinate) -> {
+            Optional<RepositoryItem> candidate = fetch(executor, coordinate);
+            RepositoryItem item = candidate.orElse(null);
+            if (item == null || item.file().isPresent()) {
+                return candidate;
+            }
+            return Optional.of(item.spill(folder.resolve(coordinate.replace('/', '-') + ".jar")));
+        };
+    }
+
     private Repository cached(Path folder, boolean snapshot) {
         if (folder == null) {
             return this;

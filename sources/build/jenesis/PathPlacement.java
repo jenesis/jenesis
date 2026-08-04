@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import java.util.jar.Attributes;
 
 public enum PathPlacement {
 
@@ -95,6 +96,13 @@ public enum PathPlacement {
             }
         } catch (IOException | RuntimeException _) {
             return null;
+        }
+    }
+
+    public static String mainClass(Path path) throws IOException {
+        try (JarFile jar = new JarFile(path.toFile(), true, ZipFile.OPEN_READ, JarFile.runtimeVersion())) {
+            Manifest manifest = jar.getManifest();
+            return manifest == null ? null : manifest.getMainAttributes().getValue(Attributes.Name.MAIN_CLASS);
         }
     }
 }

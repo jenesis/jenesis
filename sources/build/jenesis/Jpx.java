@@ -46,7 +46,11 @@ public record Jpx(Path storage,
             int slash = argument.indexOf('/');
             String mainClass = slash < 0 ? null : argument.substring(slash + 1);
             if (mainClass != null) {
-                requireClassName(mainClass);
+                for (String segment : mainClass.split("\\.", -1)) {
+                    if (segment.isEmpty() || !segment.chars().allMatch(Character::isJavaIdentifierPart)) {
+                        throw new IllegalArgumentException("Not a class name: " + mainClass);
+                    }
+                }
             }
             String head = slash < 0 ? argument : argument.substring(0, slash);
             int at = head.lastIndexOf('@');
@@ -256,9 +260,7 @@ public record Jpx(Path storage,
         Path staging = Files.createTempDirectory(storage, "staging-");
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             Map<String, Repository> repositories = new LinkedHashMap<>();
-            this.repositories.forEach((name, repository) -> repositories.put(name, repository instanceof MavenRepository maven
-                    ? spilling(maven, staging)
-                    : spilling(repository, staging)));
+            this.repositories.forEach((name, repository) -> repositories.put(name, repository.spilled(staging)));
             Resolver.Resolution resolution;
             String version = command.version(), root;
             int colon = command.name().indexOf(':');
@@ -342,70 +344,6 @@ public record Jpx(Path storage,
         }
     }
 
-    private static MavenRepository spilling(MavenRepository repository, Path folder) {
-        return new MavenRepository() {
-            @Override
-            public Optional<RepositoryItem> fetch(Executor executor,
-                                                  String groupId,
-                                                  String artifactId,
-                                                  String version,
-                                                  String type,
-                                                  String classifier,
-                                                  String checksum) throws IOException {
-                Optional<RepositoryItem> candidate = repository.fetch(executor,
-                        groupId,
-                        artifactId,
-                        version,
-                        type,
-                        classifier,
-                        checksum);
-                RepositoryItem item = candidate.orElse(null);
-                if (item == null || checksum != null || "pom".equals(type) || item.file().isPresent()) {
-                    return candidate;
-                }
-                return Optional.of(spill(item, folder.resolve(artifactId
-                        + "-" + version
-                        + (classifier == null ? "" : "-" + classifier)
-                        + "." + (type == null ? "jar" : type))));
-            }
-
-            @Override
-            public Optional<RepositoryItem> fetchMetadata(Executor executor,
-                                                          String groupId,
-                                                          String artifactId,
-                                                          String checksum) throws IOException {
-                return repository.fetchMetadata(executor, groupId, artifactId, checksum);
-            }
-        };
-    }
-
-    private static Repository spilling(Repository repository, Path folder) {
-        return (executor, coordinate) -> {
-            Optional<RepositoryItem> candidate = repository.fetch(executor, coordinate);
-            RepositoryItem item = candidate.orElse(null);
-            if (item == null || item.file().isPresent()) {
-                return candidate;
-            }
-            return Optional.of(spill(item, folder.resolve(coordinate.replace('/', '-') + ".jar")));
-        };
-    }
-
-    private static RepositoryItem spill(RepositoryItem item, Path target) throws IOException {
-        if (!Files.exists(target)) {
-            Path temporary = Files.createTempFile(target.getParent(), "spill", ".tmp");
-            try (InputStream inputStream = item.toInputStream()) {
-                Files.copy(inputStream, temporary, StandardCopyOption.REPLACE_EXISTING);
-                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
-            } catch (FileAlreadyExistsException _) {
-                Files.deleteIfExists(temporary);
-            } catch (Throwable t) {
-                Files.deleteIfExists(temporary);
-                throw t;
-            }
-        }
-        return RepositoryItem.ofFile(target);
-    }
-
     private void materialize(Command command,
                              String version,
                              Resolver.Resolution resolution,
@@ -437,7 +375,7 @@ public record Jpx(Path storage,
         }
         String mainModule = descriptor == null ? null : descriptor.name();
         String mainClass = descriptor == null || descriptor.mainClass().isEmpty()
-                ? mainClassOf(root)
+                ? PathPlacement.mainClass(root)
                 : descriptor.mainClass().get();
         List<String> modulepath = new ArrayList<>(), classpath = new ArrayList<>();
         boolean selfContainedModuleGraph = true;
@@ -490,13 +428,6 @@ public record Jpx(Path storage,
         return latest == null ? Optional.empty() : Optional.of(new Installation(latest, hashFunction));
     }
 
-    private static String mainClassOf(Path jar) throws IOException {
-        try (JarFile file = new JarFile(jar.toFile(), true, ZipFile.OPEN_READ, JarFile.runtimeVersion())) {
-            Manifest manifest = file.getManifest();
-            return manifest == null ? null : manifest.getMainAttributes().getValue("Main-Class");
-        }
-    }
-
     private static void clear(Path folder) throws IOException {
         Files.walkFileTree(folder, new SimpleFileVisitor<>() {
             @Override
@@ -532,14 +463,6 @@ public record Jpx(Path storage,
             throw new IllegalArgumentException("Not a hexadecimal checksum: " + normalized);
         }
         return normalized;
-    }
-
-    private static void requireClassName(String value) {
-        for (String segment : value.split("\\.", -1)) {
-            if (segment.isEmpty() || !segment.chars().allMatch(Character::isJavaIdentifierPart)) {
-                throw new IllegalArgumentException("Not a class name: " + value);
-            }
-        }
     }
 
     private static void requireSafeSegment(String role, String value) {
