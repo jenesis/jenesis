@@ -166,13 +166,24 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public static Function<List<String>, OfProcess> ofCommand(String command) {
-            return arguments -> new OfProcess(Stream.concat(
-                    Stream.of(locate(command)),
-                    arguments.stream()).toList());
+            return arguments -> {
+                String located = locate(command);
+                Stream<String> program = WINDOWS && (located.endsWith(".cmd") || located.endsWith(".bat"))
+                        ? Stream.of("cmd.exe", "/c", located)
+                        : Stream.of(located);
+                return new OfProcess(Stream.concat(program, arguments.stream()).toList());
+            };
         }
 
         private static String locate(String command) {
-            String name = command + (WINDOWS ? ".exe" : "");
+            List<String> names = new ArrayList<>();
+            if (WINDOWS) {
+                names.add(command + ".exe");
+                names.add(command + ".cmd");
+                names.add(command + ".bat");
+            } else {
+                names.add(command);
+            }
             List<String> homes = new ArrayList<>();
             String graalvm = System.getenv("GRAALVM_HOME");
             if (graalvm != null) {
@@ -183,17 +194,21 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                 homes.add(java);
             }
             for (String home : homes) {
-                File program = new File(new File(home, "bin"), name);
-                if (program.isFile()) {
-                    return program.getPath();
+                for (String name : names) {
+                    File program = new File(new File(home, "bin"), name);
+                    if (program.isFile()) {
+                        return program.getPath();
+                    }
                 }
             }
             String path = System.getenv("PATH");
             if (path != null) {
                 for (String entry : path.split(File.pathSeparator)) {
-                    File program = new File(entry, name);
-                    if (program.isFile() && program.canExecute()) {
-                        return program.getPath();
+                    for (String name : names) {
+                        File program = new File(entry, name);
+                        if (program.isFile() && program.canExecute()) {
+                            return program.getPath();
+                        }
                     }
                 }
             }
