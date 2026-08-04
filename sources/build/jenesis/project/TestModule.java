@@ -699,7 +699,14 @@ public class TestModule implements BuildExecutorModule {
         private SequencedSet<String> selected(SequencedMap<String, BuildStepArgument> arguments,
                                               BuildStepContext context,
                                               SequencedSet<String> candidates) throws IOException {
-            Map<String, byte[]> classes = new LinkedHashMap<>();
+            MessageDigest digest;
+            try {
+                digest = MessageDigest.getInstance(incrementalDigest);
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException(e);
+            }
+            SequencedProperties current = new SequencedProperties();
+            Map<String, Set<String>> references = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
                 Path folder = argument.folder().resolve(CLASSES);
                 if (Files.isDirectory(folder)) {
@@ -708,8 +715,10 @@ public class TestModule implements BuildExecutorModule {
                         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                             String name = folder.relativize(file).toString();
                             if (name.endsWith(".class") && !name.equals("module-info.class")) {
-                                classes.putIfAbsent(name.substring(0, name.length() - 6).replace(File.separatorChar, '.'),
-                                        Files.readAllBytes(file));
+                                String className = name.substring(0, name.length() - 6).replace(File.separatorChar, '.');
+                                if (!references.containsKey(className)) {
+                                    index(className, Files.readAllBytes(file), digest, current, references);
+                                }
                             }
                             return FileVisitResult.CONTINUE;
                         }
@@ -725,23 +734,16 @@ public class TestModule implements BuildExecutorModule {
                             JarEntry entry = entries.nextElement();
                             String name = entry.getName();
                             if (name.endsWith(".class") && !name.startsWith("META-INF/") && !name.equals("module-info.class")) {
-                                try (InputStream input = archive.getInputStream(entry)) {
-                                    classes.putIfAbsent(name.substring(0, name.length() - 6).replace('/', '.'), input.readAllBytes());
+                                String className = name.substring(0, name.length() - 6).replace('/', '.');
+                                if (!references.containsKey(className)) {
+                                    try (InputStream input = archive.getInputStream(entry)) {
+                                        index(className, input.readAllBytes(), digest, current, references);
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-            MessageDigest digest;
-            try {
-                digest = MessageDigest.getInstance(incrementalDigest);
-            } catch (NoSuchAlgorithmException e) {
-                throw new IllegalStateException(e);
-            }
-            SequencedProperties current = new SequencedProperties();
-            for (Map.Entry<String, byte[]> entry : classes.entrySet()) {
-                current.setProperty(entry.getKey(), HexFormat.of().formatHex(digest.digest(entry.getValue())));
             }
             current.store(context.next().resolve("test-selection.properties"));
             Path baseline = context.previous() == null ? null : context.previous().resolve("test-selection.properties");
@@ -763,7 +765,7 @@ public class TestModule implements BuildExecutorModule {
             if (changed.isEmpty()) {
                 return null;
             }
-            SequencedSet<String> impacted = TestSelection.of(classes).impacted(changed);
+            SequencedSet<String> impacted = TestSelection.of(references).impacted(changed);
             SequencedSet<String> result = new TreeSet<>();
             for (String candidate : candidates) {
                 if (impacted.contains(candidate)) {
@@ -771,6 +773,15 @@ public class TestModule implements BuildExecutorModule {
                 }
             }
             return result;
+        }
+
+        private static void index(String className,
+                                  byte[] bytes,
+                                  MessageDigest digest,
+                                  SequencedProperties current,
+                                  Map<String, Set<String>> references) {
+            current.setProperty(className, HexFormat.of().formatHex(digest.digest(bytes)));
+            references.put(className, TestSelection.references(bytes));
         }
 
         private static SequencedMap<String, String> attachments(SequencedMap<String, BuildStepArgument> arguments)

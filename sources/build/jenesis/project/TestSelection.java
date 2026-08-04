@@ -10,21 +10,24 @@ public final class TestSelection {
         this.dependents = dependents;
     }
 
-    public static TestSelection of(Map<String, byte[]> classes) {
-        ClassFile classFile = ClassFile.of();
+    public static TestSelection of(Map<String, Set<String>> references) {
         Map<String, Set<String>> dependents = new HashMap<>();
-        for (String name : classes.keySet()) {
+        for (String name : references.keySet()) {
             dependents.put(name, new HashSet<>());
         }
-        for (Map.Entry<String, byte[]> entry : classes.entrySet()) {
+        for (Map.Entry<String, Set<String>> entry : references.entrySet()) {
             String origin = entry.getKey();
-            for (String reference : references(classFile.parse(entry.getValue()))) {
-                if (!reference.equals(origin) && classes.containsKey(reference)) {
+            for (String reference : entry.getValue()) {
+                if (!reference.equals(origin) && references.containsKey(reference)) {
                     dependents.get(reference).add(origin);
                 }
             }
         }
         return new TestSelection(dependents);
+    }
+
+    public static Set<String> references(byte[] bytes) {
+        return references(ClassFile.of().parse(bytes));
     }
 
     public SequencedSet<String> impacted(Collection<String> changed) {
