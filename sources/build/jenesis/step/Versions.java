@@ -16,7 +16,8 @@ public class Versions implements BuildStep {
     public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(DEPENDENCIES),
-                Path.of(CLASSES)));
+                Path.of(CLASSES),
+                Path.of("manifest.mf")));
     }
 
     @Override

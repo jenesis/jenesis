@@ -28,6 +28,19 @@ public class SbomTest {
     }
 
     @Test
+    public void shouldRun_fires_when_licenses_or_graph_changed() {
+        for (Path changed : List.of(Path.of("licenses.properties"), Path.of("graph.properties"))) {
+            BuildStepArgument argument = new BuildStepArgument(root, Map.of(
+                    changed, Checksum.of(ChecksumStatus.ADDED)));
+            SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+            arguments.put("input", argument);
+            assertThat(new Sbom().shouldRun(arguments))
+                    .as("change to " + changed + " triggers Sbom")
+                    .isTrue();
+        }
+    }
+
+    @Test
     public void embeds_a_cyclonedx_sbom_with_dependency_licenses() throws Exception {
         byte[] jarBytes = "jar-bytes".getBytes(StandardCharsets.UTF_8);
         Files.write(Files.createDirectories(argument.resolve("resolved")).resolve("lib.jar"), jarBytes);

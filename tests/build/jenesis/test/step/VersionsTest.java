@@ -29,6 +29,15 @@ public class VersionsTest {
     }
 
     @Test
+    public void shouldRun_fires_when_the_manifest_changed() {
+        BuildStepArgument argument = new BuildStepArgument(root, Map.of(
+                Path.of("manifest.mf"), Checksum.of(ChecksumStatus.ADDED)));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("input", argument);
+        assertThat(new Versions().shouldRun(arguments)).isTrue();
+    }
+
+    @Test
     public void stamps_version_on_matching_requires() throws IOException {
         writeModuleInfo("foo", null, false, require("bar"));
         writeRequires(Map.of("module/bar/1.2.3", ""));

@@ -44,7 +44,9 @@ public class Sbom implements BuildStep {
     public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(DEPENDENCIES),
-                Path.of(METADATA)));
+                Path.of(METADATA),
+                Path.of("graph.properties"),
+                Path.of("licenses.properties")));
     }
 
     @Override
