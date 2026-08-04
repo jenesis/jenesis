@@ -21,6 +21,12 @@ public class MavenUriParserTest {
     @Test
     public void can_resolve_module_with_classifier() {
         assertThat(new MavenUriParser().apply(
-                "https://host.org/maven2/foo/bar/qux/1/qux-baz-1.jar")).isEqualTo("foo.bar/qux/jar/baz/1");
+                "https://host.org/maven2/foo/bar/qux/1/qux-1-baz.jar")).isEqualTo("foo.bar/qux/jar/baz/1");
+    }
+
+    @Test
+    public void can_resolve_module_with_classifier_and_type() {
+        assertThat(new MavenUriParser().apply(
+                "https://host.org/maven2/foo/bar/qux/1/qux-1-baz.zip")).isEqualTo("foo.bar/qux/zip/baz/1");
     }
 }

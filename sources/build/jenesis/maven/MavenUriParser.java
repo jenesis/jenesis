@@ -24,14 +24,18 @@ public class MavenUriParser implements Function<String, String>, Serializable {
     public String apply(String value) {
         URI uri = URI.create(value);
         String[] elements = uri.getPath().split("/");
-        String type = elements[elements.length - 1].substring(elements[elements.length - 1].lastIndexOf('.') + 1);
-        String classifier = elements[elements.length - 1].substring(
-                elements[elements.length - 3].length(),
-                elements[elements.length - 1].length() - type.length() - elements[elements.length - 2].length() - 2);
+        String fileName = elements[elements.length - 1];
+        String artifactId = elements[elements.length - 3];
+        String version = elements[elements.length - 2];
+        int dot = fileName.lastIndexOf('.');
+        String type = fileName.substring(dot + 1);
+        String stem = fileName.substring(0, dot);
+        String prefix = artifactId + "-" + version;
+        String classifier = stem.length() > prefix.length() ? stem.substring(prefix.length() + 1) : "";
         return String.join(".", Arrays.asList(elements).subList(2, elements.length - 3))
-                + "/" + elements[elements.length - 3]
+                + "/" + artifactId
                 + (Objects.equals(type, "jar") && classifier.isEmpty() ? "" : "/" + type)
-                + (classifier.isEmpty() ? "" : "/" + classifier.substring(1))
-                + "/" + elements[elements.length - 2];
+                + (classifier.isEmpty() ? "" : "/" + classifier)
+                + "/" + version;
     }
 }
