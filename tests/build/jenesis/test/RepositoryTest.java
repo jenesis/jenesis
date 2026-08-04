@@ -99,6 +99,27 @@ public class RepositoryTest {
     }
 
     @Test
+    public void open_refuses_a_redirect_to_a_file_uri() throws IOException {
+        System.setProperty("jenesis.repository.insecure", "true");
+        Path secret = Files.writeString(folder.resolve("secret.txt"), "top-secret");
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            exchange.getResponseHeaders().set("Location", secret.toUri().toString());
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+        });
+        server.start();
+        try {
+            URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
+            assertThatThrownBy(() -> Repository.open(uri, null, new Repository.Retry(0, Duration.ofMillis(1))).close())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("file URI");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     public void open_does_not_retry_a_missing_resource() throws IOException {
         System.setProperty("jenesis.repository.insecure", "true");
         AtomicInteger hits = new AtomicInteger();

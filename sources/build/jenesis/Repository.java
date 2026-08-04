@@ -154,6 +154,13 @@ public interface Repository {
                         if (location != null) {
                             http.getInputStream().close();
                             current = current.resolve(location);
+                            if ("file".equals(current.getScheme()) && !"file".equals(uri.getScheme())) {
+                                throw new IllegalStateException("Refusing to follow a redirect to a file URI: "
+                                        + current
+                                        + " (redirected from "
+                                        + uri
+                                        + ")");
+                            }
                             continue;
                         }
                     }
