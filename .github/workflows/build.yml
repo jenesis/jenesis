@@ -139,7 +139,15 @@ jobs:
       - name: Verify native image
         shell: bash
         working-directory: demo/demo-44-native-image
-        run: find target -path "*stage/native*" -type f | grep -q .
+        run: |
+          image=$(find target -path "*stage/native/output/*" -type f | head -1)
+          if [ -z "$image" ]; then
+            echo "No native image was produced under target/stage/native/output"
+            exit 1
+          fi
+          echo "Produced native image: $image"
+          "$image" | grep -q "from a native binary built by Jenesis"
+          "$image" Ada | grep -q "Hello, Ada,"
 
       - name: Upload target on failure
         if: failure()
