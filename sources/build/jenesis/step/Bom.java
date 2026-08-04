@@ -23,7 +23,7 @@ public class Bom implements BuildStep {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(DEPENDENCIES),
                 Path.of(MODULE),
-                Path.of("resolved")));
+                Path.of(Dependencies.RESOLVED)));
     }
 
     @Override

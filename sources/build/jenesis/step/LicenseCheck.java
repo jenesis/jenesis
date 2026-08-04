@@ -67,7 +67,7 @@ public class LicenseCheck implements BuildStep {
                 continue;
             }
             SequencedProperties dependencies = SequencedProperties.ofFiles(index);
-            Path sidecar = argument.folder().resolve("licenses.properties");
+            Path sidecar = argument.folder().resolve(Dependencies.LICENSES);
             SequencedProperties licenses = Files.exists(sidecar)
                     ? SequencedProperties.ofFiles(sidecar)
                     : new SequencedProperties();

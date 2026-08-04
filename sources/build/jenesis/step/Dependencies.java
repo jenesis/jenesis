@@ -19,6 +19,9 @@ import static java.util.Objects.requireNonNull;
 public class Dependencies implements BuildStep {
 
     public static final String SPDX = "spdx.properties";
+    public static final String GRAPH = "graph.properties";
+    public static final String LICENSES = "licenses.properties";
+    public static final String RESOLVED = "resolved/";
 
     private final transient Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
@@ -189,8 +192,8 @@ public class Dependencies implements BuildStep {
                 }
             }
         }
-        Path libs = Files.createDirectories(context.next().resolve("resolved"));
-        Path previousLibs = context.previous() == null ? null : context.previous().resolve("resolved");
+        Path libs = Files.createDirectories(context.next().resolve(RESOLVED));
+        Path previousLibs = context.previous() == null ? null : context.previous().resolve(RESOLVED);
         Map<String, Repository> wrapped = new LinkedHashMap<>();
         repositories.forEach((name, repository) -> {
             Repository effective = repository;
@@ -478,8 +481,8 @@ public class Dependencies implements BuildStep {
             }
         }
         index.store(context.next().resolve(DEPENDENCIES));
-        graph.store(context.next().resolve("graph.properties"));
-        licenses.store(context.next().resolve("licenses.properties"));
+        graph.store(context.next().resolve(GRAPH));
+        licenses.store(context.next().resolve(LICENSES));
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 

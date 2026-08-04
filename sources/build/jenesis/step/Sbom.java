@@ -45,9 +45,9 @@ public class Sbom implements BuildStep {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(DEPENDENCIES),
                 Path.of(METADATA),
-                Path.of("graph.properties"),
-                Path.of("licenses.properties"),
-                Path.of("resolved")));
+                Path.of(Dependencies.GRAPH),
+                Path.of(Dependencies.LICENSES),
+                Path.of(Dependencies.RESOLVED)));
     }
 
     @Override
@@ -65,7 +65,7 @@ public class Sbom implements BuildStep {
         SequencedMap<String, CycloneDx.Component> components = new LinkedHashMap<>();
         List<Path> graphFiles = new ArrayList<>();
         for (BuildStepArgument argument : arguments.values()) {
-            Path graphFile = argument.folder().resolve("graph.properties");
+            Path graphFile = argument.folder().resolve(Dependencies.GRAPH);
             if (Files.isRegularFile(graphFile)) {
                 graphFiles.add(graphFile);
             }
@@ -74,7 +74,7 @@ public class Sbom implements BuildStep {
                 continue;
             }
             SequencedProperties dependencies = SequencedProperties.ofFiles(index);
-            Path sidecar = argument.folder().resolve("licenses.properties");
+            Path sidecar = argument.folder().resolve(Dependencies.LICENSES);
             SequencedProperties licenses = Files.exists(sidecar)
                     ? SequencedProperties.ofFiles(sidecar)
                     : new SequencedProperties();
@@ -117,7 +117,7 @@ public class Sbom implements BuildStep {
         manifest.getMainAttributes().putValue("Manifest-Version", "1.0");
         manifest.getMainAttributes().putValue("Sbom-Format", "CycloneDX");
         manifest.getMainAttributes().putValue("Sbom-Location", "META-INF/sbom/" + fileName);
-        try (OutputStream out = Files.newOutputStream(context.next().resolve("manifest.mf"))) {
+        try (OutputStream out = Files.newOutputStream(context.next().resolve(Versions.MANIFEST))) {
             manifest.write(out);
         }
         Files.writeString(context.next().resolve(RESOURCES).resolve("META-INF").resolve("NOTICE"), notice(metadata));

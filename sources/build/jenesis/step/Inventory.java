@@ -40,8 +40,8 @@ public class Inventory implements BuildStep {
                 Path.of(DOCUMENTATION),
                 Path.of(DEPENDENCIES),
                 Path.of(BOMS),
-                Path.of("graph.properties"),
-                Path.of("licenses.properties"),
+                Path.of(Dependencies.GRAPH),
+                Path.of(Dependencies.LICENSES),
                 Path.of(JPackage.PACKAGES),
                 Path.of(JMod.JMODS),
                 Path.of(JLink.RUNTIME),
@@ -138,11 +138,11 @@ public class Inventory implements BuildStep {
                     }
                 }
             }
-            Path graphFile = folder.resolve("graph.properties");
+            Path graphFile = folder.resolve(Dependencies.GRAPH);
             if (Files.isRegularFile(graphFile)) {
                 graphs.add(graphFile);
             }
-            Path licensesFile = folder.resolve("licenses.properties");
+            Path licensesFile = folder.resolve(Dependencies.LICENSES);
             if (Files.isRegularFile(licensesFile)) {
                 dependencyLicenses.add(licensesFile);
             }

@@ -38,7 +38,7 @@ public class Jar extends JdkProcessBuildStep {
                 "--date=1980-01-01T00:00:02Z"));
         List<Path> manifestFiles = new ArrayList<>();
         for (BuildStepArgument argument : arguments.values()) {
-            Path candidate = argument.folder().resolve("manifest.mf");
+            Path candidate = argument.folder().resolve(Versions.MANIFEST);
             if (Files.exists(candidate)) {
                 manifestFiles.add(candidate);
             }
@@ -56,7 +56,7 @@ public class Jar extends JdkProcessBuildStep {
                     mergeAttributes(target, entry.getValue(), path);
                 }
             }
-            Path output = context.supplement().resolve("manifest.mf");
+            Path output = context.supplement().resolve(Versions.MANIFEST);
             try (OutputStream out = Files.newOutputStream(output)) {
                 merged.write(out);
             }

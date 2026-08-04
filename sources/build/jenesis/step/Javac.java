@@ -72,7 +72,7 @@ public class Javac extends JdkProcessBuildStep {
         Path sourcesDir = Path.of(SOURCES);
         Path classesDir = Path.of(CLASSES);
         Path artifactsDir = Path.of(ARTIFACTS);
-        Path resolvedDir = Path.of("resolved");
+        Path resolvedDir = Path.of(Dependencies.RESOLVED);
         Path dependencyIndex = Path.of(DEPENDENCIES);
         Set<Path> processFiles = new LinkedHashSet<>();
         for (String name : processProperties) {
@@ -316,7 +316,7 @@ public class Javac extends JdkProcessBuildStep {
         return chain.thenComposeAsync(_ -> {
             try {
                 if (!hasMultiReleaseManifest(arguments)) {
-                    Path manifest = context.next().resolve("manifest.mf");
+                    Path manifest = context.next().resolve(Versions.MANIFEST);
                     if (!Files.exists(manifest)) {
                         Files.writeString(manifest, "Manifest-Version: 1.0\r\nMulti-Release: true\r\n");
                     }
@@ -330,7 +330,7 @@ public class Javac extends JdkProcessBuildStep {
 
     private static boolean hasMultiReleaseManifest(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
         for (BuildStepArgument argument : arguments.values()) {
-            Path candidate = argument.folder().resolve("manifest.mf");
+            Path candidate = argument.folder().resolve(Versions.MANIFEST);
             if (!Files.exists(candidate)) {
                 continue;
             }

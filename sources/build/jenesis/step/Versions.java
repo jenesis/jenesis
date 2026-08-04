@@ -12,12 +12,14 @@ import build.jenesis.SequencedProperties;
 
 public class Versions implements BuildStep {
 
+    public static final String MANIFEST = "manifest.mf";
+
     @Override
     public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(DEPENDENCIES),
                 Path.of(CLASSES),
-                Path.of("manifest.mf")));
+                Path.of(MANIFEST)));
     }
 
     @Override
@@ -48,7 +50,7 @@ public class Versions implements BuildStep {
         Path target = Files.createDirectory(context.next().resolve(CLASSES));
         List<Path> manifests = new ArrayList<>();
         for (BuildStepArgument argument : arguments.values()) {
-            Path manifest = argument.folder().resolve("manifest.mf");
+            Path manifest = argument.folder().resolve(MANIFEST);
             if (Files.exists(manifest)) {
                 manifests.add(manifest);
             }
@@ -67,7 +69,7 @@ public class Versions implements BuildStep {
                     mergeAttributes(attributes, entry.getValue(), manifest);
                 }
             }
-            try (OutputStream out = Files.newOutputStream(context.next().resolve("manifest.mf"))) {
+            try (OutputStream out = Files.newOutputStream(context.next().resolve(MANIFEST))) {
                 merged.write(out);
             }
         }

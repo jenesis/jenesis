@@ -134,7 +134,7 @@ public class JaCoCoModule implements BuildExecutorModule {
                         version = descriptor.getProperty("version");
                     }
                 }
-                Path folder = argument.folder().resolve("resolved");
+                Path folder = argument.folder().resolve(Dependencies.RESOLVED);
                 if (Files.isDirectory(folder)) {
                     try (Stream<Path> files = Files.list(folder)) {
                         files.filter(file -> file.getFileName().toString().endsWith(".jar")).forEach(resolved::add);
