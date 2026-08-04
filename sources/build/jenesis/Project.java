@@ -2312,16 +2312,12 @@ public record Project(
             if (t instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
-            throw new UsageHint(t);
-        }
-    }
-
-    private static final class UsageHint extends RuntimeException {
-
-        private UsageHint(Throwable cause) {
-            super("Pass `help` as the only argument on the command line to receive"
-                            + " usage information, or `skill` for an agent-oriented briefing.",
-                    cause);
+            t.printStackTrace();
+            System.err.println();
+            System.err.println("The build failed with the error above. If you meant to look up how to"
+                    + " invoke Jenesis, pass `help` as the only argument on the command line, or `skill`"
+                    + " for an agent-oriented briefing.");
+            System.exit(1);
         }
     }
 }
