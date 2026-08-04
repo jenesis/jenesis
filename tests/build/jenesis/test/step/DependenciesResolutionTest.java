@@ -336,6 +336,38 @@ public class DependenciesResolutionTest {
     }
 
     @Test
+    public void agent_scope_inherits_the_versions_the_other_scopes_resolved() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("main/agent/foo/agent", "");
+        properties.setProperty("main/runtime/foo/app", "");
+        properties.store(dependencies.resolve(BuildStep.REQUIRES));
+        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())),
+                Map.of("foo", (executor, prefix, repositories, descriptors, bom, _) -> {
+                    SequencedMap<String, String> resolved = new LinkedHashMap<>();
+                    descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
+                    SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
+                    String version = descriptors.containsKey("agent") ? bom.getOrDefault("shared", "1") : "2";
+                    vertices.put("foo/shared", new Resolver.Vertex(version, "shared.module", false, false, List.of()));
+                    return new Resolver.Resolution(
+                            Resolver.materializeAll(executor, repositories, prefix, resolved),
+                            List.of(),
+                            vertices);
+                }))
+                .apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
+                                dependencies,
+                                Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        SequencedProperties graph = SequencedProperties.ofFiles(next.resolve("graph.properties"));
+        assertThat(graph.getProperty("vertex/main/runtime/foo/shared")).isEqualTo("2\tshared.module\tfalse\tfalse");
+        assertThat(graph.getProperty("vertex/main/agent/foo/shared"))
+                .as("the attached agent shares the class path, so it cannot hold a second version of a library")
+                .isEqualTo("2\tshared.module\tfalse\tfalse");
+    }
+
+    @Test
     public void resolves_a_non_main_scope_through_its_base_resolver() throws IOException {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("kotlinc/plugin/maven/org.jetbrains/something", "");

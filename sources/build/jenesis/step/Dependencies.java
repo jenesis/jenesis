@@ -289,7 +289,10 @@ public class Dependencies implements BuildStep {
         int edge = 0;
         for (Map.Entry<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>> groupEntry : requires.entrySet()) {
             String group = groupEntry.getKey();
-            for (String scope : groupEntry.getValue().sequencedKeySet()) {
+            List<String> orderedScopes = new ArrayList<>(groupEntry.getValue().sequencedKeySet());
+            orderedScopes.sort(Comparator.comparingInt(scope -> scope.equals("agent") ? 1 : 0));
+            SequencedMap<String, SequencedMap<String, String>> reconciled = new LinkedHashMap<>();
+            for (String scope : orderedScopes) {
                 DependencyScope intent = scope.equals("compile") ? DependencyScope.COMPILE : DependencyScope.RUNTIME;
                 for (Map.Entry<String, SequencedMap<String, String>> repoEntry : groupEntry.getValue().get(scope).entrySet()) {
                     String repo = repoEntry.getKey();
@@ -358,6 +361,9 @@ public class Dependencies implements BuildStep {
                             }
                         }
                     }
+                    if (scope.equals("agent")) {
+                        reconciled.getOrDefault(repo, new LinkedHashMap<>()).forEach(bom::putIfAbsent);
+                    }
                     Resolver.Resolution resolution = resolver.dependencies(executor,
                             repo,
                             wrapped,
@@ -387,6 +393,11 @@ public class Dependencies implements BuildStep {
                     }
                     for (Map.Entry<String, Resolver.Vertex> entry : resolution.vertices().entrySet()) {
                         Resolver.Vertex node = entry.getValue();
+                        if (!scope.equals("agent") && node.resolvedVersion() != null) {
+                            reconciled.computeIfAbsent(repo, _ -> new LinkedHashMap<>()).putIfAbsent(
+                                    entry.getKey().substring(entry.getKey().indexOf('/') + 1),
+                                    node.resolvedVersion());
+                        }
                         graph.setProperty("vertex/" + group + "/" + scope + "/" + entry.getKey(), String.join("\t",
                                 text(node.resolvedVersion()),
                                 text(node.module()),
