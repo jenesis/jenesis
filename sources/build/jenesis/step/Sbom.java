@@ -46,7 +46,8 @@ public class Sbom implements BuildStep {
                 Path.of(DEPENDENCIES),
                 Path.of(METADATA),
                 Path.of("graph.properties"),
-                Path.of("licenses.properties")));
+                Path.of("licenses.properties"),
+                Path.of("resolved")));
     }
 
     @Override

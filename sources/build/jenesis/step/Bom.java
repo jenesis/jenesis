@@ -22,7 +22,8 @@ public class Bom implements BuildStep {
     public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(DEPENDENCIES),
-                Path.of(MODULE)));
+                Path.of(MODULE),
+                Path.of("resolved")));
     }
 
     @Override
