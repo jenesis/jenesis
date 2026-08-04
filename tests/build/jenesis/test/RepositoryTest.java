@@ -20,6 +20,7 @@ public class RepositoryTest {
         System.clearProperty("jenesis.repository.insecure");
         System.clearProperty("jenesis.repository.retries");
         System.clearProperty("jenesis.repository.backoff");
+        System.clearProperty("jenesis.repository.read.timeout");
     }
 
     private HttpServer serve(IntFunction<Integer> statusOfHit, Map<String, String> headers, AtomicInteger hits) throws IOException {
@@ -68,6 +69,31 @@ public class RepositoryTest {
                     .hasMessageContaining("502");
             assertThat(hits.get()).isEqualTo(2);
         } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void open_times_out_on_a_stalled_server() throws IOException {
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.repository.read.timeout", "200");
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        CountDownLatch release = new CountDownLatch(1);
+        server.createContext("/", exchange -> {
+            try {
+                release.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException _) {
+                Thread.currentThread().interrupt();
+            }
+            exchange.close();
+        });
+        server.start();
+        try {
+            URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
+            assertThatThrownBy(() -> Repository.open(uri, null, new Repository.Retry(0, Duration.ofMillis(1))).close())
+                    .isInstanceOf(SocketTimeoutException.class);
+        } finally {
+            release.countDown();
             server.stop(0);
         }
     }

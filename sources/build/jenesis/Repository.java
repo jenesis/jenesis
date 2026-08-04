@@ -120,6 +120,8 @@ public interface Repository {
 
     static InputStream open(URI uri, String token, Retry retry) throws IOException {
         boolean insecure = Boolean.getBoolean("jenesis.repository.insecure");
+        int connectTimeout = Integer.getInteger("jenesis.repository.connect.timeout", 10_000);
+        int readTimeout = Integer.getInteger("jenesis.repository.read.timeout", 30_000);
         attempts:
         for (int attempt = 0; ; attempt++) {
             URI current = uri;
@@ -134,6 +136,8 @@ public interface Repository {
                                 + " (set -Djenesis.repository.insecure=true to allow plaintext repositories)");
                     }
                     URLConnection connection = current.toURL().openConnection();
+                    connection.setConnectTimeout(connectTimeout);
+                    connection.setReadTimeout(readTimeout);
                     if (!(connection instanceof HttpURLConnection http)) {
                         return connection.getInputStream();
                     }
