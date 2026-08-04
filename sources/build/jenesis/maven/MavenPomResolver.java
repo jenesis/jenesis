@@ -742,11 +742,6 @@ public class MavenPomResolver implements MavenResolver {
                         null,
                         null).orElse(null);
                 if (candidate == null) {
-                    if (checksum != null) {
-                        throw new IllegalStateException("Checksum-pinned POM could not be fetched for "
-                                + groupId + ":" + artifactId + ":" + version
-                                + " (a pinned import BOM must not silently evaporate)");
-                    }
                     pom = new UnresolvedPom(groupId,
                             artifactId,
                             version,
