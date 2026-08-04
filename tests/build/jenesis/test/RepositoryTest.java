@@ -120,6 +120,52 @@ public class RepositoryTest {
     }
 
     @Test
+    public void open_keeps_the_token_on_the_origin_but_strips_it_after_a_cross_origin_redirect() throws IOException {
+        System.setProperty("jenesis.repository.insecure", "true");
+        AtomicReference<String> originToken = new AtomicReference<>();
+        AtomicBoolean mirrorSawToken = new AtomicBoolean(true);
+        HttpServer mirror = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        mirror.createContext("/", exchange -> {
+            mirrorSawToken.set(exchange.getRequestHeaders().containsKey("Authorization"));
+            byte[] body = "payload".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+            exchange.close();
+        });
+        mirror.start();
+        HttpServer origin = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        origin.createContext("/", exchange -> {
+            originToken.set(exchange.getRequestHeaders().getFirst("Authorization"));
+            exchange.getResponseHeaders().set("Location",
+                    "http://localhost:" + mirror.getAddress().getPort() + "/artifact.jar");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+        });
+        origin.start();
+        try {
+            URI uri = URI.create("http://localhost:" + origin.getAddress().getPort() + "/artifact.jar");
+            try (InputStream stream = Repository.open(uri, "Bearer secret", new Repository.Retry(0, Duration.ofMillis(1)))) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("payload");
+            }
+            assertThat(originToken.get()).isEqualTo("Bearer secret");
+            assertThat(mirrorSawToken.get()).as("token must not leak to a different-origin mirror").isFalse();
+        } finally {
+            origin.stop(0);
+            mirror.stop(0);
+        }
+    }
+
+    @Test
+    public void open_refuses_an_insecure_scheme_without_the_opt_in() {
+        URI uri = URI.create("http://localhost:1/artifact.jar");
+        assertThatThrownBy(() -> Repository.open(uri, null, new Repository.Retry(0, Duration.ofMillis(1))).close())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("insecure scheme");
+    }
+
+    @Test
     public void open_does_not_retry_a_missing_resource() throws IOException {
         System.setProperty("jenesis.repository.insecure", "true");
         AtomicInteger hits = new AtomicInteger();
