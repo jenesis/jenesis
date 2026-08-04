@@ -167,7 +167,15 @@ public class JenesisModuleRepository implements JenesisRepository {
         } catch (FileNotFoundException _) {
             return Optional.empty();
         }
-        return Optional.of(() -> stream);
+        return Optional.of(reopening(uri, token, retry, stream));
+    }
+
+    private static RepositoryItem reopening(URI uri, String token, Repository.Retry retry, InputStream initial) {
+        AtomicReference<InputStream> first = new AtomicReference<>(initial);
+        return () -> {
+            InputStream stream = first.getAndSet(null);
+            return stream != null ? stream : Repository.open(uri, token, retry);
+        };
     }
 
     private static void requireSafeSegment(String role, String value) {

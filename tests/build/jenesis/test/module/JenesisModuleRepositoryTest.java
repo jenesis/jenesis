@@ -1,6 +1,7 @@
 package build.jenesis.test.module;
 
 import module java.base;
+import module jdk.httpserver;
 import module org.junit.jupiter.api;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -14,6 +15,39 @@ public class JenesisModuleRepositoryTest {
 
     @TempDir
     private Path root;
+
+    @Test
+    public void network_item_can_be_read_more_than_once() throws IOException {
+        System.setProperty("jenesis.repository.insecure", "true");
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            byte[] body = "classes".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+        server.start();
+        try {
+            URI base = URI.create("http://localhost:" + server.getAddress().getPort() + "/");
+            RepositoryItem item = new JenesisModuleRepository(base)
+                    .fetch(Runnable::run, "build.jenesis")
+                    .orElseThrow();
+            assertThat(read(item)).isEqualTo("classes");
+            assertThat(read(item))
+                    .as("a second read re-opens the connection instead of returning an exhausted stream")
+                    .isEqualTo("classes");
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+        }
+    }
+
+    private static String read(RepositoryItem item) throws IOException {
+        try (InputStream stream = item.toInputStream()) {
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
 
     @Test
     public void fetches_unversioned_module_from_root_module_directory() throws IOException {

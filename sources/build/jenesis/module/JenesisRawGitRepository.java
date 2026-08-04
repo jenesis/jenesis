@@ -185,7 +185,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
         if (contained.isAbsolute() || contained.getPath().startsWith("..")) {
             throw new IllegalArgumentException("Resolved location " + location + " escapes repository root " + repository);
         }
-        return open(location, token, retry).map(stream -> (RepositoryItem) () -> stream);
+        return open(location, token, retry).map(stream -> reopening(location, token, retry, stream));
     }
 
     private Coordinate resolve(String moduleName, String classifier, String version) throws IOException {
@@ -235,6 +235,14 @@ public class JenesisRawGitRepository implements JenesisRepository {
         } catch (FileNotFoundException _) {
             return Optional.empty();
         }
+    }
+
+    private static RepositoryItem reopening(URI uri, String token, Repository.Retry retry, InputStream initial) {
+        AtomicReference<InputStream> first = new AtomicReference<>(initial);
+        return () -> {
+            InputStream stream = first.getAndSet(null);
+            return stream != null ? stream : Repository.open(uri, token, retry);
+        };
     }
 
     private static void requireSafeSegment(String role, String value) {
