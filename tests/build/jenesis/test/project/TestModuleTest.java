@@ -460,7 +460,7 @@ public class TestModuleTest {
         assertThat(readRequires(root.resolve("test").resolve("resolved")).stringPropertyNames())
                 .containsExactlyInAnyOrder(
                         "main/runtime/maven/org.junit.platform/junit-platform-console",
-                        "main/agent/maven/org.jacoco/org.jacoco.agent/jar/runtime/RELEASE");
+                        "main/runtime/maven/org.jacoco/org.jacoco.agent/jar/runtime/RELEASE");
     }
 
     @Test

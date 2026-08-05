@@ -302,7 +302,13 @@ public class MavenProject implements BuildExecutorModule {
                                     String version = space < 0 ? null : left.substring(space + 1);
                                     int slash = key.indexOf('/');
                                     String seeded = key.substring(0, slash) + "/agent/" + key.substring(slash + 1);
-                                    requires.setProperty(seeded + (version == null ? "" : "/" + version), "");
+                                    String required = key.substring(0, slash)
+                                            + "/runtime/"
+                                            + key.substring(slash + 1)
+                                            + (version == null ? "" : "/" + version);
+                                    if (requires.getProperty(required) == null) {
+                                        requires.setProperty(required, "");
+                                    }
                                     attachments.setProperty(seeded, arguments);
                                 }
                                 requires.store(context.next().resolve(BuildStep.REQUIRES));

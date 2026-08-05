@@ -421,7 +421,7 @@ public class InferredMultiProjectAssemblerTest {
         InferredMultiProjectAssembler assembler = new InferredMultiProjectAssembler();
         assertThat(assembler.check().apply(null)).as("check configurator defaults to identity").isNull();
         assertThat(assembler.format().apply(null)).as("format configurator defaults to identity").isNull();
-        assertThat(assembler.validate().apply(null)).as("validate configurator defaults to identity").isNull();
+        assertThat(assembler.toolchain().apply(null)).as("toolchain configurator defaults to identity").isNull();
         assertThat(assembler.observe().apply(null)).as("observe configurator defaults to identity").isNull();
         assertThat(assembler.test().apply(null)).as("test configurator defaults to identity").isNull();
         assertThat(assembler.compliance().apply(null)).as("compliance configurator defaults to identity").isNull();

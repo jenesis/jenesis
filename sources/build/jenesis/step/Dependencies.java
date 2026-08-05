@@ -289,10 +289,7 @@ public class Dependencies implements BuildStep {
         int edge = 0;
         for (Map.Entry<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>> groupEntry : requires.entrySet()) {
             String group = groupEntry.getKey();
-            List<String> orderedScopes = new ArrayList<>(groupEntry.getValue().sequencedKeySet());
-            orderedScopes.sort(Comparator.comparingInt(scope -> scope.equals("agent") ? 1 : 0));
-            SequencedMap<String, SequencedMap<String, String>> reconciled = new LinkedHashMap<>();
-            for (String scope : orderedScopes) {
+            for (String scope : groupEntry.getValue().sequencedKeySet()) {
                 DependencyScope intent = scope.equals("compile") ? DependencyScope.COMPILE : DependencyScope.RUNTIME;
                 for (Map.Entry<String, SequencedMap<String, String>> repoEntry : groupEntry.getValue().get(scope).entrySet()) {
                     String repo = repoEntry.getKey();
@@ -369,38 +366,6 @@ public class Dependencies implements BuildStep {
                             moduleAliases.getOrDefault(group, new LinkedHashMap<>())
                                     .getOrDefault(repo, new LinkedHashMap<>()),
                             intent);
-                    if (scope.equals("agent")) {
-                        SequencedMap<String, String> settled = reconciled.getOrDefault(
-                                repo, new LinkedHashMap<>());
-                        SequencedMap<String, String> corrections = new LinkedHashMap<>();
-                        for (Map.Entry<String, Resolver.Vertex> entry : resolution.vertices().entrySet()) {
-                            Resolver.Vertex node = entry.getValue();
-                            String coordinate = entry.getKey().substring(entry.getKey().indexOf('/') + 1);
-                            String elsewhere = settled.get(coordinate);
-                            if (elsewhere == null && node.module() != null) {
-                                elsewhere = settled.get(node.module());
-                            }
-                            if (elsewhere != null
-                                    && node.resolvedVersion() != null
-                                    && !elsewhere.equals(node.resolvedVersion())) {
-                                corrections.putIfAbsent(coordinate, elsewhere);
-                                if (node.module() != null) {
-                                    corrections.putIfAbsent(node.module(), elsewhere);
-                                }
-                            }
-                        }
-                        if (!corrections.isEmpty()) {
-                            corrections.forEach(bom::putIfAbsent);
-                            resolution = resolver.dependencies(executor,
-                                    repo,
-                                    wrapped,
-                                    coordinates,
-                                    bom,
-                                    moduleAliases.getOrDefault(group, new LinkedHashMap<>())
-                                            .getOrDefault(repo, new LinkedHashMap<>()),
-                                    intent);
-                        }
-                    }
                     for (Map.Entry<String, Resolver.Resolved> entry : resolution.artifacts().entrySet()) {
                         String coordinate = entry.getKey().substring(entry.getKey().indexOf('/') + 1);
                         String declared = repoEntry.getValue().get(coordinate);
@@ -422,16 +387,6 @@ public class Dependencies implements BuildStep {
                     }
                     for (Map.Entry<String, Resolver.Vertex> entry : resolution.vertices().entrySet()) {
                         Resolver.Vertex node = entry.getValue();
-                        if (!scope.equals("agent") && node.resolvedVersion() != null) {
-                            SequencedMap<String, String> versionsByRepo = reconciled.computeIfAbsent(
-                                    repo, _ -> new LinkedHashMap<>());
-                            versionsByRepo.putIfAbsent(
-                                    entry.getKey().substring(entry.getKey().indexOf('/') + 1),
-                                    node.resolvedVersion());
-                            if (node.module() != null) {
-                                versionsByRepo.putIfAbsent(node.module(), node.resolvedVersion());
-                            }
-                        }
                         graph.setProperty("vertex/" + group + "/" + scope + "/" + entry.getKey(), String.join("\t",
                                 text(node.resolvedVersion()),
                                 text(node.module()),

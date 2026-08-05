@@ -256,7 +256,12 @@ public class ModularProject implements BuildExecutorModule {
             }
             info.attachments().forEach((key, _) -> {
                 int slash = key.indexOf('/');
-                String repository = key.substring(slash + 1, key.indexOf('/', slash + 1));
+                int second = key.indexOf('/', slash + 1);
+                String repository = key.substring(slash + 1, second);
+                String coordinate = key.substring(second + 1);
+                if (repository.equals(prefix) && info.requires().contains(coordinate)) {
+                    return;
+                }
                 String suffix = "";
                 if (!repository.equals("module")) {
                     String pinned = versions.get(key);
@@ -264,7 +269,7 @@ public class ModularProject implements BuildExecutorModule {
                     String bare = pinned == null ? "" : space < 0 ? pinned : pinned.substring(0, space);
                     suffix = "/" + (bare.isEmpty() || bare.startsWith(":") ? "RELEASE" : bare);
                 }
-                requires.setProperty(key.substring(0, slash) + "/agent/" + key.substring(slash + 1) + suffix, "");
+                requires.setProperty(key.substring(0, slash) + "/runtime/" + key.substring(slash + 1) + suffix, "");
             });
             requires.store(context.next().resolve(BuildStep.REQUIRES));
             if (!info.attachments().isEmpty()) {

@@ -23,7 +23,7 @@ import build.jenesis.step.Sbom;
 
 public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityModule, BuildExecutorModule> check,
                                             Function<InferredSourceFormattingModule, BuildExecutorModule> format,
-                                            Function<InferredByteCodeQualityModule, BuildExecutorModule> validate,
+                                            Function<JavaToolchainModule, BuildExecutorModule> toolchain,
                                             Function<InferredTestObservationModule, BuildExecutorModule> observe,
                                             Function<TestModule, BuildExecutorModule> test,
                                             Function<InferredComplianceModule, BuildExecutorModule> compliance) implements MultiProjectAssembler<ProjectModuleDescriptor> {
@@ -38,27 +38,27 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
     }
 
     public InferredMultiProjectAssembler check(Function<InferredSourceCodeQualityModule, BuildExecutorModule> check) {
-        return new InferredMultiProjectAssembler(check, format, validate, observe, test, compliance);
+        return new InferredMultiProjectAssembler(check, format, toolchain, observe, test, compliance);
     }
 
     public InferredMultiProjectAssembler format(Function<InferredSourceFormattingModule, BuildExecutorModule> format) {
-        return new InferredMultiProjectAssembler(check, format, validate, observe, test, compliance);
+        return new InferredMultiProjectAssembler(check, format, toolchain, observe, test, compliance);
     }
 
-    public InferredMultiProjectAssembler validate(Function<InferredByteCodeQualityModule, BuildExecutorModule> validate) {
-        return new InferredMultiProjectAssembler(check, format, validate, observe, test, compliance);
+    public InferredMultiProjectAssembler toolchain(Function<JavaToolchainModule, BuildExecutorModule> toolchain) {
+        return new InferredMultiProjectAssembler(check, format, toolchain, observe, test, compliance);
     }
 
     public InferredMultiProjectAssembler observe(Function<InferredTestObservationModule, BuildExecutorModule> observe) {
-        return new InferredMultiProjectAssembler(check, format, validate, observe, test, compliance);
+        return new InferredMultiProjectAssembler(check, format, toolchain, observe, test, compliance);
     }
 
     public InferredMultiProjectAssembler test(Function<TestModule, BuildExecutorModule> test) {
-        return new InferredMultiProjectAssembler(check, format, validate, observe, test, compliance);
+        return new InferredMultiProjectAssembler(check, format, toolchain, observe, test, compliance);
     }
 
     public InferredMultiProjectAssembler compliance(Function<InferredComplianceModule, BuildExecutorModule> compliance) {
-        return new InferredMultiProjectAssembler(check, format, validate, observe, test, compliance);
+        return new InferredMultiProjectAssembler(check, format, toolchain, observe, test, compliance);
     }
 
     @Override
@@ -95,13 +95,13 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             }
             sub.addModule("compliance", compliance.apply(new InferredComplianceModule(descriptor.configuration())),
                     Stream.concat(descriptor.manifests().stream(), descriptor.artifacts().stream()));
-            sub.addModule("binary", new JavaToolchainModule()
+            sub.addModule("binary", toolchain.apply(new JavaToolchainModule()
                             .compiler(new InferredCompilerChainModule(repositories, resolvers)
                                     .pinning(descriptor.pinning())
                                     .pathPlacement(descriptor.pathPlacement()))
-                            .validator(validate.apply(new InferredByteCodeQualityModule(descriptor.configuration(), repositories, resolvers)
-                                    .pinning(descriptor.pinning())))
-                            .archiver(new Jar(factory, Jar.Sort.CLASSES).asModule("jar")),
+                            .validator(new InferredByteCodeQualityModule(descriptor.configuration(), repositories, resolvers)
+                                    .pinning(descriptor.pinning()))
+                            .archiver(new Jar(factory, Jar.Sort.CLASSES).asModule("jar"))),
                     Stream.of(
                             Stream.of("prepare"),
                             inputs(descriptor),

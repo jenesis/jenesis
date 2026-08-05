@@ -8,41 +8,53 @@ import build.jenesis.step.Javac;
 import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.Versions;
 
-public record JavaToolchainModule(BuildExecutorModule compiler,
+public record JavaToolchainModule(BuildExecutorModule generator,
+                                  BuildExecutorModule compiler,
                                   BuildExecutorModule transformer,
                                   BuildExecutorModule validator,
                                   BuildExecutorModule archiver) implements BuildExecutorModule {
 
     public static final String ARTIFACTS = "artifacts", CLASSES = "classes", TRANSFORM = "transform", VALIDATE = "validate";
-    private static final String COMPILED = "compiled";
+    private static final String GENERATED = "generated", COMPILED = "compiled";
 
     public JavaToolchainModule() {
-        this(new Javac(ProcessHandler.Factory.of()).asModule("javac"), null, null, new Jar(ProcessHandler.Factory.of(), Jar.Sort.CLASSES).asModule("jar"));
+        this(null,
+                new Javac(ProcessHandler.Factory.of()).asModule("javac"),
+                null,
+                null,
+                new Jar(ProcessHandler.Factory.of(), Jar.Sort.CLASSES).asModule("jar"));
+    }
+
+    public JavaToolchainModule generator(BuildExecutorModule generator) {
+        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver);
     }
 
     public JavaToolchainModule compiler(BuildExecutorModule compiler) {
-        return new JavaToolchainModule(compiler, transformer, validator, archiver);
-    }
-
-    public JavaToolchainModule group(String group) {
-        return compiler(new Javac(ProcessHandler.Factory.of()).group(group).asModule("javac"));
+        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver);
     }
 
     public JavaToolchainModule archiver(BuildExecutorModule archiver) {
-        return new JavaToolchainModule(compiler, transformer, validator, archiver);
+        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver);
     }
 
     public JavaToolchainModule transformer(BuildExecutorModule transformer) {
-        return new JavaToolchainModule(compiler, transformer, validator, archiver);
+        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver);
     }
 
     public JavaToolchainModule validator(BuildExecutorModule validator) {
-        return new JavaToolchainModule(compiler, transformer, validator, archiver);
+        return new JavaToolchainModule(generator, compiler, transformer, validator, archiver);
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        buildExecutor.addModule(COMPILED, compiler, inherited.sequencedKeySet());
+        if (generator == null) {
+            buildExecutor.addModule(COMPILED, compiler, inherited.sequencedKeySet());
+        } else {
+            buildExecutor.addModule(GENERATED, generator, inherited.sequencedKeySet());
+            buildExecutor.addModule(COMPILED,
+                    compiler,
+                    Stream.concat(inherited.sequencedKeySet().stream(), Stream.of(GENERATED)));
+        }
         buildExecutor.addStep(CLASSES, new Versions(), Stream.concat(
                 Stream.of(COMPILED),
                 inherited.sequencedKeySet().stream()));

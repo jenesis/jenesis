@@ -219,11 +219,8 @@ public class Inventory implements BuildStep {
                 if (coordinate.equals(candidate)
                         || coordinate.startsWith(candidate + "/")
                         && coordinate.indexOf('/', candidate.length() + 1) < 0) {
-                    String scope = closureScopes.get(coordinate);
-                    if (scope != null && List.of(scope.split(",")).contains("agent")) {
-                        jar = closure.getValue();
-                        break;
-                    }
+                    jar = closure.getValue();
+                    break;
                 }
             }
             if (jar == null) {

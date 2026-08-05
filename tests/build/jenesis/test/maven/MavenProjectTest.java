@@ -137,7 +137,11 @@ public class MavenProjectTest {
             Path module = results.get(manifests);
             SequencedProperties requires = SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES));
             assertThat(requires.stringPropertyNames())
-                    .contains("main/agent/maven/org.mockito/mockito-core/5.11.0");
+                    .contains("main/runtime/maven/org.mockito/mockito-core/5.11.0");
+            assertThat(requires.stringPropertyNames())
+                    .filteredOn(key -> key.contains("org.mockito"))
+                    .containsExactlyInAnyOrder("main/compile/maven/org.mockito/mockito-core/5.11.0",
+                            "main/runtime/maven/org.mockito/mockito-core/5.11.0");
             assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.ATTACHMENTS))).containsOnly(
                     Map.entry("main/agent/maven/org.mockito/mockito-core", ""));
         }
@@ -176,12 +180,13 @@ public class MavenProjectTest {
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         Path module = results.get("maven/module-/manifests");
         SequencedProperties requires = SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES));
-        assertThat(requires.stringPropertyNames()).noneMatch(key -> key.startsWith("main/agent/"));
+        assertThat(requires.stringPropertyNames())
+                .doesNotContain("main/runtime/maven/org.mockito/mockito-core/5.11.0");
         assertThat(module.resolve(BuildStep.ATTACHMENTS)).doesNotExist();
         Path testModule = results.get("maven/test-module-/manifests");
         SequencedProperties testRequires = SequencedProperties.ofFiles(testModule.resolve(BuildStep.REQUIRES));
         assertThat(testRequires.stringPropertyNames())
-                .contains("main/agent/maven/org.mockito/mockito-core/5.11.0");
+                .contains("main/runtime/maven/org.mockito/mockito-core/5.11.0");
         assertThat(SequencedProperties.ofFiles(testModule.resolve(BuildStep.ATTACHMENTS))).containsOnly(
                 Map.entry("main/agent/maven/org.mockito/mockito-core", ""));
     }
@@ -221,7 +226,7 @@ public class MavenProjectTest {
         for (String manifests : List.of("maven/module-/manifests", "maven/test-module-/manifests")) {
             Path module = results.get(manifests);
             SequencedProperties requires = SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES));
-            assertThat(requires.stringPropertyNames()).contains("main/agent/maven/org.example/agent/2.0");
+            assertThat(requires.stringPropertyNames()).contains("main/runtime/maven/org.example/agent/2.0");
         }
     }
 
@@ -252,7 +257,7 @@ public class MavenProjectTest {
             Path module = results.get(manifests);
             SequencedProperties requires = SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES));
             assertThat(requires.stringPropertyNames())
-                    .contains("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent");
+                    .contains("main/runtime/maven/io.opentelemetry.javaagent/opentelemetry-javaagent");
             assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.ATTACHMENTS))).containsOnly(
                     Map.entry("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=value"));
         }

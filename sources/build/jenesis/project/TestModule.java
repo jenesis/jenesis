@@ -520,7 +520,7 @@ public class TestModule implements BuildExecutorModule {
             }
             for (ObservabilityEngine observer : observers) {
                 for (Map.Entry<String, String> entry : observer.coordinates().entrySet()) {
-                    properties.setProperty(group + "/agent/" + entry.getKey() + "/" + entry.getValue(), "");
+                    properties.setProperty(group + "/runtime/" + entry.getKey() + "/" + entry.getValue(), "");
                 }
             }
             properties.store(context.next().resolve(BuildStep.REQUIRES));
@@ -800,6 +800,12 @@ public class TestModule implements BuildExecutorModule {
             return attachments;
         }
 
+        private static String withoutScope(String key) {
+            int first = key.indexOf('/');
+            int second = first < 0 ? -1 : key.indexOf('/', first + 1);
+            return second < 0 ? key : key.substring(0, first) + key.substring(second);
+        }
+
         private static SequencedMap<String, Path> attachedJars(SequencedMap<String, BuildStepArgument> arguments,
                                                                SequencedSet<String> keys) throws IOException {
             SequencedMap<String, Path> resolved = new LinkedHashMap<>();
@@ -810,10 +816,12 @@ public class TestModule implements BuildExecutorModule {
                 }
                 SequencedProperties properties = SequencedProperties.ofFiles(file);
                 for (String key : keys) {
+                    String target = withoutScope(key);
                     for (String candidate : properties.stringPropertyNames()) {
-                        if (candidate.equals(key)
-                                || candidate.startsWith(key + "/")
-                                && candidate.indexOf('/', key.length() + 1) < 0) {
+                        String compared = withoutScope(candidate);
+                        if (compared.equals(target)
+                                || compared.startsWith(target + "/")
+                                && compared.indexOf('/', target.length() + 1) < 0) {
                             String value = properties.getProperty(candidate);
                             int space = value.indexOf(' ');
                             Path jar = argument.folder()
@@ -840,7 +848,7 @@ public class TestModule implements BuildExecutorModule {
                 }
                 SequencedProperties properties = SequencedProperties.ofFiles(file);
                 for (String coordinate : observer.coordinates().sequencedKeySet()) {
-                    String prefix = group + "/agent/" + coordinate + "/";
+                    String prefix = group + "/runtime/" + coordinate + "/";
                     for (String key : properties.stringPropertyNames()) {
                         if (key.startsWith(prefix)) {
                             String value = properties.getProperty(key);

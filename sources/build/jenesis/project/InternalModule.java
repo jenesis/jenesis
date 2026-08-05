@@ -18,6 +18,8 @@ import build.jenesis.module.ModuleInfo;
 import build.jenesis.module.ModuleInfoParser;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Javac;
+import build.jenesis.step.ProcessHandler;
 
 public class InternalModule implements BuildExecutorModule {
 
@@ -147,7 +149,10 @@ public class InternalModule implements BuildExecutorModule {
         buildExecutor.addStep(DEPENDENCIES,
                 new Dependencies(repositories, resolvers).pinning(pinning),
                 REQUIRES);
-        buildExecutor.addModule(JAVA, new JavaToolchainModule().group(group), SOURCE, DEPENDENCIES);
+        buildExecutor.addModule(JAVA,
+                new JavaToolchainModule().compiler(new Javac(ProcessHandler.Factory.of()).group(group).asModule("javac")),
+                SOURCE,
+                DEPENDENCIES);
         buildExecutor.addModule(DELEGATE, (delegateExecutor, delegated) -> {
             Path mainArtifacts = delegated.get(PREVIOUS + MAIN_ARTIFACTS).resolve(BuildStep.ARTIFACTS);
             List<Path> artifacts = new ArrayList<>();

@@ -133,6 +133,7 @@ public class ModularProjectTest {
                  * @jenesis.attach io.opentelemetry.javaagent/opentelemetry-javaagent otel.option=value
                  * @jenesis.pin org.mockito/mockito-core 5.11.0 SHA-256/cafebabe
                  * @jenesis.attach some.agent.module plain
+                 * @jenesis.attach bar
                  */
                 module foo {
                   requires bar;
@@ -149,16 +150,17 @@ public class ModularProjectTest {
         SequencedProperties requires = SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES));
         assertThat(requires).containsOnlyKeys("main/compile/module/bar",
                 "main/runtime/module/bar",
-                "main/agent/maven/org.mockito/mockito-core/5.11.0",
-                "main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent/RELEASE",
-                "main/agent/module/some.agent.module");
-        assertThat(requires.getProperty("main/agent/maven/org.mockito/mockito-core/5.11.0")).isEmpty();
+                "main/runtime/maven/org.mockito/mockito-core/5.11.0",
+                "main/runtime/maven/io.opentelemetry.javaagent/opentelemetry-javaagent/RELEASE",
+                "main/runtime/module/some.agent.module");
+        assertThat(requires.getProperty("main/runtime/maven/org.mockito/mockito-core/5.11.0")).isEmpty();
         Path attachmentsFile = module.resolve(BuildStep.ATTACHMENTS);
         assertThat(attachmentsFile).exists();
         assertThat(SequencedProperties.ofFiles(attachmentsFile)).containsOnly(
                 Map.entry("main/agent/maven/org.mockito/mockito-core", ""),
                 Map.entry("main/agent/maven/io.opentelemetry.javaagent/opentelemetry-javaagent", "otel.option=value"),
-                Map.entry("main/agent/module/some.agent.module", "plain"));
+                Map.entry("main/agent/module/some.agent.module", "plain"),
+                Map.entry("main/agent/module/bar", ""));
     }
 
     @Test
