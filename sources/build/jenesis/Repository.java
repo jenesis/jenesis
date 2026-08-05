@@ -170,9 +170,14 @@ public interface Repository {
                     return http.getInputStream();
                 }
                 throw new IOException("Exceeded redirect limit fetching " + uri);
-            } catch (SocketException | SocketTimeoutException e) {
+            } catch (SocketException | SocketTimeoutException | SSLException | EOFException e) {
                 if (attempt >= retry.retries()) {
-                    throw e;
+                    throw new IOException("Failed to fetch "
+                            + uri
+                            + " after "
+                            + (attempt + 1)
+                            + " attempt(s): "
+                            + e, e);
                 }
                 pause(retry.backoff().toMillis() << attempt, uri);
             }

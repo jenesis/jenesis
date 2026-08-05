@@ -91,7 +91,9 @@ public class RepositoryTest {
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
             assertThatThrownBy(() -> Repository.open(uri, null, new Repository.Retry(0, Duration.ofMillis(1))).close())
-                    .isInstanceOf(SocketTimeoutException.class);
+                    .isInstanceOf(IOException.class)
+                    .hasMessageContaining("/artifact.jar")
+                    .hasCauseInstanceOf(SocketTimeoutException.class);
         } finally {
             release.countDown();
             server.stop(0);
