@@ -124,8 +124,10 @@ class BuildExecutorDefault implements BuildExecutor {
                 boolean consistent = record.consistent();
                 SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
                 SequencedMap<String, Map<Path, byte[]>> inputs = new LinkedHashMap<>();
+                Set<String> declared = new HashSet<>();
                 for (Map.Entry<String, StepSummary> entry : summaries.entrySet()) {
                     Path checksums = checksum.resolve("argument." + BuildExecutorModule.encode(entry.getKey()) + ".properties");
+                    declared.add(checksums.getFileName().toString());
                     Map<Path, byte[]> argumentChecksums = entry.getValue().checksums();
                     inputs.put(entry.getKey(), argumentChecksums);
                     arguments.put(entry.getKey(), new BuildStepArgument(
@@ -134,10 +136,11 @@ class BuildExecutorDefault implements BuildExecutor {
                                     ? Checksum.diff(HashFunction.read(checksums), argumentChecksums, hash)
                                     : Checksum.added(argumentChecksums, hash)));
                 }
+                boolean vanished = consistent && hasVanishedArgument(checksum, declared);
                 BiConsumer<Boolean, Throwable> completion = callback.step(
                         location + identity,
                         new LinkedHashSet<>(summaries.keySet()));
-                if (!consistent || step.shouldRun(arguments)) {
+                if (!consistent || vanished || step.shouldRun(arguments)) {
                     Path next = target.resolve(BuildExecutorModule.encode(identity) + "~");
                     if (Files.exists(next)) {
                         Files.walkFileTree(next, new RecursiveFolderDeletion(null));
@@ -566,6 +569,17 @@ class BuildExecutorDefault implements BuildExecutor {
             }
             return merged;
         }, executor);
+    }
+
+    private static boolean hasVanishedArgument(Path checksum, Set<String> declared) throws IOException {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(checksum, "argument.*.properties")) {
+            for (Path file : stream) {
+                if (!declared.contains(file.getFileName().toString())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static String validated(String identity, Pattern pattern) {

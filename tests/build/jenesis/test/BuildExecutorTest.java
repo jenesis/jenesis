@@ -565,6 +565,35 @@ public class BuildExecutorTest implements Serializable {
     }
 
     @Test
+    public void reruns_a_step_that_lost_an_argument() throws IOException {
+        Files.writeString(source.resolve("file"), "foo");
+        Files.writeString(source2.resolve("file"), "bar");
+        BuildStep step = (_, context, arguments) -> {
+            Files.writeString(context.next().resolve("file"), String.join(",", arguments.sequencedKeySet()));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        };
+        buildExecutor.addSource("source1", source);
+        buildExecutor.addSource("source2", source2);
+        buildExecutor.addStep("step", step, "source1", "source2");
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(root.resolve("step").resolve("output").resolve("file")).content().isEqualTo("source1,source2");
+        BuildExecutor second = BuildExecutor.of(root,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+        second.addSource("source1", source);
+        second.addStep("step", step, "source1");
+        second.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(root.resolve("step").resolve("output").resolve("file"))
+                .as("a step that lost an input is not up to date, even when every surviving input is unchanged")
+                .content().isEqualTo("source1");
+        assertThat(root.resolve("step").resolve("checksum").resolve("argument.source2.properties"))
+                .as("the vanished argument's checksum must not linger to mask a later re-addition")
+                .doesNotExist();
+    }
+
+    @Test
     public void can_execute_diverging_steps() throws IOException {
         Files.writeString(source.resolve("file"), "foo");
         buildExecutor.addSource("source", source);
