@@ -133,6 +133,19 @@ public class JavacTest {
     }
 
     @Test
+    public void shouldRun_fires_when_a_resolved_jar_is_replaced_in_place() {
+        BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
+                Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.RETAINED),
+                Path.of("resolved/maven%2Fsample%2Fsample%2F1-SNAPSHOT.jar"), Checksum.of(ChecksumStatus.ALTERED)));
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("input", argument);
+        assertThat(new Javac(ProcessHandler.Factory.TOOL).shouldRun(arguments))
+                .as("a sibling module rebuilt at an unchanged coordinate leaves the dependency index identical "
+                        + "and only alters the resolved jar, which must still recompile its dependents")
+                .isTrue();
+    }
+
+    @Test
     public void shouldRun_fires_when_javac_properties_changed() {
         BuildStepArgument argument = new BuildStepArgument(sources, Map.of(
                 Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED)));
