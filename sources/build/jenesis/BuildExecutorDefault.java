@@ -113,21 +113,15 @@ class BuildExecutorDefault implements BuildExecutor {
                 }
                 Path previous = target.resolve(BuildExecutorModule.encode(identity)),
                         checksum = previous.resolve("checksum"),
-                        output = previous.resolve("output");
+                        output = previous.resolve("output"),
+                        stepFile = checksum.resolve("step.properties");
                 boolean exists = Files.exists(previous);
-                Map<Path, byte[]> current = exists ? HashFunction.read(checksum.resolve("output.properties")) : Map.of();
                 byte[] currentStepHash = stepHash.hash(step);
-                Path stepFile = checksum.resolve("step.properties");
-                boolean consistent;
-                if (exists && Files.exists(stepFile)) {
-                    SequencedProperties stepProperties = SequencedProperties.ofFiles(stepFile);
-                    String serialization = stepProperties.getProperty("serialization");
-                    consistent = serialization != null
-                            && Arrays.equals(currentStepHash, HexFormat.of().parseHex(serialization))
-                            && HashFunction.areConsistent(output, current, hash, executor);
-                } else {
-                    consistent = false;
-                }
+                StepRecord record = exists
+                        ? completed(checksum, output, stepFile, currentStepHash, executor)
+                        : StepRecord.INCOMPLETE;
+                Map<Path, byte[]> current = record.checksums();
+                boolean consistent = record.consistent();
                 SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
                 SequencedMap<String, Map<Path, byte[]>> inputs = new LinkedHashMap<>();
                 for (Map.Entry<String, StepSummary> entry : summaries.entrySet()) {
@@ -184,6 +178,7 @@ class BuildExecutorDefault implements BuildExecutor {
                                 Files.createDirectory(checksum);
                             } else if (consistent) {
                                 Files.delete(Files.walkFileTree(next, new RecursiveFolderDeletion(next)));
+                                Files.deleteIfExists(stepFile);
                                 Files.walkFileTree(checksum, new RecursiveFolderDeletion(checksum));
                             } else {
                                 throw new IllegalStateException("Cannot reuse initial run for " + location + identity);
@@ -197,7 +192,7 @@ class BuildExecutorDefault implements BuildExecutor {
                             HashFunction.write(checksum.resolve("output.properties"), checksums);
                             SequencedProperties stepProperties = new SequencedProperties();
                             stepProperties.setProperty("serialization", HexFormat.of().formatHex(currentStepHash));
-                            stepProperties.store(checksum.resolve("step.properties"));
+                            stepProperties.storeAtomically(stepFile);
                             if (cache.stores() && !fromCache && result.next()) {
                                 String stored = location + identity;
                                 try {
@@ -639,6 +634,32 @@ class BuildExecutorDefault implements BuildExecutor {
     }
 
     private record StepSummary(Path folder, Map<Path, byte[]> checksums) {
+    }
+
+    private record StepRecord(Map<Path, byte[]> checksums, boolean consistent) {
+
+        private static final StepRecord INCOMPLETE = new StepRecord(Map.of(), false);
+    }
+
+    /*
+     * A step counts as completed only once step.properties was renamed into place, which happens after every
+     * other checksum file was written. A record that is absent or unreadable describes a step that was
+     * interrupted while being recorded, and such a step is repeated rather than failing the build.
+     */
+    private StepRecord completed(Path checksum, Path output, Path stepFile, byte[] step, Executor executor) {
+        if (!Files.isRegularFile(stepFile)) {
+            return StepRecord.INCOMPLETE;
+        }
+        try {
+            String serialization = SequencedProperties.ofFiles(stepFile).getProperty("serialization");
+            if (serialization == null || !Arrays.equals(step, HexFormat.of().parseHex(serialization))) {
+                return StepRecord.INCOMPLETE;
+            }
+            Map<Path, byte[]> checksums = HashFunction.read(checksum.resolve("output.properties"));
+            return new StepRecord(checksums, HashFunction.areConsistent(output, checksums, hash, executor));
+        } catch (IOException | IllegalArgumentException _) {
+            return StepRecord.INCOMPLETE;
+        }
     }
 
     private static class RecursiveFolderDeletion extends SimpleFileVisitor<Path> {

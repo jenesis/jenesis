@@ -23,6 +23,8 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 
 public class BuildExecutorTest implements Serializable {
 
+    private static final AtomicInteger RUNS = new AtomicInteger();
+
     private static Map<Path, ChecksumStatus> statuses(Map<Path, Checksum> files) {
         Map<Path, ChecksumStatus> statuses = new LinkedHashMap<>();
         files.forEach((path, checksum) -> statuses.put(path, checksum.status()));
@@ -135,6 +137,99 @@ public class BuildExecutorTest implements Serializable {
         assertThat(root.resolve("step").resolve("output").resolve("file")).content().isEqualTo("fresh");
         assertThat(root.resolve("step").resolve("output").resolve("junk")).doesNotExist();
         assertThat(root.resolve("step~")).doesNotExist();
+    }
+
+    @Test
+    public void reruns_a_step_whose_checksum_folder_was_not_written() throws IOException {
+        assertThat(interrupted(step -> {
+            Path checksum = step.resolve("checksum");
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(checksum)) {
+                for (Path file : stream) {
+                    Files.delete(file);
+                }
+            }
+            Files.delete(checksum);
+        })).content().isEqualTo("value2");
+    }
+
+    @Test
+    public void reruns_a_step_whose_output_checksums_were_not_written() throws IOException {
+        assertThat(interrupted(step -> Files.delete(
+                step.resolve("checksum").resolve("output.properties")))).content().isEqualTo("value2");
+    }
+
+    @Test
+    public void reruns_a_step_whose_argument_checksums_were_not_written() throws IOException {
+        assertThat(interrupted(step -> Files.delete(
+                step.resolve("checksum").resolve("argument.source.properties")))).content().isEqualTo("value2");
+    }
+
+    @Test
+    public void reruns_a_step_whose_completion_marker_was_not_written() throws IOException {
+        assertThat(interrupted(step -> Files.delete(
+                step.resolve("checksum").resolve("step.properties")))).content().isEqualTo("value2");
+    }
+
+    @Test
+    public void reruns_a_step_whose_completion_marker_was_truncated() throws IOException {
+        assertThat(interrupted(step -> truncate(
+                step.resolve("checksum").resolve("step.properties")))).content().isEqualTo("value2");
+    }
+
+    @Test
+    public void reruns_a_step_whose_output_checksums_were_truncated() throws IOException {
+        assertThat(interrupted(step -> truncate(
+                step.resolve("checksum").resolve("output.properties")))).content().isEqualTo("value2");
+    }
+
+    private static void truncate(Path file) throws IOException {
+        String content = Files.readString(file).strip();
+        Files.writeString(file, content.substring(0, content.length() - 1));
+    }
+
+    @Test
+    public void does_not_rerun_a_step_whose_checksums_are_intact() throws IOException {
+        assertThat(interrupted(_ -> {
+        })).content().isEqualTo("value1");
+    }
+
+    private interface Interruption {
+        void accept(Path step) throws IOException;
+    }
+
+    private static BuildStep counting() {
+        return (_, context, _) -> {
+            Files.writeString(context.next().resolve("file"), "value" + RUNS.incrementAndGet());
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        };
+    }
+
+    private Path interrupted(Interruption interruption) throws IOException {
+        RUNS.set(0);
+        Files.writeString(source.resolve("file"), "foo");
+        buildExecutor.addSource("source", source);
+        buildExecutor.addStep("step", counting(), "source");
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        Path step = root.resolve("step");
+        assertThat(step.resolve("output").resolve("file")).content().isEqualTo("value1");
+        interruption.accept(step);
+        BuildExecutor resumed = BuildExecutor.of(root,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+        resumed.addSource("source", source);
+        resumed.addStep("step", counting(), "source");
+        resumed.execute(Runnable::run).toCompletableFuture().join();
+        Path checksum = step.resolve("checksum");
+        assertThat(checksum.resolve("output.properties")).isRegularFile();
+        assertThat(checksum.resolve("step.properties")).isRegularFile();
+        assertThat(checksum.resolve("argument.source.properties")).isRegularFile();
+        try (Stream<Path> files = Files.list(checksum)) {
+            assertThat(files.map(file -> file.getFileName().toString()))
+                    .noneMatch(name -> name.endsWith("~"));
+        }
+        return step.resolve("output").resolve("file");
     }
 
     @Test

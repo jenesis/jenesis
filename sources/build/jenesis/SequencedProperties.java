@@ -35,6 +35,18 @@ public class SequencedProperties extends Properties {
         }
     }
 
+    public void storeAtomically(Path file) throws IOException {
+        Path temporary = file.resolveSibling(file.getFileName() + "~");
+        try (Writer writer = Files.newBufferedWriter(temporary)) {
+            store(writer, null);
+        }
+        try {
+            Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException _) {
+            Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
     @Override
     public void store(Writer writer, String comments) throws IOException {
         super.store(new CommentSuppressingWriter(writer), comments);

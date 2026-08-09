@@ -86,7 +86,7 @@ public interface HashFunction {
                         HexFormat.of().formatHex(entry.getValue())))
                 .sorted(Map.Entry.comparingByKey())
                 .forEach(entry -> properties.setProperty(entry.getKey(), entry.getValue()));
-        properties.store(file);
+        properties.storeAtomically(file);
     }
 
     static boolean areConsistent(Path folder, Map<Path, byte[]> checksums, HashFunction hash, Executor executor)
