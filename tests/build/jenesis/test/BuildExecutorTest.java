@@ -188,6 +188,25 @@ public class BuildExecutorTest implements Serializable {
     }
 
     @Test
+    public void reruns_a_step_whose_committed_output_was_partly_deleted() throws IOException {
+        assertThat(interrupted(step -> Files.delete(
+                step.resolve("output").resolve("companion")))).content().isEqualTo("value2");
+    }
+
+    @Test
+    public void reruns_a_step_whose_committed_output_folder_was_deleted() throws IOException {
+        assertThat(interrupted(step -> {
+            Path output = step.resolve("output");
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(output)) {
+                for (Path file : stream) {
+                    Files.delete(file);
+                }
+            }
+            Files.delete(output);
+        })).content().isEqualTo("value2");
+    }
+
+    @Test
     public void does_not_rerun_a_step_whose_checksums_are_intact() throws IOException {
         assertThat(interrupted(_ -> {
         })).content().isEqualTo("value1");
@@ -199,7 +218,9 @@ public class BuildExecutorTest implements Serializable {
 
     private static BuildStep counting() {
         return (_, context, _) -> {
-            Files.writeString(context.next().resolve("file"), "value" + RUNS.incrementAndGet());
+            int run = RUNS.incrementAndGet();
+            Files.writeString(context.next().resolve("file"), "value" + run);
+            Files.writeString(context.next().resolve("companion"), "companion" + run);
             return CompletableFuture.completedStage(new BuildStepResult(true));
         };
     }
