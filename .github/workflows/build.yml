@@ -33,10 +33,12 @@ jobs:
           - { name: java-modular-jmod-jlink, dir: demo-06-java-modular-executable, entry: build/jenesis/Project.java stage, flags: -Djenesis.project.properties=image, verify: 'find target -name "*.jmod" | grep -q . && find target -path "*bin*" \( -name java -o -name java.exe \) | grep -q .' }
           - { name: java-pom-executable, dir: demo-05-java-pom-executable, entry: build/Demo.java }
           - { name: java-pom-bundle, dir: demo-05-java-pom-executable, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=bundle, verify: 'find target -type d -name bundle | grep -q .' }
+          - { name: java-pom-docker, dir: demo-05-java-pom-executable, entry: build/jenesis/Project.java stage, flags: -Djenesis.project.properties=docker, verify: 'grep -q "^ENTRYPOINT .*--class-path" target/stage/docker/output/Dockerfile && find target -path "*stage/docker/output/classpath*" -name "*.jar" | grep -q .' }
           - { name: java-pom-launcher, dir: demo-05-java-pom-executable, entry: build/DemoLauncher.java }
           - { name: java-pom-launcher-strict, dir: demo-05-java-pom-executable, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=launcher -Djenesis.dependency.pin=strict, verify: 'find target -path "*launcher*" -name "*.jar" -path "*output*" | grep -q .' }
           - { name: java-modular-executable, dir: demo-06-java-modular-executable, entry: build/Demo.java }
           - { name: java-modular-bundle, dir: demo-06-java-modular-executable, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=bundle, verify: 'find target -type d -name bundle | grep -q .' }
+          - { name: java-modular-docker, dir: demo-06-java-modular-executable, entry: build/jenesis/Project.java stage, flags: -Djenesis.project.properties=docker, verify: 'grep -q "^ENTRYPOINT .*--module .*sample.Sample" target/stage/docker/output/Dockerfile && find target -path "*stage/docker/output/modulepath*" -name "*.jar" | grep -q .' }
           - { name: java-modular-launcher, dir: demo-06-java-modular-executable, entry: build/DemoLauncher.java }
           - { name: java-modular-launcher-strict, dir: demo-06-java-modular-executable, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=launcher -Djenesis.dependency.pin=strict, verify: 'find target -path "*launcher*" -name "*.jar" -path "*output*" | grep -q .' }
           - { name: bundle, dir: demo-07-bundle, entry: build/Demo.java }

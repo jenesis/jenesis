@@ -116,6 +116,37 @@ needs no JDK and no jpackage:
 The modular sibling instead splits its jars into
 `modulepath/` and `classpath/` and adds a `mainModule` entry.
 
+A generated Dockerfile
+----------------------
+
+Writing that Dockerfile by hand is the one manual step left, so a `docker.properties`
+file in a configuration location generates it. The file's presence is the switch -
+there is no boolean key - and this demo commits it as a `docker` profile whose
+`from=eclipse-temurin:25-jre` names the base image:
+
+    java -Djenesis.project.properties=docker build/jenesis/Project.java stage
+
+    target/stage/docker/output/
+    |-- Dockerfile
+    `-- classpath/                 the app jar and commons-lang3
+
+The generated file is the one written by hand above, with the entry point taken from
+the module's main class:
+
+    FROM eclipse-temurin:25-jre
+    WORKDIR /app
+    COPY classpath/ /app/classpath/
+    ENTRYPOINT ["java", "--class-path", "/app/classpath/*", "sample.Sample"]
+
+The build never runs a container tool, so nothing here needs Docker installed. The
+staged folder is a complete build context, and creating the image is one command:
+
+    docker build -t sample target/stage/docker/output
+
+`docker.properties` also takes `workdir`, `user`, `env`, `expose`, `options` (JVM
+options placed before the entry point) and `arguments` (a `CMD` appended after it);
+the last four repeat over `\n`-separated values.
+
 A single executable jar with the launcher
 -----------------------------------------
 

@@ -11,6 +11,7 @@ import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bundle;
+import build.jenesis.step.Docker;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.JLink;
 import build.jenesis.step.JMod;
@@ -66,9 +67,11 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                     Map<String, Repository> repositories,
                                     Map<String, Resolver> resolvers) {
         Packaging packaging;
+        Docker docker;
         SequencedMap<String, SequencedMap<String, String>> overrides;
         try {
             packaging = Packaging.configured(BuildStep.locate(descriptor.configuration(), "packaging.properties"));
+            docker = Docker.configured(BuildStep.locate(descriptor.configuration(), "docker.properties"));
             overrides = overridesOf(descriptor.configuration());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -157,7 +160,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         Stream.concat(Stream.of("binary"), descriptor.content().stream()));
             }
         });
-        if (packaging.jlink() || packaging.jpackage() != null || packaging.bundle() || packaging.launcher() || packaging.nativeImage()) {
+        if (packaging.jlink() || packaging.jpackage() != null || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || docker != null) {
             assembly = assembly.then("package", (sub, inherited) -> {
                 SequencedSet<String> images = new LinkedHashSet<>();
                 if (packaging.jlink()) {
@@ -179,6 +182,10 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                     .pinning(descriptor.pinning())
                                     .pathPlacement(descriptor.pathPlacement()),
                             inherited.sequencedKeySet().stream());
+                }
+                if (docker != null) {
+                    sub.addStep("docker", docker, inherited.sequencedKeySet().stream());
+                    images.add("docker");
                 }
                 if (packaging.nativeImage()) {
                     sub.addStep("reachability", new NativeImageMetadata(), inherited.sequencedKeySet().stream());

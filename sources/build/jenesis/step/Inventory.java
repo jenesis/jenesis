@@ -67,6 +67,7 @@ public class Inventory implements BuildStep {
         Path runtimeImage = null;
         Path nativeBinary = null;
         Path metadataImage = null;
+        Path dockerContext = null;
         SequencedSet<Path> artifacts = new LinkedHashSet<>();
         SequencedSet<Path> bomArtifacts = new LinkedHashSet<>();
         SequencedSet<Path> sources = new LinkedHashSet<>();
@@ -157,6 +158,10 @@ public class Inventory implements BuildStep {
             Path metadata = folder.resolve(NativeImage.METADATA);
             if (metadataImage == null && Files.isDirectory(metadata)) {
                 metadataImage = metadata;
+            }
+            Path dockerFolder = folder.resolve(Docker.DOCKER);
+            if (dockerContext == null && Files.isDirectory(dockerFolder)) {
+                dockerContext = dockerFolder;
             }
             Path attachmentsFile = folder.resolve(ATTACHMENTS);
             if (Files.isRegularFile(attachmentsFile)) {
@@ -265,6 +270,9 @@ public class Inventory implements BuildStep {
         }
         if (metadataImage != null) {
             inventory.setProperty(prefix + "nativeimage", relativize(context, metadataImage));
+        }
+        if (dockerContext != null) {
+            inventory.setProperty(prefix + "docker", relativize(context, dockerContext));
         }
         if (pomFile != null) {
             inventory.setProperty(prefix + "pom", relativize(context, pomFile));

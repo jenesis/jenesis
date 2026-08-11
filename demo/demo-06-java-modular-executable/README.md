@@ -210,6 +210,33 @@ For a non-modular project the zip holds only `classpath/` and an `application.pr
 with just `mainClass`, launched with `java -cp 'classpath/*' sample.Sample` (see
 `../demo-05-java-pom-executable`).
 
+A generated Dockerfile
+----------------------
+
+That Dockerfile does not have to be written by hand either: a `docker.properties` file
+in a configuration location generates it, activated by its presence alone rather than
+by a boolean key. This demo commits it as a `docker` profile that also sets a
+`workdir` and a JVM option:
+
+    java -Djenesis.project.properties=docker build/jenesis/Project.java stage
+
+    target/stage/docker/output/
+    |-- Dockerfile
+    `-- modulepath/                the app jar and slf4j-api
+
+Because the module declares `mainModule`, the jars carrying a module descriptor land
+under `modulepath/` and the entry point launches the module, not a class:
+
+    FROM eclipse-temurin:25-jre
+    WORKDIR /opt/sample
+    COPY modulepath/ /opt/sample/modulepath/
+    ENTRYPOINT ["java", "-Xmx64m", "--module-path", "/opt/sample/modulepath", "--module", "demo.modular.executable/sample.Sample"]
+
+The build never runs a container tool, so no Docker installation is involved in
+producing this. The staged folder is a complete build context:
+
+    docker build -t sample target/stage/docker/output
+
 A single executable jar with the launcher
 -----------------------------------------
 

@@ -240,6 +240,17 @@ used to ship the app as a container image in `docker-isolation`), while
 per-dependency subfolders so the module graph is reconstructed at run time rather than
 flattened into a fat jar.
 
+The container form is the one file the bundle still left to write by hand, so both
+executable demos also commit a `docker` profile. A `docker.properties` in a
+configuration location - activated by its presence, not by a boolean key - stages a
+complete build context under `stage/docker`: a generated `Dockerfile` beside the
+`classpath/`/`modulepath/` jars it copies, its `ENTRYPOINT` the same entry point every
+other packaging form reads. The build never invokes a container tool, so it needs no
+Docker installation to produce the file:
+
+    java -Djenesis.project.properties=docker build/jenesis/Project.java stage
+    docker build -t sample target/stage/docker/output
+
 The new idea is that **the build produces a runnable artifact, not just a jar**, and
 that one entry-point declaration (`@jenesis.main` / `<mainClass>`) drives launching,
 packaging, and runtime-image linking through the same `module.properties` field.
