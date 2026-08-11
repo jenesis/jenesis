@@ -67,11 +67,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                     Map<String, Repository> repositories,
                                     Map<String, Resolver> resolvers) {
         Packaging packaging;
-        Docker docker;
         SequencedMap<String, SequencedMap<String, String>> overrides;
         try {
             packaging = Packaging.configured(BuildStep.locate(descriptor.configuration(), "packaging.properties"));
-            docker = Docker.configured(BuildStep.locate(descriptor.configuration(), "docker.properties"));
             overrides = overridesOf(descriptor.configuration());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -160,7 +158,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         Stream.concat(Stream.of("binary"), descriptor.content().stream()));
             }
         });
-        if (packaging.jlink() || packaging.jpackage() != null || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || docker != null) {
+        if (packaging.jlink() || packaging.jpackage() != null || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || packaging.docker() != null) {
             assembly = assembly.then("package", (sub, inherited) -> {
                 SequencedSet<String> images = new LinkedHashSet<>();
                 if (packaging.jlink()) {
@@ -183,8 +181,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                     .pathPlacement(descriptor.pathPlacement()),
                             inherited.sequencedKeySet().stream());
                 }
-                if (docker != null) {
-                    sub.addStep("docker", docker, inherited.sequencedKeySet().stream());
+                if (packaging.docker() != null) {
+                    sub.addStep("docker", new Docker(packaging.docker()), inherited.sequencedKeySet().stream());
                     images.add("docker");
                 }
                 if (packaging.nativeImage()) {
@@ -206,31 +204,35 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             boolean bundle,
                             boolean launcher,
                             boolean nativeImage,
-                            String jpackage) {
+                            String jpackage,
+                            String docker) {
 
         private static Packaging configured(Path properties) throws IOException {
             if (properties == null) {
-                return new Packaging(false, false, false, false, false, null);
+                return new Packaging(false, false, false, false, false, null, null);
             }
             SequencedProperties configuration = SequencedProperties.ofFiles(properties);
-            String jpackage = configuration.getProperty("jpackage");
-            if (jpackage != null) {
-                jpackage = jpackage.trim();
-                if (jpackage.isEmpty()) {
-                    jpackage = null;
-                }
-            }
             return new Packaging(flag(configuration, "jmod"),
                     flag(configuration, "jlink"),
                     flag(configuration, "bundle"),
                     flag(configuration, "launcher"),
                     flag(configuration, "native"),
-                    jpackage);
+                    value(configuration, "jpackage"),
+                    value(configuration, "docker"));
         }
 
         private static boolean flag(SequencedProperties configuration, String key) {
             String value = configuration.getProperty(key);
             return value != null && Boolean.parseBoolean(value.trim());
+        }
+
+        private static String value(SequencedProperties configuration, String key) {
+            String value = configuration.getProperty(key);
+            if (value == null) {
+                return null;
+            }
+            String trimmed = value.trim();
+            return trimmed.isEmpty() ? null : trimmed;
         }
     }
 

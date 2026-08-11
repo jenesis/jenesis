@@ -14,108 +14,18 @@ public class Docker implements BuildStep {
 
     private final String from;
     private final String group;
-    private final String workingDirectory;
-    private final String user;
-    private final List<String> environment;
-    private final List<String> ports;
-    private final List<String> options;
-    private final List<String> arguments;
 
     public Docker(String from) {
-        this(from, "main", "/app", null, List.of(), List.of(), List.of(), List.of());
+        this(from, "main");
     }
 
-    private Docker(String from,
-                   String group,
-                   String workingDirectory,
-                   String user,
-                   List<String> environment,
-                   List<String> ports,
-                   List<String> options,
-                   List<String> arguments) {
+    private Docker(String from, String group) {
         this.from = from;
         this.group = group;
-        this.workingDirectory = workingDirectory;
-        this.user = user;
-        this.environment = environment;
-        this.ports = ports;
-        this.options = options;
-        this.arguments = arguments;
     }
 
     public Docker group(String group) {
-        return new Docker(from, group, workingDirectory, user, environment, ports, options, arguments);
-    }
-
-    public Docker workingDirectory(String workingDirectory) {
-        return new Docker(from, group, workingDirectory, user, environment, ports, options, arguments);
-    }
-
-    public Docker user(String user) {
-        return new Docker(from, group, workingDirectory, user, environment, ports, options, arguments);
-    }
-
-    public Docker environment(List<String> environment) {
-        return new Docker(from, group, workingDirectory, user, environment, ports, options, arguments);
-    }
-
-    public Docker ports(List<String> ports) {
-        return new Docker(from, group, workingDirectory, user, environment, ports, options, arguments);
-    }
-
-    public Docker options(List<String> options) {
-        return new Docker(from, group, workingDirectory, user, environment, ports, options, arguments);
-    }
-
-    public Docker arguments(List<String> arguments) {
-        return new Docker(from, group, workingDirectory, user, environment, ports, options, arguments);
-    }
-
-    public static Docker configured(Path properties) throws IOException {
-        if (properties == null) {
-            return null;
-        }
-        SequencedProperties configuration = SequencedProperties.ofFiles(properties);
-        String from = value(configuration, "from");
-        Docker docker = new Docker(from == null
-                ? "eclipse-temurin:" + Runtime.version().feature() + "-jre"
-                : from);
-        String workingDirectory = value(configuration, "workdir");
-        if (workingDirectory != null) {
-            docker = docker.workingDirectory(workingDirectory);
-        }
-        String user = value(configuration, "user");
-        if (user != null) {
-            docker = docker.user(user);
-        }
-        return docker.environment(values(configuration, "env"))
-                .ports(values(configuration, "expose"))
-                .options(values(configuration, "options"))
-                .arguments(values(configuration, "arguments"));
-    }
-
-    private static String value(SequencedProperties configuration, String key) {
-        String value = configuration.getProperty(key);
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private static List<String> values(SequencedProperties configuration, String key) {
-        String value = configuration.getProperty(key);
-        if (value == null) {
-            return List.of();
-        }
-        List<String> values = new ArrayList<>();
-        for (String entry : value.split("\n")) {
-            String trimmed = entry.trim();
-            if (!trimmed.isEmpty()) {
-                values.add(trimmed);
-            }
-        }
-        return values;
+        return new Docker(from, group);
     }
 
     @Override
@@ -194,35 +104,24 @@ public class Docker implements BuildStep {
                               boolean selfContainedModuleGraph,
                               SequencedSet<String> classpath,
                               SequencedSet<String> modulepath) {
-        StringBuilder builder = new StringBuilder("FROM ").append(from).append('\n');
-        for (String variable : environment) {
-            builder.append("ENV ").append(variable).append('\n');
-        }
-        builder.append("WORKDIR ").append(workingDirectory).append('\n');
+        StringBuilder builder = new StringBuilder("FROM ").append(from).append("\nWORKDIR /app\n");
         if (!modulepath.isEmpty()) {
-            builder.append("COPY modulepath/ ").append(workingDirectory).append("/modulepath/\n");
+            builder.append("COPY modulepath/ /app/modulepath/\n");
         }
         if (!classpath.isEmpty()) {
-            builder.append("COPY classpath/ ").append(workingDirectory).append("/classpath/\n");
-        }
-        for (String port : ports) {
-            builder.append("EXPOSE ").append(port).append('\n');
-        }
-        if (user != null) {
-            builder.append("USER ").append(user).append('\n');
+            builder.append("COPY classpath/ /app/classpath/\n");
         }
         List<String> command = new ArrayList<>();
         command.add("java");
-        command.addAll(options);
         if (!classpath.isEmpty()) {
             command.add("--class-path");
-            command.add(workingDirectory + "/classpath/*");
+            command.add("/app/classpath/*");
         }
         if (mainModule == null) {
             command.add(mainClass);
         } else {
             command.add("--module-path");
-            command.add(workingDirectory + "/modulepath");
+            command.add("/app/modulepath");
             if (!selfContainedModuleGraph) {
                 command.add("--add-modules");
                 command.add("ALL-MODULE-PATH");
@@ -230,11 +129,7 @@ public class Docker implements BuildStep {
             command.add("--module");
             command.add(mainModule + "/" + mainClass);
         }
-        builder.append("ENTRYPOINT [").append(quoted(command)).append("]\n");
-        if (!arguments.isEmpty()) {
-            builder.append("CMD [").append(quoted(arguments)).append("]\n");
-        }
-        return builder.toString();
+        return builder.append("ENTRYPOINT [").append(quoted(command)).append("]\n").toString();
     }
 
     private static String quoted(List<String> values) {

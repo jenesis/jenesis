@@ -241,12 +241,15 @@ per-dependency subfolders so the module graph is reconstructed at run time rathe
 flattened into a fat jar.
 
 The container form is the one file the bundle still left to write by hand, so both
-executable demos also commit a `docker` profile. A `docker.properties` in a
-configuration location - activated by its presence, not by a boolean key - stages a
-complete build context under `stage/docker`: a generated `Dockerfile` beside the
-`classpath/`/`modulepath/` jars it copies, its `ENTRYPOINT` the same entry point every
-other packaging form reads. The build never invokes a container tool, so it needs no
-Docker installation to produce the file:
+executable demos also commit a `docker` profile. A `docker=<base image>` line in
+`packaging.properties` - valued like `jpackage`, because the base image is the one
+thing the build cannot infer - stages a complete build context under `stage/docker`:
+a generated `Dockerfile` beside the `classpath/`/`modulepath/` jars it copies, its
+`ENTRYPOINT` the same entry point every other packaging form reads. Everything else
+is fixed, since a Dockerfile inherits `ENV`, `WORKDIR`, `USER` and `EXPOSE` from its
+base, so image environment belongs in a base image rather than in build configuration.
+The build never invokes a container tool, so it needs no Docker installation to
+produce the file:
 
     java -Djenesis.project.properties=docker build/jenesis/Project.java stage
     docker build -t sample target/stage/docker/output

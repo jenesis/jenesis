@@ -213,10 +213,10 @@ with just `mainClass`, launched with `java -cp 'classpath/*' sample.Sample` (see
 A generated Dockerfile
 ----------------------
 
-That Dockerfile does not have to be written by hand either: a `docker.properties` file
-in a configuration location generates it, activated by its presence alone rather than
-by a boolean key. This demo commits it as a `docker` profile that also sets a
-`workdir` and a JVM option:
+That Dockerfile does not have to be written by hand either: a `docker` key in
+`packaging.properties` generates it, taking the base image as its value the way
+`jpackage` takes its type. This demo commits `docker=eclipse-temurin:25-jre` as a
+`docker` profile:
 
     java -Djenesis.project.properties=docker build/jenesis/Project.java stage
 
@@ -228,9 +228,9 @@ Because the module declares `mainModule`, the jars carrying a module descriptor 
 under `modulepath/` and the entry point launches the module, not a class:
 
     FROM eclipse-temurin:25-jre
-    WORKDIR /opt/sample
-    COPY modulepath/ /opt/sample/modulepath/
-    ENTRYPOINT ["java", "-Xmx64m", "--module-path", "/opt/sample/modulepath", "--module", "demo.modular.executable/sample.Sample"]
+    WORKDIR /app
+    COPY modulepath/ /app/modulepath/
+    ENTRYPOINT ["java", "--module-path", "/app/modulepath", "--module", "demo.modular.executable/sample.Sample"]
 
 The build never runs a container tool, so no Docker installation is involved in
 producing this. The staged folder is a complete build context:
