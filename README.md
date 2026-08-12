@@ -52,9 +52,12 @@ bootstrap sources are taken straight from the repository tree at that ref. The s
 repository root.
 
 **Git submodule.** Most explicit; the pinned submodule commit is the reproducibility anchor, so a fresh clone
-plus `git submodule update --init` is the entire setup with no separate install step:
+plus `git submodule update --init --depth 1` is the entire setup with no separate install step. Jenesis is read
+at its pinned commit and its history is never browsed from the consuming project, so record the submodule as
+shallow and every fresh checkout stays cheap:
 
-    git submodule add https://github.com/raphw/jenesis.git .jenesis
+    git submodule add --depth 1 https://github.com/raphw/jenesis.git .jenesis
+    git config -f .gitmodules submodule..jenesis.shallow true
     ln -s ../.jenesis/sources/build/jenesis build/jenesis
     java build/jenesis/Project.java
 

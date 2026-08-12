@@ -96,9 +96,10 @@ fi
 
 # --- detect whether the project tracks Jenesis as a submodule ----------------
 
-# Prints the submodule path if .gitmodules has an entry whose URL points at the
-# Jenesis repo, otherwise prints nothing. Always returns 0 so it is safe to call
-# from a command substitution under 'set -e'.
+# Prints "&lt;name&gt;\t&lt;path&gt;" if .gitmodules has an entry whose URL points at the
+# Jenesis repo, otherwise prints nothing. The name comes back too because the
+# shallow flag is written against it, not against the path. Always returns 0 so
+# it is safe to call from a command substitution under 'set -e'.
 detect_submodule_path() {
     local key url name
     command -v git >/dev/null 2>&1 || return 0
@@ -108,7 +109,8 @@ detect_submodule_path() {
         case "$url" in
             *"${GITHUB_REPO}" | *"${GITHUB_REPO}.git" | *"${GITHUB_REPO}/")
                 name="${key#submodule.}"; name="${name%.url}"
-                git config -f "$TARGET/.gitmodules" --get "submodule.${name}.path"
+                printf '%s\t%s\n' "$name" \
+                    "$(git config -f "$TARGET/.gitmodules" --get "submodule.${name}.path")"
                 break
                 ;;
         esac
@@ -116,9 +118,14 @@ detect_submodule_path() {
     return 0
 }
 
+SUBMODULE_NAME=""
 SUBMODULE_PATH=""
 if [ "$MODE" != "vendor" ]; then
-    SUBMODULE_PATH="$(detect_submodule_path)"
+    SUBMODULE_ENTRY="$(detect_submodule_path)"
+    if [ -n "$SUBMODULE_ENTRY" ]; then
+        SUBMODULE_NAME="${SUBMODULE_ENTRY%%	*}"
+        SUBMODULE_PATH="${SUBMODULE_ENTRY#*	}"
+    fi
 fi
 
 if [ "$MODE" = "submodule" ] && [ -z "$SUBMODULE_PATH" ]; then
@@ -133,11 +140,26 @@ if [ -n "$SUBMODULE_PATH" ]; then
     SUB="$TARGET/$SUBMODULE_PATH"
     say "detected Jenesis submodule at '${SUBMODULE_PATH}' - updating to ${REF}"
 
-    git -C "$TARGET" submodule update --init -- "$SUBMODULE_PATH" \
+    # Jenesis is read at one pinned commit and its history is never browsed from
+    # the consuming project, so record the submodule as shallow before the first
+    # clone - after it, the flag only governs the next fresh checkout.
+    if [ -n "$SUBMODULE_NAME" ] \
+        && [ "$(git config -f "$TARGET/.gitmodules" --get "submodule.${SUBMODULE_NAME}.shallow" 2>/dev/null)" != "true" ]; then
+        git config -f "$TARGET/.gitmodules" "submodule.${SUBMODULE_NAME}.shallow" true \
+            && say "recorded submodule '${SUBMODULE_PATH}' as shallow in .gitmodules"
+    fi
+
+    git -C "$TARGET" submodule update --init --depth 1 -- "$SUBMODULE_PATH" \
+        || git -C "$TARGET" submodule update --init -- "$SUBMODULE_PATH" \
         || die "failed to initialize submodule '${SUBMODULE_PATH}'"
-    git -C "$SUB" fetch --quiet --tags origin \
+    # Fetch just the requested ref at depth 1. A server that refuses a bare
+    # commit in a want, or an older git, falls back to the full fetch - a
+    # shallower clone is a preference here, never a requirement.
+    git -C "$SUB" fetch --quiet --depth 1 origin "$REF" 2>/dev/null \
+        || git -C "$SUB" fetch --quiet --tags origin \
         || die "failed to fetch in submodule '${SUBMODULE_PATH}'"
-    git -C "$SUB" checkout --quiet "$REF" \
+    git -C "$SUB" checkout --quiet "$REF" 2>/dev/null \
+        || git -C "$SUB" checkout --quiet FETCH_HEAD \
         || die "failed to check out '${REF}' in '${SUBMODULE_PATH}' - does the ref exist?"
     git -C "$TARGET" add "$SUBMODULE_PATH" \
         || die "failed to stage the updated submodule pointer"
