@@ -39,7 +39,7 @@ public class MavenRepositoryStaging implements BuildStep {
         SequencedMap<String, Module> mainsByArtifactId = new LinkedHashMap<>();
         List<Module> testModules = new ArrayList<>();
         for (BuildStepArgument argument : arguments.values()) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path inventoryFile = argument.folder().resolve(Inventory.INVENTORY);

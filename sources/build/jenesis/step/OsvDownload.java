@@ -33,7 +33,7 @@ public class OsvDownload implements BuildStep {
             throws IOException {
         SequencedSet<String> coordinateSet = new TreeSet<>();
         for (BuildStepArgument argument : arguments.values()) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path index = argument.folder().resolve(DEPENDENCIES);

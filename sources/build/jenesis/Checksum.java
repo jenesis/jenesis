@@ -52,9 +52,9 @@ public final class Checksum {
         return diff;
     }
 
-    public static Map<Path, Checksum> removed(Map<Path, byte[]> expected) {
+    public static Map<Path, Checksum> removed(Collection<Path> expected) {
         Map<Path, Checksum> removed = new LinkedHashMap<>();
-        expected.keySet().forEach(path -> removed.put(path, of(ChecksumStatus.REMOVED)));
+        expected.forEach(path -> removed.put(path, of(ChecksumStatus.REMOVED)));
         return removed;
     }
 

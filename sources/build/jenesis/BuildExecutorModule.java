@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import java.io.IOException;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -16,6 +17,10 @@ public interface BuildExecutorModule {
         return URLEncoder.encode(value, StandardCharsets.UTF_8)
                 .replace("+", "%20")
                 .replace("*", "%2A");
+    }
+
+    static String decode(String value) {
+        return URLDecoder.decode(value, StandardCharsets.UTF_8);
     }
 
     default Optional<String> resolve(String path) {

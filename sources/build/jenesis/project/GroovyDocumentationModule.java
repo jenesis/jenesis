@@ -200,7 +200,7 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
             boolean[] anyGroovy = new boolean[1];
             String release = null;
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 Path classes = argument.folder().resolve(BuildStep.CLASSES);

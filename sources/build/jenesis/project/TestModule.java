@@ -478,8 +478,8 @@ public class TestModule implements BuildExecutorModule {
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
             List<Path> folders = arguments.values().stream()
+                    .filter(argument -> !argument.removed())
                     .map(BuildStepArgument::folder)
-                    .filter(Objects::nonNull)
                     .toList();
             List<ModuleDescriptor> artifacts = TestEngine.scan(folders);
             TestEngine resolved = engine != null ? engine : TestEngine.of(artifacts).orElse(null);
@@ -501,7 +501,7 @@ public class TestModule implements BuildExecutorModule {
                 }
                 if (selectedPrefix != null) {
                     for (BuildStepArgument argument : arguments.values()) {
-                        if (argument.folder() == null) {
+                        if (argument.removed()) {
                             continue;
                         }
                         Path versionsFile = argument.folder().resolve(BuildStep.VERSIONS);
@@ -599,8 +599,8 @@ public class TestModule implements BuildExecutorModule {
             TestEngine resolved = engine != null
                     ? engine
                     : TestEngine.of(() -> arguments.values().stream()
+                            .filter(argument -> !argument.removed())
                             .map(BuildStepArgument::folder)
-                            .filter(Objects::nonNull)
                             .iterator())
                     .orElseThrow(() -> new IllegalArgumentException("No test engine found"));
             List<TestSpec> specs = TestSpec.parse(filter);
@@ -645,7 +645,7 @@ public class TestModule implements BuildExecutorModule {
             SequencedMap<String, SequencedSet<String>> matchedMethods = new TreeMap<>();
             ClassFile classFile = ClassFile.of();
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 Path classes = argument.folder().resolve(CLASSES);
@@ -720,7 +720,7 @@ public class TestModule implements BuildExecutorModule {
             SequencedProperties current = new SequencedProperties();
             Map<String, Set<String>> references = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 Path folder = argument.folder().resolve(CLASSES);
@@ -803,7 +803,7 @@ public class TestModule implements BuildExecutorModule {
                 throws IOException {
             SequencedMap<String, String> attachments = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 Path file = argument.folder().resolve(BuildStep.ATTACHMENTS);
@@ -825,7 +825,7 @@ public class TestModule implements BuildExecutorModule {
                                                                SequencedSet<String> keys) throws IOException {
             SequencedMap<String, Path> resolved = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 Path file = argument.folder().resolve(BuildStep.DEPENDENCIES);
@@ -860,7 +860,7 @@ public class TestModule implements BuildExecutorModule {
                                                             String group) throws IOException {
             SequencedMap<String, Path> resolved = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 Path file = argument.folder().resolve(BuildStep.DEPENDENCIES);

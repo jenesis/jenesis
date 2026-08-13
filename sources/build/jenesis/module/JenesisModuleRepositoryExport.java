@@ -33,10 +33,10 @@ public class JenesisModuleRepositoryExport implements BuildStep {
             throws IOException {
         Set<Path> cleaned = new HashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
-            Path folder = argument.folder();
-            if (folder == null) {
+            if (argument.removed()) {
                 continue;
             }
+            Path folder = argument.folder();
             if (!Files.isDirectory(folder)) {
                 continue;
             }

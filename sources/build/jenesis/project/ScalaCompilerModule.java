@@ -189,7 +189,7 @@ public class ScalaCompilerModule implements BuildExecutorModule {
                     plugins = new ArrayList<>();
             String release = null;
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 for (Path jar : Dependencies.select(argument.folder(), tool, "runtime")) {

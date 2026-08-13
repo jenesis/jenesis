@@ -34,7 +34,7 @@ public class SubstitutionModule implements BuildExecutorModule {
                     """);
             Path target = context.next().resolve(BuildStep.SOURCES);
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 Path sources = argument.folder().resolve(BuildStep.SOURCES);

@@ -131,7 +131,7 @@ public class KtlintModule implements BuildExecutorModule {
                 throws IOException {
             List<String> jars = new ArrayList<>(), files = new ArrayList<>();
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 for (Path jar : Dependencies.select(argument.folder(), tool, "runtime")) {
@@ -159,7 +159,7 @@ public class KtlintModule implements BuildExecutorModule {
             files.sort(null);
             Path config = null;
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 Path candidate = argument.folder().resolve(".editorconfig");

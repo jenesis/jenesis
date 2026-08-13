@@ -29,7 +29,7 @@ public class ModularStaging implements BuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         for (BuildStepArgument argument : arguments.values()) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path inventoryFile = argument.folder().resolve(Inventory.INVENTORY);

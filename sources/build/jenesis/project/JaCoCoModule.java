@@ -109,7 +109,7 @@ public class JaCoCoModule implements BuildExecutorModule {
             Path data = null;
             String artifact = null, version = null;
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 for (Path jar : Dependencies.select(argument.folder(), tool, "runtime")) {

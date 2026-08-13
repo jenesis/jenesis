@@ -38,7 +38,7 @@ public class Jar extends JdkProcessBuildStep {
                 "--date=1980-01-01T00:00:02Z"));
         List<Path> manifestFiles = new ArrayList<>();
         for (BuildStepArgument argument : arguments.values()) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path candidate = argument.folder().resolve(Versions.MANIFEST);
@@ -67,7 +67,7 @@ public class Jar extends JdkProcessBuildStep {
             commands.add(output.toString());
         }
         for (BuildStepArgument argument : arguments.values()) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             for (String name : sort.folders) {

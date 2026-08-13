@@ -50,7 +50,7 @@ public class Ide implements BuildStep {
         List<Raw> raws = new ArrayList<>();
         SequencedMap<String, String> identities = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path inventoryFile = argument.folder().resolve(Inventory.INVENTORY);

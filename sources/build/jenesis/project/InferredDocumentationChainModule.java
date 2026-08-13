@@ -65,7 +65,7 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                 throws IOException {
             boolean[] flags = new boolean[4];
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 Path sources = argument.folder().resolve(BuildStep.SOURCES);
@@ -188,7 +188,7 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                 throws IOException {
             Path combined = Files.createDirectories(context.next().resolve(Javadoc.JAVADOC));
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 Path source = argument.folder().resolve(Javadoc.JAVADOC);

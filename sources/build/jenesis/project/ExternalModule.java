@@ -150,7 +150,7 @@ public class ExternalModule implements BuildExecutorModule {
             properties.store(context.next().resolve(BuildStep.REQUIRES));
             SequencedProperties versions = new SequencedProperties();
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 Path file = argument.folder().resolve(BuildStep.VERSIONS);

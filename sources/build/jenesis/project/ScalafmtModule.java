@@ -142,7 +142,7 @@ public class ScalafmtModule implements BuildExecutorModule {
             boolean hasScala = false;
             Path config = null;
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 for (Path jar : Dependencies.select(argument.folder(), tool, "runtime")) {

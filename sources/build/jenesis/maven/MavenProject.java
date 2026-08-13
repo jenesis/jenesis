@@ -381,7 +381,7 @@ public class MavenProject implements BuildExecutorModule {
                                 metadata.setProperty("version", properties.getProperty("version"));
                                 extractMetadata(pomFile).forEach(metadata::put);
                                 for (BuildStepArgument argument : manifestArgs.values()) {
-                                    if (argument.folder() == null) {
+                                    if (argument.removed()) {
                                         continue;
                                     }
                                     Path upstream = argument.folder().resolve(BuildStep.METADATA);

@@ -233,7 +233,7 @@ public class InternalModule implements BuildExecutorModule {
             throws IOException {
         SequencedProperties versions = new SequencedProperties();
         for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
-            if (argument.getValue().folder() == null) {
+            if (argument.getValue().removed()) {
                 continue;
             }
             if (argument.getKey().equals(SOURCE)) {

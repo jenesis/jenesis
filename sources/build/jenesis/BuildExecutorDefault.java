@@ -111,23 +111,18 @@ class BuildExecutorDefault implements BuildExecutor {
                     });
                     return CompletableFuture.completedStage(Map.of(identity, Map.of()));
                 }
-                Path previous = target.resolve(BuildExecutorModule.encode(identity)),
-                        checksum = previous.resolve("checksum"),
-                        output = previous.resolve("output"),
-                        stepFile = checksum.resolve("step.properties");
-                boolean exists = Files.exists(previous);
+                StepFolder previous = StepFolder.of(target.resolve(BuildExecutorModule.encode(identity)));
+                boolean exists = Files.exists(previous.path());
                 byte[] currentStepHash = stepHash.hash(step);
                 StepRecord record = exists
-                        ? completed(checksum, output, stepFile, currentStepHash, executor)
+                        ? completed(previous, currentStepHash, executor)
                         : StepRecord.INCOMPLETE;
                 Map<Path, byte[]> current = record.checksums();
                 boolean consistent = record.consistent();
                 SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
                 SequencedMap<String, Map<Path, byte[]>> inputs = new LinkedHashMap<>();
-                Set<String> declared = new HashSet<>();
                 for (Map.Entry<String, StepSummary> entry : summaries.entrySet()) {
-                    Path checksums = checksum.resolve("argument." + BuildExecutorModule.encode(entry.getKey()) + ".properties");
-                    declared.add(checksums.getFileName().toString());
+                    Path checksums = previous.argument(entry.getKey());
                     Map<Path, byte[]> argumentChecksums = entry.getValue().checksums();
                     inputs.put(entry.getKey(), argumentChecksums);
                     arguments.put(entry.getKey(), new BuildStepArgument(
@@ -136,12 +131,12 @@ class BuildExecutorDefault implements BuildExecutor {
                                     ? Checksum.diff(HashFunction.read(checksums), argumentChecksums, hash)
                                     : Checksum.added(argumentChecksums, hash)));
                 }
-                SequencedMap<String, Map<Path, byte[]>> vanished = consistent
-                        ? vanishedArguments(checksum, declared)
-                        : new LinkedHashMap<>();
-                vanished.forEach((key, checksums) -> arguments.put(
+                SequencedMap<String, Set<Path>> vanished = consistent
+                        ? previous.vanished(summaries.keySet())
+                        : Collections.emptyNavigableMap();
+                vanished.forEach((key, paths) -> arguments.put(
                         key,
-                        new BuildStepArgument(null, Checksum.removed(checksums))));
+                        new BuildStepArgument(null, Checksum.removed(paths))));
                 BiConsumer<Boolean, Throwable> completion = callback.step(
                         location + identity,
                         new LinkedHashSet<>(summaries.keySet()));
@@ -169,7 +164,7 @@ class BuildExecutorDefault implements BuildExecutor {
                         stepStage = CompletableFuture.completedStage(cached.get());
                     } else {
                         stepStage = step.apply(executor,
-                                new BuildStepContext(consistent ? output : null, nextOutput, nextSupplement),
+                                new BuildStepContext(consistent ? previous.output() : null, nextOutput, nextSupplement),
                                 arguments);
                         if (!timeout.isZero()) {
                             stepStage = stepStage.toCompletableFuture().orTimeout(
@@ -181,33 +176,31 @@ class BuildExecutorDefault implements BuildExecutor {
                         try {
                             if (result.next()) {
                                 Files.move(next, exists
-                                        ? Files.walkFileTree(previous, new RecursiveFolderDeletion(null))
-                                        : previous);
-                                Files.createDirectory(checksum);
+                                        ? Files.walkFileTree(previous.path(), new RecursiveFolderDeletion(null))
+                                        : previous.path());
+                                Files.createDirectory(previous.checksum());
                             } else if (consistent) {
                                 Files.delete(Files.walkFileTree(next, new RecursiveFolderDeletion(next)));
-                                Files.deleteIfExists(stepFile);
-                                Files.walkFileTree(checksum, new RecursiveFolderDeletion(checksum));
+                                Files.deleteIfExists(previous.stepFile());
+                                Files.walkFileTree(previous.checksum(), new RecursiveFolderDeletion(previous.checksum()));
                             } else {
                                 throw new IllegalStateException("Cannot reuse initial run for " + location + identity);
                             }
                             for (Map.Entry<String, StepSummary> entry : summaries.entrySet()) {
-                                HashFunction.write(
-                                        checksum.resolve("argument." + BuildExecutorModule.encode(entry.getKey()) + ".properties"),
-                                        entry.getValue().checksums());
+                                HashFunction.write(previous.argument(entry.getKey()), entry.getValue().checksums());
                             }
-                            Map<Path, byte[]> checksums = HashFunction.read(output, hash, executor);
-                            HashFunction.write(checksum.resolve("output.properties"), checksums);
+                            Map<Path, byte[]> checksums = HashFunction.read(previous.output(), hash, executor);
+                            HashFunction.write(previous.outputChecksums(), checksums);
                             SequencedProperties stepProperties = new SequencedProperties();
                             stepProperties.setProperty("serialization", HexFormat.of().formatHex(currentStepHash));
-                            stepProperties.storeAtomically(stepFile);
+                            stepProperties.storeAtomically(previous.stepFile());
                             if (cache.stores() && !fromCache && result.next()) {
                                 String stored = location + identity;
                                 try {
                                     executor.execute(() -> {
                                         long storeStarted = System.nanoTime();
                                         try {
-                                            cache.store(executor, stored, currentStepHash, inputs, output);
+                                            cache.store(executor, stored, currentStepHash, inputs, previous.output());
                                         } catch (IOException _) {
                                         }
                                         callback.stored(stored, System.nanoTime() - storeStarted);
@@ -218,7 +211,7 @@ class BuildExecutorDefault implements BuildExecutor {
                             completion.accept(result.next(), null);
                             return CompletableFuture.completedStage(Map.of(
                                     identity,
-                                    Map.of(identity, new StepSummary(output, checksums))));
+                                    Map.of(identity, new StepSummary(previous.output(), checksums))));
                         } catch (Throwable t) {
                             return CompletableFuture.failedStage(new BuildExecutorException(location + identity, t));
                         }
@@ -238,8 +231,7 @@ class BuildExecutorDefault implements BuildExecutor {
                     }, executor);
                 } else {
                     for (String key : vanished.keySet()) {
-                        Files.deleteIfExists(checksum.resolve(
-                                "argument." + BuildExecutorModule.encode(key) + ".properties"));
+                        Files.deleteIfExists(previous.argument(key));
                     }
                     completion.accept(false, null);
                     try {
@@ -248,7 +240,7 @@ class BuildExecutorDefault implements BuildExecutor {
                     }
                     return CompletableFuture.completedStage(Map.of(identity, Map.of(
                             identity,
-                            new StepSummary(output, current))));
+                            new StepSummary(previous.output(), current))));
                 }
             } catch (Throwable t) {
                 return CompletableFuture.failedFuture(new BuildExecutorException(location + identity, t));
@@ -580,30 +572,6 @@ class BuildExecutorDefault implements BuildExecutor {
         }, executor);
     }
 
-    private static SequencedMap<String, Map<Path, byte[]>> vanishedArguments(Path checksum, Set<String> declared)
-            throws IOException {
-        SequencedSet<Path> files = new TreeSet<>();
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(checksum, "argument.*.properties")) {
-            for (Path file : stream) {
-                if (!declared.contains(file.getFileName().toString())) {
-                    files.add(file);
-                }
-            }
-        }
-        SequencedMap<String, Map<Path, byte[]>> vanished = new LinkedHashMap<>();
-        for (Path file : files) {
-            String name = file.getFileName().toString();
-            vanished.put(
-                    decode(name.substring("argument.".length(), name.length() - ".properties".length())),
-                    HashFunction.read(file));
-        }
-        return vanished;
-    }
-
-    private static String decode(String value) {
-        return URLDecoder.decode(value, StandardCharsets.UTF_8);
-    }
-
     private static String validated(String identity, Pattern pattern) {
         if (pattern.matcher(identity).matches()) {
             return identity;
@@ -672,22 +640,56 @@ class BuildExecutorDefault implements BuildExecutor {
     private record StepSummary(Path folder, Map<Path, byte[]> checksums) {
     }
 
+    private record StepFolder(Path path, Path checksum, Path output, Path stepFile, Path outputChecksums) {
+
+        private static final String ARGUMENT = "argument.", PROPERTIES = ".properties";
+
+        private static StepFolder of(Path path) {
+            Path checksum = path.resolve("checksum");
+            return new StepFolder(path,
+                    checksum,
+                    path.resolve("output"),
+                    checksum.resolve("step" + PROPERTIES),
+                    checksum.resolve("output" + PROPERTIES));
+        }
+
+        Path argument(String key) {
+            return checksum.resolve(ARGUMENT + BuildExecutorModule.encode(key) + PROPERTIES);
+        }
+
+        SequencedMap<String, Set<Path>> vanished(Set<String> declared) throws IOException {
+            SequencedMap<String, Set<Path>> vanished = new TreeMap<>();
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(checksum, ARGUMENT + "*" + PROPERTIES)) {
+                for (Path file : stream) {
+                    String name = file.getFileName().toString();
+                    String key = BuildExecutorModule.decode(name.substring(
+                            ARGUMENT.length(),
+                            name.length() - PROPERTIES.length()));
+                    if (!declared.contains(key)) {
+                        vanished.put(key, HashFunction.read(file).keySet());
+                    }
+                }
+            }
+            return vanished;
+        }
+    }
+
     private record StepRecord(Map<Path, byte[]> checksums, boolean consistent) {
 
         private static final StepRecord INCOMPLETE = new StepRecord(Map.of(), false);
     }
 
-    private StepRecord completed(Path checksum, Path output, Path stepFile, byte[] step, Executor executor) {
-        if (!Files.isRegularFile(stepFile)) {
+    private StepRecord completed(StepFolder folder, byte[] step, Executor executor) {
+        if (!Files.isRegularFile(folder.stepFile())) {
             return StepRecord.INCOMPLETE;
         }
         try {
-            String serialization = SequencedProperties.ofFiles(stepFile).getProperty("serialization");
+            String serialization = SequencedProperties.ofFiles(folder.stepFile()).getProperty("serialization");
             if (serialization == null || !Arrays.equals(step, HexFormat.of().parseHex(serialization))) {
                 return StepRecord.INCOMPLETE;
             }
-            Map<Path, byte[]> checksums = HashFunction.read(checksum.resolve("output.properties"));
-            return new StepRecord(checksums, HashFunction.areConsistent(output, checksums, hash, executor));
+            Map<Path, byte[]> checksums = HashFunction.read(folder.outputChecksums());
+            return new StepRecord(checksums, HashFunction.areConsistent(folder.output(), checksums, hash, executor));
         } catch (IOException | IllegalArgumentException _) {
             return StepRecord.INCOMPLETE;
         }

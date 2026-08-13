@@ -280,7 +280,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             String artifact = null;
             String moduleName = null;
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 Path moduleFile = argument.folder().resolve(BuildStep.MODULE);

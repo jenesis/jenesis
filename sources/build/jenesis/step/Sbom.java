@@ -56,8 +56,8 @@ public class Sbom implements BuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         List<Path> folders = arguments.values().stream()
+                .filter(argument -> !argument.removed())
                 .map(BuildStepArgument::folder)
-                .filter(Objects::nonNull)
                 .toList();
         SequencedProperties metadata = SequencedProperties.ofFolders(folders, METADATA);
         String groupId = metadata.getProperty("project");
@@ -68,7 +68,7 @@ public class Sbom implements BuildStep {
         SequencedMap<String, CycloneDx.Component> components = new LinkedHashMap<>();
         List<Path> graphFiles = new ArrayList<>();
         for (BuildStepArgument argument : arguments.values()) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path graphFile = argument.folder().resolve(Dependencies.GRAPH);

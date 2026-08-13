@@ -54,7 +54,7 @@ public class NativeImage extends JdkProcessBuildStep {
         List<String> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
         Path config = null;
         for (BuildStepArgument argument : arguments.values()) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path descriptor = argument.folder().resolve("launcher.properties");

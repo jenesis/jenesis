@@ -109,7 +109,7 @@ public class PiTestModule implements BuildExecutorModule {
 
         private static String junitPlatformVersion(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 Path versions = argument.folder().resolve(BuildStep.VERSIONS);
@@ -154,7 +154,7 @@ public class PiTestModule implements BuildExecutorModule {
             Set<String> expanded = new HashSet<>();
             Path code = Files.createDirectories(context.supplement().resolve("code")).toAbsolutePath();
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 for (Path jar : Dependencies.select(argument.folder(), tool, "runtime")) {

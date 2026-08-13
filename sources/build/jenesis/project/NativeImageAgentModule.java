@@ -27,7 +27,7 @@ public class NativeImageAgentModule implements BuildExecutorModule {
                 throws IOException {
             Path captured = null;
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 Path candidate = argument.folder().resolve(NativeImageAgent.NATIVE_IMAGE);

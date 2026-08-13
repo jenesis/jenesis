@@ -31,7 +31,7 @@ public class JMod extends JdkProcessBuildStep {
         List<String> classPath = new ArrayList<>(), config = new ArrayList<>(), libs = new ArrayList<>(), cmds = new ArrayList<>();
         String moduleName = null;
         for (BuildStepArgument argument : arguments.values()) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path classes = argument.folder().resolve(BuildStep.CLASSES);

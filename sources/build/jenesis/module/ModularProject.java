@@ -332,7 +332,7 @@ public class ModularProject implements BuildExecutorModule {
                     }
                     Path file = null;
                     for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
-                        if (argument.getValue().folder() == null) {
+                        if (argument.getValue().removed()) {
                             continue;
                         }
                         if (argument.getKey().startsWith("boms-")) {
@@ -380,7 +380,7 @@ public class ModularProject implements BuildExecutorModule {
                 metadata.setProperty("description", info.description());
             }
             for (BuildStepArgument argument : arguments.values()) {
-                if (argument.folder() == null) {
+                if (argument.removed()) {
                     continue;
                 }
                 Path upstream = argument.folder().resolve(BuildStep.METADATA);

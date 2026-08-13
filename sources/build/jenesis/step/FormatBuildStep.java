@@ -56,7 +56,7 @@ public abstract class FormatBuildStep extends JdkProcessBuildStep {
         Path config = null;
         Map<Path, byte[]> current = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             for (Path jar : Dependencies.select(argument.folder(), tool, "runtime")) {
@@ -104,7 +104,7 @@ public abstract class FormatBuildStep extends JdkProcessBuildStep {
                 HashFunction hash = new HashDigestFunction("SHA-256");
                 Map<Path, byte[]> after = new LinkedHashMap<>();
                 for (BuildStepArgument argument : arguments.values()) {
-                    if (argument.folder() == null) {
+                    if (argument.removed()) {
                         continue;
                     }
                     after.putAll(formattable(argument.folder(), hash, executor));

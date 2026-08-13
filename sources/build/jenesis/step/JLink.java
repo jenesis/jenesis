@@ -40,7 +40,7 @@ public class JLink extends JdkProcessBuildStep {
         }
         List<Path> jmods = new ArrayList<>(), jars = new ArrayList<>();
         for (BuildStepArgument argument : arguments.values()) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path modules = argument.folder().resolve(JMod.JMODS);

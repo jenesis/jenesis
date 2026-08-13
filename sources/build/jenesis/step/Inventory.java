@@ -84,10 +84,10 @@ public class Inventory implements BuildStep {
         SequencedMap<String, String> attachments = new LinkedHashMap<>();
         SequencedSet<String> identity = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
-            Path folder = argument.folder();
-            if (folder == null) {
+            if (argument.removed()) {
                 continue;
             }
+            Path folder = argument.folder();
             Path moduleProperties = folder.resolve(MODULE);
             if (Files.isRegularFile(moduleProperties)) {
                 SequencedProperties properties = SequencedProperties.ofFiles(moduleProperties);
@@ -324,7 +324,7 @@ public class Inventory implements BuildStep {
         String key = prefixOf(path) + "dependency.";
         SequencedMap<String, Dependency> closure = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path inventoryFile = argument.folder().resolve(INVENTORY);
@@ -355,7 +355,7 @@ public class Inventory implements BuildStep {
     public static SequencedSet<String> modulePaths(Iterable<BuildStepArgument> arguments) throws IOException {
         SequencedSet<String> paths = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path inventoryFile = argument.folder().resolve(INVENTORY);
@@ -415,7 +415,7 @@ public class Inventory implements BuildStep {
                                    BomConsumer consumer) throws IOException {
         String key = prefixOf(path) + "bom.";
         for (BuildStepArgument argument : arguments) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path inventoryFile = argument.folder().resolve(INVENTORY);
@@ -440,7 +440,7 @@ public class Inventory implements BuildStep {
     public static Set<String> identities(Iterable<BuildStepArgument> arguments) throws IOException {
         Set<String> identities = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path inventoryFile = argument.folder().resolve(INVENTORY);

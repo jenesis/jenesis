@@ -43,7 +43,7 @@ public class Launcher implements BuildStep {
         Path shaded = null;
         SequencedMap<String, Path> jars = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path properties = argument.folder().resolve("launcher.properties");

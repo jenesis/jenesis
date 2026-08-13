@@ -34,7 +34,7 @@ public class Bundle implements BuildStep {
             throws IOException {
         String mainClass = null, mainModule = null;
         for (BuildStepArgument argument : arguments.values()) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path properties = argument.folder().resolve("launcher.properties");
@@ -54,7 +54,7 @@ public class Bundle implements BuildStep {
         }
         SequencedMap<String, Path> jars = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path artifacts = argument.folder().resolve(BuildStep.ARTIFACTS);

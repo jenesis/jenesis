@@ -6,6 +6,10 @@ public record BuildStepArgument(Path folder, Map<Path, Checksum> files) {
 
     private static final Path WILDCARD = Path.of(".");
 
+    public boolean removed() {
+        return folder == null;
+    }
+
     public String checksum(Path file) {
         Checksum checksum = files.get(file);
         return checksum == null ? null : checksum.encoded();

@@ -22,7 +22,7 @@ public class ImageStaging implements BuildStep {
             throws IOException {
         String suffix = "." + key;
         for (BuildStepArgument argument : arguments.values()) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             Path inventoryFile = argument.folder().resolve(Inventory.INVENTORY);

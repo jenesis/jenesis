@@ -39,7 +39,7 @@ public class MultiProjectDependencies implements BuildStep {
             inherited.put(name, new LinkedHashMap<>());
         }
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
-            if (entry.getValue().folder() == null) {
+            if (entry.getValue().removed()) {
                 continue;
             }
             if (isModule.test(entry.getKey())) {
@@ -90,7 +90,7 @@ public class MultiProjectDependencies implements BuildStep {
 
     private static String fingerprint(Collection<BuildStepArgument> arguments, Path artifact) {
         for (BuildStepArgument argument : arguments) {
-            if (argument.folder() == null) {
+            if (argument.removed()) {
                 continue;
             }
             if (artifact.startsWith(argument.folder())) {
