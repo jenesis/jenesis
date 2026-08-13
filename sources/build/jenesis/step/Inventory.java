@@ -85,6 +85,9 @@ public class Inventory implements BuildStep {
         SequencedSet<String> identity = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             Path folder = argument.folder();
+            if (folder == null) {
+                continue;
+            }
             Path moduleProperties = folder.resolve(MODULE);
             if (Files.isRegularFile(moduleProperties)) {
                 SequencedProperties properties = SequencedProperties.ofFiles(moduleProperties);
@@ -321,6 +324,9 @@ public class Inventory implements BuildStep {
         String key = prefixOf(path) + "dependency.";
         SequencedMap<String, Dependency> closure = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path inventoryFile = argument.folder().resolve(INVENTORY);
             if (!Files.isRegularFile(inventoryFile)) {
                 continue;
@@ -349,6 +355,9 @@ public class Inventory implements BuildStep {
     public static SequencedSet<String> modulePaths(Iterable<BuildStepArgument> arguments) throws IOException {
         SequencedSet<String> paths = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path inventoryFile = argument.folder().resolve(INVENTORY);
             if (!Files.isRegularFile(inventoryFile)) {
                 continue;
@@ -406,6 +415,9 @@ public class Inventory implements BuildStep {
                                    BomConsumer consumer) throws IOException {
         String key = prefixOf(path) + "bom.";
         for (BuildStepArgument argument : arguments) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path inventoryFile = argument.folder().resolve(INVENTORY);
             if (!Files.isRegularFile(inventoryFile)) {
                 continue;
@@ -428,6 +440,9 @@ public class Inventory implements BuildStep {
     public static Set<String> identities(Iterable<BuildStepArgument> arguments) throws IOException {
         Set<String> identities = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path inventoryFile = argument.folder().resolve(INVENTORY);
             if (!Files.isRegularFile(inventoryFile)) {
                 continue;

@@ -42,6 +42,9 @@ public class MavenRepositoryExport implements BuildStep {
         SequencedMap<Path, Coordinates> stagedByVersionDir = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             Path folder = argument.folder();
+            if (folder == null) {
+                continue;
+            }
             if (!Files.isDirectory(folder)) {
                 continue;
             }

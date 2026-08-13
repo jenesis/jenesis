@@ -43,6 +43,9 @@ public class Assign implements BuildStep {
         SequencedSet<Path> files = new TreeSet<>();
         SequencedSet<Path> jmods = new TreeSet<>();
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path artifacts = argument.folder().resolve(ARTIFACTS);
             if (Files.exists(artifacts)) {
                 try (DirectoryStream<Path> stream = Files.newDirectoryStream(artifacts)) {

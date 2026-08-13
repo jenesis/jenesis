@@ -477,7 +477,10 @@ public class TestModule implements BuildExecutorModule {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            List<Path> folders = arguments.values().stream().map(BuildStepArgument::folder).toList();
+            List<Path> folders = arguments.values().stream()
+                    .map(BuildStepArgument::folder)
+                    .filter(Objects::nonNull)
+                    .toList();
             List<ModuleDescriptor> artifacts = TestEngine.scan(folders);
             TestEngine resolved = engine != null ? engine : TestEngine.of(artifacts).orElse(null);
             ModuleDescriptor engineModule = resolved == null ? null : resolved.match(artifacts).orElse(null);
@@ -498,6 +501,9 @@ public class TestModule implements BuildExecutorModule {
                 }
                 if (selectedPrefix != null) {
                     for (BuildStepArgument argument : arguments.values()) {
+                        if (argument.folder() == null) {
+                            continue;
+                        }
                         Path versionsFile = argument.folder().resolve(BuildStep.VERSIONS);
                         if (!Files.exists(versionsFile)) {
                             continue;
@@ -592,7 +598,10 @@ public class TestModule implements BuildExecutorModule {
                 throws IOException {
             TestEngine resolved = engine != null
                     ? engine
-                    : TestEngine.of(() -> arguments.values().stream().map(BuildStepArgument::folder).iterator())
+                    : TestEngine.of(() -> arguments.values().stream()
+                            .map(BuildStepArgument::folder)
+                            .filter(Objects::nonNull)
+                            .iterator())
                     .orElseThrow(() -> new IllegalArgumentException("No test engine found"));
             List<TestSpec> specs = TestSpec.parse(filter);
             SequencedSet<String> groups = groups(tag);
@@ -636,6 +645,9 @@ public class TestModule implements BuildExecutorModule {
             SequencedMap<String, SequencedSet<String>> matchedMethods = new TreeMap<>();
             ClassFile classFile = ClassFile.of();
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 Path classes = argument.folder().resolve(CLASSES);
                 if (Files.exists(classes)) {
                     Files.walkFileTree(classes, new SimpleFileVisitor<>() {
@@ -708,6 +720,9 @@ public class TestModule implements BuildExecutorModule {
             SequencedProperties current = new SequencedProperties();
             Map<String, Set<String>> references = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 Path folder = argument.folder().resolve(CLASSES);
                 if (Files.isDirectory(folder)) {
                     Files.walkFileTree(folder, new SimpleFileVisitor<>() {
@@ -788,6 +803,9 @@ public class TestModule implements BuildExecutorModule {
                 throws IOException {
             SequencedMap<String, String> attachments = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 Path file = argument.folder().resolve(BuildStep.ATTACHMENTS);
                 if (!Files.isRegularFile(file)) {
                     continue;
@@ -807,6 +825,9 @@ public class TestModule implements BuildExecutorModule {
                                                                SequencedSet<String> keys) throws IOException {
             SequencedMap<String, Path> resolved = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 Path file = argument.folder().resolve(BuildStep.DEPENDENCIES);
                 if (!Files.isRegularFile(file)) {
                     continue;
@@ -839,6 +860,9 @@ public class TestModule implements BuildExecutorModule {
                                                             String group) throws IOException {
             SequencedMap<String, Path> resolved = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 Path file = argument.folder().resolve(BuildStep.DEPENDENCIES);
                 if (!Files.exists(file)) {
                     continue;

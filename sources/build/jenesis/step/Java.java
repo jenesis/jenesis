@@ -125,6 +125,9 @@ public abstract class Java extends JdkProcessBuildStep {
         ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
             BuildStepArgument argument = entry.getValue();
+            if (argument.folder() == null) {
+                continue;
+            }
             if (!jarsOnly) {
                 for (String folder : List.of(Javac.CLASSES, Bind.RESOURCES)) {
                     Path candidate = argument.folder().resolve(folder);

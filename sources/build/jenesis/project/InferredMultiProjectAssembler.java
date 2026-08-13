@@ -280,6 +280,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             String artifact = null;
             String moduleName = null;
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 Path moduleFile = argument.folder().resolve(BuildStep.MODULE);
                 if (Files.isRegularFile(moduleFile)) {
                     SequencedProperties module = SequencedProperties.ofFiles(moduleFile);

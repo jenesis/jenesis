@@ -87,6 +87,9 @@ public abstract class ProcessBuildStep implements BuildStep {
             SequencedMap<String, BuildStepArgument> arguments) throws IOException {
         SequencedMap<String, SequencedMap<String, String>> properties = new LinkedHashMap<>();
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
+            if (entry.getValue().folder() == null) {
+                continue;
+            }
             SequencedMap<String, String> folderMap = new LinkedHashMap<>();
             for (String name : commands()) {
                 Path file = entry.getValue().folder().resolve(PROCESS + name + ".properties");

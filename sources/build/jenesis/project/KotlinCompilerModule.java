@@ -189,6 +189,9 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                     plugins = new ArrayList<>();
             String release = null;
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 for (Path jar : Dependencies.select(argument.folder(), tool, "runtime")) {
                     jars.add(jar.toString());
                 }

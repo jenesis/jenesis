@@ -192,6 +192,9 @@ public class ScalaDocumentationModule implements BuildExecutorModule {
             List<String> files = new ArrayList<>(), jars = new ArrayList<>(), classRoots = new ArrayList<>(),
                     classpath = new ArrayList<>();
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 Path classes = argument.folder().resolve(BuildStep.CLASSES);
                 if (Files.exists(classes)) {
                     classRoots.add(classes.toString());

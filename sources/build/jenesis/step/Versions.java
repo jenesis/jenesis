@@ -29,6 +29,9 @@ public class Versions implements BuildStep {
             throws IOException {
         SequencedMap<String, String> versions = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path requires = argument.folder().resolve(DEPENDENCIES);
             if (!Files.exists(requires)) {
                 continue;
@@ -50,6 +53,9 @@ public class Versions implements BuildStep {
         Path target = Files.createDirectory(context.next().resolve(CLASSES));
         List<Path> manifests = new ArrayList<>();
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path manifest = argument.folder().resolve(MANIFEST);
             if (Files.exists(manifest)) {
                 manifests.add(manifest);
@@ -78,6 +84,9 @@ public class Versions implements BuildStep {
             return status != null && status.status() != ChecksumStatus.RETAINED;
         });
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path source = argument.folder().resolve(CLASSES);
             if (!Files.exists(source)) {
                 continue;

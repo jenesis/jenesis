@@ -62,6 +62,9 @@ public class LicenseCheck implements BuildStep {
         SequencedMap<String, Path> jarByCoordinate = new LinkedHashMap<>();
         SequencedSet<String> strict = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path index = argument.folder().resolve(DEPENDENCIES);
             if (!Files.exists(index)) {
                 continue;

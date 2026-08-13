@@ -43,6 +43,9 @@ public class Launcher implements BuildStep {
         Path shaded = null;
         SequencedMap<String, Path> jars = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path properties = argument.folder().resolve("launcher.properties");
             if (Files.isRegularFile(properties)) {
                 SequencedProperties application = SequencedProperties.ofFiles(properties);

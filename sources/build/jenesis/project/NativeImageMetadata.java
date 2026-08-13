@@ -19,6 +19,9 @@ public record NativeImageMetadata() implements BuildStep {
         String selectionPrefix = BuildExecutorModule.PREVIOUS + MultiProjectModule.SELECTION + "/";
         String artifact = null;
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
+            if (entry.getValue().folder() == null) {
+                continue;
+            }
             if (entry.getKey().startsWith(selectionPrefix)) {
                 continue;
             }
@@ -43,6 +46,9 @@ public record NativeImageMetadata() implements BuildStep {
         String suffix = ".nativeimage";
         Path target = null;
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
+            if (entry.getValue().folder() == null) {
+                continue;
+            }
             if (!entry.getKey().startsWith(selectionPrefix)) {
                 continue;
             }

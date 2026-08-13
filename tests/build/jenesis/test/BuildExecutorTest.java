@@ -25,6 +25,27 @@ public class BuildExecutorTest implements Serializable {
 
     private static final AtomicInteger RUNS = new AtomicInteger();
 
+    private static final AtomicReference<SequencedMap<String, BuildStepArgument>> APPLIED = new AtomicReference<>();
+
+    private static final AtomicReference<SequencedSet<String>> REMOVED = new AtomicReference<>();
+
+    private static SequencedSet<String> removed(SequencedMap<String, BuildStepArgument> arguments) {
+        SequencedSet<String> removed = new LinkedHashSet<>();
+        arguments.forEach((key, argument) -> {
+            if (argument.folder() == null) {
+                removed.add(key);
+            }
+        });
+        return removed;
+    }
+
+    private static String live(SequencedMap<String, BuildStepArgument> arguments) {
+        return String.join(",", arguments.entrySet().stream()
+                .filter(entry -> entry.getValue().folder() != null)
+                .map(Map.Entry::getKey)
+                .toList());
+    }
+
     private static Map<Path, ChecksumStatus> statuses(Map<Path, Checksum> files) {
         Map<Path, ChecksumStatus> statuses = new LinkedHashMap<>();
         files.forEach((path, checksum) -> statuses.put(path, checksum.status()));
@@ -587,10 +608,12 @@ public class BuildExecutorTest implements Serializable {
 
     @Test
     public void reruns_a_step_that_lost_an_argument() throws IOException {
+        APPLIED.set(null);
         Files.writeString(source.resolve("file"), "foo");
         Files.writeString(source2.resolve("file"), "bar");
         BuildStep step = (_, context, arguments) -> {
-            Files.writeString(context.next().resolve("file"), String.join(",", arguments.sequencedKeySet()));
+            APPLIED.set(new LinkedHashMap<>(arguments));
+            Files.writeString(context.next().resolve("file"), live(arguments));
             return CompletableFuture.completedStage(new BuildStepResult(true));
         };
         buildExecutor.addSource("source1", source);
@@ -609,9 +632,74 @@ public class BuildExecutorTest implements Serializable {
         assertThat(root.resolve("step").resolve("output").resolve("file"))
                 .as("a step that lost an input is not up to date, even when every surviving input is unchanged")
                 .content().isEqualTo("source1");
+        assertThat(APPLIED.get())
+                .as("the lost argument is offered to the step instead of being dropped")
+                .containsOnlyKeys("source1", "source2");
+        BuildStepArgument vanished = APPLIED.get().get("source2");
+        assertThat(vanished.folder()).isNull();
+        assertThat(statuses(vanished.files())).isEqualTo(Map.of(Path.of("file"), ChecksumStatus.REMOVED));
+        assertThat(vanished.hasChanged()).isTrue();
         assertThat(root.resolve("step").resolve("checksum").resolve("argument.source2.properties"))
                 .as("the vanished argument's checksum must not linger to mask a later re-addition")
                 .doesNotExist();
+    }
+
+    @Test
+    public void does_not_rerun_a_step_that_ignores_a_lost_argument() throws IOException {
+        REMOVED.set(null);
+        Files.writeString(source.resolve("file"), "foo");
+        Files.writeString(source2.resolve("file"), "bar");
+        BuildStep step = new BuildStep() {
+            @Override
+            public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+                REMOVED.set(removed(arguments));
+                return arguments.values().stream().anyMatch(argument ->
+                        argument.folder() != null && argument.hasChanged());
+            }
+
+            @Override
+            public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                          BuildStepContext context,
+                                                          SequencedMap<String, BuildStepArgument> arguments)
+                    throws IOException {
+                Files.writeString(context.next().resolve("file"), live(arguments));
+                return CompletableFuture.completedStage(new BuildStepResult(true));
+            }
+        };
+        buildExecutor.addSource("source1", source);
+        buildExecutor.addSource("source2", source2);
+        buildExecutor.addStep("step", step, "source1", "source2");
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(root.resolve("step").resolve("output").resolve("file")).content().isEqualTo("source1,source2");
+        BuildExecutor second = BuildExecutor.of(root,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+        second.addSource("source1", source);
+        second.addStep("step", step, "source1");
+        second.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(REMOVED.get())
+                .as("the removal is signalled to shouldRun")
+                .containsExactly("source2");
+        assertThat(root.resolve("step").resolve("output").resolve("file"))
+                .as("a step that considers the lost argument irrelevant stays up to date")
+                .content().isEqualTo("source1,source2");
+        assertThat(root.resolve("step").resolve("checksum").resolve("argument.source2.properties"))
+                .as("the vanished argument's checksum is cleaned up even when the step is skipped")
+                .doesNotExist();
+        BuildExecutor third = BuildExecutor.of(root,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+        third.addSource("source1", source);
+        third.addStep("step", step, "source1");
+        third.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(REMOVED.get())
+                .as("the removal is signalled only once")
+                .isEmpty();
+        assertThat(root.resolve("step").resolve("output").resolve("file")).content().isEqualTo("source1,source2");
     }
 
     @Test

@@ -40,6 +40,9 @@ public class Group implements BuildStep {
             throws IOException {
         Map<String, Set<String>> from = new HashMap<>(), to = new LinkedHashMap<>();
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
+            if (entry.getValue().folder() == null) {
+                continue;
+            }
             String name = identification.apply(entry.getKey()).orElse(null);
             if (name == null) {
                 continue;

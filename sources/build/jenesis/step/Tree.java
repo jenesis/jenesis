@@ -46,6 +46,9 @@ public class Tree implements BuildStep {
         DependencyTreeReport report = new DependencyTreeReport(out, compact);
         SequencedMap<String, Resolver.Vertex> aggregated = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path inventoryFile = argument.folder().resolve(Inventory.INVENTORY);
             if (!Files.isRegularFile(inventoryFile)) {
                 continue;

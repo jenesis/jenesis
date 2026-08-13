@@ -187,6 +187,9 @@ public class GroovyCompilerModule implements BuildExecutorModule {
             Path target = Files.createDirectory(context.next().resolve(CLASSES));
             List<String> files = new ArrayList<>(), jars = new ArrayList<>(), classpath = new ArrayList<>();
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 Path classes = argument.folder().resolve(CLASSES);
                 if (Files.exists(classes)) {
                     classpath.add(classes.toString());

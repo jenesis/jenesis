@@ -136,11 +136,16 @@ class BuildExecutorDefault implements BuildExecutor {
                                     ? Checksum.diff(HashFunction.read(checksums), argumentChecksums, hash)
                                     : Checksum.added(argumentChecksums, hash)));
                 }
-                boolean vanished = consistent && hasVanishedArgument(checksum, declared);
+                SequencedMap<String, Map<Path, byte[]>> vanished = consistent
+                        ? vanishedArguments(checksum, declared)
+                        : new LinkedHashMap<>();
+                vanished.forEach((key, checksums) -> arguments.put(
+                        key,
+                        new BuildStepArgument(null, Checksum.removed(checksums))));
                 BiConsumer<Boolean, Throwable> completion = callback.step(
                         location + identity,
                         new LinkedHashSet<>(summaries.keySet()));
-                if (!consistent || vanished || step.shouldRun(arguments)) {
+                if (!consistent || step.shouldRun(arguments)) {
                     Path next = target.resolve(BuildExecutorModule.encode(identity) + "~");
                     if (Files.exists(next)) {
                         Files.walkFileTree(next, new RecursiveFolderDeletion(null));
@@ -232,6 +237,10 @@ class BuildExecutorDefault implements BuildExecutor {
                         return CompletableFuture.failedStage(wrapped);
                     }, executor);
                 } else {
+                    for (String key : vanished.keySet()) {
+                        Files.deleteIfExists(checksum.resolve(
+                                "argument." + BuildExecutorModule.encode(key) + ".properties"));
+                    }
                     completion.accept(false, null);
                     try {
                         cache.touch(executor, location + identity, currentStepHash, inputs);
@@ -571,15 +580,28 @@ class BuildExecutorDefault implements BuildExecutor {
         }, executor);
     }
 
-    private static boolean hasVanishedArgument(Path checksum, Set<String> declared) throws IOException {
+    private static SequencedMap<String, Map<Path, byte[]>> vanishedArguments(Path checksum, Set<String> declared)
+            throws IOException {
+        SequencedSet<Path> files = new TreeSet<>();
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(checksum, "argument.*.properties")) {
             for (Path file : stream) {
                 if (!declared.contains(file.getFileName().toString())) {
-                    return true;
+                    files.add(file);
                 }
             }
         }
-        return false;
+        SequencedMap<String, Map<Path, byte[]>> vanished = new LinkedHashMap<>();
+        for (Path file : files) {
+            String name = file.getFileName().toString();
+            vanished.put(
+                    decode(name.substring("argument.".length(), name.length() - ".properties".length())),
+                    HashFunction.read(file));
+        }
+        return vanished;
+    }
+
+    private static String decode(String value) {
+        return URLDecoder.decode(value, StandardCharsets.UTF_8);
     }
 
     private static String validated(String identity, Pattern pattern) {

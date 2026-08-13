@@ -71,6 +71,9 @@ public class Dependencies implements BuildStep {
         Map<String, String> aliases = new LinkedHashMap<>(DEFAULT_ALIASES);
         Map<String, String> categories = new LinkedHashMap<>(DEFAULT_CATEGORIES);
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path file = argument.folder().resolve(SPDX);
             if (Files.isRegularFile(file)) {
                 SequencedProperties properties = SequencedProperties.ofFiles(file);
@@ -102,6 +105,9 @@ public class Dependencies implements BuildStep {
         SequencedMap<String, String> bomTokens = new LinkedHashMap<>();
         SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedSet<String>>>>> exclusions = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path requiresFile = argument.folder().resolve(REQUIRES);
             if (Files.exists(requiresFile)) {
                 SequencedProperties properties = SequencedProperties.ofFiles(requiresFile);

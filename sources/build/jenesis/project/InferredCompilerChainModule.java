@@ -73,6 +73,9 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 throws IOException {
             boolean[] flags = new boolean[5];
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 Path sources = argument.folder().resolve(BuildStep.SOURCES);
                 if (!Files.exists(sources)) {
                     continue;
@@ -187,6 +190,9 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 throws IOException {
             Path target = Files.createDirectory(context.next().resolve(BuildStep.CLASSES));
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 Path sources = argument.folder().resolve(BuildStep.SOURCES);
                 if (!Files.exists(sources)) {
                     continue;

@@ -141,6 +141,9 @@ public class CheckstyleModule implements BuildExecutorModule {
             List<String> jars = new ArrayList<>(), files = new ArrayList<>();
             Path config = null;
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 for (Path jar : Dependencies.select(argument.folder(), tool, "runtime")) {
                     jars.add(jar.toString());
                 }

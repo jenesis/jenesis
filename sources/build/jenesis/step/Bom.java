@@ -35,6 +35,9 @@ public class Bom implements BuildStep {
         SequencedMap<String, String> entries = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             Path folder = argument.folder();
+            if (folder == null) {
+                continue;
+            }
             Path moduleFile = folder.resolve(MODULE);
             if (module == null && Files.isRegularFile(moduleFile)) {
                 String value = SequencedProperties.ofFiles(moduleFile).getProperty("module");

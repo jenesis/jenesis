@@ -52,6 +52,12 @@ public final class Checksum {
         return diff;
     }
 
+    public static Map<Path, Checksum> removed(Map<Path, byte[]> expected) {
+        Map<Path, Checksum> removed = new LinkedHashMap<>();
+        expected.keySet().forEach(path -> removed.put(path, of(ChecksumStatus.REMOVED)));
+        return removed;
+    }
+
     public static Map<Path, Checksum> added(Map<Path, byte[]> actual, HashDigestFunction hash) {
         Map<Path, Checksum> added = new LinkedHashMap<>();
         actual.forEach((path, bytes) -> added.put(path, new Checksum(ChecksumStatus.ADDED, () -> hash.encoded(bytes))));

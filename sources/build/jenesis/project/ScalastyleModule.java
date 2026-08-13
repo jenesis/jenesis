@@ -142,6 +142,9 @@ public class ScalastyleModule implements BuildExecutorModule {
             boolean hasScala = false;
             Path config = null;
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 for (Path jar : Dependencies.select(argument.folder(), tool, "runtime")) {
                     jars.add(jar.toString());
                 }

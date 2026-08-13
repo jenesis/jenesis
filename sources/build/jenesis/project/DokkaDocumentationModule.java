@@ -175,6 +175,9 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
             List<String> sources = new ArrayList<>(), jars = new ArrayList<>(), classpath = new ArrayList<>();
             boolean[] kotlin = new boolean[1];
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 Path classes = argument.folder().resolve(BuildStep.CLASSES);
                 if (Files.exists(classes)) {
                     classpath.add(classes.toString());

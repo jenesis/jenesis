@@ -34,6 +34,9 @@ public class JenesisModuleRepositoryExport implements BuildStep {
         Set<Path> cleaned = new HashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             Path folder = argument.folder();
+            if (folder == null) {
+                continue;
+            }
             if (!Files.isDirectory(folder)) {
                 continue;
             }

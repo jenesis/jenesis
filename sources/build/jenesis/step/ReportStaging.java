@@ -15,6 +15,9 @@ public class ReportStaging implements BuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path inventoryFile = argument.folder().resolve(Inventory.INVENTORY);
             if (!Files.isRegularFile(inventoryFile)) {
                 continue;

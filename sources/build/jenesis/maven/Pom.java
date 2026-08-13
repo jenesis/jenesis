@@ -51,7 +51,10 @@ public class Pom implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        List<Path> folders = arguments.values().stream().map(BuildStepArgument::folder).toList();
+        List<Path> folders = arguments.values().stream()
+                .map(BuildStepArgument::folder)
+                .filter(Objects::nonNull)
+                .toList();
         SequencedProperties requires = SequencedProperties.ofFolders(folders, resolved ? DEPENDENCIES : REQUIRES);
         SequencedProperties exclusions = SequencedProperties.ofFolders(folders, EXCLUSIONS);
         SequencedProperties metadata = SequencedProperties.ofFolders(folders, METADATA);

@@ -147,6 +147,9 @@ public class Javac extends JdkProcessBuildStep {
                 siblingClasses = new ArrayList<>(),
                 commands = new ArrayList<>(List.of("-d", target.toString()));
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             for (Path jar : Dependencies.select(argument.folder(), group, "compile")) {
                 path.add(jar.toString());
             }
@@ -254,6 +257,9 @@ public class Javac extends JdkProcessBuildStep {
         SequencedMap<Integer, List<String>> versionedRoots = new TreeMap<>();
         List<String> dependencyPath = new ArrayList<>();
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path classes = argument.folder().resolve(CLASSES);
             if (Files.exists(classes)) {
                 dependencyPath.add(classes.toString());
@@ -331,6 +337,9 @@ public class Javac extends JdkProcessBuildStep {
 
     private static boolean hasMultiReleaseManifest(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path candidate = argument.folder().resolve(Versions.MANIFEST);
             if (!Files.exists(candidate)) {
                 continue;

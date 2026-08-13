@@ -332,6 +332,9 @@ public class ModularProject implements BuildExecutorModule {
                     }
                     Path file = null;
                     for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
+                        if (argument.getValue().folder() == null) {
+                            continue;
+                        }
                         if (argument.getKey().startsWith("boms-")) {
                             Path candidate = argument.getValue().folder().resolve(name);
                             if (Files.isRegularFile(candidate)) {
@@ -377,6 +380,9 @@ public class ModularProject implements BuildExecutorModule {
                 metadata.setProperty("description", info.description());
             }
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 Path upstream = argument.folder().resolve(BuildStep.METADATA);
                 if (Files.isRegularFile(upstream)) {
                     SequencedProperties.ofFiles(upstream).forEach(metadata::put);

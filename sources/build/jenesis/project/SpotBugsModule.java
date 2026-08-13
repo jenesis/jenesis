@@ -149,6 +149,9 @@ public class SpotBugsModule implements BuildExecutorModule {
             List<String> jars = new ArrayList<>(), classes = new ArrayList<>(), auxiliary = new ArrayList<>();
             Path config = null;
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.folder() == null) {
+                    continue;
+                }
                 for (Path jar : Dependencies.select(argument.folder(), tool, "runtime")) {
                     jars.add(jar.toString());
                 }

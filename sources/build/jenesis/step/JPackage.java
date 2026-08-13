@@ -47,6 +47,9 @@ public class JPackage extends JdkProcessBuildStep {
         }
         Path runtime = null;
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path candidate = argument.folder().resolve(JLink.RUNTIME);
             if (Files.isDirectory(candidate)) {
                 runtime = candidate;
@@ -69,6 +72,9 @@ public class JPackage extends JdkProcessBuildStep {
         SequencedMap<String, Path> staged = new LinkedHashMap<>();
         ModuleGraph graph = new ModuleGraph();
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             List<Path> jars = new ArrayList<>();
             Path artifacts = argument.folder().resolve(BuildStep.ARTIFACTS);
             if (Files.isDirectory(artifacts)) {

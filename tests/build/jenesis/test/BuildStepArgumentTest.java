@@ -62,4 +62,27 @@ public class BuildStepArgumentTest {
                 Map.of(Path.of("module-info.java"), Checksum.of(ChecksumStatus.ALTERED)));
         assertThat(argument.hasChanged(Path.of("compile"))).isFalse();
     }
+
+    @Test
+    public void hasChanged_no_args_returns_true_for_removed_argument() {
+        BuildStepArgument argument = new BuildStepArgument(null,
+                Map.of(Path.of("classes/Foo.class"), Checksum.of(ChecksumStatus.REMOVED)));
+        assertThat(argument.folder()).isNull();
+        assertThat(argument.hasChanged()).isTrue();
+    }
+
+    @Test
+    public void hasChanged_with_prefix_only_matches_removed_files_under_that_prefix() {
+        BuildStepArgument argument = new BuildStepArgument(null,
+                Map.of(Path.of("classes/Foo.class"), Checksum.of(ChecksumStatus.REMOVED)));
+        assertThat(argument.hasChanged(Path.of("classes"))).isTrue();
+        assertThat(argument.hasChanged(Path.of("sources"))).isFalse();
+    }
+
+    @Test
+    public void hasChanged_returns_false_for_removed_argument_without_files() {
+        BuildStepArgument argument = new BuildStepArgument(null, Map.of());
+        assertThat(argument.hasChanged()).isFalse();
+        assertThat(argument.hasChanged(Path.of("."))).isFalse();
+    }
 }

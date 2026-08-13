@@ -54,6 +54,9 @@ public class NativeImage extends JdkProcessBuildStep {
         List<String> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
         Path config = null;
         for (BuildStepArgument argument : arguments.values()) {
+            if (argument.folder() == null) {
+                continue;
+            }
             Path descriptor = argument.folder().resolve("launcher.properties");
             if (Files.isRegularFile(descriptor)) {
                 SequencedProperties launcherProperties = SequencedProperties.ofFiles(descriptor);
