@@ -2,6 +2,7 @@ package build.jenesis.module;
 
 import module java.base;
 import build.jenesis.DependencyScope;
+import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
@@ -20,23 +21,6 @@ public class ModularJarResolver implements Resolver {
     public ModularJarResolver(boolean resolveAutomaticModules, Resolver fallback) {
         this.resolveAutomaticModules = resolveAutomaticModules;
         this.fallback = fallback;
-    }
-
-    @Override
-    public Resolver.Resolution dependencies(Executor executor,
-                                            String prefix,
-                                            Map<String, Repository> repositories,
-                                            SequencedMap<String, SequencedSet<String>> coordinates,
-                                            SequencedMap<String, String> versions,
-                                            SequencedMap<String, String> aliases,
-                                            DependencyScope scope) throws IOException {
-        if (!aliases.isEmpty()) {
-            throw new IllegalArgumentException("@jenesis.alias is not supported when resolving purely over"
-                    + " module descriptors - "
-                    + String.join(", ", aliases.sequencedKeySet())
-                    + " can only be aliased in a Maven-backed layout (modular_to_maven)");
-        }
-        return dependencies(executor, prefix, repositories, coordinates, versions, scope);
     }
 
     @Override
@@ -103,7 +87,9 @@ public class ModularJarResolver implements Resolver {
                     : repository.fetch(executor, identifier + "/" + expected).orElse(null);
             if (item == null) {
                 if (fallback == null) {
-                    throw new IllegalArgumentException("No module found for " + current);
+                    throw new IllegalArgumentException("No module found for "
+                            + current
+                            + aliased(current, parents, moduleCoordinates, dependencies));
                 }
                 unresolved.add(current);
                 if (requested != null) {
@@ -237,6 +223,27 @@ public class ModularJarResolver implements Resolver {
             fallbackResolution.vertices().forEach(nodes::putIfAbsent);
         }
         return new Resolver.Resolution(dependencies, edges, nodes);
+    }
+
+    private static String aliased(String module,
+                                  Map<String, String> parents,
+                                  Map<String, String> moduleCoordinates,
+                                  SequencedMap<String, Resolver.Resolved> dependencies) {
+        String parent = parents.get(module);
+        Resolver.Resolved resolved = parent == null ? null : dependencies.get(moduleCoordinates.get(parent));
+        String target;
+        try {
+            target = resolved == null ? null : PathPlacement.aliases(resolved.file()).get(module);
+        } catch (IOException | RuntimeException _) {
+            target = null;
+        }
+        return target == null
+                ? ""
+                : " - "
+                + parent
+                + " aliases it to "
+                + target
+                + ", which pure module resolution cannot provide (use a Maven-backed layout)";
     }
 
 }

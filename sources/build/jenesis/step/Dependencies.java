@@ -8,6 +8,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.DependencyScope;
 import build.jenesis.License;
+import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -21,6 +22,7 @@ public class Dependencies implements BuildStep {
     public static final String SPDX = "spdx.properties";
     public static final String GRAPH = "graph.properties";
     public static final String LICENSES = "licenses.properties";
+    public static final String ALIASED = "aliased.properties";
     public static final String RESOLVED = "resolved/";
 
     private final transient Map<String, Repository> repositories;
@@ -194,12 +196,32 @@ public class Dependencies implements BuildStep {
         }
         Path libs = Files.createDirectories(context.next().resolve(RESOLVED));
         Path previousLibs = context.previous() == null ? null : context.previous().resolve(RESOLVED);
+        SequencedMap<String, String> previousAliases = new LinkedHashMap<>();
+        if (context.previous() != null) {
+            Path aliasedFile = context.previous().resolve(ALIASED);
+            if (Files.exists(aliasedFile)) {
+                SequencedProperties.ofFiles(aliasedFile).forEachProperty((alias, coordinate) -> {
+                    previousAliases.put(coordinate, alias);
+                    int slash = coordinate.indexOf('/');
+                    if (slash > 0) {
+                        previousAliases.put(coordinate.substring(slash + 1), alias);
+                    }
+                });
+            }
+        }
         Map<String, Repository> wrapped = new LinkedHashMap<>();
         repositories.forEach((name, repository) -> {
             Repository effective = repository;
             if (previousLibs != null) {
                 effective = effective.prepend((_, coordinate) -> {
                     Path file = previousLibs.resolve(BuildExecutorModule.encode(coordinate) + ".jar");
+                    if (!Files.exists(file)) {
+                        String alias = previousAliases.get(coordinate);
+                        if (alias == null) {
+                            return Optional.empty();
+                        }
+                        file = previousLibs.resolve(alias + ".jar");
+                    }
                     return Files.exists(file) ? Optional.of(RepositoryItem.ofFile(file)) : Optional.empty();
                 });
             }
@@ -284,6 +306,14 @@ public class Dependencies implements BuildStep {
         }
         SequencedProperties resolved = new SequencedProperties();
         SequencedMap<String, Resolver.Resolved> materialized = new LinkedHashMap<>();
+        SequencedMap<String, Alias> aliasTargets = new LinkedHashMap<>();
+        for (SequencedMap<String, SequencedMap<String, String>> byRepository : moduleAliases.values()) {
+            for (SequencedMap<String, String> byAlias : byRepository.values()) {
+                byAlias.forEach((alias, token) -> merge(aliasTargets, alias, token, LOCAL));
+            }
+        }
+        SequencedMap<String, String> modules = new LinkedHashMap<>();
+        SequencedMap<String, Boolean> explicit = new LinkedHashMap<>();
         SequencedProperties graph = new SequencedProperties();
         SequencedProperties licenses = new SequencedProperties();
         int edge = 0;
@@ -363,8 +393,6 @@ public class Dependencies implements BuildStep {
                             wrapped,
                             coordinates,
                             bom,
-                            moduleAliases.getOrDefault(group, new LinkedHashMap<>())
-                                    .getOrDefault(repo, new LinkedHashMap<>()),
                             intent);
                     for (Map.Entry<String, Resolver.Resolved> entry : resolution.artifacts().entrySet()) {
                         String coordinate = entry.getKey().substring(entry.getKey().indexOf('/') + 1);
@@ -392,6 +420,13 @@ public class Dependencies implements BuildStep {
                                 text(node.module()),
                                 Boolean.toString(node.automatic()),
                                 Boolean.toString(node.internal())));
+                        String versioned = node.resolvedVersion() == null
+                                ? entry.getKey()
+                                : entry.getKey() + "/" + node.resolvedVersion();
+                        explicit.putIfAbsent(versioned, node.module() != null && !node.automatic());
+                        if (node.module() != null) {
+                            modules.putIfAbsent(node.module(), versioned);
+                        }
                         if (!node.licenses().isEmpty()) {
                             String licenseKey = node.resolvedVersion() == null
                                     ? entry.getKey()
@@ -424,7 +459,6 @@ public class Dependencies implements BuildStep {
                 }
             }
         }
-        SequencedProperties index = new SequencedProperties();
         SequencedMap<String, Path> placed = new LinkedHashMap<>();
         SequencedMap<String, String> checksums = new LinkedHashMap<>();
         SequencedMap<String, Boolean> internals = new LinkedHashMap<>();
@@ -450,8 +484,6 @@ public class Dependencies implements BuildStep {
                 placed.put(dependency, file);
                 internals.put(dependency, artifact.internal());
             }
-            String relative = context.next().relativize(file).toString().replace(File.separatorChar, '/');
-            index.setProperty(key, value.isEmpty() ? relative : relative + " " + value);
             checksums.merge(dependency, value, (left, right) -> {
                 if (right.isEmpty()) {
                     return left;
@@ -461,6 +493,26 @@ public class Dependencies implements BuildStep {
                 }
                 return left.isEmpty() ? right : left;
             });
+        }
+        SequencedMap<String, String> aliased = rename(placed, aliasTargets, modules, explicit, libs);
+        SequencedProperties index = new SequencedProperties();
+        for (Map.Entry<String, Resolver.Resolved> entry : materialized.entrySet()) {
+            String key = entry.getKey();
+            int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
+            if (first < 0 || second < 0) {
+                continue;
+            }
+            String value = resolved.getProperty(key);
+            String relative = context.next()
+                    .relativize(placed.get(key.substring(second + 1)))
+                    .toString()
+                    .replace(File.separatorChar, '/');
+            index.setProperty(key, value.isEmpty() ? relative : relative + " " + value);
+        }
+        if (!aliased.isEmpty()) {
+            SequencedProperties properties = new SequencedProperties();
+            aliased.forEach(properties::setProperty);
+            properties.store(context.next().resolve(ALIASED));
         }
         if (pinning == Pinning.STRICT) {
             Set<Path> pinnedFiles = new HashSet<>();
@@ -485,6 +537,118 @@ public class Dependencies implements BuildStep {
 
     private static String text(String value) {
         return value == null ? "" : value;
+    }
+
+    private static final String LOCAL = "a local @jenesis.alias declaration";
+
+    private record Alias(String token, String origin) {
+    }
+
+    private static void merge(SequencedMap<String, Alias> declared,
+                              String alias,
+                              String token,
+                              String origin) {
+        Alias previous = declared.putIfAbsent(alias, new Alias(token, origin));
+        if (previous != null && !previous.token().equals(token)) {
+            throw new IllegalArgumentException("Module alias "
+                    + alias
+                    + " is declared for "
+                    + previous.token()
+                    + " by "
+                    + previous.origin()
+                    + " and for "
+                    + token
+                    + " by "
+                    + origin);
+        }
+    }
+
+    private static SequencedMap<String, String> rename(SequencedMap<String, Path> placed,
+                                                       SequencedMap<String, Alias> declared,
+                                                       SequencedMap<String, String> modules,
+                                                       SequencedMap<String, Boolean> explicit,
+                                                       Path libs) throws IOException {
+        SequencedMap<String, String> coordinates = new LinkedHashMap<>();
+        for (String dependency : placed.sequencedKeySet()) {
+            int first = dependency.indexOf('/'), last = dependency.lastIndexOf('/');
+            if (first > 0 && last > first) {
+                coordinates.putIfAbsent(dependency.substring(first + 1, last), dependency);
+            }
+        }
+        for (Map.Entry<String, Path> entry : placed.entrySet()) {
+            if (!explicit.getOrDefault(entry.getKey(), true) || Files.isDirectory(entry.getValue())) {
+                continue;
+            }
+            String origin = entry.getValue().getFileName().toString();
+            for (Map.Entry<String, String> declaration : PathPlacement.aliases(entry.getValue()).entrySet()) {
+                merge(declared, declaration.getKey(), declaration.getValue(), origin);
+            }
+        }
+        SequencedMap<String, String> aliased = new LinkedHashMap<>(), owners = new LinkedHashMap<>();
+        for (Map.Entry<String, Alias> entry : declared.entrySet()) {
+            String alias = entry.getKey(), token = entry.getValue().token();
+            String coordinate = coordinates.get(token);
+            if (coordinate == null) {
+                throw new IllegalArgumentException("Module alias "
+                        + alias
+                        + " declared by "
+                        + entry.getValue().origin()
+                        + " does not name a resolved dependency: "
+                        + token
+                        + (entry.getValue().origin().equals(LOCAL)
+                        ? " - require the target or drop the alias"
+                        : " - stop excluding the target"));
+            }
+            String module = modules.get(alias);
+            if (module != null) {
+                throw new IllegalArgumentException("Module alias "
+                        + alias
+                        + " collides with module "
+                        + alias
+                        + " resolved from "
+                        + module
+                        + " - require it directly");
+            }
+            ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(placed.get(coordinate));
+            if (descriptor != null) {
+                throw new IllegalArgumentException("Target of module alias "
+                        + alias
+                        + " is already the "
+                        + (descriptor.isAutomatic() ? "automatic" : "named")
+                        + " module "
+                        + descriptor.name()
+                        + " - require "
+                        + descriptor.name()
+                        + " instead of aliasing "
+                        + token);
+            }
+            String previous = owners.putIfAbsent(coordinate, alias);
+            if (previous != null) {
+                throw new IllegalArgumentException(coordinate
+                        + " is aliased as both "
+                        + previous
+                        + " and "
+                        + alias
+                        + " - a jar can carry only one module name");
+            }
+            aliased.put(alias, coordinate);
+        }
+        for (Map.Entry<String, String> entry : aliased.entrySet()) {
+            String alias = entry.getKey(), coordinate = entry.getValue();
+            Path source = placed.get(coordinate), target = libs.resolve(alias + ".jar");
+            if (!source.equals(target)) {
+                if (source.startsWith(libs)) {
+                    Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+                } else {
+                    Files.deleteIfExists(target);
+                    BuildStep.linkOrCopy(target, source);
+                }
+            }
+            PathPlacement.aliased(target, alias, "Target " + coordinate);
+            Files.writeString(PathPlacement.declaration(target), alias);
+            placed.put(coordinate, target);
+        }
+        return aliased;
     }
 
     public static List<Path> select(Path folder, String group, String scope) throws IOException {

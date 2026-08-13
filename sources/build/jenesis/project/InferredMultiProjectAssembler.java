@@ -260,11 +260,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         }
         SequencedMap<String, SequencedMap<String, String>> overrides = new LinkedHashMap<>();
         for (String command : new TreeSet<>(files.keySet())) {
-            SequencedProperties properties = SequencedProperties.ofFiles(files.get(command));
             SequencedMap<String, String> values = new LinkedHashMap<>();
-            for (String key : properties.stringPropertyNames()) {
-                values.put(key, properties.getProperty(key));
-            }
+            SequencedProperties.ofFiles(files.get(command)).forEachProperty(values::put);
             overrides.put(command, values);
         }
         return overrides;

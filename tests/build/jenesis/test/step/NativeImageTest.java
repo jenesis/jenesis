@@ -75,9 +75,6 @@ public class NativeImageTest {
         launcher.setProperty("mainModule", "sample");
         launcher.setProperty("mainClass", "sample.Sample");
         store(launcher);
-        // A real modular jar lands on the module path; the plain app.jar lands on the class path. The
-        // inferred placement is therefore not a self-contained module graph, so the whole module path is
-        // rooted with --add-modules ALL-MODULE-PATH.
         modularJar(bundle.resolve(BuildStep.ARTIFACTS).resolve("sample.jar"), "sample");
 
         BuildStepResult result = run(PathPlacement.INFERRED);
@@ -85,7 +82,7 @@ public class NativeImageTest {
         assertThat(command())
                 .contains("--module-path")
                 .contains("-cp")
-                .contains("--add-modules ALL-MODULE-PATH")
+                .contains("--add-modules ALL-MODULE-PATH,ALL-DEFAULT")
                 .endsWith("--module sample/sample.Sample");
     }
 

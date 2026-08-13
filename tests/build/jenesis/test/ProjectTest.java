@@ -470,8 +470,6 @@ public class ProjectTest {
 
         Project.Layout.MODULAR.apply(executor, project, new InferredMultiProjectAssembler());
 
-        // replaceStep throws when nothing is registered at the identity, so a no-throw call proves
-        // the layout wired the `export` registration.
         executor.replaceStep(Project.EXPORT, new JenesisModuleRepositoryExport(target.resolve("module-repository")));
     }
 

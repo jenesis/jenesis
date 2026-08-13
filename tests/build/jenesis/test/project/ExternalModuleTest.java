@@ -449,11 +449,6 @@ public class ExternalModuleTest {
 
     @Test
     public void fails_clearly_when_module_uses_newer_build_executor_api() throws IOException {
-        // Emulate a build module built against a newer Jenesis whose BuildExecutor
-        // has a method this (running) Jenesis lacks: synthesize that build.jenesis by
-        // adding an abstract method to BuildExecutor, compile the plugin against it,
-        // and have the plugin call the method. The bridge cannot map it to the host,
-        // so it must fail with a clear "upgrade Jenesis" message.
         Path newerJenesisJar = jenesisJarWithExtraBuildExecutorMethod(
                 work.resolve("build.jenesis-newer.jar"), "jenesisFutureMethod");
         Path pluginJar = compileModule(work.resolve("plugin"),
@@ -494,8 +489,6 @@ public class ExternalModuleTest {
         try (FileSystem fileSystem = FileSystems.newFileSystem(jenesisJar)) {
             original = Files.readAllBytes(fileSystem.getPath(entry));
         }
-        // Add an abstract method to BuildExecutor with the ClassFile API, emulating a
-        // newer Jenesis whose BuildExecutor has a method this version does not.
         ClassFile classFile = ClassFile.of();
         byte[] modified = classFile.transformClass(classFile.parse(original),
                 ((ClassTransform) (builder, element) -> builder.with(element))

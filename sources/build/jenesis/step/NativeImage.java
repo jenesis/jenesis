@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
+import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 
@@ -48,7 +49,7 @@ public class NativeImage extends JdkProcessBuildStep {
                                                     SequencedMap<String, SequencedMap<String, String>> properties)
             throws IOException {
         boolean modular = pathPlacement.modular();
-        boolean selfContainedModuleGraph = true;
+        ModuleGraph graph = new ModuleGraph();
         String launcher = null, name = null;
         List<String> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
         Path config = null;
@@ -74,12 +75,12 @@ public class NativeImage extends JdkProcessBuildStep {
             if (Files.isDirectory(artifacts)) {
                 try (DirectoryStream<Path> files = Files.newDirectoryStream(artifacts)) {
                     for (Path file : files) {
-                        selfContainedModuleGraph &= !pathPlacement.place(file, modulePath, classPath);
+                        graph.place(pathPlacement, file, modulePath, classPath);
                     }
                 }
             }
             for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
-                selfContainedModuleGraph &= !pathPlacement.place(file, modulePath, classPath);
+                graph.place(pathPlacement, file, modulePath, classPath);
             }
             Path candidate = argument.folder().resolve("native-image");
             if (Files.isDirectory(candidate)) {
@@ -97,7 +98,6 @@ public class NativeImage extends JdkProcessBuildStep {
                 }
             }
         }
-        selfContainedModuleGraph &= classPath.isEmpty();
         List<String> commands = new ArrayList<>();
         commands.add("--no-fallback");
         if (config != null) {
@@ -115,10 +115,7 @@ public class NativeImage extends JdkProcessBuildStep {
             commands.add("-cp");
             commands.add(String.join(File.pathSeparator, classPath));
         }
-        if (!modulePath.isEmpty() && !selfContainedModuleGraph) {
-            commands.add("--add-modules");
-            commands.add("ALL-MODULE-PATH");
-        }
+        commands.addAll(graph.arguments());
         if (modular) {
             commands.add("--module");
             commands.add(launcher);

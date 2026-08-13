@@ -4,6 +4,7 @@ import module java.base;
 import java.util.jar.Attributes;
 import build.jenesis.DependencyScope;
 import module org.junit.jupiter.api;
+import build.jenesis.PathPlacement;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
 import build.jenesis.module.ModularJarResolver;
@@ -17,17 +18,27 @@ public class ModularJarResolverTest {
     private Path jars;
 
     @Test
-    public void rejects_module_aliases() {
+    public void reports_an_alias_a_module_layout_cannot_provide() {
         assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("module", (_, _) -> Optional.empty()),
-                new LinkedHashMap<>(Map.of("toolkit.lib", Collections.emptyNavigableSet())),
+                Map.of("module", (_, coordinate) -> {
+                    RepositoryItem item = switch (coordinate) {
+                        case "root" -> toAliasingJar("root",
+                                "toolkit.lib=org.example/plain-lib",
+                                require("toolkit.lib", 0));
+                        default -> null;
+                    };
+                    return Optional.ofNullable(item);
+                }),
+                new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
-                new LinkedHashMap<>(Map.of("toolkit.lib", "org.example/plain-lib")),
                 DependencyScope.COMPILE))
+                .as("an alias names a Maven artifact, which a coordinate that is a module name cannot")
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("not supported when resolving purely over module descriptors");
+                .hasMessageContaining("No module found for toolkit.lib"
+                        + " - root aliases it to org.example/plain-lib,"
+                        + " which pure module resolution cannot provide (use a Maven-backed layout)");
     }
 
     @Test
@@ -179,6 +190,28 @@ public class ModularJarResolverTest {
 
     private RepositoryItem toJar(String module, ModuleRequireInfo... requires) throws IOException {
         return toJar(module, null, requires);
+    }
+
+    private RepositoryItem toAliasingJar(String module,
+                                         String declaration,
+                                         ModuleRequireInfo... requires) throws IOException {
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        manifest.getMainAttributes().putValue(PathPlacement.ALIASES, declaration);
+        Path file = Files.createTempFile(jars, module, ".jar");
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(file), manifest)) {
+            output.putNextEntry(new JarEntry("module-info.class"));
+            output.write(ClassFile.of().buildModule(ModuleAttribute.of(
+                    ModuleDesc.of(module),
+                    builder -> {
+                        builder.requires(ModuleRequireInfo.of(ModuleDesc.of("java.base"), 0, null));
+                        for (ModuleRequireInfo require : requires) {
+                            builder.requires(require);
+                        }
+                    })));
+            output.closeEntry();
+        }
+        return RepositoryItem.ofFile(file);
     }
 
     private RepositoryItem toJar(String module, String version, ModuleRequireInfo... requires) throws IOException {

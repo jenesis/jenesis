@@ -4,7 +4,7 @@ import module java.base;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
-import build.jenesis.PathPlacement;
+import build.jenesis.ModuleGraph;
 
 public class JPackage extends JdkProcessBuildStep {
 
@@ -67,7 +67,7 @@ public class JPackage extends JdkProcessBuildStep {
         }
         Path input = Files.createDirectory(context.supplement().resolve("input"));
         SequencedMap<String, Path> staged = new LinkedHashMap<>();
-        boolean selfContainedModuleGraph = true;
+        ModuleGraph graph = new ModuleGraph();
         for (BuildStepArgument argument : arguments.values()) {
             List<Path> jars = new ArrayList<>();
             Path artifacts = argument.folder().resolve(BuildStep.ARTIFACTS);
@@ -87,8 +87,7 @@ public class JPackage extends JdkProcessBuildStep {
                             + name + "' into a single jpackage input: " + previous + " and " + file);
                 }
                 if (modular) {
-                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(file);
-                    selfContainedModuleGraph &= descriptor != null && !descriptor.isAutomatic();
+                    graph.module(file);
                 }
                 BuildStep.linkOrCopy(input.resolve(name), file);
             }
@@ -103,9 +102,9 @@ public class JPackage extends JdkProcessBuildStep {
         }
         commands.add(modular ? "--module-path" : "--input");
         commands.add(input.toString());
-        if (modular && !selfContainedModuleGraph) {
+        for (String option : graph.options()) {
             commands.add("--java-options");
-            commands.add("--add-modules=ALL-MODULE-PATH");
+            commands.add(option);
         }
         commands.add("--dest");
         commands.add(Files.createDirectory(context.next().resolve(PACKAGES)).toString());

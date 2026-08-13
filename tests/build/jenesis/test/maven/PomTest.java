@@ -138,8 +138,6 @@ public class PomTest {
         SequencedProperties coordinates = new SequencedProperties();
         coordinates.setProperty("maven/build.jenesis/jenesis/jar/1.0.0", "");
         coordinates.store(argument.resolve(BuildStep.IDENTITY));
-        // An aliased module resolves to a versionless module entry beside its Maven target;
-        // only the target belongs into the published POM.
         SequencedProperties dependencies = new SequencedProperties();
         dependencies.setProperty("main/compile/module/toolkit.lib", "");
         dependencies.setProperty("main/runtime/module/toolkit.lib", "");

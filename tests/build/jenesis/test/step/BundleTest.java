@@ -8,6 +8,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bundle;
 
@@ -97,6 +98,95 @@ public class BundleTest {
     }
 
     @Test
+    public void a_class_path_jar_beside_a_module_is_recorded_as_java_options() throws IOException {
+        Path sources = Files.createDirectory(root.resolve("sources"));
+        Files.writeString(sources.resolve("module-info.java"), "module sample { }\n");
+        Files.writeString(Files.createDirectory(sources.resolve("sample")).resolve("Sample.java"),
+                "package sample; public class Sample { public static void main(String[] args) { } }\n");
+        Path classes = Files.createDirectory(root.resolve("classes"));
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
+                "-d", classes.toString(),
+                sources.resolve("module-info.java").toString(),
+                sources.resolve("sample/Sample.java").toString())).isZero();
+        Path artifacts = Files.createDirectory(input.resolve(BuildStep.ARTIFACTS));
+        assertThat(ToolProvider.findFirst("jar").orElseThrow().run(System.out, System.err,
+                "--create", "--file", artifacts.resolve("sample.jar").toString(),
+                "-C", classes.toString(), ".")).isZero();
+        writePlainJar(artifacts.resolve("lib.jar"));
+        SequencedProperties launcher = new SequencedProperties();
+        launcher.setProperty("mainClass", "sample.Sample");
+        launcher.setProperty("mainModule", "sample");
+        launcher.store(input.resolve("launcher.properties"));
+
+        BuildStepResult result = new Bundle().apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("artifacts/lib.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        Path zip = next.resolve(Bundle.BUNDLE).resolve("bundle.zip");
+        assertThat(entries(zip)).contains("modulepath/sample.jar", "classpath/lib.jar");
+        assertThat(application(zip).getProperty("javaOptions"))
+                .as("a consumer splices the options rather than deriving them from the layout")
+                .isEqualTo("--add-modules=ALL-MODULE-PATH,ALL-DEFAULT");
+    }
+
+    @Test
+    public void bundles_an_aliased_dependency_onto_the_module_path() throws IOException {
+        Path resolved = Files.createDirectory(input.resolve("resolved"));
+        writeLibraryJar(resolved.resolve("alias.lib.jar"));
+        Files.writeString(PathPlacement.declaration(resolved.resolve("alias.lib.jar")), "alias.lib");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/runtime/maven/lib", "resolved/alias.lib.jar");
+        index.store(input.resolve(BuildStep.DEPENDENCIES));
+        Path sources = Files.createDirectory(root.resolve("sources"));
+        Files.writeString(sources.resolve("module-info.java"), """
+                module sample {
+                    requires alias.lib;
+                }
+                """);
+        Files.writeString(Files.createDirectory(sources.resolve("sample")).resolve("Sample.java"),
+                "package sample; public class Sample { public static void main(String[] args) { } }\n");
+        Path classes = Files.createDirectory(root.resolve("classes"));
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
+                "-d", classes.toString(),
+                "-p", resolved.toString(),
+                sources.resolve("module-info.java").toString(),
+                sources.resolve("sample/Sample.java").toString())).isZero();
+        assertThat(ToolProvider.findFirst("jar").orElseThrow().run(System.out, System.err,
+                "--create", "--file",
+                Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("sample.jar").toString(),
+                "-C", classes.toString(), ".")).isZero();
+        SequencedProperties launcher = new SequencedProperties();
+        launcher.setProperty("mainClass", "sample.Sample");
+        launcher.setProperty("mainModule", "sample");
+        launcher.store(input.resolve("launcher.properties"));
+
+        BuildStepResult result = new Bundle().apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("resolved/alias.lib.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        Path zip = next.resolve(Bundle.BUNDLE).resolve("bundle.zip");
+        SequencedSet<String> entries = entries(zip);
+        assertThat(entries)
+                .as("a jar named for its alias derives that module name wherever it is unpacked")
+                .contains("modulepath/sample.jar", "modulepath/alias.lib.jar");
+        assertThat(entries).noneMatch(name -> name.startsWith("classpath/"));
+        assertThat(application(zip).getProperty("javaOptions"))
+                .isEqualTo("--add-modules=ALL-MODULE-PATH,ALL-DEFAULT");
+    }
+
+    @Test
     public void skips_a_module_without_a_main() throws IOException {
         writePlainJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"));
 
@@ -109,6 +199,14 @@ public class BundleTest {
 
         assertThat(result.next()).isTrue();
         assertThat(next.resolve(Bundle.BUNDLE)).doesNotExist();
+    }
+
+    private static void writeLibraryJar(Path path) throws IOException {
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(path))) {
+            jar.putNextEntry(new JarEntry("alias/lib/Type.class"));
+            jar.write(new byte[] {1, 2, 3});
+            jar.closeEntry();
+        }
     }
 
     private static void writePlainJar(Path path) throws IOException {

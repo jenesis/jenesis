@@ -3,6 +3,8 @@ package build.jenesis.test.step;
 import module java.base;
 import module org.junit.jupiter.api;
 import module org.junit.jupiter.params;
+import java.lang.classfile.Attributes;
+import java.lang.classfile.ClassFile;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -14,6 +16,7 @@ import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.Javac;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class JavacTest {
 
@@ -264,6 +267,62 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void versioned_compilation_honours_process_javac_properties(boolean process) throws IOException {
+        Path main = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(main.resolve("Sample.java"), "package sample; public class Sample { }\n");
+        Path versioned = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/21/sample"));
+        Files.writeString(versioned.resolve("Sample.java"), "package sample; public class Sample { }\n");
+        SequencedProperties javac = new SequencedProperties();
+        javac.setProperty("-g:none", "");
+        javac.store(Files.createDirectories(sources.resolve("process")).resolve("javac.properties"));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("sources/META-INF/versions/21/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(ClassFile.of()
+                .parse(next.resolve(Javac.CLASSES + "META-INF/versions/21/sample/Sample.class"))
+                .findAttribute(Attributes.sourceFile()))
+                .as("the versioned compilation applies the supplied options, so -g:none suppressed the debug attributes")
+                .isEmpty();
+        assertThat(ClassFile.of()
+                .parse(next.resolve(Javac.CLASSES + "sample/Sample.class"))
+                .findAttribute(Attributes.sourceFile()))
+                .as("the same options apply to the main compilation")
+                .isEmpty();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void versioned_release_wins_over_a_release_in_process_javac_properties(boolean process) throws IOException {
+        Path main = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(main.resolve("Sample.java"), "package sample; public class Sample { }\n");
+        Path versioned = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/21/sample"));
+        Files.writeString(versioned.resolve("Sample.java"), "package sample; public class Sample { }\n");
+        Javac.writeRelease(sources, "17");
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("sources/META-INF/versions/21/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(ClassFile.of().parse(next.resolve(Javac.CLASSES + "sample/Sample.class")).majorVersion())
+                .as("the main sources are compiled for the release the properties supply")
+                .isEqualTo(ClassFile.JAVA_17_VERSION);
+        assertThat(ClassFile.of()
+                .parse(next.resolve(Javac.CLASSES + "META-INF/versions/21/sample/Sample.class"))
+                .majorVersion())
+                .as("the overlay's own release is appended after the supplied options, and javac honours the last --release")
+                .isEqualTo(ClassFile.JAVA_21_VERSION);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void versioned_compilation_mixes_overlay_and_additional_files(boolean process) throws IOException {
         Path main = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(main.resolve("Sample.java"), """
@@ -451,6 +510,74 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void modular_compilation_does_not_reach_a_class_path_dependency(boolean process)
+            throws IOException {
+        plainJar(Files.createDirectories(root.resolve("library")).resolve("plain.jar"));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/compile/maven/plain", "../library/plain.jar");
+        index.store(sources.resolve(BuildStep.DEPENDENCIES));
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES)).resolve("module-info.java"),
+                "module sample { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Main.java"),
+                """
+                        package sample;
+                        public class Main {
+                            public static String value() {
+                                return plain.Lib.value();
+                            }
+                        }
+                        """);
+
+        assertThatThrownBy(() -> new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("sources/sample/Main.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join())
+                .as("a jar without a module name is reached by aliasing it, not by relaxing the module")
+                .hasMessageContaining("package plain is not visible");
+        assertThat(Files.readString(supplement.resolve("javac.args")))
+                .contains("--class-path")
+                .doesNotContain("--add-reads");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void modular_compilation_without_a_class_path_reads_nothing_extra(boolean process) throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES)).resolve("module-info.java"),
+                "module sample { }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Main.java"),
+                "package sample; public class Main { }\n");
+        Path jar = modularJar(Files.createDirectories(root.resolve("library")).resolve("named.jar"), "lib.named");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/compile/maven/named", "../library/named.jar");
+        index.store(sources.resolve(BuildStep.DEPENDENCIES));
+
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("sources/sample/Main.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        assertThat(jar).isRegularFile();
+        String args = Files.readString(supplement.resolve("javac.args"));
+        assertThat(args)
+                .as("a graph of declared modules stays as strict as it was written")
+                .contains("--module-path")
+                .doesNotContain("--class-path")
+                .doesNotContain("--add-reads");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void runs_annotation_processor_from_processor_path(boolean process) throws IOException {
         Path folder = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(folder.resolve("Sample.java"), "package sample; public class Sample { }\n");
@@ -521,6 +648,54 @@ public class JavacTest {
                 .as("a modular compilation passes every processor via a single --processor-module-path")
                 .contains("--processor-module-path")
                 .doesNotContain("--processor-path\n");
+    }
+
+    private Path plainJar(Path file) throws IOException {
+        Path classes = compile(file.getParent().resolve("plain-classes"), "plain/Lib.java", """
+                package plain;
+                public class Lib {
+                    public static String value() {
+                        return "from-plain";
+                    }
+                }
+                """);
+        jarOf(file, classes);
+        return file;
+    }
+
+    private Path modularJar(Path file, String name) throws IOException {
+        Path classes = compile(file.getParent().resolve(name + "-classes"), "module-info.java",
+                "module " + name + " {\n}\n");
+        jarOf(file, classes);
+        return file;
+    }
+
+    private Path compile(Path classes, String name, String content) throws IOException {
+        Path source = classes.resolveSibling(classes.getFileName() + "-sources").resolve(name);
+        Files.createDirectories(source.getParent());
+        Files.createDirectories(classes);
+        Files.writeString(source, content);
+        StringWriter errors = new StringWriter();
+        int result = ToolProvider.findFirst("javac").orElseThrow().run(
+                new PrintWriter(Writer.nullWriter()),
+                new PrintWriter(errors),
+                "-d", classes.toString(),
+                source.toString());
+        if (result != 0) {
+            throw new IllegalStateException("Compilation failed: " + errors);
+        }
+        return classes;
+    }
+
+    private void jarOf(Path file, Path classes) throws IOException {
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(file));
+             Stream<Path> stream = Files.walk(classes)) {
+            for (Path path : stream.filter(Files::isRegularFile).toList()) {
+                output.putNextEntry(new JarEntry(classes.relativize(path).toString().replace(File.separatorChar, '/')));
+                output.write(Files.readAllBytes(path));
+                output.closeEntry();
+            }
+        }
     }
 
     private Path buildProcessorJar(Path dir, String pkg, String suffix, String moduleName) throws IOException {

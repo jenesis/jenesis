@@ -165,10 +165,7 @@ public class Inventory implements BuildStep {
             }
             Path attachmentsFile = folder.resolve(ATTACHMENTS);
             if (Files.isRegularFile(attachmentsFile)) {
-                SequencedProperties loaded = SequencedProperties.ofFiles(attachmentsFile);
-                for (String key : loaded.stringPropertyNames()) {
-                    attachments.putIfAbsent(key, loaded.getProperty(key));
-                }
+                SequencedProperties.ofFiles(attachmentsFile).forEachProperty(attachments::putIfAbsent);
             }
             collectClosure(folder, closureJars, closureScopes, closureChecksums);
             Path bomsFile = folder.resolve(BOMS);

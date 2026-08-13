@@ -33,20 +33,6 @@ public interface Resolver extends Serializable {
                             SequencedMap<String, String> versions,
                             DependencyScope scope) throws IOException;
 
-    default Resolution dependencies(Executor executor,
-                                    String prefix,
-                                    Map<String, Repository> repositories,
-                                    SequencedMap<String, SequencedSet<String>> coordinates,
-                                    SequencedMap<String, String> versions,
-                                    SequencedMap<String, String> aliases,
-                                    DependencyScope scope) throws IOException {
-        if (!aliases.isEmpty()) {
-            throw new IllegalArgumentException("Module aliases are not supported by this resolver: "
-                    + String.join(", ", aliases.sequencedKeySet()));
-        }
-        return dependencies(executor, prefix, repositories, coordinates, versions, scope);
-    }
-
     default SequencedSet<String> managedPrefixes() {
         return Collections.emptyNavigableSet();
     }

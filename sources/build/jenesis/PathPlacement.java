@@ -29,14 +29,9 @@ public enum PathPlacement {
         public boolean test(Path path) {
             return moduleDescriptor(path) != null;
         }
-
-        @Override
-        public boolean place(Path file, List<String> modulePath, List<String> classPath) {
-            ModuleDescriptor descriptor = moduleDescriptor(file);
-            (descriptor != null ? modulePath : classPath).add(file.toString());
-            return descriptor != null && descriptor.isAutomatic();
-        }
     };
+
+    public static final String ALIASES = "Jenesis-Aliases";
 
     private final boolean modular;
 
@@ -50,11 +45,6 @@ public enum PathPlacement {
 
     public abstract boolean test(Path path) throws IOException;
 
-    public boolean place(Path file, List<String> modulePath, List<String> classPath) throws IOException {
-        (test(file) ? modulePath : classPath).add(file.toString());
-        return false;
-    }
-
     public static boolean automatic(Path file) {
         ModuleDescriptor descriptor = moduleDescriptor(file);
         return descriptor != null && descriptor.isAutomatic();
@@ -62,6 +52,10 @@ public enum PathPlacement {
 
     public PathPlacement forModuleInfo(boolean moduleInfoPresent) {
         return moduleInfoPresent ? this : CLASS_PATH;
+    }
+
+    public static Path declaration(Path jar) {
+        return jar.resolveSibling(jar.getFileName() + ".module");
     }
 
     public static ModuleDescriptor moduleDescriptor(Path path) {
@@ -86,10 +80,93 @@ public enum PathPlacement {
                 String automatic = manifest == null
                         ? null
                         : manifest.getMainAttributes().getValue("Automatic-Module-Name");
-                return automatic == null ? null : ModuleDescriptor.newAutomaticModule(automatic).build();
+                if (automatic != null) {
+                    return ModuleDescriptor.newAutomaticModule(automatic).build();
+                }
             }
+            Path declaration = declaration(path);
+            return Files.isRegularFile(declaration)
+                    ? ModuleDescriptor.newAutomaticModule(Files.readString(declaration).trim()).build()
+                    : null;
         } catch (IOException | RuntimeException _) {
             return null;
+        }
+    }
+
+    public static SequencedMap<String, String> aliases(Path path) throws IOException {
+        if (Files.isDirectory(path)) {
+            return new LinkedHashMap<>();
+        }
+        String declaration;
+        try (JarFile jar = new JarFile(path.toFile(), true, ZipFile.OPEN_READ, JarFile.runtimeVersion())) {
+            Manifest manifest = jar.getManifest();
+            declaration = manifest == null ? null : manifest.getMainAttributes().getValue(ALIASES);
+        } catch (ZipException _) {
+            return new LinkedHashMap<>();
+        }
+        return aliases(declaration, path.toString());
+    }
+
+    public static SequencedMap<String, String> aliases(String declaration, String origin) {
+        SequencedMap<String, String> aliases = new LinkedHashMap<>();
+        if (declaration == null || declaration.isBlank()) {
+            return aliases;
+        }
+        for (String entry : declaration.split(",")) {
+            String pair = entry.trim();
+            if (pair.isEmpty()) {
+                continue;
+            }
+            int equals = pair.indexOf('=');
+            String alias = equals < 0 ? "" : pair.substring(0, equals).trim();
+            String target = equals < 0 ? "" : pair.substring(equals + 1).trim();
+            if (alias.isEmpty() || target.isEmpty() || target.indexOf('/') < 1) {
+                throw new IllegalArgumentException("Malformed " + ALIASES + " entry '"
+                        + pair
+                        + "' in "
+                        + origin
+                        + ": expected <module-name>=<groupId>/<artifactId>[/<type>[/<classifier>]]");
+            }
+            String previous = aliases.putIfAbsent(alias, target);
+            if (previous != null && !previous.equals(target)) {
+                throw new IllegalArgumentException("Conflicting " + ALIASES + " entries for "
+                        + alias
+                        + " in "
+                        + origin
+                        + ": "
+                        + previous
+                        + " and "
+                        + target);
+            }
+        }
+        return aliases;
+    }
+
+    public static void aliased(Path file, String alias, String origin) {
+        Set<ModuleReference> found;
+        try {
+            found = ModuleFinder.of(file).findAll();
+        } catch (FindException e) {
+            Throwable cause = e.getCause() == null ? e : e.getCause();
+            throw new IllegalArgumentException(origin
+                    + " cannot be aliased as "
+                    + alias
+                    + ": "
+                    + cause.getMessage(), e);
+        }
+        ModuleDescriptor descriptor = found.size() == 1 ? found.iterator().next().descriptor() : null;
+        if (descriptor == null || !descriptor.isAutomatic() || !descriptor.name().equals(alias)) {
+            throw new IllegalArgumentException(origin
+                    + " cannot be aliased as "
+                    + alias
+                    + ": "
+                    + file.getFileName()
+                    + (descriptor == null
+                    ? " does not describe a single module"
+                    : " describes the "
+                    + (descriptor.isAutomatic() ? "automatic" : "named")
+                    + " module "
+                    + descriptor.name()));
         }
     }
 

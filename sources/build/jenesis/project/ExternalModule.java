@@ -154,10 +154,7 @@ public class ExternalModule implements BuildExecutorModule {
                 if (!Files.isRegularFile(file)) {
                     continue;
                 }
-                SequencedProperties present = SequencedProperties.ofFiles(file);
-                for (String coordinate : present.stringPropertyNames()) {
-                    versions.putIfAbsent(coordinate, present.getProperty(coordinate));
-                }
+                SequencedProperties.ofFiles(file).forEachProperty(versions::putIfAbsent);
             }
             if (!versions.isEmpty()) {
                 versions.store(context.next().resolve(BuildStep.VERSIONS));

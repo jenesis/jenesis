@@ -59,37 +59,52 @@ Layout
 What the alias does
 -------------------
 
-Because args4j declares no module identity, Jenesis cannot simply put its jar on
-the module path under the chosen name - a jar's automatic name comes from its
-file, not from a build's wishes. Instead the alias resolver synthesizes a module
-locally: it takes a **copy of the args4j jar and injects
-`Automatic-Module-Name: org.kohsuke.args4j`** into its manifest, and that copy
-carries args4j's packages onto the module path under the aliased name. The
-original, identity-less jar stays in the closure on the class path, shadowed by
-the named copy that any module-path reader sees first. So `requires
-org.kohsuke.args4j` compiles against args4j's classes, and at run time they load
-from the module named `org.kohsuke.args4j`.
+The alias is a **rename**, not a synthesis. args4j's jar arrives in the build's
+`resolved/` folder under an encoded Maven coordinate, a file name no legal module
+name can be derived from, so the dependencies step moves it to
+`resolved/org.kohsuke.args4j.jar`. From that file name the JDK derives exactly
+the automatic module the project asked for, and `javac` and `java` agree on it
+because both derive it the same way. Nothing inside the jar is touched: bytes,
+signature entries and all, which is why the pinned checksum keeps describing the
+file that is actually on the command line. The jar in `resolved/` is a hard link
+into the shared artifact cache, so the rename never reaches the cache either.
 
-That last point is why the `opens` directive names the alias. args4j sets the
-`@Option` fields by reflection, which needs the `demo.cli` package opened to
-args4j's module - and because the alias is a real module name, `opens demo.cli
-to org.kohsuke.args4j;` is exactly how you grant it. Run the demo after deleting
-that directive and the parse fails with an `InaccessibleObjectException`: proof
-that the aliased library really is running as the named module the project
-declared.
+`requires org.kohsuke.args4j;` then means what it says. Because the target really
+is a module named that, the qualified `opens demo.cli to org.kohsuke.args4j;`
+reaches the code that does the reflecting, and args4j can set the `@Option`
+fields. Delete the `opens` directive and the parse fails with an
+`InaccessibleObjectException`, exactly as for any other module.
+
+An alias does not have to be required, either. It maps a name onto any jar the
+resolved tree already contains, so a project can name a transitive dependency it
+never mentions. Here the `requires` is what pulls args4j in: Jenesis translates a
+`requires` of an aliased name into a requirement on the aliased Maven coordinate.
+Declaring an alias for something the tree does not contain is an error - there is
+nothing to rename.
+
+The declaration also travels. Jenesis writes it into this module's own manifest as
+`Jenesis-Aliases: org.kohsuke.args4j=args4j/args4j`, so a downstream module that
+depends on `demo.cli` inherits the name without redeclaring it, and two modules
+that disagree about a name fail the build rather than racing over one file.
 
 The version resolves like any Maven coordinate: the `@jenesis.pin` here fixes it
 (with a checksum, so `-Djenesis.dependency.pin=strict` is satisfied), an inline
 `@jenesis.alias ... <version>` would be the next choice, and with neither the
 latest release is negotiated. args4j is pinned to **2.33**, the last release
 before it added an `Automatic-Module-Name` of its own - a newer args4j already
-has a module identity, so the alias would instead leave the jar untouched and
-read its packages under that existing name. Aliasing is for the artifacts that
+has a module identity, and Jenesis rejects an alias for such a target, since it
+can be required under the name it declares. Aliasing is for the artifacts that
 have no name to offer.
+
+Because the target becomes a real module rather than a class-path jar, the usual
+module-path rules apply to it: a class in the default package, a package shared
+with another module, or a name another module already carries is reported by the
+tools themselves. `jlink` and modular `jpackage` images cannot consume an alias,
+since an automatic module is not linkable.
 
 Pinning
 -------
 
 `java build/jenesis/Project.java pin` records the aliased target like any other
 Maven dependency - `@jenesis.pin args4j/args4j <version> SHA-256/...` - and never
-pins the synthetic alias itself. This demo ships already pinned.
+pins the alias name itself. This demo ships already pinned.

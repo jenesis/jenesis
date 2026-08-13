@@ -290,6 +290,7 @@ public class Javac extends JdkProcessBuildStep {
         if (versionedFiles.isEmpty()) {
             return CompletableFuture.completedStage(null);
         }
+        List<String> prepended = prepended(properties(arguments));
         Path mainTarget = context.next().resolve(CLASSES);
         Path moduleInfo = mainTarget.resolve("module-info.class");
         String moduleName;
@@ -307,7 +308,7 @@ public class Javac extends JdkProcessBuildStep {
             List<String> roots = versionedRoots.get(release);
             chain = chain.thenComposeAsync(_ -> {
                 try {
-                    return runVersioned(executor, context, dependencyPath, moduleName, mainTarget, roots, release, files);
+                    return runVersioned(executor, context, prepended, dependencyPath, moduleName, mainTarget, roots, release, files);
                 } catch (IOException e) {
                     return CompletableFuture.failedFuture(e);
                 }
@@ -347,6 +348,7 @@ public class Javac extends JdkProcessBuildStep {
 
     private CompletionStage<Void> runVersioned(Executor executor,
                                                BuildStepContext context,
+                                               List<String> prepended,
                                                List<String> dependencyPath,
                                                String moduleName,
                                                Path mainTarget,
@@ -355,7 +357,8 @@ public class Javac extends JdkProcessBuildStep {
                                                List<String> files) throws IOException {
         Path target = Files.createDirectories(context.next()
                 .resolve(CLASSES + "META-INF/versions/" + release));
-        List<String> commands = new ArrayList<>(List.of(
+        List<String> commands = new ArrayList<>(prepended);
+        commands.addAll(List.of(
                 "-d", target.toString(),
                 "--release", Integer.toString(release)));
         List<String> classPath = new ArrayList<>(), modulePath = new ArrayList<>(), patchModule = new ArrayList<>();

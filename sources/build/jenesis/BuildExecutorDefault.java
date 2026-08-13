@@ -655,11 +655,6 @@ class BuildExecutorDefault implements BuildExecutor {
         private static final StepRecord INCOMPLETE = new StepRecord(Map.of(), false);
     }
 
-    /*
-     * A step counts as completed only once step.properties was renamed into place, which happens after every
-     * other checksum file was written. A record that is absent or unreadable describes a step that was
-     * interrupted while being recorded, and such a step is repeated rather than failing the build.
-     */
     private StepRecord completed(Path checksum, Path output, Path stepFile, byte[] step, Executor executor) {
         if (!Files.isRegularFile(stepFile)) {
             return StepRecord.INCOMPLETE;

@@ -2,7 +2,6 @@ package build.jenesis;
 
 import module java.base;
 import build.jenesis.docker.DockerizedJava;
-import build.jenesis.maven.MavenAliasResolver;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenModuleResolver;
 import build.jenesis.maven.MavenPomResolver;
@@ -270,8 +269,8 @@ public record Project(
                                 .prepend(JenesisModuleRepository.ofLocal()));
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
                 resolvers.putIfAbsent("maven", new MavenPomResolver());
-                resolvers.putIfAbsent("module", new MavenAliasResolver("maven", new MavenModuleResolver("maven",
-                        MavenResolver.of(resolvers.get("maven")), repositories.get("module"))));
+                resolvers.putIfAbsent("module", new MavenModuleResolver("maven",
+                        MavenResolver.of(resolvers.get("maven")), repositories.get("module")));
                 SequencedSet<String> modulesDeps = new LinkedHashSet<>();
                 inherited.sequencedKeySet().stream()
                         .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + METADATA + "/"))

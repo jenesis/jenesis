@@ -70,10 +70,6 @@ public class ProjectWatchTest {
         return thread;
     }
 
-    // Waits for the watch thread to signal a build, but bails out as soon as the thread fails to
-    // start watching. A file watcher is an OS resource (inotify instances on Linux) that can be
-    // exhausted by a busy machine; treat "no watch service available" as an environment skip
-    // rather than a spurious failure, and surface any other watch error immediately.
     private static void await(CountDownLatch latch, AtomicReference<Throwable> failure) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
         while (System.nanoTime() < deadline) {

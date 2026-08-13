@@ -9,6 +9,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -22,6 +23,7 @@ import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Javac;
+import build.jenesis.step.Versions;
 
 import static build.jenesis.project.MultiProjectModule.ARTIFACTS;
 import static build.jenesis.project.MultiProjectModule.ASSIGN;
@@ -236,15 +238,6 @@ public class ModularProject implements BuildExecutorModule {
                         + info.requires()
                         + ")");
             }
-            SequencedProperties requires = new SequencedProperties();
-            for (String dependency : info.requires()) {
-                requires.setProperty(group + "/compile/" + prefix + "/" + dependency, "");
-                if (info.runtimeRequires().contains(dependency)) {
-                    requires.setProperty(group + "/runtime/" + prefix + "/" + dependency, "");
-                }
-            }
-            info.plugins().forEach((coordinate, group) ->
-                    requires.setProperty(group + "/plugin/" + coordinate, ""));
             SequencedMap<String, String> versions = new LinkedHashMap<>(info.versions());
             for (Map.Entry<String, SequencedMap<String, String>> variant : info.variants().entrySet()) {
                 String selected = platform.select(variant.getKey(),
@@ -254,6 +247,29 @@ public class ModularProject implements BuildExecutorModule {
                     versions.put(variant.getKey(), selected);
                 }
             }
+            SequencedMap<String, String> targets = new LinkedHashMap<>();
+            for (Map.Entry<String, String> entry : info.aliases().entrySet()) {
+                String value = entry.getValue();
+                int space = value.indexOf(' ');
+                targets.put(entry.getKey(), space < 0 ? value : value.substring(0, space));
+                if (space > 0) {
+                    versions.putIfAbsent(group + "/maven/" + targets.get(entry.getKey()),
+                            value.substring(space + 1).trim());
+                }
+            }
+            SequencedProperties requires = new SequencedProperties();
+            for (String dependency : info.requires()) {
+                String target = targets.get(dependency);
+                String coordinate = target == null
+                        ? prefix + "/" + dependency
+                        : "maven/" + target + version(versions, group + "/maven/" + target);
+                requires.setProperty(group + "/compile/" + coordinate, "");
+                if (info.runtimeRequires().contains(dependency)) {
+                    requires.setProperty(group + "/runtime/" + coordinate, "");
+                }
+            }
+            info.plugins().forEach((coordinate, group) ->
+                    requires.setProperty(group + "/plugin/" + coordinate, ""));
             info.attachments().forEach((key, _) -> {
                 int slash = key.indexOf('/');
                 int second = key.indexOf('/', slash + 1);
@@ -262,14 +278,10 @@ public class ModularProject implements BuildExecutorModule {
                 if (repository.equals(prefix) && info.requires().contains(coordinate)) {
                     return;
                 }
-                String suffix = "";
-                if (!repository.equals("module")) {
-                    String pinned = versions.get(key);
-                    int space = pinned == null ? -1 : pinned.indexOf(' ');
-                    String bare = pinned == null ? "" : space < 0 ? pinned : pinned.substring(0, space);
-                    suffix = "/" + (bare.isEmpty() || bare.startsWith(":") ? "RELEASE" : bare);
-                }
-                requires.setProperty(key.substring(0, slash) + "/runtime/" + key.substring(slash + 1) + suffix, "");
+                requires.setProperty(key.substring(0, slash)
+                        + "/runtime/"
+                        + key.substring(slash + 1)
+                        + (repository.equals("module") ? "" : version(versions, key)), "");
             });
             requires.store(context.next().resolve(BuildStep.REQUIRES));
             if (!info.attachments().isEmpty()) {
@@ -280,11 +292,20 @@ public class ModularProject implements BuildExecutorModule {
                 });
                 attachments.store(context.next().resolve(BuildStep.ATTACHMENTS));
             }
-            if (!info.aliases().isEmpty()) {
+            if (!targets.isEmpty()) {
                 SequencedProperties aliases = new SequencedProperties();
-                info.aliases().forEach((alias, target) ->
-                        aliases.setProperty(group + "/" + prefix + "/" + alias, target));
+                List<String> declarations = new ArrayList<>();
+                for (Map.Entry<String, String> entry : targets.entrySet()) {
+                    aliases.setProperty(group + "/" + prefix + "/" + entry.getKey(), entry.getValue());
+                    declarations.add(entry.getKey() + "=" + entry.getValue());
+                }
                 aliases.store(context.next().resolve(BuildStep.ALIASES));
+                Manifest manifest = new Manifest();
+                manifest.getMainAttributes().putValue("Manifest-Version", "1.0");
+                manifest.getMainAttributes().putValue(PathPlacement.ALIASES, String.join(",", declarations));
+                try (OutputStream out = Files.newOutputStream(context.next().resolve(Versions.MANIFEST))) {
+                    manifest.write(out);
+                }
             }
             if (!versions.isEmpty()) {
                 SequencedProperties properties = new SequencedProperties();
@@ -363,6 +384,13 @@ public class ModularProject implements BuildExecutorModule {
             }
             metadata.store(context.next().resolve(BuildStep.METADATA));
             return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+
+        private static String version(SequencedMap<String, String> versions, String key) {
+            String pinned = versions.get(key);
+            int space = pinned == null ? -1 : pinned.indexOf(' ');
+            String bare = pinned == null ? "" : space < 0 ? pinned : pinned.substring(0, space);
+            return "/" + (bare.isEmpty() || bare.startsWith(":") ? "RELEASE" : bare);
         }
     }
 

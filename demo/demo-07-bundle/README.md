@@ -35,7 +35,7 @@ What the bundle contains
 The `bundle` step writes one `bundle.zip` per module that declares a main class:
 
     bundle.zip
-    |-- application.properties     mainClass=sample.Sample, mainModule=demo.bundle, selfContainedModuleGraph=true
+    |-- application.properties     mainClass=sample.Sample, mainModule=demo.bundle
     |-- modulepath/                jars that are modules (here the app jar and slf4j-api)
     `-- classpath/                 any non-modular (plain) jars
 
@@ -46,12 +46,12 @@ launch:
 
 - `mainClass` - the entry point, always present;
 - `mainModule` - present only when the launcher is modular;
-- `selfContainedModuleGraph` - present whenever `modulepath/` is non-empty. `true`
-  means the module path resolves entirely from the main module's `requires`, so a
-  consumer launches it as-is; `false` (an automatic module or a `classpath/` jar is
-  present) means the consumer must add `--add-modules ALL-MODULE-PATH` to root the
-  whole module path. This demo's closure is `demo.bundle` + `org.slf4j`, both
-  explicit modules, so the flag is `true`.
+- `javaOptions` - space-separated JVM options the consumer splices in verbatim, present
+  only when this module graph does not resolve on its own:
+  `--add-modules=ALL-MODULE-PATH,ALL-DEFAULT` when an automatic module or a `classpath/` jar
+  keeps the main module's `requires` from rooting the whole module path and the platform
+  modules such a jar expects. This demo's closure is `demo.bundle` + `org.slf4j`, both
+  explicit modules, so the key is absent and the bundle launches as-is.
 
 `Demo.java` reads those three fields and reconstructs the launch command -
 `java --module-path modulepath -m demo.bundle/sample.Sample` here - the same command

@@ -9,8 +9,6 @@ public class MavenDependencyKeyTest {
 
     @Test
     public void normalizes_empty_classifier_to_absent() {
-        // netty-parent resolves <classifier>${tcnative.classifier}</classifier> to "" when the
-        // os-maven-plugin extension is absent; "" must behave like no classifier.
         MavenDependencyKey key = new MavenDependencyKey("io.netty", "netty-tcnative-boringssl-static", "jar", "");
         assertThat(key.classifier()).isNull();
         assertThat(key.coordinate(null, "2.0.78.Final"))

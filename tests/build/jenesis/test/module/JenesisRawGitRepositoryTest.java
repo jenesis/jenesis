@@ -29,8 +29,6 @@ public class JenesisRawGitRepositoryTest {
 
     @Test
     public void maps_explicit_module_version_to_its_maven_version() throws IOException {
-        // The module-info version (1.0) differs from the Maven coordinate version (1.0.5): the
-        // download must use the Maven version from the row's last column, not the requested one.
         writeTsv("widget", "modules.tsv",
                 "2.0\tcom.example\twidget-core\t2.0",
                 "1.0\tcom.example\twidget-core\t1.0.5");
@@ -41,7 +39,6 @@ public class JenesisRawGitRepositoryTest {
 
     @Test
     public void resolves_through_artifacts_tsv_when_not_requiring_named_modules() throws IOException {
-        // artifacts.tsv columns are version, type, groupId, artifactId.
         writeTsv("widget", "artifacts.tsv",
                 "2.0\tnamed\tcom.example\twidget-core",
                 "1.0\tnamed\tcom.example\twidget-core");
@@ -52,8 +49,6 @@ public class JenesisRawGitRepositoryTest {
 
     @Test
     public void assumes_newest_coordinate_for_a_version_absent_from_the_tsv() throws IOException {
-        // 9.9 is not in the TSV: best effort assumes it exists on Maven Central under the newest
-        // coordinate (com.example:widget-core), with the requested version verbatim.
         writeTsv("widget", "modules.tsv", "1.0\tcom.example\twidget-core\t1.0");
         writeArtifact("com.example", "widget-core", "9.9", "jar", "guessed");
 

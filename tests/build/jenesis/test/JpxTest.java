@@ -6,6 +6,7 @@ import java.util.jar.Attributes;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Jpx;
+import build.jenesis.ModuleGraph;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
@@ -106,7 +107,9 @@ public class JpxTest {
         assertThat(properties.getProperty("mainModule")).isEqualTo("tool.main");
         assertThat(properties.getProperty("mainClass")).isEqualTo("toolmain.Main");
         assertThat(properties.getProperty("modulepath")).isEqualTo("tool-lib-1.0.jar,tool-main-1.0.jar");
-        assertThat(properties.getProperty("selfContainedModuleGraph")).isEqualTo("true");
+        assertThat(properties.getProperty(ModuleGraph.JAVA_OPTIONS))
+                .as("a graph that resolves from the main module's requires needs no option at all")
+                .isNull();
         assertThat(properties.getProperty("classpath")).isNull();
         assertThat(properties.getProperty("checksum")).startsWith("SHA-256/");
 
@@ -163,7 +166,7 @@ public class JpxTest {
         SequencedProperties properties = installation.properties();
         assertThat(properties.getProperty("mainModule")).isEqualTo("tool.main");
         assertThat(properties.getProperty("modulepath")).isEqualTo("tool.lib.jar,tool.main.jar");
-        assertThat(properties.getProperty("selfContainedModuleGraph")).isEqualTo("true");
+        assertThat(properties.getProperty(ModuleGraph.JAVA_OPTIONS)).isNull();
 
         Path marker = work.resolve("marker.txt");
         assertThat(installation.launch(List.of(marker.toString()))).isEqualTo(7);
@@ -203,8 +206,6 @@ public class JpxTest {
     @Test
     public void installs_without_local_maven_repository() throws IOException, InterruptedException {
         addMavenTool();
-        // Without a local repository to materialize into, the Maven repository only
-        // streams its items; the installation spills them into its target folder instead.
         Repository streaming = new MavenDefaultRepository(mavenRepoFolder.toUri(), null, Map.of(), _ -> {});
         Jpx jpx = new Jpx(storage,
                 Map.of("maven", streaming),
@@ -400,7 +401,34 @@ public class JpxTest {
     }
 
     @Test
-    public void java_arguments_add_all_module_path_for_non_self_contained_graph() throws IOException {
+    public void java_arguments_splice_the_stored_java_options() throws IOException {
+        Path folder = Files.createDirectories(work.resolve("crafted@1.0"));
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("mainModule", "tool.main");
+        properties.setProperty("mainClass", "toolmain.Main");
+        properties.setProperty("modulepath", "tool-main.jar");
+        properties.setProperty(ModuleGraph.JAVA_OPTIONS,
+                "--add-modules=ALL-MODULE-PATH --add-reads=tool.main=ALL-UNNAMED");
+        properties.setProperty("classpath", "legacy.jar");
+        properties.store(folder.resolve(Jpx.PROPERTIES));
+        Jpx.Installation installation = new Jpx.Installation(folder, new HashDigestFunction("SHA-256"));
+
+        List<String> arguments = installation.javaArguments(null, List.of("run"));
+
+        assertThat(arguments)
+                .as("the installation carries ready-made options"
+                        + ", so the launch splices them without interpreting them")
+                .containsSubsequence(
+                        "-p", folder.resolve("tool-main.jar").toString(),
+                        "--add-modules=ALL-MODULE-PATH",
+                        "--add-reads=tool.main=ALL-UNNAMED",
+                        "-cp", folder.resolve("legacy.jar").toString(),
+                        "-m", "tool.main/toolmain.Main",
+                        "run");
+    }
+
+    @Test
+    public void java_arguments_add_all_module_path_for_a_legacy_installation() throws IOException {
         Path folder = Files.createDirectories(work.resolve("crafted@1.0"));
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("mainModule", "tool.main");
@@ -413,12 +441,14 @@ public class JpxTest {
 
         List<String> arguments = installation.javaArguments(null, List.of("run"));
 
-        assertThat(arguments).containsSubsequence(
-                "-p", folder.resolve("tool-main.jar").toString(),
-                "--add-modules", "ALL-MODULE-PATH",
-                "-cp", folder.resolve("legacy.jar").toString(),
-                "-m", "tool.main/toolmain.Main",
-                "run");
+        assertThat(arguments)
+                .as("an installation written before javaOptions existed still gets its module path rooted")
+                .containsSubsequence(
+                        "-p", folder.resolve("tool-main.jar").toString(),
+                        "--add-modules=ALL-MODULE-PATH",
+                        "-cp", folder.resolve("legacy.jar").toString(),
+                        "-m", "tool.main/toolmain.Main",
+                        "run");
     }
 
     @Test
@@ -549,16 +579,10 @@ public class JpxTest {
                 .collect(Collectors.joining())));
     }
 
-    /**
-     * Lays out the tool as a local jenesis repository: a discovery POM for the {@code module} prefix and
-     * the module jars for the {@code modular} prefix, versioned or not.
-     */
     private void addDiscoveryPom(String version) throws IOException {
         Path folder = Files.createDirectories(version == null
                 ? jenesisRepoFolder.resolve("tool.main")
                 : jenesisRepoFolder.resolve("tool.main/" + version));
-        // The discovery POM is the artifact's full POM: the graph is read from it directly,
-        // never refetched from the Maven repository.
         Files.writeString(folder.resolve("tool.main.pom"), """
                 <project xmlns="http://maven.apache.org/POM/4.0.0">
                     <groupId>org.example</groupId>

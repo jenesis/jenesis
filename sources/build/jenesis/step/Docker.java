@@ -5,6 +5,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 
@@ -68,12 +69,11 @@ public class Docker implements BuildStep {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         SequencedMap<String, Path> classpath = new LinkedHashMap<>(), modulepath = new LinkedHashMap<>();
-        boolean selfContainedModuleGraph = true;
+        ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
             if (mainModule != null) {
-                ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(entry.getValue());
-                (descriptor != null ? modulepath : classpath).put(entry.getKey(), entry.getValue());
-                selfContainedModuleGraph &= descriptor != null && !descriptor.isAutomatic();
+                (graph.place(PathPlacement.INFERRED, entry.getValue()) ? modulepath : classpath)
+                        .put(entry.getKey(), entry.getValue());
             } else {
                 classpath.put(entry.getKey(), entry.getValue());
             }
@@ -83,7 +83,7 @@ public class Docker implements BuildStep {
         copy(folder.resolve("modulepath"), modulepath);
         Files.writeString(folder.resolve("Dockerfile"), dockerfile(mainClass,
                 modulepath.isEmpty() ? null : mainModule,
-                selfContainedModuleGraph,
+                graph.arguments(),
                 classpath.sequencedKeySet(),
                 modulepath.sequencedKeySet()));
         return CompletableFuture.completedStage(new BuildStepResult(true));
@@ -101,7 +101,7 @@ public class Docker implements BuildStep {
 
     private String dockerfile(String mainClass,
                               String mainModule,
-                              boolean selfContainedModuleGraph,
+                              List<String> relaxations,
                               SequencedSet<String> classpath,
                               SequencedSet<String> modulepath) {
         StringBuilder builder = new StringBuilder("FROM ").append(from).append("\nWORKDIR /app\n");
@@ -122,10 +122,7 @@ public class Docker implements BuildStep {
         } else {
             command.add("--module-path");
             command.add("/app/modulepath");
-            if (!selfContainedModuleGraph) {
-                command.add("--add-modules");
-                command.add("ALL-MODULE-PATH");
-            }
+            command.addAll(relaxations);
             command.add("--module");
             command.add(mainModule + "/" + mainClass);
         }

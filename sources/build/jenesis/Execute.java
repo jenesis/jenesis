@@ -122,12 +122,10 @@ public record Execute(Project project, String mainClass, String module) {
             javaArgs.add("-javaagent:" + jar.toAbsolutePath() + (options == null ? "" : "=" + options));
         }
         if (candidate.module != null) {
-            boolean selfContainedModuleGraph = true;
+            ModuleGraph graph = new ModuleGraph();
             List<String> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
             for (String jar : jars) {
-                ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(Path.of(jar));
-                (descriptor != null ? modulePath : classPath).add(jar);
-                selfContainedModuleGraph &= descriptor != null && !descriptor.isAutomatic();
+                graph.place(PathPlacement.INFERRED, Path.of(jar), modulePath, classPath);
             }
             javaArgs.add("--module-path");
             javaArgs.add(String.join(File.pathSeparator, modulePath));
@@ -135,10 +133,7 @@ public record Execute(Project project, String mainClass, String module) {
                 javaArgs.add("--class-path");
                 javaArgs.add(String.join(File.pathSeparator, classPath));
             }
-            if (!selfContainedModuleGraph) {
-                javaArgs.add("--add-modules");
-                javaArgs.add("ALL-MODULE-PATH");
-            }
+            javaArgs.addAll(graph.arguments());
             javaArgs.add("-m");
             javaArgs.add(candidate.module + "/" + candidate.mainClass);
         } else {

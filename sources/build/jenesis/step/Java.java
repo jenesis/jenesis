@@ -3,6 +3,7 @@ package build.jenesis.step;
 import module java.base;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
+import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 
 public abstract class Java extends JdkProcessBuildStep {
@@ -121,14 +122,14 @@ public abstract class Java extends JdkProcessBuildStep {
                                                  SequencedMap<String, SequencedMap<String, String>> properties)
             throws IOException {
         List<String> classPath = new ArrayList<>(), modulePath = new ArrayList<>();
-        boolean selfContainedModuleGraph = true;
+        ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
             BuildStepArgument argument = entry.getValue();
             if (!jarsOnly) {
                 for (String folder : List.of(Javac.CLASSES, Bind.RESOURCES)) {
                     Path candidate = argument.folder().resolve(folder);
                     if (Files.isDirectory(candidate)) {
-                        (pathPlacement.test(candidate) ? modulePath : classPath).add(candidate.toString());
+                        graph.place(pathPlacement, candidate, modulePath, classPath);
                     }
                 }
             }
@@ -136,12 +137,12 @@ public abstract class Java extends JdkProcessBuildStep {
             if (Files.isDirectory(artifacts)) {
                 try (DirectoryStream<Path> files = Files.newDirectoryStream(artifacts)) {
                     for (Path file : files) {
-                        selfContainedModuleGraph &= !pathPlacement.place(file, modulePath, classPath);
+                        graph.place(pathPlacement, file, modulePath, classPath);
                     }
                 }
             }
             for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
-                selfContainedModuleGraph &= !pathPlacement.place(file, modulePath, classPath);
+                graph.place(pathPlacement, file, modulePath, classPath);
             }
             SequencedMap<String, String> folders = properties.get(entry.getKey());
             if (folders != null) {
@@ -153,14 +154,19 @@ public abstract class Java extends JdkProcessBuildStep {
                     if (value != null) {
                         for (String part : value.split("\n")) {
                             if (!part.isEmpty()) {
-                                paths.getValue().add(argument.folder().resolve(part).toString());
+                                Path resolved = argument.folder().resolve(part);
+                                paths.getValue().add(resolved.toString());
+                                if (paths.getKey().equals(MODULE_PATH)) {
+                                    graph.module(resolved);
+                                } else {
+                                    graph.unnamed();
+                                }
                             }
                         }
                     }
                 }
             }
         }
-        selfContainedModuleGraph &= classPath.isEmpty();
         List<String> prefixes = new ArrayList<>();
         for (Map.Entry<String, List<String>> paths : List.of(
                 Map.entry(MODULE_PATH, modulePath),
@@ -171,10 +177,7 @@ public abstract class Java extends JdkProcessBuildStep {
                 prefixes.add(String.join(File.pathSeparator, paths.getValue()));
             }
         }
-        if (!selfContainedModuleGraph && !modulePath.isEmpty()) {
-            prefixes.add("--add-modules");
-            prefixes.add("ALL-MODULE-PATH");
-        }
+        prefixes.addAll(graph.arguments());
         return commands(executor, context, arguments).thenApplyAsync(commands -> Stream.concat(
                 prefixes.stream(),
                 commands.stream()).toList(), executor);

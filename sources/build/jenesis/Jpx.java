@@ -124,10 +124,7 @@ public record Jpx(Path storage,
             if (modulepath != null) {
                 command.add("-p");
                 command.add(join(modulepath));
-                if (!Boolean.parseBoolean(properties.getProperty("selfContainedModuleGraph"))) {
-                    command.add("--add-modules");
-                    command.add("ALL-MODULE-PATH");
-                }
+                command.addAll(ModuleGraph.load(properties));
             }
             if (classpath != null) {
                 command.add("-cp");
@@ -368,6 +365,7 @@ public record Jpx(Path storage,
                 BuildStep.linkOrCopy(folder.resolve(file.getFileName().toString()), placed);
             }
         }
+        root = rename(resolution, jars, folder, root);
         ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(root);
         if (command.name().indexOf(':') < 0
                 && (descriptor == null || !descriptor.name().equals(command.name()))) {
@@ -379,11 +377,11 @@ public record Jpx(Path storage,
                 ? PathPlacement.mainClass(root)
                 : descriptor.mainClass().get();
         List<String> modulepath = new ArrayList<>(), classpath = new ArrayList<>();
-        boolean selfContainedModuleGraph = true;
+        ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
-            ModuleDescriptor placed = mainModule == null ? null : PathPlacement.moduleDescriptor(folder.resolve(entry.getKey()));
-            (placed != null ? modulepath : classpath).add(entry.getKey());
-            selfContainedModuleGraph &= placed != null && !placed.isAutomatic();
+            Path file = folder.resolve(entry.getKey());
+            boolean placed = mainModule != null && graph.place(PathPlacement.INFERRED, file);
+            (placed ? modulepath : classpath).add(entry.getKey());
         }
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("name", command.name());
@@ -396,8 +394,8 @@ public record Jpx(Path storage,
         }
         if (!modulepath.isEmpty()) {
             properties.setProperty("modulepath", String.join(",", modulepath));
-            properties.setProperty("selfContainedModuleGraph", Boolean.toString(selfContainedModuleGraph));
         }
+        graph.store(properties);
         if (!classpath.isEmpty()) {
             properties.setProperty("classpath", String.join(",", classpath));
         }
@@ -405,6 +403,79 @@ public record Jpx(Path storage,
         Path temporary = Files.createTempFile(folder, PROPERTIES, ".tmp");
         properties.store(temporary);
         Files.move(temporary, folder.resolve(PROPERTIES), StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    private static Path rename(Resolver.Resolution resolution,
+                               SequencedMap<String, Path> jars,
+                               Path folder,
+                               Path root) throws IOException {
+        SequencedMap<String, String> coordinates = new LinkedHashMap<>();
+        for (Map.Entry<String, Resolver.Resolved> entry : resolution.artifacts().entrySet()) {
+            String coordinate = entry.getKey();
+            int first = coordinate.indexOf('/'), last = coordinate.lastIndexOf('/');
+            if (first > 0 && last > first) {
+                coordinates.putIfAbsent(coordinate.substring(first + 1, last),
+                        entry.getValue().file().getFileName().toString());
+            }
+        }
+        SequencedMap<String, String> aliased = new LinkedHashMap<>();
+        for (Map.Entry<String, Path> entry : jars.entrySet()) {
+            String origin = entry.getKey();
+            for (Map.Entry<String, String> declaration : PathPlacement.aliases(folder.resolve(origin)).entrySet()) {
+                String alias = declaration.getKey(), name = coordinates.get(declaration.getValue());
+                if (name == null || !jars.containsKey(name)) {
+                    throw new IllegalStateException(origin
+                            + " aliases "
+                            + alias
+                            + " to "
+                            + declaration.getValue()
+                            + ", which this installation does not contain");
+                }
+                String previous = aliased.putIfAbsent(alias, name);
+                if (previous != null && !previous.equals(name)) {
+                    throw new IllegalStateException("Module alias "
+                            + alias
+                            + " is declared for "
+                            + previous
+                            + " and for "
+                            + name
+                            + " within "
+                            + folder.getFileName());
+                }
+            }
+        }
+        SequencedMap<String, String> owners = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : aliased.entrySet()) {
+            String alias = entry.getKey(), name = entry.getValue(), aliasedJar = alias + ".jar";
+            String previous = owners.putIfAbsent(name, alias);
+            if (previous != null) {
+                throw new IllegalStateException(name
+                        + " is aliased as both "
+                        + previous
+                        + " and "
+                        + alias
+                        + " - a jar can carry only one module name");
+            }
+            if (jars.containsKey(aliasedJar)) {
+                throw new IllegalStateException("Module alias "
+                        + alias
+                        + " collides with "
+                        + aliasedJar
+                        + " within "
+                        + folder.getFileName()
+                        + " - require it directly");
+            }
+            Path target = folder.resolve(aliasedJar);
+            Files.move(folder.resolve(name), target, StandardCopyOption.REPLACE_EXISTING);
+            jars.remove(name);
+            jars.put(aliasedJar, target);
+            PathPlacement.aliased(target, alias, name);
+            Files.writeString(PathPlacement.declaration(target), alias);
+            if (root.getFileName().toString().equals(name)) {
+                root = target;
+            }
+        }
+        return root;
     }
 
     public Optional<Installation> latestInstalled(String name) throws IOException {

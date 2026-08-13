@@ -5,6 +5,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 
@@ -66,12 +67,11 @@ public class Bundle implements BuildStep {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         SequencedMap<String, Path> classpath = new LinkedHashMap<>(), modulepath = new LinkedHashMap<>();
-        boolean selfContainedModuleGraph = true;
+        ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
             if (mainModule != null) {
-                ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(entry.getValue());
-                (descriptor != null ? modulepath : classpath).put(entry.getKey(), entry.getValue());
-                selfContainedModuleGraph &= descriptor != null && !descriptor.isAutomatic();
+                (graph.place(PathPlacement.INFERRED, entry.getValue()) ? modulepath : classpath)
+                        .put(entry.getKey(), entry.getValue());
             } else {
                 classpath.put(entry.getKey(), entry.getValue());
             }
@@ -81,9 +81,7 @@ public class Bundle implements BuildStep {
         if (mainModule != null) {
             application.setProperty("mainModule", mainModule);
         }
-        if (!modulepath.isEmpty()) {
-            application.setProperty("selfContainedModuleGraph", Boolean.toString(selfContainedModuleGraph));
-        }
+        graph.store(application);
         Path descriptor = context.supplement().resolve("application.properties");
         application.store(descriptor);
         Path zip = Files.createDirectory(context.next().resolve(BUNDLE)).resolve("bundle.zip");

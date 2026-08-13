@@ -99,21 +99,6 @@ public class MavenModuleResolver implements Resolver {
                                             Map<String, Repository> repositories,
                                             SequencedMap<String, SequencedSet<String>> coordinates,
                                             SequencedMap<String, String> versions,
-                                            SequencedMap<String, String> aliases,
-                                            DependencyScope scope) throws IOException {
-        if (!aliases.isEmpty()) {
-            throw new IllegalArgumentException("Module aliases require wrapping this resolver in a"
-                    + " MavenAliasResolver: " + String.join(", ", aliases.sequencedKeySet()));
-        }
-        return dependencies(executor, prefix, repositories, coordinates, versions, scope);
-    }
-
-    @Override
-    public Resolver.Resolution dependencies(Executor executor,
-                                            String prefix,
-                                            Map<String, Repository> repositories,
-                                            SequencedMap<String, SequencedSet<String>> coordinates,
-                                            SequencedMap<String, String> versions,
                                             DependencyScope scope) throws IOException {
         coordinates.forEach((coordinate, exclusions) -> {
             if (!exclusions.isEmpty()) {

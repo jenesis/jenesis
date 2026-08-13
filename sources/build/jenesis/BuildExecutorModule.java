@@ -1,10 +1,5 @@
 package build.jenesis;
 
-// Maven parses sources with a third-party tool which does not understand
-// module imports and fails the build. To allow comparative execution, this
-// file avoids module imports for now.
-//import module java.base;
-
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;

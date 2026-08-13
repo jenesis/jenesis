@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
+import build.jenesis.PathPlacement;
 
 public class Javadoc extends JdkProcessBuildStep {
 
@@ -104,11 +105,28 @@ public class Javadoc extends JdkProcessBuildStep {
                             "Path entry contains separator '" + File.pathSeparator + "': " + entry);
                 }
             }
-            String joined = String.join(File.pathSeparator, path);
-            String escaped = joined.replace("\\", "\\\\").replace("\"", "\\\"");
+            List<String> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
+            for (String entry : path) {
+                (module && PathPlacement.moduleDescriptor(Path.of(entry)) != null
+                        ? modulePath
+                        : classPath).add(entry);
+            }
+            StringBuilder args = new StringBuilder();
+            for (Map.Entry<String, List<String>> paths : List.of(
+                    Map.entry("--module-path", modulePath),
+                    Map.entry("--class-path", classPath)
+            )) {
+                if (!paths.getValue().isEmpty()) {
+                    args.append(paths.getKey())
+                            .append("\n\"")
+                            .append(String.join(File.pathSeparator, paths.getValue())
+                                    .replace("\\", "\\\\")
+                                    .replace("\"", "\\\""))
+                            .append("\"\n");
+                }
+            }
             Path argfile = context.supplement().resolve("javadoc.args");
-            Files.writeString(argfile,
-                    (module ? "--module-path" : "--class-path") + "\n\"" + escaped + "\"\n");
+            Files.writeString(argfile, args.toString());
             commands.add("@" + argfile);
         }
         commands.addAll(files);

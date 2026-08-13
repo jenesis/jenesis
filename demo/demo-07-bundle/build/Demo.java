@@ -63,15 +63,15 @@ public class Demo {
         }
 
         // application.properties describes the launch: mainClass, mainModule (modular
-        // launchers only), and selfContainedModuleGraph - whether the module path roots
-        // itself from the main module's requires, or needs --add-modules ALL-MODULE-PATH.
+        // launchers only), and javaOptions - the JVM options this module graph needs to
+        // resolve, absent when it resolves from the main module's requires alone.
         Properties application = new Properties();
         try (InputStream in = Files.newInputStream(unpacked.resolve("application.properties"))) {
             application.load(in);
         }
         String mainClass = application.getProperty("mainClass");
         String mainModule = application.getProperty("mainModule");
-        boolean selfContained = Boolean.parseBoolean(application.getProperty("selfContainedModuleGraph", "true"));
+        String javaOptions = application.getProperty("javaOptions", "");
 
         // Reconstruct the launch command a JRE-based deployment would run.
         List<String> command = new ArrayList<>();
@@ -86,11 +86,12 @@ public class Demo {
             command.add("-classpath");
             command.add(classpath.resolve("*").toString());
         }
-        if (mainModule != null) {
-            if (!selfContained) {
-                command.add("--add-modules");
-                command.add("ALL-MODULE-PATH");
+        for (String option : javaOptions.split(" ")) {
+            if (!option.isEmpty()) {
+                command.add(option);
             }
+        }
+        if (mainModule != null) {
             command.add("-m");
             command.add(mainModule + "/" + mainClass);
         } else {

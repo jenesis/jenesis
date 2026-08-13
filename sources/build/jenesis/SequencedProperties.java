@@ -224,6 +224,14 @@ public class SequencedProperties extends Properties {
         return keys;
     }
 
+    public void forEachProperty(BiConsumer<String, String> action) {
+        delegate.forEach((key, value) -> {
+            if (key instanceof String property && value instanceof String text) {
+                action.accept(property, text);
+            }
+        });
+    }
+
     private static class CommentSuppressingWriter extends BufferedWriter {
 
         private boolean suppressLine;

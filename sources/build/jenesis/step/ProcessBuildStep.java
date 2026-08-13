@@ -83,6 +83,37 @@ public abstract class ProcessBuildStep implements BuildStep {
                                                              SequencedMap<String, SequencedMap<String, String>> properties)
             throws IOException;
 
+    protected SequencedMap<String, SequencedMap<String, String>> properties(
+            SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+        SequencedMap<String, SequencedMap<String, String>> properties = new LinkedHashMap<>();
+        for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
+            SequencedMap<String, String> folderMap = new LinkedHashMap<>();
+            for (String name : commands()) {
+                Path file = entry.getValue().folder().resolve(PROCESS + name + ".properties");
+                if (Files.exists(file)) {
+                    SequencedProperties.ofFiles(file).forEachProperty(folderMap::put);
+                }
+            }
+            properties.put(entry.getKey(), folderMap);
+        }
+        return properties;
+    }
+
+    protected static List<String> prepended(SequencedMap<String, SequencedMap<String, String>> properties) {
+        List<String> prepended = new ArrayList<>();
+        for (SequencedMap<String, String> folderMap : properties.values()) {
+            for (Map.Entry<String, String> entry : folderMap.entrySet()) {
+                for (String value : entry.getValue().split("\n")) {
+                    prepended.add(entry.getKey());
+                    if (!value.isEmpty()) {
+                        prepended.add(value);
+                    }
+                }
+            }
+        }
+        return prepended;
+    }
+
     public boolean acceptableExitCode(int code,
                                       Executor executor,
                                       BuildStepContext context,
@@ -95,20 +126,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        SequencedMap<String, SequencedMap<String, String>> properties = new LinkedHashMap<>();
-        for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
-            SequencedMap<String, String> folderMap = new LinkedHashMap<>();
-            for (String name : commands()) {
-                Path file = entry.getValue().folder().resolve(PROCESS + name + ".properties");
-                if (Files.exists(file)) {
-                    SequencedProperties loaded = SequencedProperties.ofFiles(file);
-                    for (String key : loaded.stringPropertyNames()) {
-                        folderMap.put(key, loaded.getProperty(key));
-                    }
-                }
-            }
-            properties.put(entry.getKey(), folderMap);
-        }
+        SequencedMap<String, SequencedMap<String, String>> properties = properties(arguments);
         AtomicReference<Thread> worker = new AtomicReference<>();
         CompletableFuture<BuildStepResult> result = process(executor, context, arguments, properties).thenComposeAsync(processed -> {
             if (processed == null) {
@@ -116,19 +134,10 @@ public abstract class ProcessBuildStep implements BuildStep {
             }
             CompletableFuture<BuildStepResult> future = new CompletableFuture<>();
             try {
-                List<String> prepended = new ArrayList<>();
-                for (SequencedMap<String, String> folderMap : properties.values()) {
-                    for (Map.Entry<String, String> entry : folderMap.entrySet()) {
-                        for (String value : entry.getValue().split("\n")) {
-                            prepended.add(entry.getKey());
-                            if (!value.isEmpty()) {
-                                prepended.add(value);
-                            }
-                        }
-                    }
-                }
+                List<String> commands = prepended(properties);
+                commands.addAll(processed);
                 Path output = context.supplement().resolve("output"), error = context.supplement().resolve("error");
-                ProcessHandler handler = factory.apply(Stream.concat(prepended.stream(), processed.stream()).toList());
+                ProcessHandler handler = factory.apply(commands);
                 Files.writeString(context.supplement().resolve("command"), String.join(" ", handler.commands()));
                 ProcessHandler.Tee tee = tee(executor, handler);
                 if (Boolean.getBoolean("jenesis.print.command")) {

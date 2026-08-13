@@ -98,61 +98,10 @@ public class DependenciesResolutionTest {
     }
 
     @Test
-    public void passes_module_aliases_to_resolver() throws IOException {
-        SequencedProperties properties = new SequencedProperties();
-        properties.setProperty("main/compile/foo/qux", "");
-        properties.store(dependencies.resolve(BuildStep.REQUIRES));
-        SequencedProperties aliases = new SequencedProperties();
-        aliases.setProperty("main/foo/toolkit.lib", "org.example/plain-lib");
-        aliases.store(dependencies.resolve(BuildStep.ALIASES));
-        SequencedMap<String, String> observed = new LinkedHashMap<>();
-        Resolver capturing = new Resolver() {
-            @Override
-            public Resolver.Resolution dependencies(Executor executor,
-                                                    String prefix,
-                                                    Map<String, Repository> repositories,
-                                                    SequencedMap<String, SequencedSet<String>> descriptors,
-                                                    SequencedMap<String, String> versions,
-                                                    DependencyScope scope) throws IOException {
-                SequencedMap<String, String> resolved = new LinkedHashMap<>();
-                descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
-                return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-            }
-
-            @Override
-            public Resolver.Resolution dependencies(Executor executor,
-                                                    String prefix,
-                                                    Map<String, Repository> repositories,
-                                                    SequencedMap<String, SequencedSet<String>> descriptors,
-                                                    SequencedMap<String, String> versions,
-                                                    SequencedMap<String, String> aliases,
-                                                    DependencyScope scope) throws IOException {
-                observed.putAll(aliases);
-                return dependencies(executor, prefix, repositories, descriptors, versions, scope);
-            }
-        };
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", capturing)).apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(
-                                Path.of(BuildStep.REQUIRES),
-                                Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.ALIASES),
-                                Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
-        assertThat(observed).containsEntry("toolkit.lib", "org.example/plain-lib");
-    }
-
-    @Test
     public void can_resolve_dependencies_from_streaming_repository() throws IOException {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/qux", "");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
-        // A repository without local files - like the Maven repository when no ~/.m2 exists and
-        // no artifacts cache is configured - only streams its items; the step must materialize
-        // them into its own output rather than fail.
         Repository streaming = (_, coordinate) -> Optional.of(
                 () -> new ByteArrayInputStream(coordinate.getBytes(StandardCharsets.UTF_8)));
         BuildStepResult result = new Dependencies(Map.of("foo", streaming), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {

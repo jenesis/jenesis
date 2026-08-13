@@ -8,6 +8,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.PathPlacement;
 import build.jenesis.Platform;
 import build.jenesis.SequencedProperties;
 import build.jenesis.module.ModularJarResolver;
@@ -201,7 +202,16 @@ public class ModularProjectTest {
         Path aliasesFile = module.resolve(BuildStep.ALIASES);
         assertThat(aliasesFile).exists();
         assertThat(SequencedProperties.ofFiles(aliasesFile)).containsOnly(
-                Map.entry("main/module/toolkit.lib", "org.example/plain-lib 1.0"));
+                Map.entry("main/module/toolkit.lib", "org.example/plain-lib"));
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.VERSIONS)))
+                .containsEntry("main/maven/org.example/plain-lib", "1.0");
+        Manifest manifest = new Manifest();
+        try (InputStream input = Files.newInputStream(module.resolve("manifest.mf"))) {
+            manifest.read(input);
+        }
+        assertThat(manifest.getMainAttributes().getValue(PathPlacement.ALIASES))
+                .as("a consumer of this module inherits the declaration through its manifest")
+                .isEqualTo("toolkit.lib=org.example/plain-lib");
     }
 
     @Test

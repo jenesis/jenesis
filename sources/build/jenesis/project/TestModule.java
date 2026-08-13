@@ -792,10 +792,7 @@ public class TestModule implements BuildExecutorModule {
                 if (!Files.isRegularFile(file)) {
                     continue;
                 }
-                SequencedProperties properties = SequencedProperties.ofFiles(file);
-                for (String key : properties.stringPropertyNames()) {
-                    attachments.putIfAbsent(key, properties.getProperty(key));
-                }
+                SequencedProperties.ofFiles(file).forEachProperty(attachments::putIfAbsent);
             }
             return attachments;
         }

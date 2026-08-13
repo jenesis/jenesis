@@ -87,7 +87,7 @@ public class DockerTest {
     }
 
     @Test
-    public void roots_the_module_path_when_the_graph_is_not_self_contained() throws IOException {
+    public void relaxes_the_graph_when_a_class_path_jar_is_present() throws IOException {
         Path artifacts = Files.createDirectory(input.resolve(BuildStep.ARTIFACTS));
         writeModularJar(artifacts.resolve("sample.jar"));
         writePlainJar(artifacts.resolve("lib.jar"));
@@ -111,7 +111,8 @@ public class DockerTest {
         assertThat(folder.resolve("classpath/lib.jar")).isRegularFile();
         assertThat(dockerfile(folder)).contains(
                 "ENTRYPOINT [\"java\", \"--class-path\", \"/app/classpath/*\", \"--module-path\", \"/app/modulepath\", "
-                        + "\"--add-modules\", \"ALL-MODULE-PATH\", \"--module\", \"sample/sample.Sample\"]");
+                        + "\"--add-modules\", \"ALL-MODULE-PATH,ALL-DEFAULT\", "
+                        + "\"--module\", \"sample/sample.Sample\"]");
     }
 
     @Test
