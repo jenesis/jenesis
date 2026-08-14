@@ -86,9 +86,13 @@ public class JavadocTest {
         assertThat(next.resolve(Javadoc.JAVADOC + "sample/sample/Sample.html")).isNotEmptyFile();
         assertThat(Files.readString(supplement.resolve("javadoc.args")))
                 .as("a jar without a module name is unscannable on the module path, so it goes where it belongs")
-                .contains("--module-path\n\"" + named)
-                .contains("--class-path\n\"" + plain)
+                .contains("--module-path\n\"" + escaped(named))
+                .contains("--class-path\n\"" + escaped(plain))
                 .doesNotContain("--add-reads");
+    }
+
+    private static String escaped(Path path) {
+        return path.toString().replace("\\", "\\\\");
     }
 
     private Path plainJar(Path file) throws IOException {

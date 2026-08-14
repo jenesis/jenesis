@@ -22,8 +22,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class DependenciesAliasTest {
 
+    @TempDir(cleanup = CleanupMode.NEVER)
+    private Path root;
     @TempDir
-    private Path root, mavenRepoFolder, work;
+    private Path mavenRepoFolder, work;
     private Path previous, next, supplement, dependencies;
 
     @BeforeEach
