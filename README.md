@@ -249,7 +249,7 @@ matter for the native build:
   `JAVA_HOME` is still required either way - the build resolves its tool home from it, and `javac --release` reads
   that JDK's symbol files - so this trades the fork's process-spawn cost for speed, not the JDK dependency itself.
 - The incremental cache serializes every `BuildStep` to key it, so that a changed step configuration (for
-  example the `jenesis.test.filter` filter) invalidates that step. That serialization needs native-image
+  example the `jenesis.test.reporting` flag) invalidates that step. That serialization needs native-image
   reachability metadata, which is captured from a real build with the native-image agent.
 
 Putting it together (after the `javac` precompile above), on a GraalVM JDK:
@@ -1360,7 +1360,10 @@ The `arguments` map carries one `BuildStepArgument` per registered predecessor. 
 read from (`argument.folder()`) and a per-file checksum status (`ADDED`, `ALTERED`, `REMOVED`, `RETAINED`) computed
 against the previous run. The default `shouldRun(...)` re-runs the step when any input has changed; a step can
 override it to express finer-grained dependencies (e.g. `Bind` only re-runs when files matching its bound paths
-changed).
+changed). A step that executes only part of what it could decides its own reuse instead: it records what it
+executed in its output folder, compares that record against the current request through `context.previous()`, and
+answers `BuildStepResult(false)` to keep the previous result - see *Tag-aware test caching* under
+[Architecture](#architecture).
 
 Steps are organised into a graph by `BuildExecutor`:
 
@@ -1773,8 +1776,13 @@ module-path - the `Requires` step then writes an empty `requires.properties` and
   the tags into a
   single comma-separated `-groups` argument and adds `-parallel methods`; `JUnit4` rejects tags (its console
   runner cannot select `@Category` by name) and ignores the parallel and reporting flags. `filter` and `tag`
-  are part of the step's serialized state (so changing either invalidates the cache) and, when set, force the step
-  to re-run regardless of cache consistency; `reporting` is also part of the serialized state (so toggling it
+  are transient - a narrowed test step is the same step, executing less - and are instead written as
+  `testscope.properties` into the step's `output` folder whenever the step runs. `Run.shouldRun(...)` therefore
+  always returns `true`, so that its `apply` is entered and can read the record of the previous run back through
+  `context.previous()`: when no input changed and its `Scope` record decides that the recorded run executed everything
+  the current request selects, the step answers `BuildStepResult(false)` and the previous result stands, with the
+  scope that produced it left untouched (see *Tag-aware test caching* under [Architecture](#architecture)).
+  `reporting` is part of the serialized state (so toggling it
   invalidates the cache and re-runs to produce or drop the report) but, like `parallel`, is not forced to re-run
   on every invocation; `parallel` is transient - it changes how tests run, not their result, so toggling it
   neither invalidates the cache nor forces a re-run. `Java` dispatches each
@@ -2282,6 +2290,15 @@ A few rules of thumb for new steps:
   the cache. Conversely, fields that *do* affect the output (a sort order, a placement function, a flag list)
   must stay non-transient.
 
+- **Record a narrowing in the output, not in the configuration hash.** A field that makes the step execute *less*
+  of what it could (`TestModule`'s `filter` and `tag`) is `transient`: a narrowing does not make it a different
+  step, and hashing it discards the previous result before it can be reused. Write what was executed into the
+  step's own output folder instead, keep `shouldRun(...)` returning `true` so that `apply` is always entered, and
+  compare that record against the current request through `context.previous()`, answering `BuildStepResult(false)`
+  where the previous run already covered it. The comparison must answer "not covered" whenever coverage cannot be
+  proven - reusing a result that never executed a selected unit silently skips it, which is far worse than a
+  wasted run - and must never override a changed input, which `shouldRun(...)`'s default still decides.
+
 - **Hold lambdas through serializable bounds.** Constructors that take functional values should declare an
   intersection bound (`<T extends Function<…> & Serializable>`) so the compiler emits a serializable lambda.
   A step that holds a non-serializable value will fail outright when `BuildStepHashFunction.ofSerializationDigest`
@@ -2328,8 +2345,8 @@ The following system properties and environment variables tune the build at laun
 | `jenesis.executor.rebuild` | system property | When `true`, `BuildExecutor.of(Path)` recursively deletes the target folder before constructing the executor, forcing a full rebuild from a clean tree. Equivalent to `rm -rf target/` ahead of the build. The `of(target, timeout, hash, stepHash, callback, rebuild)` overload accepts the flag directly; the convenience `of(Path)` overload reads this property. Default `false`. |
 | `jenesis.executor.aggregate` | system property | Default `false`. Governs how independent step failures are reported when the build's step graph fans out (for example a multi-module build where each module's test step is its own root). Independent steps always run concurrently to completion; this flag only decides how their failures surface. When `false` (the default), the run fails with the first step failure. When `true`, the executor waits for every scheduled root to settle and throws a single `BuildExecutorException` carrying the first failure with the rest attached as suppressed exceptions, so one run reports every module that broke instead of stopping at the first. Dependent steps still short-circuit on an upstream failure either way (a step never runs when the input it depends on failed). Read once by `BuildExecutor.Configuration` (its default constructor) as the default, exactly like `jenesis.executor.rebuild`; the `Configuration.aggregate(boolean)` wither and the explicit `of(target, timeout, hash, stepHash, callback, cache, rebuild, aggregate)` overload override it in code. Set `-Djenesis.executor.aggregate=true` for the aggregate-everything behavior that suits CI and local iteration. |
 | `jenesis.process.factory` | system property | Selects how the JDK tool steps (`Javac`, `Javadoc`, `Jar`, `JMod`, `JLink`, `JPackage`) launch: `tool` runs them in-process via `ToolProvider` (the default), `fork` runs them as separate `java`-home processes (`bin/javac`, …) - use it under stricter sandboxes that disallow in-process tool runs. Read once by `ProcessHandler.Factory.of()` wherever a step is constructed. Unset defaults to `tool`, except in a GraalVM native image (which has no in-process JDK tools), where it defaults to `fork`. An unknown value fails fast. |
-| `jenesis.test.filter`     | system property     | Read by `TestModule` as an implicit default for the test filter: a comma-separated list of `<classRegex>[#<method>]` entries. When set, `TestModule.executed` only emits selectors for classes (and optionally methods) matching those patterns, and the value becomes part of the step's serialized state, forcing a re-run. `TestModule` applies it **unless** the `filter(String)` wither was set explicitly (an explicit wither always wins); the assembler wires a bare `TestModule` and no longer reads the property itself. |
-| `jenesis.test.tag`     | system property     | Read by `TestModule` as an implicit default for the test tag selector (overridable by the `tag(String)` wither): a comma-separated list of tags mapped per framework (JUnit Platform tags, TestNG groups). Like the filter it becomes part of the step's serialized state and forces a re-run when set; `JUnit4` rejects it, since its console runner cannot select `@Category` by name. |
+| `jenesis.test.filter`     | system property     | Read by `TestModule` as an implicit default for the test filter: a comma-separated list of `<classRegex>[#<method>]` entries. When set, `TestModule.executed` only emits selectors for classes (and optionally methods) matching those patterns, and the value is recorded as `testscope.properties` in the test step's own output folder. A cached test result is reused only under the identical filter: a filter bypasses the `isTest` predicate and selects classes an unfiltered run never executed, so no filter is a superset of another. `TestModule` applies it **unless** the `filter(String)` wither was set explicitly (an explicit wither always wins); the assembler wires a bare `TestModule` and no longer reads the property itself. |
+| `jenesis.test.tag`     | system property     | Read by `TestModule` as an implicit default for the test tag selector (overridable by the `tag(String)` wither): a comma-separated list of tags mapped per framework (JUnit Platform tags, TestNG groups). Like the filter it is recorded as `testscope.properties` in the test step's own output folder, but it admits a coverage ordering: an untagged cached run covers any tagged request, an exclusion covers another exclusion that excludes at least as much (`!(npm)` covers `!(npm|pypi)`), and an identical expression covers itself - anything else re-runs, including every request that selects tests the cached run skipped (see *Tag-aware test caching* under [Architecture](#architecture)); `JUnit4` rejects it, since its console runner cannot select `@Category` by name. |
 | `jenesis.test.engine`     | system property     | Read by `TestModule`'s default constructor to force the test engine instead of auto-detecting it: `junit-platform` (`JUnitPlatform`), `junit4` (`JUnit4`), or `testng` (`TestNG`), case-insensitive; an unknown value fails fast. Unset (the default) leaves the engine `null`, so `TestModule` resolves it from the test module's resolved dependencies (`TestEngine.of(...)`) - the right choice for almost every project. The `engine(TestEngine)` wither overrides the property in code. Forcing it is for the ambiguous case where more than one engine is on the test path and auto-detection would pick the wrong one. |
 | `jenesis.test.parallel` | system property     | Read by `TestModule` as an implicit default (overridable by the `parallel(boolean)` wither); enables parallel test execution where the framework supports it (JUnit Platform parallel config parameters, TestNG `-parallel methods`; ignored by `JUnit4`). It is transient on the test step, so toggling it neither invalidates the cache nor forces a re-run. |
 | `jenesis.test.reporting` | system property     | Read by `TestModule` as an implicit default (overridable by the `reporting(boolean)` wither); when `true`, `JUnitPlatform` enables the JUnit Platform Open Test Reporting listener (`junit.platform.reporting.open.xml.enabled` plus `junit.platform.reporting.output.dir`), writing the lossless Open Test Reporting XML into a `reports/tests/` subfolder (under the public `BuildStep.REPORTS` constant) of the test step's `output` folder. The listener ships in `org.junit.platform.reporting`, which the console runner (`org.junit.platform.console`) already requires, so no extra coordinate is resolved. `TestNG` and `JUnit4` ignore the flag. Unlike `filter`/`tag` it is part of the step's serialized state without forcing a re-run, so toggling it invalidates the cache and re-runs to produce or drop the report, but a cached run with the flag unchanged is reused. Default `false`. |
@@ -2398,7 +2415,7 @@ arguments, the full graph runs.
 | `java build/jenesis/Project.java`                 | Whole graph. On a warm cache, every step is `[SKIPPED]`.                                                                                                        |
 | `java build/jenesis/Project.java ::/test`         | Every `test` sub-module at any depth, plus its transitive preliminary closure. Modules along the path have their step preliminaries cache-checked; sibling sub-graphs that happen to be scheduled by `::` lenient-skip. |
 | `java build/jenesis/Project.java build/::/test`   | Same, but anchored under the top-level `build` module. Top-level entries that aren't on the path to `build` (e.g. the `stage` step that depends on `build`) are not scheduled at all.                  |
-| `java -Djenesis.test.filter='.*FooTest' build/jenesis/Project.java ::/test` | Same selector, but `TestModule.executed` re-runs unconditionally and only selects classes matching the regex; upstream `classes`/`artifacts` etc. stay cached. |
+| `java -Djenesis.test.filter='.*FooTest' build/jenesis/Project.java ::/test` | Same selector, but `TestModule.executed` only selects classes matching the regex; it re-runs unless the cached result was produced under the identical filter, and upstream `classes`/`artifacts` etc. stay cached. |
 
 Literal selectors that don't resolve throw `Unknown selector: …`. Wildcards (`:` for one segment, `::` for any
 depth) silently skip non-matching branches, but over-schedule sibling subtrees: each such module's `accept(...)`
@@ -2439,6 +2456,40 @@ output folder's contents. If `consistent && !shouldRun(arguments)`, the cached o
 the step runs into a fresh temp directory; on success the temp directory atomically replaces the persistent folder
 (or, if the step set `BuildStepResult.next() == false`, the temp is deleted and the previous run is reused).
 Crashed runs always delete the temp.
+
+**Tag-aware test caching.** A step that executes only part of what it could - a test step narrowed to a tag or a
+filter - is still the same step, so its narrowing stays out of the step-config hash: hashing it would make every
+distinct narrowing a different step and throw the previous run's result away before coverage could be considered.
+The executor knows nothing about this. `TestModule`'s `Run` step keeps `filter` and `tag` `transient`, writes them
+as `testscope.properties` into its own `output` folder on every run that executes, and returns `true` from
+`shouldRun(...)` so that its `apply` is always entered rather than skipped by the executor. There it reads the
+record of the previous run through `context.previous()` and, when no input changed and its nested `Scope` record
+decides the recorded scope covers what is asked for now, returns `BuildStepResult(false)`: the temp directory is
+dropped and the previous result stands, still recording the scope that produced it, so a skipped run never
+narrows the claim it inherits. A missing record - the first run - proves nothing and re-runs. The record is
+local to the step's folder: a shared cache (`jenesis.cache.uri`, `jenesis.project.cache`) is keyed by the
+step-config hash, which no longer separates one narrowing from another, so an entry a narrowed run stored can be
+fetched for a wider request on another machine. Narrowed runs therefore belong on developer machines, not on
+the builds that populate a shared cache.
+
+`TestModule.Scope` decides the coverage. A skipped test is not a passed test, so the relation is one-sided and
+deliberately partial - it answers "covered" only where the superset relation follows from the two expressions
+alone, and re-runs for everything else:
+
+- an **untagged** run executed every test and covers any tagged request;
+- an **exclusion** covers another exclusion when it excludes no more: `!(npm)` covers `!(npm|pypi)`, because
+  excluding fewer tags means more tests ran. The converse re-runs - `!(npm|pypi)` never executed the `pypi`-tagged
+  tests that `!(npm)` selects;
+- an **identical** expression covers itself (entries are trimmed and compared as a set, since repeated
+  `--include-tag` is OR).
+
+A tagged run never covers an untagged request, and anything the lattice cannot decide - conjunctions, nested
+expressions, plain inclusion tags, `any()`/`none()`, lists mixing several exclusions - re-runs. Only `!tag` and
+`!(tag|tag|…)` over plain tag names parse as exclusions; `!npm|pypi` does not, since `!` binds tighter than `|`.
+A **filter** is covered only by the identical filter (compared as an ordered list, since the first matching
+pattern wins): a filter bypasses the `isTest` predicate and selects classes an unfiltered run never executed, so
+no filter is a superset of another. Coverage never overrides a changed input - the default `shouldRun(...)` rule
+is applied first, and a source change re-runs the tests whatever the tags say.
 
 **`bindModule`.** Wraps a `BuildExecutorModule` in a `Bound` whose `apply` is *not* short-circuited by selectors:
 modules always run their `accept(buildExecutor, folders)` to register a sub-graph. The child `BuildExecutor` it

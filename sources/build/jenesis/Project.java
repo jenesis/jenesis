@@ -547,8 +547,8 @@ public record Project(
                                                       %{name}junit4%{reset}, %{name}testng%{reset}); unset auto-detects it
                                                       from the resolved test dependencies
                       %{name}filter%{reset} <patterns>                Comma-separated %{name}<classRegex>[#<method>]%{reset} entries
-                                                      restricting which tests run; changing the value
-                                                      invalidates the test step's cache and forces a re-run
+                                                      restricting which tests run; a previous result is
+                                                      reused only under the identical filter
                       %{name}incremental%{reset} [<digest>]           Re-run only the tests a change can reach: a fast
                                                       feedback aid for %{name}watch%{reset} loops, not a correctness gate.
                                                       Static selection cannot see reflection or other indirect
@@ -1248,10 +1248,9 @@ public record Project(
                                                         entries restricting which
                                                         tests the default
                                                         InferredMultiProjectAssembler
-                                                        executes. Changing the
-                                                        value invalidates the test
-                                                        step's cache and forces a
-                                                        re-run.
+                                                        executes. A previous result
+                                                        is reused only under the
+                                                        identical filter.
                       -Djenesis.test.incremental          Re-run only the tests a
                                                         change can reach: a fast
                                                         feedback aid for watch

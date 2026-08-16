@@ -52,6 +52,7 @@ public class TestModuleTest {
         Path sampleClasses = classes.resolve(Javac.CLASSES + "sample");
         compileSource(sampleClasses, "TestSample", """
                 package sample;
+                @org.junit.jupiter.api.Tag("fast")
                 public class TestSample {
                     @org.junit.jupiter.api.Test
                     public void test() { System.out.println("Hello world!"); }
@@ -627,6 +628,131 @@ public class TestModuleTest {
         SequencedProperties properties = readRequires(root.resolve("test").resolve("resolved"));
         assertThat(properties.stringPropertyNames())
                 .containsExactly("main/runtime/maven/com.example/runner-core", "main/runtime/maven/com.example/runner-cli");
+    }
+
+    private static final String EXECUTED = "test/" + TestModule.EXECUTED;
+
+    @Test
+    public void an_unchanged_tag_expression_reuses_the_cached_test_result() throws IOException {
+        assertThat(executeTests(null, "!(npm)")).contains(EXECUTED);
+        assertThat(executeTests(null, "!(npm)"))
+                .as("a no-op rebuild under an unchanged tag expression reuses the cached test result")
+                .doesNotContain(EXECUTED);
+    }
+
+    @Test
+    public void an_untagged_test_result_covers_a_later_tagged_request() throws IOException {
+        assertThat(executeTests(null, null)).contains(EXECUTED);
+        assertThat(executeTests(null, "!(npm)"))
+                .as("an untagged run executed every test, so it covers any tagged request")
+                .doesNotContain(EXECUTED);
+    }
+
+    @Test
+    public void a_tagged_test_result_does_not_cover_a_request_that_excludes_less() throws IOException {
+        assertThat(executeTests(null, "!(npm|pypi)")).contains(EXECUTED);
+        assertThat(executeTests(null, "!(npm)"))
+                .as("the cached run never executed the pypi-tagged tests the narrower exclusion selects")
+                .contains(EXECUTED);
+        assertThat(executeTests(null, null))
+                .as("an untagged request selects everything a tagged run skipped")
+                .contains(EXECUTED);
+    }
+
+    @Test
+    public void a_changed_source_reruns_the_tests_under_an_unchanged_tag_expression() throws IOException {
+        assertThat(executeTests(null, "!(npm)")).contains(EXECUTED);
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "TestSample", """
+                package sample;
+                @org.junit.jupiter.api.Tag("fast")
+                public class TestSample {
+                    @org.junit.jupiter.api.Test
+                    public void test() { System.out.println("Goodbye world!"); }
+                }
+                """, bootModuleJars());
+        assertThat(executeTests(null, "!(npm)"))
+                .as("coverage never overrides a changed input")
+                .contains(EXECUTED);
+        assertThat(root.resolve("test").resolve(TestModule.EXECUTED).resolve("supplement").resolve("output"))
+                .content().contains("Goodbye world!");
+    }
+
+    @Test
+    public void an_undecidable_tag_expression_reruns_the_tests() throws IOException {
+        assertThat(executeTests(null, "fast|slow")).contains(EXECUTED);
+        assertThat(executeTests(null, "fast"))
+                .as("a disjunction of inclusion tags is outside the lattice, so coverage is not assumed")
+                .contains(EXECUTED);
+    }
+
+    @Test
+    public void a_changed_filter_reruns_the_tests() throws IOException {
+        assertThat(executeTests(".*TestSample", null)).contains(EXECUTED);
+        assertThat(executeTests(".*TestSample", null))
+                .as("an unchanged filter reuses the cached test result")
+                .doesNotContain(EXECUTED);
+        assertThat(executeTests(".*Sample", null))
+                .as("a filter selects classes the test predicate rejects, so no filter is a superset of another")
+                .contains(EXECUTED);
+    }
+
+    @Test
+    public void a_tag_expression_is_recorded_with_the_test_output() throws IOException {
+        executeTests(".*TestSample", "!(npm)");
+        assertThat(SequencedProperties.ofFiles(root.resolve("test")
+                .resolve(TestModule.EXECUTED)
+                .resolve("output")
+                .resolve("testscope.properties")))
+                .containsEntry("filter", ".*TestSample")
+                .containsEntry("tag", "!(npm)");
+    }
+
+    @Test
+    public void a_reused_test_result_keeps_the_scope_that_produced_it() throws IOException {
+        assertThat(executeTests(null, null)).contains(EXECUTED);
+        assertThat(executeTests(null, "!(npm)")).doesNotContain(EXECUTED);
+        assertThat(SequencedProperties.ofFiles(root.resolve("test")
+                .resolve(TestModule.EXECUTED)
+                .resolve("output")
+                .resolve("testscope.properties")))
+                .as("a skipped run must not narrow the scope of the result it reuses")
+                .isEmpty();
+    }
+
+    private SequencedSet<String> executeTests(String filter, String tag) throws IOException {
+        SequencedSet<String> executed = new LinkedHashSet<>();
+        BuildExecutor executor = BuildExecutor.of(root,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                new BuildExecutorCallback() {
+                    @Override
+                    public BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys) {
+                        return (applied, _) -> {
+                            if (identity != null && Boolean.TRUE.equals(applied)) {
+                                executed.add(identity);
+                            }
+                        };
+                    }
+                },
+                BuildExecutorCache.nop(), false, false);
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                new TestModule(Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                _ -> {})),
+                        Map.of("maven", new MavenPomResolver()))
+                        .isTest(candidate -> candidate.endsWith("TestSample"))
+                        .jarsOnly(false)
+                        .filter(filter)
+                        .tag(tag),
+                "dependencies", "classes");
+        executor.execute();
+        return executed;
     }
 
     private BuildExecutor newExecutor() throws IOException {

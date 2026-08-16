@@ -537,13 +537,105 @@ public class TestModule implements BuildExecutorModule {
         }
     }
 
+    public record Scope(String filter, String tag) {
+
+        private static final String FILTER = "filter", TAG = "tag";
+
+        private static final Pattern TAG_NAME = Pattern.compile("[A-Za-z0-9_.\\-]+");
+        private static final Set<String> RESERVED = Set.of("any", "none");
+
+        public Scope {
+            filter = filter == null || filter.isBlank() ? null : filter;
+            tag = tag == null || tag.isBlank() ? null : tag;
+        }
+
+        public static Scope ofFile(Path file) throws IOException {
+            SequencedProperties recorded = SequencedProperties.ofFiles(file);
+            return new Scope(recorded.getProperty(FILTER), recorded.getProperty(TAG));
+        }
+
+        public void store(Path file) throws IOException {
+            SequencedProperties recorded = new SequencedProperties();
+            if (filter != null) {
+                recorded.setProperty(FILTER, filter);
+            }
+            if (tag != null) {
+                recorded.setProperty(TAG, tag);
+            }
+            recorded.store(file);
+        }
+
+        public boolean covers(Scope requested) {
+            return coversFilter(requested.filter()) && coversTag(requested.tag());
+        }
+
+        private boolean coversFilter(String requested) {
+            return entries(filter).equals(entries(requested));
+        }
+
+        private boolean coversTag(String requested) {
+            List<String> executed = entries(tag), selected = entries(requested);
+            if (executed.isEmpty()) {
+                return true;
+            } else if (selected.isEmpty()) {
+                return false;
+            } else if (Set.copyOf(executed).equals(Set.copyOf(selected))) {
+                return true;
+            } else if (executed.size() == 1 && selected.size() == 1) {
+                Set<String> excluded = excluded(executed.getFirst()), narrowed = excluded(selected.getFirst());
+                return excluded != null && narrowed != null && narrowed.containsAll(excluded);
+            } else {
+                return false;
+            }
+        }
+
+        private static Set<String> excluded(String expression) {
+            if (!expression.startsWith("!")) {
+                return null;
+            }
+            String body = expression.substring(1).trim();
+            if (!body.startsWith("(")) {
+                return name(body) ? Set.of(body) : null;
+            } else if (!body.endsWith(")")) {
+                return null;
+            }
+            Set<String> excluded = new TreeSet<>();
+            for (String candidate : body.substring(1, body.length() - 1).split("\\|", -1)) {
+                String name = candidate.trim();
+                if (!name(name)) {
+                    return null;
+                }
+                excluded.add(name);
+            }
+            return excluded;
+        }
+
+        private static boolean name(String candidate) {
+            return TAG_NAME.matcher(candidate).matches() && !RESERVED.contains(candidate);
+        }
+
+        private static List<String> entries(String expression) {
+            if (expression == null || expression.isBlank()) {
+                return List.of();
+            }
+            List<String> entries = new ArrayList<>();
+            for (String candidate : expression.split(",")) {
+                String entry = candidate.trim();
+                if (!entry.isEmpty()) {
+                    entries.add(entry);
+                }
+            }
+            return entries;
+        }
+    }
+
     private static class Run extends Java {
 
         private final TestEngine engine;
         private final Predicate<String> isTest;
         private final String moduleName;
-        private final String filter;
-        private final String tag;
+        private final transient String filter;
+        private final transient String tag;
         private final transient boolean parallel;
         private final boolean reporting;
         private final String group;
@@ -588,7 +680,23 @@ public class TestModule implements BuildExecutorModule {
 
         @Override
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
-            return filter != null || tag != null || super.shouldRun(arguments);
+            return true;
+        }
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            Scope scope = new Scope(filter, tag);
+            if (!super.shouldRun(arguments) && context.previous() != null) {
+                Path recorded = context.previous().resolve("testscope.properties");
+                if (Files.exists(recorded) && Scope.ofFile(recorded).covers(scope)) {
+                    return CompletableFuture.completedStage(new BuildStepResult(false));
+                }
+            }
+            scope.store(context.next().resolve("testscope.properties"));
+            return super.apply(executor, context, arguments);
         }
 
         @Override
