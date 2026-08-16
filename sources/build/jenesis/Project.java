@@ -572,6 +572,8 @@ public record Project(
                       %{name}filter%{reset} <patterns>                Comma-separated %{name}<classRegex>[#<method>]%{reset} entries
                                                       restricting which tests run; a previous result is
                                                       reused only under the identical filter
+                      %{name}force%{reset}                            Execute the tests even where a previous run
+                                                      already covered them, for flaky tests and debugging
                       %{name}incremental%{reset} [<digest>]           Re-run only the tests a change can reach: a fast
                                                       feedback aid for %{name}watch%{reset} loops, not a correctness gate.
                                                       Static selection cannot see reflection or other indirect
@@ -1311,6 +1313,10 @@ public record Project(
                                                         executes. A previous result
                                                         is reused only under the
                                                         identical filter.
+                      -Djenesis.test.force=true           Execute the tests even
+                                                        where a previous run
+                                                        already covered them, for
+                                                        flaky tests and debugging.
                       -Djenesis.test.incremental          Re-run only the tests a
                                                         change can reach: a fast
                                                         feedback aid for watch

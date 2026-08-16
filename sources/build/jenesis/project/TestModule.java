@@ -34,6 +34,7 @@ public class TestModule implements BuildExecutorModule {
     private final String moduleName;
     private final String filter;
     private final String tag;
+    private final boolean force;
     private final boolean parallel;
     private final boolean reporting;
     private final String group;
@@ -68,6 +69,7 @@ public class TestModule implements BuildExecutorModule {
                 null,
                 System.getProperty("jenesis.test.filter"),
                 System.getProperty("jenesis.test.tag"),
+                Boolean.getBoolean("jenesis.test.force"),
                 Boolean.getBoolean("jenesis.test.parallel"),
                 Boolean.getBoolean("jenesis.test.reporting"),
                 "main",
@@ -87,6 +89,7 @@ public class TestModule implements BuildExecutorModule {
                        String moduleName,
                        String filter,
                        String tag,
+                       boolean force,
                        boolean parallel,
                        boolean reporting,
                        String group,
@@ -104,6 +107,7 @@ public class TestModule implements BuildExecutorModule {
         this.moduleName = moduleName;
         this.filter = filter;
         this.tag = tag;
+        this.force = force;
         this.parallel = parallel;
         this.reporting = reporting;
         this.group = group;
@@ -124,6 +128,7 @@ public class TestModule implements BuildExecutorModule {
                 moduleName,
                 filter,
                 tag,
+                force,
                 parallel,
                 reporting,
                 group,
@@ -144,6 +149,7 @@ public class TestModule implements BuildExecutorModule {
                 moduleName,
                 filter,
                 tag,
+                force,
                 parallel,
                 reporting,
                 group,
@@ -164,6 +170,7 @@ public class TestModule implements BuildExecutorModule {
                 moduleName,
                 filter,
                 tag,
+                force,
                 parallel,
                 reporting,
                 group,
@@ -184,6 +191,7 @@ public class TestModule implements BuildExecutorModule {
                 moduleName,
                 filter,
                 tag,
+                force,
                 parallel,
                 reporting,
                 group,
@@ -204,6 +212,7 @@ public class TestModule implements BuildExecutorModule {
                 moduleName,
                 filter,
                 tag,
+                force,
                 parallel,
                 reporting,
                 group,
@@ -224,6 +233,7 @@ public class TestModule implements BuildExecutorModule {
                 moduleName,
                 filter,
                 tag,
+                force,
                 parallel,
                 reporting,
                 group,
@@ -244,6 +254,7 @@ public class TestModule implements BuildExecutorModule {
                 moduleName,
                 filter,
                 tag,
+                force,
                 parallel,
                 reporting,
                 group,
@@ -264,6 +275,7 @@ public class TestModule implements BuildExecutorModule {
                 moduleName,
                 filter,
                 tag,
+                force,
                 parallel,
                 reporting,
                 group,
@@ -284,6 +296,7 @@ public class TestModule implements BuildExecutorModule {
                 moduleName,
                 filter,
                 tag,
+                force,
                 parallel,
                 reporting,
                 group,
@@ -304,6 +317,28 @@ public class TestModule implements BuildExecutorModule {
                 moduleName,
                 filter,
                 tag,
+                force,
+                parallel,
+                reporting,
+                group,
+                observers,
+                printing);
+    }
+
+    public TestModule force(boolean force) {
+        return new TestModule(engine,
+                isTest,
+                factory,
+                repositories,
+                resolvers,
+                jarsOnly,
+                requireEngine,
+                pinning,
+                pathPlacement,
+                moduleName,
+                filter,
+                tag,
+                force,
                 parallel,
                 reporting,
                 group,
@@ -324,6 +359,7 @@ public class TestModule implements BuildExecutorModule {
                 moduleName,
                 filter,
                 tag,
+                force,
                 parallel,
                 reporting,
                 group,
@@ -344,6 +380,7 @@ public class TestModule implements BuildExecutorModule {
                 moduleName,
                 filter,
                 tag,
+                force,
                 parallel,
                 reporting,
                 group,
@@ -364,6 +401,7 @@ public class TestModule implements BuildExecutorModule {
                 moduleName,
                 filter,
                 tag,
+                force,
                 parallel,
                 reporting,
                 group,
@@ -388,6 +426,7 @@ public class TestModule implements BuildExecutorModule {
                 moduleName,
                 filter,
                 tag,
+                force,
                 parallel,
                 reporting,
                 group,
@@ -408,6 +447,7 @@ public class TestModule implements BuildExecutorModule {
                 moduleName,
                 filter,
                 tag,
+                force,
                 parallel,
                 reporting,
                 group,
@@ -450,6 +490,7 @@ public class TestModule implements BuildExecutorModule {
                         moduleName,
                         filter,
                         tag,
+                        force,
                         parallel,
                         reporting,
                         group,
@@ -636,6 +677,7 @@ public class TestModule implements BuildExecutorModule {
         private final String moduleName;
         private final transient String filter;
         private final transient String tag;
+        private final transient boolean force;
         private final transient boolean parallel;
         private final boolean reporting;
         private final String group;
@@ -650,6 +692,7 @@ public class TestModule implements BuildExecutorModule {
                     String moduleName,
                     String filter,
                     String tag,
+                    boolean force,
                     boolean parallel,
                     boolean reporting,
                     String group,
@@ -666,6 +709,7 @@ public class TestModule implements BuildExecutorModule {
             this.moduleName = moduleName;
             this.filter = filter;
             this.tag = tag;
+            this.force = force;
             this.parallel = parallel;
             this.reporting = reporting;
             this.group = group;
@@ -689,7 +733,7 @@ public class TestModule implements BuildExecutorModule {
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
             Scope scope = new Scope(filter, tag);
-            if (!super.shouldRun(arguments) && context.previous() != null) {
+            if (!force && !super.shouldRun(arguments) && context.previous() != null) {
                 Path recorded = context.previous().resolve("testscope.properties");
                 if (Files.exists(recorded) && Scope.ofFile(recorded).covers(scope)) {
                     return CompletableFuture.completedStage(new BuildStepResult(false));

@@ -719,7 +719,34 @@ public class TestModuleTest {
                 .isEmpty();
     }
 
+    @Test
+    public void a_forced_run_executes_what_the_recorded_scope_already_covered() throws IOException {
+        assertThat(executeTests(null, null)).contains(EXECUTED);
+        assertThat(executeTests(null, null)).doesNotContain(EXECUTED);
+        assertThat(executeTests(null, null, true))
+                .as("a forced run executes even where the recorded scope covers the request")
+                .contains(EXECUTED);
+    }
+
+    @Test
+    public void the_force_property_is_the_default_of_the_wither() throws IOException {
+        assertThat(executeTests(null, null)).contains(EXECUTED);
+        System.setProperty("jenesis.test.force", "true");
+        try {
+            assertThat(executeTests(null, null)).contains(EXECUTED);
+        } finally {
+            System.clearProperty("jenesis.test.force");
+        }
+        assertThat(executeTests(null, null))
+                .as("tests run only when needed again once the property is cleared")
+                .doesNotContain(EXECUTED);
+    }
+
     private SequencedSet<String> executeTests(String filter, String tag) throws IOException {
+        return executeTests(filter, tag, null);
+    }
+
+    private SequencedSet<String> executeTests(String filter, String tag, Boolean force) throws IOException {
         SequencedSet<String> executed = new LinkedHashSet<>();
         BuildExecutor executor = BuildExecutor.of(root,
                 Duration.ZERO,
@@ -738,19 +765,17 @@ public class TestModuleTest {
                 BuildExecutorCache.nop(), false, false);
         executor.addSource("dependencies", dependencies);
         executor.addSource("classes", classes);
-        executor.addModule(
-                "test",
-                new TestModule(Map.of("maven", new MavenDefaultRepository(
-                                URI.create("https://repo1.maven.org/maven2/"),
-                                null,
-                                Map.of(),
-                                _ -> {})),
-                        Map.of("maven", new MavenPomResolver()))
-                        .isTest(candidate -> candidate.endsWith("TestSample"))
-                        .jarsOnly(false)
-                        .filter(filter)
-                        .tag(tag),
-                "dependencies", "classes");
+        TestModule module = new TestModule(Map.of("maven", new MavenDefaultRepository(
+                        URI.create("https://repo1.maven.org/maven2/"),
+                        null,
+                        Map.of(),
+                        _ -> {})),
+                Map.of("maven", new MavenPomResolver()))
+                .isTest(candidate -> candidate.endsWith("TestSample"))
+                .jarsOnly(false)
+                .filter(filter)
+                .tag(tag);
+        executor.addModule("test", force == null ? module : module.force(force), "dependencies", "classes");
         executor.execute();
         return executed;
     }
