@@ -626,10 +626,12 @@ automatic module named after its *file*, which is unstable and cannot be
 args4j - a small command-line parser - is aliased with
 `@jenesis.alias org.kohsuke.args4j args4j/args4j`, and the module then
 `requires org.kohsuke.args4j;` as if it were a real module. Because args4j
-declares no identity of its own, the alias resolver synthesizes the module: it
-copies the jar with `Automatic-Module-Name: org.kohsuke.args4j` injected and puts
-that copy on the module path under the aliased name (the original, nameless jar
-stays on the class path, shadowed). The name is a first-class module name, so the
+declares no identity of its own, the alias gives the jar the name by *renaming*
+it: the resolved closure already holds the artifact, and it lands in `resolved/`
+under the aliased file name as a hard link, so the JDK derives exactly the
+automatic module the project asked for and the bytes are never touched - a
+pinned checksum keeps describing the file, and the shared artifact cache stays
+untouched. The name is a first-class module name, so the
 demo also `opens demo.cli to org.kohsuke.args4j;` - args4j sets the `@Option`
 fields by reflection, and delete that `opens` and the run fails with an
 `InaccessibleObjectException` naming `org.kohsuke.args4j`, which is the proof the
