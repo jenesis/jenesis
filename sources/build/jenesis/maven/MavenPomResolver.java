@@ -196,11 +196,12 @@ public class MavenPomResolver implements MavenResolver {
             MavenRepository repository,
             List<RootPom> rootPoms,
             List<RootPom> managedPoms,
+            Map<MavenDependencyKey, MavenDependencyValue> managedCoordinates,
             MavenDependencyScope scope,
             String prefix) throws IOException {
         Map<DependencyCoordinate, UnresolvedPom> unresolved = new HashMap<>();
         Map<DependencyCoordinate, ResolvedPom> resolved = new HashMap<>();
-        Map<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>();
+        Map<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>(managedCoordinates);
         SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = new LinkedHashMap<>();
         SequencedMap<String, MavenDependencyKey> roots = new LinkedHashMap<>();
         for (RootPom managedPom : managedPoms) {
@@ -217,9 +218,15 @@ public class MavenPomResolver implements MavenResolver {
             DependencyCoordinate coordinate = new DependencyCoordinate(groupId, artifactId, version);
             unresolved.putIfAbsent(coordinate, assembled);
             resolved.putIfAbsent(coordinate, resolvedManaged);
-            managedDependencies.putIfAbsent(
-                    new MavenDependencyKey(groupId, artifactId, "jar", null),
-                    new MavenDependencyValue(version, null, null, null, null, managedPom.checksum()));
+            MavenDependencyKey key = new MavenDependencyKey(groupId, artifactId, "jar", null);
+            MavenDependencyValue value = new MavenDependencyValue(
+                    version, null, null, null, null, managedPom.checksum());
+            MavenDependencyValue pinned = managedCoordinates.get(key);
+            if (pinned == null) {
+                managedDependencies.putIfAbsent(key, value);
+            } else {
+                managedDependencies.put(key, reconcile(key, pinned, value));
+            }
         }
         for (RootPom rootPom : rootPoms) {
             UnresolvedPom assembled;
@@ -236,7 +243,13 @@ public class MavenPomResolver implements MavenResolver {
             unresolved.putIfAbsent(coordinate, assembled);
             resolved.putIfAbsent(coordinate, resolvedRoot);
             MavenDependencyKey key = new MavenDependencyKey(groupId, artifactId, "jar", null);
-            dependencies.put(key, new MavenDependencyValue(version, scope, null, null, null, rootPom.checksum()));
+            MavenDependencyValue value = new MavenDependencyValue(
+                    version, scope, null, null, null, rootPom.checksum());
+            MavenDependencyValue pinned = managedCoordinates.get(key);
+            if (pinned != null) {
+                value = rootPom.versionPinned() ? reconcile(key, pinned, value) : merge(pinned, value);
+            }
+            dependencies.put(key, value);
             if (rootPom.identifier() != null) {
                 roots.put(rootPom.identifier(), key);
             }
@@ -1153,6 +1166,29 @@ public class MavenPomResolver implements MavenResolver {
                 value.exclusions(),
                 value.optional(),
                 value.checksum()) : value;
+    }
+
+    private static MavenDependencyValue reconcile(MavenDependencyKey key,
+                                                  MavenDependencyValue pinned,
+                                                  MavenDependencyValue declared) {
+        if (pinned.version() != null
+                && declared.version() != null
+                && !pinned.version().equals(declared.version())) {
+            throw new IllegalStateException("Pinned version "
+                    + pinned.version()
+                    + " for "
+                    + key.groupId() + ":" + key.artifactId()
+                    + " conflicts with pinned version "
+                    + declared.version());
+        }
+        if (pinned.checksum() != null
+                && declared.checksum() != null
+                && !pinned.checksum().equals(declared.checksum())) {
+            throw new IllegalStateException("Conflicting checksums for "
+                    + key.groupId() + ":" + key.artifactId() + ":" + pinned.version()
+                    + " (" + pinned.checksum() + " and " + declared.checksum() + ")");
+        }
+        return merge(pinned, declared);
     }
 
     private static MavenDependencyValue merge(MavenDependencyValue left, MavenDependencyValue right) {

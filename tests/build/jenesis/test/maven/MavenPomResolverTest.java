@@ -4711,6 +4711,7 @@ public class MavenPomResolverTest {
                 Runnable::run, mavenRepository,
                 List.of(new MavenResolver.RootPom(new ByteArrayInputStream(rootPom.getBytes(StandardCharsets.UTF_8)))),
                 List.of(),
+                Map.of(),
                 MavenDependencyScope.COMPILE,
                 "main").dependencies();
         assertThat(deps.get(new MavenDependencyKey("other", "artifact", "jar", null)).checksum())
@@ -4935,6 +4936,7 @@ public class MavenPomResolverTest {
                 Runnable::run, mavenRepository,
                 List.of(new MavenResolver.RootPom(new ByteArrayInputStream(rootPom.getBytes(StandardCharsets.UTF_8)))),
                 List.of(),
+                Map.of(),
                 MavenDependencyScope.COMPILE,
                 "main"))
                 .hasStackTraceContaining("Mismatched POM checksum")

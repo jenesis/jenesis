@@ -109,7 +109,7 @@ public class MavenModuleResolver implements Resolver {
         Repository repository = repositories.getOrDefault(Resolver.base(prefix), discovery);
         List<MavenResolver.RootPom> rootPoms = new ArrayList<>();
         List<MavenResolver.RootPom> managedPoms = new ArrayList<>();
-        SequencedMap<String, String> mavenPins = new LinkedHashMap<>();
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> mavenPins = new LinkedHashMap<>();
         try {
             for (String coordinate : coordinates.sequencedKeySet()) {
                 rootPoms.add(toRootPom(executor, repository, coordinate, versions.get(coordinate), coordinate));
@@ -121,7 +121,10 @@ public class MavenModuleResolver implements Resolver {
                 if (pin.getKey().indexOf('/') < 0) {
                     managedPoms.add(toRootPom(executor, repository, pin.getKey(), pin.getValue(), null));
                 } else {
-                    mavenPins.put(pin.getKey(), pin.getValue());
+                    MavenDependencyValue managed = toManagedValue(pin.getKey(), pin.getValue());
+                    if (managed != null) {
+                        mavenPins.put(MavenDependencyKey.parseKey(pin.getKey()), managed);
+                    }
                 }
             }
         } catch (RuntimeException | IOException e) {
@@ -143,22 +146,12 @@ public class MavenModuleResolver implements Resolver {
         }
         MavenRepository mavenRepo = MavenRepository.of(repositories.getOrDefault(mavenPrefix, Repository.empty()));
         MavenResolver.Closure resolution = delegate.dependencies(
-                executor, mavenRepo, rootPoms, managedPoms, MavenDependencyScope.COMPILE, mavenPrefix);
+                executor, mavenRepo, rootPoms, managedPoms, mavenPins, MavenDependencyScope.COMPILE, mavenPrefix);
         SequencedMap<MavenDependencyKey, MavenDependencyValue> closure = resolution.dependencies();
         SequencedMap<String, String> result = new LinkedHashMap<>();
-        closure.forEach((key, value) -> {
-            String checksum = value.checksum();
-            if (checksum == null) {
-                String pinned = mavenPins.get(key.coordinate(null, null));
-                if (pinned != null) {
-                    int space = pinned.indexOf(' ');
-                    if (space > 0 && pinned.substring(0, space).equals(value.version())) {
-                        checksum = pinned.substring(space + 1).trim();
-                    }
-                }
-            }
-            result.put(key.coordinate(mavenPrefix, value.version()), checksum == null ? "" : checksum);
-        });
+        closure.forEach((key, value) -> result.put(
+                key.coordinate(mavenPrefix, value.version()),
+                value.checksum() == null ? "" : value.checksum()));
         SequencedMap<String, Resolver.Resolved> materialized = new LinkedHashMap<>(
                 Resolver.materializeAll(executor, repositories, mavenPrefix, result));
         resolution.roots().forEach((module, key) -> {
@@ -223,23 +216,33 @@ public class MavenModuleResolver implements Resolver {
                                             String coordinate,
                                             String pinned,
                                             String identifier) throws IOException {
-        String fetchCoord;
-        String checksum;
-        if (pinned == null || pinned.isEmpty()) {
-            fetchCoord = coordinate + ":pom";
-            checksum = null;
-        } else {
-            int space = pinned.indexOf(' ');
-            String version = space < 0 ? pinned : pinned.substring(0, space);
-            if (version.startsWith(":")) {
-                throw new IllegalArgumentException("Module classifiers are not supported when resolving "
-                        + coordinate + " through Maven: " + version);
-            }
-            checksum = space < 0 ? null : pinned.substring(space + 1).trim();
-            fetchCoord = coordinate + "/" + version + ":pom";
-        }
+        MavenDependencyValue managed = toManagedValue(coordinate, pinned);
+        String fetchCoord = managed == null
+                ? coordinate + ":pom"
+                : coordinate + "/" + managed.version() + ":pom";
         RepositoryItem item = repository.fetch(executor, fetchCoord)
                 .orElseThrow(() -> new IllegalArgumentException("No POM found for " + coordinate));
-        return new MavenResolver.RootPom(item.toInputStream(), checksum, identifier);
+        return new MavenResolver.RootPom(item.toInputStream(),
+                managed == null ? null : managed.checksum(),
+                identifier,
+                managed != null);
+    }
+
+    private static MavenDependencyValue toManagedValue(String coordinate, String pinned) {
+        if (pinned == null || pinned.isEmpty()) {
+            return null;
+        }
+        int space = pinned.indexOf(' ');
+        String version = space < 0 ? pinned : pinned.substring(0, space);
+        if (version.startsWith(":")) {
+            throw new IllegalArgumentException("Module classifiers are not supported when resolving "
+                    + coordinate + " through Maven: " + version);
+        }
+        return new MavenDependencyValue(version,
+                null,
+                null,
+                null,
+                null,
+                space < 0 ? null : pinned.substring(space + 1).trim());
     }
 }

@@ -701,7 +701,15 @@ Two callbacks govern how the build is assembled, and they are pluggable independ
   dependency) as `org.foo/bar` (or `main/maven/org.foo/bar` in full) even though its declared dependencies resolve
   through the `module` repository. The grammar - including both abbreviations - is identical for the
   `module-info.java` `@jenesis.pin` tag and the `pom.xml` `<!--jenesis.pin ... -->` comment block, and a malformed
-  token fails the build in either place rather than being silently ignored. A `module`-repository pin's version value may additionally select an artifact
+  token fails the build in either place rather than being silently ignored. Whichever repository a pin names, it
+  **manages the version as well as carrying the checksum**: the pinned version is what the closure selects for that
+  coordinate wherever it appears, which for a Maven coordinate means Maven's own `dependencyManagement` semantics -
+  it outranks nearest-wins transitive selection, and it applies only to coordinates the graph actually reaches, so a
+  pin for something outside the closure manages nothing rather than failing. One line is therefore enough to both
+  select a version and verify the bytes it resolves to. In `MODULAR_TO_MAVEN`, where a Java module and its Maven
+  coordinate can both be pinned, the two forms must name the same version for the same artifact: a disagreement is
+  an error, since one of them would otherwise decide the version while the other's checksum described a jar the
+  build never fetched. A `module`-repository pin's version value may additionally select an artifact
   classifier with a leading-colon qualifier, `:<classifier>[:<version>]` (e.g.
   `@jenesis.pin org.example.native :windows-x86_64:1.2.3 <algo>/<hash>`, or `:windows-x86_64` alone to leave the
   version floating). The pin stays keyed by the bare module name - the classifier is part of the value, never the
@@ -992,7 +1000,7 @@ entries with the same key override the layout default.
 | -------------------- | ----------------------------------------------------------------------------------------- | ---------------------- |
 | `Layout.MAVEN`       | **Input: `pom.xml`. Output: classic JAR + `pom.xml`.** `MavenProject` scan + per-project `JavaToolchainModule` + per-module `Pom` step + `MavenRepositoryStaging` + `MavenRepositoryExport` | `demo/demo-01-java-pom`         |
 | `Layout.MODULAR`     | **Input: `module-info.java`. Output: modular JAR (no `pom.xml`).** `ModularProject` over `JenesisModuleRepository` (public overlay, cached under `.jenesis/artifacts/`) with `JenesisModuleRepository.ofLocal()` prepended + per-project `JavaToolchainModule` + `ModularStaging` + `JenesisModuleRepositoryExport` | `demo/demo-02-java-modular`     |
-| `Layout.MODULAR_TO_MAVEN` | **Input: `module-info.java`. Output: modular JAR + `pom.xml`.** `ModularProject` against a `MavenDefaultRepository` driven by `MavenModuleResolver`, which fetches each declared module's `:pom` artifact from a permissive `JenesisModuleRepository.of(JenesisRepository.Scope.ARTIFACT)` (with `JenesisModuleRepository.ofLocal()` prepended, so a locally exported or published module resolves before the worker overlay - matching `Layout.MODULAR`) to translate the module name into its Maven coordinate, then resolves through `MavenPomResolver` as if the project were a single synthetic POM declaring those coordinates as its `<dependencies>`. No `module-info.class` is ever read; `<dependencyManagement>` is taken solely from the `@jenesis.pin` tags (a pin on a non-declared module is fetched the same way and registered as a managed dependency), never hoisted from the declared modules' own POMs. The discovered first-layer POMs seed the resolver cache, so they are not re-fetched from Maven Central. Per-module `Pom` step on top of the assembler; since the jars are genuine modules, both `stage` and `export` are modules with aligned `maven`/`modular` sub-steps - `MavenRepositoryStaging` + `ModularStaging`, then `MavenRepositoryExport` into the local Maven repository + `JenesisModuleRepositoryExport` into the local Jenesis module repository | `demo/demo-02-java-modular`     |
+| `Layout.MODULAR_TO_MAVEN` | **Input: `module-info.java`. Output: modular JAR + `pom.xml`.** `ModularProject` against a `MavenDefaultRepository` driven by `MavenModuleResolver`, which fetches each declared module's `:pom` artifact from a permissive `JenesisModuleRepository.of(JenesisRepository.Scope.ARTIFACT)` (with `JenesisModuleRepository.ofLocal()` prepended, so a locally exported or published module resolves before the worker overlay - matching `Layout.MODULAR`) to translate the module name into its Maven coordinate, then resolves through `MavenPomResolver` as if the project were a single synthetic POM declaring those coordinates as its `<dependencies>`. No `module-info.class` is ever read; `<dependencyManagement>` is taken solely from the `@jenesis.pin` tags (a pin on a non-declared module is fetched the same way and registered as a managed dependency; a pin naming a Maven coordinate is registered directly, without any POM fetch), never hoisted from the declared modules' own POMs. The discovered first-layer POMs seed the resolver cache, so they are not re-fetched from Maven Central. Per-module `Pom` step on top of the assembler; since the jars are genuine modules, both `stage` and `export` are modules with aligned `maven`/`modular` sub-steps - `MavenRepositoryStaging` + `ModularStaging`, then `MavenRepositoryExport` into the local Maven repository + `JenesisModuleRepositoryExport` into the local Jenesis module repository | `demo/demo-02-java-modular`     |
 | `Layout.AUTO` (default) | Detection: a root `pom.xml` → `MAVEN`; else any `module-info.java` under the root → `MODULAR_TO_MAVEN`. Trees rooted at a nested `.jenesis.skip` marker are skipped. Falling through throws. | - |
 
 `MODULAR_TO_MAVEN` translates each `requires` directive into the declaring module's Maven coordinate (discovered
@@ -2626,7 +2634,8 @@ name and automatic flag, and declared licenses). The downstream `Dependencies` s
 coordinate's `:pom` from a `JenesisModuleRepository.of(JenesisRepository.Scope.ARTIFACT)` to learn its Maven coordinate and handing the bytes to
 `MavenPomResolver`'s pre-fetched-root entry point. Declared modules become the synthetic project's direct
 dependencies; `@jenesis.pin` entries on non-declared modules are fetched the same way and passed as managed
-dependencies, so `<dependencyManagement>` derives only from the pins and the first-layer POMs are never
+dependencies, while a pin naming a Maven coordinate becomes a managed dependency directly, so
+`<dependencyManagement>` derives only from the pins and the first-layer POMs are never
 re-downloaded from Maven Central.
 
 Static factories: **`Resolver.identity()`** emits its inputs unchanged under the supplied prefix without any
@@ -2951,7 +2960,11 @@ serve POMs in addition to artifacts, so they get a refined `Repository` interfac
   `MavenDefaultRepository`, but the first-layer POMs the discovery repo already produced are reused as the
   root of the resolution rather than re-downloaded from Maven Central. `Layout.MODULAR_TO_MAVEN` plugs it
   into `ModularJarResolver` as the fallback, so declaring `requires foo.bar` in `module-info.java` is enough
-  to drive a full Maven-style transitive resolution against the project's chosen Maven repository.
+  to drive a full Maven-style transitive resolution against the project's chosen Maven repository. Pins reach
+  the resolution along two paths that end in the same virtual outermost `<dependencyManagement>`: a
+  module-name pin is a POM to fetch (its coordinate and version are whatever that POM declares), while a
+  Maven-coordinate pin is passed straight through as a managed coordinate - version *and* checksum - with no
+  POM fetch at all, since the coordinate is already what `dependencyManagement` is keyed by.
 - **`MavenModuleDescriptor`** is `MavenProject`'s implementation of `ModuleDescriptor` - the bridge between
   Maven's per-module data and `MultiProjectModule`'s generic factory contract.
 - **`MavenProject`** is the `BuildExecutorModule` entry point: scans a directory tree of `pom.xml` files,

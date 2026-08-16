@@ -13,6 +13,7 @@ public interface MavenResolver extends Resolver {
                          MavenRepository repository,
                          List<RootPom> rootPoms,
                          List<RootPom> managedPoms,
+                         Map<MavenDependencyKey, MavenDependencyValue> managedCoordinates,
                          MavenDependencyScope scope,
                          String prefix) throws IOException;
 
@@ -31,14 +32,14 @@ public interface MavenResolver extends Resolver {
                 + " is not a MavenResolver");
     }
 
-    record RootPom(InputStream pom, String checksum, String identifier) {
+    record RootPom(InputStream pom, String checksum, String identifier, boolean versionPinned) {
 
         public RootPom(InputStream pom) {
-            this(pom, null, null);
+            this(pom, null, null, false);
         }
 
         public RootPom(InputStream pom, String checksum) {
-            this(pom, checksum, null);
+            this(pom, checksum, null, false);
         }
     }
 }

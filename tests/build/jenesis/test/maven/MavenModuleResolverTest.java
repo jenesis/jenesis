@@ -1,15 +1,24 @@
 package build.jenesis.test.maven;
 
 import module java.base;
+import build.jenesis.BuildStep;
+import build.jenesis.BuildStepArgument;
+import build.jenesis.BuildStepContext;
+import build.jenesis.Checksum;
+import build.jenesis.ChecksumStatus;
 import build.jenesis.DependencyScope;
 import module org.junit.jupiter.api;
+import module org.junit.jupiter.params;
+import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
+import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenDefaultVersionNegotiator;
 import build.jenesis.maven.MavenModuleResolver;
 import build.jenesis.maven.MavenPomResolver;
+import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -18,6 +27,9 @@ public class MavenModuleResolverTest {
 
     @TempDir
     private Path mavenRepoFolder;
+
+    @TempDir
+    private Path workspace;
 
     private MavenPomResolver mavenPomResolver;
 
@@ -353,6 +365,316 @@ public class MavenModuleResolverTest {
     }
 
     @Test
+    public void coordinate_pin_manages_the_transitive_version() throws IOException {
+        addToMavenRepository("org.example", "example-core", "1.0", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>1.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.transitive</groupId>
+                            <artifactId>lib</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>""");
+        addToMavenRepository("org.transitive", "lib", "1.0", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.transitive</groupId>
+                    <artifactId>lib</artifactId>
+                    <version>1.0</version>
+                </project>""");
+        addToMavenRepository("org.transitive", "lib", "2.0", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.transitive</groupId>
+                    <artifactId>lib</artifactId>
+                    <version>2.0</version>
+                </project>""");
+        addJarToMavenRepository("org.example", "example-core", "1.0");
+        addJarToMavenRepository("org.transitive", "lib", "1.0");
+        String checksum = "SHA-256/" + addJarToMavenRepository("org.transitive", "lib", "2.0");
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>1.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.transitive</groupId>
+                            <artifactId>lib</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>"""));
+
+        SequencedMap<String, Resolver.Resolved> resolved = resolve(
+                discovery, Map.of("org.transitive/lib", "2.0 " + checksum));
+
+        assertThat(resolved).containsOnlyKeys(
+                "maven/org.example/example-core/1.0",
+                "maven/org.transitive/lib/2.0",
+                "module/foo.bar/1.0");
+        assertThat(resolved.get("maven/org.transitive/lib/2.0").checksum()).isEqualTo(checksum);
+    }
+
+    @Test
+    public void coordinate_pin_outranks_nearest_wins_selection() throws IOException {
+        addToMavenRepository("org.mid", "mid", "1.0", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.mid</groupId>
+                    <artifactId>mid</artifactId>
+                    <version>1.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.transitive</groupId>
+                            <artifactId>lib</artifactId>
+                            <version>3.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>""");
+        for (String version : List.of("1.0", "2.0", "3.0")) {
+            addToMavenRepository("org.transitive", "lib", version, """
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <groupId>org.transitive</groupId>
+                        <artifactId>lib</artifactId>
+                        <version>%s</version>
+                    </project>""".formatted(version));
+            addJarToMavenRepository("org.transitive", "lib", version);
+        }
+        addJarToMavenRepository("org.example", "example-core", "1.0");
+        addJarToMavenRepository("org.mid", "mid", "1.0");
+        String discoveryPom = """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>1.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.transitive</groupId>
+                            <artifactId>lib</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.mid</groupId>
+                            <artifactId>mid</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>""";
+
+        assertThat(resolve(stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", discoveryPom)), Map.of()))
+                .containsKey("maven/org.transitive/lib/1.0");
+        assertThat(resolve(stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", discoveryPom)),
+                Map.of("org.transitive/lib", "2.0")))
+                .containsKey("maven/org.transitive/lib/2.0");
+    }
+
+    @Test
+    public void coordinate_pin_is_inert_outside_the_closure() throws IOException {
+        addJarToMavenRepository("org.example", "example-core", "1.0");
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>1.0</version>
+                </project>"""));
+
+        SequencedMap<String, Resolver.Resolved> resolved = resolve(
+                discovery, Map.of("org.absent/absent", "9.9 SHA-256/cafebabe"));
+
+        assertThat(resolved).containsOnlyKeys("maven/org.example/example-core/1.0", "module/foo.bar/1.0");
+    }
+
+    @Test
+    public void coordinate_pin_manages_a_declared_module_without_a_module_pin() throws IOException {
+        addToMavenRepository("org.example", "example-core", "2.0", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>2.0</version>
+                </project>""");
+        addJarToMavenRepository("org.example", "example-core", "1.0");
+        String checksum = "SHA-256/" + addJarToMavenRepository("org.example", "example-core", "2.0");
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>1.0</version>
+                </project>"""));
+
+        SequencedMap<String, Resolver.Resolved> resolved = resolve(
+                discovery, Map.of("org.example/example-core", "2.0 " + checksum));
+
+        assertThat(resolved).containsOnlyKeys("maven/org.example/example-core/2.0", "module/foo.bar/2.0");
+        assertThat(resolved.get("maven/org.example/example-core/2.0").checksum()).isEqualTo(checksum);
+    }
+
+    @Test
+    public void module_pin_and_coordinate_pin_agree() throws IOException {
+        addToMavenRepository("org.transitive", "lib", "2.0", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.transitive</groupId>
+                    <artifactId>lib</artifactId>
+                    <version>2.0</version>
+                </project>""");
+        addJarToMavenRepository("org.example", "example-core", "1.0");
+        String checksum = "SHA-256/" + addJarToMavenRepository("org.transitive", "lib", "2.0");
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of(
+                "foo.bar:pom", """
+                        <project xmlns="http://maven.apache.org/POM/4.0.0">
+                            <groupId>org.example</groupId>
+                            <artifactId>example-core</artifactId>
+                            <version>1.0</version>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.transitive</groupId>
+                                    <artifactId>lib</artifactId>
+                                    <version>1.0</version>
+                                </dependency>
+                            </dependencies>
+                        </project>""",
+                "lib.module/2.0:pom", """
+                        <project xmlns="http://maven.apache.org/POM/4.0.0">
+                            <groupId>org.transitive</groupId>
+                            <artifactId>lib</artifactId>
+                            <version>2.0</version>
+                        </project>"""));
+
+        SequencedMap<String, String> pins = new LinkedHashMap<>();
+        pins.put("lib.module", "2.0");
+        pins.put("org.transitive/lib", "2.0 " + checksum);
+        SequencedMap<String, Resolver.Resolved> resolved = resolve(discovery, pins);
+
+        assertThat(resolved).containsOnlyKeys(
+                "maven/org.example/example-core/1.0",
+                "maven/org.transitive/lib/2.0",
+                "module/foo.bar/1.0");
+        assertThat(resolved.get("maven/org.transitive/lib/2.0").checksum()).isEqualTo(checksum);
+    }
+
+    @Test
+    public void module_pin_and_coordinate_pin_must_not_disagree() throws IOException {
+        addJarToMavenRepository("org.example", "example-core", "1.0");
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of(
+                "foo.bar:pom", """
+                        <project xmlns="http://maven.apache.org/POM/4.0.0">
+                            <groupId>org.example</groupId>
+                            <artifactId>example-core</artifactId>
+                            <version>1.0</version>
+                        </project>""",
+                "lib.module/2.0:pom", """
+                        <project xmlns="http://maven.apache.org/POM/4.0.0">
+                            <groupId>org.transitive</groupId>
+                            <artifactId>lib</artifactId>
+                            <version>2.0</version>
+                        </project>"""));
+
+        SequencedMap<String, String> pins = new LinkedHashMap<>();
+        pins.put("lib.module", "2.0");
+        pins.put("org.transitive/lib", "3.0 SHA-256/cafebabe");
+
+        assertThatThrownBy(() -> resolve(discovery, pins))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Pinned version 3.0 for org.transitive:lib")
+                .hasMessageContaining("conflicts with pinned version 2.0");
+    }
+
+    @Test
+    public void declared_module_pin_and_coordinate_pin_must_not_disagree() throws IOException {
+        addJarToMavenRepository("org.example", "example-core", "1.0");
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar/1.0:pom", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>1.0</version>
+                </project>"""));
+
+        SequencedMap<String, String> pins = new LinkedHashMap<>();
+        pins.put("foo.bar", "1.0");
+        pins.put("org.example/example-core", "2.0 SHA-256/cafebabe");
+
+        assertThatThrownBy(() -> resolve(discovery, pins))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Pinned version 2.0 for org.example:example-core")
+                .hasMessageContaining("conflicts with pinned version 1.0");
+    }
+
+    static List<Arguments> pinningModes() {
+        return List.of(
+                Arguments.of(null, "2.0", true),
+                Arguments.of(Pinning.STRICT, "2.0", true),
+                Arguments.of(Pinning.VERSIONS, "2.0", false),
+                Arguments.of(Pinning.IGNORE, "1.0", false));
+    }
+
+    @ParameterizedTest
+    @MethodSource("pinningModes")
+    public void coordinate_pin_follows_the_pinning_mode(Pinning pinning,
+                                                        String version,
+                                                        boolean checksummed) throws IOException {
+        for (String pinned : List.of("1.0", "2.0")) {
+            addToMavenRepository("org.transitive", "lib", pinned, """
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <groupId>org.transitive</groupId>
+                        <artifactId>lib</artifactId>
+                        <version>%s</version>
+                    </project>""".formatted(pinned));
+        }
+        String core = "SHA-256/" + addJarToMavenRepository("org.example", "example-core", "1.0");
+        Map<String, String> libs = new LinkedHashMap<>();
+        libs.put("1.0", "SHA-256/" + addJarToMavenRepository("org.transitive", "lib", "1.0"));
+        libs.put("2.0", "SHA-256/" + addJarToMavenRepository("org.transitive", "lib", "2.0"));
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>1.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.transitive</groupId>
+                            <artifactId>lib</artifactId>
+                            <version>1.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>"""));
+        Path folder = Files.createDirectory(workspace.resolve("dependencies"));
+        Path next = Files.createDirectory(workspace.resolve("next"));
+        Path supplement = Files.createDirectory(workspace.resolve("supplement"));
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/module/foo.bar", "");
+        requires.store(folder.resolve(BuildStep.REQUIRES));
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("main/maven/org.example/example-core", "1.0 " + core);
+        versions.setProperty("main/maven/org.transitive/lib", "2.0 " + libs.get("2.0"));
+        versions.store(folder.resolve(BuildStep.VERSIONS));
+
+        new Dependencies(
+                Map.of("module", discovery,
+                        "maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                Map.of("module", new MavenModuleResolver("maven", mavenPomResolver, discovery)))
+                .pinning(pinning)
+                .apply(Runnable::run,
+                        new BuildStepContext(workspace.resolve("previous"), next, supplement),
+                        new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(folder, Map.of(
+                                Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.VERSIONS), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+
+        SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
+        assertThat(index.stringPropertyNames())
+                .contains("main/compile/maven/org.transitive/lib/" + version)
+                .doesNotContain("main/compile/maven/org.transitive/lib/" + (version.equals("1.0") ? "2.0" : "1.0"));
+        String entry = index.getProperty("main/compile/maven/org.transitive/lib/" + version);
+        if (checksummed) {
+            assertThat(entry).endsWith(" " + libs.get(version));
+        } else {
+            assertThat(entry).doesNotContain(" ");
+        }
+    }
+
+    @Test
     public void bom_floats_to_discovery_pom_version() throws IOException {
         Path properties = Files.writeString(mavenRepoFolder.resolve("acme.platform-2.0.properties"), "bar = 2.0\n");
         Map<String, String> fetched = new LinkedHashMap<>();
@@ -400,6 +722,17 @@ public class MavenModuleResolverTest {
                 true);
         assertThat(bom.version()).isEqualTo("1.0");
         assertThat(bom.entries()).containsExactly(Map.entry("module/bar", "1.0"));
+    }
+
+    private SequencedMap<String, Resolver.Resolved> resolve(Repository discovery,
+                                                            Map<String, String> pins) throws IOException {
+        return new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
+                Runnable::run,
+                "module",
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(pins),
+                DependencyScope.COMPILE).artifacts();
     }
 
     private static Repository stubRepository(Map<String, String> fetched, Map<String, String> bodies) {
