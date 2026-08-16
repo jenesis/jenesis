@@ -113,7 +113,7 @@ public class ModuleInfoParserTest {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
                  * @jenesis.alias toolkit.lib org.example/plain-lib
-                 * @jenesis.alias   other.lib   org.example/other-lib   2.0 \s
+                 * @jenesis.alias   other.lib   org.example/other-lib \s
                  * @jenesis.alias natives.lib org.example/plain-lib/jar/natives-linux
                  */
                 module foo {
@@ -123,22 +123,40 @@ public class ModuleInfoParserTest {
         ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
         assertThat(info.aliases())
                 .containsEntry("toolkit.lib", "org.example/plain-lib")
-                .containsEntry("other.lib", "org.example/other-lib 2.0")
+                .containsEntry("other.lib", "org.example/other-lib")
                 .containsEntry("natives.lib", "org.example/plain-lib/jar/natives-linux");
     }
 
     @Test
-    public void jenesis_alias_rejects_checksum_declaration() throws IOException {
+    public void jenesis_alias_rejects_version_declaration() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
-                 * @jenesis.alias toolkit.lib org.example/plain-lib 1.0 SHA-256/cafebabe
+                 * @jenesis.alias toolkit.lib org.example/plain-lib 1.0
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("a version has exactly one home, and it is not this tag")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.alias declaration"
+                        + " 'toolkit.lib org.example/plain-lib 1.0': expected <module-name>"
+                        + " <groupId>/<artifactId>[/<type>[/<classifier>]]");
+    }
+
+    @Test
+    public void jenesis_alias_rejects_missing_target() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias toolkit.lib
                  */
                 module foo {
                 }
                 """);
         assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("checksums are pinned on the Maven coordinate instead");
+                .hasMessageContaining("Malformed @jenesis.alias declaration 'toolkit.lib': expected"
+                        + " <module-name> <groupId>/<artifactId>[/<type>[/<classifier>]]");
     }
 
     @Test
@@ -196,20 +214,6 @@ public class ModuleInfoParserTest {
         assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("expected a module name");
-    }
-
-    @Test
-    public void jenesis_alias_rejects_slash_in_version() throws IOException {
-        Files.writeString(folder.resolve("module-info.java"), """
-                /**
-                 * @jenesis.alias toolkit.lib org.example/plain-lib 1.0/beta
-                 */
-                module foo {
-                }
-                """);
-        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Malformed @jenesis.alias version");
     }
 
     @Test

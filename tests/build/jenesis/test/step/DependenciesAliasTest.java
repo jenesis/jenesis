@@ -272,6 +272,71 @@ public class DependenciesAliasTest {
                         + " by a local @jenesis.alias declaration and for org.example/other-lib by");
     }
 
+    @Test
+    public void an_unversioned_alias_renames_the_pinned_version_of_its_target() throws IOException {
+        plainLib();
+        plainLibVersion("2.0");
+        byte[] pinned = Files.readAllBytes(
+                mavenRepoFolder.resolve("org/example/plain-lib/1.0/plain-lib-1.0.jar"));
+
+        resolve(Map.of("toolkit.lib", "org.example/plain-lib"), "org.example/plain-lib/1.0");
+
+        assertThat(Files.readAllBytes(next.resolve(Dependencies.RESOLVED + "toolkit.lib.jar")))
+                .as("the alias declares no version, so the @jenesis.pin on the coordinate decides which jar is renamed")
+                .isEqualTo(pinned);
+        assertThat(SequencedProperties.ofFiles(next.resolve(Dependencies.ALIASED))
+                .getProperty("toolkit.lib"))
+                .isEqualTo("maven/org.example/plain-lib/1.0");
+    }
+
+    @Test
+    public void an_unpinned_alias_keeps_the_version_the_closure_already_resolved() throws IOException {
+        plainLib();
+        plainLibVersion("2.0");
+        byte[] transitive = Files.readAllBytes(
+                mavenRepoFolder.resolve("org/example/plain-lib/1.0/plain-lib-1.0.jar"));
+        Path classes = compile("consumer", "module-info.java", """
+                module lib.consumer {
+                }
+                """);
+        addPom("org.example", "consumer-lib", "1.0", List.of("org.example/plain-lib/1.0"));
+        jarOf(Files.createDirectories(mavenRepoFolder.resolve("org/example/consumer-lib/1.0"))
+                .resolve("consumer-lib-1.0.jar"), classes, null);
+
+        resolve(Map.of("toolkit.lib", "org.example/plain-lib"),
+                "org.example/consumer-lib/1.0",
+                "org.example/plain-lib");
+
+        assertThat(Files.readAllBytes(next.resolve(Dependencies.RESOLVED + "toolkit.lib.jar")))
+                .as("naming somebody else's transitive dependency must not raise the version the graph decided,"
+                        + " even though 2.0 is the latest the repository serves")
+                .isEqualTo(transitive);
+        assertThat(SequencedProperties.ofFiles(next.resolve(Dependencies.ALIASED))
+                .getProperty("toolkit.lib"))
+                .isEqualTo("maven/org.example/plain-lib/1.0");
+        assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
+                .as("the coordinate joins the closure once, at the version its parent asked for")
+                .contains("main/compile/maven/org.example/plain-lib/1.0")
+                .doesNotContain("main/compile/maven/org.example/plain-lib/2.0");
+    }
+
+    @Test
+    public void an_unpinned_alias_nothing_else_pulls_in_resolves_to_the_latest_version() throws IOException {
+        plainLib();
+        plainLibVersion("2.0");
+        byte[] latest = Files.readAllBytes(
+                mavenRepoFolder.resolve("org/example/plain-lib/2.0/plain-lib-2.0.jar"));
+
+        resolve(Map.of("toolkit.lib", "org.example/plain-lib"), "org.example/plain-lib");
+
+        assertThat(Files.readAllBytes(next.resolve(Dependencies.RESOLVED + "toolkit.lib.jar")))
+                .as("a coordinate the closure does not carry is added as a root, floating like any unpinned require")
+                .isEqualTo(latest);
+        assertThat(SequencedProperties.ofFiles(next.resolve(Dependencies.ALIASED))
+                .getProperty("toolkit.lib"))
+                .isEqualTo("maven/org.example/plain-lib/2.0");
+    }
+
     private void plainLib() throws IOException {
         Path classes = compile("plain", "toollib/Lib.java", """
                 package toollib;
@@ -289,6 +354,27 @@ public class DependenciesAliasTest {
             Files.createDirectories(system.getPath("META-INF"));
             Files.write(system.getPath("META-INF/FAKE.SF"), new byte[]{7});
         }
+    }
+
+    private void plainLibVersion(String version) throws IOException {
+        addPom("org.example", "plain-lib", version, List.of());
+        addJar("org/example/plain-lib/" + version + "/plain-lib-" + version + ".jar", null, Map.of(
+                "toollib/Lib.class", new byte[]{9, 9, 9}));
+        Files.writeString(Files
+                        .createDirectories(mavenRepoFolder.resolve("org/example/plain-lib"))
+                        .resolve("maven-metadata.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <metadata modelVersion="1.1.0">
+                  <versioning>
+                    <latest>%1$s</latest>
+                    <release>%1$s</release>
+                    <versions>
+                      <version>1.0</version>
+                      <version>%1$s</version>
+                    </versions>
+                  </versioning>
+                </metadata>
+                """.formatted(version));
     }
 
     private BuildStepResult resolve(Map<String, String> aliases, String... coordinates) throws IOException {

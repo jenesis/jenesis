@@ -185,7 +185,8 @@ public class ModularProjectTest {
     public void emits_aliases_properties_from_javadoc_declarations() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
-                 * @jenesis.alias toolkit.lib org.example/plain-lib 1.0
+                 * @jenesis.alias toolkit.lib org.example/plain-lib
+                 * @jenesis.pin org.example/plain-lib 1.0 SHA-256/cafebabe
                  */
                 module foo {
                   requires toolkit.lib;
@@ -204,7 +205,12 @@ public class ModularProjectTest {
         assertThat(SequencedProperties.ofFiles(aliasesFile)).containsOnly(
                 Map.entry("main/module/toolkit.lib", "org.example/plain-lib"));
         assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.VERSIONS)))
-                .containsEntry("main/maven/org.example/plain-lib", "1.0");
+                .as("the alias states no version, so the pin is the only place one can come from")
+                .containsOnly(Map.entry("main/maven/org.example/plain-lib", "1.0 SHA-256/cafebabe"));
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES)))
+                .as("requiring the alias requires the pinned version of the coordinate it names")
+                .containsOnly(Map.entry("main/compile/maven/org.example/plain-lib/1.0", ""),
+                        Map.entry("main/runtime/maven/org.example/plain-lib/1.0", ""));
         Manifest manifest = new Manifest();
         try (InputStream input = Files.newInputStream(module.resolve("manifest.mf"))) {
             manifest.read(input);
@@ -212,6 +218,57 @@ public class ModularProjectTest {
         assertThat(manifest.getMainAttributes().getValue(PathPlacement.ALIASES))
                 .as("a consumer of this module inherits the declaration through its manifest")
                 .isEqualTo("toolkit.lib=org.example/plain-lib");
+    }
+
+    @Test
+    public void requires_an_unpinned_alias_target_without_a_version() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias toolkit.lib org.example/plain-lib
+                 */
+                module foo {
+                  requires toolkit.lib;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path module = results.get("module/module-/manifests");
+        assertThat(module.resolve(BuildStep.VERSIONS))
+                .as("an alias contributes no version of its own")
+                .doesNotExist();
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES)))
+                .as("no pin means no version here either, so the closure - not this file - decides one")
+                .containsOnly(Map.entry("main/compile/maven/org.example/plain-lib", ""),
+                        Map.entry("main/runtime/maven/org.example/plain-lib", ""));
+    }
+
+    @Test
+    public void requires_a_classified_alias_target_without_inventing_a_version_segment() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias natives.lib org.example/native-lib/jar/linux
+                 */
+                module foo {
+                  requires natives.lib;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(
+                results.get("module/module-/manifests").resolve(BuildStep.REQUIRES)))
+                .as("the token is passed through whole, so its classifier is never mistaken for a version")
+                .containsOnly(Map.entry("main/compile/maven/org.example/native-lib/jar/linux", ""),
+                        Map.entry("main/runtime/maven/org.example/native-lib/jar/linux", ""));
     }
 
     @Test

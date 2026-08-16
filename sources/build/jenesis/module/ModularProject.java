@@ -247,22 +247,13 @@ public class ModularProject implements BuildExecutorModule {
                     versions.put(variant.getKey(), selected);
                 }
             }
-            SequencedMap<String, String> targets = new LinkedHashMap<>();
-            for (Map.Entry<String, String> entry : info.aliases().entrySet()) {
-                String value = entry.getValue();
-                int space = value.indexOf(' ');
-                targets.put(entry.getKey(), space < 0 ? value : value.substring(0, space));
-                if (space > 0) {
-                    versions.putIfAbsent(group + "/maven/" + targets.get(entry.getKey()),
-                            value.substring(space + 1).trim());
-                }
-            }
+            SequencedMap<String, String> targets = info.aliases();
             SequencedProperties requires = new SequencedProperties();
             for (String dependency : info.requires()) {
                 String target = targets.get(dependency);
                 String coordinate = target == null
                         ? prefix + "/" + dependency
-                        : "maven/" + target + version(versions, group + "/maven/" + target);
+                        : "maven/" + target + pinned(versions, group + "/maven/" + target);
                 requires.setProperty(group + "/compile/" + coordinate, "");
                 if (info.runtimeRequires().contains(dependency)) {
                     requires.setProperty(group + "/runtime/" + coordinate, "");
@@ -393,10 +384,20 @@ public class ModularProject implements BuildExecutorModule {
         }
 
         private static String version(SequencedMap<String, String> versions, String key) {
+            String bare = bare(versions, key);
+            return "/" + (bare.isEmpty() ? "RELEASE" : bare);
+        }
+
+        private static String pinned(SequencedMap<String, String> versions, String key) {
+            String bare = bare(versions, key);
+            return bare.isEmpty() ? "" : "/" + bare;
+        }
+
+        private static String bare(SequencedMap<String, String> versions, String key) {
             String pinned = versions.get(key);
             int space = pinned == null ? -1 : pinned.indexOf(' ');
             String bare = pinned == null ? "" : space < 0 ? pinned : pinned.substring(0, space);
-            return "/" + (bare.isEmpty() || bare.startsWith(":") ? "RELEASE" : bare);
+            return bare.startsWith(":") ? "" : bare;
         }
     }
 

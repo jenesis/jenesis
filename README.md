@@ -841,7 +841,7 @@ Two callbacks govern how the build is assembled, and they are pluggable independ
   merged entry map, and the Maven BOM versions and entries in its output `boms.properties`, and `Inventory`
   mirrors them as indexed `prefix.bom.<n>` entries.
 - **Module aliases** (`MODULAR_TO_MAVEN` layout only) give a Maven artifact a stable module name of the
-  project's choosing: `@jenesis.alias <module-name> <groupId>/<artifactId>[/<type>[/<classifier>]] [<version>]`
+  project's choosing: `@jenesis.alias <module-name> <groupId>/<artifactId>[/<type>[/<classifier>]]`
   in `module-info.java` maps `<module-name>` onto an artifact the resolved closure already contains. Nothing is
   synthesized - the alias is a rename. `Dependencies` merges every declaration reachable in the hierarchy into
   one view, validates it, and moves the target to `resolved/<module-name>.jar`, the file name from which the JDK
@@ -855,7 +855,8 @@ Two callbacks govern how the build is assembled, and they are pluggable independ
   every other module can `requires`. If a declaration matches no artifact in the resolved tree the build fails -
   require the target or drop the alias, or stop excluding it when an exclusion is what removed it. Where the
   declaring `module-info.java` does `requires <module-name>;`, `Manifests` translates that requirement into the
-  aliased Maven coordinate, so the author's own declaration is what pulls the target into the closure.
+  aliased Maven coordinate, so the author's own declaration is what pulls the target into the closure when
+  nothing else already does - without displacing it when something already has (see the version rules below).
   Declarations travel across the hierarchy: `Manifests` writes them into the module's own manifest as
   `Jenesis-Aliases: <module-name>=<token>[,...]`, and both `Dependencies` and `Jpx` read that header off every
   resolved jar, so a consumer inherits the names its dependencies chose without redeclaring them. Every conflict
@@ -867,11 +868,19 @@ Two callbacks govern how the build is assembled, and they are pluggable independ
   themselves, as for any other module path entry. `jlink` and modular `jpackage` images cannot consume an
   alias, since an automatic module is not linkable.
   The target follows the Maven pin token grammar (`<groupId>/<artifactId>` is the
-  shortcut, a type or classifier is written in full), and its version resolves like any Maven coordinate's:
-  a `@jenesis.pin` or BOM entry for the coordinate wins - and is the only place a checksum can be declared -
-  then the inline version, and without either the latest release is negotiated implicitly, so an alias
-  resolves without any pin at all. A `pin` run records the target like any other Maven dependency while
-  never pinning the alias itself. Each declaration is scoped to the module that carries it, and the rename is
+  shortcut, a type or classifier is written in full) and has no version slot of its own: the declaration is
+  exactly two words, and a third is rejected with an error naming the `@jenesis.pin` line to write instead,
+  so a version is stated in one place only. Where the alias is required, that version is then decided in
+  three steps. A `@jenesis.pin` or BOM entry for the coordinate wins - and is the only place a checksum can
+  be declared. Failing that, if the resolved closure already carries the coordinate, however deeply, the
+  alias takes **that version unchanged**: aliasing is a naming operation, and promoting a transitive
+  dependency to a module must never raise the version the graph settled on. `Dependencies` therefore holds a
+  version-less aliased requirement back from the first resolution pass and consults the closure afterwards -
+  a root declaration would otherwise win the traversal outright, since the first visit to a coordinate fixes
+  its version and a floating root is visited before any transitive edge. Only a coordinate that appears
+  nowhere in that closure is added as a root and negotiated as `LATEST`, exactly as any other unpinned
+  requirement is, so an alias still resolves without any pin at all. A `pin` run records the target like any
+  other Maven dependency while never pinning the alias itself. Each declaration is scoped to the module that carries it, and the rename is
   recorded in `aliased.properties` so an incremental rebuild finds the renamed jar without refetching it. In
   the purely modular layout the tag is rejected, since resolution there walks module descriptors only.
 - **Java agents** are declared with `@jenesis.attach <token> [<arguments...>]` in `module-info.java`, or with the

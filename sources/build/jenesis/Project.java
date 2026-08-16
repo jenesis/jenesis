@@ -591,15 +591,17 @@ public record Project(
                                                        an optional trailing %{name}[<token>,<token>...]%{reset} guard applies
                                                        the pin only when those tokens are in the active platform,
                                                        with an unguarded line for the same coordinate as fallback
-                      %{name}@jenesis.alias%{reset} <module> <groupId>/<artifactId>[/<type>[/<classifier>]] [<ver>]
+                      %{name}@jenesis.alias%{reset} <module> <groupId>/<artifactId>[/<type>[/<classifier>]]
                                                        Alias a module name to a Maven artifact (MODULAR_TO_MAVEN
                                                        layout only): requiring <module> resolves the artifact and
                                                        its dependency graph under that stable name, so also a
                                                        non-modular artifact can be required without relying on a
-                                                       derived automatic module name; a @jenesis.pin or BOM entry
-                                                       for the coordinate overrides the version and is the place
-                                                       for a checksum, and without any version the latest release
-                                                       is negotiated implicitly
+                                                       derived automatic module name; the declaration carries no
+                                                       version - a @jenesis.pin or BOM entry for the coordinate
+                                                       states it and is the place for a checksum, failing which
+                                                       a coordinate the closure already resolves is taken at
+                                                       that version unchanged, and only a coordinate nothing
+                                                       else pulls in is negotiated as LATEST
                       %{name}@jenesis.bom%{reset} <token> [<ver> [<algo>/<hex>]] [<guard>]
                                                        Import managed versions from a BOM; the token follows the
                                                        pin grammar: a bare <module> (short for <group>/module/<module>)
@@ -922,7 +924,7 @@ public record Project(
                                                         active platform, with an
                                                         unguarded line for the same
                                                         coordinate as the fallback.
-                      @jenesis.alias <module> <groupId>/<artifactId>[/<type>[/<classifier>]] [<ver>]
+                      @jenesis.alias <module> <groupId>/<artifactId>[/<type>[/<classifier>]]
                                                         Alias a module name to a
                                                         Maven artifact
                                                         (MODULAR_TO_MAVEN layout
@@ -935,15 +937,19 @@ public record Project(
                                                         relying on a derived
                                                         automatic module name. The
                                                         target follows the Maven
-                                                        pin token grammar. A
+                                                        pin token grammar and
+                                                        carries no version: a
                                                         @jenesis.pin or BOM entry
-                                                        for the coordinate
-                                                        overrides the inline
-                                                        version and is the place
-                                                        for a checksum; without
-                                                        any version the latest
-                                                        release is negotiated
-                                                        implicitly.
+                                                        for the coordinate states
+                                                        it and is the place for a
+                                                        checksum, failing which a
+                                                        coordinate the closure
+                                                        already resolves is taken
+                                                        at that version
+                                                        unchanged, and only a
+                                                        coordinate nothing else
+                                                        pulls in is negotiated
+                                                        as LATEST.
                       @jenesis.bom <token> [<ver> [<algo>/<hex>]] [<guard>]
                                                         Import managed versions
                                                         from a BOM. The token

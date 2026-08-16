@@ -318,6 +318,10 @@ public class Dependencies implements BuildStep {
                 byAlias.forEach((alias, token) -> merge(aliasTargets, alias, token, LOCAL));
             }
         }
+        SequencedSet<String> aliasTokens = new LinkedHashSet<>();
+        for (Alias alias : aliasTargets.values()) {
+            aliasTokens.add(alias.token());
+        }
         SequencedMap<String, String> modules = new LinkedHashMap<>();
         SequencedMap<String, Boolean> explicit = new LinkedHashMap<>();
         SequencedProperties graph = new SequencedProperties();
@@ -335,8 +339,14 @@ public class Dependencies implements BuildStep {
                             .getOrDefault(scope, new LinkedHashMap<>())
                             .getOrDefault(repo, new LinkedHashMap<>());
                     SequencedMap<String, SequencedSet<String>> coordinates = new LinkedHashMap<>();
+                    SequencedMap<String, SequencedSet<String>> deferred = new LinkedHashMap<>();
                     for (String coordinate : repoEntry.getValue().sequencedKeySet()) {
-                        coordinates.put(coordinate, repoExclusions.getOrDefault(coordinate, Collections.emptyNavigableSet()));
+                        SequencedSet<String> excludes = repoExclusions.getOrDefault(coordinate, Collections.emptyNavigableSet());
+                        if (aliasTokens.contains(coordinate)) {
+                            deferred.put(coordinate, excludes);
+                        } else {
+                            coordinates.put(coordinate, excludes);
+                        }
                     }
                     SequencedMap<String, SequencedMap<String, String>> groupVersions = versions
                             .getOrDefault(group, new LinkedHashMap<>());
@@ -400,6 +410,18 @@ public class Dependencies implements BuildStep {
                             coordinates,
                             bom,
                             intent);
+                    if (!deferred.isEmpty()) {
+                        SequencedMap<String, SequencedSet<String>> absent = new LinkedHashMap<>();
+                        for (Map.Entry<String, SequencedSet<String>> entry : deferred.entrySet()) {
+                            if (!resolution.vertices().containsKey(repo + "/" + entry.getKey())) {
+                                absent.put(entry.getKey() + "/LATEST", entry.getValue());
+                            }
+                        }
+                        if (!absent.isEmpty()) {
+                            coordinates.putAll(absent);
+                            resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, intent);
+                        }
+                    }
                     for (Map.Entry<String, Resolver.Resolved> entry : resolution.artifacts().entrySet()) {
                         String coordinate = entry.getKey().substring(entry.getKey().indexOf('/') + 1);
                         String declared = repoEntry.getValue().get(coordinate);

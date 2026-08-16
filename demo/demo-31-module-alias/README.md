@@ -87,10 +87,15 @@ The declaration also travels. Jenesis writes it into this module's own manifest 
 depends on `demo.cli` inherits the name without redeclaring it, and two modules
 that disagree about a name fail the build rather than racing over one file.
 
-The version resolves like any Maven coordinate: the `@jenesis.pin` here fixes it
-(with a checksum, so `-Djenesis.dependency.pin=strict` is satisfied), an inline
-`@jenesis.alias ... <version>` would be the next choice, and with neither the
-latest release is negotiated. args4j is pinned to **2.33**, the last release
+The alias itself never carries a version - the tag is exactly two words, and a
+third is rejected with an error naming the `@jenesis.pin` line to write instead,
+so the version lives in one place only. Three steps decide it: the `@jenesis.pin`
+here fixes it (with a checksum, so `-Djenesis.dependency.pin=strict` is
+satisfied); failing a pin or a BOM entry, a coordinate the resolved closure
+already carries - even as somebody else's transitive dependency - is taken at
+exactly the version that closure settled on, because naming a jar must never
+raise its version; and only a coordinate nothing else pulls in is fetched as
+`LATEST`. args4j is pinned to **2.33**, the last release
 before it added an `Automatic-Module-Name` of its own - a newer args4j already
 has a module identity, and Jenesis rejects an alias for such a target, since it
 can be required under the name it declares. Aliasing is for the artifacts that

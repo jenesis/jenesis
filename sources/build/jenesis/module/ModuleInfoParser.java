@@ -207,12 +207,13 @@ public class ModuleInfoParser {
                                 plugins.put(token.indexOf('/') < 0 ? "module/" + token : token, group);
                             }
                             case "jenesis.alias" -> {
-                                String[] words = content.replaceAll("\\s+", " ").trim().split(" ");
-                                if (words.length < 2 || words.length > 3) {
+                                String declaration = content.replaceAll("\\s+", " ").trim();
+                                String[] words = declaration.split(" ");
+                                if (words.length != 2) {
                                     throw new IllegalArgumentException("Malformed @jenesis.alias declaration '"
-                                            + content
-                                            + "': expected <module-name> <groupId>/<artifactId>[/<type>[/<classifier>]]"
-                                            + " [<version>] - checksums are pinned on the Maven coordinate instead");
+                                            + declaration
+                                            + "': expected <module-name>"
+                                            + " <groupId>/<artifactId>[/<type>[/<classifier>]]");
                                 }
                                 String alias = words[0];
                                 if (alias.startsWith("java.") || alias.startsWith("jdk.")) {
@@ -232,13 +233,7 @@ public class ModuleInfoParser {
                                             + words[1]
                                             + "': expected <groupId>/<artifactId>[/<type>[/<classifier>]]");
                                 }
-                                if (words.length > 2 && (words[2].isEmpty() || words[2].indexOf('/') >= 0)) {
-                                    throw new IllegalArgumentException("Malformed @jenesis.alias version '"
-                                            + words[2]
-                                            + "': checksums and other qualifiers are pinned on the Maven"
-                                            + " coordinate instead");
-                                }
-                                String value = String.join(" ", Arrays.asList(words).subList(1, words.length));
+                                String value = words[1];
                                 String previous = aliases.putIfAbsent(alias, value);
                                 if (previous != null && !previous.equals(value)) {
                                     throw new IllegalArgumentException("Duplicate @jenesis.alias for "
