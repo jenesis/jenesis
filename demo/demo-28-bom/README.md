@@ -141,6 +141,16 @@ entries are trusted, and its hashed entries satisfy the strict closure
 check); a Maven BOM reference is exempt, since it cannot carry one, and its
 safety comes from the pins the pin goal imports instead.
 
+Which version a coordinate finally resolves to, once pins and BOM entries have
+had their say, is the Maven resolver's own decision, and
+`-Djenesis.resolver.maven` selects the rule: `maven` (the default) follows
+Maven's nearest-wins, with a version range as a hard requirement that a conflict
+is decided against; `closest` keeps the nearest declaration even against a
+competing range; `latest` and `release` ignore every declared and pinned version
+and take the newest version, or newest non-snapshot release, the repository
+publishes - an upgrade probe rather than a build mode, since a checksum pinned
+for another version stops applying.
+
 Repinning
 ---------
 

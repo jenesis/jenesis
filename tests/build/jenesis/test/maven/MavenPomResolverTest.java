@@ -2,6 +2,7 @@ package build.jenesis.test.maven;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.BuildStepHashFunction;
 import build.jenesis.DependencyScope;
 import build.jenesis.License;
 import build.jenesis.Repository;
@@ -16,6 +17,7 @@ import build.jenesis.maven.MavenLocalPom;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.maven.MavenRepository;
 import build.jenesis.maven.MavenResolver;
+import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -33,6 +35,67 @@ public class MavenPomResolverTest {
     public void setUp() throws Exception {
         mavenRepository = new MavenDefaultRepository(repository.toUri(), repository, Map.of(), _ -> {});
         mavenPomResolver = new MavenPomResolver(MavenDefaultVersionNegotiator.maven());
+    }
+
+    @AfterEach
+    public void clearProperties() {
+        System.clearProperty("jenesis.resolver.maven");
+    }
+
+    @Test
+    public void system_property_picks_each_negotiation_strategy() throws IOException {
+        Map<String, MavenPomResolver> cases = Map.of(
+                "maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()),
+                "latest", new MavenPomResolver(MavenDefaultVersionNegotiator.latest()),
+                "release", new MavenPomResolver(MavenDefaultVersionNegotiator.release()),
+                "closest", new MavenPomResolver(MavenDefaultVersionNegotiator.closest()));
+        for (Map.Entry<String, MavenPomResolver> entry : cases.entrySet()) {
+            System.setProperty("jenesis.resolver.maven", entry.getKey());
+            assertThat(serialize(new MavenPomResolver()))
+                    .as("strategy=%s", entry.getKey())
+                    .isEqualTo(serialize(entry.getValue()));
+        }
+    }
+
+    @Test
+    public void system_property_is_read_case_insensitively() throws IOException {
+        System.setProperty("jenesis.resolver.maven", "LaTeSt");
+        assertThat(serialize(new MavenPomResolver()))
+                .isEqualTo(serialize(new MavenPomResolver(MavenDefaultVersionNegotiator.latest())));
+    }
+
+    @Test
+    public void system_property_rejects_an_unknown_strategy() {
+        System.setProperty("jenesis.resolver.maven", "nonsense");
+        assertThatThrownBy(MavenPomResolver::new)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Unknown jenesis.resolver.maven 'nonsense',"
+                        + " expected one of: maven, latest, release, closest");
+    }
+
+    @Test
+    public void the_plain_resolver_negotiates_as_maven() throws IOException {
+        assertThat(serialize(new MavenPomResolver(MavenDefaultVersionNegotiator.maven())))
+                .as("maven() names what the no-argument constructor already does")
+                .isEqualTo(serialize(new MavenPomResolver()));
+    }
+
+    @Test
+    public void a_selected_negotiator_changes_the_dependencies_step_hash() throws IOException {
+        BuildStepHashFunction hashFunction = BuildStepHashFunction.ofSerializationDigest("SHA-256");
+        assertThat(hashFunction.hash(new Dependencies(Map.of(), Map.of(
+                "maven", new MavenPomResolver(MavenDefaultVersionNegotiator.latest())))))
+                .as("a resolution decided differently must not be served from the cache")
+                .isNotEqualTo(hashFunction.hash(new Dependencies(Map.of(), Map.of(
+                        "maven", new MavenPomResolver()))));
+    }
+
+    private static byte[] serialize(Object value) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (ObjectOutputStream out = new ObjectOutputStream(bytes)) {
+            out.writeObject(value);
+        }
+        return bytes.toByteArray();
     }
 
     @Test

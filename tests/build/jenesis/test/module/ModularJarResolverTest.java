@@ -2,12 +2,15 @@ package build.jenesis.test.module;
 
 import module java.base;
 import java.util.jar.Attributes;
+import build.jenesis.BuildStepHashFunction;
 import build.jenesis.DependencyScope;
 import module org.junit.jupiter.api;
 import build.jenesis.PathPlacement;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
 import build.jenesis.module.ModularJarResolver;
+import build.jenesis.module.ModuleVersionNegotiator;
+import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -16,6 +19,66 @@ public class ModularJarResolverTest {
 
     @TempDir
     private Path jars;
+
+    @AfterEach
+    public void clearProperties() {
+        System.clearProperty("jenesis.resolver.module");
+    }
+
+    @Test
+    public void system_property_picks_each_propagation_mode() throws IOException {
+        Map<String, ModularJarResolver> cases = Map.of(
+                "first", new ModularJarResolver(false, null, ModuleVersionNegotiator.first()),
+                "ignore", new ModularJarResolver(false, null, ModuleVersionNegotiator.ignore()),
+                "fail", new ModularJarResolver(false, null, ModuleVersionNegotiator.fail()));
+        for (Map.Entry<String, ModularJarResolver> entry : cases.entrySet()) {
+            System.setProperty("jenesis.resolver.module", entry.getKey());
+            assertThat(serialize(new ModularJarResolver(false)))
+                    .as("mode=%s", entry.getKey())
+                    .isEqualTo(serialize(entry.getValue()));
+        }
+    }
+
+    @Test
+    public void system_property_is_read_case_insensitively() throws IOException {
+        System.setProperty("jenesis.resolver.module", "IgNoRe");
+        assertThat(serialize(new ModularJarResolver(false)))
+                .isEqualTo(serialize(new ModularJarResolver(false, null, ModuleVersionNegotiator.ignore())));
+    }
+
+    @Test
+    public void system_property_rejects_an_unknown_mode() {
+        System.setProperty("jenesis.resolver.module", "nonsense");
+        assertThatThrownBy(() -> new ModularJarResolver(false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Unknown jenesis.resolver.module 'nonsense',"
+                        + " expected one of: first, ignore, fail");
+    }
+
+    @Test
+    public void the_plain_resolver_negotiates_as_first() throws IOException {
+        assertThat(serialize(new ModularJarResolver(false, null, ModuleVersionNegotiator.first())))
+                .as("first() names what the shorter constructors already do")
+                .isEqualTo(serialize(new ModularJarResolver(false)));
+    }
+
+    @Test
+    public void a_selected_negotiator_changes_the_dependencies_step_hash() throws IOException {
+        BuildStepHashFunction hashFunction = BuildStepHashFunction.ofSerializationDigest("SHA-256");
+        assertThat(hashFunction.hash(new Dependencies(Map.of(), Map.of(
+                "module", new ModularJarResolver(false, null, ModuleVersionNegotiator.ignore())))))
+                .as("a resolution decided differently must not be served from the cache")
+                .isNotEqualTo(hashFunction.hash(new Dependencies(Map.of(), Map.of(
+                        "module", new ModularJarResolver(false)))));
+    }
+
+    private static byte[] serialize(Object value) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (ObjectOutputStream out = new ObjectOutputStream(bytes)) {
+            out.writeObject(value);
+        }
+        return bytes.toByteArray();
+    }
 
     @Test
     public void reports_an_alias_a_module_layout_cannot_provide() {
@@ -567,6 +630,196 @@ public class ModularJarResolverTest {
                 DependencyScope.COMPILE).artifacts();
         assertThat(fetched).contains(Map.entry("shared/1.0", ""));
         assertThat(dependencies).containsKey("foo/shared/1.0");
+    }
+
+    @Test
+    public void ignored_propagation_looks_every_unpinned_module_up_bare() throws IOException {
+        Map<String, String> fetched = new LinkedHashMap<>();
+        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false,
+                null,
+                ModuleVersionNegotiator.ignore()).dependencies(
+                Runnable::run,
+                "foo",
+                Map.of("foo", (_, coordinate) -> {
+                    fetched.put(coordinate, "");
+                    RepositoryItem item = switch (coordinate) {
+                        case "root" -> toJar("root", "1.0",
+                                require("middle", 0, "1.0"),
+                                require("shared", 0, "1.0"));
+                        case "middle" -> toJar("middle", "3.0", require("shared", 0, "2.0"));
+                        case "shared" -> toJar("shared", "4.0");
+                        default -> null;
+                    };
+                    return Optional.ofNullable(item);
+                }),
+                new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE).artifacts();
+        assertThat(fetched).containsOnlyKeys("root", "middle", "shared");
+        assertThat(dependencies.sequencedKeySet()).containsExactly(
+                "foo/root/1.0",
+                "foo/middle/3.0",
+                "foo/shared/4.0");
+    }
+
+    @Test
+    public void ignored_propagation_keeps_a_pin_ahead_of_an_inline_version() throws IOException {
+        Map<String, String> fetched = new LinkedHashMap<>();
+        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false,
+                null,
+                ModuleVersionNegotiator.ignore()).dependencies(
+                Runnable::run,
+                "foo",
+                Map.of("foo", (_, coordinate) -> {
+                    fetched.put(coordinate, "");
+                    RepositoryItem item = switch (coordinate) {
+                        case "root/1.0" -> toJar("root", "1.0",
+                                require("middle", 0, "1.0"),
+                                require("shared", 0, "1.0"));
+                        case "middle" -> toJar("middle", "3.0");
+                        case "shared/9.9" -> toJar("shared", "9.9");
+                        default -> null;
+                    };
+                    return Optional.ofNullable(item);
+                }),
+                new LinkedHashMap<>(Map.of("root/1.0", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(Map.of("shared", "9.9")),
+                DependencyScope.COMPILE).artifacts();
+        assertThat(fetched).containsOnlyKeys("root/1.0", "middle", "shared/9.9");
+        assertThat(dependencies.sequencedKeySet()).containsExactly(
+                "foo/root/1.0",
+                "foo/middle/3.0",
+                "foo/shared/9.9");
+    }
+
+    @Test
+    public void failing_propagation_reports_two_parents_that_disagree() {
+        assertThatThrownBy(() -> new ModularJarResolver(false,
+                null,
+                ModuleVersionNegotiator.fail()).dependencies(
+                Runnable::run,
+                "foo",
+                Map.of("foo", (_, coordinate) -> {
+                    RepositoryItem item = switch (coordinate) {
+                        case "root" -> toJar("root", "1.0",
+                                require("middle", 0, "1.0"),
+                                require("shared", 0, "1.0"));
+                        case "middle/1.0" -> toJar("middle", "1.0", require("shared", 0, "2.0"));
+                        case "shared/1.0" -> toJar("shared", "1.0");
+                        default -> null;
+                    };
+                    return Optional.ofNullable(item);
+                }),
+                new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Conflicting compiled versions for module shared:"
+                        + " root requires 1.0, middle requires 2.0");
+    }
+
+    @Test
+    public void failing_propagation_accepts_two_parents_that_agree() throws IOException {
+        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false,
+                null,
+                ModuleVersionNegotiator.fail()).dependencies(
+                Runnable::run,
+                "foo",
+                Map.of("foo", (_, coordinate) -> {
+                    RepositoryItem item = switch (coordinate) {
+                        case "root" -> toJar("root", "1.0",
+                                require("middle", 0, "1.0"),
+                                require("shared", 0, "1.0"));
+                        case "middle/1.0" -> toJar("middle", "1.0", require("shared", 0, "1.0"));
+                        case "shared/1.0" -> toJar("shared", "1.0");
+                        default -> null;
+                    };
+                    return Optional.ofNullable(item);
+                }),
+                new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE).artifacts();
+        assertThat(dependencies.sequencedKeySet()).containsExactly(
+                "foo/root/1.0",
+                "foo/middle/1.0",
+                "foo/shared/1.0");
+    }
+
+    @Test
+    public void failing_propagation_leaves_a_pinned_module_to_its_pin() throws IOException {
+        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false,
+                null,
+                ModuleVersionNegotiator.fail()).dependencies(
+                Runnable::run,
+                "foo",
+                Map.of("foo", (_, coordinate) -> {
+                    RepositoryItem item = switch (coordinate) {
+                        case "root" -> toJar("root", "1.0",
+                                require("middle", 0, "1.0"),
+                                require("shared", 0, "1.0"));
+                        case "middle/1.0" -> toJar("middle", "1.0", require("shared", 0, "2.0"));
+                        case "shared/9.9" -> toJar("shared", "9.9");
+                        default -> null;
+                    };
+                    return Optional.ofNullable(item);
+                }),
+                new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(Map.of("shared", "9.9")),
+                DependencyScope.COMPILE).artifacts();
+        assertThat(dependencies.sequencedKeySet()).containsExactly(
+                "foo/root/1.0",
+                "foo/middle/1.0",
+                "foo/shared/9.9");
+    }
+
+    @Test
+    public void every_propagation_mode_rejects_an_unsafe_compiled_version() {
+        for (ModularJarResolver resolver : List.of(
+                new ModularJarResolver(false, null, ModuleVersionNegotiator.first()),
+                new ModularJarResolver(false, null, ModuleVersionNegotiator.ignore()),
+                new ModularJarResolver(false, null, ModuleVersionNegotiator.fail()))) {
+            assertThatThrownBy(() -> resolver.dependencies(
+                    Runnable::run,
+                    "foo",
+                    Map.of("foo", (_, coordinate) -> {
+                        RepositoryItem item = switch (coordinate) {
+                            case "root" -> toJar("root", "1.0", require("dep", 0, "../../secret"));
+                            default -> null;
+                        };
+                        return Optional.ofNullable(item);
+                    }),
+                    new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
+                    new LinkedHashMap<>(),
+                    DependencyScope.COMPILE))
+                    .as("resolver=%s", resolver)
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Module root declares an unsafe compiled version '../../secret' for dep");
+        }
+    }
+
+    @Test
+    public void every_propagation_mode_rejects_an_unsafe_compiled_version_of_a_pinned_module() {
+        for (ModularJarResolver resolver : List.of(
+                new ModularJarResolver(false, null, ModuleVersionNegotiator.first()),
+                new ModularJarResolver(false, null, ModuleVersionNegotiator.ignore()),
+                new ModularJarResolver(false, null, ModuleVersionNegotiator.fail()))) {
+            assertThatThrownBy(() -> resolver.dependencies(
+                    Runnable::run,
+                    "foo",
+                    Map.of("foo", (_, coordinate) -> {
+                        RepositoryItem item = switch (coordinate) {
+                            case "root" -> toJar("root", "1.0", require("dep", 0, "../../secret"));
+                            default -> null;
+                        };
+                        return Optional.ofNullable(item);
+                    }),
+                    new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
+                    new LinkedHashMap<>(Map.of("dep", "9.9")),
+                    DependencyScope.COMPILE))
+                    .as("resolver=%s", resolver)
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Module root declares an unsafe compiled version '../../secret' for dep");
+        }
     }
 
     @Test

@@ -21,7 +21,16 @@ public class MavenPomResolver implements MavenResolver {
     private final transient DocumentBuilderFactory factory = MavenDefaultVersionNegotiator.toDocumentBuilderFactory();
 
     public MavenPomResolver() {
-        negotiatorSupplier = MavenDefaultVersionNegotiator.maven();
+        String property = System.getProperty("jenesis.resolver.maven", "maven");
+        negotiatorSupplier = switch (property.toLowerCase(Locale.ROOT)) {
+            case "maven" -> MavenDefaultVersionNegotiator.maven();
+            case "latest" -> MavenDefaultVersionNegotiator.latest();
+            case "release" -> MavenDefaultVersionNegotiator.release();
+            case "closest" -> MavenDefaultVersionNegotiator.closest();
+            default -> throw new IllegalArgumentException("Unknown jenesis.resolver.maven '"
+                    + property
+                    + "', expected one of: maven, latest, release, closest");
+        };
     }
 
     public <S extends Supplier<MavenVersionNegotiator> & Serializable> MavenPomResolver(S negotiatorSupplier) {

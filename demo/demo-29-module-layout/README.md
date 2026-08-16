@@ -107,6 +107,19 @@ In a project with transitive dependencies the Maven side expands the full
 nearest-wins closure (resolved versions, scopes, and duplicates dimmed and marked
 `(*)`), while the modular side stays a graph of named modules.
 
+Deciding a module's version
+---------------------------
+
+A module resolves to the version its `@jenesis.pin` names, failing that to the
+inline `<module>/<version>` spelling of a root coordinate, failing that to the
+version a `module-info.class` was compiled against - and where several
+descriptors record one for the same module, `-Djenesis.resolver.module` decides
+which survives: `first` (the default) keeps the one the descriptor nearest the
+roots recorded and drops later disagreements silently, `fail` rejects two
+descriptors that disagree, and `ignore` keeps none, so an unpinned module
+resolves to whatever the repository serves as its latest. The switch is read by
+`ModularJarResolver`, the resolver this layout wires.
+
 When to use it
 --------------
 

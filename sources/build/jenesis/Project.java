@@ -497,6 +497,29 @@ public record Project(
                       pinned versions but skips checksum verification. Unset keeps existing
                       pins but tolerates missing ones.
 
+                    %{header}Maven resolution (-Djenesis.resolver.maven=<strategy>):%{reset}
+                      Which version a Maven coordinate resolves to. %{name}maven%{reset} (the default)
+                      follows Maven: the declaration nearest the root wins, except that a
+                      version range is a hard requirement, and a conflict involving one is
+                      decided against the repository metadata as the highest published
+                      version satisfying every competing range. %{name}closest%{reset} keeps the
+                      nearest declaration even against a competing range. %{name}latest%{reset} and
+                      %{name}release%{reset} ignore every declared and pinned version and take the
+                      newest version, or the newest non-snapshot release, that the
+                      repository's metadata publishes - an upgrade probe rather than a
+                      reproducible build, since a checksum pinned for another version stops
+                      applying.
+
+                    %{header}Modular resolution (-Djenesis.resolver.module=<mode>):%{reset}
+                      What a modular resolution does with the versions a %{name}module-info%{reset}
+                      records for its own requirements, which rank behind a pin and ahead of
+                      an inline %{name}<module>/<version>%{reset}. %{name}first%{reset} (the default) keeps the one
+                      the nearest descriptor recorded and drops every later disagreement
+                      silently; %{name}ignore%{reset} never keeps one, so an unpinned module resolves to
+                      whatever the repository serves as its latest; %{name}fail%{reset} rejects two
+                      descriptors that disagree about a module's version. A pinned module
+                      takes its pin under every mode.
+
                     %{header}Pin step (-Djenesis.pin.<key>=<value>):%{reset}
                       %{name}checksum%{reset} <true|false>          Record content checksums in pins (default: true);
                                                        false writes versions only
@@ -1110,6 +1133,43 @@ public record Project(
                                                   (refresh pins via the pin step);
                                                   versions keeps pinned versions
                                                   but skips checksum verification.
+
+                    Resolution:
+                      -Djenesis.resolver.maven=maven|latest|release|closest
+                                                  Which version a Maven
+                                                  coordinate resolves to. maven
+                                                  (the default) follows Maven:
+                                                  the nearest declaration wins,
+                                                  a version range is a hard
+                                                  requirement, and a conflict
+                                                  involving one is decided
+                                                  against the repository
+                                                  metadata. closest keeps the
+                                                  nearest declaration even
+                                                  against a competing range.
+                                                  latest and release ignore
+                                                  every declared and pinned
+                                                  version and take the newest
+                                                  published version or newest
+                                                  non-snapshot release - an
+                                                  upgrade probe, not a
+                                                  reproducible build.
+                      -Djenesis.resolver.module=first|ignore|fail
+                                                  What a modular resolution does
+                                                  with the versions a
+                                                  module-info records for its
+                                                  requirements, which rank behind
+                                                  a pin and ahead of an inline
+                                                  <module>/<version>. first (the
+                                                  default) keeps the nearest
+                                                  descriptor's and drops later
+                                                  disagreements silently; ignore
+                                                  keeps none, so an unpinned
+                                                  module resolves to the
+                                                  repository's latest; fail
+                                                  rejects two descriptors that
+                                                  disagree. A pinned module takes
+                                                  its pin under every mode.
 
                     Pin step:
                       -Djenesis.pin.checksum=true|false

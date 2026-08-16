@@ -562,7 +562,11 @@ from the module repository by naming its coordinate - versioned and
 checksummed, or floating to the latest published file - and the demo shows
 the precedence rules: a local `@jenesis.pin` overrides any BOM entry, the
 last declared BOM wins a conflict, and both models satisfy
-`-Djenesis.dependency.pin=strict`.
+`-Djenesis.dependency.pin=strict`. What the resolver does with the versions
+that survive is a separate switch: `-Djenesis.resolver.maven` picks between
+Maven's nearest-wins rules (`maven`, the default), the same without range
+arbitration (`closest`), and the upgrade probes that ignore declared and
+pinned versions entirely (`latest`, `release`).
 
 ## 18. Choosing the pure modular layout - [`module-layout`](demo-29-module-layout/README.md)
 
@@ -585,7 +589,11 @@ every dependency is resolved as a named module the closure is provably
 module-path-consumable, which is also why MODULAR is opt-in (it cannot resolve a
 dependency that ships only as an automatic module, so `AUTO` never picks it).
 Reach for it when artifacts are consumed only as Java modules and you want no POMs
-in the pipeline; keep the default when you also need a `pom.xml`.
+in the pipeline; keep the default when you also need a `pom.xml`. Resolving by
+module name also raises the question of which recorded version wins when two
+`module-info.class` files disagree, which `-Djenesis.resolver.module` answers:
+`first` (the default) keeps the nearest, `fail` rejects the disagreement, and
+`ignore` keeps no compiled version at all.
 
 ## 19. Selecting a classified module variant - [`module-classifier`](demo-30-module-classifier/README.md)
 

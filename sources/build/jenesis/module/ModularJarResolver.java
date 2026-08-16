@@ -13,14 +13,33 @@ public class ModularJarResolver implements Resolver {
 
     private final Resolver fallback;
 
+    private final Supplier<ModuleVersionNegotiator> negotiatorSupplier;
+
     public ModularJarResolver(boolean resolveAutomaticModules) {
-        this.resolveAutomaticModules = resolveAutomaticModules;
-        fallback = null;
+        this(resolveAutomaticModules, null);
     }
 
     public ModularJarResolver(boolean resolveAutomaticModules, Resolver fallback) {
         this.resolveAutomaticModules = resolveAutomaticModules;
         this.fallback = fallback;
+        String property = System.getProperty("jenesis.resolver.module", "first");
+        negotiatorSupplier = switch (property.toLowerCase(Locale.ROOT)) {
+            case "first" -> ModuleVersionNegotiator.first();
+            case "ignore" -> ModuleVersionNegotiator.ignore();
+            case "fail" -> ModuleVersionNegotiator.fail();
+            default -> throw new IllegalArgumentException("Unknown jenesis.resolver.module '"
+                    + property
+                    + "', expected one of: first, ignore, fail");
+        };
+    }
+
+    public <S extends Supplier<ModuleVersionNegotiator> & Serializable> ModularJarResolver(
+            boolean resolveAutomaticModules,
+            Resolver fallback,
+            S negotiatorSupplier) {
+        this.resolveAutomaticModules = resolveAutomaticModules;
+        this.fallback = fallback;
+        this.negotiatorSupplier = negotiatorSupplier;
     }
 
     @Override
@@ -39,7 +58,8 @@ public class ModularJarResolver implements Resolver {
         SequencedMap<String, Resolver.Resolved> dependencies = new LinkedHashMap<>();
         SequencedSet<String> resolved = new LinkedHashSet<>();
         SequencedSet<String> unresolved = new LinkedHashSet<>();
-        SequencedMap<String, String> propagated = new LinkedHashMap<>();
+        SequencedMap<String, ModuleVersionNegotiator.CompiledVersion> propagated = new LinkedHashMap<>();
+        ModuleVersionNegotiator negotiator = negotiatorSupplier.get();
         SequencedMap<String, String> hints = new LinkedHashMap<>(versions);
         List<Resolver.Edge> edges = new ArrayList<>();
         SequencedMap<String, Resolver.Vertex> nodes = new LinkedHashMap<>();
@@ -65,7 +85,8 @@ public class ModularJarResolver implements Resolver {
                 pin = split < 0 ? pinValue : pinValue.substring(0, split);
                 checksum = split < 0 ? null : pinValue.substring(split + 1).trim();
             }
-            String hint = propagated.get(current);
+            ModuleVersionNegotiator.CompiledVersion compiled = propagated.get(current);
+            String hint = compiled == null ? null : compiled.version();
             String requested = pin != null ? pin : (hint != null ? hint : inlineVersion);
             String classifier, expected;
             if (requested != null && requested.startsWith(":")) {
@@ -195,7 +216,17 @@ public class ModularJarResolver implements Resolver {
                                     throw new IllegalArgumentException("Module " + current
                                             + " declares an unsafe compiled version '" + v + "' for " + name);
                                 }
-                                propagated.putIfAbsent(name, v);
+                                if (versions.get(name) != null) {
+                                    return;
+                                }
+                                ModuleVersionNegotiator.CompiledVersion kept = negotiator.negotiate(name,
+                                        propagated.get(name),
+                                        new ModuleVersionNegotiator.CompiledVersion(v, current));
+                                if (kept == null) {
+                                    propagated.remove(name);
+                                } else {
+                                    propagated.put(name, kept);
+                                }
                             });
                             parents.putIfAbsent(name, current);
                             if (!unresolved.contains(name) && !resolved.contains(name)) {
