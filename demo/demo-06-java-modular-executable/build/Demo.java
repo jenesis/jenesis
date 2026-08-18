@@ -24,11 +24,7 @@ public class Demo {
         // Packaging is selected by the committed packaging.properties in this directory
         // (jpackage=app-image), which Jenesis reads from the configuration location for
         // every module - so the stock InferredMultiProjectAssembler needs no extra wiring.
-        // jpackage hands the version to the platform bundlers verbatim, and those parse it as a
-        // dotted version: macOS and Windows reject a qualifier such as the default 1-SNAPSHOT.
-        // Packaging a native image therefore means declaring a version every bundler accepts.
         Project project = new Project()
-                .version("1.0.0")
                 .assembler(new InferredMultiProjectAssembler());
 
         // `stage/packages` is a fixed build target: building `stage` returns a map keyed

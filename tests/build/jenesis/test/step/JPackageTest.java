@@ -66,6 +66,41 @@ public class JPackageTest {
     }
 
     @ParameterizedTest
+    @CsvSource({
+            "1-SNAPSHOT,        1",
+            "1.0.0-SNAPSHOT,    1.0.0",
+            "2.1.3+build.7,     2.1.3",
+            "1.0.0,             1.0.0",
+            "1.0.-beta,         1.0",
+            "RELEASE,           RELEASE",
+            "main-SNAPSHOT,     main-SNAPSHOT"})
+    public void truncates_the_app_version_qualifier(String version, String expected) throws IOException {
+        SequencedProperties configuration = new SequencedProperties();
+        configuration.setProperty("--app-version", version);
+        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jpackage.properties"));
+        SequencedMap<String, SequencedMap<String, String>> properties = new ExposedJPackage().properties(
+                new LinkedHashMap<>(Map.of("bundle", new BuildStepArgument(
+                        bundle,
+                        Map.of(Path.of("process/jpackage.properties"), Checksum.of(ChecksumStatus.ADDED))))));
+        assertThat(properties.get("bundle").get("--app-version"))
+                .as("jpackage parses --app-version as a dotted version on every platform")
+                .isEqualTo(expected);
+    }
+
+    private static class ExposedJPackage extends JPackage {
+
+        private ExposedJPackage() {
+            super(ProcessHandler.Factory.TOOL, "app-image");
+        }
+
+        @Override
+        public SequencedMap<String, SequencedMap<String, String>> properties(
+                SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            return super.properties(arguments);
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void skips_when_no_jars_are_present(boolean process) throws IOException {
         SequencedProperties configuration = new SequencedProperties();

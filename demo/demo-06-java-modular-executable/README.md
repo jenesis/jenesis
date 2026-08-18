@@ -55,24 +55,6 @@ no `module-info.java`; its equivalent is a `<mainClass>` POM property, shown in
 `../demo-05-java-pom-executable`. Both layouts converge on the same `module.properties`
 `main` field.)
 
-Why the demo declares a version
--------------------------------
-
-The launcher sets `.version("1.0.0")` on the `Project`, which is not decoration.
-Jenesis hands the project's version to `jpackage` as `--app-version` verbatim, and
-`jpackage` parses that as a dotted version: on macOS it becomes `CFBundleVersion`,
-on Windows the MSI `ProductVersion`, and both reject anything after the digits and
-dots. The default version a modular project carries is `1-SNAPSHOT`, so packaging
-without declaring one fails on those two platforms with
-
-    java.lang.IllegalArgumentException: Version [1-SNAPSHOT] contains invalid component [-SNAPSHOT]
-
-while succeeding on Linux, whose bundlers parse the same value leniently. Jenesis
-deliberately does not rewrite the version to make it acceptable: what a release is
-called is the project's to decide, and silently shipping an image versioned `1`
-when the build says `1-SNAPSHOT` would be worse than the error. A project that
-packages a native image carries a version every bundler accepts.
-
 Layout
 ------
 

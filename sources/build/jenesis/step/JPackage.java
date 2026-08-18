@@ -36,6 +36,22 @@ public class JPackage extends JdkProcessBuildStep {
     }
 
     @Override
+    protected SequencedMap<String, SequencedMap<String, String>> properties(
+            SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+        SequencedMap<String, SequencedMap<String, String>> properties = super.properties(arguments);
+        for (SequencedMap<String, String> folder : properties.values()) {
+            folder.computeIfPresent("--app-version", (_, version) -> {
+                String dotted = version.split("[^0-9.]", 2)[0];
+                while (dotted.endsWith(".")) {
+                    dotted = dotted.substring(0, dotted.length() - 1);
+                }
+                return dotted.isEmpty() ? version : dotted;
+            });
+        }
+        return properties;
+    }
+
+    @Override
     protected CompletionStage<List<String>> process(Executor executor,
                                                     BuildStepContext context,
                                                     SequencedMap<String, BuildStepArgument> arguments,
