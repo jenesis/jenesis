@@ -51,11 +51,7 @@ public class ModularizeModule implements BuildExecutorModule {
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
         buildExecutor.addStep(PREPARE, new Prepare(synthetic), inherited.sequencedKeySet());
         buildExecutor.addStep(DESCRIBE, new JDeps(factory), PREPARE);
-        SequencedSet<String> inputs = new LinkedHashSet<>();
-        inputs.add(PREPARE);
-        inputs.add(DESCRIBE);
-        inputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(MODULARIZE, new Modularize(), inputs);
+        buildExecutor.addStep(MODULARIZE, new Modularize(), PREPARE, DESCRIBE);
     }
 
     @Override
@@ -184,81 +180,46 @@ public class ModularizeModule implements BuildExecutorModule {
     private static class Modularize implements BuildStep {
 
         @Override
-        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
-            return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
-                    Path.of(STAGED),
-                    Path.of(JDeps.ANALYZED),
-                    Path.of(JDeps.MODULES),
-                    Path.of(JDeps.DESCRIPTORS),
-                    Path.of(DEPENDENCIES)));
-        }
-
-        @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            SequencedMap<Path, SequencedProperties> stagings = new LinkedHashMap<>();
-            SequencedMap<String, String> checksums = new LinkedHashMap<>();
-            SequencedSet<Path> descriptors = new LinkedHashSet<>();
-            for (BuildStepArgument argument : arguments.values()) {
-                if (argument.removed()) {
-                    continue;
-                }
-                Path staged = argument.folder().resolve(STAGED);
-                if (Files.exists(staged)) {
-                    stagings.put(argument.folder(), SequencedProperties.ofFiles(staged));
-                }
-                Path generated = argument.folder().resolve(JDeps.DESCRIPTORS);
-                if (Files.isDirectory(generated)) {
-                    descriptors.add(generated);
-                }
-                Path index = argument.folder().resolve(DEPENDENCIES);
-                if (Files.exists(index)) {
-                    SequencedProperties.ofFiles(index).forEachProperty((key, value) -> {
-                        int space = value.indexOf(' ');
-                        checksums.putIfAbsent(key, space < 0 ? "" : value.substring(space + 1).trim());
-                    });
-                }
-            }
-            Path target = Files.createDirectory(context.next().resolve(Dependencies.RESOLVED));
-            boolean synthesizing = stagings.values().stream()
-                    .flatMap(staging -> staging.stringPropertyNames().stream().map(staging::getProperty))
-                    .anyMatch(relative -> relative.startsWith(JDeps.ANALYZED));
-            SequencedMap<String, String> owners = synthesizing ? owners(stagings) : new LinkedHashMap<>();
+            Path staged = arguments.get(PREPARE).folder(),
+                    descriptors = arguments.get(DESCRIBE).folder().resolve(JDeps.DESCRIPTORS);
+            SequencedProperties staging = SequencedProperties.ofFiles(staged.resolve(STAGED));
+            Path target = Files.createDirectory(context.next().resolve(Dependencies.MODULAR_PATH));
+            SequencedMap<String, String> owners = owners(staged, staging);
             SequencedMap<Path, Path> emitted = new LinkedHashMap<>();
             SequencedProperties index = new SequencedProperties();
-            for (Map.Entry<Path, SequencedProperties> staging : stagings.entrySet()) {
-                for (String key : staging.getValue().stringPropertyNames()) {
-                    String relative = staging.getValue().getProperty(key);
-                    Path source = staging.getKey().resolve(relative).normalize();
-                    if (!Files.exists(source)) {
-                        throw new IllegalStateException("Staged module " + relative + " does not exist for " + key);
-                    }
-                    boolean synthesized = relative.startsWith(JDeps.ANALYZED);
-                    Path file = emitted.get(source);
-                    if (file == null) {
-                        file = target.resolve(source.getFileName().toString());
-                        if (emitted.containsValue(file)) {
-                            throw new IllegalStateException("Module " + module(file) + " is staged more than once");
-                        }
-                        if (synthesized) {
-                            inject(source, file, synthesize(source, descriptors, owners));
-                        } else {
-                            BuildStep.linkOrCopy(file, source);
-                        }
-                        emitted.put(source, file);
-                    }
-                    String checksum = synthesized ? "" : checksums.getOrDefault(key, "");
-                    String value = context.next().relativize(file).toString().replace(File.separatorChar, '/');
-                    index.setProperty(key, checksum.isEmpty() ? value : value + " " + checksum);
+            for (String key : staging.stringPropertyNames()) {
+                String relative = staging.getProperty(key);
+                Path source = staged.resolve(relative).normalize();
+                if (!Files.exists(source)) {
+                    throw new IllegalStateException("Staged module " + relative + " does not exist for " + key);
                 }
+                Path file = emitted.get(source);
+                if (file == null) {
+                    file = target.resolve(source.getFileName().toString());
+                    if (emitted.containsValue(file)) {
+                        throw new IllegalStateException("Module " + module(file) + " is staged more than once");
+                    }
+                    if (relative.startsWith(JDeps.ANALYZED)) {
+                        inject(source, file, synthesize(source, descriptors, owners));
+                    } else {
+                        BuildStep.linkOrCopy(file, source);
+                    }
+                    emitted.put(source, file);
+                }
+                index.setProperty(key, context.next()
+                        .relativize(file)
+                        .toString()
+                        .replace(File.separatorChar, '/'));
             }
-            index.store(context.next().resolve(DEPENDENCIES));
+            index.store(context.next().resolve(Dependencies.MODULAR));
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
 
-        private static SequencedMap<String, String> owners(SequencedMap<Path, SequencedProperties> stagings) {
+        private static SequencedMap<String, String> owners(Path staged, SequencedProperties staging) {
             SequencedMap<String, String> owners = new LinkedHashMap<>();
             for (ModuleReference reference : ModuleFinder.ofSystem().findAll()) {
                 for (String name : reference.descriptor().packages()) {
@@ -266,23 +227,28 @@ public class ModularizeModule implements BuildExecutorModule {
                 }
             }
             SequencedSet<Path> jars = new LinkedHashSet<>();
-            for (Map.Entry<Path, SequencedProperties> staging : stagings.entrySet()) {
-                for (String key : staging.getValue().stringPropertyNames()) {
-                    jars.add(staging.getKey().resolve(staging.getValue().getProperty(key)).normalize());
-                }
+            for (String key : staging.stringPropertyNames()) {
+                jars.add(staged.resolve(staging.getProperty(key)).normalize());
             }
             for (Path jar : jars) {
                 ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
                 boolean named = descriptor != null && !descriptor.isAutomatic();
+                String module = named ? descriptor.name() : module(jar);
                 for (String name : (named ? descriptor : derive(jar)).packages()) {
-                    owners.putIfAbsent(name, named ? descriptor.name() : module(jar));
+                    String previous = owners.putIfAbsent(name, module);
+                    if (previous != null && !previous.equals(module)) {
+                        throw new IllegalStateException("Package " + name
+                                + " is split between " + previous + " and " + module
+                                + ": a split package cannot be resolved on the module path, so the closure"
+                                + " cannot be modularized until one of the two stops carrying it");
+                    }
                 }
             }
             return owners;
         }
 
         private static byte[] synthesize(Path jar,
-                                         SequencedSet<Path> descriptors,
+                                         Path descriptors,
                                          SequencedMap<String, String> owners) throws IOException {
             String module = module(jar);
             ModuleDescriptor derived = derive(jar);
@@ -320,22 +286,16 @@ public class ModularizeModule implements BuildExecutorModule {
         }
 
         private static SequencedMap<String, Integer> requires(String module,
-                                                              SequencedSet<Path> descriptors,
+                                                              Path descriptors,
                                                               boolean optional) throws IOException {
             Path source = null;
-            for (Path folder : descriptors) {
-                Path candidate = folder.resolve(module);
-                if (!Files.isDirectory(candidate)) {
-                    continue;
-                }
+            Path candidate = descriptors.resolve(module);
+            if (Files.isDirectory(candidate)) {
                 try (Stream<Path> files = Files.walk(candidate)) {
                     source = files.filter(file -> file.getFileName().toString().equals("module-info.java"))
                             .sorted()
                             .findFirst()
                             .orElse(null);
-                }
-                if (source != null) {
-                    break;
                 }
             }
             if (source == null) {

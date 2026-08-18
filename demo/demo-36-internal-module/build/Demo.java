@@ -52,7 +52,7 @@ public class Demo {
         @Override
         public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
                                         Map<String, Repository> repositories,
-                                        Map<String, Resolver> resolvers) {
+                                        Map<String, Resolver> resolvers) throws IOException {
             // Load the preprocessing logic from the plugin/ build module via
             // InternalModule, and let the stock assembler wire the regular flow
             // against its output. The project's sources are passed to the module

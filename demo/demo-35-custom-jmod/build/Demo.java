@@ -69,7 +69,7 @@ public class Demo {
         @Override
         public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
                                         Map<String, Repository> repositories,
-                                        Map<String, Resolver> resolvers) {
+                                        Map<String, Resolver> resolvers) throws IOException {
             // Declare a config step's output as the module's content, so the stock
             // jmod step (which runs in the build phase) depends on it and routes the
             // emitted config/ directory to jmod --config. Only the build phase is

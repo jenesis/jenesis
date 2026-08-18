@@ -13,23 +13,17 @@ public class Inventory implements BuildStep {
     public static final String POM = "pom.xml";
 
     private final String group;
-    private final String closure;
 
     public Inventory() {
-        this("main", null);
+        this("main");
     }
 
-    private Inventory(String group, String closure) {
+    private Inventory(String group) {
         this.group = group;
-        this.closure = closure;
     }
 
     public Inventory group(String group) {
-        return new Inventory(group, closure);
-    }
-
-    public Inventory closure(String closure) {
-        return new Inventory(group, closure);
+        return new Inventory(group);
     }
 
     @Override
@@ -89,8 +83,7 @@ public class Inventory implements BuildStep {
         SequencedMap<String, String> bomValues = new LinkedHashMap<>();
         SequencedMap<String, String> attachments = new LinkedHashMap<>();
         SequencedSet<String> identity = new LinkedHashSet<>();
-        for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
-            BuildStepArgument argument = entry.getValue();
+        for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
             }
@@ -177,9 +170,7 @@ public class Inventory implements BuildStep {
             if (Files.isRegularFile(attachmentsFile)) {
                 SequencedProperties.ofFiles(attachmentsFile).forEachProperty(attachments::putIfAbsent);
             }
-            if (closure == null || closure.equals(entry.getKey())) {
-                collectClosure(folder, closureJars, closureScopes, closureChecksums);
-            }
+            collectClosure(folder, closureJars, closureScopes, closureChecksums);
             Path bomsFile = folder.resolve(BOMS);
             if (Files.isRegularFile(folder.resolve(DEPENDENCIES)) && Files.isRegularFile(bomsFile)) {
                 SequencedProperties resolvedBoms = SequencedProperties.ofFiles(bomsFile);

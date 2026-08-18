@@ -49,11 +49,21 @@ public class ModularizeModuleTest {
         Path source = named();
         automatic();
         Path modularized = modularize(false);
-        Path target = modularized.resolve(Dependencies.RESOLVED + "demo.named.jar");
+        Path target = modularized.resolve(Dependencies.MODULAR_PATH + "demo.named.jar");
         assertThat(target).hasBinaryContent(Files.readAllBytes(source));
-        SequencedProperties index = SequencedProperties.ofFiles(modularized.resolve(BuildStep.DEPENDENCIES));
-        assertThat(index.getProperty(NAMED))
-                .isEqualTo(Dependencies.RESOLVED + "demo.named.jar SHA-256/named");
+        SequencedProperties index = SequencedProperties.ofFiles(modularized.resolve(Dependencies.MODULAR));
+        assertThat(index.getProperty(NAMED)).isEqualTo(Dependencies.MODULAR_PATH + "demo.named.jar");
+    }
+
+    @Test
+    public void leaves_the_resolved_closure_untouched() throws IOException {
+        named();
+        automatic();
+        Path modularized = modularize(false);
+        assertThat(modularized.resolve(BuildStep.DEPENDENCIES)).doesNotExist();
+        assertThat(modularized.resolve(Dependencies.RESOLVED)).doesNotExist();
+        assertThat(SequencedProperties.ofFiles(closure.resolve(BuildStep.DEPENDENCIES)).getProperty(NAMED))
+                .endsWith("SHA-256/named");
     }
 
     @Test
@@ -61,7 +71,7 @@ public class ModularizeModuleTest {
         named();
         automatic();
         Path modularized = modularize(false);
-        ModuleDescriptor descriptor = describe(modularized.resolve(Dependencies.RESOLVED + "demo.automatic.jar"));
+        ModuleDescriptor descriptor = describe(modularized.resolve(Dependencies.MODULAR_PATH + "demo.automatic.jar"));
         assertThat(descriptor.name()).isEqualTo("demo.automatic");
         assertThat(descriptor.isOpen()).isTrue();
         assertThat(descriptor.exports().stream().map(ModuleDescriptor.Exports::source))
@@ -74,8 +84,8 @@ public class ModularizeModuleTest {
             assertThat(provides.service()).isEqualTo("demo.named.Service");
             assertThat(provides.providers()).containsExactly("demo.automatic.Provider");
         });
-        SequencedProperties index = SequencedProperties.ofFiles(modularized.resolve(BuildStep.DEPENDENCIES));
-        assertThat(index.getProperty(AUTOMATIC)).isEqualTo(Dependencies.RESOLVED + "demo.automatic.jar");
+        SequencedProperties index = SequencedProperties.ofFiles(modularized.resolve(Dependencies.MODULAR));
+        assertThat(index.getProperty(AUTOMATIC)).isEqualTo(Dependencies.MODULAR_PATH + "demo.automatic.jar");
     }
 
     @Test
@@ -95,13 +105,28 @@ public class ModularizeModuleTest {
         Path source = plain();
         String digest = HexFormat.of().formatHex(new HashDigestFunction("SHA-256").hash(source));
         Path modularized = modularize(true);
-        SequencedProperties index = SequencedProperties.ofFiles(modularized.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties index = SequencedProperties.ofFiles(modularized.resolve(Dependencies.MODULAR));
         assertThat(index.getProperty(PLAIN)).isEqualTo(
-                Dependencies.RESOLVED + ModularizeModule.PSEUDO + digest.substring(0, 32) + ".jar");
+                Dependencies.MODULAR_PATH + ModularizeModule.PSEUDO + digest.substring(0, 32) + ".jar");
         ModuleDescriptor descriptor = describe(modularized.resolve(index.getProperty(PLAIN)));
         assertThat(descriptor.name()).isEqualTo(ModularizeModule.PSEUDO + digest.substring(0, 32));
         assertThat(descriptor.requires().stream().map(ModuleDescriptor.Requires::name)).contains("demo.automatic");
         assertThat(descriptor.exports().stream().map(ModuleDescriptor.Exports::source)).containsExactly("demo.plain");
+    }
+
+    @Test
+    public void rejects_a_split_package() throws IOException {
+        named();
+        automatic();
+        Path sources = Files.createDirectories(root.resolve("split/demo/named"));
+        Files.writeString(sources.resolve("Other.java"), "package demo.named; public class Other { }\n");
+        Path classes = compile("split", null);
+        Path manifest = root.resolve("split.mf");
+        Files.writeString(manifest, "Automatic-Module-Name: demo.split\n");
+        archive(classes, "demo/split/1.0", "main/compile/maven/demo/split/1.0", "", manifest);
+        assertThatThrownBy(() -> modularize(false))
+                .hasStackTraceContaining("demo.named")
+                .hasStackTraceContaining("split between");
     }
 
     @Test
@@ -117,7 +142,7 @@ public class ModularizeModuleTest {
         }
         Path modularized = modularize(false);
         try (JarFile file = new JarFile(
-                modularized.resolve(Dependencies.RESOLVED + "demo.automatic.jar").toFile(), false)) {
+                modularized.resolve(Dependencies.MODULAR_PATH + "demo.automatic.jar").toFile(), false)) {
             assertThat(file.stream().map(JarEntry::getName)).doesNotContain("META-INF/DEMO.SF", "META-INF/DEMO.RSA");
             assertThat(file.getManifest().getEntries()).isEmpty();
             assertThat(file.getManifest().getMainAttributes().getValue("Automatic-Module-Name"))
@@ -131,10 +156,10 @@ public class ModularizeModuleTest {
         automatic();
         plain();
         Path modularized = modularize(true);
-        SequencedProperties index = SequencedProperties.ofFiles(modularized.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties index = SequencedProperties.ofFiles(modularized.resolve(Dependencies.MODULAR));
         Path image = root.resolve("image");
         int linked = ToolProvider.findFirst("jlink").orElseThrow().run(System.out, System.err,
-                "--module-path", modularized.resolve(Dependencies.RESOLVED).toString(),
+                "--module-path", modularized.resolve(Dependencies.MODULAR_PATH).toString(),
                 "--add-modules", describe(modularized.resolve(index.getProperty(PLAIN))).name(),
                 "--output", image.toString());
         assertThat(linked).isZero();

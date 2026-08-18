@@ -30,7 +30,7 @@ public class Demo {
         @Override
         public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
                                         Map<String, Repository> repositories,
-                                        Map<String, Resolver> resolvers) {
+                                        Map<String, Resolver> resolvers) throws IOException {
             // Redirect the descriptor's sources to a preprocessing step using
             // the ProjectModuleDescriptor wither, then let the stock assembler
             // wire the regular flow against the preprocessed tree. Only the build

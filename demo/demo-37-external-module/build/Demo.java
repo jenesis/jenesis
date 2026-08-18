@@ -87,7 +87,7 @@ public class Demo {
         @Override
         public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
                                         Map<String, Repository> repositories,
-                                        Map<String, Resolver> resolvers) {
+                                        Map<String, Resolver> resolvers) throws IOException {
             // Resolve the build module from its coordinate with ExternalModule and
             // let the stock assembler wire the regular flow against its output.
             // ExternalModule does not compile the plugin (it is pre-staged), so

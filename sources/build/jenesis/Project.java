@@ -1501,7 +1501,7 @@ public record Project(
         @Override
         public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
                                         Map<String, Repository> repositories,
-                                        Map<String, Resolver> resolvers) {
+                                        Map<String, Resolver> resolvers) throws IOException {
             return base.apply(descriptor.toInherited(), repositories, resolvers).mapBuild(delegate -> (sub, inherited) -> {
                 sub.addModule("assemble", delegate, inherited.sequencedKeySet().stream());
                 sub.addModule("describe", (describe, describeInherited) -> {
@@ -1521,7 +1521,7 @@ public record Project(
         @Override
         public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
                                         Map<String, Repository> repositories,
-                                        Map<String, Resolver> resolvers) {
+                                        Map<String, Resolver> resolvers) throws IOException {
             AssemblyDescriptor assembly = base.apply(descriptor, repositories, resolvers);
             if (BuildStep.locate(descriptor.configuration(), "bom.properties") == null) {
                 return assembly;

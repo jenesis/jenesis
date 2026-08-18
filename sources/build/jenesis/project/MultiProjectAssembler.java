@@ -9,5 +9,5 @@ public interface MultiProjectAssembler<D extends ProjectModule> {
 
     AssemblyDescriptor apply(D descriptor,
                              Map<String, Repository> repositories,
-                             Map<String, Resolver> resolvers);
+                             Map<String, Resolver> resolvers) throws IOException;
 }

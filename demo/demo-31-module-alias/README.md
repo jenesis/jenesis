@@ -135,9 +135,12 @@ is to carry - runs `jdeps` **once** over the whole set to work out what each one
 actually reads, and injects a generated `module-info.class` into a copy of each
 jar.
 
-That rewritten closure then *replaces* the resolved one for everything the module
-builds: `javac` compiles against it, the tests compile and run against it, and
-`jlink` links from it. Replacing rather than adding is deliberate. A module graph
+The rewritten jars simply exist alongside the resolved ones, in a `modular/`
+folder with its own index, and everything that puts jars on a path prefers that
+index: `javac` compiles against them, the tests compile and run against them, and
+`jlink` links from them. Everything that describes what was *fetched* - the SBOM,
+the license and vulnerability checks, and the inventory `pin` reads - keeps reading
+the resolved closure and never sees the rewrite. Replacing rather than adding is deliberate. A module graph
 that does not hold together - a split package, a `requires` nothing provides, a
 jar with no name - is then a compile or test failure, where it is cheap to read
 and cheap to fix, instead of a `jlink` error at the end of the pipeline or a
@@ -198,13 +201,10 @@ its `uses` from the `ServiceLoader.load` call sites in its byte code, and its
 infers.
 
 Because the bytes change, the rewritten jar is no longer the artifact that was
-fetched: any signature is stripped (it could not verify anyway), and the entry
-loses its checksum in the rewritten index. The parts of the build that describe
-what was *fetched* therefore keep reading the resolved closure and never see the
-rewrite: the SBOM, the license and vulnerability checks, and the inventory that
-`pin` reads - so a rewritten jar's bytes can never end up in a `@jenesis.pin`
-checksum. That is also why the `Execute` run above launches against args4j as
-fetched, an automatic module as before, while the linked image runs the rewrite.
+fetched: any signature is stripped (it could not verify anyway), and the modular
+index carries no checksums at all. That is also why the `Execute` run above
+launches against args4j as fetched, an automatic module as before, while the
+linked image runs the rewrite.
 
 Pinning
 -------

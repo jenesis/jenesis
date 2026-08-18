@@ -65,17 +65,13 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
     @Override
     public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
                                     Map<String, Repository> repositories,
-                                    Map<String, Resolver> resolvers) {
-        Packaging packaging;
-        Boolean modules;
-        SequencedMap<String, SequencedMap<String, String>> overrides;
-        try {
-            packaging = Packaging.configured(BuildStep.locate(descriptor.configuration(), "packaging.properties"));
-            modules = ModularizeModule.configured(BuildStep.locate(descriptor.configuration(), "modules.properties"));
-            overrides = overridesOf(descriptor.configuration());
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+                                    Map<String, Resolver> resolvers) throws IOException {
+        Packaging packaging = Packaging.configured(
+                BuildStep.locate(descriptor.configuration(), "packaging.properties"));
+        Boolean modules = descriptor.pathPlacement() == PathPlacement.MODULE_PATH
+                ? null
+                : ModularizeModule.configured(BuildStep.locate(descriptor.configuration(), "modules.properties"));
+        SequencedMap<String, SequencedMap<String, String>> overrides = overridesOf(descriptor.configuration());
         ProcessHandler.Factory factory = ProcessHandler.Factory.of();
         AssemblyDescriptor assembly = new AssemblyDescriptor((sub, outerInherited) -> {
             SequencedSet<String> closure = new LinkedHashSet<>(descriptor.artifacts());
@@ -356,10 +352,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     jpackage.setProperty("--main-class", main);
                 }
                 if (version != null) {
-                    String appVersion = appVersion(version);
-                    if (appVersion != null) {
-                        jpackage.setProperty("--app-version", appVersion);
-                    }
+                    jpackage.setProperty("--app-version", version);
                 }
                 jpackage.store(processFolder.resolve("jpackage.properties"));
                 SequencedProperties launcher = new SequencedProperties();
@@ -402,20 +395,5 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
 
-        private static String appVersion(String version) {
-            int end = 0;
-            while (end < version.length()
-                    && (Character.isDigit(version.charAt(end)) || version.charAt(end) == '.')) {
-                end++;
-            }
-            String prefix = version.substring(0, end);
-            while (prefix.startsWith(".")) {
-                prefix = prefix.substring(1);
-            }
-            while (prefix.endsWith(".")) {
-                prefix = prefix.substring(0, prefix.length() - 1);
-            }
-            return prefix.isEmpty() ? null : prefix;
-        }
     }
 }

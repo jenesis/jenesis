@@ -24,6 +24,8 @@ public class Dependencies implements BuildStep {
     public static final String LICENSES = "licenses.properties";
     public static final String ALIASED = "aliased.properties";
     public static final String RESOLVED = "resolved/";
+    public static final String MODULAR = "modular.properties";
+    public static final String MODULAR_PATH = "modular/";
 
     private final transient Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
@@ -189,9 +191,7 @@ public class Dependencies implements BuildStep {
                     SequencedSet<String> excludes = new LinkedHashSet<>();
                     String value = properties.getProperty(key);
                     if (!value.isEmpty()) {
-                        for (String entry : value.split(",")) {
-                            excludes.add(entry);
-                        }
+                        excludes.addAll(Arrays.asList(value.split(",")));
                     }
                     exclusions.computeIfAbsent(parts[0], _ -> new LinkedHashMap<>())
                             .computeIfAbsent(parts[1], _ -> new LinkedHashMap<>())
@@ -679,9 +679,18 @@ public class Dependencies implements BuildStep {
         return aliased;
     }
 
+    private static Path index(Path folder) {
+        Path modular = folder.resolve(MODULAR);
+        if (Files.exists(modular)) {
+            return modular;
+        }
+        Path dependencies = folder.resolve(BuildStep.DEPENDENCIES);
+        return Files.exists(dependencies) ? dependencies : null;
+    }
+
     public static List<Path> select(Path folder, String group, String scope) throws IOException {
-        Path file = folder.resolve(BuildStep.DEPENDENCIES);
-        if (!Files.exists(file)) {
+        Path file = index(folder);
+        if (file == null) {
             return List.of();
         }
         SequencedProperties properties = SequencedProperties.ofFiles(file);
@@ -701,8 +710,8 @@ public class Dependencies implements BuildStep {
     }
 
     public static List<Path> all(Path folder) throws IOException {
-        Path file = folder.resolve(BuildStep.DEPENDENCIES);
-        if (!Files.exists(file)) {
+        Path file = index(folder);
+        if (file == null) {
             return List.of();
         }
         SequencedProperties properties = SequencedProperties.ofFiles(file);
