@@ -5,7 +5,6 @@
  *
  * @jenesis.release 25
  * @jenesis.test demo.greeter
- * @jenesis.pin demo.greeter 1-SNAPSHOT SHA-256/4d7450c4af30d4b62a56bb07265f49111d59fd2502d4e62af5bafcb2cf67abf6
  * @jenesis.pin org.apiguardian.api 1.1.2 SHA-256/b509448ac506d607319f182537f0b35d71007582ec741832a1f111e5b5b70b38
  * @jenesis.pin org.apiguardian/apiguardian-api 1.1.2 SHA-256/b509448ac506d607319f182537f0b35d71007582ec741832a1f111e5b5b70b38
  * @jenesis.pin org.junit.jupiter 5.11.3 SHA-256/ac7578efed162367c3ddc006338e07d4571510fd9866642ea93d5b9e4ed2f665
