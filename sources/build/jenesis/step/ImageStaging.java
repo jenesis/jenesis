@@ -27,10 +27,12 @@ public class ImageStaging implements BuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         String suffix = "." + key;
-        for (BuildStepArgument argument : arguments.values()) {
+        for (Map.Entry<String, BuildStepArgument> entry0 : arguments.entrySet()) {
+            BuildStepArgument argument = entry0.getValue();
             if (argument.removed()) {
                 continue;
             }
+            String module = moduleOf(argument.folder());
             Path inventoryFile = argument.folder().resolve(Inventory.INVENTORY);
             if (!Files.isRegularFile(inventoryFile)) {
                 continue;
@@ -44,9 +46,7 @@ public class ImageStaging implements BuildStep {
                 if (!Files.isDirectory(image)) {
                     continue;
                 }
-                Path target = perModule
-                        ? context.next().resolve(entry.substring(0, entry.length() - suffix.length()).replace('/', '-'))
-                        : context.next();
+                Path target = perModule ? context.next().resolve(module) : context.next();
                 Files.createDirectories(target);
                 Files.walkFileTree(image, new SimpleFileVisitor<>() {
                     @Override
@@ -67,5 +67,15 @@ public class ImageStaging implements BuildStep {
             }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
+    }
+
+    private static String moduleOf(Path folder) {
+        for (Path path = folder; path != null; path = path.getParent()) {
+            Path name = path.getFileName();
+            if (name != null && name.toString().startsWith("module")) {
+                return URLDecoder.decode(name.toString(), StandardCharsets.UTF_8).replace('/', '-');
+            }
+        }
+        return "module";
     }
 }
