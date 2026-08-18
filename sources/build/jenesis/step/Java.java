@@ -10,6 +10,8 @@ public abstract class Java extends JdkProcessBuildStep {
 
     private static final String MODULE_PATH = "--module-path", CLASS_PATH = "--class-path";
 
+    private static final int ARGUMENT_LIMIT = 8_000;
+
     protected final PathPlacement pathPlacement;
     protected final boolean jarsOnly;
     protected final String group;
@@ -171,14 +173,28 @@ public abstract class Java extends JdkProcessBuildStep {
             }
         }
         List<String> prefixes = new ArrayList<>();
+        StringBuilder args = new StringBuilder();
+        boolean spill = false;
         for (Map.Entry<String, List<String>> paths : List.of(
                 Map.entry(MODULE_PATH, modulePath),
                 Map.entry(CLASS_PATH, classPath)
         )) {
             if (!paths.getValue().isEmpty()) {
+                String joined = String.join(File.pathSeparator, paths.getValue());
+                spill |= joined.length() > ARGUMENT_LIMIT;
                 prefixes.add(paths.getKey());
-                prefixes.add(String.join(File.pathSeparator, paths.getValue()));
+                prefixes.add(joined);
+                args.append(paths.getKey())
+                        .append("\n\"")
+                        .append(joined.replace("\\", "\\\\").replace("\"", "\\\""))
+                        .append("\"\n");
             }
+        }
+        if (spill) {
+            Path file = context.supplement().resolve("java.args");
+            Files.writeString(file, args.toString());
+            prefixes.clear();
+            prefixes.add("@" + file);
         }
         prefixes.addAll(graph.arguments());
         return commands(executor, context, arguments).thenApplyAsync(commands -> Stream.concat(

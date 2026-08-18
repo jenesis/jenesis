@@ -116,4 +116,47 @@ public class JavaTest {
                 .contains("--class-path")
                 .doesNotContain("--add-modules", "ALL-MODULE-PATH");
     }
+
+    @Test
+    public void an_overlong_path_moves_into_an_argument_file() throws IOException {
+        Path folder = Files.createDirectories(classes.resolve(Javac.CLASSES + "sample"));
+        try (InputStream input = Sample.class.getResourceAsStream(Sample.class.getSimpleName() + ".class")) {
+            Files.copy(requireNonNull(input), folder.resolve("Sample.class"));
+        }
+        Path artifacts = Files.createDirectories(classes.resolve(BuildStep.ARTIFACTS));
+        Map<Path, Checksum> tracked = new LinkedHashMap<>();
+        tracked.put(Path.of("sample/Sample.class"), Checksum.of(ChecksumStatus.ADDED));
+        for (int index = 0; index < 120; index++) {
+            String name = "a-jar-with-a-name-long-enough-to-add-up-" + index + ".jar";
+            try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(artifacts.resolve(name)))) {
+                jar.putNextEntry(new JarEntry("plain/Lib.class"));
+                jar.write(new byte[]{1, 2, 3});
+                jar.closeEntry();
+            }
+            tracked.put(Path.of(BuildStep.ARTIFACTS + name), Checksum.of(ChecksumStatus.ADDED));
+        }
+        AtomicReference<List<String>> captured = new AtomicReference<>();
+        Function<List<String>, ProcessHandler.OfProcess> base = ProcessHandler.OfProcess.ofJavaHome("bin/java");
+        Function<List<String>, ProcessHandler.OfProcess> factory = arguments -> {
+            captured.set(arguments);
+            return base.apply(arguments);
+        };
+        BuildStepResult result = Java.of(factory, PathPlacement.CLASS_PATH, false, "sample.Sample").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(classes, tracked))))
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+        assertThat(captured.get())
+                .as("the path options are handed over as an @-file rather than as one enormous argument")
+                .doesNotContain("--class-path", "--module-path")
+                .anySatisfy(argument -> assertThat(argument).startsWith("@").endsWith("java.args"));
+        assertThat(supplement.resolve("java.args"))
+                .content()
+                .startsWith("--class-path\n\"")
+                .contains("a-jar-with-a-name-long-enough-to-add-up-119.jar");
+        assertThat(supplement.resolve("output")).content().isEqualTo("Hello world!");
+    }
+
 }
