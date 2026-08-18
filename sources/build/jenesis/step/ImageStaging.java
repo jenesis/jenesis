@@ -73,7 +73,11 @@ public class ImageStaging implements BuildStep {
         for (Path path = folder; path != null; path = path.getParent()) {
             Path name = path.getFileName();
             if (name != null && name.toString().startsWith("module")) {
-                return URLDecoder.decode(name.toString(), StandardCharsets.UTF_8).replace('/', '-');
+                String decoded = URLDecoder.decode(name.toString(), StandardCharsets.UTF_8).replace('/', '-');
+                while (decoded.endsWith("-")) {
+                    decoded = decoded.substring(0, decoded.length() - 1);
+                }
+                return decoded.isEmpty() ? "module" : decoded;
             }
         }
         return "module";
