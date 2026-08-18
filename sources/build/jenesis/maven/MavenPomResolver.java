@@ -450,19 +450,21 @@ public class MavenPomResolver implements MavenResolver {
                         scope.name().toLowerCase(Locale.ROOT),
                         followed));
                 if (followed) {
-                    ResolvedPom pom = resolveOrCached(executor,
-                            repository,
-                            entry.getKey().groupId(),
-                            entry.getKey().artifactId(),
-                            version,
-                            resolved,
-                            unresolved);
                     Set<MavenDependencyName> exclusions = current.exclusions();
                     if (value.exclusions() != null) {
                         exclusions = new HashSet<>(exclusions);
                         exclusions.addAll(value.exclusions());
                     }
-                    queue.add(new ContextualPom(pom, false, scope, exclusions, entry.getKey(), value.version()));
+                    if (!exclusions.contains(MavenDependencyName.EXCLUDE_ALL)) {
+                        ResolvedPom pom = resolveOrCached(executor,
+                                repository,
+                                entry.getKey().groupId(),
+                                entry.getKey().artifactId(),
+                                version,
+                                resolved,
+                                unresolved);
+                        queue.add(new ContextualPom(pom, false, scope, exclusions, entry.getKey(), value.version()));
+                    }
                 }
             }
         } while ((current = queue.poll()) != null);

@@ -101,16 +101,21 @@ public class Pom implements BuildStep {
             MavenDependencyScope scope = inCompile && inRuntime
                     ? MavenDependencyScope.COMPILE
                     : inCompile ? MavenDependencyScope.PROVIDED : MavenDependencyScope.RUNTIME;
-            List<MavenDependencyName> excludes = null;
-            String exclusionList = coordinateExclusions.get(name);
-            if (exclusionList != null && !exclusionList.isEmpty()) {
-                excludes = new ArrayList<>();
-                for (String entry : exclusionList.split(",")) {
-                    int slash = entry.indexOf('/');
-                    if (slash > 0) {
-                        excludes.add(new MavenDependencyName(
-                                entry.substring(0, slash),
-                                entry.substring(slash + 1)));
+            List<MavenDependencyName> excludes;
+            if (resolved) {
+                excludes = List.of(MavenDependencyName.EXCLUDE_ALL);
+            } else {
+                excludes = null;
+                String exclusionList = coordinateExclusions.get(name);
+                if (exclusionList != null && !exclusionList.isEmpty()) {
+                    excludes = new ArrayList<>();
+                    for (String entry : exclusionList.split(",")) {
+                        int slash = entry.indexOf('/');
+                        if (slash > 0) {
+                            excludes.add(new MavenDependencyName(
+                                    entry.substring(0, slash),
+                                    entry.substring(slash + 1)));
+                        }
                     }
                 }
             }

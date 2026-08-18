@@ -75,7 +75,6 @@ public record Project(
                                        Project project,
                                        MultiProjectAssembler<? super ProjectModuleDescriptor> assembler) throws IOException;
 
-
         private static Path modularConfigurationFolder(Path location) {
             return location == null ? null : location.resolve("META-INF").resolve("build.jenesis");
         }

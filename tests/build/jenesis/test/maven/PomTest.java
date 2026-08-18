@@ -127,6 +127,12 @@ public class PomTest {
                             <groupId>org.example</groupId>
                             <artifactId>lib</artifactId>
                             <version>1.2.3</version>
+                            <exclusions>
+                                <exclusion>
+                                    <groupId>*</groupId>
+                                    <artifactId>*</artifactId>
+                                </exclusion>
+                            </exclusions>
                         </dependency>
                     </dependencies>
                 </project>
@@ -392,6 +398,44 @@ public class PomTest {
         assertThat(pom).contains("<version>1.0.0</version>");
         assertThat(pom).contains("<url>https://example.com/pom-url</url>");
         assertThat(pom).contains("<name>Apache-2.0</name>");
+    }
+
+    @Test
+    public void unresolved_pom_keeps_an_exclusion_on_the_dependency_that_declared_it() throws IOException {
+        SequencedProperties coordinates = new SequencedProperties();
+        coordinates.setProperty("maven/build.jenesis/jenesis/jar/1.0.0", "");
+        coordinates.store(argument.resolve(BuildStep.IDENTITY));
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.example/lib/1.2.3", "");
+        requires.setProperty("main/runtime/maven/org.example/lib/1.2.3", "");
+        requires.setProperty("main/compile/maven/org.example/other/4.5.6", "");
+        requires.setProperty("main/runtime/maven/org.example/other/4.5.6", "");
+        requires.store(argument.resolve(BuildStep.REQUIRES));
+        SequencedProperties exclusions = new SequencedProperties();
+        exclusions.setProperty("main/compile/maven/org.example/lib/1.2.3", "commons-logging/commons-logging");
+        exclusions.store(argument.resolve(BuildStep.EXCLUSIONS));
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        BuildStepResult result = new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.EXCLUSIONS), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+        String pom = Files.readString(next.resolve(Pom.POM));
+        assertThat(pom).contains("<artifactId>commons-logging</artifactId>");
+        assertThat(pom).doesNotContain("<groupId>*</groupId>");
+        assertThat(pom.indexOf("<exclusions>"))
+                .isGreaterThan(pom.indexOf("<artifactId>lib</artifactId>"))
+                .isLessThan(pom.indexOf("<artifactId>other</artifactId>"));
     }
 
 }
