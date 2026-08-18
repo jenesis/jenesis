@@ -166,11 +166,7 @@ public record Project(
                     (path, file) -> new PinPom("maven", path, List.of(file), project.hashFunction())), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", new Tree(), inherited.sequencedKeySet()), BUILD);
-            executor.addModule(IDE, (ide, inherited) -> {
-                ide.addStep("idea", new Ide(project.root(), Ide.IDEA), inherited.sequencedKeySet());
-                ide.addStep("vscode", new Ide(project.root(), Ide.VSCODE), inherited.sequencedKeySet());
-                ide.addStep("eclipse", new Ide(project.root(), Ide.ECLIPSE), inherited.sequencedKeySet());
-            }, BUILD);
+            executor.addModule(IDE, new Ide(project.root()), BUILD);
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
@@ -236,11 +232,7 @@ public record Project(
                     (path, file) -> new PinModuleInfo("module", path, List.of(file), project.hashFunction())), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", new Tree(), inherited.sequencedKeySet()), BUILD);
-            executor.addModule(IDE, (ide, inherited) -> {
-                ide.addStep("idea", new Ide(project.root(), Ide.IDEA), inherited.sequencedKeySet());
-                ide.addStep("vscode", new Ide(project.root(), Ide.VSCODE), inherited.sequencedKeySet());
-                ide.addStep("eclipse", new Ide(project.root(), Ide.ECLIPSE), inherited.sequencedKeySet());
-            }, BUILD);
+            executor.addModule(IDE, new Ide(project.root()), BUILD);
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
@@ -317,11 +309,7 @@ public record Project(
                             (path, file) -> new PinModuleInfo("module", path, List.of(file), project.hashFunction())),
                     BUILD);
             executor.addStep(DEPENDENCIES, new Tree(), BUILD);
-            executor.addModule(IDE, (ide, inherited) -> {
-                ide.addStep("idea", new Ide(project.root(), Ide.IDEA), inherited.sequencedKeySet());
-                ide.addStep("vscode", new Ide(project.root(), Ide.VSCODE), inherited.sequencedKeySet());
-                ide.addStep("eclipse", new Ide(project.root(), Ide.ECLIPSE), inherited.sequencedKeySet());
-            }, BUILD);
+            executor.addModule(IDE, new Ide(project.root()), BUILD);
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');

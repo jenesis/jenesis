@@ -1,6 +1,8 @@
 package build.jenesis.project;
 
 import module java.base;
+import build.jenesis.BuildExecutor;
+import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -8,7 +10,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
 
-public class Ide implements BuildStep {
+public class Ide implements BuildExecutorModule {
 
     public static final String IDEA = "idea", VSCODE = "vscode", ECLIPSE = "eclipse";
 
@@ -18,35 +20,72 @@ public class Ide implements BuildStep {
             "src/test/java", "src/test/kotlin", "src/test/scala", "src/test/groovy", "tests", "test");
 
     private final Path root;
-    private final String tool;
 
-    public Ide(Path root, String tool) {
+    public Ide(Path root) {
         this.root = root;
-        this.tool = tool;
     }
 
     @Override
-    public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
-        return true;
+    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
+        buildExecutor.addStep(IDEA, new Idea(root), inherited.sequencedKeySet());
+        buildExecutor.addStep(VSCODE, new VsCode(root), inherited.sequencedKeySet());
+        buildExecutor.addStep(ECLIPSE, new Eclipse(root), inherited.sequencedKeySet());
     }
 
-    @Override
-    public CompletionStage<BuildStepResult> apply(Executor executor,
-                                                  BuildStepContext context,
-                                                  SequencedMap<String, BuildStepArgument> arguments)
-            throws IOException {
-        Path base = root.toAbsolutePath().normalize();
-        List<Module> modules = read(arguments.values(), base);
-        switch (tool) {
-            case IDEA -> idea(modules, base);
-            case ECLIPSE -> eclipse(modules);
-            case VSCODE -> vscode(modules, base);
-            default -> throw new IllegalArgumentException("Unknown IDE tool: " + tool);
+    public record Idea(Path root) implements BuildStep {
+
+        @Override
+        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+            return true;
         }
-        return CompletableFuture.completedStage(new BuildStepResult(true));
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            Path base = root.toAbsolutePath().normalize();
+            idea(read(arguments.values(), base), base);
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
     }
 
-    private List<Module> read(Collection<BuildStepArgument> arguments, Path base) throws IOException {
+    public record VsCode(Path root) implements BuildStep {
+
+        @Override
+        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+            return true;
+        }
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            Path base = root.toAbsolutePath().normalize();
+            vscode(read(arguments.values(), base), base);
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    public record Eclipse(Path root) implements BuildStep {
+
+        @Override
+        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+            return true;
+        }
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            eclipse(read(arguments.values(), root.toAbsolutePath().normalize()));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    private static List<Module> read(Collection<BuildStepArgument> arguments, Path base) throws IOException {
         List<Raw> raws = new ArrayList<>();
         SequencedMap<String, String> identities = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments) {
@@ -154,7 +193,7 @@ public class Ide implements BuildStep {
         return null;
     }
 
-    private void idea(List<Module> modules, Path base) throws IOException {
+    private static void idea(List<Module> modules, Path base) throws IOException {
         Path folder = Files.createDirectories(base.resolve(".idea"));
         List<String> entries = new ArrayList<>();
         for (Module module : modules) {
@@ -237,7 +276,7 @@ public class Ide implements BuildStep {
                 : library.toString().replace(File.separatorChar, '/');
     }
 
-    private void eclipse(List<Module> modules) throws IOException {
+    private static void eclipse(List<Module> modules) throws IOException {
         for (Module module : modules) {
             Files.writeString(module.content().resolve(".project"), """
                     <?xml version="1.0" encoding="UTF-8"?>
@@ -294,7 +333,7 @@ public class Ide implements BuildStep {
         return content.toString();
     }
 
-    private void vscode(List<Module> modules, Path base) throws IOException {
+    private static void vscode(List<Module> modules, Path base) throws IOException {
         Path folder = Files.createDirectories(base.resolve(".vscode"));
         SequencedSet<String> sourcePaths = new LinkedHashSet<>();
         SequencedSet<String> libraries = new LinkedHashSet<>();

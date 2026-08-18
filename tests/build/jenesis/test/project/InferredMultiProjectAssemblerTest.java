@@ -62,25 +62,25 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
-    public void snapshot_version_is_sanitized_for_jpackage_app_version() throws IOException {
+    public void snapshot_version_reaches_jpackage_app_version_verbatim() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "artifact=demo\nversion=0-SNAPSHOT\n");
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
         SequencedProperties jpackageArguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"));
         assertThat(jpackageArguments.getProperty("--app-version"))
-                .as("jpackage rejects qualifiers like -SNAPSHOT on Windows, so only the dotted numeric prefix is passed")
-                .isEqualTo("0");
+                .as("the version is the project's to get right, so a qualifier reaches jpackage and fails there")
+                .isEqualTo("0-SNAPSHOT");
     }
 
     @Test
-    public void non_numeric_version_yields_no_jpackage_app_version() throws IOException {
+    public void non_numeric_version_reaches_jpackage_app_version_verbatim() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "artifact=demo\nversion=RELEASE\n");
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
         SequencedProperties jpackageArguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"));
-        assertThat(jpackageArguments.stringPropertyNames())
-                .as("a version with no dotted numeric prefix leaves jpackage to its own default")
-                .doesNotContain("--app-version");
+        assertThat(jpackageArguments.getProperty("--app-version"))
+                .as("nothing is invented for a version jpackage cannot parse; it is reported by jpackage itself")
+                .isEqualTo("RELEASE");
     }
 
     @Test

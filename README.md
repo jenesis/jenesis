@@ -1220,7 +1220,7 @@ disturbing them.
 `pin`, it depends on `BUILD` and writes back into the project tree rather than under `target/`, so the generated
 files land where each editor expects them. It groups three steps - `ide/idea`, `ide/vscode`, and `ide/eclipse` -
 and selecting `ide` runs all three; a sub-step name (e.g. `java build/jenesis/Project.java ide/idea`) generates
-just one editor's files. The `Ide` step reads each module's `inventory.properties` and recovers the module's
+just one editor's files. `Ide` is a `BuildExecutorModule` that wires those three steps - `Ide.Idea`, `Ide.VsCode` and `Ide.Eclipse`, each public and usable on its own - so a build gets every editor by default rather than registering one step per tool. Each step reads every module's `inventory.properties` and recovers the module's
 source folder (`prefix.path`), its resolved dependency jars (`prefix.dependency`, self-anchored under `target/`),
 and its own published coordinates (`prefix.identity`). A dependency whose coordinate matches another module's
 identity is emitted as an inter-module project reference rather than a jar library, so a multi-module import

@@ -2,6 +2,7 @@ package build.jenesis.test.project;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
@@ -188,7 +189,13 @@ public class IdeTest {
         for (Path inventory : inventories) {
             arguments.put("inventory-" + index++, new BuildStepArgument(inventory, Map.of()));
         }
-        BuildStepResult result = new Ide(root, tool).apply(Runnable::run,
+        BuildStep step = switch (tool) {
+            case Ide.IDEA -> new Ide.Idea(root);
+            case Ide.VSCODE -> new Ide.VsCode(root);
+            case Ide.ECLIPSE -> new Ide.Eclipse(root);
+            default -> throw new IllegalArgumentException(tool);
+        };
+        BuildStepResult result = step.apply(Runnable::run,
                         new BuildStepContext(root.resolve("previous"), next, supplement),
                         arguments)
                 .toCompletableFuture()
