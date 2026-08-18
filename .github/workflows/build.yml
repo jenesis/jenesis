@@ -35,12 +35,12 @@ jobs:
           - { name: java-pom-bundle, dir: demo-05-java-pom-executable, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=bundle, verify: 'find target -type d -name bundle | grep -q .' }
           - { name: java-pom-docker, dir: demo-05-java-pom-executable, entry: build/jenesis/Project.java stage, flags: -Djenesis.project.properties=docker, verify: 'grep -q "^ENTRYPOINT .*--class-path" target/stage/docker/output/Dockerfile && find target -path "*stage/docker/output/classpath*" -name "*.jar" | grep -q .' }
           - { name: java-pom-launcher, dir: demo-05-java-pom-executable, entry: build/DemoLauncher.java }
-          - { name: java-pom-launcher-strict, dir: demo-05-java-pom-executable, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=launcher -Djenesis.dependency.pin=strict, verify: 'find target -path "*launcher*" -name "*.jar" -path "*output*" | grep -q .' }
+          - { name: java-pom-launcher-profile, dir: demo-05-java-pom-executable, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=launcher, verify: 'find target -path "*launcher*" -name "*.jar" -path "*output*" | grep -q .' }
           - { name: java-modular-executable, dir: demo-06-java-modular-executable, entry: build/Demo.java }
           - { name: java-modular-bundle, dir: demo-06-java-modular-executable, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=bundle, verify: 'find target -type d -name bundle | grep -q .' }
           - { name: java-modular-docker, dir: demo-06-java-modular-executable, entry: build/jenesis/Project.java stage, flags: -Djenesis.project.properties=docker, verify: 'grep -q "^ENTRYPOINT .*--module-path.*--module.*demo.modular.executable/sample.Sample" target/stage/docker/output/Dockerfile && find target -path "*stage/docker/output/modulepath*" -name "*.jar" | grep -q .' }
           - { name: java-modular-launcher, dir: demo-06-java-modular-executable, entry: build/DemoLauncher.java }
-          - { name: java-modular-launcher-strict, dir: demo-06-java-modular-executable, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=launcher -Djenesis.dependency.pin=strict, verify: 'find target -path "*launcher*" -name "*.jar" -path "*output*" | grep -q .' }
+          - { name: java-modular-launcher-profile, dir: demo-06-java-modular-executable, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=launcher, verify: 'find target -path "*launcher*" -name "*.jar" -path "*output*" | grep -q .' }
           - { name: bundle, dir: demo-07-bundle, entry: build/Demo.java }
           - { name: java-multi-release, dir: demo-08-java-multi-release, entry: build/jenesis/Execute.java }
           - { name: javac-arguments, dir: demo-09-javac-arguments, entry: build/jenesis/Execute.java }
@@ -97,7 +97,7 @@ jobs:
       - name: Demo ${{ matrix.demo.name }}
         shell: bash
         working-directory: demo/${{ matrix.demo.dir }}
-        run: java ${{ matrix.demo.flags }} ${{ matrix.demo.entry }}
+        run: java -Djenesis.dependency.pin=strict ${{ matrix.demo.flags }} ${{ matrix.demo.entry }}
 
       - name: Verify ${{ matrix.demo.name }}
         if: matrix.demo.verify
@@ -136,7 +136,7 @@ jobs:
       - name: Native image demo
         shell: bash
         working-directory: demo/demo-44-native-image
-        run: java build/jenesis/Project.java stage
+        run: java -Djenesis.dependency.pin=strict build/jenesis/Project.java stage
 
       - name: Verify native image
         shell: bash
@@ -178,7 +178,7 @@ jobs:
 
       - name: Project layout ${{ matrix.layout }}
         shell: bash
-        run: java -Djenesis.project.layout=${{ matrix.layout }} build/jenesis/Project.java stage
+        run: java -Djenesis.dependency.pin=strict -Djenesis.project.layout=${{ matrix.layout }} build/jenesis/Project.java stage
 
       - name: Upload target on failure
         if: failure()
@@ -207,7 +207,8 @@ jobs:
       - name: Stage Jenesis
         shell: bash
         run: |
-          java -Djenesis.project.version=0.0.0-TEST \
+          java -Djenesis.dependency.pin=strict \
+               -Djenesis.project.version=0.0.0-TEST \
                -Djenesis.project.sources=true \
                -Djenesis.test.skip=true \
                -Djenesis.project.metadata=project.properties \
