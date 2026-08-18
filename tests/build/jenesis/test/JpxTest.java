@@ -396,8 +396,12 @@ public class JpxTest {
         assertThat(docker.host).isEqualTo(installation.folder());
         assertThat(docker.container).isEqualTo(installation.folder().toString());
         assertThat(docker.readOnly).isTrue();
-        assertThat(docker.javaArgs).containsSubsequence("-p", "-m", "tool.main/toolmain.Main", "argument");
-        assertThat(docker.javaArgs).doesNotContain("--add-modules");
+        assertThat(docker.javaArgs)
+                .as("the paths travel as an @-file, written inside the mounted installation so the container reads"
+                        + " it at the same path")
+                .containsSubsequence("@" + installation.folder().resolve("jpx.args"),
+                        "-m", "tool.main/toolmain.Main", "argument");
+        assertThat(docker.javaArgs).doesNotContain("--add-modules", "-p", "-cp");
     }
 
     @Test
@@ -419,12 +423,16 @@ public class JpxTest {
                 .as("the installation carries ready-made options"
                         + ", so the launch splices them without interpreting them")
                 .containsSubsequence(
-                        "-p", folder.resolve("tool-main.jar").toString(),
+                        "@" + folder.resolve("jpx.args"),
                         "--add-modules=ALL-MODULE-PATH",
                         "--add-reads=tool.main=ALL-UNNAMED",
-                        "-cp", folder.resolve("legacy.jar").toString(),
                         "-m", "tool.main/toolmain.Main",
                         "run");
+        assertThat(folder.resolve("jpx.args"))
+                .as("both paths are in the file rather than on the command line")
+                .content()
+                .contains("-p", folder.resolve("tool-main.jar").toString(),
+                        "-cp", folder.resolve("legacy.jar").toString());
     }
 
     @Test
@@ -444,11 +452,14 @@ public class JpxTest {
         assertThat(arguments)
                 .as("an installation written before javaOptions existed still gets its module path rooted")
                 .containsSubsequence(
-                        "-p", folder.resolve("tool-main.jar").toString(),
+                        "@" + folder.resolve("jpx.args"),
                         "--add-modules=ALL-MODULE-PATH",
-                        "-cp", folder.resolve("legacy.jar").toString(),
                         "-m", "tool.main/toolmain.Main",
                         "run");
+        assertThat(folder.resolve("jpx.args"))
+                .content()
+                .contains("-p", folder.resolve("tool-main.jar").toString(),
+                        "-cp", folder.resolve("legacy.jar").toString());
     }
 
     @Test

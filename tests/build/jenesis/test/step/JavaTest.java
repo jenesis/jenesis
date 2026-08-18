@@ -113,12 +113,17 @@ public class JavaTest {
         assertThat(result.next()).isTrue();
         assertThat(captured.get())
                 .as("a classpath-only run has no module path, so ALL-MODULE-PATH must not be emitted")
-                .contains("--class-path")
+                .anySatisfy(argument -> assertThat(argument).startsWith("@").endsWith("java.args"))
                 .doesNotContain("--add-modules", "ALL-MODULE-PATH");
+        assertThat(supplement.resolve("java.args"))
+                .as("the class path is in the file, and a run without a module path names no module path at all")
+                .content()
+                .contains("--class-path")
+                .doesNotContain("--module-path");
     }
 
     @Test
-    public void an_overlong_path_moves_into_an_argument_file() throws IOException {
+    public void the_paths_always_move_into_an_argument_file() throws IOException {
         Path folder = Files.createDirectories(classes.resolve(Javac.CLASSES + "sample"));
         try (InputStream input = Sample.class.getResourceAsStream(Sample.class.getSimpleName() + ".class")) {
             Files.copy(requireNonNull(input), folder.resolve("Sample.class"));

@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenDefaultVersionNegotiator;
@@ -121,14 +122,12 @@ public record Jpx(Path storage,
             }
             List<String> command = new ArrayList<>();
             String modulepath = properties.getProperty("modulepath"), classpath = properties.getProperty("classpath");
+            SequencedMap<String, String> options = new LinkedHashMap<>();
+            options.put("-p", modulepath == null ? null : join(modulepath));
+            options.put("-cp", classpath == null ? null : join(classpath));
+            command.addAll(ProcessBuildStep.argumentFile(folder.resolve("jpx.args"), options));
             if (modulepath != null) {
-                command.add("-p");
-                command.add(join(modulepath));
                 command.addAll(ModuleGraph.load(properties));
-            }
-            if (classpath != null) {
-                command.add("-cp");
-                command.add(join(classpath));
             }
             String mainModule = properties.getProperty("mainModule");
             if (mainModule != null) {

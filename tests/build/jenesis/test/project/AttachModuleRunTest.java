@@ -59,7 +59,7 @@ public class AttachModuleRunTest {
         assertThat(agentPath)
                 .as("agent and runtime scope resolve to the identical artifact")
                 .isEqualTo(runtime.split(" ")[0]);
-        String command = Files.readString(root.resolve("test").resolve("executed").resolve("supplement").resolve("command"));
+        String command = launch(root.resolve("test").resolve("executed").resolve("supplement"));
         assertThat(command).contains("-javaagent:");
         assertThat(occurrences(command, agentPath.substring(agentPath.lastIndexOf('/') + 1)))
                 .as("the probe jar is attached once and on the class path once")
@@ -93,7 +93,7 @@ public class AttachModuleRunTest {
         String agent = index.getProperty("main/agent/probes/probe/probe/1");
         assertThat(agent).isNotNull();
         String agentPath = agent.split(" ")[0];
-        String command = Files.readString(root.resolve("test").resolve("executed").resolve("supplement").resolve("command"));
+        String command = launch(root.resolve("test").resolve("executed").resolve("supplement"));
         assertThat(command).contains("-javaagent:");
         assertThat(occurrences(command, agentPath.substring(agentPath.lastIndexOf('/') + 1)))
                 .as("the probe jar is attached but joins no class or module path")
@@ -232,6 +232,12 @@ public class AttachModuleRunTest {
 
     private void writeTest(String source) throws IOException {
         compile(classes.resolve(Javac.CLASSES), bootModuleJars(), "attach", Map.of("AttachedTest", source));
+    }
+
+    private static String launch(Path supplement) throws IOException {
+        String command = Files.readString(supplement.resolve("command"));
+        Path args = supplement.resolve("java.args");
+        return Files.exists(args) ? command + "\n" + Files.readString(args) : command;
     }
 
     private static int occurrences(String text, String token) {

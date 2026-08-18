@@ -186,4 +186,25 @@ public abstract class ProcessBuildStep implements BuildStep {
         });
         return result;
     }
+
+    public static List<String> argumentFile(Path file, SequencedMap<String, String> options) throws IOException {
+        StringBuilder args = new StringBuilder();
+        options.forEach((option, value) -> {
+            if (value != null && !value.isEmpty()) {
+                args.append(option)
+                        .append("\n\"")
+                        .append(value.replace("\\", "\\\\").replace("\"", "\\\""))
+                        .append("\"\n");
+            }
+        });
+        if (args.isEmpty()) {
+            return List.of();
+        }
+        Path parent = file.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        Files.writeString(file, args.toString());
+        return List.of("@" + file);
+    }
 }

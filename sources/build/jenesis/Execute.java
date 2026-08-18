@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.step.Inventory;
 
@@ -127,18 +128,16 @@ public record Execute(Project project, String mainClass, String module) {
             for (String jar : jars) {
                 graph.place(PathPlacement.INFERRED, Path.of(jar), modulePath, classPath);
             }
-            javaArgs.add("--module-path");
-            javaArgs.add(String.join(File.pathSeparator, modulePath));
-            if (!classPath.isEmpty()) {
-                javaArgs.add("--class-path");
-                javaArgs.add(String.join(File.pathSeparator, classPath));
-            }
+            SequencedMap<String, String> options = new LinkedHashMap<>();
+            options.put("--module-path", String.join(File.pathSeparator, modulePath));
+            options.put("--class-path", String.join(File.pathSeparator, classPath));
+            javaArgs.addAll(ProcessBuildStep.argumentFile(project.target().resolve("execute.args"), options));
             javaArgs.addAll(graph.arguments());
             javaArgs.add("-m");
             javaArgs.add(candidate.module + "/" + candidate.mainClass);
         } else {
-            javaArgs.add("-cp");
-            javaArgs.add(String.join(File.pathSeparator, jars));
+            javaArgs.addAll(ProcessBuildStep.argumentFile(project.target().resolve("execute.args"),
+                    new LinkedHashMap<>(Map.of("-cp", String.join(File.pathSeparator, jars)))));
             javaArgs.add(candidate.mainClass);
         }
         javaArgs.addAll(List.of(arguments));
