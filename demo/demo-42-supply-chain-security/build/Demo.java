@@ -9,7 +9,7 @@ public class Demo {
     static void main(String[] args) throws IOException {
         // Baseline: a version-only dependency resolves and builds by default.
         wipe();
-        new Project().build("+unpinned");
+        new Project().pinning(null).build("+unpinned");
         System.out.println("[ok]      unpinned: a version-only dependency builds by default");
 
         // 1. ... but strict pinning rejects it - there is no checksum to verify.
@@ -19,7 +19,7 @@ public class Demo {
         // 2. A wrong checksum fails the build even without strict pinning: every
         // download is verified against its pin regardless.
         expectFailure("tampered: a dependency whose pinned checksum does not match",
-                () -> new Project().build("+tampered"));
+                () -> new Project().pinning(null).build("+tampered"));
 
         System.out.println();
         System.out.println("Both supply-chain checks blocked the build, as expected.");
