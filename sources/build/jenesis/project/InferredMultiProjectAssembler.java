@@ -87,11 +87,13 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             sub.addModule("check",
                     check.apply(new InferredSourceCodeQualityModule(descriptor.configuration(), repositories, resolvers)
                             .pinning(descriptor.pinning())),
-                    Stream.concat(descriptor.sources().stream(), descriptor.spdx().stream()));
+                    Stream.of(descriptor.sources().stream(), descriptor.spdx().stream(), descriptor.manifests().stream())
+                            .flatMap(Function.identity()));
             sub.addModule("format",
                     format.apply(new InferredSourceFormattingModule(descriptor.configuration(), repositories, resolvers)
                             .pinning(descriptor.pinning())),
-                    Stream.concat(descriptor.sources().stream(), descriptor.spdx().stream()));
+                    Stream.of(descriptor.sources().stream(), descriptor.spdx().stream(), descriptor.manifests().stream())
+                            .flatMap(Function.identity()));
             Sbom sbom = Boolean.parseBoolean(System.getProperty("jenesis.sbom.cyclonedx", "true"))
                     ? Sbom.configured(BuildStep.locate(descriptor.configuration(), "sbom.properties"))
                     : null;
@@ -154,7 +156,10 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             inherited.sequencedKeySet());
                     module.addStep("archive",
                             new Jar(factory, Jar.Sort.JAVADOC),
-                            "generate");
+                            "generate/"
+                                    + InferredDocumentationChainModule.DOCUMENT
+                                    + "/"
+                                    + InferredDocumentationChainModule.AGGREGATE);
                 }, Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             }
             if (packaging.jmod()) {

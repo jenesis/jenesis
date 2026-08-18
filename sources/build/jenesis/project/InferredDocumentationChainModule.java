@@ -172,11 +172,6 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
             }
             buildExecutor.addStep(AGGREGATE, new Aggregate(), outputs);
         }
-
-        @Override
-        public Optional<String> resolve(String path) {
-            return path.equals(AGGREGATE) ? Optional.of(AGGREGATE) : Optional.empty();
-        }
     }
 
     private static class Aggregate implements BuildStep {
