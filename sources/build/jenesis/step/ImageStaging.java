@@ -10,15 +10,19 @@ import build.jenesis.SequencedProperties;
 public class ImageStaging implements BuildStep {
 
     private final String key;
-    private final boolean perModule;
+    private final boolean noFolder;
 
     public ImageStaging(String key) {
         this(key, false);
     }
 
-    public ImageStaging(String key, boolean perModule) {
+    private ImageStaging(String key, boolean noFolder) {
         this.key = key;
-        this.perModule = perModule;
+        this.noFolder = noFolder;
+    }
+
+    public ImageStaging noFolder(boolean noFolder) {
+        return new ImageStaging(key, noFolder);
     }
 
     @Override
@@ -27,12 +31,27 @@ public class ImageStaging implements BuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         String suffix = "." + key;
-        for (Map.Entry<String, BuildStepArgument> entry0 : arguments.entrySet()) {
-            BuildStepArgument argument = entry0.getValue();
+        SequencedMap<String, String> artifacts = new LinkedHashMap<>();
+        for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
             }
-            String module = moduleOf(argument.folder());
+            Path candidate = argument.folder().resolve(Inventory.INVENTORY);
+            if (!Files.isRegularFile(candidate)) {
+                continue;
+            }
+            SequencedProperties declared = SequencedProperties.ofFiles(candidate);
+            for (String entry : declared.stringPropertyNames()) {
+                if (entry.endsWith(".artifact")) {
+                    artifacts.putIfAbsent(entry.substring(0, entry.length() - ".artifact".length()),
+                            declared.getProperty(entry));
+                }
+            }
+        }
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
             Path inventoryFile = argument.folder().resolve(Inventory.INVENTORY);
             if (!Files.isRegularFile(inventoryFile)) {
                 continue;
@@ -46,7 +65,11 @@ public class ImageStaging implements BuildStep {
                 if (!Files.isDirectory(image)) {
                     continue;
                 }
-                Path target = perModule ? context.next().resolve(module) : context.next();
+                String prefix = entry.substring(0, entry.length() - suffix.length());
+                String artifact = artifacts.get(prefix);
+                Path target = noFolder
+                        ? context.next()
+                        : context.next().resolve(artifact == null || artifact.isEmpty() ? prefix : artifact);
                 Files.createDirectories(target);
                 Files.walkFileTree(image, new SimpleFileVisitor<>() {
                     @Override
@@ -67,19 +90,5 @@ public class ImageStaging implements BuildStep {
             }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
-    }
-
-    private static String moduleOf(Path folder) {
-        for (Path path = folder; path != null; path = path.getParent()) {
-            Path name = path.getFileName();
-            if (name != null && name.toString().startsWith("module")) {
-                String decoded = URLDecoder.decode(name.toString(), StandardCharsets.UTF_8).replace('/', '-');
-                while (decoded.endsWith("-")) {
-                    decoded = decoded.substring(0, decoded.length() - 1);
-                }
-                return decoded.isEmpty() ? "module" : decoded;
-            }
-        }
-        return "module";
     }
 }

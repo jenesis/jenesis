@@ -149,7 +149,7 @@ and cheap to fix, instead of a `jlink` error at the end of the pipeline or a
 With `jlink=true` beside it in `packaging.properties`, the `stage` goal produces a
 runtime that knows about exactly four modules:
 
-    target/stage/runtime/output/bin/java --list-modules
+    target/stage/runtime/output/demo.cli/bin/java --list-modules
 
     demo.cli@1-SNAPSHOT
     java.base@25.0.3
@@ -160,7 +160,7 @@ runtime that knows about exactly four modules:
 came along because `jdeps` found that args4j reads it. The app runs from that
 runtime with no class path and no `--add-modules`, nothing but the module graph:
 
-    target/stage/runtime/output/bin/java -m demo.cli/demo.cli.Main -name Ada -shout
+    target/stage/runtime/output/demo.cli/bin/java -m demo.cli/demo.cli.Main -name Ada -shout
 
     HELLO, ADA!
 
