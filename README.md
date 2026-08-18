@@ -306,7 +306,7 @@ whose `test` names this module's `artifact` (the same cross-module channel stagi
 so each image gets exactly its own test's metadata - no `META-INF/native-image/` commit in between. The tool is located through `GRAALVM_HOME`, then `java.home`, then `PATH`, and the `stage` goal collects the executable into
 its canonical target directory (the native-image analogue of `stage/packages` and `stage/runtime`):
 
-    target/stage/native/output/build.jenesis/build.jenesis
+    target/stage/native/output/build.jenesis
 
 Running that binary launches the build with the near-instant startup measured below. This was verified end to end on
 a GraalVM 25 JDK: the agent run captured the reachability metadata and the resulting native executable launched the

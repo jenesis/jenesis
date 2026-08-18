@@ -31,23 +31,6 @@ public class ImageStaging implements BuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         String suffix = "." + key;
-        SequencedMap<String, String> artifacts = new LinkedHashMap<>();
-        for (BuildStepArgument argument : arguments.values()) {
-            if (argument.removed()) {
-                continue;
-            }
-            Path candidate = argument.folder().resolve(Inventory.INVENTORY);
-            if (!Files.isRegularFile(candidate)) {
-                continue;
-            }
-            SequencedProperties declared = SequencedProperties.ofFiles(candidate);
-            for (String entry : declared.stringPropertyNames()) {
-                if (entry.endsWith(".artifact")) {
-                    artifacts.putIfAbsent(entry.substring(0, entry.length() - ".artifact".length()),
-                            declared.getProperty(entry));
-                }
-            }
-        }
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -66,10 +49,7 @@ public class ImageStaging implements BuildStep {
                     continue;
                 }
                 String prefix = entry.substring(0, entry.length() - suffix.length());
-                String artifact = artifacts.get(prefix);
-                Path target = noFolder
-                        ? context.next()
-                        : context.next().resolve(artifact == null || artifact.isEmpty() ? prefix : artifact);
+                Path target = noFolder ? context.next() : context.next().resolve(prefix);
                 Files.createDirectories(target);
                 Files.walkFileTree(image, new SimpleFileVisitor<>() {
                     @Override

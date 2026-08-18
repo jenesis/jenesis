@@ -159,7 +159,7 @@ module-repository layout:
 image** holding only the modules this app needs, staged under `stage/runtime` (the
 analogue of `stage/packages`):
 
-    target/stage/runtime/output/demo.modular.executable/
+    target/stage/runtime/output/module/
     |-- bin/java          the runtime's own launcher
     `-- lib/ conf/ ...    a standard, trimmed JDK runtime layout
 
@@ -167,7 +167,7 @@ The image is trimmed to exactly `demo.modular.executable`, `org.slf4j`, and
 `java.base` (about 61 MB here, against ~300 MB for a full JDK), and it runs straight
 from its own `bin/java` with no JDK installed:
 
-    target/stage/runtime/output/demo.modular.executable/bin/java -m demo.modular.executable/sample.Sample Ada Lovelace
+    target/stage/runtime/output/module/bin/java -m demo.modular.executable/sample.Sample Ada Lovelace
     # Hello, Ada Lovelace, from a packaged Java module built by Jenesis!
 
 The difference from the app-image is only the wrapper: `jpackage` adds a native
@@ -223,7 +223,7 @@ That Dockerfile does not have to be written by hand either: a `docker` key in
 
     java -Djenesis.project.properties=docker build/jenesis/Project.java stage
 
-    target/stage/docker/output/demo.modular.executable/
+    target/stage/docker/output/module/
     |-- Dockerfile
     `-- modulepath/                the app jar and slf4j-api
 
@@ -238,7 +238,7 @@ under `modulepath/` and the entry point launches the module, not a class:
 The build never runs a container tool, so no Docker installation is involved in
 producing this. The staged folder is a complete build context:
 
-    docker build -t sample target/stage/docker/output/demo.modular.executable
+    docker build -t sample target/stage/docker/output/module
 
 A single executable jar with the launcher
 -----------------------------------------
@@ -323,7 +323,7 @@ CI), then copy it into an image with a small `Dockerfile` (Podman reads the same
 file):
 
     FROM debian:stable-slim
-    COPY target/stage/packages/output/demo.modular.executable/demo.modular.executable /opt/app
+    COPY target/stage/packages/output/demo.modular.executable /opt/app
     ENTRYPOINT ["/opt/app/bin/demo.modular.executable"]
 
 From this directory, build and run it with Docker:

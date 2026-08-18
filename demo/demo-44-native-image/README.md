@@ -45,12 +45,12 @@ The build compiles the modules, runs the test under the agent, then runs
 minute or two - it analyses the whole reachable program), after which the `stage`
 goal collects the standalone binary into its canonical target directory:
 
-    target/stage/native/output/demo.graal.image/demo.graal.image
+    target/stage/native/output/demo.graal.image
 
 Run it directly - there is no `java` in the command, because there is no JVM:
 
-    target/stage/native/output/demo.graal.image/demo.graal.image            # Hello, world, from a native binary built by Jenesis (reflectively)!
-    target/stage/native/output/demo.graal.image/demo.graal.image Ada        # Hello, Ada, from a native binary built by Jenesis (reflectively)!
+    target/stage/native/output/demo.graal.image            # Hello, world, from a native binary built by Jenesis (reflectively)!
+    target/stage/native/output/demo.graal.image Ada        # Hello, Ada, from a native binary built by Jenesis (reflectively)!
 
 The result is a ~15 MB ELF executable (`.exe` on Windows, a Mach-O binary on macOS)
 that links `java.base` statically and starts without a runtime. The greeting comes

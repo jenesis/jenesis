@@ -126,7 +126,7 @@ build cannot infer, and this demo commits `docker=eclipse-temurin:25-jre` as a
 
     java -Djenesis.project.properties=docker build/jenesis/Project.java stage
 
-    target/stage/docker/output/java-pom-executable/
+    target/stage/docker/output/module/
     |-- Dockerfile
     `-- classpath/                 the app jar and commons-lang3
 
@@ -141,7 +141,7 @@ the module's main class:
 The build never runs a container tool, so nothing here needs Docker installed. The
 staged folder is a complete build context, and creating the image is one command:
 
-    docker build -t sample target/stage/docker/output/java-pom-executable
+    docker build -t sample target/stage/docker/output/module
 
 There is no second configuration file, and deliberately so: a Dockerfile inherits
 `ENV`, `WORKDIR`, `USER` and `EXPOSE` from its base image, so anything else the image
@@ -211,7 +211,7 @@ deployable container needs no JDK, only a minimal base with a C library. Stage a
 into an image with a small `Dockerfile` (Podman reads the same file):
 
     FROM debian:stable-slim
-    COPY target/stage/packages/output/java-pom-executable/java-pom-executable /opt/app
+    COPY target/stage/packages/output/java-pom-executable /opt/app
     ENTRYPOINT ["/opt/app/bin/java-pom-executable"]
 
 From this directory, build and run it with Docker:

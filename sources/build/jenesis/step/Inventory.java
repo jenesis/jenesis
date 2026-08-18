@@ -13,23 +13,17 @@ public class Inventory implements BuildStep {
     public static final String POM = "pom.xml";
 
     private final String group;
-    private final String module;
 
     public Inventory() {
-        this("main", null);
+        this("main");
     }
 
-    private Inventory(String group, String module) {
+    private Inventory(String group) {
         this.group = group;
-        this.module = module;
     }
 
     public Inventory group(String group) {
-        return new Inventory(group, module);
-    }
-
-    public Inventory module(String module) {
-        return new Inventory(group, module);
+        return new Inventory(group);
     }
 
     @Override
@@ -189,7 +183,7 @@ public class Inventory implements BuildStep {
                 }
             }
         }
-        String prefix = this.module == null ? prefixOf(path) : this.module + ".";
+        String prefix = prefixOf(path);
         SequencedProperties inventory = new SequencedProperties();
         SequencedSet<Path> runtime = new LinkedHashSet<>(artifacts);
         for (Map.Entry<String, Path> entry : closureJars.entrySet()) {
