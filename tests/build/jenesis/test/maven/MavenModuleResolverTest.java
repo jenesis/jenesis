@@ -226,18 +226,126 @@ public class MavenModuleResolverTest {
     }
 
     @Test
-    public void rejects_exclusions_on_module_coordinates() {
-        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of());
+    public void excludes_a_transitive_and_everything_below_it() throws IOException {
+        addToMavenRepository("org.deep", "deep", "3.0", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.deep</groupId>
+                    <artifactId>deep</artifactId>
+                    <version>3.0</version>
+                </project>""");
+        addToMavenRepository("org.transitive", "lib", "2.0", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.transitive</groupId>
+                    <artifactId>lib</artifactId>
+                    <version>2.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.deep</groupId>
+                            <artifactId>deep</artifactId>
+                            <version>3.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>""");
+        addJarToMavenRepository("org.example", "example-core", "1.0");
+        addJarToMavenRepository("org.transitive", "lib", "2.0");
+        addJarToMavenRepository("org.deep", "deep", "3.0");
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>1.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.transitive</groupId>
+                            <artifactId>lib</artifactId>
+                            <version>2.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>"""));
+
+        SequencedMap<String, Resolver.Resolved> resolved = new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
+                Runnable::run,
+                "module",
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                new LinkedHashMap<>(Map.of("foo.bar", new LinkedHashSet<>(List.of("org.transitive/lib")))),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE).artifacts();
+
+        assertThat(resolved)
+                .as("excluding a dependency drops the subtree it pulled in, not just the dependency")
+                .containsOnlyKeys("maven/org.example/example-core/1.0", "module/foo.bar/1.0");
+    }
+
+    @Test
+    public void excludes_several_transitives_and_keeps_the_rest() throws IOException {
+        for (String artifact : List.of("first", "second", "third")) {
+            addToMavenRepository("org.transitive", artifact, "2.0", """
+                    <project xmlns="http://maven.apache.org/POM/4.0.0">
+                        <groupId>org.transitive</groupId>
+                        <artifactId>%s</artifactId>
+                        <version>2.0</version>
+                    </project>""".formatted(artifact));
+            addJarToMavenRepository("org.transitive", artifact, "2.0");
+        }
+        addJarToMavenRepository("org.example", "example-core", "1.0");
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>1.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.transitive</groupId>
+                            <artifactId>first</artifactId>
+                            <version>2.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.transitive</groupId>
+                            <artifactId>second</artifactId>
+                            <version>2.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.transitive</groupId>
+                            <artifactId>third</artifactId>
+                            <version>2.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>"""));
+
+        SequencedMap<String, Resolver.Resolved> resolved = new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
+                Runnable::run,
+                "module",
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                new LinkedHashMap<>(Map.of("foo.bar",
+                        new LinkedHashSet<>(List.of("org.transitive/first", "org.transitive/third")))),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE).artifacts();
+
+        assertThat(resolved).containsOnlyKeys(
+                "maven/org.example/example-core/1.0",
+                "maven/org.transitive/second/2.0",
+                "module/foo.bar/1.0");
+    }
+
+    @Test
+    public void rejects_a_malformed_exclusion() throws IOException {
+        addJarToMavenRepository("org.example", "example-core", "1.0");
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>1.0</version>
+                </project>"""));
 
         assertThatThrownBy(() -> new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
                 Runnable::run,
                 "module",
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
-                new LinkedHashMap<>(Map.of("foo.bar", new LinkedHashSet<>(List.of("org.x/y")))),
+                new LinkedHashMap<>(Map.of("foo.bar", new LinkedHashSet<>(List.of("org.transitive")))),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("exclusions");
+                .hasMessageContaining("Malformed exclusion 'org.transitive' for foo.bar");
     }
 
     @Test

@@ -83,7 +83,7 @@ Quick index
 | 24 | [`test-selection`](demo-24-test-selection/README.md)         | Re-run only the tests a change can affect (`-Djenesis.test.incremental`), a watch-mode development-loop optimisation | `java build/Demo.java`             |
 | 25 | [`pitest`](demo-25-pitest/README.md)                         | Mutation testing: a `pitest.properties` config file makes the build run PIT, which seeds faults into the code and checks the tests catch them | `java build/jenesis/Project.java`  |
 | 26 | [`agents`](demo-26-agents/README.md)                         | Attach libraries as Java agents with `@jenesis.attach`: Mockito as a dependency that also attaches to the test JVM, and the OpenTelemetry agent attached to the main run without ever joining a compile or runtime path | `java build/Demo.java`             |
-| 27 | [`maven-exclusions`](demo-27-maven-exclusions/README.md)     | Maven only: a dependency with an `<exclusions>` block; a test asserts the excluded transitive is absent | `java build/jenesis/Project.java`  |
+| 27 | [`maven-exclusions`](demo-27-maven-exclusions/README.md)     | A dependency with an `<exclusions>` block; a test asserts the excluded transitive is absent, and `@jenesis.exclude` states the same thing without a pom | `java build/jenesis/Project.java`  |
 | 28 | [`bom`](demo-28-bom/README.md)                               | Bills of materials: a Maven BOM's `dependencyManagement` imported via `@jenesis.bom` with its hashes brought in by the `pin` goal, next to a local `pin-<name>.properties` whose hashed entries need no pins at all; both overridable by local `@jenesis.pin` tags and strong enough for strict pinning | `java build/jenesis/Project.java`  |
 | 29 | [`module-layout`](demo-29-module-layout/README.md)           | Explicitly select the pure MODULAR layout (via `jenesis.properties`): resolve by module name, emit a modular jar with no `pom.xml` | `java build/jenesis/Project.java`  |
 | 30 | [`module-classifier`](demo-30-module-classifier/README.md)   | Pin a classified variant of a module (`:jdk-flow:0.4.3`): the build fetches the classifier artifact, validated by checksum and asserted at runtime | `java build/jenesis/Execute.java`  |
@@ -530,11 +530,13 @@ of it. `maven-exclusions` declares Apache Commons Text but excludes its Apache
 Commons Lang transitive, and a test confirms the result: Commons Text is on the
 class path, Commons Lang is not.
 
-The new idea is **exclusions, and why they are a Maven-only concern**. A modular
-project has no equivalent: a module only sees what its `module-info.java`
-`requires`, so an unwanted transitive cannot silently reach the module path and
-there is nothing to exclude. So the idea is shown here, and only here, on a Maven
-project. The test looks the classes up as resources rather than with
+The new idea is **exclusions, and where they apply**. A pom decides a transitive
+subtree wherever it is read, so the `MODULAR_TO_MAVEN` layout has the same problem
+and states the same fix as a tag instead of an element:
+`@jenesis.exclude <module> <groupId>/<artifactId>...`, one line per module and any
+number of targets on it. Only the purely modular layout has nothing to prune -
+resolution there matches module descriptors and never reads a pom - and there the
+tag is rejected rather than ignored. The test looks the classes up as resources rather than with
 `Class.forName(...)` (loading a Commons Text class would link it against the
 missing Commons Lang), and - exactly as in Maven, where test scope extends
 compile scope - the exclusion applies to the test class path too, not just the

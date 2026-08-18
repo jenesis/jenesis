@@ -49,6 +49,7 @@ public class ModuleInfoParser {
                 }
             }
             SequencedMap<String, String> aliases = new LinkedHashMap<>();
+            SequencedMap<String, SequencedSet<String>> excludes = new LinkedHashMap<>();
             SequencedMap<String, String> versions = new LinkedHashMap<>();
             SequencedMap<String, SequencedMap<String, String>> variants = new LinkedHashMap<>();
             SequencedMap<String, String> boms = new LinkedHashMap<>();
@@ -244,6 +245,37 @@ public class ModuleInfoParser {
                                             + value);
                                 }
                             }
+                            case "jenesis.exclude" -> {
+                                String declaration = content.replaceAll("\\s+", " ").trim();
+                                String[] words = declaration.split(" ");
+                                if (words.length < 2) {
+                                    throw new IllegalArgumentException("Malformed @jenesis.exclude declaration '"
+                                            + declaration
+                                            + "': expected <module-name> <groupId>/<artifactId>...");
+                                }
+                                String excluded = words[0];
+                                if (excluded.startsWith("java.") || excluded.startsWith("jdk.")) {
+                                    throw new IllegalArgumentException("Illegal @jenesis.exclude module '"
+                                            + excluded
+                                            + "': platform modules resolve no dependencies");
+                                }
+                                if (excluded.indexOf('/') >= 0) {
+                                    throw new IllegalArgumentException("Illegal @jenesis.exclude module '"
+                                            + excluded
+                                            + "': expected a module name");
+                                }
+                                SequencedSet<String> targets = excludes.computeIfAbsent(
+                                        excluded, _ -> new LinkedHashSet<>());
+                                for (int index = 1; index < words.length; index++) {
+                                    String[] segments = words[index].split("/", -1);
+                                    if (segments.length != 2 || Arrays.stream(segments).anyMatch(String::isEmpty)) {
+                                        throw new IllegalArgumentException("Malformed @jenesis.exclude target '"
+                                                + words[index]
+                                                + "': expected <groupId>/<artifactId>");
+                                    }
+                                    targets.add(words[index]);
+                                }
+                            }
                             case "jenesis.attach" -> {
                                 String attach = content.replaceAll("\\s+", " ").trim();
                                 if (attach.isEmpty()) {
@@ -295,6 +327,7 @@ public class ModuleInfoParser {
                     plugins,
                     attachments,
                     aliases,
+                    excludes,
                     versions,
                     variants,
                     boms,

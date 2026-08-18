@@ -128,6 +128,103 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void jenesis_exclude_lists_several_targets_on_one_line() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.exclude toolkit.lib org.example/wrong-lib   commons-logging/commons-logging \s
+                 * @jenesis.exclude other.lib org.example/other-wrong
+                 */
+                module foo {
+                    requires toolkit.lib;
+                    requires other.lib;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.excludes())
+                .containsEntry("toolkit.lib",
+                        new LinkedHashSet<>(List.of("org.example/wrong-lib", "commons-logging/commons-logging")))
+                .containsEntry("other.lib", new LinkedHashSet<>(List.of("org.example/other-wrong")));
+    }
+
+    @Test
+    public void jenesis_exclude_accumulates_repeated_declarations() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.exclude toolkit.lib org.example/wrong-lib
+                 * @jenesis.exclude toolkit.lib org.example/other-wrong
+                 */
+                module foo {
+                    requires toolkit.lib;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.excludes())
+                .as("two lines about one module are additive, not a conflict")
+                .containsEntry("toolkit.lib",
+                        new LinkedHashSet<>(List.of("org.example/wrong-lib", "org.example/other-wrong")));
+    }
+
+    @Test
+    public void jenesis_exclude_rejects_missing_target() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.exclude toolkit.lib
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.exclude declaration 'toolkit.lib':"
+                        + " expected <module-name> <groupId>/<artifactId>...");
+    }
+
+    @Test
+    public void jenesis_exclude_rejects_malformed_target() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.exclude toolkit.lib org.example/wrong-lib org.example.other
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("every target on the line is checked, not just the first")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.exclude target 'org.example.other':"
+                        + " expected <groupId>/<artifactId>");
+    }
+
+    @Test
+    public void jenesis_exclude_rejects_a_versioned_target() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.exclude toolkit.lib org.example/wrong-lib/jar/natives
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("an exclusion names an artifact, not one of its variants")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expected <groupId>/<artifactId>");
+    }
+
+    @Test
+    public void jenesis_exclude_rejects_platform_module_names() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.exclude java.sql org.example/wrong-lib
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("platform modules resolve no dependencies");
+    }
+
+    @Test
     public void jenesis_alias_rejects_version_declaration() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**

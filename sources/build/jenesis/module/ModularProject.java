@@ -298,6 +298,30 @@ public class ModularProject implements BuildExecutorModule {
                     manifest.write(out);
                 }
             }
+            if (!info.excludes().isEmpty()) {
+                SequencedProperties exclusions = new SequencedProperties();
+                for (Map.Entry<String, SequencedSet<String>> entry : info.excludes().entrySet()) {
+                    if (!info.requires().contains(entry.getKey())) {
+                        throw new IllegalArgumentException("Cannot apply @jenesis.exclude to "
+                                + entry.getKey()
+                                + " which is not required by "
+                                + info.coordinate()
+                                + " (declared requires: "
+                                + info.requires()
+                                + ")");
+                    }
+                    String target = targets.get(entry.getKey());
+                    String coordinate = target == null
+                            ? prefix + "/" + entry.getKey()
+                            : "maven/" + target + pinned(versions, group + "/maven/" + target);
+                    String excluded = String.join(",", entry.getValue());
+                    exclusions.setProperty(group + "/compile/" + coordinate, excluded);
+                    if (info.runtimeRequires().contains(entry.getKey())) {
+                        exclusions.setProperty(group + "/runtime/" + coordinate, excluded);
+                    }
+                }
+                exclusions.store(context.next().resolve(BuildStep.EXCLUSIONS));
+            }
             if (!versions.isEmpty()) {
                 SequencedProperties properties = new SequencedProperties();
                 versions.forEach(properties::setProperty);

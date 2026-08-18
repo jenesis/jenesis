@@ -51,8 +51,11 @@ public class ModularJarResolver implements Resolver {
                                             DependencyScope scope) throws IOException {
         coordinates.forEach((coordinate, exclusions) -> {
             if (!exclusions.isEmpty()) {
-                throw new IllegalArgumentException(
-                        "Module system does not support exclusions, but " + coordinate + " declares " + exclusions);
+                throw new IllegalArgumentException("Cannot exclude "
+                        + exclusions
+                        + " from "
+                        + coordinate
+                        + ": a modular resolution reads no POM to exclude a dependency from");
             }
         });
         SequencedMap<String, Resolver.Resolved> dependencies = new LinkedHashMap<>();

@@ -253,7 +253,7 @@ public class MavenPomResolver implements MavenResolver {
             resolved.putIfAbsent(coordinate, resolvedRoot);
             MavenDependencyKey key = new MavenDependencyKey(groupId, artifactId, "jar", null);
             MavenDependencyValue value = new MavenDependencyValue(
-                    version, scope, null, null, null, rootPom.checksum());
+                    version, scope, null, rootPom.exclusions(), null, rootPom.checksum());
             MavenDependencyValue pinned = managedCoordinates.get(key);
             if (pinned != null) {
                 value = rootPom.versionPinned() ? reconcile(key, pinned, value) : merge(pinned, value);

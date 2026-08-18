@@ -60,15 +60,43 @@ dependency. The POM keeps Commons Text but drops Lang:
         </exclusions>
     </dependency>
 
-Why only Maven?
----------------
+The same thing without a pom
+----------------------------
 
-Exclusions are a Maven-graph concept: a dependency drags in a transitive subtree,
-and `<exclusions>` prunes part of it. A **modular** project does not have the same
-problem to solve - a module only sees what its `module-info.java` `requires`, so
-an unwanted transitive cannot silently appear on the module path, and there is no
-`<exclusions>` equivalent to add. So this idea is shown here, and only here, on a
-Maven project.
+Exclusions are a Maven-graph concept: a dependency drags in a transitive subtree
+and `<exclusions>` prunes part of it. That subtree exists wherever a pom decides
+it, so it exists in the `MODULAR_TO_MAVEN` layout too - there a `requires` is
+resolved by fetching the module's pom and walking it, which is the same walk, and
+an upstream pom that declares a dependency it should not have declared is the same
+problem. There the declaration is a tag rather than a `pom.xml` element:
+
+    /**
+     * @jenesis.exclude org.apache.commons.text org.apache.commons/commons-lang3
+     */
+    module demo.sample {
+        requires org.apache.commons.text;
+    }
+
+One line names one module and any number of targets, and repeated lines for one
+module add up, so a list of upstream mistakes stays readable:
+
+    @jenesis.exclude some.module org.example/wrong-lib commons-logging/commons-logging
+
+Each target is an exact `<groupId>/<artifactId>` - an exclusion names an artifact,
+not one of its variants, so there is no version, type or classifier slot. Excluding
+from a module the `module-info.java` does not `requires` is an error rather than a
+silent no-op.
+
+What it does is what `<exclusions>` does here: the artifact takes the whole subtree
+it pulled in with it, and because it never enters the resolved closure there is
+nothing left to leak. It is off the compile and test paths, out of any linked
+image, absent from the generated pom, and absent from the `sbom` and the compliance
+report - which is the honest answer, since the build genuinely never fetched it.
+
+The **purely modular** layout is the one place this cannot apply. Resolution there
+matches module descriptors against the Jenesis module repository and never reads a
+pom at all, so there is no transitive pom dependency to prune; the tag is rejected
+rather than ignored.
 
 Pinned dependencies
 -------------------

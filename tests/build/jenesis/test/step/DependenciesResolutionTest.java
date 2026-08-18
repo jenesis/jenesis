@@ -98,6 +98,39 @@ public class DependenciesResolutionTest {
     }
 
     @Test
+    public void routes_declared_exclusions_to_the_resolver() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("main/compile/foo/qux", "");
+        properties.setProperty("main/compile/foo/baz", "");
+        properties.store(dependencies.resolve(BuildStep.REQUIRES));
+        SequencedProperties exclusions = new SequencedProperties();
+        exclusions.setProperty("main/compile/foo/qux", "org.example/wrong,commons-logging/commons-logging");
+        exclusions.store(dependencies.resolve(BuildStep.EXCLUSIONS));
+        SequencedMap<String, SequencedSet<String>> received = new LinkedHashMap<>();
+        new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+                    received.putAll(descriptors);
+                    SequencedMap<String, String> resolved = new LinkedHashMap<>();
+                    descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
+                    return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+                })).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
+                        dependencies,
+                        Map.of(
+                                Path.of(BuildStep.REQUIRES),
+                                Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.EXCLUSIONS),
+                                Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(received)
+                .as("what an exclusion means is the resolver's business; the step only delivers it intact")
+                .containsEntry("qux",
+                        new LinkedHashSet<>(List.of("org.example/wrong", "commons-logging/commons-logging")))
+                .containsEntry("baz", Collections.emptyNavigableSet());
+    }
+
+    @Test
     public void can_resolve_dependencies_from_streaming_repository() throws IOException {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/qux", "");

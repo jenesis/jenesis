@@ -32,14 +32,18 @@ public interface MavenResolver extends Resolver {
                 + " is not a MavenResolver");
     }
 
-    record RootPom(InputStream pom, String checksum, String identifier, boolean versionPinned) {
+    record RootPom(InputStream pom,
+                   String checksum,
+                   String identifier,
+                   boolean versionPinned,
+                   List<MavenDependencyName> exclusions) {
 
         public RootPom(InputStream pom) {
-            this(pom, null, null, false);
+            this(pom, null, null, false, null);
         }
 
         public RootPom(InputStream pom, String checksum) {
-            this(pom, checksum, null, false);
+            this(pom, checksum, null, false, null);
         }
     }
 }

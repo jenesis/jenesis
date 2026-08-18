@@ -221,6 +221,98 @@ public class ModularProjectTest {
     }
 
     @Test
+    public void emits_exclusions_properties_from_javadoc_declarations() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.exclude toolkit.lib org.example/wrong-lib commons-logging/commons-logging
+                 */
+                module foo {
+                  requires toolkit.lib;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path module = results.get("module/module-/manifests");
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.EXCLUSIONS)))
+                .as("the exclusion is keyed exactly as the requirement it applies to")
+                .containsOnly(
+                        Map.entry("main/compile/module/toolkit.lib",
+                                "org.example/wrong-lib,commons-logging/commons-logging"),
+                        Map.entry("main/runtime/module/toolkit.lib",
+                                "org.example/wrong-lib,commons-logging/commons-logging"));
+    }
+
+    @Test
+    public void keys_an_exclusion_against_the_coordinate_an_alias_names() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.alias toolkit.lib org.example/plain-lib
+                 * @jenesis.exclude toolkit.lib org.example/wrong-lib
+                 * @jenesis.pin org.example/plain-lib 1.0 SHA-256/cafebabe
+                 */
+                module foo {
+                  requires toolkit.lib;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path module = results.get("module/module-/manifests");
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.EXCLUSIONS)))
+                .as("an aliased module resolves under its Maven coordinate, so the exclusion follows it there")
+                .containsOnly(
+                        Map.entry("main/compile/maven/org.example/plain-lib/1.0", "org.example/wrong-lib"),
+                        Map.entry("main/runtime/maven/org.example/plain-lib/1.0", "org.example/wrong-lib"));
+    }
+
+    @Test
+    public void writes_no_exclusions_file_without_a_declaration() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                module foo {
+                  requires toolkit.lib;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results.get("module/module-/manifests").resolve(BuildStep.EXCLUSIONS)).doesNotExist();
+    }
+
+    @Test
+    public void rejects_an_exclusion_for_a_module_that_is_not_required() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.exclude other.lib org.example/wrong-lib
+                 */
+                module foo {
+                  requires toolkit.lib;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+        executor.addModule("module", new ModularProject("module", project));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .as("excluding from something this module never requires is a typo, not a no-op")
+                .hasStackTraceContaining("Cannot apply @jenesis.exclude to other.lib which is not required by foo");
+    }
+
+    @Test
     public void requires_an_unpinned_alias_target_without_a_version() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**

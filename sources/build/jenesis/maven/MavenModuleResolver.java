@@ -100,26 +100,30 @@ public class MavenModuleResolver implements Resolver {
                                             SequencedMap<String, SequencedSet<String>> coordinates,
                                             SequencedMap<String, String> versions,
                                             DependencyScope scope) throws IOException {
-        coordinates.forEach((coordinate, exclusions) -> {
-            if (!exclusions.isEmpty()) {
-                throw new IllegalArgumentException(
-                        "Module system does not support exclusions, but " + coordinate + " declares " + exclusions);
-            }
-        });
         Repository repository = repositories.getOrDefault(Resolver.base(prefix), discovery);
         List<MavenResolver.RootPom> rootPoms = new ArrayList<>();
         List<MavenResolver.RootPom> managedPoms = new ArrayList<>();
         SequencedMap<MavenDependencyKey, MavenDependencyValue> mavenPins = new LinkedHashMap<>();
         try {
-            for (String coordinate : coordinates.sequencedKeySet()) {
-                rootPoms.add(toRootPom(executor, repository, coordinate, versions.get(coordinate), coordinate));
+            for (Map.Entry<String, SequencedSet<String>> entry : coordinates.entrySet()) {
+                rootPoms.add(toRootPom(executor,
+                        repository,
+                        entry.getKey(),
+                        versions.get(entry.getKey()),
+                        entry.getKey(),
+                        entry.getValue()));
             }
             for (Map.Entry<String, String> pin : versions.entrySet()) {
                 if (coordinates.containsKey(pin.getKey())) {
                     continue;
                 }
                 if (pin.getKey().indexOf('/') < 0) {
-                    managedPoms.add(toRootPom(executor, repository, pin.getKey(), pin.getValue(), null));
+                    managedPoms.add(toRootPom(executor,
+                            repository,
+                            pin.getKey(),
+                            pin.getValue(),
+                            null,
+                            Collections.emptyNavigableSet()));
                 } else {
                     MavenDependencyValue managed = toManagedValue(pin.getKey(), pin.getValue());
                     if (managed != null) {
@@ -215,17 +219,35 @@ public class MavenModuleResolver implements Resolver {
                                             Repository repository,
                                             String coordinate,
                                             String pinned,
-                                            String identifier) throws IOException {
+                                            String identifier,
+                                            SequencedSet<String> excludes) throws IOException {
         MavenDependencyValue managed = toManagedValue(coordinate, pinned);
         String fetchCoord = managed == null
                 ? coordinate + ":pom"
                 : coordinate + "/" + managed.version() + ":pom";
         RepositoryItem item = repository.fetch(executor, fetchCoord)
                 .orElseThrow(() -> new IllegalArgumentException("No POM found for " + coordinate));
+        List<MavenDependencyName> exclusions = null;
+        if (!excludes.isEmpty()) {
+            exclusions = new ArrayList<>();
+            for (String exclude : excludes) {
+                int separator = exclude.indexOf('/');
+                if (separator < 1 || separator == exclude.length() - 1) {
+                    throw new IllegalArgumentException("Malformed exclusion '"
+                            + exclude
+                            + "' for "
+                            + coordinate
+                            + ": expected <groupId>/<artifactId>");
+                }
+                exclusions.add(new MavenDependencyName(
+                        exclude.substring(0, separator), exclude.substring(separator + 1)));
+            }
+        }
         return new MavenResolver.RootPom(item.toInputStream(),
                 managed == null ? null : managed.checksum(),
                 identifier,
-                managed != null);
+                managed != null,
+                exclusions);
     }
 
     private static MavenDependencyValue toManagedValue(String coordinate, String pinned) {

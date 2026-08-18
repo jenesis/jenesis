@@ -620,6 +620,17 @@ public record Project(
                                                        a coordinate the closure already resolves is taken at
                                                        that version unchanged, and only a coordinate nothing
                                                        else pulls in is negotiated as LATEST
+                      %{name}@jenesis.exclude%{reset} <module> <groupId>/<artifactId>...
+                                                       Drop transitive dependencies from what requiring <module>
+                                                       resolves (MODULAR_TO_MAVEN layout only), for the upstream
+                                                       pom that declares a dependency it should not; one line
+                                                       names one module and any number of targets, repeated lines
+                                                       for a module add to each other, and each target is an
+                                                       exact <groupId>/<artifactId>. An excluded dependency takes
+                                                       the subtree it pulled in with it and never reaches the
+                                                       resolved closure, so it is absent from the compile and
+                                                       runtime paths and from the generated pom alike. Excluding
+                                                       from a module that is not required is an error
                       %{name}@jenesis.bom%{reset} <token> [<ver> [<algo>/<hex>]] [<guard>]
                                                        Import managed versions from a BOM; the token follows the
                                                        pin grammar: a bare <module> (short for <group>/module/<module>)
@@ -968,6 +979,33 @@ public record Project(
                                                         coordinate nothing else
                                                         pulls in is negotiated
                                                         as LATEST.
+                      @jenesis.exclude <module> <groupId>/<artifactId>...
+                                                        Drop transitive
+                                                        dependencies from what
+                                                        requiring <module>
+                                                        resolves
+                                                        (MODULAR_TO_MAVEN layout
+                                                        only), for the upstream
+                                                        pom that declares a
+                                                        dependency it should not.
+                                                        One line names one module
+                                                        and any number of
+                                                        targets, repeated lines
+                                                        for a module add to each
+                                                        other, and each target is
+                                                        an exact
+                                                        <groupId>/<artifactId>.
+                                                        An excluded dependency
+                                                        takes the subtree it
+                                                        pulled in with it and
+                                                        never reaches the
+                                                        resolved closure, so it
+                                                        is absent from the
+                                                        compile and runtime paths
+                                                        and from the generated
+                                                        pom alike. Excluding from
+                                                        a module that is not
+                                                        required is an error.
                       @jenesis.bom <token> [<ver> [<algo>/<hex>]] [<guard>]
                                                         Import managed versions
                                                         from a BOM. The token
