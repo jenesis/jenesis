@@ -223,7 +223,7 @@ That Dockerfile does not have to be written by hand either: a `docker` key in
 
     java -Djenesis.project.properties=docker build/jenesis/Project.java stage
 
-    target/stage/docker/output/
+    target/stage/docker/output/module/
     |-- Dockerfile
     `-- modulepath/                the app jar and slf4j-api
 
@@ -238,7 +238,7 @@ under `modulepath/` and the entry point launches the module, not a class:
 The build never runs a container tool, so no Docker installation is involved in
 producing this. The staged folder is a complete build context:
 
-    docker build -t sample target/stage/docker/output
+    docker build -t sample target/stage/docker/output/module
 
 A single executable jar with the launcher
 -----------------------------------------

@@ -126,7 +126,7 @@ build cannot infer, and this demo commits `docker=eclipse-temurin:25-jre` as a
 
     java -Djenesis.project.properties=docker build/jenesis/Project.java stage
 
-    target/stage/docker/output/
+    target/stage/docker/output/module/
     |-- Dockerfile
     `-- classpath/                 the app jar and commons-lang3
 
@@ -141,7 +141,7 @@ the module's main class:
 The build never runs a container tool, so nothing here needs Docker installed. The
 staged folder is a complete build context, and creating the image is one command:
 
-    docker build -t sample target/stage/docker/output
+    docker build -t sample target/stage/docker/output/module
 
 There is no second configuration file, and deliberately so: a Dockerfile inherits
 `ENV`, `WORKDIR`, `USER` and `EXPOSE` from its base image, so anything else the image

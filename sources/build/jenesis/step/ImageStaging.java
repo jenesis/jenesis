@@ -10,9 +10,15 @@ import build.jenesis.SequencedProperties;
 public class ImageStaging implements BuildStep {
 
     private final String key;
+    private final boolean perModule;
 
     public ImageStaging(String key) {
+        this(key, false);
+    }
+
+    public ImageStaging(String key, boolean perModule) {
         this.key = key;
+        this.perModule = perModule;
     }
 
     @Override
@@ -38,7 +44,10 @@ public class ImageStaging implements BuildStep {
                 if (!Files.isDirectory(image)) {
                     continue;
                 }
-                Path target = context.next();
+                Path target = perModule
+                        ? context.next().resolve(entry.substring(0, entry.length() - suffix.length()).replace('/', '-'))
+                        : context.next();
+                Files.createDirectories(target);
                 Files.walkFileTree(image, new SimpleFileVisitor<>() {
                     @Override
                     public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) throws IOException {

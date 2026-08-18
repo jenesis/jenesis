@@ -252,7 +252,7 @@ The build never invokes a container tool, so it needs no Docker installation to
 produce the file:
 
     java -Djenesis.project.properties=docker build/jenesis/Project.java stage
-    docker build -t sample target/stage/docker/output
+    docker build -t sample target/stage/docker/output/module
 
 The new idea is that **the build produces a runnable artifact, not just a jar**, and
 that one entry-point declaration (`@jenesis.main` / `<mainClass>`) drives launching,
