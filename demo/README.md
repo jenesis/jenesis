@@ -863,7 +863,11 @@ and GPG signing are deferred to a dedicated release tool - the README recommends
 **[JReleaser](https://jreleaser.org/)** pointed at `target/stage/maven/output/`
 (exactly how Jenesis itself releases). So the demo never needs credentials, a
 signing key, or the network, yet shows the complete, validated artifact set a
-release would carry.
+release would carry. The division is about credentials rather than about who types
+the command: a `jreleaser.yml` at the project root adds a `release/jreleaser` step
+to the `release` goal, a rehearsal by default, and its `environment` step hands the
+version this build stamped to the release tool so it is stated once rather than
+passed twice.
 
 ## 29. Ahead-of-time native image - [`native-image`](demo-44-native-image/README.md)
 

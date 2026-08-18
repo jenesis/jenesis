@@ -140,6 +140,35 @@ both to tools that own them:
 So the division of labour is: Jenesis guarantees *what* you publish is complete
 and correct, and JReleaser handles *getting it there* safely.
 
+That division is about credentials and signing keys, not about who types the
+command, so the build does offer to run the release tool for you. A `jreleaser.yml`
+at the project root adds a `release/jreleaser` step to the `release` goal:
+
+    java build/jenesis/Project.java release
+
+It is a rehearsal by default - JReleaser runs with `--dry-run`, performing every
+local phase and skipping every remote one - and publishing takes the explicit
+`-Djenesis.jreleaser.dryRun=false`. The tool itself is expected on the `PATH`
+rather than resolved as a pinned dependency, because unlike a compiler or a linter
+a release tool shapes nothing about the artifact: it transmits a staged tree that
+is already finished, so its version changes how the upload happens and never what
+was uploaded. It is environmental setup, like the JDK or `git`.
+
+The goal also contributes one thing to a release run by somebody else. Its
+`release/jreleaser/environment` step writes a `jreleaser.properties` carrying
+`JRELEASER_PROJECT_VERSION`, the version this build stamped, which a configuration
+picks up with a single `environment: { variables: ... }` line - so the version is
+stated once, by the build, instead of being passed separately to the build and to
+the release tool and drifting. That step runs no process and has no side effect,
+which makes it safe for a CI job that then hands off to a dedicated release action.
+Note it only applies to a configuration that leaves `project.version` unset: a
+version written in the `jreleaser.yml` wins outright and the file is ignored.
+
+For a release driven by CI, prefer a dedicated release step where your platform
+offers one - JReleaser's own GitHub Action pins the tool version and wires the
+secret store better than a build tool reaching for `PATH`. This repository does
+exactly that, and keeps the goal for rehearsing a release locally first.
+
 This separation is deliberate, not just convenient. Most people building the
 project never release it at all - releasing is usually a job for CI or another
 hardened environment that holds the credentials and signing keys, run rarely and

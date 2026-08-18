@@ -24,6 +24,7 @@ import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.MultiProjectModule;
 import build.jenesis.project.ProjectModuleDescriptor;
+import build.jenesis.project.ReleaseModule;
 import build.jenesis.project.ProjectWatch;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Bom;
@@ -58,6 +59,7 @@ public record Project(
     public static final String BUILD = "build",
             STAGE = "stage",
             EXPORT = "export",
+            RELEASE = "release",
             PIN = "pin",
             DEPENDENCIES = "dependencies",
             IDE = "ide",
@@ -85,7 +87,7 @@ public record Project(
         static SequencedSet<Path> configurations(List<Path> locals, SequencedSet<Path> folders, SequencedSet<Path> profiles) {
             LinkedHashSet<Path> base = new LinkedHashSet<>();
             Stream.concat(locals.stream(), folders.stream())
-                    .filter(folder -> folder != null)
+                    .filter(Objects::nonNull)
                     .map(folder -> folder.toAbsolutePath().normalize())
                     .forEach(base::add);
             LinkedHashSet<Path> ordered = new LinkedHashSet<>();
@@ -167,6 +169,7 @@ public record Project(
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", new Tree(), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
+            executor.addModule(RELEASE, new ReleaseModule(project.root(), project.version()), STAGE);
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
@@ -233,6 +236,7 @@ public record Project(
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", new Tree(), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
+            executor.addModule(RELEASE, new ReleaseModule(project.root(), project.version()), STAGE);
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
@@ -310,6 +314,7 @@ public record Project(
                     BUILD);
             executor.addStep(DEPENDENCIES, new Tree(), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
+            executor.addModule(RELEASE, new ReleaseModule(project.root(), project.version()), STAGE);
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
