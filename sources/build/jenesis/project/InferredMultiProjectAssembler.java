@@ -67,15 +67,24 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                     Map<String, Repository> repositories,
                                     Map<String, Resolver> resolvers) {
         Packaging packaging;
+        Boolean modules;
         SequencedMap<String, SequencedMap<String, String>> overrides;
         try {
             packaging = Packaging.configured(BuildStep.locate(descriptor.configuration(), "packaging.properties"));
+            modules = ModularizeModule.configured(BuildStep.locate(descriptor.configuration(), "modules.properties"));
             overrides = overridesOf(descriptor.configuration());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
         ProcessHandler.Factory factory = ProcessHandler.Factory.of();
         AssemblyDescriptor assembly = new AssemblyDescriptor((sub, outerInherited) -> {
+            SequencedSet<String> closure = new LinkedHashSet<>(descriptor.artifacts());
+            if (modules != null) {
+                sub.addModule("modules",
+                        new ModularizeModule(factory, modules),
+                        descriptor.artifacts().stream());
+                closure = new LinkedHashSet<>(Set.of("modules"));
+            }
             sub.addStep("prepare",
                     new Prepare(descriptor.pathPlacement(), overrides),
                     outerInherited.sequencedKeySet().stream());
@@ -105,7 +114,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             .archiver(new Jar(factory, Jar.Sort.CLASSES).asModule("jar"))),
                     Stream.of(
                             Stream.of("prepare"),
-                            inputs(descriptor),
+                            inputs(descriptor, closure),
                             descriptor.resources().stream(),
                             sbom == null ? Stream.<String>empty() : Stream.of("sbom"))
                             .flatMap(Function.identity()));
@@ -131,7 +140,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                         .pinning(descriptor.pinning())
                                         .pathPlacement(descriptor.pathPlacement())
                                         .moduleName(properties.getProperty("module")))
-                                )), Stream.concat(Stream.of("prepare", "binary"), inputs(descriptor)));
+                                )), Stream.concat(Stream.of("prepare", "binary"), inputs(descriptor, closure)));
                     }
                 }
             }
@@ -150,7 +159,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     module.addStep("archive",
                             new Jar(factory, Jar.Sort.JAVADOC),
                             "generate");
-                }, Stream.concat(Stream.of("binary"), inputs(descriptor)));
+                }, Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             }
             if (packaging.jmod()) {
                 sub.addStep("jmod",
@@ -161,34 +170,41 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         if (packaging.jlink() || packaging.jpackage() != null || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || packaging.docker() != null) {
             assembly = assembly.then("package", (sub, inherited) -> {
                 SequencedSet<String> images = new LinkedHashSet<>();
+                SequencedSet<String> inputs = new LinkedHashSet<>(inherited.sequencedKeySet());
+                if (modules != null) {
+                    SequencedSet<String> replaced = descriptor.artifacts().stream()
+                            .map(InferredMultiProjectAssembler::local)
+                            .collect(Collectors.toCollection(LinkedHashSet::new));
+                    inputs.removeIf(key -> replaced.contains(local(key)));
+                }
                 if (packaging.jlink()) {
-                    sub.addStep("jlink", new JLink(factory), inherited.sequencedKeySet().stream());
+                    sub.addStep("jlink", new JLink(factory), inputs);
                     images.add("jlink");
                 }
                 if (packaging.jpackage() != null) {
                     sub.addStep("jpackage", new JPackage(factory, packaging.jpackage()), packaging.jlink()
-                            ? Stream.concat(Stream.of("jlink"), inherited.sequencedKeySet().stream())
-                            : inherited.sequencedKeySet().stream());
+                            ? Stream.concat(Stream.of("jlink"), inputs.stream())
+                            : inputs.stream());
                     images.add("jpackage");
                 }
                 if (packaging.bundle()) {
-                    sub.addStep("bundle", new Bundle(), inherited.sequencedKeySet().stream());
+                    sub.addStep("bundle", new Bundle(), inputs);
                 }
                 if (packaging.launcher()) {
                     sub.addModule("launcher",
                             new LauncherModule(repositories, resolvers)
                                     .pinning(descriptor.pinning())
                                     .pathPlacement(descriptor.pathPlacement()),
-                            inherited.sequencedKeySet().stream());
+                            inputs.stream());
                 }
                 if (packaging.docker() != null) {
-                    sub.addStep("docker", new Docker(packaging.docker()), inherited.sequencedKeySet().stream());
+                    sub.addStep("docker", new Docker(packaging.docker()), inputs);
                     images.add("docker");
                 }
                 if (packaging.nativeImage()) {
-                    sub.addStep("reachability", new NativeImageMetadata(), inherited.sequencedKeySet().stream());
+                    sub.addStep("reachability", new NativeImageMetadata(), inputs);
                     sub.addStep("native-image", new NativeImage(descriptor.pathPlacement()),
-                            Stream.concat(inherited.sequencedKeySet().stream(), Stream.of("reachability")));
+                            Stream.concat(inputs.stream(), Stream.of("reachability")));
                     images.add("native-image");
                 }
                 if (!images.isEmpty()) {
@@ -236,10 +252,17 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         }
     }
 
-    private static Stream<String> inputs(ProjectModuleDescriptor descriptor) {
+    private static String local(String identity) {
+        while (identity.startsWith(BuildExecutorModule.PREVIOUS)) {
+            identity = identity.substring(BuildExecutorModule.PREVIOUS.length());
+        }
+        return identity;
+    }
+
+    private static Stream<String> inputs(ProjectModuleDescriptor descriptor, SequencedSet<String> closure) {
         return Stream.of(descriptor.sources(),
                 descriptor.manifests(),
-                descriptor.artifacts(),
+                closure,
                 descriptor.spdx()).flatMap(SequencedSet::stream);
     }
 

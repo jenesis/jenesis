@@ -107,4 +107,24 @@ public class ProcessHandlerTest {
         assertThat(outLines).containsExactly("out-one", "out-two");
         assertThat(errLines).containsExactly("err-one");
     }
+
+    @Test
+    public void concurrent_image_tool_runs_are_serialized() throws Exception {
+        List<Callable<Integer>> linkers = new ArrayList<>();
+        for (int index = 0; index < 4; index++) {
+            Path image = root.resolve("image-" + index);
+            Path output = root.resolve("output-" + index), error = root.resolve("error-" + index);
+            ProcessHandler handler = ProcessHandler.OfTool.of("jlink").apply(List.of(
+                    "--add-modules", "java.base",
+                    "--output", image.toString()));
+            linkers.add(() -> handler.execute(output, error, null));
+        }
+        List<Integer> codes = new ArrayList<>();
+        try (ExecutorService executor = Executors.newFixedThreadPool(linkers.size())) {
+            for (Future<Integer> linked : executor.invokeAll(linkers)) {
+                codes.add(linked.get());
+            }
+        }
+        assertThat(codes).containsOnly(0);
+    }
 }

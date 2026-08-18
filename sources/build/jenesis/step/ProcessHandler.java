@@ -58,21 +58,32 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
 
     final class OfTool implements ProcessHandler {
 
+        private static final Lock IMAGE = new ReentrantLock();
+
         private final ToolProvider toolProvider;
+
+        private final Lock exclusive;
 
         private final List<String> commands;
 
-        private OfTool(ToolProvider toolProvider, List<String> commands) {
+        private OfTool(ToolProvider toolProvider, Lock exclusive, List<String> commands) {
             this.toolProvider = toolProvider;
+            this.exclusive = exclusive;
             this.commands = commands;
         }
 
         public static Function<List<String>, ProcessHandler> of(ToolProvider toolProvider) {
-            return arguments -> new OfTool(toolProvider, arguments);
+            return arguments -> new OfTool(toolProvider, null, arguments);
         }
 
         public static Function<List<String>, ProcessHandler> of(String name) {
-            return of(ToolProvider.findFirst(name).orElseThrow(() -> new IllegalArgumentException("No tool: " + name)));
+            ToolProvider toolProvider = ToolProvider.findFirst(name)
+                    .orElseThrow(() -> new IllegalArgumentException("No tool: " + name));
+            Lock exclusive = switch (name) {
+                case "jlink", "jpackage" -> IMAGE;
+                default -> null;
+            };
+            return arguments -> new OfTool(toolProvider, exclusive, arguments);
         }
 
         @Override
@@ -82,6 +93,18 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
 
         @Override
         public int execute(Path output, Path error, Tee tee) throws IOException {
+            if (exclusive == null) {
+                return run(output, error, tee);
+            }
+            exclusive.lock();
+            try {
+                return run(output, error, tee);
+            } finally {
+                exclusive.unlock();
+            }
+        }
+
+        private int run(Path output, Path error, Tee tee) throws IOException {
             if (tee == null) {
                 try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(output, encoding()));
                      PrintWriter err = new PrintWriter(Files.newBufferedWriter(error, encoding()))) {

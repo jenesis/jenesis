@@ -45,11 +45,19 @@ the program prints:
 Without arguments it falls back to the defaults and prints `Hello, world!`. The
 first run downloads args4j from Maven Central.
 
+The second half of the demo links the same module into a self-contained runtime
+image, which needs the `stage` goal:
+
+    java build/jenesis/Project.java stage
+
 Layout
 ------
 
     demo/demo-31-module-alias
     |-- build/jenesis          symlink to ../../../sources/build/jenesis
+    |-- build.jenesis
+    |   |-- modules.properties     mode=declared - rewrite the closure into named modules
+    |   `-- packaging.properties   jlink=true - link the result into a runtime image
     `-- sources
         |-- module-info.java   @jenesis.main + @jenesis.alias for args4j
         `-- demo/cli
@@ -104,8 +112,99 @@ have no name to offer.
 Because the target becomes a real module rather than a class-path jar, the usual
 module-path rules apply to it: a class in the default package, a package shared
 with another module, or a name another module already carries is reported by the
-tools themselves. `jlink` and modular `jpackage` images cannot consume an alias,
-since an automatic module is not linkable.
+tools themselves.
+
+From requirable to linkable
+---------------------------
+
+An alias makes args4j *requirable*, but only as an **automatic** module, and an
+automatic module declares no `requires` of its own. `jlink` needs a complete,
+explicit module graph to decide what belongs in an image, so it refuses one
+outright:
+
+    Error: automatic module cannot be used with jlink: org.kohsuke.args4j
+
+That is the gap `build.jenesis/modules.properties` closes, with one key:
+
+    mode=declared
+
+The rewrite runs at the head of the module's assembly. It splits the resolved
+closure in two - jars that already declare a `module-info` (here, this project's
+own) pass through byte for byte, everything else is renamed to the module name it
+is to carry - runs `jdeps` **once** over the whole set to work out what each one
+actually reads, and injects a generated `module-info.class` into a copy of each
+jar.
+
+That rewritten closure then *replaces* the resolved one for everything the module
+builds: `javac` compiles against it, the tests compile and run against it, and
+`jlink` links from it. Replacing rather than adding is deliberate. A module graph
+that does not hold together - a split package, a `requires` nothing provides, a
+jar with no name - is then a compile or test failure, where it is cheap to read
+and cheap to fix, instead of a `jlink` error at the end of the pipeline or a
+`NoClassDefFoundError` inside a shipped image.
+
+With `jlink=true` beside it in `packaging.properties`, the `stage` goal produces a
+runtime that knows about exactly four modules:
+
+    target/stage/runtime/output/bin/java --list-modules
+
+    demo.cli@1-SNAPSHOT
+    java.base@25.0.3
+    java.xml@25.0.3
+    org.kohsuke.args4j open
+
+`org.kohsuke.args4j` is a real, explicit module in the image now, and `java.xml`
+came along because `jdeps` found that args4j reads it. The app runs from that
+runtime with no class path and no `--add-modules`, nothing but the module graph:
+
+    target/stage/runtime/output/bin/java -m demo.cli/demo.cli.Main -name Ada -shout
+
+    HELLO, ADA!
+
+The `opens demo.cli to org.kohsuke.args4j;` above still does its job there, because
+the synthesized module is an `open` module that `exports` every package it
+contains - as close to the class path the jar came from as a named module gets.
+
+The three modes
+---------------
+
+    mode=declared     rewrite; fail on a jar that declares no name, naming the coordinate
+    mode=synthetic    rewrite; name such a jar build.jenesis.pseudo.module<hash>
+    mode=none         no rewrite
+
+`declared` is the default, so an empty `modules.properties` is the strict rewrite,
+and it is what this demo uses: every module name in the image is one that was
+either declared upstream (an `Automatic-Module-Name`) or chosen by this project -
+the `@jenesis.alias` above. Drop that alias and the build stops with the
+coordinate that has no name, though it would already have stopped earlier, since
+nothing could `requires` it.
+
+`synthetic` is for the deep transitive dependency nobody wants to name by hand: it
+derives `build.jenesis.pseudo.module<hash>` from the jar's content - the leading
+128 bits of its SHA-256 digest in hex, so `sha256sum` on the jar reproduces it.
+The name is stable across builds and machines, but it is not one anything should
+`requires` in source.
+
+`none` is what an absent file already means, so it exists for one reason: the file
+is located per module and the first match wins, so `mode=none` is how one module
+opts out of a project-wide file that would otherwise rewrite it.
+
+What the generated descriptor says
+----------------------------------
+
+The synthesized module's `provides` come from the jar's own `META-INF/services`,
+its `uses` from the `ServiceLoader.load` call sites in its byte code, and its
+`requires` from `jdeps`, which keeps the `transitive` and `static` modifiers it
+infers.
+
+Because the bytes change, the rewritten jar is no longer the artifact that was
+fetched: any signature is stripped (it could not verify anyway), and the entry
+loses its checksum in the rewritten index. The parts of the build that describe
+what was *fetched* therefore keep reading the resolved closure and never see the
+rewrite: the SBOM, the license and vulnerability checks, and the inventory that
+`pin` reads - so a rewritten jar's bytes can never end up in a `@jenesis.pin`
+checksum. That is also why the `Execute` run above launches against args4j as
+fetched, an automatic module as before, while the linked image runs the rewrite.
 
 Pinning
 -------

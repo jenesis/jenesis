@@ -87,7 +87,7 @@ Quick index
 | 28 | [`bom`](demo-28-bom/README.md)                               | Bills of materials: a Maven BOM's `dependencyManagement` imported via `@jenesis.bom` with its hashes brought in by the `pin` goal, next to a local `pin-<name>.properties` whose hashed entries need no pins at all; both overridable by local `@jenesis.pin` tags and strong enough for strict pinning | `java build/jenesis/Project.java`  |
 | 29 | [`module-layout`](demo-29-module-layout/README.md)           | Explicitly select the pure MODULAR layout (via `jenesis.properties`): resolve by module name, emit a modular jar with no `pom.xml` | `java build/jenesis/Project.java`  |
 | 30 | [`module-classifier`](demo-30-module-classifier/README.md)   | Pin a classified variant of a module (`:jdk-flow:0.4.3`): the build fetches the classifier artifact, validated by checksum and asserted at runtime | `java build/jenesis/Execute.java`  |
-| 31 | [`module-alias`](demo-31-module-alias/README.md)             | Give a plain jar with no module identity (no `module-info`, no `Automatic-Module-Name`) a stable name with `@jenesis.alias`, so it can be `requires`d and `opens`d like any module - shown with args4j 2.33 | `java build/jenesis/Execute.java`  |
+| 31 | [`module-alias`](demo-31-module-alias/README.md)             | Give a plain jar with no module identity (no `module-info`, no `Automatic-Module-Name`) a stable name with `@jenesis.alias`, so it can be `requires`d and `opens`d like any module - shown with args4j 2.33 - then a `modules.properties` rewrites the closure into explicit named modules with `jdeps`, so the alias becomes linkable into a `jlink` image | `java build/jenesis/Execute.java`  |
 | 32 | [`platform-guard`](demo-32-platform-guard/README.md)         | Select a dependency variant per platform: guarded pin lines (`[windows]`) matched against the `-Djenesis.platform.<token>=true` flags, with an unguarded fallback | `java build/jenesis/Execute.java`  |
 | 33 | [`platform-guard-pom`](demo-33-platform-guard-pom/README.md)  | The same guards in a `pom.xml`'s `<!--jenesis.pin-->` block: switch a transitive's pinned version per platform, each variant checksummed | `java build/jenesis/Execute.java`  |
 | 34 | [`custom-assembler`](demo-34-custom-assembler/README.md)     | Wrap the assembler to preprocess sources before the regular flow      | `java build/Demo.java`             |
@@ -651,6 +651,27 @@ artifacts with no name to offer). Run it with
 `java build/jenesis/Execute.java -name Ada -shout`, which builds the module,
 launches its `@jenesis.main`, and prints `HELLO, ADA!`.
 
+The demo then carries the same library one step further. An alias makes args4j
+*requirable*, but only as an **automatic** module, and an automatic module declares
+no `requires` of its own - so `jlink`, which needs a complete explicit graph to
+decide what belongs in an image, refuses it: `automatic module cannot be used with
+jlink`. A `build.jenesis/modules.properties` holding `mode=declared` closes that
+gap. It rewrites the resolved closure at the head of the module's assembly: jars
+that already declare a `module-info` pass through byte for byte, the rest are
+renamed to the module name they are to carry, a single `jdeps` run over the whole
+set works out what each one actually reads, and a generated `module-info.class` is
+injected into a copy of each jar. That rewritten closure then *replaces* the
+resolved one for everything the module builds - `javac`, the tests, and the
+packaging - which is the point: a module graph that does not hold together fails at
+compile or test time, not first in the shipped image. With `jlink=true` beside it,
+`java build/jenesis/Project.java stage` links a four-module runtime that runs the
+app with no class path and no `--add-modules`. `mode=synthetic` will instead invent
+a content-derived `build.jenesis.pseudo.module<hash>` for a deep transitive nobody
+wants to name by hand, and `mode=none` is how one module opts out of a project-wide
+file. What keeps reading the *resolved* closure is everything that describes what
+was fetched: the SBOM, the license and vulnerability checks, and the inventory
+`pin` reads - so a rewritten jar's bytes never reach a `@jenesis.pin` checksum.
+
 ## 21. Selecting a variant per platform - [`platform-guard`](demo-32-platform-guard/README.md), [`platform-guard-pom`](demo-33-platform-guard-pom/README.md)
 
 The `module-classifier` demo committed one classified variant explicitly; `platform-guard`
@@ -939,8 +960,12 @@ a native application image (collected under `stage/packages/` next to `stage/mav
 `stage/modular`; see section 4), `jmod=true` / `jlink=true` pack a `.jmod` and link it
 into a trimmed `jlink` runtime image (staged under `stage/runtime`), `bundle=true` zips
 jars-only for a JRE base, `launcher=true` shades the `build.jenesis.launcher` into a
-single `java -jar`-able executable jar that keeps the module graph, and `native=true`
-compiles ahead of time into a standalone GraalVM native binary (see section 29).
+single `java -jar`-able executable jar that keeps the module graph, `native=true`
+compiles ahead of time into a standalone GraalVM native binary (see section 29), and
+and a `modules.properties` file beside it (per module, `mode=declared|synthetic|none`,
+absent by default) rewrites the resolved closure into explicit named modules - replacing it for compile, test and packaging
+alike - so a non-modular dependency tree becomes linkable and a broken module graph fails
+early (see section 20).
 
 **Pinning, checksums, and scopes.** Pins live in source: a POM's
 `<dependencyManagement>` (with `<!--Checksum/...-->` comments) or a

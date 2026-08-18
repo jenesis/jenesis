@@ -179,7 +179,7 @@ public class MavenProject implements BuildExecutorModule {
                             MultiProjectModule.IDENTIFIER_PATH + name + "/" + COORDINATES,
                             PRODUCE);
                     buildExecutor.addStep(MultiProjectModule.INVENTORY,
-                            new Inventory(),
+                            new Inventory().closure(DEPENDENCIES + "/" + ARTIFACTS),
                             MultiProjectModule.IDENTIFIER_PATH + name + "/" + MANIFESTS,
                             ASSIGN,
                             PRODUCE,
