@@ -1,6 +1,9 @@
 Jenesis
 =======
 
+[![release](https://img.shields.io/github/v/release/raphw/jenesis?label=release)](https://github.com/raphw/jenesis/releases/latest)
+![build](https://github.com/raphw/jenesis/actions/workflows/build.yml/badge.svg)
+
 > ### [Jenesis](https://jenesis.build) - a modern Java build tool
 > _Java-native config, plugin-free, with `module-info.java` treated as a feature, not an afterthought._
 
