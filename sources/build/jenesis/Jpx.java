@@ -24,9 +24,6 @@ public record Jpx(Path storage,
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
 
-    // The wiring the command line runs on: the default repositories under the default installation folder.
-    // A module path throughout is resolved over module descriptors, any other placement over published
-    // coordinates. Everything else names all five components itself.
     public Jpx(PathPlacement placement) {
         boolean modular = placement == PathPlacement.MODULE_PATH;
         Repository module = JenesisModuleRepository.of(modular
