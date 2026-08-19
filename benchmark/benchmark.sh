@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Reproducible build-performance benchmarks for the Jenesis project; reproduces the README
-# "Build performance" tables. Usage, methodology and configuration are in benchmark/README.md.
+# Reproducible build-performance benchmarks for the Jenesis project.
+# Usage, methodology and configuration are in benchmark/README.md.
 #   benchmark/benchmark.sh {launch|compile|full|maven|pinning|aot|all}
 #
 set -u

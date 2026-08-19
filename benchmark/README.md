@@ -1,10 +1,9 @@
 Build-performance benchmarks
 ============================
 
-`benchmark.sh` reproduces the numbers in the README's [Build performance](../README.md#build-performance)
-section. It compares Maven against the three ways the Jenesis build is launched (source, `javac`-precompiled,
-and `native-image`) across launch overhead, compile-and-package, full builds, Maven 3 vs Maven 4, and the
-dependency-pinning modes.
+`benchmark.sh` measures this project's own build performance. It compares Maven against the three ways the
+Jenesis build is launched (source, `javac`-precompiled, and `native-image`) across launch overhead,
+compile-and-package, full builds, Maven 3 vs Maven 4, and the dependency-pinning modes.
 
 Running
 -------
