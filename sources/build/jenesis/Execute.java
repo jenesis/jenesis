@@ -26,6 +26,16 @@ public record Execute(Project project, String mainClass, String module) {
     }
 
     private int doExecute(boolean mainMethod, String... arguments) throws IOException, InterruptedException {
+        Path argumentFile = Files.createTempFile(Files.createDirectories(project.target()), "execute.", ".args");
+        try {
+            return doExecute(mainMethod, argumentFile, arguments);
+        } finally {
+            Files.deleteIfExists(argumentFile);
+        }
+    }
+
+    private int doExecute(boolean mainMethod, Path argumentFile, String... arguments)
+            throws IOException, InterruptedException {
         String selector = module != null ? "+" + module.replace('/', '+') : Project.BUILD;
         SequencedMap<String, Path> outputs = mainMethod ? project.doMain(selector) : project.build(selector);
         SequencedProperties merged = new SequencedProperties();
@@ -131,12 +141,12 @@ public record Execute(Project project, String mainClass, String module) {
             SequencedMap<String, String> options = new LinkedHashMap<>();
             options.put("--module-path", String.join(File.pathSeparator, modulePath));
             options.put("--class-path", String.join(File.pathSeparator, classPath));
-            javaArgs.addAll(ProcessBuildStep.argumentFile(project.target().resolve("execute.args"), options));
+            javaArgs.addAll(ProcessBuildStep.argumentFile(argumentFile, options));
             javaArgs.addAll(graph.arguments());
             javaArgs.add("-m");
             javaArgs.add(candidate.module + "/" + candidate.mainClass);
         } else {
-            javaArgs.addAll(ProcessBuildStep.argumentFile(project.target().resolve("execute.args"),
+            javaArgs.addAll(ProcessBuildStep.argumentFile(argumentFile,
                     new LinkedHashMap<>(Map.of("-cp", String.join(File.pathSeparator, jars)))));
             javaArgs.add(candidate.mainClass);
         }

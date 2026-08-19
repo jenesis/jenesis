@@ -396,12 +396,19 @@ public class JpxTest {
         assertThat(docker.host).isEqualTo(installation.folder());
         assertThat(docker.container).isEqualTo(installation.folder().toString());
         assertThat(docker.readOnly).isTrue();
-        assertThat(docker.javaArgs)
+        assertThat(docker.javaArgs.getFirst())
                 .as("the paths travel as an @-file, written inside the mounted installation so the container reads"
                         + " it at the same path")
-                .containsSubsequence("@" + installation.folder().resolve("jpx.args"),
-                        "-m", "tool.main/toolmain.Main", "argument");
+                .startsWith("@" + installation.folder().resolve("jpx."))
+                .endsWith(".args");
+        assertThat(docker.javaArgs)
+                .containsSubsequence("-m", "tool.main/toolmain.Main", "argument");
         assertThat(docker.javaArgs).doesNotContain("--add-modules", "-p", "-cp");
+        try (Stream<Path> entries = Files.list(installation.folder())) {
+            assertThat(entries.filter(entry -> entry.getFileName().toString().endsWith(".args")))
+                    .as("the argument file is a temporary one, removed once the launch returned")
+                    .isEmpty();
+        }
     }
 
     @Test
@@ -417,7 +424,7 @@ public class JpxTest {
         properties.store(folder.resolve(Jpx.PROPERTIES));
         Jpx.Installation installation = new Jpx.Installation(folder, new HashDigestFunction("SHA-256"));
 
-        List<String> arguments = installation.javaArguments(null, List.of("run"));
+        List<String> arguments = installation.javaArguments(null, List.of("run"), folder.resolve("jpx.args"));
 
         assertThat(arguments)
                 .as("the installation carries ready-made options"
@@ -447,7 +454,7 @@ public class JpxTest {
         properties.store(folder.resolve(Jpx.PROPERTIES));
         Jpx.Installation installation = new Jpx.Installation(folder, new HashDigestFunction("SHA-256"));
 
-        List<String> arguments = installation.javaArguments(null, List.of("run"));
+        List<String> arguments = installation.javaArguments(null, List.of("run"), folder.resolve("jpx.args"));
 
         assertThat(arguments)
                 .as("an installation written before javaOptions existed still gets its module path rooted")

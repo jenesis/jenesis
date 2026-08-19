@@ -101,18 +101,30 @@ public record Jpx(Path storage,
         }
 
         public int launch(String mainClass, List<String> arguments) throws IOException, InterruptedException {
-            List<String> command = new ArrayList<>();
-            command.add(Path.of(System.getProperty("java.home"), "bin", File.separatorChar == '\\' ? "java.exe" : "java").toString());
-            command.addAll(javaArguments(mainClass, arguments));
-            return new ProcessBuilder(command).inheritIO().start().waitFor();
+            Path argumentFile = Files.createTempFile(folder, "jpx.", ".args");
+            try {
+                List<String> command = new ArrayList<>();
+                command.add(Path.of(System.getProperty("java.home"), "bin", File.separatorChar == '\\' ? "java.exe" : "java").toString());
+                command.addAll(javaArguments(mainClass, arguments, argumentFile));
+                return new ProcessBuilder(command).inheritIO().start().waitFor();
+            } finally {
+                Files.deleteIfExists(argumentFile);
+            }
         }
 
         public int launch(String mainClass, List<String> arguments, DockerizedJava docker)
                 throws IOException, InterruptedException {
-            return docker.mount(folder, folder.toString(), true).execute(javaArguments(mainClass, arguments));
+            Path argumentFile = Files.createTempFile(folder, "jpx.", ".args");
+            try {
+                return docker.mount(folder, folder.toString(), true)
+                        .execute(javaArguments(mainClass, arguments, argumentFile));
+            } finally {
+                Files.deleteIfExists(argumentFile);
+            }
         }
 
-        public List<String> javaArguments(String mainClass, List<String> arguments) throws IOException {
+        public List<String> javaArguments(String mainClass, List<String> arguments, Path argumentFile)
+                throws IOException {
             SequencedProperties properties = properties();
             String main = mainClass == null ? properties.getProperty("mainClass") : mainClass;
             if (main == null) {
@@ -125,7 +137,7 @@ public record Jpx(Path storage,
             SequencedMap<String, String> options = new LinkedHashMap<>();
             options.put("-p", modulepath == null ? null : join(modulepath));
             options.put("-cp", classpath == null ? null : join(classpath));
-            command.addAll(ProcessBuildStep.argumentFile(folder.resolve("jpx.args"), options));
+            command.addAll(ProcessBuildStep.argumentFile(argumentFile, options));
             if (modulepath != null) {
                 command.addAll(ModuleGraph.load(properties));
             }
