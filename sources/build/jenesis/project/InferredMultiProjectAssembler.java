@@ -209,7 +209,10 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     images.add("native-image");
                 }
                 if (!images.isEmpty()) {
-                    sub.addStep("inventory", new Inventory(), images.stream());
+                    String named = descriptor.name().endsWith("-")
+                            ? descriptor.name().substring(0, descriptor.name().length() - 1)
+                            : descriptor.name();
+                    sub.addStep("inventory", new Inventory().module(named), images.stream());
                 }
             });
         }

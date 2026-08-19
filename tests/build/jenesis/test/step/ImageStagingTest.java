@@ -169,6 +169,38 @@ public class ImageStagingTest {
         }
     }
 
+    @Test
+    public void a_package_phase_inventory_names_the_module_it_describes() throws IOException {
+        Path greeter = packagePhase("module-greeter");
+        Path app = packagePhase("module-app");
+
+        new ImageStaging("docker").apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of(
+                                "greeter", new BuildStepArgument(greeter, Map.of()),
+                                "app", new BuildStepArgument(app, Map.of()))))
+                .toCompletableFuture()
+                .join();
+
+        assertThat(next.resolve("module-greeter/Dockerfile"))
+                .as("the inventory a module declares must name that module, or every context stages as one")
+                .hasContent("module-greeter");
+        assertThat(next.resolve("module-app/Dockerfile")).hasContent("module-app");
+    }
+
+    private Path packagePhase(String module) throws IOException {
+        Path root = Files.createDirectories(source.resolve(module));
+        Path docker = Files.createDirectories(root.resolve("docker").resolve("output"));
+        Files.writeString(Files.createDirectories(docker.resolve("docker")).resolve("Dockerfile"), module);
+        Path inventory = Files.createDirectories(root.resolve("inventory").resolve("output"));
+        new Inventory().module(module).apply(Runnable::run,
+                        new BuildStepContext(previous, inventory, supplement),
+                        new LinkedHashMap<>(Map.of("docker", new BuildStepArgument(docker, Map.of()))))
+                .toCompletableFuture()
+                .join();
+        return inventory;
+    }
+
     private Path runtimeImage(String folderName, String launcher) throws IOException {
         Path folder = Files.createDirectory(source.resolve(folderName));
         Path bin = Files.createDirectories(folder.resolve("runtime").resolve("bin"));

@@ -49,7 +49,7 @@ public record Execute(Project project, String mainClass, String module) {
             for (String key : loaded.stringPropertyNames()) {
                 merged.setProperty(key, loaded.getProperty(key));
                 int dot = key.indexOf('.');
-                if (dot > 0) {
+                if (dot > 0 && key.endsWith(".path")) {
                     sourceByPrefix.put(key.substring(0, dot), entry.getValue());
                 }
             }

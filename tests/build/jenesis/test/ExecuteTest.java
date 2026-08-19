@@ -189,6 +189,7 @@ public class ExecuteTest {
     private void writeInventoryFile(Path folder, String path, String mainClass, String module, String runtime) throws IOException {
         SequencedProperties properties = new SequencedProperties();
         String prefix = ((path == null || path.isEmpty()) ? "module" : "module-" + path) + ".";
+        properties.setProperty(prefix + "path", path == null ? "" : path);
         if (runtime != null) {
             properties.setProperty(prefix + "runtime.0", runtime);
         }
