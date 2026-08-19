@@ -431,8 +431,8 @@ public class JpxTest {
         assertThat(folder.resolve("jpx.args"))
                 .as("both paths are in the file rather than on the command line")
                 .content()
-                .contains("-p", folder.resolve("tool-main.jar").toString(),
-                        "-cp", folder.resolve("legacy.jar").toString());
+                .contains("-p", folder.resolve("tool-main.jar").toString().replace("\\", "\\\\"),
+                        "-cp", folder.resolve("legacy.jar").toString().replace("\\", "\\\\"));
     }
 
     @Test
@@ -458,8 +458,8 @@ public class JpxTest {
                         "run");
         assertThat(folder.resolve("jpx.args"))
                 .content()
-                .contains("-p", folder.resolve("tool-main.jar").toString(),
-                        "-cp", folder.resolve("legacy.jar").toString());
+                .contains("-p", folder.resolve("tool-main.jar").toString().replace("\\", "\\\\"),
+                        "-cp", folder.resolve("legacy.jar").toString().replace("\\", "\\\\"));
     }
 
     @Test
