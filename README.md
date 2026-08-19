@@ -1,6 +1,9 @@
 Jenesis
 =======
 
+> ### [Jenesis](https://jenesis.build) - a modern Java build tool
+> _Java-native config, plugin-free, with `module-info.java` treated as a feature, not an afterthought._
+
 **A build tool for Java, written in Java.** The engine ships *with* your project as plain source under
 `build/jenesis/` and is launched by the JDK directly, so there is no wrapper binary, no fetched plugin tree and
 no daemon. Modules declared with `module-info.java` drive the build, every step is content-hashed so unchanged
