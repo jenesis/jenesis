@@ -3,7 +3,7 @@ name: Build performance benchmarks
 # On-demand only: build-performance numbers are environment-sensitive, so this is
 # never run automatically. Trigger it from the Actions tab; results are written to
 # a per-OS text file and uploaded as an artifact. The default set produces every
-# table the README carries except the full (with-tests) build, which is slow and
+# table benchmark.sh knows except the full (with-tests) build, which is slow and
 # gated behind the `full` switch.
 on:
   workflow_dispatch:

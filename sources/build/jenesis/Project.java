@@ -672,7 +672,7 @@ public record Project(
                       The inferred linters and other formatters activate instead from their own native config
                       files (checkstyle.xml, pmd.xml, spotbugs-exclude.xml, .editorconfig, .scalafmt.conf, ...).
 
-                    See README.md for the full reference.
+                    See https://jenesis.build for the full documentation.
                     """)
                     .replace("%{layout}", layout)
                     .replace("%{assembler}", assembler)
@@ -694,8 +694,8 @@ public record Project(
                     You are operating inside a Jenesis-built Java project. This
                     briefing tells you how to drive the build, inspect intermediate
                     state, and avoid the cache pitfalls that catch agents most
-                    often. README.md at the project root is the full reference;
-                    use this document as the working minimum.
+                    often. https://jenesis.build is the full documentation; use
+                    this document as the working minimum.
                     
                     1. Invoke the build
                     -------------------
@@ -873,8 +873,8 @@ public record Project(
                                             (artifacts/sources/documentation/pom/
                                             runtime classpath, prefixed).
                     
-                    Consult README's "Conventional folders and files" table for
-                    the full schema.
+                    Each file's exact schema is defined by the constants on the
+                    step that writes it, under `sources/build/jenesis/`.
                     
                     6. Address the graph with selectors
                     -----------------------------------
@@ -1453,27 +1453,27 @@ public record Project(
                     
                     13. Read further when stuck
                     ---------------------------
-                    README.md (project root, and on the public repo) is the full
-                    reference. Useful sections:
+                    https://jenesis.build is the full documentation. Useful
+                    chapters:
                     
-                      "Layouts and assemblers"            How the three layouts
-                                                          wire modules.
-                      "Conventional folders and files"    Exact schema of every
-                                                          properties file.
-                      "Build steps" and
-                      "Build executor modules"            Per-step and per-module
-                                                          contracts.
-                      "Project metadata"                  How metadata.properties
-                                                          and project.properties
-                                                          merge.
-                      "Releasing to Maven Central"        Stage / export / pin and
-                                                          handoff to JReleaser.
+                      "Core concepts"        Build steps, the build graph, and
+                                             how the layouts wire modules.
+                      "Dependencies" and
+                      "Pinning"              Resolution, exclusions, aliases,
+                                             pins and bills of materials.
+                      "Packaging" and
+                      "Publishing"           Stage / export / release and the
+                                             handoff to a release tool.
+                      "Extending the build"  Writing a step, wrapping the
+                                             assembler, wiring a graph by hand.
+                      "Reference"            Every selector, configuration key
+                                             and built-in step.
                     
                     Online resources:
+                      Documentation
+                        https://jenesis.build
                       Source repository
                         https://github.com/raphw/jenesis
-                      README (current main)
-                        https://github.com/raphw/jenesis/blob/main/README.md
                       Issue tracker (bugs, questions, design discussion)
                         https://github.com/raphw/jenesis/issues
                       Releases (changelog, downloads, the matching git tag for
