@@ -30,14 +30,24 @@ what it launched:
     JVM: 25.0.3 (Eclipse Adoptium OpenJDK 64-Bit Server VM 25.0.3+9-LTS)
     OS: Linux 7.0.0-28-generic amd64
 
-    [... the same by Maven coordinate, and again with a 32-character prefix ...]
+    jpx --hash=9b60dfc3d10f0b4fdf69050eec7b7332f5c395f7e36fad5747ff421e01cfd3e8 org.junit.platform:junit-platform-console@6.1.3 --version
+      [verified] target/jpx/org.junit.platform--junit-platform-console@6.1.3 as org.junit.platform.console.ConsoleLauncher over 9 jars on the class path
+    JUnit Platform Console Launcher 6.1.3
+    JVM: 25.0.3 (Eclipse Adoptium OpenJDK 64-Bit Server VM 25.0.3+9-LTS)
+    OS: Linux 7.0.0-28-generic amd64
+
+    [... and the module name once more, with a 32-character prefix ...]
 
     jpx --hash=9b60dfc3d10f0b4fdf69050eec7b7332f5c395f7e36fad5747ff421e01c0ffee org.junit.platform.console@6.1.3 --version
       [blocked]  Checksum mismatch for org.junit.platform.console@6.1.3: expected a digest starting with 9b60...c0ffee but computed 9b60...cfd3e8
 
 The demo drives the `Jpx` API (`jpx.install(<target>).verify(<hash>).launch(...)`)
 so it can install into its own `target/jpx/` folder and leave `~/.jenesis/jpx/`
-untouched. The command line does the same thing:
+untouched. That is why it names the whole record - storage folder, repositories,
+resolvers, digest function and placement: the short constructor,
+`new Jpx(PathPlacement.INFERRED)`, is the command line's and installs under the
+home folder, so a folder of your own arrives together with the repositories and
+resolvers that go with it. The command line does the same thing:
 
     java build/jenesis/Jpx.java \
         --hash=9b60dfc3d10f0b4fdf69050eec7b7332f5c395f7e36fad5747ff421e01cfd3e8 \
@@ -67,6 +77,13 @@ artifact. They install side by side, under folders named for what was asked for
 (`org.junit.platform.console@6.1.3` and
 `org.junit.platform--junit-platform-console@6.1.3`), because the name is part of
 what a run reproduces.
+
+What the name also decides is how the program runs. A module name is run as a
+module: every jar that describes one goes on the module path, and the entry point
+starts as `-m org.junit.platform.console/...`, which is why the first run reports
+nine modules. A coordinate names an artifact rather than a module, so the same
+nine jars go on the class path in full and the main class is named directly -
+`over 9 jars on the class path` in the second run.
 
 Dropping `@6.1.3` from either form resolves the latest release instead - handy at
 a prompt, but then neither the version nor the checksum is fixed, so this demo
@@ -119,7 +136,7 @@ coordinates, both fronted by the local exports in `~/.jenesis/` and by `~/.m2/`.
 internal repository.
 
 Two further flags round it out, neither used here: `--modular` resolves purely
-over module descriptors, walking `requires` clauses like the `modular` layout,
-and `--docker[=<image>]` runs the launched process in a container while
-resolution and installation stay on the host, so the containerized run needs no
-network and no credentials.
+over module descriptors, walking `requires` clauses like the `modular` layout, and
+runs the whole closure on the module path; `--docker[=<image>]` runs the launched
+process in a container while resolution and installation stay on the host, so the
+containerized run needs no network and no credentials.

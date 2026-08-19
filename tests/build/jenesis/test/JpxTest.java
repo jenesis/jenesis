@@ -8,6 +8,7 @@ import build.jenesis.docker.DockerizedJava;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Jpx;
 import build.jenesis.ModuleGraph;
+import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
@@ -105,13 +106,17 @@ public class JpxTest {
         SequencedProperties properties = installation.properties();
         assertThat(properties.getProperty("name")).isEqualTo("org.example:tool-main");
         assertThat(properties.getProperty("version")).isEqualTo("1.0");
-        assertThat(properties.getProperty("mainModule")).isEqualTo("tool.main");
-        assertThat(properties.getProperty("mainClass")).isEqualTo("toolmain.Main");
-        assertThat(properties.getProperty("modulepath")).isEqualTo("tool-lib-1.0.jar,tool-main-1.0.jar");
-        assertThat(properties.getProperty(ModuleGraph.JAVA_OPTIONS))
-                .as("a graph that resolves from the main module's requires needs no option at all")
+        assertThat(properties.getProperty("mainModule"))
+                .as("a coordinate names an artifact, not a module, so the run has no main module")
                 .isNull();
-        assertThat(properties.getProperty("classpath")).isNull();
+        assertThat(properties.getProperty("mainClass")).isEqualTo("toolmain.Main");
+        assertThat(properties.getProperty("classpath"))
+                .as("coordinates run on the class path in full, modular jars included")
+                .isEqualTo("tool-lib-1.0.jar,tool-main-1.0.jar");
+        assertThat(properties.getProperty("modulepath")).isNull();
+        assertThat(properties.getProperty(ModuleGraph.JAVA_OPTIONS))
+                .as("nothing is on the module path, so nothing has to be added to the graph")
+                .isNull();
         assertThat(properties.getProperty("checksum")).startsWith("SHA-256/");
 
         Path marker = work.resolve("marker.txt");
@@ -157,6 +162,65 @@ public class JpxTest {
     }
 
     @Test
+    public void module_name_infers_the_placement_of_every_jar() throws IOException, InterruptedException {
+        addMavenTool();
+        addPlainTool("1.0");
+        addDiscoveryPom(null, true);
+        Jpx jpx = jpx();
+
+        Jpx.Installation installation = jpx.install("tool.main");
+
+        SequencedProperties properties = installation.properties();
+        assertThat(properties.getProperty("mainModule")).isEqualTo("tool.main");
+        assertThat(properties.getProperty("modulepath")).isEqualTo("tool-lib-1.0.jar,tool-main-1.0.jar");
+        assertThat(properties.getProperty("classpath"))
+                .as("a module name infers the placement jar by jar, so a plain dependency stays unnamed")
+                .isEqualTo("plain-tool-1.0.jar");
+
+        Path marker = work.resolve("marker.txt");
+        assertThat(installation.launch(List.of(marker.toString()))).isEqualTo(7);
+        assertThat(marker).hasContent("from-lib");
+    }
+
+    @Test
+    public void module_placement_takes_every_jar_onto_the_module_path() throws IOException, InterruptedException {
+        addMavenTool();
+        addPlainTool("1.0");
+        addDiscoveryPom(null, true);
+        Jpx jpx = jpx(PathPlacement.MODULE_PATH);
+
+        Jpx.Installation installation = jpx.install("tool.main");
+
+        SequencedProperties properties = installation.properties();
+        assertThat(properties.getProperty("mainModule")).isEqualTo("tool.main");
+        assertThat(properties.getProperty("modulepath"))
+                .isEqualTo("plain-tool-1.0.jar,tool-lib-1.0.jar,tool-main-1.0.jar");
+        assertThat(properties.getProperty("classpath")).isNull();
+        assertThat(properties.getProperty(ModuleGraph.JAVA_OPTIONS))
+                .as("the plain jar joins as an automatic module, which the graph has to root explicitly")
+                .isEqualTo("--add-modules=ALL-MODULE-PATH,ALL-DEFAULT");
+
+        Path marker = work.resolve("marker.txt");
+        assertThat(installation.launch(List.of(marker.toString()))).isEqualTo(7);
+        assertThat(marker).hasContent("from-lib");
+    }
+
+    @Test
+    public void coordinates_run_on_the_class_path_whatever_the_placement() throws IOException {
+        addMavenTool();
+        Jpx jpx = jpx(PathPlacement.MODULE_PATH);
+
+        Jpx.Installation installation = jpx.install("org.example:tool-main@1.0");
+
+        SequencedProperties properties = installation.properties();
+        assertThat(properties.getProperty("classpath"))
+                .as("coordinates name an artifact rather than a module, module path or not")
+                .isEqualTo("tool-lib-1.0.jar,tool-main-1.0.jar");
+        assertThat(properties.getProperty("modulepath")).isNull();
+        assertThat(properties.getProperty("mainModule")).isNull();
+    }
+
+    @Test
     public void installs_and_launches_pure_modular() throws IOException, InterruptedException {
         addModularJars(true);
         Jpx jpx = modularJpx();
@@ -198,7 +262,8 @@ public class JpxTest {
         Jpx offlineJpx = new Jpx(storage,
                 Map.of("maven", offline, "module", offline),
                 Map.of("maven", new MavenPomResolver()),
-                new HashDigestFunction("SHA-256"));
+                new HashDigestFunction("SHA-256"),
+                PathPlacement.INFERRED);
 
         assertThat(offlineJpx.install("org.example:plain-tool").folder()).isEqualTo(newer);
         assertThat(older).isNotEqualTo(newer);
@@ -211,11 +276,12 @@ public class JpxTest {
         Jpx jpx = new Jpx(storage,
                 Map.of("maven", streaming),
                 Map.of("maven", new MavenPomResolver()),
-                new HashDigestFunction("SHA-256"));
+                new HashDigestFunction("SHA-256"),
+                PathPlacement.INFERRED);
 
         Jpx.Installation installation = jpx.install("org.example:tool-main@1.0");
 
-        assertThat(installation.properties().getProperty("modulepath")).isEqualTo("tool-lib-1.0.jar,tool-main-1.0.jar");
+        assertThat(installation.properties().getProperty("classpath")).isEqualTo("tool-lib-1.0.jar,tool-main-1.0.jar");
         try (Stream<Path> entries = Files.list(storage)) {
             assertThat(entries.filter(entry -> entry.getFileName().toString().startsWith("staging-"))).isEmpty();
         }
@@ -295,9 +361,15 @@ public class JpxTest {
     }
 
     @Test
-    public void modular_wiring_selects_the_modular_resolver() {
-        assertThat(new Jpx(storage).resolvers().get("module")).isInstanceOf(MavenModuleResolver.class);
-        assertThat(new Jpx(storage, true).resolvers().get("module")).isInstanceOf(ModularJarResolver.class);
+    public void placement_selects_the_default_wiring() {
+        assertThat(new Jpx(PathPlacement.INFERRED).storage())
+                .as("the placement-only constructor is the command line's, so it installs under the home folder")
+                .isEqualTo(Path.of(System.getProperty("user.home")).resolve(".jenesis").resolve("jpx"));
+        assertThat(new Jpx(PathPlacement.INFERRED).resolvers().get("module"))
+                .isInstanceOf(MavenModuleResolver.class);
+        assertThat(new Jpx(PathPlacement.MODULE_PATH).resolvers().get("module"))
+                .as("a module path throughout is resolved over module descriptors")
+                .isInstanceOf(ModularJarResolver.class);
     }
 
     @Test
@@ -327,7 +399,8 @@ public class JpxTest {
         Jpx jpx = new Jpx(storage,
                 Map.of("module", streaming),
                 Map.of("module", new ModularJarResolver(false)),
-                new HashDigestFunction("SHA-256"));
+                new HashDigestFunction("SHA-256"),
+                PathPlacement.MODULE_PATH);
 
         Jpx.Installation installation = jpx.install("tool.main@1.0");
 
@@ -354,7 +427,8 @@ public class JpxTest {
         Jpx jpx = new Jpx(storage,
                 Map.of("maven", mavenRepository),
                 Map.of("maven", racing),
-                new HashDigestFunction("SHA-256"));
+                new HashDigestFunction("SHA-256"),
+                PathPlacement.INFERRED);
 
         Jpx.Installation installation = jpx.install("org.example:tool-main@1.0");
 
@@ -402,8 +476,9 @@ public class JpxTest {
                 .startsWith("@" + installation.folder().resolve("jpx."))
                 .endsWith(".args");
         assertThat(docker.javaArgs)
-                .containsSubsequence("-m", "tool.main/toolmain.Main", "argument");
-        assertThat(docker.javaArgs).doesNotContain("--add-modules", "-p", "-cp");
+                .as("a coordinate runs on the class path, so its main class is named directly")
+                .containsSubsequence("toolmain.Main", "argument");
+        assertThat(docker.javaArgs).doesNotContain("-m", "--add-modules", "-p", "-cp");
         try (Stream<Path> entries = Files.list(installation.folder())) {
             assertThat(entries.filter(entry -> entry.getFileName().toString().endsWith(".args")))
                     .as("the argument file is a temporary one, removed once the launch returned")
@@ -487,7 +562,11 @@ public class JpxTest {
 
     @Test
     public void latest_installed_is_empty_without_storage_directory() throws IOException {
-        Jpx jpx = new Jpx(storage.resolve("absent"));
+        Jpx jpx = new Jpx(storage.resolve("absent"),
+                Map.of(),
+                Map.of(),
+                new HashDigestFunction("SHA-256"),
+                PathPlacement.INFERRED);
 
         assertThat(jpx.latestInstalled("tool.main")).isEmpty();
     }
@@ -509,11 +588,11 @@ public class JpxTest {
             System.setProperty("jenesis.repository.insecure", "true");
             System.setProperty("jenesis.module.uri", "http://localhost:" + server.getAddress().getPort() + "/");
             System.setProperty("jenesis.module.local", jenesisRepoFolder.toString());
-            assertThat(read(new Jpx(storage).repositories()
+            assertThat(read(new Jpx(PathPlacement.INFERRED).repositories()
                     .get("module")
                     .fetch(Runnable::run, "tool.main:pom")
                     .orElseThrow())).isEqualTo("remote");
-            assertThat(read(new Jpx(storage, true).repositories()
+            assertThat(read(new Jpx(PathPlacement.MODULE_PATH).repositories()
                     .get("module")
                     .fetch(Runnable::run, "tool.main/1.0")
                     .orElseThrow())).isEqualTo("remote");
@@ -545,7 +624,7 @@ public class JpxTest {
             Files.createDirectories(jenesisRepoFolder.resolve("tool.main").resolve("1.0"));
             Files.writeString(jenesisRepoFolder.resolve("tool.main").resolve("1.0").resolve("tool.main.jar"), "local");
 
-            assertThat(read(new Jpx(storage, true).repositories()
+            assertThat(read(new Jpx(PathPlacement.MODULE_PATH).repositories()
                     .get("module")
                     .fetch(Runnable::run, "tool.main/1.0")
                     .orElseThrow())).isEqualTo("local");
@@ -603,13 +682,18 @@ public class JpxTest {
     }
 
     private Jpx jpx() {
+        return jpx(PathPlacement.INFERRED);
+    }
+
+    private Jpx jpx(PathPlacement placement) {
         MavenPomResolver maven = new MavenPomResolver();
         Repository mavenRepository = new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {});
         Repository jenesisRepository = new JenesisModuleRepository(jenesisRepoFolder.toUri());
         return new Jpx(storage,
                 Map.of("maven", mavenRepository, "module", jenesisRepository),
                 Map.of("maven", maven, "module", new MavenModuleResolver("maven", maven, jenesisRepository)),
-                new HashDigestFunction("SHA-256"));
+                new HashDigestFunction("SHA-256"),
+                placement);
     }
 
     private Jpx modularJpx() {
@@ -617,7 +701,8 @@ public class JpxTest {
         return new Jpx(storage,
                 Map.of("module", jenesisRepository),
                 Map.of("module", new ModularJarResolver(false)),
-                new HashDigestFunction("SHA-256"));
+                new HashDigestFunction("SHA-256"),
+                PathPlacement.MODULE_PATH);
     }
 
     private void addMavenTool() throws IOException {
@@ -676,6 +761,10 @@ public class JpxTest {
     }
 
     private void addDiscoveryPom(String version) throws IOException {
+        addDiscoveryPom(version, false);
+    }
+
+    private void addDiscoveryPom(String version, boolean plain) throws IOException {
         Path folder = Files.createDirectories(version == null
                 ? jenesisRepoFolder.resolve("tool.main")
                 : jenesisRepoFolder.resolve("tool.main/" + version));
@@ -690,8 +779,14 @@ public class JpxTest {
                             <artifactId>tool-lib</artifactId>
                             <version>1.0</version>
                         </dependency>
-                    </dependencies>
-                </project>""");
+                %s    </dependencies>
+                </project>""".formatted(plain ? """
+                            <dependency>
+                                <groupId>org.example</groupId>
+                                <artifactId>plain-tool</artifactId>
+                                <version>1.0</version>
+                            </dependency>
+                """ : ""));
     }
 
     private void addModularJars(boolean versioned) throws IOException {
