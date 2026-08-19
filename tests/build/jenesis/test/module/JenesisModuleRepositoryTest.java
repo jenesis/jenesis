@@ -16,6 +16,16 @@ public class JenesisModuleRepositoryTest {
     @TempDir
     private Path root;
 
+    @BeforeEach
+    public void setUp() throws IOException {
+        System.setProperty("jenesis.module.local", Files.createDirectories(root.resolve("home")).toString());
+    }
+
+    @AfterEach
+    public void tearDown() {
+        System.clearProperty("jenesis.module.local");
+    }
+
     @Test
     public void credential_is_not_leaked_to_a_fallback_repository() throws IOException {
         System.setProperty("jenesis.repository.insecure", "true");
@@ -84,6 +94,45 @@ public class JenesisModuleRepositoryTest {
         } finally {
             server.stop(0);
             System.clearProperty("jenesis.repository.insecure");
+        }
+    }
+
+    @Test
+    public void local_repository_is_consulted_before_the_remote() throws IOException {
+        Files.writeString(Files
+                .createDirectories(root.resolve("home/build.jenesis/1.0"))
+                .resolve("build.jenesis.jar"), "local");
+        Files.writeString(Files
+                .createDirectories(root.resolve("remote/module/build.jenesis/1.0"))
+                .resolve("build.jenesis.jar"), "remote");
+        System.setProperty("jenesis.module.uri", root.resolve("remote").toUri().toString());
+        try {
+            RepositoryItem item = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)
+                    .fetch(Runnable::run, "build.jenesis/1.0")
+                    .orElseThrow();
+
+            assertThat(read(item))
+                    .as("the local repository must be consulted without an explicit prepend")
+                    .isEqualTo("local");
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
+    public void remote_repository_serves_what_the_local_one_lacks() throws IOException {
+        Files.writeString(Files
+                .createDirectories(root.resolve("remote/module/build.jenesis/1.0"))
+                .resolve("build.jenesis.jar"), "remote");
+        System.setProperty("jenesis.module.uri", root.resolve("remote").toUri().toString());
+        try {
+            RepositoryItem item = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)
+                    .fetch(Runnable::run, "build.jenesis/1.0")
+                    .orElseThrow();
+
+            assertThat(read(item)).isEqualTo("remote");
+        } finally {
+            System.clearProperty("jenesis.module.uri");
         }
     }
 

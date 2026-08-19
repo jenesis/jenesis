@@ -2,6 +2,7 @@ package build.jenesis.test;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import module jdk.httpserver;
 import java.util.jar.Attributes;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.HashDigestFunction;
@@ -98,7 +99,7 @@ public class JpxTest {
         addMavenTool();
         Jpx jpx = jpx();
 
-        Jpx.Installation installation = jpx.install(Jpx.Command.parse("org.example:tool-main@1.0"));
+        Jpx.Installation installation = jpx.install("org.example:tool-main@1.0");
 
         assertThat(installation.folder().getFileName().toString()).isEqualTo("org.example--tool-main@1.0");
         SequencedProperties properties = installation.properties();
@@ -124,7 +125,7 @@ public class JpxTest {
         addMavenMetadata("plain-tool", "2.0", "1.0", "2.0");
         Jpx jpx = jpx();
 
-        Jpx.Installation installation = jpx.install(Jpx.Command.parse("org.example:plain-tool"));
+        Jpx.Installation installation = jpx.install("org.example:plain-tool");
 
         assertThat(installation.folder().getFileName().toString()).isEqualTo("org.example--plain-tool@2.0");
         SequencedProperties properties = installation.properties();
@@ -143,7 +144,7 @@ public class JpxTest {
         addDiscoveryPom(null);
         Jpx jpx = jpx();
 
-        Jpx.Installation installation = jpx.install(Jpx.Command.parse("tool.main"));
+        Jpx.Installation installation = jpx.install("tool.main");
 
         assertThat(installation.folder().getFileName().toString()).isEqualTo("tool.main@1.0");
         SequencedProperties properties = installation.properties();
@@ -158,9 +159,9 @@ public class JpxTest {
     @Test
     public void installs_and_launches_pure_modular() throws IOException, InterruptedException {
         addModularJars(true);
-        Jpx jpx = jpx();
+        Jpx jpx = modularJpx();
 
-        Jpx.Installation installation = jpx.install(Jpx.Command.parse("tool.main@1.0"), true);
+        Jpx.Installation installation = jpx.install("tool.main@1.0");
 
         assertThat(installation.folder().getFileName().toString()).isEqualTo("tool.main@1.0");
         SequencedProperties properties = installation.properties();
@@ -176,9 +177,9 @@ public class JpxTest {
     @Test
     public void pure_modular_uses_declared_version_without_pin() throws IOException {
         addModularJars(false);
-        Jpx jpx = jpx();
+        Jpx jpx = modularJpx();
 
-        Jpx.Installation installation = jpx.install(Jpx.Command.parse("tool.main"), true);
+        Jpx.Installation installation = jpx.install("tool.main");
 
         assertThat(installation.folder().getFileName().toString()).isEqualTo("tool.main@1.0");
     }
@@ -188,18 +189,18 @@ public class JpxTest {
         addPlainTool("1.0");
         addPlainTool("2.0");
         Jpx jpx = jpx();
-        Path older = jpx.install(Jpx.Command.parse("org.example:plain-tool@2.0")).folder();
-        Path newer = jpx.install(Jpx.Command.parse("org.example:plain-tool@1.0")).folder();
+        Path older = jpx.install("org.example:plain-tool@2.0").folder();
+        Path newer = jpx.install("org.example:plain-tool@1.0").folder();
         Files.setLastModifiedTime(newer.resolve(Jpx.PROPERTIES), FileTime.from(Instant.now().plusSeconds(60)));
         Repository offline = (_, coordinate) -> {
             throw new IOException("Offline, but fetched: " + coordinate);
         };
         Jpx offlineJpx = new Jpx(storage,
-                Map.of("maven", offline, "module", offline, "modular", offline),
+                Map.of("maven", offline, "module", offline),
                 Map.of("maven", new MavenPomResolver()),
                 new HashDigestFunction("SHA-256"));
 
-        assertThat(offlineJpx.install(Jpx.Command.parse("org.example:plain-tool")).folder()).isEqualTo(newer);
+        assertThat(offlineJpx.install("org.example:plain-tool").folder()).isEqualTo(newer);
         assertThat(older).isNotEqualTo(newer);
     }
 
@@ -212,7 +213,7 @@ public class JpxTest {
                 Map.of("maven", new MavenPomResolver()),
                 new HashDigestFunction("SHA-256"));
 
-        Jpx.Installation installation = jpx.install(Jpx.Command.parse("org.example:tool-main@1.0"));
+        Jpx.Installation installation = jpx.install("org.example:tool-main@1.0");
 
         assertThat(installation.properties().getProperty("modulepath")).isEqualTo("tool-lib-1.0.jar,tool-main-1.0.jar");
         try (Stream<Path> entries = Files.list(storage)) {
@@ -227,10 +228,10 @@ public class JpxTest {
     public void redoes_broken_installation() throws IOException, InterruptedException {
         addMavenTool();
         Jpx jpx = jpx();
-        Jpx.Installation installation = jpx.install(Jpx.Command.parse("org.example:tool-main@1.0"));
+        Jpx.Installation installation = jpx.install("org.example:tool-main@1.0");
         Files.delete(installation.folder().resolve(Jpx.PROPERTIES));
 
-        assertThat(jpx.install(Jpx.Command.parse("org.example:tool-main@1.0"))).isEqualTo(installation);
+        assertThat(jpx.install("org.example:tool-main@1.0")).isEqualTo(installation);
         assertThat(installation.folder().resolve(Jpx.PROPERTIES)).isRegularFile();
 
         Path marker = work.resolve("marker.txt");
@@ -241,12 +242,12 @@ public class JpxTest {
     public void verifies_checksum_prefix_and_rejects_mismatch() throws IOException {
         addMavenTool();
         Jpx jpx = jpx();
-        Jpx.Installation installation = jpx.install(Jpx.Command.parse("org.example:tool-main@1.0"));
+        Jpx.Installation installation = jpx.install("org.example:tool-main@1.0");
         String checksum = installation.properties()
                 .getProperty("checksum")
                 .substring("SHA-256/".length());
 
-        assertThat(jpx.install(Jpx.Command.parse("org.example:tool-main@1.0")).verify(checksum.substring(0, 32)))
+        assertThat(jpx.install("org.example:tool-main@1.0").verify(checksum.substring(0, 32)))
                 .isEqualTo(installation);
         assertThatThrownBy(() -> installation.verify("0".repeat(32)))
                 .isInstanceOf(IllegalStateException.class)
@@ -256,7 +257,7 @@ public class JpxTest {
     @Test
     public void rejects_insecure_or_malformed_checksum() throws IOException {
         addPlainTool("1.0");
-        Jpx.Installation installation = jpx().install(Jpx.Command.parse("org.example:plain-tool@1.0"));
+        Jpx.Installation installation = jpx().install("org.example:plain-tool@1.0");
 
         assertThatThrownBy(() -> installation.verify("0".repeat(31)))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -271,7 +272,7 @@ public class JpxTest {
     public void launches_in_docker() throws IOException, InterruptedException {
         addMavenTool();
         Jpx jpx = jpx();
-        Jpx.Installation installation = jpx.install(Jpx.Command.parse("org.example:tool-main@1.0"));
+        Jpx.Installation installation = jpx.install("org.example:tool-main@1.0");
 
         Path marker = work.resolve("marker.txt");
         assertThat(installation.launch(null, List.of(marker.toString()), new DockerizedJava(work))).isEqualTo(7);
@@ -294,10 +295,9 @@ public class JpxTest {
     }
 
     @Test
-    public void rejects_coordinates_with_modular_switch() {
-        assertThatThrownBy(() -> jpx().install(Jpx.Command.parse("org.example:tool-main@1.0"), true))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Pure module resolution requires a module name");
+    public void modular_wiring_selects_the_modular_resolver() {
+        assertThat(new Jpx(storage).resolvers().get("module")).isInstanceOf(MavenModuleResolver.class);
+        assertThat(new Jpx(storage, true).resolvers().get("module")).isInstanceOf(ModularJarResolver.class);
     }
 
     @Test
@@ -305,7 +305,7 @@ public class JpxTest {
         addMavenTool();
         Jpx jpx = jpx();
 
-        Jpx.Installation installation = jpx.install(Jpx.Command.parse("org.example:tool-lib@1.0"));
+        Jpx.Installation installation = jpx.install("org.example:tool-lib@1.0");
         assertThat(installation.properties().getProperty("mainClass")).isNull();
         assertThatThrownBy(() -> installation.launch(List.of()))
                 .isInstanceOf(IllegalStateException.class)
@@ -325,11 +325,11 @@ public class JpxTest {
         addModularJars(true);
         Repository streaming = streaming(new JenesisModuleRepository(jenesisRepoFolder.toUri()));
         Jpx jpx = new Jpx(storage,
-                Map.of("modular", streaming),
-                Map.of("modular", new ModularJarResolver(false)),
+                Map.of("module", streaming),
+                Map.of("module", new ModularJarResolver(false)),
                 new HashDigestFunction("SHA-256"));
 
-        Jpx.Installation installation = jpx.install(Jpx.Command.parse("tool.main@1.0"), true);
+        Jpx.Installation installation = jpx.install("tool.main@1.0");
 
         assertThat(installation.properties().getProperty("modulepath")).isNotNull();
         try (Stream<Path> entries = Files.list(storage)) {
@@ -356,7 +356,7 @@ public class JpxTest {
                 Map.of("maven", racing),
                 new HashDigestFunction("SHA-256"));
 
-        Jpx.Installation installation = jpx.install(Jpx.Command.parse("org.example:tool-main@1.0"));
+        Jpx.Installation installation = jpx.install("org.example:tool-main@1.0");
 
         assertThat(installation.folder()).isEqualTo(folder);
         assertThat(installation.properties().getProperty("name")).isEqualTo("SENTINEL");
@@ -387,7 +387,7 @@ public class JpxTest {
             throws IOException, InterruptedException {
         addMavenTool();
         Jpx jpx = jpx();
-        Jpx.Installation installation = jpx.install(Jpx.Command.parse("org.example:tool-main@1.0"));
+        Jpx.Installation installation = jpx.install("org.example:tool-main@1.0");
         RecordingDocker docker = new RecordingDocker(work);
 
         int code = installation.launch(null, List.of("argument"), docker);
@@ -492,6 +492,78 @@ public class JpxTest {
         assertThat(jpx.latestInstalled("tool.main")).isEmpty();
     }
 
+    @Test
+    public void default_repositories_reach_the_configured_remote() throws IOException {
+        List<String> requested = new ArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            requested.add(exchange.getRequestURI().getPath());
+            byte[] body = "remote".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+        server.start();
+        try {
+            System.setProperty("jenesis.repository.insecure", "true");
+            System.setProperty("jenesis.module.uri", "http://localhost:" + server.getAddress().getPort() + "/");
+            System.setProperty("jenesis.module.local", jenesisRepoFolder.toString());
+            assertThat(read(new Jpx(storage).repositories()
+                    .get("module")
+                    .fetch(Runnable::run, "tool.main:pom")
+                    .orElseThrow())).isEqualTo("remote");
+            assertThat(read(new Jpx(storage, true).repositories()
+                    .get("module")
+                    .fetch(Runnable::run, "tool.main/1.0")
+                    .orElseThrow())).isEqualTo("remote");
+            assertThat(requested).containsExactly(
+                    "/artifact/tool.main/tool.main.pom",
+                    "/module/tool.main/1.0/tool.main.jar");
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.module.uri");
+            System.clearProperty("jenesis.module.local");
+        }
+    }
+
+    @Test
+    public void default_repositories_prefer_the_local_export() throws IOException {
+        List<String> requested = new ArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            requested.add(exchange.getRequestURI().getPath());
+            exchange.sendResponseHeaders(404, -1);
+            exchange.close();
+        });
+        server.start();
+        try {
+            System.setProperty("jenesis.repository.insecure", "true");
+            System.setProperty("jenesis.module.uri", "http://localhost:" + server.getAddress().getPort() + "/");
+            System.setProperty("jenesis.module.local", jenesisRepoFolder.toString());
+            Files.createDirectories(jenesisRepoFolder.resolve("tool.main").resolve("1.0"));
+            Files.writeString(jenesisRepoFolder.resolve("tool.main").resolve("1.0").resolve("tool.main.jar"), "local");
+
+            assertThat(read(new Jpx(storage, true).repositories()
+                    .get("module")
+                    .fetch(Runnable::run, "tool.main/1.0")
+                    .orElseThrow())).isEqualTo("local");
+            assertThat(requested).isEmpty();
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.module.uri");
+            System.clearProperty("jenesis.module.local");
+        }
+    }
+
+    private static String read(RepositoryItem item) throws IOException {
+        try (InputStream stream = item.toInputStream()) {
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
     private static Repository streaming(Repository delegate) {
         return (executor, coordinate) -> {
             Optional<RepositoryItem> candidate = delegate.fetch(executor, coordinate);
@@ -535,10 +607,16 @@ public class JpxTest {
         Repository mavenRepository = new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {});
         Repository jenesisRepository = new JenesisModuleRepository(jenesisRepoFolder.toUri());
         return new Jpx(storage,
-                Map.of("maven", mavenRepository, "module", jenesisRepository, "modular", jenesisRepository),
-                Map.of("maven", maven,
-                        "module", new MavenModuleResolver("maven", maven, jenesisRepository),
-                        "modular", new ModularJarResolver(false)),
+                Map.of("maven", mavenRepository, "module", jenesisRepository),
+                Map.of("maven", maven, "module", new MavenModuleResolver("maven", maven, jenesisRepository)),
+                new HashDigestFunction("SHA-256"));
+    }
+
+    private Jpx modularJpx() {
+        Repository jenesisRepository = new JenesisModuleRepository(jenesisRepoFolder.toUri());
+        return new Jpx(storage,
+                Map.of("module", jenesisRepository),
+                Map.of("module", new ModularJarResolver(false)),
                 new HashDigestFunction("SHA-256"));
     }
 

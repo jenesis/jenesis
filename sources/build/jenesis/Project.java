@@ -186,8 +186,7 @@ public record Project(
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
                 repositories.putIfAbsent("module",
                         JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)
-                                .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts()))
-                                .prepend(JenesisModuleRepository.ofLocal()));
+                                .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
                 resolvers.putIfAbsent("module", new ModularJarResolver(false));
                 SequencedSet<String> modulesDeps = new LinkedHashSet<>();
@@ -260,8 +259,7 @@ public record Project(
                                 .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
                 repositories.putIfAbsent("module",
                         JenesisModuleRepository.of(JenesisRepository.Scope.ARTIFACT)
-                                .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts()))
-                                .prepend(JenesisModuleRepository.ofLocal()));
+                                .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
                 resolvers.putIfAbsent("maven", new MavenPomResolver());
                 resolvers.putIfAbsent("module", new MavenModuleResolver("maven",

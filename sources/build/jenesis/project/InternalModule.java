@@ -44,7 +44,7 @@ public class InternalModule implements BuildExecutorModule {
                           Path source) {
         this(prefix,
                 source,
-                Map.of(prefix, JenesisModuleRepository.of(JenesisRepository.Scope.MODULE).prepend(JenesisModuleRepository.ofLocal())),
+                Map.of(prefix, JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)),
                 Map.of(prefix, new ModularJarResolver(true)),
                 Collections.emptyNavigableSet(),
                 null,

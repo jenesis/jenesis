@@ -55,8 +55,8 @@ public class Demo {
         Path pluginJar = modular.resolve("demo.plugin").resolve("1").resolve("demo.plugin.jar");
 
         // Serve the staged jar under the custom coordinate demo.plugin, ahead of
-        // the local export (~/.jenesis) and the default Jenesis repository that
-        // resolve its build.jenesis and org.json dependencies.
+        // the default Jenesis repository (which already consults the local export
+        // in ~/.jenesis) that resolves its build.jenesis and org.json dependencies.
         Repository local = (executor, coordinate) -> {
             int slash = coordinate.indexOf('/');
             String module = slash < 0 ? coordinate : coordinate.substring(0, slash);
@@ -64,9 +64,7 @@ public class Demo {
                     ? Optional.of(RepositoryItem.ofFile(pluginJar))
                     : Optional.empty();
         };
-        Repository repository = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)
-                .prepend(JenesisModuleRepository.ofLocal())
-                .prepend(local);
+        Repository repository = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE).prepend(local);
 
         // Build the project (the resolved plugin rewrites ${greeting} first) and
         // launch the produced module so its main prints the substituted greeting.

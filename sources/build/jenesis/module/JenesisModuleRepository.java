@@ -31,7 +31,7 @@ public class JenesisModuleRepository implements JenesisRepository {
         if (repository == null) {
             throw new IllegalStateException("No Jenesis module repository is configured by: " + text);
         }
-        return repository;
+        return repository.prepend(ofLocal());
     }
 
     private static JenesisRepository chain(String text,

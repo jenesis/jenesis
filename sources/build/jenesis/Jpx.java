@@ -9,6 +9,7 @@ import build.jenesis.maven.MavenModuleResolver;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.maven.MavenRepository;
 import build.jenesis.module.JenesisModuleRepository;
+import build.jenesis.module.JenesisRepository;
 import build.jenesis.module.ModularJarResolver;
 
 public record Jpx(Path storage,
@@ -22,21 +23,27 @@ public record Jpx(Path storage,
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
 
-    public Jpx() {
-        this(Path.of(System.getProperty("user.home")).resolve(".jenesis").resolve("jpx"));
+    public Jpx(boolean modular) {
+        this(Path.of(System.getProperty("user.home")).resolve(".jenesis").resolve("jpx"), modular);
     }
 
     public Jpx(Path storage) {
-        Repository local = JenesisModuleRepository.ofLocal();
+        this(storage, false);
+    }
+
+    public Jpx(Path storage, boolean modular) {
+        Repository module = JenesisModuleRepository.of(modular
+                ? JenesisRepository.Scope.MODULE
+                : JenesisRepository.Scope.ARTIFACT);
         Map<String, Repository> repositories = new LinkedHashMap<>();
         repositories.put("maven", MavenDefaultRepository.of());
-        repositories.put("module", local);
-        repositories.put("modular", local);
+        repositories.put("module", module);
         Map<String, Resolver> resolvers = new LinkedHashMap<>();
         MavenPomResolver maven = new MavenPomResolver();
         resolvers.put("maven", maven);
-        resolvers.put("module", new MavenModuleResolver("maven", maven, local));
-        resolvers.put("modular", new ModularJarResolver(false));
+        resolvers.put("module", modular
+                ? new ModularJarResolver(false)
+                : new MavenModuleResolver("maven", maven, module));
         this(storage,
                 Collections.unmodifiableMap(repositories),
                 Collections.unmodifiableMap(resolvers),
@@ -234,9 +241,12 @@ public record Jpx(Path storage,
             System.err.println(HELP);
             System.exit(64);
         }
-        Jpx jpx = new Jpx();
         Command command = Command.parse(arguments[target]);
-        Installation installation = jpx.install(command, modular);
+        if (modular && command.name().indexOf(':') >= 0) {
+            throw new IllegalArgumentException("Pure module resolution requires a module name, "
+                    + "not Maven coordinates: " + command.name());
+        }
+        Installation installation = new Jpx(modular).install(command);
         if (checksum != null) {
             installation.verify(checksum);
         }
@@ -251,11 +261,11 @@ public record Jpx(Path storage,
         }
     }
 
-    public Installation install(Command command) throws IOException {
-        return install(command, false);
+    public Installation install(String target) throws IOException {
+        return install(Command.parse(target));
     }
 
-    public Installation install(Command command, boolean modular) throws IOException {
+    public Installation install(Command command) throws IOException {
         if (command.version() == null) {
             Installation installed = latestInstalled(command.name()).orElse(null);
             if (installed != null) {
@@ -277,21 +287,20 @@ public record Jpx(Path storage,
             int colon = command.name().indexOf(':');
             if (colon < 0) {
                 SAFE_SEGMENT.accept("module name", command.name());
-                String prefix = modular ? "modular" : "module";
+                String head = "module/" + command.name();
                 SequencedMap<String, String> versions = new LinkedHashMap<>();
                 if (version != null) {
                     versions.put(command.name(), version);
                 }
-                resolution = resolvers.get(prefix).dependencies(executor,
-                        prefix,
+                resolution = resolvers.get("module").dependencies(executor,
+                        "module",
                         repositories,
                         new LinkedHashMap<>(Map.of(command.name(), Collections.emptyNavigableSet())),
                         versions,
                         DependencyScope.RUNTIME);
                 root = null;
                 for (String coordinate : resolution.artifacts().sequencedKeySet()) {
-                    if (coordinate.equals(prefix + "/" + command.name())
-                            || coordinate.startsWith(prefix + "/" + command.name() + "/")) {
+                    if (coordinate.equals(head) || coordinate.startsWith(head + "/")) {
                         root = coordinate;
                         break;
                     }
@@ -301,19 +310,13 @@ public record Jpx(Path storage,
                 }
                 if (version == null) {
                     int slash = root.lastIndexOf('/');
-                    version = slash < prefix.length() + 1 + command.name().length()
-                            ? null
-                            : root.substring(slash + 1);
+                    version = slash < head.length() ? null : root.substring(slash + 1);
                 }
                 if (version == null) {
                     throw new IllegalStateException("Cannot determine a version for " + command.name()
                             + " - specify one as " + command.name() + "@<version>");
                 }
             } else {
-                if (modular) {
-                    throw new IllegalArgumentException("Pure module resolution requires a module name, "
-                            + "not Maven coordinates: " + command.name());
-                }
                 String groupId = command.name().substring(0, colon), artifactId = command.name().substring(colon + 1);
                 SAFE_SEGMENT.accept("group", groupId);
                 SAFE_SEGMENT.accept("artifact", artifactId);

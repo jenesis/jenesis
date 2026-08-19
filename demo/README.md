@@ -8,8 +8,9 @@ scale to many modules, package a module into a runnable application image, build
 a multi-release JAR, infer code-quality tools, bring in other JVM languages and
 lint them too, customize or replace the build template itself, lock down the
 supply chain, assemble a release for Maven Central, compile a module ahead of
-time into a GraalVM native binary, and finally share build outputs through a
-content-addressed cache.
+time into a GraalVM native binary, share build outputs through a content-addressed
+cache, and finally run somebody else's released program without building anything
+at all.
 
 Every demo has its own `build/jenesis` symlink into this repository's
 `sources/build/jenesis`, so each runs in isolation from inside its own directory
@@ -48,8 +49,9 @@ executable demos (`java-pom-executable`, `java-modular-executable`), which stage
 `build/DemoNative.java` sibling that builds a native installer and a
 `build/DemoLauncher.java` sibling that builds a single `java -jar`-able executable jar
 with the `build.jenesis.launcher` and runs it. The `bundle` demo unpacks its
-`bundle.zip` and runs it on a stock JRE, and `agents` builds (attaching Mockito to
-the tests) and then runs the application (attaching the OpenTelemetry agent). Each demo writes
+`bundle.zip` and runs it on a stock JRE, `agents` builds (attaching Mockito to
+the tests) and then runs the application (attaching the OpenTelemetry agent), and
+`jpx` builds nothing at all - it installs and runs a released program. Each demo writes
 to a local `target/` directory; delete it to rebuild from scratch.
 
 Quick index
@@ -102,6 +104,7 @@ Quick index
 | 43 | [`publishing`](demo-43-publishing/README.md)                 | Assemble a Maven Central ready bundle (POM metadata + sources/javadoc jars) and resolve it back | `java build/Demo.java`             |
 | 44 | [`native-image`](demo-44-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Project.java`  |
 | 45 | [`build-cache`](demo-45-build-cache/README.md)               | A content-addressed build cache serving step outputs across builds - project-local (`-Djenesis.project.cache`), shared via a URI (`-Djenesis.cache.uri=`), or local layered in front of a remote; shown by bootstrapping it then serving a full `-Djenesis.executor.rebuild=true` from it | `java build/jenesis/Project.java`  |
+| 46 | [`jpx`](demo-46-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -937,6 +940,43 @@ HTTP/object-store backend is another implementation of the same `fetch`/`store`
 interface, and the local folder is the on-disk analogue - point several checkouts
 or a CI workspace and a laptop at one folder and a step compiled once is reused
 wherever its inputs match.
+
+## 31. Running a released program - [`jpx`](demo-46-jpx/README.md)
+
+Every demo so far built something. `jpx` builds nothing: it resolves a *published*
+module (or Maven artifact), installs its runtime closure once into
+`~/.jenesis/jpx/<name>@<version>/`, and launches its entry point - an `npx` for
+the module path, and the counterpart to `Execute.java`, which runs the project
+you have in front of you. The demo drives the `Jpx` API so it can point that
+storage at its own `target/jpx/` and leave your home directory alone; it asks the
+JUnit Platform Console Launcher for its `--version` twice, spelling the same
+artifact two ways:
+
+    jpx --hash=9b60dfc3... org.junit.platform.console@6.1.3 --version
+    jpx --hash=9b60dfc3... org.junit.platform:junit-platform-console@6.1.3 --version
+
+The first names a **Java module**, whose Maven coordinates the module repository
+discovers as a POM before the graph is read from Maven metadata, exactly as the
+MODULAR_TO_MAVEN layout resolves a `requires` clause (see section 18). The second
+names a **Maven coordinate** directly; a module name can never contain a colon, so
+the grammar `<name>[@<version>][/<main-class>]` keeps the two apart with no flag.
+Both install the same nine jars, so both verify against the same digest.
+
+That digest is the third thing the demo pins down. `--hash=<prefix>` recomputes a
+SHA-256 over every jar the installation's `jpx.properties` lists - name and
+content hash, in sorted order - before each launch, so it covers the whole closure
+rather than a single artifact, and catches a jar swapped underneath an existing
+installation as readily as a tampered download. Two further runs show both ends of
+that check: one passes only the leading `9b60dfc3d10f0b4fdf69050eec7b7332`, since
+the value is matched as a prefix and 32 hex characters is the shortest accepted,
+and one passes a full-length digest ending `c0ffee` rather than `cfd3e8`, which is
+blocked before the JVM starts. Naming a version and a hash turns a convenience
+command into a reproducible one: the same three tokens fetch the same bytes on any
+machine, which is what makes `jpx` usable in a pipeline and not just at a prompt.
+Resolution reaches the default repositories - the Jenesis module repository for
+module names, Maven Central for coordinates - each fronted by the local
+`~/.jenesis/` exports and `~/.m2/`, and each redirectable at a mirror through
+`JENESIS_REPOSITORY_URI` and `MAVEN_REPOSITORY_URI`.
 
 Cross-cutting concepts
 ----------------------
