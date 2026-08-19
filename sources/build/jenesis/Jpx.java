@@ -15,7 +15,8 @@ import build.jenesis.module.ModularJarResolver;
 public record Jpx(Path storage,
                   Map<String, Repository> repositories,
                   Map<String, Resolver> resolvers,
-                  HashDigestFunction hashFunction) {
+                  HashDigestFunction hashFunction,
+                  PathPlacement placement) {
 
     public static final String PROPERTIES = "jpx.properties";
 
@@ -23,15 +24,11 @@ public record Jpx(Path storage,
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
 
-    public Jpx(boolean modular) {
-        this(Path.of(System.getProperty("user.home")).resolve(".jenesis").resolve("jpx"), modular);
-    }
-
-    public Jpx(Path storage) {
-        this(storage, false);
-    }
-
-    public Jpx(Path storage, boolean modular) {
+    // The wiring the command line runs on: the default repositories under the default installation folder.
+    // A module path throughout is resolved over module descriptors, any other placement over published
+    // coordinates. Everything else names all five components itself.
+    public Jpx(PathPlacement placement) {
+        boolean modular = placement == PathPlacement.MODULE_PATH;
         Repository module = JenesisModuleRepository.of(modular
                 ? JenesisRepository.Scope.MODULE
                 : JenesisRepository.Scope.ARTIFACT);
@@ -44,10 +41,11 @@ public record Jpx(Path storage,
         resolvers.put("module", modular
                 ? new ModularJarResolver(false)
                 : new MavenModuleResolver("maven", maven, module));
-        this(storage,
+        this(Path.of(System.getProperty("user.home")).resolve(".jenesis").resolve("jpx"),
                 Collections.unmodifiableMap(repositories),
                 Collections.unmodifiableMap(resolvers),
-                new HashDigestFunction("SHA-256"));
+                new HashDigestFunction("SHA-256"),
+                placement);
     }
 
     public record Command(String name, String version, String mainClass) {
@@ -195,12 +193,18 @@ public record Jpx(Path storage,
               module main class or Main-Class manifest entry - name one to override it,
               as in java -m <module>/<main-class>.
 
+              A module name runs as a module: every jar that describes one is placed on
+              the module path, any jar that does not on the class path. A
+              <groupId>:<artifactId> pair names an artifact rather than a module, and
+              runs on the class path in full.
+
             Installations live in ~/.jenesis/jpx/<name>@<version>/ beside a
             jpx.properties descriptor listing paths, entry point and checksum.
 
             Options:
               --modular           resolve purely over module descriptors, walking requires
-                                  clauses; every module must then be explicitly named
+                                  clauses, and place every jar on the module path; every
+                                  module must then be explicitly named
               --docker[=<image>]  run the program in a Docker container; resolution and
                                   installation still happen on the host, the installation
                                   and the host's Java home are mounted read-only. Without
@@ -210,12 +214,13 @@ public record Jpx(Path storage,
               --help              print this help""";
 
     public static void main(String... arguments) throws IOException, InterruptedException {
-        boolean modular = false, dockerized = false;
+        PathPlacement placement = PathPlacement.INFERRED;
+        boolean dockerized = false;
         String image = null, checksum = null;
         int target = 0;
         while (target < arguments.length && arguments[target].startsWith("--")) {
             switch (arguments[target]) {
-                case "--modular" -> modular = true;
+                case "--modular" -> placement = PathPlacement.MODULE_PATH;
                 case "--docker" -> dockerized = true;
                 case "--help" -> {
                     System.out.println(HELP);
@@ -242,11 +247,11 @@ public record Jpx(Path storage,
             System.exit(64);
         }
         Command command = Command.parse(arguments[target]);
-        if (modular && command.name().indexOf(':') >= 0) {
+        if (placement == PathPlacement.MODULE_PATH && command.name().indexOf(':') >= 0) {
             throw new IllegalArgumentException("Pure module resolution requires a module name, "
                     + "not Maven coordinates: " + command.name());
         }
-        Installation installation = new Jpx(modular).install(command);
+        Installation installation = new Jpx(placement).install(command);
         if (checksum != null) {
             installation.verify(checksum);
         }
@@ -381,20 +386,23 @@ public record Jpx(Path storage,
         }
         root = rename(resolution, jars, folder, root);
         ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(root);
-        if (command.name().indexOf(':') < 0
-                && (descriptor == null || !descriptor.name().equals(command.name()))) {
+        boolean coordinate = command.name().indexOf(':') >= 0;
+        if (!coordinate && (descriptor == null || !descriptor.name().equals(command.name()))) {
             throw new IllegalStateException("The jar resolved for module " + command.name() + " is named "
                     + (descriptor == null ? "nothing" : descriptor.name()) + " - the repository mapping appears stale");
         }
-        String mainModule = descriptor == null ? null : descriptor.name();
+        // A coordinate names an artifact rather than a module, so it and its dependencies run on the class
+        // path in full. A module name runs as a module: placed jar by jar as each describes one, or - where
+        // this Jpx resolves over module descriptors - on the module path throughout.
+        PathPlacement placement = coordinate ? PathPlacement.CLASS_PATH : this.placement;
+        String mainModule = placement.modular() && descriptor != null ? descriptor.name() : null;
         String mainClass = descriptor == null || descriptor.mainClass().isEmpty()
                 ? PathPlacement.mainClass(root)
                 : descriptor.mainClass().get();
         List<String> modulepath = new ArrayList<>(), classpath = new ArrayList<>();
         ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
-            Path file = folder.resolve(entry.getKey());
-            boolean placed = mainModule != null && graph.place(PathPlacement.INFERRED, file);
+            boolean placed = graph.place(placement, folder.resolve(entry.getKey()));
             (placed ? modulepath : classpath).add(entry.getKey());
         }
         SequencedProperties properties = new SequencedProperties();

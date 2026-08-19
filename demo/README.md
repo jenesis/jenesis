@@ -960,7 +960,10 @@ discovers as a POM before the graph is read from Maven metadata, exactly as the
 MODULAR_TO_MAVEN layout resolves a `requires` clause (see section 18). The second
 names a **Maven coordinate** directly; a module name can never contain a colon, so
 the grammar `<name>[@<version>][/<main-class>]` keeps the two apart with no flag.
-Both install the same nine jars, so both verify against the same digest.
+Both install the same nine jars, so both verify against the same digest - and the
+name they were asked for also decides how they run: a module name is run as a
+module, every jar that describes one placed on the module path, while a coordinate
+names an artifact rather than a module and runs on the class path in full.
 
 That digest is the third thing the demo pins down. `--hash=<prefix>` recomputes a
 SHA-256 over every jar the installation's `jpx.properties` lists - name and
