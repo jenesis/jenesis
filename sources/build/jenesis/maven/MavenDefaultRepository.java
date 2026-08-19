@@ -347,10 +347,6 @@ public class MavenDefaultRepository implements MavenRepository {
                 retry);
     }
 
-    private static InputStream openStream(URI uri, String token, Repository.Retry retry) throws IOException {
-        return Repository.open(uri, token, retry);
-    }
-
     private static Optional<Path> download(URI uri,
                                            Map<LazyRepositoryItem, MessageDigest> digests,
                                            String prefix,
@@ -363,7 +359,7 @@ public class MavenDefaultRepository implements MavenRepository {
                 : Files.createTempFile(directory, prefix, suffix);
         try {
             for (int attempt = 0; ; attempt++) {
-                try (InputStream stream = openStream(uri, token, retry)) {
+                try (InputStream stream = Repository.open(uri, token, retry)) {
                     Files.copy(stream, temporary, StandardCopyOption.REPLACE_EXISTING);
                     break;
                 } catch (FileNotFoundException _) {

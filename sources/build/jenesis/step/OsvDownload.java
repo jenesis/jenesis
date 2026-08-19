@@ -51,7 +51,7 @@ public class OsvDownload implements BuildStep {
         List<String> coordinates = new ArrayList<>(coordinateSet);
         SequencedProperties feed = new SequencedProperties();
         if (!coordinates.isEmpty()) {
-            List<List<String>> identifiers = identifiers(post(endpoint.resolve("/v1/querybatch"), queryBatch(coordinates)));
+            List<List<String>> identifiers = identifiers(request(endpoint.resolve("/v1/querybatch"), queryBatch(coordinates)));
             SequencedSet<String> distinct = new LinkedHashSet<>();
             for (List<String> ids : identifiers) {
                 distinct.addAll(ids);
@@ -60,7 +60,7 @@ public class OsvDownload implements BuildStep {
             for (String id : distinct) {
                 pending.put(id, CompletableFuture.supplyAsync(() -> {
                     try {
-                        return severity(get(endpoint.resolve("/v1/vulns/" + id)));
+                        return severity(request(endpoint.resolve("/v1/vulns/" + id), null));
                     } catch (IOException e) {
                         throw new CompletionException(e);
                     }
@@ -314,14 +314,6 @@ public class OsvDownload implements BuildStep {
             }
         }
         return builder.toString();
-    }
-
-    private static String post(URI uri, String body) throws IOException {
-        return request(uri, body);
-    }
-
-    private static String get(URI uri) throws IOException {
-        return request(uri, null);
     }
 
     private static String request(URI uri, String body) throws IOException {
