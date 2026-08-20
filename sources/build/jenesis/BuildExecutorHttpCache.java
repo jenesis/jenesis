@@ -12,6 +12,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
     private final String project;
     private final String algorithm;
     private final Duration connectTimeout;
+    private final Duration readTimeout;
     private final boolean read;
     private final boolean write;
 
@@ -20,7 +21,8 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                 System.getProperty("jenesis.cache.key", System.getenv("JENESIS_CACHE_KEY")),
                 System.getProperty("jenesis.cache.project", System.getenv("JENESIS_CACHE_PROJECT")),
                 "SHA-256",
-                defaultConnectTimeout(),
+                Duration.parse(System.getProperty("jenesis.cache.connect", "PT1S")),
+                Duration.parse(System.getProperty("jenesis.cache.read", "PT10S")),
                 true,
                 true);
     }
@@ -30,6 +32,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                                    String project,
                                    String algorithm,
                                    Duration connectTimeout,
+                                   Duration readTimeout,
                                    boolean read,
                                    boolean write) {
         this.uri = uri;
@@ -37,41 +40,37 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         this.project = project;
         this.algorithm = algorithm;
         this.connectTimeout = connectTimeout;
+        this.readTimeout = readTimeout;
         this.read = read;
         this.write = write;
     }
 
-    private static Duration defaultConnectTimeout() {
-        String timeout = System.getProperty("jenesis.cache.timeout");
-        return timeout == null ? Duration.ofSeconds(1) : Duration.parse(timeout);
-    }
-
     public BuildExecutorHttpCache key(String key) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, read, write);
+        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write);
     }
 
     public BuildExecutorHttpCache project(String project) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, read, write);
+        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write);
     }
 
     public BuildExecutorHttpCache algorithm(String algorithm) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, read, write);
+        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write);
     }
 
     public BuildExecutorHttpCache connectTimeout(Duration connectTimeout) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, read, write);
+        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write);
     }
 
     public BuildExecutorHttpCache read(boolean read) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, read, write);
+        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write);
     }
 
     public BuildExecutorHttpCache write(boolean write) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, read, write);
+        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write);
     }
 
-    public Duration connectTimeout() {
-        return connectTimeout;
+    public BuildExecutorHttpCache readTimeout(Duration readTimeout) {
+        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write);
     }
 
     @Override
@@ -187,7 +186,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         HttpURLConnection connection = (HttpURLConnection) target.toURL().openConnection();
         connection.setRequestMethod(method);
         connection.setConnectTimeout((int) Math.min(connectTimeout.toMillis(), Integer.MAX_VALUE));
-        connection.setReadTimeout(60_000);
+        connection.setReadTimeout((int) Math.min(readTimeout.toMillis(), Integer.MAX_VALUE));
         connection.setInstanceFollowRedirects(false);
         connection.setRequestProperty("User-Agent", "Jenesis");
         if (key != null) {
@@ -224,8 +223,18 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(target))) {
             Files.walkFileTree(source, new SimpleFileVisitor<>() {
                 @Override
+                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes)
+                        throws IOException {
+                    if (!directory.equals(source)) {
+                        zip.putNextEntry(new ZipEntry(name(source, directory) + "/"));
+                        zip.closeEntry();
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
-                    zip.putNextEntry(new ZipEntry(source.relativize(file).toString().replace('\\', '/')));
+                    zip.putNextEntry(new ZipEntry(name(source, file)));
                     Files.copy(file, zip);
                     zip.closeEntry();
                     return FileVisitResult.CONTINUE;
@@ -234,11 +243,20 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         }
     }
 
+    private static String trimmed(String name) {
+        return name.endsWith("/") ? name.substring(0, name.length() - 1) : name;
+    }
+
+    private static String name(Path source, Path path) {
+        return source.relativize(path).toString().replace('\\', '/');
+    }
+
     private static void unzip(InputStream source, Path target) throws IOException {
         Path base = target.normalize();
         ZipInputStream zip = new ZipInputStream(source);
         for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
             if (entry.isDirectory()) {
+                Files.createDirectories(BuildStep.resolveContained(base, trimmed(entry.getName())));
                 continue;
             }
             Path destination = BuildStep.resolveContained(base, entry.getName());

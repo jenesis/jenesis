@@ -1278,7 +1278,8 @@ public record Project(
                                                   -Djenesis.cache.key authorise it
                                                   (env fallbacks
                                                   JENESIS_CACHE_PROJECT/KEY);
-                                                  -Djenesis.cache.timeout and
+                                                  -Djenesis.cache.connect,
+                                                  -Djenesis.cache.read and
                                                   -Djenesis.cache.insecure tune it.
                       -Djenesis.project.cache=<path>      Also cache locally on disk,
                                                   layered in front of the remote
