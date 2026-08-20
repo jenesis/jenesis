@@ -132,6 +132,72 @@ public class BuildExecutorHttpCacheTest {
     }
 
     @Test
+    public void an_empty_directory_survives_the_round_trip() throws IOException {
+        // A step that leaves an empty output directory - a staging area, a marker, somewhere a later step writes -
+        // must find it there again after a cache hit. Without a directory entry the archive simply has no record
+        // of it, so the restored tree differs from the stored one and the build fails somewhere far from the cache.
+        Files.createDirectory(output.resolve("empty-dir"));
+        Files.createDirectories(output.resolve("nested").resolve("deeper"));
+        Files.writeString(output.resolve("nested").resolve("deeper").resolve("leaf"), "leaf");
+        BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo");
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        cache.store(Runnable::run, "step", step, in, output);
+
+        Path restored = Files.createTempDirectory("restored");
+        assertThat(cache.fetch(Runnable::run, "step", step, in, restored)).isPresent();
+        assertThat(restored.resolve("empty-dir")).isDirectory();
+        assertThat(restored.resolve("nested").resolve("deeper").resolve("leaf")).content().isEqualTo("leaf");
+    }
+
+    @Test
+    public void a_directory_entry_may_not_escape_the_target() throws IOException {
+        // The directory branch resolves through the same containment check as a file, so an archive cannot create
+        // a directory outside the output by naming one.
+        BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo");
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("file"), "result");
+        cache.store(Runnable::run, "step", step, in, output);
+        String identifier = blobs.keySet().iterator().next();
+        ByteArrayOutputStream malicious = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(malicious)) {
+            zip.putNextEntry(new ZipEntry("../escaped-dir/"));
+            zip.closeEntry();
+        }
+        blobs.put(identifier, malicious.toByteArray());
+
+        Path restored = Files.createTempDirectory("restored");
+        assertThat(cache.fetch(Runnable::run, "step", step, in, restored)).isEmpty();
+        assertThat(restored.getParent().resolve("escaped-dir")).doesNotExist();
+    }
+
+    @Test
+    public void a_cache_that_hangs_does_not_hang_the_build() throws IOException {
+        System.setProperty("jenesis.cache.read", "PT0.5S");
+        try (ServerSocket hanging = new ServerSocket(0, 0, InetAddress.getLoopbackAddress())) {
+            Thread accepting = Thread.ofVirtual().start(() -> {
+                try {
+                    Socket accepted = hanging.accept();
+                    Thread.sleep(Duration.ofMinutes(1));
+                    accepted.close();
+                } catch (IOException | InterruptedException _) {
+                }
+            });
+            BuildExecutorHttpCache cache = new BuildExecutorHttpCache(
+                    URI.create("http://localhost:" + hanging.getLocalPort() + "/cache"))
+                    .key("team-alpha").project("demo");
+            long started = System.nanoTime();
+            assertThat(cache.fetch(Runnable::run, "step", new byte[]{1},
+                    inputs("source", "file", new byte[]{9}), Files.createTempDirectory("hung"))).isEmpty();
+            assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(20));
+            accepting.interrupt();
+        } finally {
+            System.clearProperty("jenesis.cache.read");
+        }
+    }
+
+    @Test
     public void corrupt_cache_entry_leaves_the_target_empty() throws IOException {
         BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo");
         byte[] step = {1};
@@ -159,12 +225,6 @@ public class BuildExecutorHttpCacheTest {
                 .fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), target);
         assertThat(keys).containsExactly("null");
         assertThat(projects).containsExactly("null");
-    }
-
-    @Test
-    public void default_connect_timeout_is_short() {
-        assertThat(new BuildExecutorHttpCache(uri).key("team-alpha").project("demo").connectTimeout())
-                .isEqualTo(Duration.ofSeconds(1));
     }
 
     @Test
