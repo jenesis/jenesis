@@ -10,7 +10,7 @@ public interface BuildExecutor {
         return new Configuration().of(target);
     }
 
-    record Configuration(Duration timeout, String digest, boolean verbose, boolean rebuild, boolean aggregate, BuildExecutorCache cache) {
+    record Configuration(Duration timeout, String digest, boolean verbose, boolean rebuild, boolean aggregate, int concurrency, BuildExecutorCache cache) {
 
         private static final ConcurrentMap<Path, FileChannel> LOCKS = new ConcurrentHashMap<>();
 
@@ -33,31 +33,36 @@ public interface BuildExecutor {
                     Boolean.getBoolean("jenesis.print.checksum"),
                     Boolean.getBoolean("jenesis.executor.rebuild"),
                     Boolean.getBoolean("jenesis.executor.aggregate"),
+                    Integer.getInteger("jenesis.executor.concurrency", 0),
                     cache);
         }
 
         public Configuration timeout(Duration timeout) {
-            return new Configuration(timeout, digest, verbose, rebuild, aggregate, cache);
+            return new Configuration(timeout, digest, verbose, rebuild, aggregate, concurrency, cache);
         }
 
         public Configuration digest(String digest) {
-            return new Configuration(timeout, digest, verbose, rebuild, aggregate, cache);
+            return new Configuration(timeout, digest, verbose, rebuild, aggregate, concurrency, cache);
         }
 
         public Configuration verbose(boolean verbose) {
-            return new Configuration(timeout, digest, verbose, rebuild, aggregate, cache);
+            return new Configuration(timeout, digest, verbose, rebuild, aggregate, concurrency, cache);
         }
 
         public Configuration rebuild(boolean rebuild) {
-            return new Configuration(timeout, digest, verbose, rebuild, aggregate, cache);
+            return new Configuration(timeout, digest, verbose, rebuild, aggregate, concurrency, cache);
         }
 
         public Configuration aggregate(boolean aggregate) {
-            return new Configuration(timeout, digest, verbose, rebuild, aggregate, cache);
+            return new Configuration(timeout, digest, verbose, rebuild, aggregate, concurrency, cache);
+        }
+
+        public Configuration concurrency(int concurrency) {
+            return new Configuration(timeout, digest, verbose, rebuild, aggregate, concurrency, cache);
         }
 
         public Configuration cache(BuildExecutorCache cache) {
-            return new Configuration(timeout, digest, verbose, rebuild, aggregate, cache);
+            return new Configuration(timeout, digest, verbose, rebuild, aggregate, concurrency, cache);
         }
 
         public BuildExecutor of(Path target) throws IOException {
@@ -70,7 +75,8 @@ public interface BuildExecutor {
                             : BuildExecutorCallback.nop(),
                     cache == null ? BuildExecutorCache.nop() : cache,
                     rebuild,
-                    aggregate);
+                    aggregate,
+                    concurrency);
         }
     }
 
@@ -81,7 +87,11 @@ public interface BuildExecutor {
                             BuildExecutorCallback callback,
                             BuildExecutorCache cache,
                             boolean rebuild,
-                            boolean aggregate) throws IOException {
+                            boolean aggregate,
+                            int concurrency) throws IOException {
+        if (concurrency < 0) {
+            throw new IllegalArgumentException("Concurrency must not be negative: " + concurrency);
+        }
         if (rebuild && Files.isDirectory(target)) {
             Files.walkFileTree(target, new SimpleFileVisitor<>() {
                 @Override
@@ -100,7 +110,7 @@ public interface BuildExecutor {
                 }
             });
         }
-        BuildExecutor executor = new BuildExecutorDefault(target, timeout, hash, stepHash, callback, cache, aggregate, "", Map.of());
+        BuildExecutor executor = new BuildExecutorDefault(target, timeout, hash, stepHash, callback, cache, aggregate, concurrency == 0 ? null : new BuildExecutorDefault.Permits(concurrency), "", Map.of());
         Path canonical = target.toAbsolutePath().normalize();
         FileChannel channel = FileChannel.open(target.resolve(LOCK_MARKER),
                 StandardOpenOption.CREATE,

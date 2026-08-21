@@ -140,7 +140,8 @@ public class BuildExecutorFileCacheTest implements Serializable {
                 BuildExecutorCallback.nop(),
                 cache,
                 false,
-                false);
+                false,
+                0);
         first.addSource("source", source);
         first.addStep("step", buildStep, "source");
         first.execute(Runnable::run).toCompletableFuture().join();
@@ -154,7 +155,8 @@ public class BuildExecutorFileCacheTest implements Serializable {
                 BuildExecutorCallback.nop(),
                 cache,
                 false,
-                false);
+                false,
+                0);
         second.addSource("source", source);
         second.addStep("step", buildStep, "source");
         second.execute(Runnable::run).toCompletableFuture().join();
@@ -200,7 +202,8 @@ public class BuildExecutorFileCacheTest implements Serializable {
                 BuildExecutorCallback.nop(),
                 cache,
                 false,
-                false);
+                false,
+                0);
         first.addSource("source", source);
         first.addStep("step", buildStep, "source");
         first.execute(Runnable::run).toCompletableFuture().join();
@@ -216,7 +219,8 @@ public class BuildExecutorFileCacheTest implements Serializable {
                 BuildExecutorCallback.nop(),
                 cache,
                 false,
-                false);
+                false,
+                0);
         second.addSource("source", source);
         second.addStep("step", buildStep, "source");
         second.execute(Runnable::run).toCompletableFuture().join();

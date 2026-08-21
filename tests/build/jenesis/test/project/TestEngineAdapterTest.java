@@ -232,7 +232,8 @@ public class TestEngineAdapterTest {
                 BuildExecutorCallback.nop(),
                 BuildExecutorCache.nop(),
                 false,
-                false);
+                false,
+                0);
     }
 
     private static SequencedProperties readRequires(Path root) throws IOException {

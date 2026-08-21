@@ -1299,6 +1299,9 @@ public record Project(
                                                         for content and
                                                         serialization hashes
                                                         (default MD5).
+                      -Djenesis.executor.concurrency=<n>  Run at most n build
+                                                        steps at once (default
+                                                        0: no limit).
                     
                     Printing (-Djenesis.print.<key>=<value>):
                       -Djenesis.print.progress=false      Suppress the build

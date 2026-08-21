@@ -71,6 +71,6 @@ public class ScalastyleModuleRunTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
     }
 }
