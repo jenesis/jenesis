@@ -32,6 +32,6 @@
         </dependency>
     </dependencies>
     <!--jenesis.pin
-    launcher/maven/build.jenesis/build.jenesis.launcher 0.2.0 SHA-256/0a1865acddc82c6d57a52a9343f1b698e647f376cdf93c3c2527bf17b91e6d29
+    launcher/maven/build.jenesis/build.jenesis.launcher 0.3.1 SHA-256/720f9c1710ce6d498c2591f11d365423b9f1b76190d1bdca6920f381c32bf05c
     -->
 </project>
