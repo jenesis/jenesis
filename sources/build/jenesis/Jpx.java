@@ -388,9 +388,6 @@ public record Jpx(Path storage,
             throw new IllegalStateException("The jar resolved for module " + command.name() + " is named "
                     + (descriptor == null ? "nothing" : descriptor.name()) + " - the repository mapping appears stale");
         }
-        // A coordinate names an artifact rather than a module, so it and its dependencies run on the class
-        // path in full. A module name runs as a module: placed jar by jar as each describes one, or - where
-        // this Jpx resolves over module descriptors - on the module path throughout.
         PathPlacement placement = coordinate ? PathPlacement.CLASS_PATH : this.placement;
         String mainModule = placement.modular() && descriptor != null ? descriptor.name() : null;
         String mainClass = descriptor == null || descriptor.mainClass().isEmpty()
