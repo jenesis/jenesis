@@ -179,7 +179,7 @@ class BuildExecutorDefault implements BuildExecutor {
                                 } catch (Throwable t) {
                                     return CompletableFuture.failedStage(t);
                                 }
-                            }, executor).whenComplete((_, _) -> permits.release());
+                            }, executor).whenCompleteAsync((_, _) -> permits.release(), executor);
                         }
                         if (!timeout.isZero()) {
                             stepStage = stepStage.toCompletableFuture().orTimeout(
