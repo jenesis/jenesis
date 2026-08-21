@@ -15,6 +15,7 @@ class BuildExecutorDefault implements BuildExecutor {
     private final BuildExecutorCallback callback;
     private final BuildExecutorCache cache;
     private final boolean aggregate;
+    private final Permits permits;
     private final String location;
 
     private final Map<String, StepSummary> inherited;
@@ -27,6 +28,7 @@ class BuildExecutorDefault implements BuildExecutor {
                          BuildExecutorCallback callback,
                          BuildExecutorCache cache,
                          boolean aggregate,
+                         Permits permits,
                          String location,
                          Map<String, StepSummary> inherited) throws IOException {
         this.target = Files.isDirectory(target) ? target : Files.createDirectory(target);
@@ -36,6 +38,7 @@ class BuildExecutorDefault implements BuildExecutor {
         this.callback = callback;
         this.cache = cache;
         this.aggregate = aggregate;
+        this.permits = permits;
         this.location = location;
         this.inherited = inherited;
     }
@@ -163,9 +166,21 @@ class BuildExecutorDefault implements BuildExecutor {
                     if (fromCache) {
                         stepStage = CompletableFuture.completedStage(cached.get());
                     } else {
-                        stepStage = step.apply(executor,
-                                new BuildStepContext(consistent ? previous.output() : null, nextOutput, nextSupplement),
-                                arguments);
+                        BuildStepContext context = new BuildStepContext(
+                                consistent ? previous.output() : null,
+                                nextOutput,
+                                nextSupplement);
+                        if (permits == null) {
+                            stepStage = step.apply(executor, context, arguments);
+                        } else {
+                            stepStage = permits.acquire().thenComposeAsync(_ -> {
+                                try {
+                                    return step.apply(executor, context, arguments);
+                                } catch (Throwable t) {
+                                    return CompletableFuture.failedStage(t);
+                                }
+                            }, executor).whenComplete((_, _) -> permits.release());
+                        }
                         if (!timeout.isZero()) {
                             stepStage = stepStage.toCompletableFuture().orTimeout(
                                     timeout.toNanos(),
@@ -307,6 +322,7 @@ class BuildExecutorDefault implements BuildExecutor {
                             callback,
                             cache,
                             aggregate,
+                            permits,
                             location + prefix + "/",
                             inherited);
                     module.accept(buildExecutor, folders);
@@ -715,6 +731,41 @@ class BuildExecutorDefault implements BuildExecutor {
                 Files.delete(dir);
             }
             return FileVisitResult.CONTINUE;
+        }
+    }
+
+    static final class Permits {
+
+        private final Deque<CompletableFuture<Void>> waiting = new ArrayDeque<>();
+        private int available;
+
+        Permits(int available) {
+            this.available = available;
+        }
+
+        CompletionStage<Void> acquire() {
+            synchronized (this) {
+                if (available > 0) {
+                    available--;
+                    return CompletableFuture.completedStage(null);
+                }
+                CompletableFuture<Void> future = new CompletableFuture<>();
+                waiting.add(future);
+                return future;
+            }
+        }
+
+        void release() {
+            CompletableFuture<Void> next;
+            synchronized (this) {
+                next = waiting.poll();
+                if (next == null) {
+                    available++;
+                }
+            }
+            if (next != null) {
+                next.complete(null);
+            }
         }
     }
 }

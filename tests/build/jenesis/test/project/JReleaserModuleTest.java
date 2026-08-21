@@ -104,7 +104,7 @@ public class JReleaserModuleTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         buildExecutor.addSource("source", source);
         buildExecutor.addModule("release", new ReleaseModule(root, version), "source");
         return buildExecutor.execute(selector);

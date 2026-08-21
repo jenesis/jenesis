@@ -123,7 +123,7 @@ public class JaCoCoModuleRunTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
     }
 
     private static void compileSources(Path classesDir, List<Path> classpath, Map<String, String> units)

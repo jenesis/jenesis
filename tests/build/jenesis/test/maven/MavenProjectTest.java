@@ -62,7 +62,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(results).containsKeys("maven/module-/manifests",
@@ -130,7 +130,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         for (String manifests : List.of("maven/module-/manifests", "maven/test-module-/manifests")) {
@@ -175,7 +175,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         Path module = results.get("maven/module-/manifests");
@@ -220,7 +220,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         for (String manifests : List.of("maven/module-/manifests", "maven/test-module-/manifests")) {
@@ -250,7 +250,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         for (String manifests : List.of("maven/module-/manifests", "maven/test-module-/manifests")) {
@@ -281,7 +281,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
@@ -331,7 +331,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
 
@@ -390,7 +390,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         SequencedProperties mainExclusions = SequencedProperties.ofFiles(
@@ -445,7 +445,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(results).containsKeys("maven/module-/manifests", "maven/module-subproject/manifests");
@@ -516,7 +516,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(results).containsKeys("maven/module-/manifests",
@@ -555,7 +555,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(results).containsKeys("maven/module-/manifests",
@@ -584,7 +584,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(results).containsKeys("maven/test-module-/manifests",
@@ -623,7 +623,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(results).containsKeys("maven/test-module-/manifests",
@@ -695,7 +695,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         root.addModule("maven", MavenProject.make(project,
                 "main",
                 "maven",
@@ -814,7 +814,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         Path module = results.get("maven/module-/manifests");
@@ -850,7 +850,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         SequencedProperties versions = SequencedProperties.ofFiles(
@@ -881,7 +881,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         SequencedProperties versions = SequencedProperties.ofFiles(
@@ -913,7 +913,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
@@ -942,7 +942,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver)
                 .platform(Platform.of("windows,x86_64")));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
@@ -971,7 +971,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver)
                 .platform(Platform.of("linux,x86_64")));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
@@ -998,7 +998,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         Path module = results.get("maven/module-/manifests");
@@ -1052,7 +1052,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         Path module = results.get("maven/module-/manifests");
@@ -1109,7 +1109,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         SequencedProperties versions = SequencedProperties.ofFiles(results.get("maven/module-/manifests")
@@ -1148,7 +1148,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
 
@@ -1183,7 +1183,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         SequencedProperties mainModule = SequencedProperties.ofFiles(
@@ -1210,7 +1210,7 @@ public class MavenProjectTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
         SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
         SequencedProperties mainModule = SequencedProperties.ofFiles(

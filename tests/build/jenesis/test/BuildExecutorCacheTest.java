@@ -34,7 +34,8 @@ public class BuildExecutorCacheTest implements Serializable {
                 BuildExecutorCallback.nop(),
                 cache,
                 false,
-                false);
+                false,
+                0);
         BuildStep buildStep = (_, _, _) -> {
             throw new AssertionError("Did not expect that step is executed");
         };
@@ -63,7 +64,8 @@ public class BuildExecutorCacheTest implements Serializable {
                 BuildExecutorCallback.nop(),
                 cache,
                 false,
-                false);
+                false,
+                0);
         BuildStep buildStep = (_, context, arguments) -> {
             Files.writeString(
                     context.next().resolve("file"),
@@ -111,7 +113,8 @@ public class BuildExecutorCacheTest implements Serializable {
                 BuildExecutorCallback.nop(),
                 cache,
                 false,
-                false);
+                false,
+                0);
         buildExecutor.addSource("source", source);
         buildExecutor.addStep("step", buildStep, "source");
         buildExecutor.execute(Runnable::run).toCompletableFuture().join();
@@ -148,7 +151,8 @@ public class BuildExecutorCacheTest implements Serializable {
                 BuildExecutorCallback.nop(),
                 cache,
                 false,
-                false);
+                false,
+                0);
         BuildStep buildStep = (_, context, arguments) -> {
             Files.writeString(
                     context.next().resolve("file"),
@@ -175,7 +179,8 @@ public class BuildExecutorCacheTest implements Serializable {
                 BuildExecutorCallback.nop(),
                 cache,
                 false,
-                false);
+                false,
+                0);
         BuildStep buildStep = (_, context, arguments) -> {
             Files.writeString(
                     context.next().resolve("file"),
@@ -204,7 +209,8 @@ public class BuildExecutorCacheTest implements Serializable {
                 BuildExecutorCallback.nop(),
                 cache,
                 false,
-                false);
+                false,
+                0);
         BuildStep buildStep = (_, _, _) -> {
             throw new AssertionError("Did not expect that step is executed");
         };

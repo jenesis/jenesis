@@ -762,7 +762,7 @@ public class TestModuleTest {
                         };
                     }
                 },
-                BuildExecutorCache.nop(), false, false);
+                BuildExecutorCache.nop(), false, false, 0);
         executor.addSource("dependencies", dependencies);
         executor.addSource("classes", classes);
         TestModule module = new TestModule(Map.of("maven", new MavenDefaultRepository(
@@ -785,7 +785,7 @@ public class TestModuleTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false);
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
     }
 
     private static SequencedProperties readRequires(Path stepFolder) throws IOException {
