@@ -30,11 +30,16 @@ construct seems to need a comment, restructure it or name it better. The one pla
 `module-info.java`, because the `@jenesis.*` tags there (`@jenesis.main`, `@jenesis.test`, `@jenesis.pin`,
 …) are configuration the tool reads, not commentary.
 
-**Java 25, the JDK alone.** Every file starts with `import module java.base;` (plus `jdk.compiler` or
-`java.xml` where used). Records, sealed types, pattern switches and unnamed variables (`_`) are the normal
-idiom. The sources depend on no library: `jdk.compiler` and `java.xml` are the only `requires`. A tool the
-build needs at run time - a compiler, a linter, a packager - is resolved as a dependency in its own group and
-forked or loaded in a layer, never added to the module's own `requires`.
+**Zero dependencies.** The tool ships as source, vendored into every project that uses it, and runs with a
+JDK and nothing else - that is the promise, and it is not negotiable. `build.jenesis` `requires` only
+`jdk.compiler` and `java.xml`; there is no third-party library anywhere in `sources/`, and none is added for
+convenience. What the JDK does not provide is written against what it does: JSON is `Json.java` over
+`java.base`, HTTP is `HttpURLConnection`, XML is `java.xml`. A tool the build needs at run time - a compiler, a
+linter, a packager - is resolved as a dependency in its own group and forked or loaded in a module layer,
+never added to the module's own `requires`.
+
+**Java 25 idiom.** Every file starts with `import module java.base;` (plus `jdk.compiler` or `java.xml` where
+used). Records, sealed types, pattern switches and unnamed variables (`_`) are the normal idiom.
 
 **Immutable records with withers.** Configuration objects are records or final classes whose state never
 changes after construction. Each exposes one method per component, named exactly like the component, that
