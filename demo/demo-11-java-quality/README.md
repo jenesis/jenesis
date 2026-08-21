@@ -136,11 +136,12 @@ rewrite, a plain `java build/jenesis/Project.java` passes the verify gate again.
 Pinning
 -------
 
-Each tool resolves a floating `RELEASE` in its own group (`checkstyle`, `pmd`,
-`spotbugs`, `google-java-format`), kept separate from the module's `main`-group
-dependencies. Running `java build/jenesis/Project.java pin` records every
-resolved tool jar with its `SHA-256` into `@jenesis.pin` tags, exactly as the
-other demos pin their compilers. These closures are large (PMD's CLI bundle
-alone pulls in well over a hundred artifacts), so this demo leaves them floating
-to keep the descriptor readable; pin them when you want a reproducible,
-checksum-verified tool chain.
+Each tool resolves in its own group (`checkstyle`, `pmd`, `spotbugs`,
+`google-java-format`), kept separate from the module's `main`-group
+dependencies, and floats a `RELEASE` version until pinned. Running
+`java build/jenesis/Project.java pin` records every resolved tool jar with its
+`SHA-256` into `@jenesis.pin` tags, exactly as the other demos pin their
+compilers. These closures are large (PMD's CLI bundle alone pulls in well over a
+hundred artifacts), which is why the `module-info.java` here carries so many pin
+lines: the demo builds under strict pinning, so the whole tool chain is
+checksum-verified.
