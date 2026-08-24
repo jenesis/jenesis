@@ -103,7 +103,9 @@ documented; a property that exists only in the code and not on jenesis.build is 
 
 ## Releasing and downstream
 
-A release is a commit on `main` whose first line starts with `[release X.Y.Z]`; after the test workflow passes,
-the release workflow stages, signs, publishes to Maven Central, SDKMAN, Homebrew and Scoop, and cuts the
-`vX.Y.Z` tag. `jenesis-launcher`, `jenesis-modules` and `jenesis-repository` pin this repository as the
-`.jenesis/upstream` git submodule; after a release they are moved to the release commit.
+A release is a manual run of the release workflow from the Actions tab, so any commit is releasable: its
+optional `sha` input names the commit (default: the head it runs on) and its optional `tag` input names the
+tag (default: the next minor of the highest `vX.Y.Z` tag). The workflow stages, signs, publishes to Maven
+Central, SDKMAN, Homebrew and Scoop, and cuts the `vX.Y.Z` tag. `jenesis-launcher`, `jenesis-modules` and
+`jenesis-repository` pin this repository as the `.jenesis/upstream` git submodule; after a release they are
+moved to the release commit.

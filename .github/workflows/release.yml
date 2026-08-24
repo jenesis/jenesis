@@ -1,17 +1,19 @@
 name: Release Jenesis
 
 on:
-  workflow_run:
-    workflows: [Test Jenesis Tool]
-    types: [completed]
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit to release; defaults to the head this workflow runs on
+        required: false
+        type: string
+      tag:
+        description: Tag to cut, vX.Y.Z; defaults to the next minor of the latest tag
+        required: false
+        type: string
 
 jobs:
   release:
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      (startsWith(github.event.workflow_run.head_commit.message, '[release]') ||
-       startsWith(github.event.workflow_run.head_commit.message, '[release '))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -20,21 +22,20 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ inputs.sha || github.sha }}
 
       - name: Resolve release version
         id: version
         env:
-          MESSAGE: ${{ github.event.workflow_run.head_commit.message }}
+          TAG: ${{ inputs.tag }}
         run: |
-          HEADER="$(printf '%s\n' "$MESSAGE" | head -n1)"
-          VERSION="$(echo "$HEADER" | sed -nE 's/^\[release[[:space:]]+v?([0-9]+\.[0-9]+\.[0-9]+)\].*$/\1/p')"
-          if [ -z "$VERSION" ]; then
-            STRAY="$(echo "$HEADER" | sed -nE 's/^\[release\][[:space:]]+v?([0-9]+\.[0-9]+\.[0-9]+).*$/\1/p')"
-            if [ -n "$STRAY" ]; then
-              echo "Version '$STRAY' must be inside the marker: use '[release $STRAY]', not '[release] $STRAY'." >&2
+          if [ -n "$TAG" ]; then
+            VERSION="$(printf '%s' "$TAG" | sed -nE 's/^v?([0-9]+\.[0-9]+\.[0-9]+)$/\1/p')"
+            if [ -z "$VERSION" ]; then
+              echo "Tag '$TAG' is not a release tag: pass vX.Y.Z or X.Y.Z, e.g. v1.2.3." >&2
               exit 1
             fi
+          else
             LATEST="$(git tag --list --sort=-v:refname | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 | sed 's/^v//')"
             if [ -z "$LATEST" ]; then
               VERSION="0.0.1"
@@ -44,7 +45,7 @@ jobs:
               VERSION="${MAJOR}.$((MINOR + 1)).0"
             fi
           fi
-          echo "Resolved release version: $VERSION"
+          echo "Releasing $VERSION as tag v$VERSION from $(git rev-parse HEAD)"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK 25
