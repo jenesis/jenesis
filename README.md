@@ -117,10 +117,12 @@ Continuous integration
 Releasing
 ---------
 
-A release is triggered by a commit on `main` whose first line starts with `[release]`:
+A release is triggered by running the **Release Jenesis** workflow from the Actions tab. Both of its inputs
+are optional:
 
-- `[release 1.2.3]` releases that exact version;
-- `[release]` alone takes the highest `vX.Y.Z` tag and bumps the minor (`v0.9.0` → `0.10.0`).
+- `sha` releases that commit; left empty, the head of the branch the workflow runs on is released.
+- `tag` releases under that tag (`v1.2.3` or `1.2.3`); left empty, the highest `vX.Y.Z` tag is taken and the
+  minor bumped (`v0.9.0` → `0.10.0`). A tag that is not `vX.Y.Z` is rejected.
 
 The workflow builds with `jenesis.project.version` set, then hands `target/stage/maven/output/` to
 [JReleaser](https://jreleaser.org) (`jreleaser.yml`), which signs and uploads to Maven Central, publishes the
