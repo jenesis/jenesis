@@ -468,6 +468,20 @@ public record Project(
                       %{name}docker.mountWritable%{reset} <h[:c],...> Extra writable container mounts
                       %{name}docker.env%{reset} <N[=V],...>           Forward host env vars (name) or set them (name=value)
                     
+                    %{header}Executor (-Djenesis.executor.<key>=<value>):%{reset}
+                      %{name}concurrency%{reset} <n>                  Run at most <n> build steps at once; %{name}0%{reset} (the
+                                                       default) leaves the build unbounded, and a negative
+                                                       value is rejected
+                      %{name}timeout%{reset} <duration>               Abort a step that outruns this ISO-8601 duration
+                                                       (default: PT0S, no timeout)
+                      %{name}digest%{reset} <algorithm>               MessageDigest algorithm behind the content and
+                                                       step hashes that drive the cache (default: MD5)
+                      %{name}rebuild%{reset}                          Wipe target/ before building so every step
+                                                       recomputes (default: false); prefer letting the
+                                                       incremental cache decide what is stale
+                      %{name}aggregate%{reset}                        Collect independent step failures into one report
+                                                       instead of failing at the first (default: false)
+
                     %{header}Printing (-Djenesis.print.<key>=<value>):%{reset}
                       %{name}progress%{reset}                         Print the build progress lines (default: true)
                       %{name}checksum%{reset}                         Print each step's input/output file checksums
@@ -1323,6 +1337,10 @@ public record Project(
                       -Djenesis.executor.concurrency=<n>  Run at most n build
                                                         steps at once (default
                                                         0: no limit).
+                      -Djenesis.executor.aggregate=true  Collect independent step
+                                                        failures into one report
+                                                        instead of failing at
+                                                        the first.
                     
                     Printing (-Djenesis.print.<key>=<value>):
                       -Djenesis.print.progress=false      Suppress the build
