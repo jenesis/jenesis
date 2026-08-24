@@ -12,7 +12,7 @@ import build.jenesis.SequencedProperties;
 public class Tree implements BuildStep {
 
     private final transient PrintStream out;
-    private final transient boolean compact;
+    private final transient DependencyTreeReport.Format format;
 
     public Tree() {
         this(System.out);
@@ -21,16 +21,17 @@ public class Tree implements BuildStep {
     public Tree(PrintStream out) {
         String format = System.getProperty("jenesis.tree.format", "full");
         this(out, switch (format) {
-            case "full" -> false;
-            case "compact" -> true;
+            case "full" -> DependencyTreeReport.Format.FULL;
+            case "compact" -> DependencyTreeReport.Format.COMPACT;
+            case "main" -> DependencyTreeReport.Format.MAIN;
             default -> throw new IllegalArgumentException(
-                    "Unknown jenesis.tree.format '" + format + "', expected 'full' or 'compact'");
+                    "Unknown jenesis.tree.format '" + format + "', expected 'full', 'compact' or 'main'");
         });
     }
 
-    public Tree(PrintStream out, boolean compact) {
+    public Tree(PrintStream out, DependencyTreeReport.Format format) {
         this.out = out;
-        this.compact = compact;
+        this.format = format;
     }
 
     @Override
@@ -43,7 +44,7 @@ public class Tree implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        DependencyTreeReport report = new DependencyTreeReport(out, compact);
+        DependencyTreeReport report = new DependencyTreeReport(out, format);
         SequencedMap<String, Resolver.Vertex> aggregated = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -66,6 +67,9 @@ public class Tree implements BuildStep {
                 continue;
             }
             String prefix = candidate;
+            if (format == DependencyTreeReport.Format.MAIN && inventory.getProperty(prefix + ".test") != null) {
+                continue;
+            }
             List<Path> graphs = Inventory.paths(inventory, argument.folder(), prefix + ".graph");
             List<Path> licenses = Inventory.paths(inventory, argument.folder(), prefix + ".licenses");
             SequencedMap<String, Resolver.Resolution> resolutions = Dependencies.graph(graphs, licenses);

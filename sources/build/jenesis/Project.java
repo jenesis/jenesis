@@ -510,6 +510,13 @@ public record Project(
                       descriptors that disagree about a module's version. A pinned module
                       takes its pin under every mode.
 
+                    %{header}Dependency tree (-Djenesis.tree.format=<mode>):%{reset}
+                      What the %{name}dependencies%{reset} selector prints. %{name}full%{reset} (the default) prints
+                      every module's graph in full; %{name}compact%{reset} keeps only the modules the
+                      build produces itself and folds the external closure into counts;
+                      %{name}main%{reset} renders that compact graph without the modules that are
+                      declared as the test variant of another module.
+
                     %{header}Pin step (-Djenesis.pin.<key>=<value>):%{reset}
                       %{name}checksum%{reset} <true|false>          Record content checksums in pins (default: true);
                                                        false writes versions only
@@ -1200,6 +1207,20 @@ public record Project(
                                                   rejects two descriptors that
                                                   disagree. A pinned module takes
                                                   its pin under every mode.
+
+                    Dependency tree:
+                      -Djenesis.tree.format=full|compact|main
+                                                  What the dependencies selector
+                                                  prints. full (the default)
+                                                  prints every module's graph in
+                                                  full; compact keeps only the
+                                                  modules the build produces
+                                                  itself and folds the external
+                                                  closure into counts; main
+                                                  renders that compact graph
+                                                  without the modules declared as
+                                                  the test variant of another
+                                                  module.
 
                     Pin step:
                       -Djenesis.pin.checksum=true|false
