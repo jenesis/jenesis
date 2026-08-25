@@ -38,7 +38,13 @@ public abstract class ProcessBuildStep implements BuildStep {
     protected ProcessBuildStep(String command,
                                Function<List<String>, ? extends ProcessHandler> factory,
                                boolean verbose) {
-        this(command, factory, verbose, shared(Integer.getInteger("jenesis.process.concurrency", 0)));
+        int concurrency = Integer.getInteger("jenesis.process.concurrency", 0);
+        if (concurrency < 0) {
+            throw new IllegalArgumentException("Process concurrency must not be negative: " + concurrency);
+        }
+        this(command, factory, verbose, concurrency == 0
+                ? null
+                : PERMITS.computeIfAbsent(concurrency, Semaphore::new));
     }
 
     protected ProcessBuildStep(String command,
@@ -49,13 +55,6 @@ public abstract class ProcessBuildStep implements BuildStep {
         this.factory = factory;
         this.verbose = verbose;
         this.permits = permits;
-    }
-
-    private static Semaphore shared(int concurrency) {
-        if (concurrency < 0) {
-            throw new IllegalArgumentException("Process concurrency must not be negative: " + concurrency);
-        }
-        return concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Semaphore::new);
     }
 
     private static Charset nativeEncoding() {
