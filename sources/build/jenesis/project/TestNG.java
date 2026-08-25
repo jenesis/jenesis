@@ -1,6 +1,7 @@
 package build.jenesis.project;
 
 import module java.base;
+import build.jenesis.BuildStep;
 
 public record TestNG() implements TestEngine {
 
@@ -37,7 +38,9 @@ public record TestNG() implements TestEngine {
                                  SequencedSet<String> groups,
                                  boolean parallel,
                                  boolean reporting) {
-        List<String> commands = new ArrayList<>(List.of("-d", supplement.resolve("test-output").toString()));
+        List<String> commands = new ArrayList<>(List.of("-d", (reporting
+                ? output.resolve(BuildStep.REPORTS + "tests")
+                : supplement.resolve("test-output")).toString()));
         if (!groups.isEmpty()) {
             commands.add("-groups");
             commands.add(String.join(",", groups));

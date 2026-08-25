@@ -56,8 +56,10 @@ public record JUnitPlatform() implements TestEngine {
             commands.add("--config=junit.jupiter.execution.parallel.mode.default=concurrent");
         }
         if (reporting) {
+            Path reports = output.resolve(BuildStep.REPORTS + "tests");
+            commands.add("--reports-dir=" + reports);
             commands.add("--config=junit.platform.reporting.open.xml.enabled=true");
-            commands.add("--config=junit.platform.reporting.output.dir=" + output.resolve(BuildStep.REPORTS + "tests"));
+            commands.add("--config=junit.platform.reporting.output.dir=" + reports);
         }
         for (String className : classes) {
             commands.add("--select-class=" + className);

@@ -144,9 +144,10 @@ Passing `-Djenesis.test.parallel` runs the matched tests in parallel, letting
 the test framework execute them concurrently where its configuration allows.
 
 Three more switches round out the test wiring. `-Djenesis.test.reporting=true`
-writes a machine-readable JUnit open-test-reporting XML into the module's
-`reports/tests`, next to the console summary. `-Djenesis.test.skip=true` skips the
-test step entirely - handy when staging an artifact whose tests have already run.
+writes machine-readable reports into the module's `reports/tests`, next to the
+console summary: the legacy JUnit XML that CI report plugins read, and the JUnit
+open-test-reporting XML. `-Djenesis.test.skip=true` skips the test step entirely
+- handy when staging an artifact whose tests have already run.
 And on a `stage` build, `-Djenesis.stage.tests=true` also stages the module's
 `tests`-classifier variant beside the main jar, so the test artifact is published
 too (by default only the main artifact is staged).
