@@ -14,6 +14,8 @@ public abstract class ProcessBuildStep implements BuildStep {
 
     private static final Charset NATIVE_ENCODING = nativeEncoding();
 
+    private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
+
     static {
         if (System.getProperty("java.home") == null) {
             String home = System.getenv("JAVA_HOME");
@@ -27,6 +29,7 @@ public abstract class ProcessBuildStep implements BuildStep {
     protected final transient Function<List<String>, ? extends ProcessHandler> factory;
     private final String command;
     protected final transient boolean verbose;
+    private final transient Semaphore permits;
 
     protected ProcessBuildStep(String command, Function<List<String>, ? extends ProcessHandler> factory) {
         this(command, factory, printing(command));
@@ -35,9 +38,24 @@ public abstract class ProcessBuildStep implements BuildStep {
     protected ProcessBuildStep(String command,
                                Function<List<String>, ? extends ProcessHandler> factory,
                                boolean verbose) {
+        this(command, factory, verbose, shared(Integer.getInteger("jenesis.process.concurrency", 0)));
+    }
+
+    protected ProcessBuildStep(String command,
+                               Function<List<String>, ? extends ProcessHandler> factory,
+                               boolean verbose,
+                               Semaphore permits) {
         this.command = command;
         this.factory = factory;
         this.verbose = verbose;
+        this.permits = permits;
+    }
+
+    private static Semaphore shared(int concurrency) {
+        if (concurrency < 0) {
+            throw new IllegalArgumentException("Process concurrency must not be negative: " + concurrency);
+        }
+        return concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Semaphore::new);
     }
 
     private static Charset nativeEncoding() {
@@ -61,6 +79,19 @@ public abstract class ProcessBuildStep implements BuildStep {
 
     protected List<String> commands() {
         return List.of(command);
+    }
+
+    protected int execute(ProcessHandler handler, Path output, Path error, ProcessHandler.Tee tee)
+            throws IOException, InterruptedException {
+        if (permits == null) {
+            return handler.execute(output, error, tee);
+        }
+        permits.acquire();
+        try {
+            return handler.execute(output, error, tee);
+        } finally {
+            permits.release();
+        }
     }
 
     protected ProcessHandler.Tee tee(Executor executor, ProcessHandler handler) {
@@ -153,7 +184,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                 executor.execute(() -> {
                     worker.set(Thread.currentThread());
                     try {
-                        int exitCode = handler.execute(output, error, tee);
+                        int exitCode = execute(handler, output, error, tee);
                         if (acceptableExitCode(exitCode, executor, context, arguments)) {
                             future.complete(new BuildStepResult(true));
                         } else {

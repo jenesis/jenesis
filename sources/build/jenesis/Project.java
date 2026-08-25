@@ -482,6 +482,17 @@ public record Project(
                       %{name}aggregate%{reset}                        Collect independent step failures into one report
                                                        instead of failing at the first (default: false)
 
+                    %{header}Tool execution (-Djenesis.process.<key>=<value>):%{reset}
+                      %{name}concurrency%{reset} <n>                  Run at most <n> JDK tool runs at once, across every
+                                                       step that runs one; %{name}0%{reset} (the default) leaves them
+                                                       unbounded, and a negative value is rejected. It
+                                                       caps the tools underneath the step limit above,
+                                                       which counts every kind of step
+                      %{name}factory%{reset} <tool|fork>              How a JDK tool runs: %{name}tool%{reset} (the default) invokes it
+                                                       in-process through its ToolProvider, %{name}fork%{reset} starts
+                                                       a separate process for it, which a stricter
+                                                       sandbox can require
+
                     %{header}Printing (-Djenesis.print.<key>=<value>):%{reset}
                       %{name}progress%{reset}                         Print the build progress lines (default: true)
                       %{name}checksum%{reset}                         Print each step's input/output file checksums
@@ -1414,6 +1425,12 @@ public record Project(
                                                         of invoking them
                                                         in-process. Use under
                                                         stricter sandboxes.
+                      -Djenesis.process.concurrency=<n>
+                                                        Run at most n JDK tool
+                                                        runs at once, across
+                                                        every step that runs one.
+                                                        0 (the default) leaves
+                                                        them unbounded.
                     
                     10. Launch a built main class with the Execute companion
                     --------------------------------------------------------
