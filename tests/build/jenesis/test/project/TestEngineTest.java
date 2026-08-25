@@ -175,7 +175,7 @@ public class TestEngineTest {
     }
 
     @Test
-    public void junit_platform_commands_add_open_test_reporting_when_enabled() {
+    public void junit_platform_commands_add_both_report_formats_when_enabled() {
         assertThat(new JUnitPlatform().commands(root,
                 root,
                 Collections.emptyNavigableSet(),
@@ -183,7 +183,8 @@ public class TestEngineTest {
                 Collections.emptyNavigableSet(),
                 false,
                 true))
-                .contains("--config=junit.platform.reporting.open.xml.enabled=true",
+                .contains("--reports-dir=" + root.resolve(BuildStep.REPORTS + "tests"),
+                        "--config=junit.platform.reporting.open.xml.enabled=true",
                         "--config=junit.platform.reporting.output.dir=" + root.resolve(BuildStep.REPORTS + "tests"));
         assertThat(new JUnitPlatform().commands(root,
                 root,
@@ -192,7 +193,20 @@ public class TestEngineTest {
                 Collections.emptyNavigableSet(),
                 false,
                 false))
-                .noneMatch(command -> command.startsWith("--config=junit.platform.reporting."));
+                .noneMatch(command -> command.startsWith("--reports-dir")
+                        || command.startsWith("--config=junit.platform.reporting."));
+    }
+
+    @Test
+    public void testng_writes_its_report_into_the_reports_folder_when_enabled() {
+        assertThat(new TestNG().commands(root,
+                root,
+                Collections.emptyNavigableSet(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableSet(),
+                false,
+                true))
+                .containsExactly("-d", root.resolve(BuildStep.REPORTS + "tests").toString());
     }
 
     @Test
