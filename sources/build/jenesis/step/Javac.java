@@ -430,7 +430,7 @@ public class Javac extends JdkProcessBuildStep {
         CompletableFuture<Void> future = new CompletableFuture<>();
         executor.execute(() -> {
             try {
-                int exitCode = handler.execute(output, error, tee);
+                int exitCode = execute(handler, output, error, tee);
                 if (exitCode == 0) {
                     future.complete(null);
                 } else {

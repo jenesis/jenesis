@@ -4,10 +4,12 @@ import module java.base;
 import module org.junit.jupiter.api;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
+import build.jenesis.BuildStepResult;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class ProcessBuildStepTest {
 
@@ -16,6 +18,7 @@ public class ProcessBuildStepTest {
     public void clear() {
         System.clearProperty("jenesis.print.process");
         System.clearProperty("jenesis.print.probe");
+        System.clearProperty("jenesis.process.concurrency");
     }
 
     @TempDir
@@ -76,6 +79,113 @@ public class ProcessBuildStepTest {
         assertThat(new Probe(true).streams()).isTrue();
         System.setProperty("jenesis.print.process", "true");
         assertThat(new Probe(false).streams()).isFalse();
+    }
+
+    @Test
+    public void limits_the_processes_running_at_once() throws Exception {
+        AtomicInteger running = new AtomicInteger(), peak = new AtomicInteger();
+        Semaphore permits = new Semaphore(1);
+        run(() -> new Gated(counting(running, peak), permits));
+        assertThat(peak).hasValue(1);
+    }
+
+    @Test
+    public void shares_the_limit_of_the_property_between_steps() throws Exception {
+        System.setProperty("jenesis.process.concurrency", "2");
+        AtomicInteger running = new AtomicInteger(), peak = new AtomicInteger();
+        run(() -> new Gated(counting(running, peak)));
+        assertThat(peak).hasValueLessThanOrEqualTo(2);
+        assertThat(peak).hasValueGreaterThan(0);
+    }
+
+    @Test
+    public void runs_every_process_at_once_without_a_limit() throws Exception {
+        CountDownLatch started = new CountDownLatch(4);
+        run(() -> new Gated(new ToolProvider() {
+            @Override
+            public String name() {
+                return "gated";
+            }
+
+            @Override
+            public int run(PrintWriter out, PrintWriter err, String... arguments) {
+                started.countDown();
+                try {
+                    if (!started.await(10, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("Processes did not run concurrently");
+                    }
+                } catch (InterruptedException e) {
+                    throw new IllegalStateException(e);
+                }
+                return 0;
+            }
+        }));
+    }
+
+    @Test
+    public void rejects_a_negative_limit() {
+        System.setProperty("jenesis.process.concurrency", "-1");
+        assertThatThrownBy(Probe::new)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("-1");
+    }
+
+    private void run(Supplier<ProcessBuildStep> steps) throws Exception {
+        List<CompletionStage<BuildStepResult>> results = new ArrayList<>();
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int index = 0; index < 4; index++) {
+                Path folder = Files.createDirectories(root.resolve(Integer.toString(index)));
+                results.add(steps.get().apply(executor,
+                        new BuildStepContext(null,
+                                Files.createDirectory(folder.resolve("next")),
+                                Files.createDirectory(folder.resolve("supplement"))),
+                        new LinkedHashMap<>()));
+            }
+            for (CompletionStage<BuildStepResult> result : results) {
+                assertThat(result.toCompletableFuture().join().next()).isTrue();
+            }
+        }
+    }
+
+    private static ToolProvider counting(AtomicInteger running, AtomicInteger peak) {
+        return new ToolProvider() {
+            @Override
+            public String name() {
+                return "gated";
+            }
+
+            @Override
+            public int run(PrintWriter out, PrintWriter err, String... arguments) {
+                peak.accumulateAndGet(running.incrementAndGet(), Math::max);
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    throw new IllegalStateException(e);
+                } finally {
+                    running.decrementAndGet();
+                }
+                return 0;
+            }
+        };
+    }
+
+    private static final class Gated extends ProcessBuildStep {
+
+        private Gated(ToolProvider provider) {
+            super("gated", ProcessHandler.OfTool.of(provider), false);
+        }
+
+        private Gated(ToolProvider provider, Semaphore permits) {
+            super("gated", ProcessHandler.OfTool.of(provider), false, permits);
+        }
+
+        @Override
+        protected CompletionStage<List<String>> process(Executor executor,
+                                                        BuildStepContext context,
+                                                        SequencedMap<String, BuildStepArgument> arguments,
+                                                        SequencedMap<String, SequencedMap<String, String>> properties) {
+            return CompletableFuture.completedStage(List.of());
+        }
     }
 
     private static final class Probe extends ProcessBuildStep {
