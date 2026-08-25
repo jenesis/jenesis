@@ -12,7 +12,7 @@ import build.jenesis.SequencedProperties;
 public class Tree implements BuildStep {
 
     private final transient PrintStream out;
-    private final transient DependencyTreeReport.Format format;
+    private final transient boolean compact, tests;
 
     public Tree() {
         this(System.out);
@@ -21,17 +21,25 @@ public class Tree implements BuildStep {
     public Tree(PrintStream out) {
         String format = System.getProperty("jenesis.tree.format", "full");
         this(out, switch (format) {
-            case "full" -> DependencyTreeReport.Format.FULL;
-            case "compact" -> DependencyTreeReport.Format.COMPACT;
-            case "main" -> DependencyTreeReport.Format.MAIN;
+            case "full" -> false;
+            case "compact" -> true;
             default -> throw new IllegalArgumentException(
-                    "Unknown jenesis.tree.format '" + format + "', expected 'full', 'compact' or 'main'");
-        });
+                    "Unknown jenesis.tree.format '" + format + "', expected 'full' or 'compact'");
+        }, Boolean.parseBoolean(System.getProperty("jenesis.tree.tests", "true")));
     }
 
-    public Tree(PrintStream out, DependencyTreeReport.Format format) {
+    private Tree(PrintStream out, boolean compact, boolean tests) {
         this.out = out;
-        this.format = format;
+        this.compact = compact;
+        this.tests = tests;
+    }
+
+    public Tree compact(boolean compact) {
+        return new Tree(out, compact, tests);
+    }
+
+    public Tree tests(boolean tests) {
+        return new Tree(out, compact, tests);
     }
 
     @Override
@@ -44,7 +52,7 @@ public class Tree implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        DependencyTreeReport report = new DependencyTreeReport(out, format);
+        DependencyTreeReport report = new DependencyTreeReport(out, compact);
         SequencedMap<String, Resolver.Vertex> aggregated = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -67,7 +75,7 @@ public class Tree implements BuildStep {
                 continue;
             }
             String prefix = candidate;
-            if (format == DependencyTreeReport.Format.MAIN && inventory.getProperty(prefix + ".test") != null) {
+            if (!tests && inventory.getProperty(prefix + ".test") != null) {
                 continue;
             }
             List<Path> graphs = Inventory.paths(inventory, argument.folder(), prefix + ".graph");

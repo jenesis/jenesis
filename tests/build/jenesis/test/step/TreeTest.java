@@ -37,8 +37,7 @@ public class TreeTest {
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("Unknown jenesis.tree.format 'fancy'")
                     .hasMessageContaining("full")
-                    .hasMessageContaining("compact")
-                    .hasMessageContaining("main");
+                    .hasMessageContaining("compact");
         } finally {
             System.clearProperty("jenesis.tree.format");
         }
@@ -76,8 +75,8 @@ public class TreeTest {
     }
 
     @Test
-    public void main_format_omits_a_test_module() throws IOException {
-        System.setProperty("jenesis.tree.format", "main");
+    public void omits_a_test_module_when_tests_are_excluded() throws IOException {
+        System.setProperty("jenesis.tree.tests", "false");
         try {
             SequencedProperties graph = new SequencedProperties();
             graph.setProperty("edge/0", "main\tcompile\tmodule\ttrue\tcompile\t1.0\t\tmodule/foo/1.0");
@@ -111,7 +110,7 @@ public class TreeTest {
             assertThat(text).contains("module/foo");
             assertThat(text).doesNotContain("module/bar");
         } finally {
-            System.clearProperty("jenesis.tree.format");
+            System.clearProperty("jenesis.tree.tests");
         }
     }
 

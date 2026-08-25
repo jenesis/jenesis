@@ -4,10 +4,6 @@ import module java.base;
 
 public final class DependencyTreeReport {
 
-    public enum Format {
-        FULL, COMPACT, MAIN
-    }
-
     private static final int[] GRADIENT = {
             39, 44, 48, 83, 113, 148, 184, 214, 208, 203, 168, 134};
 
@@ -19,12 +15,12 @@ public final class DependencyTreeReport {
     }
 
     public DependencyTreeReport(PrintStream out) {
-        this(out, Format.FULL);
+        this(out, false);
     }
 
-    public DependencyTreeReport(PrintStream out, Format format) {
+    public DependencyTreeReport(PrintStream out, boolean compact) {
         this.out = out;
-        this.compact = format != Format.FULL;
+        this.compact = compact;
     }
 
     public void render(Resolver.Resolution resolution) {
