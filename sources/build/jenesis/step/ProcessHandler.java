@@ -58,15 +58,15 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
 
     final class OfTool implements ProcessHandler {
 
-        private static final Lock IMAGE = new ReentrantLock();
+        private static final Semaphore IMAGE = new Semaphore(1);
 
         private final ToolProvider toolProvider;
 
-        private final Lock exclusive;
+        private final Semaphore exclusive;
 
         private final List<String> commands;
 
-        private OfTool(ToolProvider toolProvider, Lock exclusive, List<String> commands) {
+        private OfTool(ToolProvider toolProvider, Semaphore exclusive, List<String> commands) {
             this.toolProvider = toolProvider;
             this.exclusive = exclusive;
             this.commands = commands;
@@ -79,7 +79,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         public static Function<List<String>, ProcessHandler> of(String name) {
             ToolProvider toolProvider = ToolProvider.findFirst(name)
                     .orElseThrow(() -> new IllegalArgumentException("No tool: " + name));
-            Lock exclusive = switch (name) {
+            Semaphore exclusive = switch (name) {
                 case "jlink", "jpackage" -> IMAGE;
                 default -> null;
             };
@@ -96,11 +96,11 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             if (exclusive == null) {
                 return run(output, error, tee);
             }
-            exclusive.lock();
+            exclusive.acquireUninterruptibly();
             try {
                 return run(output, error, tee);
             } finally {
-                exclusive.unlock();
+                exclusive.release();
             }
         }
 
