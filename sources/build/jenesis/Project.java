@@ -524,12 +524,15 @@ public record Project(
                       descriptors that disagree about a module's version. A pinned module
                       takes its pin under every mode.
 
-                    %{header}Dependency tree (-Djenesis.tree.format=<mode>):%{reset}
-                      What the %{name}dependencies%{reset} selector prints. %{name}full%{reset} (the default) prints
-                      every module's graph in full; %{name}compact%{reset} keeps only the modules the
-                      build produces itself and folds the external closure into counts;
-                      %{name}main%{reset} renders that compact graph without the modules that are
-                      declared as the test variant of another module.
+                    %{header}Dependency tree (-Djenesis.tree.<key>=<value>):%{reset}
+                      %{name}format%{reset} <full|compact>            What the %{name}dependencies%{reset} selector prints. %{name}full%{reset} (the
+                                                       default) prints every module's graph in full;
+                                                       %{name}compact%{reset} keeps only the modules the build produces
+                                                       itself and folds the external closure into counts
+                      %{name}tests%{reset} <true|false>               Print the modules that are declared as the test
+                                                       variant of another module (default: true); false
+                                                       leaves them out of either format, as they are not
+                                                       part of what the project releases
 
                     %{header}Pin step (-Djenesis.pin.<key>=<value>):%{reset}
                       %{name}checksum%{reset} <true|false>          Record content checksums in pins (default: true);
@@ -1223,18 +1226,21 @@ public record Project(
                                                   its pin under every mode.
 
                     Dependency tree:
-                      -Djenesis.tree.format=full|compact|main
+                      -Djenesis.tree.format=full|compact
                                                   What the dependencies selector
                                                   prints. full (the default)
                                                   prints every module's graph in
                                                   full; compact keeps only the
                                                   modules the build produces
                                                   itself and folds the external
-                                                  closure into counts; main
-                                                  renders that compact graph
-                                                  without the modules declared as
+                                                  closure into counts.
+                      -Djenesis.tree.tests=true|false
+                                                  Print the modules declared as
                                                   the test variant of another
-                                                  module.
+                                                  module (default true); false
+                                                  leaves them out of either
+                                                  format, as they are not part
+                                                  of what the project releases.
 
                     Pin step:
                       -Djenesis.pin.checksum=true|false

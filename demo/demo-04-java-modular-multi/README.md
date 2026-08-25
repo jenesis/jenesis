@@ -244,10 +244,11 @@ beneath it, while the purely external `junit-jupiter` root and its closure becom
 the trailing count. When several trees share the same local module, it is printed
 once inside the largest tree that reaches it and collapsed in the others.
 
-The `main` format renders that same compacted graph without the modules that are
-declared as the test variant of another module:
+`-Djenesis.tree.tests=false` is a second, independent switch. It leaves out the
+modules that are declared as the test variant of another module, which are not
+part of what the project releases, and it does so under either format:
 
-    java -Djenesis.tree.format=main build/jenesis/Project.java dependencies
+    java -Djenesis.tree.format=compact -Djenesis.tree.tests=false build/jenesis/Project.java dependencies
 
     main/compile (module-app)
     maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (module demo.greeter, local)
@@ -256,5 +257,6 @@ declared as the test variant of another module:
 `greeter-test` declares `@jenesis.test demo.greeter`, so both of its blocks are
 gone and the JUnit closure only they reached goes with them: the license and
 module summary below the trees now counts the two modules the project ships
-rather than the thirteen a test run resolves. The default `full` format prints
-the whole graph; any other value is rejected.
+rather than the thirteen a test run resolves. Passed on its own, the flag prunes
+the same modules from the full graph. The default `full` format prints the whole
+graph; any other value is rejected.
