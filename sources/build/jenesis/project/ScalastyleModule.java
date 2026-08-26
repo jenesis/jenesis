@@ -84,7 +84,7 @@ public class ScalastyleModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addStep(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning),
+                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> checkInputs = new LinkedHashSet<>();
         checkInputs.add(DEPENDENCIES);

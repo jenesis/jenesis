@@ -121,6 +121,27 @@ public class DependenciesMavenBomTest {
     }
 
     @Test
+    public void a_scoped_step_ignores_a_maven_bom_of_another_group() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("tool/runtime/maven/org.acme/tool/1.0", "");
+        requires.store(dependencies.resolve(BuildStep.REQUIRES));
+        SequencedProperties boms = new SequencedProperties();
+        boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
+        boms.store(dependencies.resolve(BuildStep.BOMS));
+        BuildStepResult result = apply(new Dependencies(
+                Map.of("maven", maven(Map.of("org.acme/tool/pom/1.0", """
+                        <project xmlns="http://maven.apache.org/POM/4.0.0">
+                            <modelVersion>4.0.0</modelVersion>
+                        </project>
+                        """))),
+                Map.of("maven", new MavenPomResolver())).group("tool"));
+        assertThat(result.next()).isTrue();
+        assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
+                .as("a tool never fetches the bill of materials that manages the module's own closure")
+                .containsExactly("tool/runtime/maven/org.acme/tool/1.0");
+    }
+
+    @Test
     public void local_pin_wins_over_maven_bom_entry() throws IOException {
         SequencedProperties requires = new SequencedProperties();
         requires.setProperty("main/compile/maven/org.acme/lib", "");

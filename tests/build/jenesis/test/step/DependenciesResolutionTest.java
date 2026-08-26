@@ -98,6 +98,57 @@ public class DependenciesResolutionTest {
     }
 
     @Test
+    public void a_scoped_step_resolves_nothing_but_its_own_group() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("main/compile/foo/qux", "");
+        properties.setProperty("tool/runtime/foo/baz", "");
+        properties.store(dependencies.resolve(BuildStep.REQUIRES));
+        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+                    SequencedMap<String, String> resolved = new LinkedHashMap<>();
+                    descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
+                    return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+                })).group("tool").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
+                        dependencies,
+                        Map.of(
+                                Path.of(BuildStep.REQUIRES),
+                                Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
+                .as("a tool reads the module's requirements for its pins, but resolves only what it declares")
+                .containsExactly("tool/runtime/foo/baz");
+    }
+
+    @Test
+    public void a_scoped_step_leaves_an_alias_of_another_group_alone() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("main/compile/foo/org.example/plain-lib", "");
+        properties.setProperty("tool/runtime/foo/baz", "");
+        properties.store(dependencies.resolve(BuildStep.REQUIRES));
+        SequencedProperties aliases = new SequencedProperties();
+        aliases.setProperty("main/foo/toolkit.lib", "org.example/plain-lib");
+        aliases.store(dependencies.resolve(BuildStep.ALIASES));
+        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+                    SequencedMap<String, String> resolved = new LinkedHashMap<>();
+                    descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
+                    return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+                })).group("tool").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
+                        dependencies,
+                        Map.of(
+                                Path.of(BuildStep.REQUIRES),
+                                Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Dependencies.ALIASED))
+                .as("the module renames its own jars; a tool step is not the place that fails over it")
+                .doesNotExist();
+    }
+
+    @Test
     public void routes_declared_exclusions_to_the_resolver() throws IOException {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/qux", "");

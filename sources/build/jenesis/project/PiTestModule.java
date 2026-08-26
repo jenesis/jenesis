@@ -76,7 +76,7 @@ public class PiTestModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addStep(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning),
+                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> mutateInputs = new LinkedHashSet<>();
         mutateInputs.add(DEPENDENCIES);
@@ -163,12 +163,15 @@ public class PiTestModule implements BuildExecutorModule {
                 for (Path jar : Dependencies.select(argument.folder(), tool, "classpath")) {
                     external.add(jar.toString());
                 }
+                SequencedMap<String, Path> mutable = Dependencies.internal(argument.folder());
+                for (Map.Entry<String, Path> entry : mutable.entrySet()) {
+                    if (expanded.add(entry.getKey())) {
+                        extract(entry.getValue(), code);
+                    }
+                }
                 for (Path jar : Dependencies.select(argument.folder(), group, "runtime")) {
-                    String fileName = jar.getFileName().toString();
-                    if (fileName.contains("%2F")) {
+                    if (!mutable.containsValue(jar)) {
                         external.add(jar.toString());
-                    } else if (expanded.add(fileName)) {
-                        extract(jar, code);
                     }
                 }
                 Path classes = argument.folder().resolve(BuildStep.CLASSES);

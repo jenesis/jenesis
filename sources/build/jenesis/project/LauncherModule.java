@@ -60,7 +60,7 @@ public class LauncherModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addStep(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning),
+                new Dependencies(repositories, resolvers).pinning(pinning).group(group),
                 resolveInputs);
         SequencedSet<String> bundleInputs = new LinkedHashSet<>();
         bundleInputs.add(DEPENDENCIES);
