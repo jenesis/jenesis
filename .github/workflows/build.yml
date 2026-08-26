@@ -80,7 +80,7 @@ jobs:
           - { name: vulnerabilities, dir: demo-14-vulnerabilities, entry: build/Demo.java }
           - { name: profiles, dir: demo-15-profiles, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=release, verify: 'find target -type d -path "*assemble/sources*" | grep -q .' }
           - { name: test-selection, dir: demo-24-test-selection, entry: build/Demo.java }
-          - { name: pitest, dir: demo-25-pitest, entry: build/jenesis/Project.java, verify: 'find target -type d -name mutate | grep -q .' }
+          - { name: pitest, dir: demo-25-pitest, entry: build/jenesis/Project.java, verify: 'find target -path "*reports/pitest/mutations.xml" -exec grep -l "calc.Calculator" {} + | grep -q .' }
           - { name: agents, dir: demo-26-agents, entry: build/Demo.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: bom, dir: demo-28-bom, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: module-alias, dir: demo-31-module-alias, entry: 'build/jenesis/Execute.java -name Ada -shout', verify: 'find target -name classes.jar | grep -q .' }
