@@ -104,10 +104,10 @@ public class JaCoCoModule implements BuildExecutorModule {
                                                      SequencedMap<String, BuildStepArgument> arguments,
                                                      SequencedMap<String, SequencedMap<String, String>> properties)
                 throws IOException {
-            List<String> jars = new ArrayList<>(), classes = new ArrayList<>(), sources = new ArrayList<>();
-            List<Path> resolved = new ArrayList<>();
+            List<String> jars = new ArrayList<>(), sources = new ArrayList<>();
+            SequencedSet<String> classes = new LinkedHashSet<>();
+            SequencedMap<String, Path> covered = new LinkedHashMap<>();
             Path data = null;
-            String artifact = null, version = null;
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
@@ -127,30 +127,10 @@ public class JaCoCoModule implements BuildExecutorModule {
                 if (Files.isDirectory(source)) {
                     sources.add(source.toString());
                 }
-                Path metadata = argument.folder().resolve(BuildStep.METADATA);
-                if (Files.isRegularFile(metadata)) {
-                    SequencedProperties descriptor = SequencedProperties.ofFiles(metadata);
-                    if (artifact == null) {
-                        artifact = descriptor.getProperty("artifact");
-                    }
-                    if (version == null) {
-                        version = descriptor.getProperty("version");
-                    }
-                }
-                Path folder = argument.folder().resolve(Dependencies.RESOLVED);
-                if (Files.isDirectory(folder)) {
-                    try (Stream<Path> files = Files.list(folder)) {
-                        files.filter(file -> file.getFileName().toString().endsWith(".jar")).forEach(resolved::add);
-                    }
-                }
+                Dependencies.internal(argument.folder()).forEach(covered::putIfAbsent);
             }
-            if (artifact != null && version != null) {
-                String suffix = artifact + "-" + version + ".jar";
-                for (Path jar : resolved) {
-                    if (jar.getFileName().toString().endsWith(suffix)) {
-                        classes.add(jar.toString());
-                    }
-                }
+            for (Path jar : covered.values()) {
+                classes.add(jar.toString());
             }
             if (data == null || classes.isEmpty()) {
                 return CompletableFuture.completedStage(null);

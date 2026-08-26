@@ -727,6 +727,33 @@ public class Dependencies implements BuildStep {
         return new ArrayList<>(selected);
     }
 
+    public static SequencedMap<String, Path> internal(Path folder) throws IOException {
+        Path file = index(folder), graphFile = folder.resolve(GRAPH);
+        if (file == null || !Files.exists(graphFile)) {
+            return new LinkedHashMap<>();
+        }
+        SequencedProperties properties = SequencedProperties.ofFiles(file);
+        SequencedMap<String, Path> selected = new LinkedHashMap<>();
+        for (Map.Entry<String, Resolver.Resolution> entry : graph(List.of(graphFile), List.of()).entrySet()) {
+            for (Map.Entry<String, Resolver.Vertex> vertex : entry.getValue().vertices().entrySet()) {
+                if (!vertex.getValue().internal() || vertex.getValue().resolvedVersion() == null) {
+                    continue;
+                }
+                String coordinate = vertex.getKey() + "/" + vertex.getValue().resolvedVersion();
+                String value = properties.getProperty(entry.getKey() + "/" + coordinate);
+                if (value == null) {
+                    continue;
+                }
+                int space = value.indexOf(' ');
+                Path jar = folder.resolve(space < 0 ? value : value.substring(0, space)).normalize();
+                if (Files.exists(jar)) {
+                    selected.putIfAbsent(coordinate, jar);
+                }
+            }
+        }
+        return selected;
+    }
+
     private static final Map<String, String> DEFAULT_ALIASES = Map.ofEntries(
             Map.entry("apache license 2.0", "Apache-2.0"),
             Map.entry("apache license, version 2.0", "Apache-2.0"),
