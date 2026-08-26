@@ -373,22 +373,44 @@ public record Jpx(Path storage,
         if (root.startsWith(staging)) {
             root = folder.resolve(root.getFileName());
         }
+        PathPlacement placement = command.name().indexOf(':') >= 0
+                ? PathPlacement.CLASS_PATH
+                : this.placement;
         SequencedMap<String, Path> jars = new TreeMap<>();
-        for (Resolver.Resolved resolved : resolution.artifacts().values()) {
-            Path file = resolved.file();
-            Path placed = file.startsWith(staging) ? folder.resolve(file.getFileName()) : file;
-            if (jars.putIfAbsent(file.getFileName().toString(), placed) == null && !placed.startsWith(folder)) {
-                BuildStep.linkOrCopy(folder.resolve(file.getFileName().toString()), placed);
+        SequencedMap<String, String> tokens = new LinkedHashMap<>(), names = new LinkedHashMap<>();
+        for (Map.Entry<String, Resolver.Resolved> entry : resolution.artifacts().entrySet()) {
+            String dependency = entry.getKey();
+            Path file = entry.getValue().file();
+            Path source = file.startsWith(staging) ? folder.resolve(file.getFileName()) : file;
+            String coordinate = dependency.substring(dependency.indexOf('/') + 1);
+            ModuleDescriptor identity = PathPlacement.moduleDescriptor(source);
+            String name = identity == null
+                    ? PathPlacement.fileName(coordinate)
+                    : PathPlacement.fileName(coordinate, identity.name(), true);
+            Path target = folder.resolve(name);
+            if (jars.putIfAbsent(name, target) == null && !source.equals(target)) {
+                if (source.startsWith(folder)) {
+                    Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+                } else {
+                    BuildStep.linkOrCopy(target, source);
+                }
+            }
+            names.putIfAbsent(dependency, name);
+            int last = coordinate.lastIndexOf('/');
+            if (last > 0) {
+                tokens.putIfAbsent(coordinate.substring(0, last), dependency);
+            }
+            if (source.equals(root)) {
+                root = target;
             }
         }
-        root = rename(resolution, jars, folder, root);
+        root = rename(jars, tokens, names, folder, root);
         ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(root);
-        boolean coordinate = command.name().indexOf(':') >= 0;
-        if (!coordinate && (descriptor == null || !descriptor.name().equals(command.name()))) {
+        if (placement != PathPlacement.CLASS_PATH
+                && (descriptor == null || !descriptor.name().equals(command.name()))) {
             throw new IllegalStateException("The jar resolved for module " + command.name() + " is named "
                     + (descriptor == null ? "nothing" : descriptor.name()) + " - the repository mapping appears stale");
         }
-        PathPlacement placement = coordinate ? PathPlacement.CLASS_PATH : this.placement;
         String mainModule = placement.modular() && descriptor != null ? descriptor.name() : null;
         String mainClass = descriptor == null || descriptor.mainClass().isEmpty()
                 ? PathPlacement.mainClass(root)
@@ -421,25 +443,17 @@ public record Jpx(Path storage,
         Files.move(temporary, folder.resolve(PROPERTIES), StandardCopyOption.ATOMIC_MOVE);
     }
 
-    private static Path rename(Resolver.Resolution resolution,
-                               SequencedMap<String, Path> jars,
+    private static Path rename(SequencedMap<String, Path> jars,
+                               SequencedMap<String, String> tokens,
+                               SequencedMap<String, String> names,
                                Path folder,
                                Path root) throws IOException {
-        SequencedMap<String, String> coordinates = new LinkedHashMap<>();
-        for (Map.Entry<String, Resolver.Resolved> entry : resolution.artifacts().entrySet()) {
-            String coordinate = entry.getKey();
-            int first = coordinate.indexOf('/'), last = coordinate.lastIndexOf('/');
-            if (first > 0 && last > first) {
-                coordinates.putIfAbsent(coordinate.substring(first + 1, last),
-                        entry.getValue().file().getFileName().toString());
-            }
-        }
         SequencedMap<String, String> aliased = new LinkedHashMap<>();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
             String origin = entry.getKey();
-            for (Map.Entry<String, String> declaration : PathPlacement.aliases(folder.resolve(origin)).entrySet()) {
-                String alias = declaration.getKey(), name = coordinates.get(declaration.getValue());
-                if (name == null || !jars.containsKey(name)) {
+            for (Map.Entry<String, String> declaration : PathPlacement.aliases(entry.getValue()).entrySet()) {
+                String alias = declaration.getKey(), dependency = tokens.get(declaration.getValue());
+                if (dependency == null || !jars.containsKey(names.get(dependency))) {
                     throw new IllegalStateException(origin
                             + " aliases "
                             + alias
@@ -447,14 +461,14 @@ public record Jpx(Path storage,
                             + declaration.getValue()
                             + ", which this installation does not contain");
                 }
-                String previous = aliased.putIfAbsent(alias, name);
-                if (previous != null && !previous.equals(name)) {
+                String previous = aliased.putIfAbsent(alias, dependency);
+                if (previous != null && !previous.equals(dependency)) {
                     throw new IllegalStateException("Module alias "
                             + alias
                             + " is declared for "
                             + previous
                             + " and for "
-                            + name
+                            + dependency
                             + " within "
                             + folder.getFileName());
                 }
@@ -462,32 +476,35 @@ public record Jpx(Path storage,
         }
         SequencedMap<String, String> owners = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : aliased.entrySet()) {
-            String alias = entry.getKey(), name = entry.getValue(), aliasedJar = alias + ".jar";
-            String previous = owners.putIfAbsent(name, alias);
+            String alias = entry.getKey(), dependency = entry.getValue();
+            String previous = owners.putIfAbsent(dependency, alias);
             if (previous != null) {
-                throw new IllegalStateException(name
+                throw new IllegalStateException(dependency
                         + " is aliased as both "
                         + previous
                         + " and "
                         + alias
                         + " - a jar can carry only one module name");
             }
-            if (jars.containsKey(aliasedJar)) {
+            String coordinate = dependency.substring(dependency.indexOf('/') + 1);
+            String name = PathPlacement.fileName(coordinate, alias, false);
+            if (jars.containsKey(name)) {
                 throw new IllegalStateException("Module alias "
                         + alias
                         + " collides with "
-                        + aliasedJar
+                        + name
                         + " within "
                         + folder.getFileName()
                         + " - require it directly");
             }
-            Path target = folder.resolve(aliasedJar);
-            Files.move(folder.resolve(name), target, StandardCopyOption.REPLACE_EXISTING);
-            jars.remove(name);
-            jars.put(aliasedJar, target);
-            PathPlacement.aliased(target, alias, name);
+            Path source = folder.resolve(names.get(dependency)), target = folder.resolve(name);
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+            jars.remove(names.get(dependency));
+            jars.put(name, target);
+            names.put(dependency, name);
+            PathPlacement.aliased(target, alias, dependency);
             Files.writeString(PathPlacement.declaration(target), alias);
-            if (root.getFileName().toString().equals(name)) {
+            if (root.equals(source)) {
                 root = target;
             }
         }
