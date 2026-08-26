@@ -210,8 +210,10 @@ public class Dependencies implements BuildStep {
         if (group != null) {
             requires.keySet().retainAll(Set.of(group));
             moduleAliases.keySet().retainAll(Set.of(group));
-            bomTokens.keySet().removeIf(token -> !token.startsWith("bom/" + group + "/")
-                    && !token.startsWith("entry/" + group + "/"));
+            bomTokens.keySet().removeIf(token -> {
+                int first = token.indexOf('/'), second = token.indexOf('/', first + 1);
+                return second < 0 || !group.equals(token.substring(first + 1, second));
+            });
             exclusions.keySet().retainAll(Set.of(group));
             versions.keySet().retainAll(Set.of(group));
         }
