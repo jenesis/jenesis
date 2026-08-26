@@ -33,6 +33,8 @@ public enum PathPlacement {
 
     public static final String ALIASES = "Jenesis-Aliases";
 
+    private static final Pattern DERIVED_VERSION = Pattern.compile("\\d+(\\..*)?");
+
     private final boolean modular;
 
     PathPlacement(boolean modular) {
@@ -52,6 +54,30 @@ public enum PathPlacement {
 
     public PathPlacement forModuleInfo(boolean moduleInfoPresent) {
         return moduleInfoPresent ? this : CLASS_PATH;
+    }
+
+    public static String fileName(String coordinate) {
+        return BuildExecutorModule.encode(coordinate) + ".jar";
+    }
+
+    public static String fileName(String coordinate, String module, boolean declared) {
+        String version = coordinate.substring(coordinate.lastIndexOf('/') + 1);
+        if (!declared && !derivable(version)) {
+            return BuildExecutorModule.encode(module) + ".jar";
+        }
+        return BuildExecutorModule.encode(module) + "-" + BuildExecutorModule.encode(version) + ".jar";
+    }
+
+    private static boolean derivable(String version) {
+        if (!DERIVED_VERSION.matcher(version).matches()) {
+            return false;
+        }
+        try {
+            ModuleDescriptor.Version.parse(version);
+            return true;
+        } catch (IllegalArgumentException _) {
+            return false;
+        }
     }
 
     public static Path declaration(Path jar) {

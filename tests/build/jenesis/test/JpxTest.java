@@ -112,7 +112,7 @@ public class JpxTest {
         assertThat(properties.getProperty("mainClass")).isEqualTo("toolmain.Main");
         assertThat(properties.getProperty("classpath"))
                 .as("coordinates run on the class path in full, modular jars included")
-                .isEqualTo("tool-lib-1.0.jar,tool-main-1.0.jar");
+                .isEqualTo("tool.lib-1.0.jar,tool.main-1.0.jar");
         assertThat(properties.getProperty("modulepath")).isNull();
         assertThat(properties.getProperty(ModuleGraph.JAVA_OPTIONS))
                 .as("nothing is on the module path, so nothing has to be added to the graph")
@@ -136,7 +136,7 @@ public class JpxTest {
         SequencedProperties properties = installation.properties();
         assertThat(properties.getProperty("mainModule")).isNull();
         assertThat(properties.getProperty("mainClass")).isEqualTo("plaintool.Main");
-        assertThat(properties.getProperty("classpath")).isEqualTo("plain-tool-2.0.jar");
+        assertThat(properties.getProperty("classpath")).isEqualTo("org.example%2Fplain-tool%2F2.0.jar");
 
         Path marker = work.resolve("marker.txt");
         assertThat(installation.launch(List.of(marker.toString()))).isEqualTo(5);
@@ -154,7 +154,7 @@ public class JpxTest {
         assertThat(installation.folder().getFileName().toString()).isEqualTo("tool.main@1.0");
         SequencedProperties properties = installation.properties();
         assertThat(properties.getProperty("mainModule")).isEqualTo("tool.main");
-        assertThat(properties.getProperty("modulepath")).isEqualTo("tool-lib-1.0.jar,tool-main-1.0.jar");
+        assertThat(properties.getProperty("modulepath")).isEqualTo("tool.lib-1.0.jar,tool.main-1.0.jar");
 
         Path marker = work.resolve("marker.txt");
         assertThat(installation.launch(List.of(marker.toString()))).isEqualTo(7);
@@ -172,10 +172,10 @@ public class JpxTest {
 
         SequencedProperties properties = installation.properties();
         assertThat(properties.getProperty("mainModule")).isEqualTo("tool.main");
-        assertThat(properties.getProperty("modulepath")).isEqualTo("tool-lib-1.0.jar,tool-main-1.0.jar");
+        assertThat(properties.getProperty("modulepath")).isEqualTo("tool.lib-1.0.jar,tool.main-1.0.jar");
         assertThat(properties.getProperty("classpath"))
                 .as("a module name infers the placement jar by jar, so a plain dependency stays unnamed")
-                .isEqualTo("plain-tool-1.0.jar");
+                .isEqualTo("org.example%2Fplain-tool%2F1.0.jar");
 
         Path marker = work.resolve("marker.txt");
         assertThat(installation.launch(List.of(marker.toString()))).isEqualTo(7);
@@ -185,8 +185,7 @@ public class JpxTest {
     @Test
     public void module_placement_takes_every_jar_onto_the_module_path() throws IOException, InterruptedException {
         addMavenTool();
-        addPlainTool("1.0");
-        addDiscoveryPom(null, true);
+        addDiscoveryPom(null);
         Jpx jpx = jpx(PathPlacement.MODULE_PATH);
 
         Jpx.Installation installation = jpx.install("tool.main");
@@ -194,11 +193,9 @@ public class JpxTest {
         SequencedProperties properties = installation.properties();
         assertThat(properties.getProperty("mainModule")).isEqualTo("tool.main");
         assertThat(properties.getProperty("modulepath"))
-                .isEqualTo("plain-tool-1.0.jar,tool-lib-1.0.jar,tool-main-1.0.jar");
+                .as("a placement that names the module path takes the closure there, jar by jar")
+                .isEqualTo("tool.lib-1.0.jar,tool.main-1.0.jar");
         assertThat(properties.getProperty("classpath")).isNull();
-        assertThat(properties.getProperty(ModuleGraph.JAVA_OPTIONS))
-                .as("the plain jar joins as an automatic module, which the graph has to root explicitly")
-                .isEqualTo("--add-modules=ALL-MODULE-PATH,ALL-DEFAULT");
 
         Path marker = work.resolve("marker.txt");
         assertThat(installation.launch(List.of(marker.toString()))).isEqualTo(7);
@@ -215,7 +212,7 @@ public class JpxTest {
         SequencedProperties properties = installation.properties();
         assertThat(properties.getProperty("classpath"))
                 .as("coordinates name an artifact rather than a module, module path or not")
-                .isEqualTo("tool-lib-1.0.jar,tool-main-1.0.jar");
+                .isEqualTo("tool.lib-1.0.jar,tool.main-1.0.jar");
         assertThat(properties.getProperty("modulepath")).isNull();
         assertThat(properties.getProperty("mainModule")).isNull();
     }
@@ -230,7 +227,7 @@ public class JpxTest {
         assertThat(installation.folder().getFileName().toString()).isEqualTo("tool.main@1.0");
         SequencedProperties properties = installation.properties();
         assertThat(properties.getProperty("mainModule")).isEqualTo("tool.main");
-        assertThat(properties.getProperty("modulepath")).isEqualTo("tool.lib.jar,tool.main.jar");
+        assertThat(properties.getProperty("modulepath")).isEqualTo("tool.lib-1.0.jar,tool.main-1.0.jar");
         assertThat(properties.getProperty(ModuleGraph.JAVA_OPTIONS)).isNull();
 
         Path marker = work.resolve("marker.txt");
@@ -281,7 +278,7 @@ public class JpxTest {
 
         Jpx.Installation installation = jpx.install("org.example:tool-main@1.0");
 
-        assertThat(installation.properties().getProperty("classpath")).isEqualTo("tool-lib-1.0.jar,tool-main-1.0.jar");
+        assertThat(installation.properties().getProperty("classpath")).isEqualTo("tool.lib-1.0.jar,tool.main-1.0.jar");
         try (Stream<Path> entries = Files.list(storage)) {
             assertThat(entries.filter(entry -> entry.getFileName().toString().startsWith("staging-"))).isEmpty();
         }

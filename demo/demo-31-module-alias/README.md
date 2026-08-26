@@ -70,11 +70,13 @@ What the alias does
 The alias is a **rename**, not a synthesis. args4j's jar arrives in the build's
 `resolved/` folder under an encoded Maven coordinate, a file name no legal module
 name can be derived from, so the dependencies step moves it to
-`resolved/org.kohsuke.args4j.jar`. From that file name the JDK derives exactly
-the automatic module the project asked for, and `javac` and `java` agree on it
-because both derive it the same way. Nothing inside the jar is touched: bytes,
-signature entries and all, which is why the pinned checksum keeps describing the
-file that is actually on the command line. The jar in `resolved/` is a hard link
+`resolved/org.kohsuke.args4j-2.33.jar`. From that file name the JDK derives exactly
+the automatic module the project asked for, at the version the closure resolved, and
+`javac` and `java` agree on it because both derive it the same way - which is why a
+stack trace out of args4j reads `org.kohsuke.args4j@2.33`. A version the runtime
+cannot parse is left off the name rather than breaking it. Nothing inside the jar is
+touched: bytes, signature entries and all, which is why the pinned checksum keeps
+describing the file that is actually on the command line. The jar in `resolved/` is a hard link
 into the shared artifact cache, so the rename never reaches the cache either.
 
 `requires org.kohsuke.args4j;` then means what it says. Because the target really
@@ -133,7 +135,9 @@ closure in two - jars that already declare a `module-info` (here, this project's
 own) pass through byte for byte, everything else is renamed to the module name it
 is to carry - runs `jdeps` **once** over the whole set to work out what each one
 actually reads, and injects a generated `module-info.class` into a copy of each
-jar.
+jar. That descriptor records the version the closure resolved, taken from the
+resolution itself rather than from any file name, so the image reports the same
+identity a plain module path does.
 
 The rewritten jars simply exist alongside the resolved ones, in a `modular/`
 folder with its own index, and everything that puts jars on a path prefers that
@@ -154,7 +158,7 @@ runtime that knows about exactly four modules:
     demo.cli@1-SNAPSHOT
     java.base@25.0.3
     java.xml@25.0.3
-    org.kohsuke.args4j open
+    org.kohsuke.args4j@2.33 open
 
 `org.kohsuke.args4j` is a real, explicit module in the image now, and `java.xml`
 came along because `jdeps` found that args4j reads it. The app runs from that

@@ -10,6 +10,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.PathPlacement;
+import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.JDeps;
@@ -24,7 +25,7 @@ public class ModularizeModule implements BuildExecutorModule {
 
     private static final String PREPARE = "prepare", DESCRIBE = "describe", MODULARIZE = "modularize";
 
-    private static final String STAGED = "staged.properties";
+    private static final String STAGED = "staged.properties", IDENTITY = "identity.properties";
 
     private final ProcessHandler.Factory factory;
     private final boolean synthetic;
@@ -59,9 +60,7 @@ public class ModularizeModule implements BuildExecutorModule {
         return path.equals(MODULARIZE) ? Optional.of("") : Optional.empty();
     }
 
-    private static String module(Path jar) {
-        String file = jar.getFileName().toString();
-        return file.substring(0, file.length() - ".jar".length());
+    private record Identity(String module, String version) {
     }
 
     private static ModuleDescriptor derive(Path jar) {
@@ -105,7 +104,7 @@ public class ModularizeModule implements BuildExecutorModule {
                 throws IOException {
             Path modules = Files.createDirectory(context.next().resolve(JDeps.MODULES));
             Path analyzed = Files.createDirectory(context.next().resolve(JDeps.ANALYZED));
-            SequencedProperties staged = new SequencedProperties();
+            SequencedProperties staged = new SequencedProperties(), identity = new SequencedProperties();
             SequencedMap<Path, String> placed = new LinkedHashMap<>();
             SequencedMap<String, Path> claimed = new LinkedHashMap<>();
             for (BuildStepArgument argument : arguments.values()) {
@@ -116,6 +115,7 @@ public class ModularizeModule implements BuildExecutorModule {
                 if (!Files.exists(index)) {
                     continue;
                 }
+                SequencedMap<String, String> versions = versions(argument.folder());
                 SequencedProperties properties = SequencedProperties.ofFiles(index);
                 for (String key : properties.stringPropertyNames()) {
                     String value = properties.getProperty(key);
@@ -153,23 +153,57 @@ public class ModularizeModule implements BuildExecutorModule {
                                     + " and "
                                     + jar.getFileName());
                         }
-                        relative = (named ? JDeps.MODULES : JDeps.ANALYZED) + module + ".jar";
-                        Path target = (named ? modules : analyzed).resolve(module + ".jar");
+                        String[] parts = split(key);
+                        String version = parts == null ? null : versions.get(parts[2] + "/" + parts[3]);
+                        String name = version == null
+                                ? module + ".jar"
+                                : PathPlacement.fileName(parts[3], module, named);
+                        relative = (named ? JDeps.MODULES : JDeps.ANALYZED) + name;
+                        Path target = (named ? modules : analyzed).resolve(name);
                         if (!Files.exists(target)) {
                             BuildStep.linkOrCopy(target, jar);
                         }
                         placed.put(jar, relative);
+                        identity.setProperty(relative, module + (version == null ? "" : "\t" + version));
                     }
                     staged.setProperty(key, relative);
                 }
             }
             staged.store(context.next().resolve(STAGED));
+            identity.store(context.next().resolve(IDENTITY));
             SequencedProperties options = new SequencedProperties();
             options.setProperty("--multi-release", String.valueOf(Runtime.version().feature()));
             options.setProperty("--ignore-missing-deps", "");
             options.store(Files.createDirectories(context.next().resolve(ProcessBuildStep.PROCESS))
                     .resolve("jdeps.properties"));
             return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+
+        private static SequencedMap<String, String> versions(Path folder) throws IOException {
+            SequencedMap<String, String> versions = new LinkedHashMap<>();
+            Path graph = folder.resolve(Dependencies.GRAPH);
+            if (!Files.exists(graph)) {
+                return versions;
+            }
+            for (Resolver.Resolution resolution : Dependencies.graph(List.of(graph), List.of()).values()) {
+                resolution.vertices().forEach((coordinate, vertex) -> {
+                    if (vertex.resolvedVersion() != null) {
+                        versions.putIfAbsent(coordinate + "/" + vertex.resolvedVersion(), vertex.resolvedVersion());
+                    }
+                });
+            }
+            return versions;
+        }
+
+        private static String[] split(String key) {
+            int first = key.indexOf('/');
+            int second = first < 0 ? -1 : key.indexOf('/', first + 1);
+            int third = second < 0 ? -1 : key.indexOf('/', second + 1);
+            return third < 0 ? null : new String[] {
+                    key.substring(0, first),
+                    key.substring(first + 1, second),
+                    key.substring(second + 1, third),
+                    key.substring(third + 1)};
         }
 
         private static String pseudonym(Path jar) throws IOException {
@@ -187,8 +221,9 @@ public class ModularizeModule implements BuildExecutorModule {
             Path staged = arguments.get(PREPARE).folder(),
                     descriptors = arguments.get(DESCRIBE).folder().resolve(JDeps.DESCRIPTORS);
             SequencedProperties staging = SequencedProperties.ofFiles(staged.resolve(STAGED));
+            SequencedMap<String, Identity> identities = identities(staged);
             Path target = Files.createDirectory(context.next().resolve(Dependencies.MODULAR_PATH));
-            SequencedMap<String, String> owners = owners(staged, staging);
+            SequencedMap<String, String> owners = owners(staged, staging, identities);
             SequencedMap<Path, Path> emitted = new LinkedHashMap<>();
             SequencedProperties index = new SequencedProperties();
             for (String key : staging.stringPropertyNames()) {
@@ -199,12 +234,13 @@ public class ModularizeModule implements BuildExecutorModule {
                 }
                 Path file = emitted.get(source);
                 if (file == null) {
+                    Identity identity = identities.get(relative);
                     file = target.resolve(source.getFileName().toString());
                     if (emitted.containsValue(file)) {
-                        throw new IllegalStateException("Module " + module(file) + " is staged more than once");
+                        throw new IllegalStateException("Module " + identity.module() + " is staged more than once");
                     }
                     if (relative.startsWith(JDeps.ANALYZED)) {
-                        inject(source, file, synthesize(source, descriptors, owners));
+                        inject(source, file, synthesize(source, identity, descriptors, owners));
                     } else {
                         BuildStep.linkOrCopy(file, source);
                     }
@@ -219,21 +255,37 @@ public class ModularizeModule implements BuildExecutorModule {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
 
-        private static SequencedMap<String, String> owners(Path staged, SequencedProperties staging) {
+        private static SequencedMap<String, Identity> identities(Path staged) throws IOException {
+            SequencedMap<String, Identity> identities = new LinkedHashMap<>();
+            SequencedProperties properties = SequencedProperties.ofFiles(staged.resolve(IDENTITY));
+            properties.forEachProperty((relative, value) -> {
+                int tab = value.indexOf('\t');
+                identities.put(relative, tab < 0
+                        ? new Identity(value, null)
+                        : new Identity(value.substring(0, tab), value.substring(tab + 1)));
+            });
+            return identities;
+        }
+
+        private static SequencedMap<String, String> owners(Path staged,
+                                                           SequencedProperties staging,
+                                                           SequencedMap<String, Identity> identities) {
             SequencedMap<String, String> owners = new LinkedHashMap<>();
             for (ModuleReference reference : ModuleFinder.ofSystem().findAll()) {
                 for (String name : reference.descriptor().packages()) {
                     owners.putIfAbsent(name, reference.descriptor().name());
                 }
             }
-            SequencedSet<Path> jars = new LinkedHashSet<>();
+            SequencedMap<Path, String> jars = new LinkedHashMap<>();
             for (String key : staging.stringPropertyNames()) {
-                jars.add(staged.resolve(staging.getProperty(key)).normalize());
+                String relative = staging.getProperty(key);
+                jars.putIfAbsent(staged.resolve(relative).normalize(), identities.get(relative).module());
             }
-            for (Path jar : jars) {
+            for (Map.Entry<Path, String> entry : jars.entrySet()) {
+                Path jar = entry.getKey();
                 ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
                 boolean named = descriptor != null && !descriptor.isAutomatic();
-                String module = named ? descriptor.name() : module(jar);
+                String module = named ? descriptor.name() : entry.getValue();
                 for (String name : (named ? descriptor : derive(jar)).packages()) {
                     String previous = owners.putIfAbsent(name, module);
                     if (previous != null && !previous.equals(module)) {
@@ -248,9 +300,10 @@ public class ModularizeModule implements BuildExecutorModule {
         }
 
         private static byte[] synthesize(Path jar,
+                                         Identity identity,
                                          Path descriptors,
                                          SequencedMap<String, String> owners) throws IOException {
-            String module = module(jar);
+            String module = identity.module();
             ModuleDescriptor derived = derive(jar);
             SequencedSet<String> packages = new TreeSet<>(derived.packages());
             SequencedMap<String, Integer> requires = requires(module, descriptors, packages.isEmpty());
@@ -263,6 +316,9 @@ public class ModularizeModule implements BuildExecutorModule {
             }
             return ClassFile.of().buildModule(ModuleAttribute.of(ModuleDesc.of(module), builder -> {
                 builder.moduleFlags(ClassFile.ACC_OPEN);
+                if (identity.version() != null) {
+                    builder.moduleVersion(identity.version());
+                }
                 builder.requires(ModuleDesc.of("java.base"), ClassFile.ACC_MANDATED, null);
                 requires.forEach((name, flags) -> builder.requires(ModuleDesc.of(name), flags, null));
                 packages.forEach(name -> builder.exports(PackageDesc.of(name), 0));
