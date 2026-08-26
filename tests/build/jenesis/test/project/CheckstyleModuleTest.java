@@ -36,6 +36,10 @@ public class CheckstyleModuleTest {
 
     @Test
     public void tool_emits_an_independent_resolution_trail() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.example/library/1.0", "");
+        requires.store(project.resolve(BuildStep.REQUIRES));
+
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
         executor.addModule(
@@ -48,6 +52,7 @@ public class CheckstyleModuleTest {
         Path resolvedOutput = root.resolve("checkstyle").resolve("dependencies").resolve("output");
         SequencedProperties resolved = SequencedProperties.ofFiles(resolvedOutput.resolve(BuildStep.DEPENDENCIES));
         assertThat(resolved.stringPropertyNames())
+                .as("the module's own closure is resolved by the module, not again by every tool")
                 .containsExactly("custom/runtime/maven/com.puppycrawl.tools/checkstyle/RELEASE");
     }
 
