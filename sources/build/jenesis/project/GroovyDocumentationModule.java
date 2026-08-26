@@ -100,7 +100,7 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(upstream);
         buildExecutor.addStep(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning),
+                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> documentInputs = new LinkedHashSet<>();
         documentInputs.add(DEPENDENCIES);

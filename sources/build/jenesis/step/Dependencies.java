@@ -30,21 +30,28 @@ public class Dependencies implements BuildStep {
     private final transient Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
+    private final String group;
 
     public Dependencies(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null);
+        this(repositories, resolvers, null, null);
     }
 
     private Dependencies(Map<String, Repository> repositories,
                          Map<String, Resolver> resolvers,
-                         Pinning pinning) {
+                         Pinning pinning,
+                         String group) {
         this.repositories = repositories;
         this.resolvers = new LinkedHashMap<>(resolvers);
         this.pinning = pinning;
+        this.group = group;
     }
 
     public Dependencies pinning(Pinning pinning) {
-        return new Dependencies(repositories, resolvers, pinning);
+        return new Dependencies(repositories, resolvers, pinning, group);
+    }
+
+    public Dependencies group(String group) {
+        return new Dependencies(repositories, resolvers, pinning, group);
     }
 
     public static SequencedMap<String, String> bomEntries(SequencedProperties properties, String group) {
@@ -199,6 +206,16 @@ public class Dependencies implements BuildStep {
                             .put(parts[3], excludes);
                 }
             }
+        }
+        if (group != null) {
+            requires.keySet().retainAll(Set.of(group));
+            moduleAliases.keySet().retainAll(Set.of(group));
+            bomTokens.keySet().removeIf(token -> {
+                int first = token.indexOf('/'), second = token.indexOf('/', first + 1);
+                return second < 0 || !group.equals(token.substring(first + 1, second));
+            });
+            exclusions.keySet().retainAll(Set.of(group));
+            versions.keySet().retainAll(Set.of(group));
         }
         Path libs = Files.createDirectories(context.next().resolve(RESOLVED));
         Path previousLibs = context.previous() == null ? null : context.previous().resolve(RESOLVED);
@@ -725,6 +742,33 @@ public class Dependencies implements BuildStep {
             }
         }
         return new ArrayList<>(selected);
+    }
+
+    public static SequencedMap<String, Path> internal(Path folder) throws IOException {
+        Path file = index(folder), graphFile = folder.resolve(GRAPH);
+        if (file == null || !Files.exists(graphFile)) {
+            return new LinkedHashMap<>();
+        }
+        SequencedProperties properties = SequencedProperties.ofFiles(file);
+        SequencedMap<String, Path> selected = new LinkedHashMap<>();
+        for (Map.Entry<String, Resolver.Resolution> entry : graph(List.of(graphFile), List.of()).entrySet()) {
+            for (Map.Entry<String, Resolver.Vertex> vertex : entry.getValue().vertices().entrySet()) {
+                if (!vertex.getValue().internal() || vertex.getValue().resolvedVersion() == null) {
+                    continue;
+                }
+                String coordinate = vertex.getKey() + "/" + vertex.getValue().resolvedVersion();
+                String value = properties.getProperty(entry.getKey() + "/" + coordinate);
+                if (value == null) {
+                    continue;
+                }
+                int space = value.indexOf(' ');
+                Path jar = folder.resolve(space < 0 ? value : value.substring(0, space)).normalize();
+                if (Files.exists(jar)) {
+                    selected.putIfAbsent(coordinate, jar);
+                }
+            }
+        }
+        return selected;
     }
 
     private static final Map<String, String> DEFAULT_ALIASES = Map.ofEntries(
