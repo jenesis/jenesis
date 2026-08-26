@@ -30,21 +30,28 @@ public class Dependencies implements BuildStep {
     private final transient Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
+    private final String group;
 
     public Dependencies(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null);
+        this(repositories, resolvers, null, null);
     }
 
     private Dependencies(Map<String, Repository> repositories,
                          Map<String, Resolver> resolvers,
-                         Pinning pinning) {
+                         Pinning pinning,
+                         String group) {
         this.repositories = repositories;
         this.resolvers = new LinkedHashMap<>(resolvers);
         this.pinning = pinning;
+        this.group = group;
     }
 
     public Dependencies pinning(Pinning pinning) {
-        return new Dependencies(repositories, resolvers, pinning);
+        return new Dependencies(repositories, resolvers, pinning, group);
+    }
+
+    public Dependencies group(String group) {
+        return new Dependencies(repositories, resolvers, pinning, group);
     }
 
     public static SequencedMap<String, String> bomEntries(SequencedProperties properties, String group) {
@@ -199,6 +206,14 @@ public class Dependencies implements BuildStep {
                             .put(parts[3], excludes);
                 }
             }
+        }
+        if (group != null) {
+            requires.keySet().retainAll(Set.of(group));
+            moduleAliases.keySet().retainAll(Set.of(group));
+            bomTokens.keySet().removeIf(token -> !token.startsWith("bom/" + group + "/")
+                    && !token.startsWith("entry/" + group + "/"));
+            exclusions.keySet().retainAll(Set.of(group));
+            versions.keySet().retainAll(Set.of(group));
         }
         Path libs = Files.createDirectories(context.next().resolve(RESOLVED));
         Path previousLibs = context.previous() == null ? null : context.previous().resolve(RESOLVED);

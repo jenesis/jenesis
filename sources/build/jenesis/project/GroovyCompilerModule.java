@@ -93,7 +93,7 @@ public class GroovyCompilerModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(upstream);
         buildExecutor.addStep(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning),
+                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> compileInputs = new LinkedHashSet<>();
         compileInputs.add(DEPENDENCIES);
