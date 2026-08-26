@@ -57,7 +57,7 @@ jobs:
           - { name: groovy, dir: demo-21-groovy, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: groovy-documentation, dir: demo-21-groovy, entry: build/jenesis/Project.java, flags: -Djenesis.project.documentation=true, verify: 'find target -type d -name documentation | grep -q .' }
           - { name: groovy-quality, dir: demo-22-groovy-quality, entry: build/jenesis/Project.java, verify: 'find target -type d -name codenarc | grep -q .' }
-          - { name: code-coverage, dir: demo-23-code-coverage, entry: build/jenesis/Project.java, verify: 'find target -type d -path "*jacoco*" | grep -q .' }
+          - { name: code-coverage, dir: demo-23-code-coverage, entry: build/jenesis/Project.java, verify: 'find target -path "*reports/jacoco/coverage/Calculator.html" | grep -q .' }
           - { name: maven-exclusions, dir: demo-27-maven-exclusions, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q . && ! find target -path "*resolved*" -name "commons-lang3*" | grep -q .' }
           - { name: module-layout, dir: demo-29-module-layout, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: module-classifier, dir: demo-30-module-classifier, entry: build/jenesis/Execute.java }
