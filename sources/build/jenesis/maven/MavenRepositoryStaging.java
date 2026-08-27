@@ -30,7 +30,9 @@ public class MavenRepositoryStaging implements BuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         Collected collected = collectModules(arguments);
-        Pairings pairings = pairTests(collected.mainsByArtifactId(), collected.testModules());
+        Pairings pairings = pairTests(collected.mainsByArtifactId(),
+                collected.testModules(),
+                collected.abstractArtifactIds());
         stageModules(context.next(), collected.mainsByArtifactId(), pairings);
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
@@ -38,6 +40,7 @@ public class MavenRepositoryStaging implements BuildStep {
     private Collected collectModules(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
         SequencedMap<String, Module> mainsByArtifactId = new LinkedHashMap<>();
         List<Module> testModules = new ArrayList<>();
+        SequencedSet<String> abstractArtifactIds = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -53,6 +56,10 @@ public class MavenRepositoryStaging implements BuildStep {
                 continue;
             }
             Coordinates coordinates = parseCoordinates(pom);
+            if (Boolean.parseBoolean(inventory.getProperty(prefix + ".abstract"))) {
+                abstractArtifactIds.add(coordinates.artifactId());
+                continue;
+            }
             Path artifact = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".artifacts"),
                     prefix, "artifacts", true, inventoryFile);
             Path sources = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".sources"),
@@ -89,14 +96,16 @@ public class MavenRepositoryStaging implements BuildStep {
                 testModules.add(module);
             }
         }
-        return new Collected(mainsByArtifactId, testModules);
+        return new Collected(mainsByArtifactId, testModules, abstractArtifactIds);
     }
 
     private static Pairings pairTests(SequencedMap<String, Module> mainsByArtifactId,
-                                      List<Module> testModules) throws IOException {
+                                      List<Module> testModules,
+                                      Set<String> abstractArtifactIds) throws IOException {
         SequencedMap<String, Module> testByMain = new LinkedHashMap<>();
         SequencedMap<String, List<DependencyEntry>> testDepsByMain = new LinkedHashMap<>();
-        Set<String> allMainArtifactIds = mainsByArtifactId.keySet();
+        Set<String> unstagedArtifactIds = new LinkedHashSet<>(mainsByArtifactId.keySet());
+        unstagedArtifactIds.addAll(abstractArtifactIds);
         for (Module test : testModules) {
             Module main;
             if (test.testsOf().isEmpty()) {
@@ -137,7 +146,7 @@ public class MavenRepositoryStaging implements BuildStep {
             }
             if (test.pom() != null) {
                 collectDependencies(test.pom(),
-                        allMainArtifactIds,
+                        unstagedArtifactIds,
                         testDepsByMain.computeIfAbsent(main.coordinates().artifactId(), _ -> new ArrayList<>()));
             }
         }
@@ -187,7 +196,9 @@ public class MavenRepositoryStaging implements BuildStep {
         }
     }
 
-    private record Collected(SequencedMap<String, Module> mainsByArtifactId, List<Module> testModules) {
+    private record Collected(SequencedMap<String, Module> mainsByArtifactId,
+                             List<Module> testModules,
+                             SequencedSet<String> abstractArtifactIds) {
     }
 
     private record Pairings(SequencedMap<String, Module> testByMain,

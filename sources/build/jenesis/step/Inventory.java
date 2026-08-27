@@ -65,6 +65,7 @@ public class Inventory implements BuildStep {
         String mainClass = null;
         String module = null;
         String tests = null;
+        boolean abstractTest = false;
         String version = null;
         String artifact = null;
         Path pomFile = null;
@@ -109,6 +110,7 @@ public class Inventory implements BuildStep {
                 if (tests == null) {
                     tests = properties.getProperty("test");
                 }
+                abstractTest |= Boolean.parseBoolean(properties.getProperty("abstract"));
                 modular |= Boolean.parseBoolean(properties.getProperty("modular"));
             }
             Path metadataFile = folder.resolve(METADATA);
@@ -291,6 +293,9 @@ public class Inventory implements BuildStep {
         }
         if (tests != null) {
             inventory.setProperty(prefix + "test", tests);
+        }
+        if (abstractTest) {
+            inventory.setProperty(prefix + "abstract", "true");
         }
         if (mainClass != null) {
             inventory.setProperty(prefix + "mainClass", mainClass);

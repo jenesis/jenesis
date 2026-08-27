@@ -32,5 +32,6 @@
  */
 open module demo.greeter.test {
     requires demo.greeter;
+    requires demo.greeter.testing;
     requires org.junit.jupiter;
 }

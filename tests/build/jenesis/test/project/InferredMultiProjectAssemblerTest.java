@@ -273,6 +273,14 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void abstract_test_module_omits_test_sub_module() throws IOException {
+        Fixture fixture = setUp("path=\ntest=\nabstract=true\n", true, false, false);
+        assertThatThrownBy(() -> fixture.execute("sub/observed/test/resolved"))
+                .rootCause()
+                .hasMessage("Unknown selector: observed/test/resolved");
+    }
+
+    @Test
     public void editing_a_process_override_reruns_prepare_on_the_next_build() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("process-javac.properties"), "-g=\n");

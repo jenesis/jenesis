@@ -3,6 +3,7 @@ package build.jenesis.module;
 import module java.base;
 import module jdk.compiler;
 import build.jenesis.Platform;
+import javax.lang.model.SourceVersion;
 import javax.tools.ToolProvider;
 
 import static java.util.Objects.requireNonNull;
@@ -60,6 +61,7 @@ public class ModuleInfoParser {
             String name = null;
             String description = null;
             String testOf = null;
+            boolean abstractTest = false;
             String main = null;
             DocCommentTree docComment = docTrees.getDocCommentTree(TreePath.getPath(unit, module));
             if (docComment != null) {
@@ -306,7 +308,19 @@ public class ModuleInfoParser {
                                     release = content;
                                 }
                             }
-                            case "jenesis.test" -> testOf = content;
+                            case "jenesis.test" -> {
+                                String test = content.replaceAll("\\s+", " ").trim();
+                                if (test.equals("abstract")) {
+                                    abstractTest = true;
+                                    testOf = "";
+                                } else if (test.isEmpty() || SourceVersion.isName(test)) {
+                                    testOf = test;
+                                } else {
+                                    throw new IllegalArgumentException("Malformed @jenesis.test value '"
+                                            + test
+                                            + "': expected no value, a module name, or 'abstract'");
+                                }
+                            }
                             case "jenesis.main" -> {
                                 if (!content.isEmpty()) {
                                     main = content;
@@ -321,6 +335,7 @@ public class ModuleInfoParser {
                     name,
                     description,
                     testOf,
+                    abstractTest,
                     main,
                     dependencies,
                     runtimeDependencies,

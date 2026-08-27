@@ -161,6 +161,22 @@ public class ModularStagingTest {
     }
 
     @Test
+    public void abstract_test_module_is_not_staged_when_tests_are_included() throws IOException {
+        Path folder = Files.createDirectory(source.resolve("testing"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-testing.module", "foo.testing");
+        inventory.setProperty("module-testing.test", "");
+        inventory.setProperty("module-testing.abstract", "true");
+        inventory.setProperty("module-testing.artifacts.0", "artifacts/classes.jar");
+        inventory.store(folder.resolve(Inventory.INVENTORY));
+        Files.writeString(Files.createDirectory(folder.resolve("artifacts")).resolve("classes.jar"), "jar");
+
+        run(true, folder);
+
+        assertThat(next.resolve("foo.testing")).doesNotExist();
+    }
+
+    @Test
     public void arguments_without_inventory_are_skipped() throws IOException {
         Path stray = Files.createDirectory(source.resolve("stray"));
         writeArtifact(stray, "classes.jar", "stray");
