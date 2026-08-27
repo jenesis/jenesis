@@ -135,6 +135,43 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
+    public void abstract_test_module_is_never_staged() throws IOException {
+        Path main = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
+        writeArtifact(main, "classes.jar", "main");
+        Path fixtures = abstractInventory("foo-testing", "com.example", "foo-testing", "1.2.3",
+                List.of(), "classes.jar");
+        writeArtifact(fixtures, "classes.jar", "testing");
+
+        run(true, main, fixtures);
+
+        assertThat(next.resolve("com/example/foo-testing")).doesNotExist();
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-tests.jar"))
+                .as("an abstract module is not the test variant of the single main")
+                .doesNotExist();
+    }
+
+    @Test
+    public void dependency_on_an_abstract_test_module_is_excluded_from_the_merged_pom() throws IOException {
+        Path main = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
+        writeArtifact(main, "classes.jar", "main");
+        Path fixtures = abstractInventory("foo-testing", "com.example", "foo-testing", "1.2.3",
+                List.of(), "classes.jar");
+        writeArtifact(fixtures, "classes.jar", "testing");
+        Path test = testInventory("foo-test", "com.example", "foo.test", "1.2.3", "foo",
+                List.of(
+                        new Dep("com.example", "foo-testing", "1.2.3"),
+                        new Dep("org.junit.jupiter", "junit-jupiter", "5.11.3")),
+                "classes.jar");
+        writeArtifact(test, "classes.jar", "test");
+
+        run(true, main, fixtures, test);
+
+        String pom = Files.readString(next.resolve("com/example/foo/1.2.3/foo-1.2.3.pom"));
+        assertThat(pom).doesNotContain("<artifactId>foo-testing</artifactId>");
+        assertThat(pom).contains("<artifactId>junit-jupiter</artifactId>");
+    }
+
+    @Test
     public void test_variant_jars_are_routed_to_main_coordinate_with_test_classifier() throws IOException {
         Path main = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
         writeArtifact(main, "classes.jar", "main");
@@ -361,7 +398,7 @@ public class MavenRepositoryStagingTest {
                                String artifactId,
                                String version,
                                String... artifactFiles) throws IOException {
-        return writeInventory(name, groupId, artifactId, version, null, List.of(), artifactFiles);
+        return writeInventory(name, groupId, artifactId, version, null, false, List.of(), artifactFiles);
     }
 
     private Path mainInventoryWithDeps(String name,
@@ -370,7 +407,7 @@ public class MavenRepositoryStagingTest {
                                        String version,
                                        List<Dep> deps,
                                        String... artifactFiles) throws IOException {
-        return writeInventory(name, groupId, artifactId, version, null, deps, artifactFiles);
+        return writeInventory(name, groupId, artifactId, version, null, false, deps, artifactFiles);
     }
 
     private Path testInventory(String name,
@@ -380,7 +417,16 @@ public class MavenRepositoryStagingTest {
                                String testsOf,
                                List<Dep> deps,
                                String... artifactFiles) throws IOException {
-        return writeInventory(name, groupId, artifactId, version, testsOf, deps, artifactFiles);
+        return writeInventory(name, groupId, artifactId, version, testsOf, false, deps, artifactFiles);
+    }
+
+    private Path abstractInventory(String name,
+                                   String groupId,
+                                   String artifactId,
+                                   String version,
+                                   List<Dep> deps,
+                                   String... artifactFiles) throws IOException {
+        return writeInventory(name, groupId, artifactId, version, "", true, deps, artifactFiles);
     }
 
     private Path writeInventory(String name,
@@ -388,6 +434,7 @@ public class MavenRepositoryStagingTest {
                                 String artifactId,
                                 String version,
                                 String testsOf,
+                                boolean abstractTest,
                                 List<Dep> deps,
                                 String... artifactFiles) throws IOException {
         Path folder = Files.createDirectory(source.resolve(name));
@@ -405,6 +452,9 @@ public class MavenRepositoryStagingTest {
         }
         if (testsOf != null) {
             inventory.setProperty(prefix + ".test", testsOf);
+        }
+        if (abstractTest) {
+            inventory.setProperty(prefix + ".abstract", "true");
         }
         inventory.store(folder.resolve(Inventory.INVENTORY));
         return folder;

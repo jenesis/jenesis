@@ -5,8 +5,8 @@ Build a multi-module project of Java modules where one module depends on another
 every build descriptor is a `module-info.java` and there is no `pom.xml` anywhere.
 One module `requires` the sibling plus a real external named module, so you get
 intra-project and external resolution side by side with no build script to write.
-A third module is the test variant of the library, so the demo doubles as a
-modular testing example. Its single-module counterpart is `../demo-02-java-modular`,
+A third module is the test variant of the library and a fourth carries the test
+infrastructure it reads, so the demo doubles as a modular testing example. Its single-module counterpart is `../demo-02-java-modular`,
 and its POM-based sibling is `../demo-03-java-pom-multi`.
 
 Build it
@@ -19,7 +19,7 @@ From this directory:
 Layout
 ------
 
-The project is three module directories, each with its own `module-info.java`:
+The project is four module directories, each with its own `module-info.java`:
 
     demo/demo-04-java-modular-multi
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
@@ -30,6 +30,9 @@ The project is three module directories, each with its own `module-info.java`:
     |-- greeter-test/        the test variant of demo.greeter
     |   |-- module-info.java     open module demo.greeter.test (@jenesis.test demo.greeter)
     |   `-- greetertest/GreeterTest.java
+    |-- greeter-testing/     the shared test infrastructure, declaring no tests
+    |   |-- module-info.java     module demo.greeter.testing (@jenesis.test abstract)
+    |   `-- greetertesting/Greetings.java
     `-- app/                 the consumer module
         |-- module-info.java     requires demo.greeter + org.slf4j
         `-- sample/app/App.java   uses Greeter + org.slf4j.Logger
@@ -98,6 +101,33 @@ line the tests compile against - though the `@jenesis.pin org.junit.platform.con
 tag overrides that default, so the pinned version always wins. Unlike the `pin` runs of the other demos, the JUnit closure is kept on
 the test module alone rather than propagated project-wide, to keep `greeter` and
 `app` focused on their own dependencies.
+
+Shared test infrastructure
+--------------------------
+
+`greeter-testing/` is a fourth module that carries what the tests reuse rather
+than tests of its own:
+
+    /**
+     * @jenesis.test abstract
+     */
+    module demo.greeter.testing {
+        requires demo.greeter;
+        exports greetertesting;
+    }
+
+The `abstract` form of the tag marks a test module that declares no tests, so it
+is compiled and read by `greeter-test` like any other module, but no test run is
+wired for it and it is never staged - not even under `-Djenesis.stage.tests=true`,
+which does publish `greeter-test` as the `-tests` classifier of `demo.greeter`.
+Because the module is never published, it is also dropped from the test-scoped
+dependencies that `-Djenesis.stage.tests=true` merges into `demo.greeter`'s POM,
+which would otherwise point at an artifact that does not exist.
+
+`abstract` is a reserved Java keyword and so can never be a module name, which
+keeps the value slot of the tag unambiguous: absent or a module name marks the
+test variant *of* that module, `abstract` marks infrastructure *for* the modules
+that are.
 
 Selecting modules and filtering tests
 -------------------------------------
@@ -245,8 +275,8 @@ the trailing count. When several trees share the same local module, it is printe
 once inside the largest tree that reaches it and collapsed in the others.
 
 `-Djenesis.tree.tests=false` is a second, independent switch. It leaves out the
-modules that are declared as the test variant of another module, which are not
-part of what the project releases, and it does so under either format:
+modules that are declared with `@jenesis.test`, which are not part of what the
+project releases, and it does so under either format:
 
     java -Djenesis.tree.format=compact -Djenesis.tree.tests=false build/jenesis/Project.java dependencies
 
@@ -254,9 +284,10 @@ part of what the project releases, and it does so under either format:
     maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (module demo.greeter, local)
     └─ 1 external dependency
 
-`greeter-test` declares `@jenesis.test demo.greeter`, so both of its blocks are
-gone and the JUnit closure only they reached goes with them: the license and
-module summary below the trees now counts the two modules the project ships
-rather than the thirteen a test run resolves. Passed on its own, the flag prunes
+`greeter-test` declares `@jenesis.test demo.greeter` and `greeter-testing`
+declares `@jenesis.test abstract`, so their blocks are gone and the JUnit closure
+only they reached goes with them: the license and module summary below the trees
+now counts the two modules the project ships rather than the fourteen a test run
+resolves. Passed on its own, the flag prunes
 the same modules from the full graph. The default `full` format prints the whole
 graph; any other value is rejected.

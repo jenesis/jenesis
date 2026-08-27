@@ -1,5 +1,6 @@
 package greetertest;
 
+import greetertesting.Greetings;
 import org.junit.jupiter.api.Test;
 import sample.greeter.Greeter;
 
@@ -20,6 +21,6 @@ class GreeterTest {
 
     @Test
     void prefix_is_loaded_from_the_packaged_resource() {
-        assertTrue(new Greeter().prefix().contains("packaged resource"));
+        assertTrue(Greetings.isGreeting(new Greeter().prefix()));
     }
 }

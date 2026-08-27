@@ -378,6 +378,9 @@ public class ModularProject implements BuildExecutorModule {
             if (info.testOf() != null) {
                 module.setProperty("test", info.testOf());
             }
+            if (info.abstractTest()) {
+                module.setProperty("abstract", "true");
+            }
             if (info.main() != null) {
                 module.setProperty("main", info.main());
             }

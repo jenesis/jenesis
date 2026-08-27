@@ -765,6 +765,37 @@ public class ModuleInfoParserTest {
                 """);
         ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
         assertThat(info.testOf()).isEmpty();
+        assertThat(info.abstractTest()).isFalse();
+    }
+
+    @Test
+    public void abstract_tests_tag_marks_module_that_declares_no_tests_of_its_own() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.test abstract
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.testOf()).isEmpty();
+        assertThat(info.abstractTest()).isTrue();
+    }
+
+    @Test
+    public void tests_tag_rejects_a_value_that_is_neither_a_module_name_nor_abstract() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.test not-a-module
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not-a-module");
     }
 
     @Test

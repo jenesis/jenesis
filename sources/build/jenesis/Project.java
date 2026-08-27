@@ -540,8 +540,8 @@ public record Project(
                                                        default) prints every module's graph in full;
                                                        %{name}compact%{reset} keeps only the modules the build produces
                                                        itself and folds the external closure into counts
-                      %{name}tests%{reset} <true|false>               Print the modules that are declared as the test
-                                                       variant of another module (default: true); false
+                      %{name}tests%{reset} <true|false>               Print the modules that are declared with
+                                                       %{name}@jenesis.test%{reset} (default: true); false
                                                        leaves them out of either format, as they are not
                                                        part of what the project releases
 
@@ -618,7 +618,8 @@ public record Project(
                                                       %{name}junit4%{reset} has no reporter and writes none
 
                     %{header}Staging (-Djenesis.stage.<key>=<value>):%{reset}
-                      %{name}tests%{reset}                            Stage test-variant artifacts alongside main artifacts
+                      %{name}tests%{reset}                            Stage test-variant artifacts alongside main artifacts;
+                                                       a module marked %{name}@jenesis.test abstract%{reset} is never staged
                     
                     %{header}Build cache (-Djenesis.cache.uri=<uri>):%{reset}
                       Reuse step outputs across builds. A %{name}file://%{reset} URI is an on-disk
@@ -645,7 +646,11 @@ public record Project(
                     %{header}Custom Javadoc tags in module-info.java:%{reset}
                       %{name}@jenesis.release%{reset} <V>             Java release target
                       %{name}@jenesis.main%{reset} <class>            Main class for the module
-                      %{name}@jenesis.test%{reset} [<module>]         Mark module as a test variant of <module>
+                      %{name}@jenesis.test%{reset} [<module>|abstract]
+                                                       Mark module as a test variant of <module>; the
+                                                       %{name}abstract%{reset} form declares no tests of its own but
+                                                       supplies infrastructure to modules that do, is
+                                                       never executed and never staged
                       %{name}@jenesis.pin%{reset} <group>/<repo>/<coord> <ver> [<algo>/<hex>] [<guard>]
                                                        Pin a dependency version and checksum
                                                        (<module> is short for <group>/module/<module>,
@@ -924,7 +929,9 @@ public record Project(
 
                       @jenesis.release <V>  Java release target.
                       @jenesis.main <class>  Main class for the module.
-                      @jenesis.test [<module>]  Mark this module as a test variant of <module>.
+                      @jenesis.test [<module>|abstract]  Mark this module as a test variant of
+                          <module>. The abstract form declares no tests of its own but supplies
+                          infrastructure to modules that do; it runs no tests and is never staged.
                       @jenesis.pin <group>/<repo>/<coord> <ver> [<algo>/<hex>] [<guard>]
                           Pin a dependency's version and optionally its content checksum. A bare
                           <module> abbreviates <group>/module/<module>, and <groupId>/<artifactId>
@@ -1169,7 +1176,8 @@ public record Project(
                           report there; junit4 has no reporter and writes none.
 
                       -Djenesis.stage.tests=true
-                          Stage test-variant artifacts alongside main artifacts.
+                          Stage test-variant artifacts alongside main artifacts. A module marked
+                          `@jenesis.test abstract` is never staged.
 
                     Printing (-Djenesis.print.<key>=<value>):
 

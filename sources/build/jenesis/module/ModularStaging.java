@@ -39,7 +39,8 @@ public class ModularStaging implements BuildStep {
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
             String prefix = inventoryPrefix(inventory, inventoryFile);
             String testsOf = inventory.getProperty(prefix + ".test");
-            if (!includeTests && testsOf != null) {
+            if (Boolean.parseBoolean(inventory.getProperty(prefix + ".abstract"))
+                    || (!includeTests && testsOf != null)) {
                 continue;
             }
             String moduleName = inventory.getProperty(prefix + ".module");

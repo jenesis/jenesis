@@ -127,7 +127,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
                 if (module != null) {
                     SequencedProperties properties = SequencedProperties.ofFiles(module);
-                    if (properties.getProperty("test") != null) {
+                    if (properties.getProperty("test") != null
+                            && !Boolean.parseBoolean(properties.getProperty("abstract"))) {
                         sub.addModule("observed", observe.apply(new InferredTestObservationModule(
                                 descriptor.configuration(),
                                 repositories,
