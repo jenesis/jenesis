@@ -23,6 +23,7 @@ public class Dependencies implements BuildStep {
     public static final String GRAPH = "graph.properties";
     public static final String LICENSES = "licenses.properties";
     public static final String ALIASED = "aliased.properties";
+    public static final String INTERNAL = "internal.properties";
     public static final String RESOLVED = "resolved/";
     public static final String MODULAR = "modular.properties";
     public static final String MODULAR_PATH = "modular/";
@@ -218,16 +219,28 @@ public class Dependencies implements BuildStep {
             versions.keySet().retainAll(Set.of(group));
         }
         Path libs = Files.createDirectories(context.next().resolve(RESOLVED));
-        Path previousLibs = context.previous() == null ? null : context.previous().resolve(RESOLVED);
-        SequencedMap<String, String> previousAliases = new LinkedHashMap<>();
+        SequencedMap<String, Path> previousArtifacts = new LinkedHashMap<>();
+        SequencedSet<String> previousInternal = new LinkedHashSet<>();
         if (context.previous() != null) {
-            Path aliasedFile = context.previous().resolve(ALIASED);
-            if (Files.exists(aliasedFile)) {
-                SequencedProperties.ofFiles(aliasedFile).forEachProperty((alias, coordinate) -> {
-                    previousAliases.put(coordinate, alias);
-                    int slash = coordinate.indexOf('/');
-                    if (slash > 0) {
-                        previousAliases.put(coordinate.substring(slash + 1), alias);
+            Path previousInternalFile = context.previous().resolve(INTERNAL);
+            if (Files.exists(previousInternalFile)) {
+                for (String dependency : SequencedProperties.ofFiles(previousInternalFile).stringPropertyNames()) {
+                    previousInternal.add(dependency.substring(dependency.indexOf('/') + 1));
+                }
+            }
+            Path previousIndex = context.previous().resolve(DEPENDENCIES);
+            if (Files.exists(previousIndex)) {
+                SequencedProperties.ofFiles(previousIndex).forEachProperty((key, value) -> {
+                    String[] parts = split(key);
+                    if (parts == null) {
+                        return;
+                    }
+                    int space = value.indexOf(' ');
+                    Path file = context.previous()
+                            .resolve(space < 0 ? value : value.substring(0, space))
+                            .normalize();
+                    if (Files.exists(file) && !previousInternal.contains(parts[3])) {
+                        previousArtifacts.putIfAbsent(parts[3], file);
                     }
                 });
             }
@@ -235,18 +248,10 @@ public class Dependencies implements BuildStep {
         Map<String, Repository> wrapped = new LinkedHashMap<>();
         repositories.forEach((name, repository) -> {
             Repository effective = repository;
-            if (previousLibs != null) {
-                effective = effective.prepend((_, coordinate) -> {
-                    Path file = previousLibs.resolve(BuildExecutorModule.encode(coordinate) + ".jar");
-                    if (!Files.exists(file)) {
-                        String alias = previousAliases.get(coordinate);
-                        if (alias == null) {
-                            return Optional.empty();
-                        }
-                        file = previousLibs.resolve(alias + ".jar");
-                    }
-                    return Files.exists(file) ? Optional.of(RepositoryItem.ofFile(file)) : Optional.empty();
-                });
+            if (!previousArtifacts.isEmpty()) {
+                effective = effective.prepend((_, coordinate) -> Optional
+                        .ofNullable(previousArtifacts.get(coordinate))
+                        .map(RepositoryItem::ofFile));
             }
             wrapped.put(name, effective.materialized(libs));
         });
@@ -519,7 +524,8 @@ public class Dependencies implements BuildStep {
             Path file = placed.get(dependency);
             if (file == null) {
                 if (artifact.internal()) {
-                    file = libs.resolve(BuildExecutorModule.encode(dependency) + ".jar");
+                    file = libs.resolve(PathPlacement.fileName(
+                            dependency.substring(dependency.indexOf('/') + 1)));
                     if (!Files.exists(file)) {
                         BuildStep.linkOrCopy(file, artifact.file());
                     }
@@ -558,6 +564,15 @@ public class Dependencies implements BuildStep {
             SequencedProperties properties = new SequencedProperties();
             aliased.forEach(properties::setProperty);
             properties.store(context.next().resolve(ALIASED));
+        }
+        SequencedProperties produced = new SequencedProperties();
+        internals.forEach((dependency, internal) -> {
+            if (internal) {
+                produced.setProperty(dependency, "");
+            }
+        });
+        if (!produced.isEmpty()) {
+            produced.store(context.next().resolve(INTERNAL));
         }
         if (pinning == Pinning.STRICT) {
             Set<Path> pinnedFiles = new HashSet<>();
@@ -678,9 +693,45 @@ public class Dependencies implements BuildStep {
             }
             aliased.put(alias, coordinate);
         }
-        for (Map.Entry<String, String> entry : aliased.entrySet()) {
-            String alias = entry.getKey(), coordinate = entry.getValue();
-            Path source = placed.get(coordinate), target = libs.resolve(alias + ".jar");
+        SequencedMap<String, String> names = new LinkedHashMap<>();
+        aliased.forEach((alias, coordinate) -> names.put(coordinate, alias));
+        SequencedMap<String, Path> ordered = new LinkedHashMap<>();
+        names.keySet().forEach(dependency -> ordered.put(dependency, placed.get(dependency)));
+        ordered.putAll(placed);
+        SequencedMap<String, Claim> claims = new LinkedHashMap<>();
+        SequencedMap<Path, Path> renamed = new LinkedHashMap<>();
+        for (Map.Entry<String, Path> entry : ordered.entrySet()) {
+            String dependency = entry.getKey();
+            Path source = entry.getValue();
+            if (Files.isDirectory(source)) {
+                continue;
+            }
+            Path taken = renamed.get(source);
+            if (taken != null) {
+                placed.put(dependency, taken);
+                continue;
+            }
+            String coordinate = dependency.substring(dependency.indexOf('/') + 1);
+            String alias = names.get(dependency);
+            String name;
+            if (alias != null) {
+                name = PathPlacement.fileName(coordinate, alias, false);
+            } else {
+                ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(source);
+                name = descriptor == null
+                        ? PathPlacement.fileName(coordinate)
+                        : PathPlacement.fileName(coordinate, descriptor.name(), true);
+            }
+            Claim previous = claims.putIfAbsent(name, new Claim(dependency, source));
+            if (previous != null && !previous.file().equals(source)) {
+                throw new IllegalArgumentException(previous.dependency()
+                        + " and "
+                        + dependency
+                        + " are both materialized as "
+                        + name
+                        + " - two artifacts cannot carry one module name");
+            }
+            Path target = libs.resolve(name);
             if (!source.equals(target)) {
                 if (source.startsWith(libs)) {
                     Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
@@ -688,12 +739,18 @@ public class Dependencies implements BuildStep {
                     Files.deleteIfExists(target);
                     BuildStep.linkOrCopy(target, source);
                 }
+                placed.put(dependency, target);
             }
-            PathPlacement.aliased(target, alias, "Target " + coordinate);
-            Files.writeString(PathPlacement.declaration(target), alias);
-            placed.put(coordinate, target);
+            renamed.put(source, target);
+            if (alias != null) {
+                PathPlacement.aliased(target, alias, "Target " + dependency);
+                Files.writeString(PathPlacement.declaration(target), alias);
+            }
         }
         return aliased;
+    }
+
+    private record Claim(String dependency, Path file) {
     }
 
     private static Path index(Path folder) {
