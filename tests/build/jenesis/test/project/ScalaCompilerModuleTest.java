@@ -245,7 +245,7 @@ public class ScalaCompilerModuleTest {
                 .resolve("scala")
                 .resolve("dependencies")
                 .resolve("output");
-        List<String> names = listJarNames(artifacts);
+        List<String> names = listCoordinates(artifacts);
         assertThat(names).anyMatch(name -> name.contains("scala3-compiler_3"));
         assertThat(names).anyMatch(name -> name.contains("scala3-library_3"));
         assertThat(names).anyMatch(name -> name.contains("scala3-interfaces"));
@@ -362,11 +362,9 @@ public class ScalaCompilerModuleTest {
         return urls;
     }
 
-    private static List<String> listJarNames(Path folder) throws IOException {
-        List<String> names = new ArrayList<>();
-        for (Path jar : Dependencies.all(folder)) {
-            names.add(jar.getFileName().toString());
-        }
-        return names;
+    private static List<String> listCoordinates(Path folder) throws IOException {
+        return new ArrayList<>(SequencedProperties
+                .ofFiles(folder.resolve(BuildStep.DEPENDENCIES))
+                .stringPropertyNames());
     }
 }

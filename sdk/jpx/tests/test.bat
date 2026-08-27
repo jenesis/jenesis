@@ -99,9 +99,9 @@ call "%SDK_HOME%\bin\jpx.bat" org.example:tool@1.0 "%TMPDIR%\marker.txt" > "%OUT
 set "RC=!ERRORLEVEL!"
 if not "!RC!"=="7" goto :fail
 findstr /c:"jpx-sdk-test" "%TMPDIR%\marker.txt" >nul || goto :fail
-set "DESCRIPTOR=%TMPDIR%\home\.jenesis\jpx\org.example--tool@1.0\jpx.properties"
+set "DESCRIPTOR=%TMPDIR%\home\.jenesis\jpx\maven\org.example--tool@1.0\jpx.properties"
 if not exist "%DESCRIPTOR%" goto :fail
-findstr /c:"classpath=tool-1.0.jar" "%DESCRIPTOR%" >nul || goto :fail
+findstr /c:"classpath=org.example%%2Ftool%%2F1.0.jar" "%DESCRIPTOR%" >nul || goto :fail
 echo   ok
 
 REM [6/6] --hash verifies the recorded checksum prefix and rejects a mismatch

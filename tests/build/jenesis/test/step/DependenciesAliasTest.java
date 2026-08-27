@@ -46,7 +46,7 @@ public class DependenciesAliasTest {
                 "org.example/plain-lib/1.0");
 
         assertThat(result.next()).isTrue();
-        Path aliased = next.resolve(Dependencies.RESOLVED + "toolkit.lib.jar");
+        Path aliased = next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar");
         assertThat(aliased).exists();
         assertThat(Files.readAllBytes(aliased))
                 .as("a pinned checksum keeps describing the jar on the command line, so only the name changes")
@@ -59,7 +59,7 @@ public class DependenciesAliasTest {
                 .isEqualTo("maven/org.example/plain-lib/1.0");
         assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES))
                 .getProperty("main/compile/maven/org.example/plain-lib/1.0"))
-                .startsWith(Dependencies.RESOLVED + "toolkit.lib.jar");
+                .startsWith(Dependencies.RESOLVED + "toolkit.lib-1.0.jar");
     }
 
     @Test
@@ -68,7 +68,7 @@ public class DependenciesAliasTest {
 
         resolve(Map.of("toolkit.lib", "org.example/plain-lib"), "org.example/plain-lib/1.0");
 
-        Path aliased = next.resolve(Dependencies.RESOLVED + "toolkit.lib.jar");
+        Path aliased = next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar");
         assertThat(PathPlacement.INFERRED.test(aliased))
                 .as("a jar named for a module the build declared belongs on the module path")
                 .isTrue();
@@ -84,7 +84,7 @@ public class DependenciesAliasTest {
 
         resolve(Map.of("toolkit.lib", "org.example/plain-lib"), "org.example/plain-lib/1.0");
 
-        Path aliased = next.resolve(Dependencies.RESOLVED + "toolkit.lib.jar");
+        Path aliased = next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar");
         Path classes = app(aliased, """
                 module my.app {
                     exports myapp;
@@ -125,7 +125,7 @@ public class DependenciesAliasTest {
                 "org.example/plain-lib/1.0");
 
         assertThat(result.next()).isTrue();
-        assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.lib.jar"))
+        assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar"))
                 .as("a jar renamed by a previous resolution is found again under the name it was given")
                 .exists();
     }
@@ -139,7 +139,7 @@ public class DependenciesAliasTest {
         resolve(Map.of("toolkit.natives", "org.example/native-lib/jar/linux"),
                 "org.example/native-lib/jar/linux/1.0");
 
-        assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.natives.jar"))
+        assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.natives-1.0.jar"))
                 .as("a type and a classifier are part of the token a declaration matches")
                 .exists();
     }
@@ -240,7 +240,7 @@ public class DependenciesAliasTest {
         BuildStepResult result = resolve(Map.of(), "org.example/consumer-lib/1.0");
 
         assertThat(result.next()).isTrue();
-        assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.lib.jar"))
+        assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar"))
                 .as("a declaration travels to every consumer through the manifest of the jar that made it")
                 .exists();
     }
@@ -281,7 +281,7 @@ public class DependenciesAliasTest {
 
         resolve(Map.of("toolkit.lib", "org.example/plain-lib"), "org.example/plain-lib/1.0");
 
-        assertThat(Files.readAllBytes(next.resolve(Dependencies.RESOLVED + "toolkit.lib.jar")))
+        assertThat(Files.readAllBytes(next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar")))
                 .as("the alias declares no version, so the @jenesis.pin on the coordinate decides which jar is renamed")
                 .isEqualTo(pinned);
         assertThat(SequencedProperties.ofFiles(next.resolve(Dependencies.ALIASED))
@@ -307,7 +307,7 @@ public class DependenciesAliasTest {
                 "org.example/consumer-lib/1.0",
                 "org.example/plain-lib");
 
-        assertThat(Files.readAllBytes(next.resolve(Dependencies.RESOLVED + "toolkit.lib.jar")))
+        assertThat(Files.readAllBytes(next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar")))
                 .as("naming somebody else's transitive dependency must not raise the version the graph decided,"
                         + " even though 2.0 is the latest the repository serves")
                 .isEqualTo(transitive);
@@ -329,7 +329,7 @@ public class DependenciesAliasTest {
 
         resolve(Map.of("toolkit.lib", "org.example/plain-lib"), "org.example/plain-lib");
 
-        assertThat(Files.readAllBytes(next.resolve(Dependencies.RESOLVED + "toolkit.lib.jar")))
+        assertThat(Files.readAllBytes(next.resolve(Dependencies.RESOLVED + "toolkit.lib-2.0.jar")))
                 .as("a coordinate the closure does not carry is added as a root, floating like any unpinned require")
                 .isEqualTo(latest);
         assertThat(SequencedProperties.ofFiles(next.resolve(Dependencies.ALIASED))

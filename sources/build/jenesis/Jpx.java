@@ -267,6 +267,13 @@ public record Jpx(Path storage,
         return install(Command.parse(target));
     }
 
+    private Path layout(Command command) {
+        if (command.name().indexOf(':') >= 0) {
+            return storage.resolve("maven");
+        }
+        return storage.resolve(placement == PathPlacement.MODULE_PATH ? "modular" : "modular_to_maven");
+    }
+
     public Installation install(Command command) throws IOException {
         if (command.version() == null) {
             Installation installed = latestInstalled(command.name()).orElse(null);
@@ -274,13 +281,13 @@ public record Jpx(Path storage,
                 return installed;
             }
         } else {
-            Path folder = storage.resolve(command.folder(command.version()));
+            Path folder = layout(command).resolve(command.folder(command.version()));
             if (Files.isRegularFile(folder.resolve(PROPERTIES))) {
                 return new Installation(folder, hashFunction);
             }
         }
-        Files.createDirectories(storage);
-        Path staging = Files.createTempDirectory(storage, "staging-");
+        Path installations = Files.createDirectories(layout(command));
+        Path staging = Files.createTempDirectory(installations, "staging-");
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             Map<String, Repository> repositories = new LinkedHashMap<>();
             this.repositories.forEach((name, repository) -> repositories.put(name, repository.spilled(staging)));
@@ -339,9 +346,9 @@ public record Jpx(Path storage,
                 }
             }
             SAFE_SEGMENT.accept("version", version);
-            Installation installation = new Installation(storage.resolve(command.folder(version)), hashFunction);
+            Installation installation = new Installation(installations.resolve(command.folder(version)), hashFunction);
             if (!Files.isRegularFile(installation.folder().resolve(PROPERTIES))) {
-                try (FileChannel channel = FileChannel.open(storage.resolve(command.folder(version) + ".lock"),
+                try (FileChannel channel = FileChannel.open(installations.resolve(command.folder(version) + ".lock"),
                         StandardOpenOption.CREATE,
                         StandardOpenOption.WRITE); FileLock _ = channel.lock()) {
                     if (!Files.isRegularFile(installation.folder().resolve(PROPERTIES))) {
@@ -373,22 +380,58 @@ public record Jpx(Path storage,
         if (root.startsWith(staging)) {
             root = folder.resolve(root.getFileName());
         }
+        PathPlacement placement = command.name().indexOf(':') >= 0
+                ? PathPlacement.CLASS_PATH
+                : this.placement;
         SequencedMap<String, Path> jars = new TreeMap<>();
-        for (Resolver.Resolved resolved : resolution.artifacts().values()) {
-            Path file = resolved.file();
-            Path placed = file.startsWith(staging) ? folder.resolve(file.getFileName()) : file;
-            if (jars.putIfAbsent(file.getFileName().toString(), placed) == null && !placed.startsWith(folder)) {
-                BuildStep.linkOrCopy(folder.resolve(file.getFileName().toString()), placed);
+        SequencedMap<String, String> tokens = new LinkedHashMap<>(), names = new LinkedHashMap<>();
+        SequencedMap<Path, String> renamed = new LinkedHashMap<>();
+        for (Map.Entry<String, Resolver.Resolved> entry : resolution.artifacts().entrySet()) {
+            String dependency = entry.getKey();
+            Path file = entry.getValue().file();
+            Path source = file.startsWith(staging) ? folder.resolve(file.getFileName()) : file;
+            String coordinate = dependency.substring(dependency.indexOf('/') + 1);
+            String name = renamed.get(source);
+            if (name == null) {
+                ModuleDescriptor identity = PathPlacement.moduleDescriptor(source);
+                name = identity == null
+                        ? PathPlacement.fileName(coordinate)
+                        : PathPlacement.fileName(coordinate, identity.name(), true);
+                Path target = folder.resolve(name);
+                if (jars.putIfAbsent(name, target) != null) {
+                    throw new IllegalStateException(dependency
+                            + " and another artifact are both installed as "
+                            + name
+                            + " within "
+                            + folder.getFileName());
+                }
+                if (!source.equals(target)) {
+                    if (source.startsWith(folder)) {
+                        Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+                    } else {
+                        BuildStep.linkOrCopy(target, source);
+                    }
+                }
+                renamed.put(source, name);
+                if (source.equals(root)) {
+                    root = target;
+                }
+            } else if (source.equals(root)) {
+                root = folder.resolve(name);
+            }
+            names.putIfAbsent(dependency, name);
+            int last = coordinate.lastIndexOf('/');
+            if (last > 0) {
+                tokens.putIfAbsent(coordinate.substring(0, last), dependency);
             }
         }
-        root = rename(resolution, jars, folder, root);
+        root = rename(jars, tokens, names, folder, root);
         ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(root);
-        boolean coordinate = command.name().indexOf(':') >= 0;
-        if (!coordinate && (descriptor == null || !descriptor.name().equals(command.name()))) {
+        if (placement != PathPlacement.CLASS_PATH
+                && (descriptor == null || !descriptor.name().equals(command.name()))) {
             throw new IllegalStateException("The jar resolved for module " + command.name() + " is named "
                     + (descriptor == null ? "nothing" : descriptor.name()) + " - the repository mapping appears stale");
         }
-        PathPlacement placement = coordinate ? PathPlacement.CLASS_PATH : this.placement;
         String mainModule = placement.modular() && descriptor != null ? descriptor.name() : null;
         String mainClass = descriptor == null || descriptor.mainClass().isEmpty()
                 ? PathPlacement.mainClass(root)
@@ -421,25 +464,17 @@ public record Jpx(Path storage,
         Files.move(temporary, folder.resolve(PROPERTIES), StandardCopyOption.ATOMIC_MOVE);
     }
 
-    private static Path rename(Resolver.Resolution resolution,
-                               SequencedMap<String, Path> jars,
+    private static Path rename(SequencedMap<String, Path> jars,
+                               SequencedMap<String, String> tokens,
+                               SequencedMap<String, String> names,
                                Path folder,
                                Path root) throws IOException {
-        SequencedMap<String, String> coordinates = new LinkedHashMap<>();
-        for (Map.Entry<String, Resolver.Resolved> entry : resolution.artifacts().entrySet()) {
-            String coordinate = entry.getKey();
-            int first = coordinate.indexOf('/'), last = coordinate.lastIndexOf('/');
-            if (first > 0 && last > first) {
-                coordinates.putIfAbsent(coordinate.substring(first + 1, last),
-                        entry.getValue().file().getFileName().toString());
-            }
-        }
         SequencedMap<String, String> aliased = new LinkedHashMap<>();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
             String origin = entry.getKey();
-            for (Map.Entry<String, String> declaration : PathPlacement.aliases(folder.resolve(origin)).entrySet()) {
-                String alias = declaration.getKey(), name = coordinates.get(declaration.getValue());
-                if (name == null || !jars.containsKey(name)) {
+            for (Map.Entry<String, String> declaration : PathPlacement.aliases(entry.getValue()).entrySet()) {
+                String alias = declaration.getKey(), dependency = tokens.get(declaration.getValue());
+                if (dependency == null || !jars.containsKey(names.get(dependency))) {
                     throw new IllegalStateException(origin
                             + " aliases "
                             + alias
@@ -447,14 +482,14 @@ public record Jpx(Path storage,
                             + declaration.getValue()
                             + ", which this installation does not contain");
                 }
-                String previous = aliased.putIfAbsent(alias, name);
-                if (previous != null && !previous.equals(name)) {
+                String previous = aliased.putIfAbsent(alias, dependency);
+                if (previous != null && !previous.equals(dependency)) {
                     throw new IllegalStateException("Module alias "
                             + alias
                             + " is declared for "
                             + previous
                             + " and for "
-                            + name
+                            + dependency
                             + " within "
                             + folder.getFileName());
                 }
@@ -462,32 +497,35 @@ public record Jpx(Path storage,
         }
         SequencedMap<String, String> owners = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : aliased.entrySet()) {
-            String alias = entry.getKey(), name = entry.getValue(), aliasedJar = alias + ".jar";
-            String previous = owners.putIfAbsent(name, alias);
+            String alias = entry.getKey(), dependency = entry.getValue();
+            String previous = owners.putIfAbsent(dependency, alias);
             if (previous != null) {
-                throw new IllegalStateException(name
+                throw new IllegalStateException(dependency
                         + " is aliased as both "
                         + previous
                         + " and "
                         + alias
                         + " - a jar can carry only one module name");
             }
-            if (jars.containsKey(aliasedJar)) {
+            String coordinate = dependency.substring(dependency.indexOf('/') + 1);
+            String name = PathPlacement.fileName(coordinate, alias, false);
+            if (jars.containsKey(name)) {
                 throw new IllegalStateException("Module alias "
                         + alias
                         + " collides with "
-                        + aliasedJar
+                        + name
                         + " within "
                         + folder.getFileName()
                         + " - require it directly");
             }
-            Path target = folder.resolve(aliasedJar);
-            Files.move(folder.resolve(name), target, StandardCopyOption.REPLACE_EXISTING);
-            jars.remove(name);
-            jars.put(aliasedJar, target);
-            PathPlacement.aliased(target, alias, name);
+            Path source = folder.resolve(names.get(dependency)), target = folder.resolve(name);
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+            jars.remove(names.get(dependency));
+            jars.put(name, target);
+            names.put(dependency, name);
+            PathPlacement.aliased(target, alias, dependency);
             Files.writeString(PathPlacement.declaration(target), alias);
-            if (root.getFileName().toString().equals(name)) {
+            if (root.equals(source)) {
                 root = target;
             }
         }
@@ -495,13 +533,14 @@ public record Jpx(Path storage,
     }
 
     public Optional<Installation> latestInstalled(String name) throws IOException {
-        if (!Files.isDirectory(storage)) {
+        Path root = layout(new Command(name, null, null));
+        if (!Files.isDirectory(root)) {
             return Optional.empty();
         }
         String prefix = new Command(name, null, null).folder("");
         Path latest = null;
         FileTime time = null;
-        try (DirectoryStream<Path> folders = Files.newDirectoryStream(storage)) {
+        try (DirectoryStream<Path> folders = Files.newDirectoryStream(root)) {
             for (Path folder : folders) {
                 if (!folder.getFileName().toString().startsWith(prefix) || !Files.isRegularFile(folder.resolve(PROPERTIES))) {
                     continue;

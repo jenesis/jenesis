@@ -13,6 +13,67 @@ public class PathPlacementTest {
     private Path root;
 
     @Test
+    public void a_class_path_artifact_is_named_by_its_encoded_coordinate() {
+        assertThat(PathPlacement.fileName("org.example/plain-lib/1.0"))
+                .isEqualTo("org.example%2Fplain-lib%2F1.0.jar");
+        assertThat(PathPlacement.fileName("org.example/native-lib/jar/linux/1.0"))
+                .isEqualTo("org.example%2Fnative-lib%2Fjar%2Flinux%2F1.0.jar");
+    }
+
+    @Test
+    public void a_module_is_named_after_the_module_and_its_version() {
+        assertThat(PathPlacement.fileName("org.kohsuke/args4j/2.33", "org.kohsuke.args4j", false))
+                .isEqualTo("org.kohsuke.args4j-2.33.jar");
+        assertThat(PathPlacement.fileName("org.example/lib/9.4.53.v20231009", "org.example.lib", false))
+                .isEqualTo("org.example.lib-9.4.53.v20231009.jar");
+    }
+
+    @Test
+    public void a_version_the_runtime_cannot_derive_is_dropped_from_a_derived_name() {
+        assertThat(PathPlacement.fileName("org.example/lib/1-SNAPSHOT", "org.example.lib", false))
+                .as("the runtime would truncate the name at the dash and fail to derive a module")
+                .isEqualTo("org.example.lib.jar");
+        assertThat(PathPlacement.fileName("org.example/lib/RELEASE", "org.example.lib", false))
+                .isEqualTo("org.example.lib.jar");
+    }
+
+    @Test
+    public void a_declared_name_carries_any_version() {
+        assertThat(PathPlacement.fileName("build.jenesis/build.jenesis/1-SNAPSHOT", "build.jenesis", true))
+                .as("a jar that states its own name is read from within, so the name cannot break")
+                .isEqualTo("build.jenesis-1-SNAPSHOT.jar");
+    }
+
+    @Test
+    public void a_name_the_file_system_would_reject_is_encoded() {
+        assertThat(PathPlacement.fileName("org.example/lib/1.0:beta", "org.example.lib", true))
+                .isEqualTo("org.example.lib-1.0%3Abeta.jar");
+    }
+
+    @Test
+    public void a_derived_name_is_the_one_the_runtime_derives_back() throws IOException {
+        for (String version : List.of("2.33", "1", "1.0.0-SNAPSHOT", "2.0.SP1", "20030203.000550",
+                "1.0.0.Final", "3.0-alpha-1", "9.4.53.v20231009", "1-SNAPSHOT", "RELEASE", "r08")) {
+            Path jar = root.resolve(PathPlacement.fileName("org.example/lib/" + version, "org.example.lib", false));
+            try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar))) {
+                output.putNextEntry(new JarEntry("sample/Sample.class"));
+                output.write(new byte[] {1, 2, 3});
+                output.closeEntry();
+            }
+            Set<ModuleReference> found = ModuleFinder.of(jar).findAll();
+            assertThat(found).hasSize(1);
+            ModuleDescriptor descriptor = found.iterator().next().descriptor();
+            assertThat(descriptor.name())
+                    .as("a jar named for an alias must resolve to that alias, whatever the version looks like")
+                    .isEqualTo("org.example.lib");
+            assertThat(descriptor.rawVersion().orElse(null))
+                    .as("the version is carried when the runtime can derive it, and dropped when it cannot")
+                    .isEqualTo(jar.getFileName().toString().contains("-") ? version : null);
+            Files.delete(jar);
+        }
+    }
+
+    @Test
     public void exposes_modular_flag() {
         assertThat(PathPlacement.CLASS_PATH.modular()).isFalse();
         assertThat(PathPlacement.MODULE_PATH.modular()).isTrue();
