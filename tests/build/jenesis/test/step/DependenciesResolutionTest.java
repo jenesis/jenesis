@@ -593,13 +593,14 @@ public class DependenciesResolutionTest {
     }
 
     @Test
-    public void strict_pinning_accepts_an_internal_artifact_reused_from_a_previous_resolution() throws IOException {
+    public void an_internal_artifact_is_resolved_again_rather_than_reused() throws IOException {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/bar", "");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
+        AtomicReference<String> produced = new AtomicReference<>("first");
         Repository internal = (_, coordinate) -> {
             Path file = Files.write(artifacts.resolve(coordinate.replace('/', '-') + ".jar"),
-                    coordinate.getBytes(StandardCharsets.UTF_8));
+                    produced.get().getBytes(StandardCharsets.UTF_8));
             return Optional.of(RepositoryItem.ofFile(file, true));
         };
         Dependencies resolve = new Dependencies(Map.of("foo", internal), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
@@ -614,6 +615,7 @@ public class DependenciesResolutionTest {
                 .toCompletableFuture()
                 .join();
 
+        produced.set("second");
         Path second = Files.createDirectory(root.resolve("second"));
         BuildStepResult result = resolve.apply(Runnable::run,
                         new BuildStepContext(next, second, supplement),
@@ -621,9 +623,12 @@ public class DependenciesResolutionTest {
                 .toCompletableFuture()
                 .join();
 
-        assertThat(result.next())
-                .as("an artifact this build produced needs no checksum, however it is reached")
-                .isTrue();
+        assertThat(result.next()).isTrue();
+        String entry = SequencedProperties.ofFiles(second.resolve(BuildStep.DEPENDENCIES))
+                .getProperty("main/compile/foo/bar");
+        assertThat(second.resolve(entry))
+                .as("what this build produces is taken from the build, never from what a previous run left behind")
+                .hasContent("second");
     }
 
     @Test
