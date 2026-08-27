@@ -239,7 +239,7 @@ public class Dependencies implements BuildStep {
                     Path file = context.previous()
                             .resolve(space < 0 ? value : value.substring(0, space))
                             .normalize();
-                    if (Files.exists(file)) {
+                    if (Files.exists(file) && !previousInternal.contains(parts[3])) {
                         previousArtifacts.putIfAbsent(parts[3], file);
                     }
                 });
@@ -251,7 +251,7 @@ public class Dependencies implements BuildStep {
             if (!previousArtifacts.isEmpty()) {
                 effective = effective.prepend((_, coordinate) -> Optional
                         .ofNullable(previousArtifacts.get(coordinate))
-                        .map(file -> RepositoryItem.ofFile(file, previousInternal.contains(coordinate))));
+                        .map(RepositoryItem::ofFile));
             }
             wrapped.put(name, effective.materialized(libs));
         });
