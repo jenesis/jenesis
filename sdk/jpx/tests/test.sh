@@ -113,9 +113,9 @@ RC=$?
 set -e
 [ "$RC" = "7" ] || dump_and_fail "expected the tool's exit 7, got $RC"
 [ "$(cat "$TMPDIR/marker.txt")" = "jpx-sdk-test" ] || dump_and_fail "marker file not written by the tool"
-DESCRIPTOR="$TMPDIR/home/.jenesis/jpx/org.example--tool@1.0/jpx.properties"
+DESCRIPTOR="$TMPDIR/home/.jenesis/jpx/maven/org.example--tool@1.0/jpx.properties"
 [ -f "$DESCRIPTOR" ] || dump_and_fail "no descriptor at $DESCRIPTOR"
-grep -qF "classpath=tool-1.0.jar" "$DESCRIPTOR" || dump_and_fail "descriptor does not record the Maven jar name" "$(cat "$DESCRIPTOR")"
+grep -qF "classpath=org.example%2Ftool%2F1.0.jar" "$DESCRIPTOR" || dump_and_fail "descriptor does not record the encoded coordinate" "$(cat "$DESCRIPTOR")"
 echo "  ok"
 
 # [6/6] --hash verifies the recorded checksum prefix and rejects a mismatch

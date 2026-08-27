@@ -36,18 +36,18 @@ public class Demo {
         // The name also decides how the program runs: as a module for the module name,
         // on the class path for the coordinate.
         launch(jpx, "org.junit.platform.console@6.1.3",
-                "9b60dfc3d10f0b4fdf69050eec7b7332f5c395f7e36fad5747ff421e01cfd3e8");
+                "ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452aa1e2dd");
         launch(jpx, "org.junit.platform:junit-platform-console@6.1.3",
-                "9b60dfc3d10f0b4fdf69050eec7b7332f5c395f7e36fad5747ff421e01cfd3e8");
+                "ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452aa1e2dd");
 
         // A leading fraction of that digest is enough: 32 hex characters is the
         // shortest prefix accepted, and it is matched against the recomputed digest.
-        launch(jpx, "org.junit.platform.console@6.1.3", "9b60dfc3d10f0b4fdf69050eec7b7332");
+        launch(jpx, "org.junit.platform.console@6.1.3", "ed5600ef861c7e86cab68c134c6ca0cf");
 
         // A digest that does not match the installed jars refuses to launch, on the
         // run that installed them and on every run after it.
         reject(jpx, "org.junit.platform.console@6.1.3",
-                "9b60dfc3d10f0b4fdf69050eec7b7332f5c395f7e36fad5747ff421e01c0ffee");
+                "ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452ac0ffee");
     }
 
     private static void launch(Jpx jpx, String target, String hash) throws Exception {

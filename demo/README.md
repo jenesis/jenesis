@@ -945,15 +945,15 @@ wherever its inputs match.
 
 Every demo so far built something. `jpx` builds nothing: it resolves a *published*
 module (or Maven artifact), installs its runtime closure once into
-`~/.jenesis/jpx/<name>@<version>/`, and launches its entry point - an `npx` for
+`~/.jenesis/jpx/<layout>/<name>@<version>/`, and launches its entry point - an `npx` for
 the module path, and the counterpart to `Execute.java`, which runs the project
 you have in front of you. The demo drives the `Jpx` API so it can point that
 storage at its own `target/jpx/` and leave your home directory alone; it asks the
 JUnit Platform Console Launcher for its `--version` twice, spelling the same
 artifact two ways:
 
-    jpx --hash=9b60dfc3... org.junit.platform.console@6.1.3 --version
-    jpx --hash=9b60dfc3... org.junit.platform:junit-platform-console@6.1.3 --version
+    jpx --hash=ed5600ef... org.junit.platform.console@6.1.3 --version
+    jpx --hash=ed5600ef... org.junit.platform:junit-platform-console@6.1.3 --version
 
 The first names a **Java module**, whose Maven coordinates the module repository
 discovers as a POM before the graph is read from Maven metadata, exactly as the
@@ -970,7 +970,7 @@ SHA-256 over every jar the installation's `jpx.properties` lists - name and
 content hash, in sorted order - before each launch, so it covers the whole closure
 rather than a single artifact, and catches a jar swapped underneath an existing
 installation as readily as a tampered download. Two further runs show both ends of
-that check: one passes only the leading `9b60dfc3d10f0b4fdf69050eec7b7332`, since
+that check: one passes only the leading `ed5600ef861c7e86cab68c134c6ca0cf`, since
 the value is matched as a prefix and 32 hex characters is the shortest accepted,
 and one passes a full-length digest ending `c0ffee` rather than `cfd3e8`, which is
 blocked before the JVM starts. Naming a version and a hash turns a convenience
