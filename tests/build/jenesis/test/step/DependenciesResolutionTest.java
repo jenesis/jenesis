@@ -593,6 +593,40 @@ public class DependenciesResolutionTest {
     }
 
     @Test
+    public void strict_pinning_accepts_an_internal_artifact_reused_from_a_previous_resolution() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("main/compile/foo/bar", "");
+        properties.store(dependencies.resolve(BuildStep.REQUIRES));
+        Repository internal = (_, coordinate) -> {
+            Path file = Files.write(artifacts.resolve(coordinate.replace('/', '-') + ".jar"),
+                    coordinate.getBytes(StandardCharsets.UTF_8));
+            return Optional.of(RepositoryItem.ofFile(file, true));
+        };
+        Dependencies resolve = new Dependencies(Map.of("foo", internal), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+            SequencedMap<String, String> resolved = new LinkedHashMap<>();
+            descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
+            return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
+        })).pinning(Pinning.STRICT);
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>(Map.of("dependencies",
+                new BuildStepArgument(dependencies, Map.of(
+                        Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED)))));
+        resolve.apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture()
+                .join();
+
+        Path second = Files.createDirectory(root.resolve("second"));
+        BuildStepResult result = resolve.apply(Runnable::run,
+                        new BuildStepContext(next, second, supplement),
+                        arguments)
+                .toCompletableFuture()
+                .join();
+
+        assertThat(result.next())
+                .as("an artifact this build produced needs no checksum, however it is reached")
+                .isTrue();
+    }
+
+    @Test
     public void strict_pinning_rejects_unpinned_external_dependency() throws IOException {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/bar", "");

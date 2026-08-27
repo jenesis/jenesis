@@ -23,6 +23,7 @@ public class Dependencies implements BuildStep {
     public static final String GRAPH = "graph.properties";
     public static final String LICENSES = "licenses.properties";
     public static final String ALIASED = "aliased.properties";
+    public static final String INTERNAL = "internal.properties";
     public static final String RESOLVED = "resolved/";
     public static final String MODULAR = "modular.properties";
     public static final String MODULAR_PATH = "modular/";
@@ -219,7 +220,14 @@ public class Dependencies implements BuildStep {
         }
         Path libs = Files.createDirectories(context.next().resolve(RESOLVED));
         SequencedMap<String, Path> previousArtifacts = new LinkedHashMap<>();
+        SequencedSet<String> previousInternal = new LinkedHashSet<>();
         if (context.previous() != null) {
+            Path previousInternalFile = context.previous().resolve(INTERNAL);
+            if (Files.exists(previousInternalFile)) {
+                for (String dependency : SequencedProperties.ofFiles(previousInternalFile).stringPropertyNames()) {
+                    previousInternal.add(dependency.substring(dependency.indexOf('/') + 1));
+                }
+            }
             Path previousIndex = context.previous().resolve(DEPENDENCIES);
             if (Files.exists(previousIndex)) {
                 SequencedProperties.ofFiles(previousIndex).forEachProperty((key, value) -> {
@@ -243,7 +251,7 @@ public class Dependencies implements BuildStep {
             if (!previousArtifacts.isEmpty()) {
                 effective = effective.prepend((_, coordinate) -> Optional
                         .ofNullable(previousArtifacts.get(coordinate))
-                        .map(RepositoryItem::ofFile));
+                        .map(file -> RepositoryItem.ofFile(file, previousInternal.contains(coordinate))));
             }
             wrapped.put(name, effective.materialized(libs));
         });
@@ -556,6 +564,15 @@ public class Dependencies implements BuildStep {
             SequencedProperties properties = new SequencedProperties();
             aliased.forEach(properties::setProperty);
             properties.store(context.next().resolve(ALIASED));
+        }
+        SequencedProperties produced = new SequencedProperties();
+        internals.forEach((dependency, internal) -> {
+            if (internal) {
+                produced.setProperty(dependency, "");
+            }
+        });
+        if (!produced.isEmpty()) {
+            produced.store(context.next().resolve(INTERNAL));
         }
         if (pinning == Pinning.STRICT) {
             Set<Path> pinnedFiles = new HashSet<>();
