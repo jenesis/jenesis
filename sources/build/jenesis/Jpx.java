@@ -385,30 +385,44 @@ public record Jpx(Path storage,
                 : this.placement;
         SequencedMap<String, Path> jars = new TreeMap<>();
         SequencedMap<String, String> tokens = new LinkedHashMap<>(), names = new LinkedHashMap<>();
+        SequencedMap<Path, String> renamed = new LinkedHashMap<>();
         for (Map.Entry<String, Resolver.Resolved> entry : resolution.artifacts().entrySet()) {
             String dependency = entry.getKey();
             Path file = entry.getValue().file();
             Path source = file.startsWith(staging) ? folder.resolve(file.getFileName()) : file;
             String coordinate = dependency.substring(dependency.indexOf('/') + 1);
-            ModuleDescriptor identity = PathPlacement.moduleDescriptor(source);
-            String name = identity == null
-                    ? PathPlacement.fileName(coordinate)
-                    : PathPlacement.fileName(coordinate, identity.name(), true);
-            Path target = folder.resolve(name);
-            if (jars.putIfAbsent(name, target) == null && !source.equals(target)) {
-                if (source.startsWith(folder)) {
-                    Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
-                } else {
-                    BuildStep.linkOrCopy(target, source);
+            String name = renamed.get(source);
+            if (name == null) {
+                ModuleDescriptor identity = PathPlacement.moduleDescriptor(source);
+                name = identity == null
+                        ? PathPlacement.fileName(coordinate)
+                        : PathPlacement.fileName(coordinate, identity.name(), true);
+                Path target = folder.resolve(name);
+                if (jars.putIfAbsent(name, target) != null) {
+                    throw new IllegalStateException(dependency
+                            + " and another artifact are both installed as "
+                            + name
+                            + " within "
+                            + folder.getFileName());
                 }
+                if (!source.equals(target)) {
+                    if (source.startsWith(folder)) {
+                        Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+                    } else {
+                        BuildStep.linkOrCopy(target, source);
+                    }
+                }
+                renamed.put(source, name);
+                if (source.equals(root)) {
+                    root = target;
+                }
+            } else if (source.equals(root)) {
+                root = folder.resolve(name);
             }
             names.putIfAbsent(dependency, name);
             int last = coordinate.lastIndexOf('/');
             if (last > 0) {
                 tokens.putIfAbsent(coordinate.substring(0, last), dependency);
-            }
-            if (source.equals(root)) {
-                root = target;
             }
         }
         root = rename(jars, tokens, names, folder, root);
