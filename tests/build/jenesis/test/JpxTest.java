@@ -411,9 +411,30 @@ public class JpxTest {
     }
 
     @Test
+    public void a_layout_keeps_its_own_installations() throws IOException, InterruptedException {
+        addMavenTool();
+        addPlainTool("1.0");
+        addDiscoveryPom(null);
+
+        Jpx.Installation named = jpx().install("tool.main");
+        Jpx.Installation modular = jpx(PathPlacement.MODULE_PATH).install("tool.main");
+        Jpx.Installation coordinate = jpx().install("org.example:tool-main@1.0");
+
+        assertThat(named.folder().getParent().getFileName()).hasToString("modular_to_maven");
+        assertThat(modular.folder().getParent().getFileName())
+                .as("a module resolved over descriptors is not the one resolved over poms")
+                .hasToString("modular");
+        assertThat(coordinate.folder().getParent().getFileName())
+                .as("a coordinate names an artifact, not a module, and installs apart")
+                .hasToString("maven");
+        assertThat(modular.properties().getProperty("modulepath"))
+                .isNotEqualTo(named.properties().getProperty("classpath"));
+    }
+
+    @Test
     public void skips_materialization_when_installation_appears_during_resolution() throws IOException {
         addMavenTool();
-        Path folder = storage.resolve("org.example--tool-main@1.0");
+        Path folder = storage.resolve("maven").resolve("org.example--tool-main@1.0");
         Repository mavenRepository = new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {});
         Resolver delegate = new MavenPomResolver();
         Resolver racing = (executor, prefix, repositories, coordinates, versions, scope) -> {
@@ -431,7 +452,7 @@ public class JpxTest {
 
         assertThat(installation.folder()).isEqualTo(folder);
         assertThat(installation.properties().getProperty("name")).isEqualTo("SENTINEL");
-        try (Stream<Path> entries = Files.list(storage)) {
+        try (Stream<Path> entries = Files.list(storage.resolve("maven"))) {
             assertThat(entries.filter(entry -> entry.getFileName().toString().startsWith("staging-"))).isEmpty();
         }
     }

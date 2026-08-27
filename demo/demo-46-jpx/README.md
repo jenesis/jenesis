@@ -24,21 +24,21 @@ From this directory:
 which prints, for each run, the command it stands for, where it installed, and
 what it launched:
 
-    jpx --hash=9b60dfc3d10f0b4fdf69050eec7b7332f5c395f7e36fad5747ff421e01cfd3e8 org.junit.platform.console@6.1.3 --version
-      [verified] target/jpx/org.junit.platform.console@6.1.3 as org.junit.platform.console/org.junit.platform.console.ConsoleLauncher over 9 modules
+    jpx --hash=ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452aa1e2dd org.junit.platform.console@6.1.3 --version
+      [verified] target/jpx/modular_to_maven/org.junit.platform.console@6.1.3 as org.junit.platform.console/org.junit.platform.console.ConsoleLauncher over 9 modules
     JUnit Platform Console Launcher 6.1.3
     JVM: 25.0.3 (Eclipse Adoptium OpenJDK 64-Bit Server VM 25.0.3+9-LTS)
     OS: Linux 7.0.0-28-generic amd64
 
-    jpx --hash=9b60dfc3d10f0b4fdf69050eec7b7332f5c395f7e36fad5747ff421e01cfd3e8 org.junit.platform:junit-platform-console@6.1.3 --version
-      [verified] target/jpx/org.junit.platform--junit-platform-console@6.1.3 as org.junit.platform.console.ConsoleLauncher over 9 jars on the class path
+    jpx --hash=ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452aa1e2dd org.junit.platform:junit-platform-console@6.1.3 --version
+      [verified] target/jpx/maven/org.junit.platform--junit-platform-console@6.1.3 as org.junit.platform.console.ConsoleLauncher over 9 jars on the class path
     JUnit Platform Console Launcher 6.1.3
     JVM: 25.0.3 (Eclipse Adoptium OpenJDK 64-Bit Server VM 25.0.3+9-LTS)
     OS: Linux 7.0.0-28-generic amd64
 
     [... and the module name once more, with a 32-character prefix ...]
 
-    jpx --hash=9b60dfc3d10f0b4fdf69050eec7b7332f5c395f7e36fad5747ff421e01c0ffee org.junit.platform.console@6.1.3 --version
+    jpx --hash=ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452ac0ffee org.junit.platform.console@6.1.3 --version
       [blocked]  Checksum mismatch for org.junit.platform.console@6.1.3: expected a digest starting with 9b60...c0ffee but computed 9b60...cfd3e8
 
 The demo drives the `Jpx` API (`jpx.install(<target>).verify(<hash>).launch(...)`)
@@ -50,11 +50,11 @@ home folder, so a folder of your own arrives together with the repositories and
 resolvers that go with it. The command line does the same thing:
 
     java build/jenesis/Jpx.java \
-        --hash=9b60dfc3d10f0b4fdf69050eec7b7332f5c395f7e36fad5747ff421e01cfd3e8 \
+        --hash=ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452aa1e2dd \
         org.junit.platform.console@6.1.3 --version
 
     java build/jenesis/Jpx.java \
-        --hash=9b60dfc3d10f0b4fdf69050eec7b7332f5c395f7e36fad5747ff421e01cfd3e8 \
+        --hash=ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452aa1e2dd \
         org.junit.platform:junit-platform-console@6.1.3 --version
 
 The two forms
@@ -98,8 +98,8 @@ Each installation is a flat folder of jars beside a `jpx.properties` descriptor:
     version=6.1.3
     mainClass=org.junit.platform.console.ConsoleLauncher
     mainModule=org.junit.platform.console
-    modulepath=apiguardian-api-1.1.2.jar,jspecify-1.0.0.jar,junit-platform-commons-6.1.3.jar,...
-    checksum=SHA-256/9b60dfc3d10f0b4fdf69050eec7b7332f5c395f7e36fad5747ff421e01cfd3e8
+    modulepath=org.apiguardian.api-1.1.2.jar,org.jspecify-1.0.0.jar,org.junit.platform.commons-6.1.3.jar,...
+    checksum=SHA-256/ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452aa1e2dd
 
 `--hash=<prefix>` recomputes that digest over every jar the descriptor lists -
 each file's name and content hash, in sorted order - and refuses to launch on a
@@ -110,7 +110,7 @@ so an interrupted download is recognized and redone, and concurrent installs of
 one target coordinate through a file lock.
 
 The value is matched as a **prefix**, which the demo's third run shows by passing
-only `9b60dfc3d10f0b4fdf69050eec7b7332` - the first 32 hex characters, which is
+only `ed5600ef861c7e86cab68c134c6ca0cf` - the first 32 hex characters, which is
 also the shortest accepted. Anything shorter is refused outright rather than
 checked loosely: 32 hex characters is 128 bits, the floor at which a prefix still
 pins the bytes. A leading `SHA-256/` is stripped, so the `checksum` line can be

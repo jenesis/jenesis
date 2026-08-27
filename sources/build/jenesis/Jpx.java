@@ -267,6 +267,13 @@ public record Jpx(Path storage,
         return install(Command.parse(target));
     }
 
+    private Path layout(Command command) {
+        if (command.name().indexOf(':') >= 0) {
+            return storage.resolve("maven");
+        }
+        return storage.resolve(placement == PathPlacement.MODULE_PATH ? "modular" : "modular_to_maven");
+    }
+
     public Installation install(Command command) throws IOException {
         if (command.version() == null) {
             Installation installed = latestInstalled(command.name()).orElse(null);
@@ -274,13 +281,13 @@ public record Jpx(Path storage,
                 return installed;
             }
         } else {
-            Path folder = storage.resolve(command.folder(command.version()));
+            Path folder = layout(command).resolve(command.folder(command.version()));
             if (Files.isRegularFile(folder.resolve(PROPERTIES))) {
                 return new Installation(folder, hashFunction);
             }
         }
-        Files.createDirectories(storage);
-        Path staging = Files.createTempDirectory(storage, "staging-");
+        Path installations = Files.createDirectories(layout(command));
+        Path staging = Files.createTempDirectory(installations, "staging-");
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             Map<String, Repository> repositories = new LinkedHashMap<>();
             this.repositories.forEach((name, repository) -> repositories.put(name, repository.spilled(staging)));
@@ -339,9 +346,9 @@ public record Jpx(Path storage,
                 }
             }
             SAFE_SEGMENT.accept("version", version);
-            Installation installation = new Installation(storage.resolve(command.folder(version)), hashFunction);
+            Installation installation = new Installation(installations.resolve(command.folder(version)), hashFunction);
             if (!Files.isRegularFile(installation.folder().resolve(PROPERTIES))) {
-                try (FileChannel channel = FileChannel.open(storage.resolve(command.folder(version) + ".lock"),
+                try (FileChannel channel = FileChannel.open(installations.resolve(command.folder(version) + ".lock"),
                         StandardOpenOption.CREATE,
                         StandardOpenOption.WRITE); FileLock _ = channel.lock()) {
                     if (!Files.isRegularFile(installation.folder().resolve(PROPERTIES))) {
@@ -512,13 +519,14 @@ public record Jpx(Path storage,
     }
 
     public Optional<Installation> latestInstalled(String name) throws IOException {
-        if (!Files.isDirectory(storage)) {
+        Path root = layout(new Command(name, null, null));
+        if (!Files.isDirectory(root)) {
             return Optional.empty();
         }
         String prefix = new Command(name, null, null).folder("");
         Path latest = null;
         FileTime time = null;
-        try (DirectoryStream<Path> folders = Files.newDirectoryStream(storage)) {
+        try (DirectoryStream<Path> folders = Files.newDirectoryStream(root)) {
             for (Path folder : folders) {
                 if (!folder.getFileName().toString().startsWith(prefix) || !Files.isRegularFile(folder.resolve(PROPERTIES))) {
                     continue;
