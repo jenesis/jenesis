@@ -119,7 +119,7 @@ this module's `native` key, and the `STAGE` module's `native` step collects it i
 Layout
 ------
 
-    demo/demo-44-native-image
+    demo/demo-45-native-image
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- graal.properties     marker file; presence enables the GraalVM tracing agent
     |-- sources/
