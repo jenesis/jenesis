@@ -2139,11 +2139,11 @@ public record Project(
                 }
             }
             properties.forEach((name, value) -> System.out.println(name + "=" + value));
-            return new LinkedHashMap<>();
+            return Collections.emptyNavigableMap();
         }
         if (Boolean.getBoolean("jenesis.project.watch")) {
             watch(selectors);
-            return new LinkedHashMap<>();
+            return Collections.emptyNavigableMap();
         }
         if (Boolean.getBoolean("jenesis.project.docker")) {
             SortedMap<String, String> properties = new TreeMap<>();
@@ -2226,7 +2226,7 @@ public record Project(
             if (code != 0) {
                 System.exit(code);
             }
-            return new LinkedHashMap<>();
+            return Collections.emptyNavigableMap();
         }
         return this.build(selectors);
     }

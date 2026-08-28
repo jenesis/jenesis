@@ -356,7 +356,7 @@ public class ModularizeModule implements BuildExecutorModule {
             }
             if (source == null) {
                 if (optional) {
-                    return new LinkedHashMap<>();
+                    return Collections.emptyNavigableMap();
                 }
                 throw new IllegalStateException("No module descriptor was generated for " + module);
             }

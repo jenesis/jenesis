@@ -2,6 +2,7 @@ package build.jenesis.test.step;
 
 import build.jenesis.PathPlacement;
 import module java.base;
+import java.util.jar.Attributes;
 import module org.junit.jupiter.api;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
@@ -182,7 +183,7 @@ public class LauncherTest {
 
     private static String mainClass(Path zip) throws IOException {
         try (JarFile file = new JarFile(zip.toFile())) {
-            return file.getManifest().getMainAttributes().getValue("Main-Class");
+            return file.getManifest().getMainAttributes().getValue(Attributes.Name.MAIN_CLASS);
         }
     }
 

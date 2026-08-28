@@ -262,7 +262,7 @@ public class PathPlacementTest {
     private Path multiReleaseJar(String file, Map<String, byte[]> entries) throws IOException {
         Manifest manifest = new Manifest();
         manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
-        manifest.getMainAttributes().putValue("Multi-Release", "true");
+        manifest.getMainAttributes().put(Attributes.Name.MULTI_RELEASE, "true");
         Path jar = root.resolve(file);
         try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar), manifest)) {
             for (Map.Entry<String, byte[]> entry : entries.entrySet()) {

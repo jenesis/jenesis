@@ -162,7 +162,7 @@ public class MavenRepositoryExport implements BuildStep {
 
     private static SequencedSet<String> readMetadataVersions(Path metadata) throws IOException {
         if (!Files.isRegularFile(metadata)) {
-            return new LinkedHashSet<>();
+            return Collections.emptyNavigableSet();
         }
         SequencedSet<String> versions = new LinkedHashSet<>();
         try (InputStream stream = Files.newInputStream(metadata)) {
@@ -178,7 +178,7 @@ public class MavenRepositoryExport implements BuildStep {
                 }
             }
         } catch (ParserConfigurationException | SAXException _) {
-            return new LinkedHashSet<>();
+            return Collections.emptyNavigableSet();
         }
         return versions;
     }

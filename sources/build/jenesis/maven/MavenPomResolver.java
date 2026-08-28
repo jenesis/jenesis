@@ -742,10 +742,10 @@ public class MavenPomResolver implements MavenResolver {
                         dependencies,
                         extended
                                 ? toQualifiedDependencies(document.getDocumentElement())
-                                : new LinkedHashMap<>(),
+                                : Collections.emptyNavigableMap(),
                         extended
                                 ? toAttachments(document.getDocumentElement())
-                                : new LinkedHashMap<>(),
+                                : Collections.emptyNavigableMap(),
                         ownLicenses.isEmpty() ? parentLicenses : ownLicenses);
             }
             default -> throw new IllegalArgumentException("Unknown namespace: " + namespace);
@@ -784,8 +784,8 @@ public class MavenPomResolver implements MavenResolver {
                             Map.of(),
                             Map.of(),
                             Collections.emptyNavigableMap(),
-                            new LinkedHashMap<>(),
-                            new LinkedHashMap<>(),
+                            Collections.emptyNavigableMap(),
+                            Collections.emptyNavigableMap(),
                             List.of());
                 } else {
                     Path localPath = candidate.file().map(Path::getParent).orElse(null);

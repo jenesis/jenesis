@@ -123,7 +123,7 @@ public class JarTest {
                 .isRegularFile();
         assertThat(next.resolve("manifest.mf")).doesNotExist();
         try (JarInputStream jarStream = new JarInputStream(Files.newInputStream(jar))) {
-            assertThat(jarStream.getManifest().getMainAttributes().getValue("Multi-Release"))
+            assertThat(jarStream.getManifest().getMainAttributes().getValue(Attributes.Name.MULTI_RELEASE))
                     .isEqualTo("true");
         }
     }
@@ -156,8 +156,8 @@ public class JarTest {
         try (JarInputStream jarStream = new JarInputStream(Files.newInputStream(
                 next.resolve(BuildStep.ARTIFACTS + "classes.jar")))) {
             Attributes attributes = jarStream.getManifest().getMainAttributes();
-            assertThat(attributes.getValue("Multi-Release")).isEqualTo("true");
-            assertThat(attributes.getValue("Main-Class")).isEqualTo("sample.Sample");
+            assertThat(attributes.getValue(Attributes.Name.MULTI_RELEASE)).isEqualTo("true");
+            assertThat(attributes.getValue(Attributes.Name.MAIN_CLASS)).isEqualTo("sample.Sample");
             assertThat(attributes.getValue("Implementation-Title")).isEqualTo("example");
         }
     }

@@ -395,9 +395,9 @@ public class Dependencies implements BuildStep {
                     String repo = repoEntry.getKey();
                     Resolver resolver = requireNonNull(resolvers.get(Resolver.base(repo)), "Unknown resolver: " + Resolver.base(repo));
                     SequencedMap<String, SequencedSet<String>> repoExclusions = exclusions
-                            .getOrDefault(group, new LinkedHashMap<>())
-                            .getOrDefault(scope, new LinkedHashMap<>())
-                            .getOrDefault(repo, new LinkedHashMap<>());
+                            .getOrDefault(group, Collections.emptyNavigableMap())
+                            .getOrDefault(scope, Collections.emptyNavigableMap())
+                            .getOrDefault(repo, Collections.emptyNavigableMap());
                     SequencedMap<String, SequencedSet<String>> coordinates = new LinkedHashMap<>();
                     SequencedMap<String, SequencedSet<String>> deferred = new LinkedHashMap<>();
                     for (String coordinate : repoEntry.getValue().sequencedKeySet()) {
@@ -412,16 +412,16 @@ public class Dependencies implements BuildStep {
                         }
                     }
                     SequencedMap<String, SequencedMap<String, String>> groupVersions = versions
-                            .getOrDefault(group, new LinkedHashMap<>());
+                            .getOrDefault(group, Collections.emptyNavigableMap());
                     SequencedMap<String, SequencedMap<String, String>> groupManaged = managed
-                            .getOrDefault(group, new LinkedHashMap<>());
+                            .getOrDefault(group, Collections.emptyNavigableMap());
                     List<SequencedMap<String, String>> scoped = new ArrayList<>();
                     List<SequencedMap<String, String>> scopedManaged = new ArrayList<>();
-                    scoped.add(groupVersions.getOrDefault(repo, new LinkedHashMap<>()));
-                    scopedManaged.add(groupManaged.getOrDefault(repo, new LinkedHashMap<>()));
+                    scoped.add(groupVersions.getOrDefault(repo, Collections.emptyNavigableMap()));
+                    scopedManaged.add(groupManaged.getOrDefault(repo, Collections.emptyNavigableMap()));
                     for (String managedPrefix : resolver.managedPrefixes()) {
-                        scoped.add(groupVersions.getOrDefault(managedPrefix, new LinkedHashMap<>()));
-                        scopedManaged.add(groupManaged.getOrDefault(managedPrefix, new LinkedHashMap<>()));
+                        scoped.add(groupVersions.getOrDefault(managedPrefix, Collections.emptyNavigableMap()));
+                        scopedManaged.add(groupManaged.getOrDefault(managedPrefix, Collections.emptyNavigableMap()));
                     }
                     SequencedMap<String, String> bom = new LinkedHashMap<>();
                     if (!pinned) {
@@ -947,7 +947,7 @@ public class Dependencies implements BuildStep {
     public static SequencedMap<String, Path> internal(Path folder) throws IOException {
         Path file = index(folder), graphFile = folder.resolve(GRAPH);
         if (file == null || !Files.exists(graphFile)) {
-            return new LinkedHashMap<>();
+            return Collections.emptyNavigableMap();
         }
         SequencedProperties properties = SequencedProperties.ofFiles(file);
         SequencedMap<String, Path> selected = new LinkedHashMap<>();
@@ -1166,9 +1166,9 @@ public class Dependencies implements BuildStep {
         groupScopes.addAll(vertices.sequencedKeySet());
         for (String groupScope : groupScopes) {
             result.put(groupScope, new Resolver.Resolution(
-                    new LinkedHashMap<>(),
-                    new ArrayList<>(edges.getOrDefault(groupScope, new LinkedHashSet<>())),
-                    vertices.getOrDefault(groupScope, new LinkedHashMap<>())));
+                    Collections.emptyNavigableMap(),
+                    new ArrayList<>(edges.getOrDefault(groupScope, Collections.emptyNavigableSet())),
+                    vertices.getOrDefault(groupScope, Collections.emptyNavigableMap())));
         }
         return result;
     }
