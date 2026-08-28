@@ -33,6 +33,8 @@ public enum PathPlacement {
 
     public static final String ALIASES = "Jenesis-Aliases";
 
+    public static final String OVERRIDES = "Jenesis-Overrides";
+
     private static final Pattern DERIVED_VERSION = Pattern.compile("\\d+(\\..*)?");
 
     private final boolean modular;
@@ -119,18 +121,68 @@ public enum PathPlacement {
         }
     }
 
-    public static SequencedMap<String, String> aliases(Path path) throws IOException {
+    public record Declarations(SequencedMap<String, String> aliases,
+                               SequencedMap<String, SequencedSet<String>> overrides) {
+    }
+
+    public static Declarations declarations(Path path) throws IOException {
         if (Files.isDirectory(path)) {
-            return new LinkedHashMap<>();
+            return new Declarations(Collections.emptyNavigableMap(), Collections.emptyNavigableMap());
         }
-        String declaration;
+        String aliases, overrides;
         try (JarFile jar = new JarFile(path.toFile(), true, ZipFile.OPEN_READ, JarFile.runtimeVersion())) {
             Manifest manifest = jar.getManifest();
-            declaration = manifest == null ? null : manifest.getMainAttributes().getValue(ALIASES);
+            aliases = manifest == null ? null : manifest.getMainAttributes().getValue(ALIASES);
+            overrides = manifest == null ? null : manifest.getMainAttributes().getValue(OVERRIDES);
         } catch (ZipException _) {
-            return new LinkedHashMap<>();
+            return new Declarations(Collections.emptyNavigableMap(), Collections.emptyNavigableMap());
         }
-        return aliases(declaration, path.toString());
+        return new Declarations(aliases(aliases, path.toString()), overrides(overrides, path.toString()));
+    }
+
+    public static SequencedMap<String, String> aliases(Path path) throws IOException {
+        return declarations(path).aliases();
+    }
+
+    public static SequencedMap<String, SequencedSet<String>> overrides(String declaration, String origin) {
+        SequencedMap<String, SequencedSet<String>> overrides = new LinkedHashMap<>();
+        if (declaration == null || declaration.isBlank()) {
+            return overrides;
+        }
+        for (String entry : declaration.split(",")) {
+            String pair = entry.trim();
+            if (pair.isEmpty()) {
+                continue;
+            }
+            int equals = pair.indexOf('=');
+            String module = equals < 0 ? "" : pair.substring(0, equals).trim();
+            String declared = equals < 0 ? "" : pair.substring(equals + 1).trim();
+            if (module.isEmpty() || declared.isEmpty()) {
+                throw new IllegalArgumentException("Malformed " + OVERRIDES + " entry '"
+                        + pair
+                        + "' in "
+                        + origin
+                        + ": expected <module-name>=<module-name>[ <module-name>...]");
+            }
+            SequencedSet<String> carriers = new LinkedHashSet<>();
+            for (String carrier : declared.split(" ")) {
+                if (!carrier.isBlank()) {
+                    carriers.add(carrier.trim());
+                }
+            }
+            SequencedSet<String> previous = overrides.putIfAbsent(module, carriers);
+            if (previous != null && !previous.equals(carriers)) {
+                throw new IllegalArgumentException("Conflicting " + OVERRIDES + " entries for "
+                        + module
+                        + " in "
+                        + origin
+                        + ": "
+                        + previous
+                        + " and "
+                        + carriers);
+            }
+        }
+        return overrides;
     }
 
     public static SequencedMap<String, String> aliases(String declaration, String origin) {

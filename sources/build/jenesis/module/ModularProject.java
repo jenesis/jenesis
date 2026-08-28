@@ -1,6 +1,7 @@
 package build.jenesis.module;
 
 import module java.base;
+import java.util.jar.Attributes;
 import build.jenesis.Pinning;
 import build.jenesis.Platform;
 import build.jenesis.BuildExecutor;
@@ -285,15 +286,33 @@ public class ModularProject implements BuildExecutorModule {
             }
             if (!targets.isEmpty()) {
                 SequencedProperties aliases = new SequencedProperties();
-                List<String> declarations = new ArrayList<>();
                 for (Map.Entry<String, String> entry : targets.entrySet()) {
                     aliases.setProperty(group + "/" + prefix + "/" + entry.getKey(), entry.getValue());
-                    declarations.add(entry.getKey() + "=" + entry.getValue());
                 }
                 aliases.store(context.next().resolve(BuildStep.ALIASES));
+            }
+            if (!info.overrides().isEmpty()) {
+                SequencedProperties overrides = new SequencedProperties();
+                for (Map.Entry<String, SequencedSet<String>> entry : info.overrides().entrySet()) {
+                    overrides.setProperty(group + "/" + prefix + "/" + entry.getKey(),
+                            String.join(" ", entry.getValue()));
+                }
+                overrides.store(context.next().resolve(BuildStep.OVERRIDES));
+            }
+            if (!targets.isEmpty() || !info.overrides().isEmpty()) {
                 Manifest manifest = new Manifest();
-                manifest.getMainAttributes().putValue("Manifest-Version", "1.0");
-                manifest.getMainAttributes().putValue(PathPlacement.ALIASES, String.join(",", declarations));
+                manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+                if (!targets.isEmpty()) {
+                    List<String> declarations = new ArrayList<>();
+                    targets.forEach((alias, target) -> declarations.add(alias + "=" + target));
+                    manifest.getMainAttributes().putValue(PathPlacement.ALIASES, String.join(",", declarations));
+                }
+                if (!info.overrides().isEmpty()) {
+                    List<String> declarations = new ArrayList<>();
+                    info.overrides().forEach((module, carriers) ->
+                            declarations.add(module + "=" + String.join(" ", carriers)));
+                    manifest.getMainAttributes().putValue(PathPlacement.OVERRIDES, String.join(",", declarations));
+                }
                 try (OutputStream out = Files.newOutputStream(context.next().resolve(Versions.MANIFEST))) {
                     manifest.write(out);
                 }
