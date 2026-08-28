@@ -32,7 +32,7 @@ two channels described under "Where the POM metadata comes from" below:
     <version>1.0.0</version>
     <name>Jenesis Publishing Demo</name>
     <description>A sample library whose name and description are taken from this Javadoc ...</description>
-    <url>https://github.com/raphw/jenesis</url>
+    <url>https://github.com/jenesis/jenesis</url>
     <licenses>...</licenses>
     <developers>...</developers>
     <scm>...</scm>

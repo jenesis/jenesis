@@ -9,7 +9,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
 
     private static final String GITHUB_DATA =
-            "https://raw.githubusercontent.com/raphw/jenesis-modules/main/data/modules/";
+            "https://raw.githubusercontent.com/jenesis/jenesis-modules/main/data/modules/";
 
     private final Scope scope;
     private final URI data;

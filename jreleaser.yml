@@ -5,7 +5,7 @@ project:
   authors: [Rafael Winterhalter]
   license: Apache-2.0
   links:
-    homepage: https://github.com/raphw/jenesis
+    homepage: https://github.com/jenesis/jenesis
   languages:
     java:
       groupId: build.jenesis
@@ -21,7 +21,7 @@ signing:
 
 release:
   github:
-    owner: raphw
+    owner: jenesis
     name: jenesis
     branch: main
     branchPush: main
@@ -46,19 +46,19 @@ distributions:
       active: ALWAYS
       formulaName: jenesis
       repository:
-        owner: raphw
+        owner: jenesis
         name: homebrew-tap
     scoop:
       active: ALWAYS
       packageName: jenesis
       repository:
-        owner: raphw
+        owner: jenesis
         name: scoop-bucket
     sdkman:
       active: ALWAYS
       candidate: jenesis
       command: MAJOR
-      releaseNotesUrl: 'https://github.com/raphw/jenesis/releases/tag/v{{projectVersion}}'
+      releaseNotesUrl: 'https://github.com/jenesis/jenesis/releases/tag/v{{projectVersion}}'
 
 deploy:
   maven:

@@ -4,7 +4,7 @@ Jenesis, the build tool, and jpx, the module runner, in one repository. The tool
 links to `sources/build/jenesis`, so `java build/jenesis/Project.java` compiles, tests and packages this
 project with the very sources it is working on. `README.md` covers the layout, the demos, CI and releasing;
 this file is how the code is written and changed. The user documentation is
-[jenesis.build](https://jenesis.build) ([raphw/jenesis-documentation](https://github.com/raphw/jenesis-documentation)),
+[jenesis.build](https://jenesis.build) ([jenesis/jenesis-documentation](https://github.com/jenesis/jenesis-documentation)),
 and `java build/jenesis/Project.java skill` prints an onboarding briefing from the same material.
 
 ## Build & test

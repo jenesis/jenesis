@@ -1292,7 +1292,7 @@ public record Project(
                       external-module  from local source or from a coordinate.
 
                     They live under `demo/` in the repository, indexed by `demo/README.md`, and
-                    online at https://github.com/raphw/jenesis/tree/main/demo.
+                    online at https://github.com/jenesis/jenesis/tree/main/demo.
 
                     ## 13. Read further when stuck
 
@@ -1304,10 +1304,10 @@ public record Project(
                     assembler, wiring a graph by hand); "Reference" (every selector, configuration
                     key and built-in step).
 
-                      Source repository  https://github.com/raphw/jenesis
-                      Issue tracker  https://github.com/raphw/jenesis/issues
+                      Source repository  https://github.com/jenesis/jenesis
+                      Issue tracker  https://github.com/jenesis/jenesis/issues
                       Releases
-                          https://github.com/raphw/jenesis/releases (changelog, downloads, the
+                          https://github.com/jenesis/jenesis/releases (changelog, downloads, the
                           matching git tag per published version)
 
                     When stuck, read the source: every public type lives under
