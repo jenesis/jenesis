@@ -69,6 +69,7 @@ public class Dependencies implements BuildStep {
                 Path.of(ALIASES),
                 Path.of(BOMS),
                 Path.of(EXCLUSIONS),
+                Path.of(OVERRIDES),
                 Path.of(SPDX)));
     }
 
@@ -112,6 +113,7 @@ public class Dependencies implements BuildStep {
         SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>> requires = new LinkedHashMap<>();
         SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> versions = new LinkedHashMap<>();
         SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> moduleAliases = new LinkedHashMap<>();
+        SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> moduleOverrides = new LinkedHashMap<>();
         SequencedMap<String, String> bomTokens = new LinkedHashMap<>();
         SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedSet<String>>>>> exclusions = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
@@ -168,6 +170,24 @@ public class Dependencies implements BuildStep {
                             .putIfAbsent(key.substring(second + 1), properties.getProperty(key));
                 }
             }
+            Path overridesFile = argument.folder().resolve(OVERRIDES);
+            if (Files.exists(overridesFile)) {
+                SequencedProperties properties = SequencedProperties.ofFiles(overridesFile);
+                for (String key : properties.stringPropertyNames()) {
+                    int first = key.indexOf('/');
+                    int second = first < 1 ? -1 : key.indexOf('/', first + 1);
+                    if (first < 1 || second <= first || second == key.length() - 1) {
+                        throw new IllegalArgumentException("Malformed module override '"
+                                + key
+                                + "' in "
+                                + overridesFile
+                                + ": expected <group>/<repository>/<module-name>");
+                    }
+                    moduleOverrides.computeIfAbsent(key.substring(0, first), _ -> new LinkedHashMap<>())
+                            .computeIfAbsent(key.substring(first + 1, second), _ -> new LinkedHashMap<>())
+                            .putIfAbsent(key.substring(second + 1), properties.getProperty(key));
+                }
+            }
             Path bomsFile = argument.folder().resolve(BOMS);
             if (Files.exists(bomsFile)) {
                 SequencedProperties properties = SequencedProperties.ofFiles(bomsFile);
@@ -211,6 +231,7 @@ public class Dependencies implements BuildStep {
         if (group != null) {
             requires.keySet().retainAll(Set.of(group));
             moduleAliases.keySet().retainAll(Set.of(group));
+            moduleOverrides.keySet().retainAll(Set.of(group));
             bomTokens.keySet().removeIf(token -> {
                 int first = token.indexOf('/'), second = token.indexOf('/', first + 1);
                 return second < 0 || !group.equals(token.substring(first + 1, second));
@@ -340,6 +361,23 @@ public class Dependencies implements BuildStep {
                 byAlias.forEach((alias, token) -> merge(aliasTargets, alias, token, LOCAL));
             }
         }
+        SequencedMap<String, Overridden> overrideTargets = new LinkedHashMap<>();
+        for (SequencedMap<String, SequencedMap<String, String>> byRepository : moduleOverrides.values()) {
+            for (SequencedMap<String, String> byModule : byRepository.values()) {
+                byModule.forEach((module, carriers) -> merge(overrideTargets,
+                        module,
+                        PathPlacement.overrides(module + "=" + carriers, "a local @jenesis.override declaration")
+                                .get(module),
+                        "a local @jenesis.override declaration"));
+            }
+        }
+        if (!overrideTargets.isEmpty()
+                && resolvers.values().stream().allMatch(resolver -> resolver.managedPrefixes().isEmpty())) {
+            throw new IllegalArgumentException("Cannot override "
+                    + overrideTargets.sequencedKeySet()
+                    + ": a module override needs a layout where module names resolve to Maven coordinates"
+                    + " - drop the declaration or build with jenesis.project.layout=modular_to_maven");
+        }
         SequencedSet<String> aliasTokens = new LinkedHashSet<>();
         for (Alias alias : aliasTargets.values()) {
             aliasTokens.add(alias.token());
@@ -363,6 +401,9 @@ public class Dependencies implements BuildStep {
                     SequencedMap<String, SequencedSet<String>> coordinates = new LinkedHashMap<>();
                     SequencedMap<String, SequencedSet<String>> deferred = new LinkedHashMap<>();
                     for (String coordinate : repoEntry.getValue().sequencedKeySet()) {
+                        if (overrideTargets.containsKey(coordinate)) {
+                            continue;
+                        }
                         SequencedSet<String> excludes = repoExclusions.getOrDefault(coordinate, Collections.emptyNavigableSet());
                         if (aliasTokens.contains(coordinate)) {
                             deferred.put(coordinate, excludes);
@@ -441,6 +482,22 @@ public class Dependencies implements BuildStep {
                         }
                         if (!absent.isEmpty()) {
                             coordinates.putAll(absent);
+                            resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, intent);
+                        }
+                    }
+                    if (!overrideTargets.isEmpty() && !coordinates.isEmpty()) {
+                        SequencedSet<String> overridden = new LinkedHashSet<>();
+                        resolution.vertices().forEach((coordinate, node) -> {
+                            if (node.module() != null && overrideTargets.containsKey(node.module())) {
+                                overridden.add(artifactName(coordinate.substring(coordinate.indexOf('/') + 1)));
+                            }
+                        });
+                        if (!overridden.isEmpty()) {
+                            coordinates.replaceAll((_, excludes) -> {
+                                SequencedSet<String> merged = new LinkedHashSet<>(excludes);
+                                merged.addAll(overridden);
+                                return merged;
+                            });
                             resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, intent);
                         }
                     }
@@ -546,6 +603,43 @@ public class Dependencies implements BuildStep {
             });
         }
         SequencedMap<String, String> aliased = rename(placed, aliasTargets, modules, explicit, libs);
+        for (Map.Entry<String, Overridden> entry : overrideTargets.entrySet()) {
+            for (String carrier : entry.getValue().carriers()) {
+                if (!modules.containsKey(carrier)) {
+                    throw new IllegalArgumentException("Module override "
+                            + entry.getKey()
+                            + " declared by "
+                            + entry.getValue().origin()
+                            + " names "
+                            + carrier
+                            + " which no resolved dependency carries"
+                            + " - require the carrier or drop the override");
+                }
+            }
+        }
+        for (Map.Entry<String, SequencedMap<String, SequencedMap<String, String>>> byGroup : moduleOverrides.entrySet()) {
+            SequencedSet<String> scopes = requires
+                    .getOrDefault(byGroup.getKey(), Collections.emptyNavigableMap())
+                    .sequencedKeySet();
+            for (SequencedMap<String, String> byModule : byGroup.getValue().values()) {
+                for (String module : byModule.sequencedKeySet()) {
+                    Path file = libs.resolve(BuildExecutorModule.encode(module) + ".jar");
+                    if (!Files.exists(file)) {
+                        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(file))) {
+                            output.putNextEntry(new JarEntry("module-info.class"));
+                            output.write(carrying(module, overrideTargets.get(module).carriers()));
+                            output.closeEntry();
+                        }
+                    }
+                    placed.put("module/" + module, file);
+                    for (String scope : scopes) {
+                        String key = byGroup.getKey() + "/" + scope + "/module/" + module;
+                        materialized.put(key, new Resolver.Resolved(file, "", false));
+                        resolved.setProperty(key, "");
+                    }
+                }
+            }
+        }
         SequencedProperties index = new SequencedProperties();
         for (Map.Entry<String, Resolver.Resolved> entry : materialized.entrySet()) {
             String key = entry.getKey();
@@ -602,6 +696,42 @@ public class Dependencies implements BuildStep {
     private static final String LOCAL = "a local @jenesis.alias declaration";
 
     private record Alias(String token, String origin) {
+    }
+
+    private record Overridden(SequencedSet<String> carriers, String origin) {
+    }
+
+    private static void merge(SequencedMap<String, Overridden> declared,
+                              String module,
+                              SequencedSet<String> carriers,
+                              String origin) {
+        Overridden previous = declared.putIfAbsent(module, new Overridden(carriers, origin));
+        if (previous != null && !previous.carriers().equals(carriers)) {
+            throw new IllegalArgumentException("Module override "
+                    + module
+                    + " is declared for "
+                    + previous.carriers()
+                    + " by "
+                    + previous.origin()
+                    + " and for "
+                    + carriers
+                    + " by "
+                    + origin);
+        }
+    }
+
+    private static String artifactName(String coordinate) {
+        int slash = coordinate.indexOf('/');
+        int second = slash < 0 ? -1 : coordinate.indexOf('/', slash + 1);
+        return second < 0 ? coordinate : coordinate.substring(0, second);
+    }
+
+    private static byte[] carrying(String module, SequencedSet<String> carriers) {
+        return ClassFile.of().buildModule(ModuleAttribute.of(ModuleDesc.of(module), builder -> {
+            builder.requires(ModuleDesc.of("java.base"), ClassFile.ACC_MANDATED, null);
+            carriers.forEach(carrier -> builder.requires(
+                    ModuleDesc.of(carrier), ClassFile.ACC_TRANSITIVE, null));
+        }));
     }
 
     private static void merge(SequencedMap<String, Alias> declared,

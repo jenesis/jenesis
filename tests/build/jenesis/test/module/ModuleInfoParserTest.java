@@ -165,6 +165,88 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void jenesis_override_lists_several_carriers_on_one_line() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.override jakarta.websocket org.apache.tomcat.embed.websocket  lib.extra \s
+                 * @jenesis.override jakarta.servlet org.apache.tomcat.embed.core
+                 */
+                module foo {
+                    requires jakarta.servlet;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.overrides())
+                .containsEntry("jakarta.websocket",
+                        new LinkedHashSet<>(List.of("org.apache.tomcat.embed.websocket", "lib.extra")))
+                .containsEntry("jakarta.servlet",
+                        new LinkedHashSet<>(List.of("org.apache.tomcat.embed.core")));
+    }
+
+    @Test
+    public void jenesis_override_accumulates_repeated_declarations() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.override jakarta.servlet org.apache.tomcat.embed.core
+                 * @jenesis.override jakarta.servlet lib.extra
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.overrides())
+                .as("two lines about one module are additive, not a conflict")
+                .containsEntry("jakarta.servlet",
+                        new LinkedHashSet<>(List.of("org.apache.tomcat.embed.core", "lib.extra")));
+    }
+
+    @Test
+    public void jenesis_override_rejects_missing_carrier() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.override jakarta.servlet
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.override declaration 'jakarta.servlet':"
+                        + " expected <module-name> <module-name>...");
+    }
+
+    @Test
+    public void jenesis_override_rejects_a_coordinate() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.override jakarta.servlet org.apache.tomcat.embed/tomcat-embed-core
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("a carrier is named by the module it declares, never by the artifact that ships it")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Illegal @jenesis.override module"
+                        + " 'org.apache.tomcat.embed/tomcat-embed-core': expected a module name");
+    }
+
+    @Test
+    public void jenesis_override_rejects_a_module_carrying_itself() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.override jakarta.servlet jakarta.servlet
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Illegal @jenesis.override for jakarta.servlet:"
+                        + " a module cannot carry itself");
+    }
+
+    @Test
     public void jenesis_exclude_rejects_missing_target() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**

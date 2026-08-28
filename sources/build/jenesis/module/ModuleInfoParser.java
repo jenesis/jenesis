@@ -51,6 +51,7 @@ public class ModuleInfoParser {
             }
             SequencedMap<String, String> aliases = new LinkedHashMap<>();
             SequencedMap<String, SequencedSet<String>> excludes = new LinkedHashMap<>();
+            SequencedMap<String, SequencedSet<String>> overrides = new LinkedHashMap<>();
             SequencedMap<String, String> versions = new LinkedHashMap<>();
             SequencedMap<String, SequencedMap<String, String>> variants = new LinkedHashMap<>();
             SequencedMap<String, String> boms = new LinkedHashMap<>();
@@ -278,6 +279,37 @@ public class ModuleInfoParser {
                                     targets.add(words[index]);
                                 }
                             }
+                            case "jenesis.override" -> {
+                                String declaration = content.replaceAll("\\s+", " ").trim();
+                                String[] words = declaration.split(" ");
+                                if (words.length < 2) {
+                                    throw new IllegalArgumentException("Malformed @jenesis.override declaration '"
+                                            + declaration
+                                            + "': expected <module-name> <module-name>...");
+                                }
+                                for (String word : words) {
+                                    if (word.startsWith("java.") || word.startsWith("jdk.")) {
+                                        throw new IllegalArgumentException("Illegal @jenesis.override module '"
+                                                + word
+                                                + "': platform modules cannot be overridden or carry an override");
+                                    }
+                                    if (word.indexOf('/') >= 0) {
+                                        throw new IllegalArgumentException("Illegal @jenesis.override module '"
+                                                + word
+                                                + "': expected a module name");
+                                    }
+                                }
+                                SequencedSet<String> carriers = overrides.computeIfAbsent(
+                                        words[0], _ -> new LinkedHashSet<>());
+                                for (int index = 1; index < words.length; index++) {
+                                    if (words[index].equals(words[0])) {
+                                        throw new IllegalArgumentException("Illegal @jenesis.override for "
+                                                + words[0]
+                                                + ": a module cannot carry itself");
+                                    }
+                                    carriers.add(words[index]);
+                                }
+                            }
                             case "jenesis.attach" -> {
                                 String attach = content.replaceAll("\\s+", " ").trim();
                                 if (attach.isEmpty()) {
@@ -343,6 +375,7 @@ public class ModuleInfoParser {
                     attachments,
                     aliases,
                     excludes,
+                    overrides,
                     versions,
                     variants,
                     boms,

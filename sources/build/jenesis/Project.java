@@ -680,6 +680,19 @@ public record Project(
                                                        resolved closure, so it is absent from the compile and
                                                        runtime paths and from the generated pom alike. Excluding
                                                        from a module that is not required is an error
+                      %{name}@jenesis.override%{reset} <module> <module>...
+                                                       Replace a module with the modules that already carry its
+                                                       packages (MODULAR_TO_MAVEN layout only), for a dependency
+                                                       that shades another module's content, as Tomcat Embed
+                                                       shades the Jakarta Servlet API. Jenesis puts a module of
+                                                       that name on the module path which contains no packages
+                                                       and requires the named carriers transitively, so requiring
+                                                       it reads the carrier's copy, and it drops every resolved
+                                                       artifact that declares the overridden module, so neither
+                                                       the module path nor the generated pom carries the packages
+                                                       twice. One line names one module and any number of
+                                                       carriers, repeated lines for a module add to each other,
+                                                       and a carrier no resolved dependency declares is an error
                       %{name}@jenesis.bom%{reset} <token> [<ver> [<algo>/<hex>]] [<guard>]
                                                        Import managed versions from a BOM; the token follows the
                                                        pin grammar: a bare <module> (short for <group>/module/<module>)
@@ -957,6 +970,17 @@ public record Project(
                           pulled in with it and never reaches the resolved closure, so it is absent
                           from the compile and runtime paths and from the generated pom alike.
                           Excluding from a module that is not required is an error.
+                      @jenesis.override <module> <module>...
+                          Replace a module with the modules that already carry its packages
+                          (MODULAR_TO_MAVEN only), for a dependency that shades another module's
+                          content, as Tomcat Embed shades the Jakarta Servlet API. Jenesis places
+                          a module of that name that contains no packages and requires the carriers
+                          transitively, so requiring it reads the carrier's copy, and it drops every
+                          resolved artifact declaring the overridden module, so neither the module
+                          path nor the generated pom carries those packages twice. One line names
+                          one module and any number of carriers, repeated lines add to each other,
+                          and a carrier no resolved dependency declares is an error. The declaration
+                          travels to consumers through the Jenesis-Overrides manifest header.
                       @jenesis.bom <token> [<ver> [<algo>/<hex>]] [<guard>]
                           Import managed versions from a BOM. The token follows the pin grammar: a
                           bare <module> (abbreviating <group>/module/<module>) names a BOM
