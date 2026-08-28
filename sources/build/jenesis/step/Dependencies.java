@@ -698,7 +698,7 @@ public class Dependencies implements BuildStep {
         SequencedMap<String, Path> ordered = new LinkedHashMap<>();
         names.keySet().forEach(dependency -> ordered.put(dependency, placed.get(dependency)));
         ordered.putAll(placed);
-        SequencedMap<String, Claim> claims = new LinkedHashMap<>();
+        SequencedMap<String, Claim> claims = new LinkedHashMap<>(), carriers = new LinkedHashMap<>();
         SequencedMap<Path, Path> renamed = new LinkedHashMap<>();
         for (Map.Entry<String, Path> entry : ordered.entrySet()) {
             String dependency = entry.getKey();
@@ -713,14 +713,27 @@ public class Dependencies implements BuildStep {
             }
             String coordinate = dependency.substring(dependency.indexOf('/') + 1);
             String alias = names.get(dependency);
-            String name;
+            String module;
             if (alias != null) {
-                name = PathPlacement.fileName(coordinate, alias, false);
+                module = alias;
             } else {
                 ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(source);
-                name = descriptor == null
-                        ? PathPlacement.fileName(coordinate)
-                        : PathPlacement.fileName(coordinate, descriptor.name(), true);
+                module = descriptor == null ? null : descriptor.name();
+            }
+            String name = module == null
+                    ? PathPlacement.fileName(coordinate)
+                    : PathPlacement.fileName(coordinate, module, alias == null);
+            if (module != null) {
+                Claim carrier = carriers.putIfAbsent(module, new Claim(dependency, source));
+                if (carrier != null && !carrier.file().equals(source)) {
+                    throw new IllegalArgumentException(carrier.dependency()
+                            + " and "
+                            + dependency
+                            + " both carry module "
+                            + module
+                            + " - a module path resolves whichever of the two comes first,"
+                            + " so drop one with @jenesis.exclude");
+                }
             }
             Claim previous = claims.putIfAbsent(name, new Claim(dependency, source));
             if (previous != null && !previous.file().equals(source)) {
@@ -729,7 +742,7 @@ public class Dependencies implements BuildStep {
                         + dependency
                         + " are both materialized as "
                         + name
-                        + " - two artifacts cannot carry one module name");
+                        + " - two artifacts cannot share one file name");
             }
             Path target = libs.resolve(name);
             if (!source.equals(target)) {
