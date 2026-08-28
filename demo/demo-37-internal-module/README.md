@@ -25,7 +25,7 @@ Built without the plugin the literal `${greeting}` would print instead.
 Layout
 ------
 
-    demo/demo-36-internal-module
+    demo/demo-37-internal-module
     |-- build/jenesis            symlink to ../../../sources/build/jenesis
     |-- build/Demo.java          the launcher (Project + wrapping assembler)
     |-- plugin/

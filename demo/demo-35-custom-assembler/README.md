@@ -38,7 +38,7 @@ unsubstituted `${greeting}` placeholder.
 Layout
 ------
 
-    demo/demo-34-custom-assembler
+    demo/demo-35-custom-assembler
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- build/Demo.java    the launcher: wires the wrapping assembler, builds, runs
     `-- sources/

@@ -6,7 +6,7 @@ the standard entry point, while still reusing Jenesis's stock toolchain. You wri
 small `build/Demo.java` that points Jenesis at the project root, and one convenience
 call discovers the `module-info.java` modules, builds the library module first, and
 resolves it when compiling the consumer module - a custom launcher without wiring
-every step by hand. This is the modular counterpart of `../demo-38-custom-maven`.
+every step by hand. This is the modular counterpart of `../demo-39-custom-maven`.
 
 Run it
 ------
@@ -22,7 +22,7 @@ demo.greeter`). Each module produces a modular jar under `target/`.
 Layout
 ------
 
-    demo/demo-39-custom-modular
+    demo/demo-40-custom-modular
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- build/Demo.java      the launcher: BuildExecutor + ModularProject.make(...)
     |-- greeter/             the library module

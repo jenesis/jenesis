@@ -90,21 +90,22 @@ Quick index
 | 29 | [`module-layout`](demo-29-module-layout/README.md)           | Explicitly select the pure MODULAR layout (via `jenesis.properties`): resolve by module name, emit a modular jar with no `pom.xml` | `java build/jenesis/Project.java`  |
 | 30 | [`module-classifier`](demo-30-module-classifier/README.md)   | Pin a classified variant of a module (`:jdk-flow:0.4.3`): the build fetches the classifier artifact, validated by checksum and asserted at runtime | `java build/jenesis/Execute.java`  |
 | 31 | [`module-alias`](demo-31-module-alias/README.md)             | Give a plain jar with no module identity (no `module-info`, no `Automatic-Module-Name`) a stable name with `@jenesis.alias`, so it can be `requires`d and `opens`d like any module - shown with args4j 2.33 - then a `modules.properties` rewrites the closure into explicit named modules with `jdeps`, so the alias becomes linkable into a `jlink` image | `java build/jenesis/Execute.java`  |
-| 32 | [`platform-guard`](demo-32-platform-guard/README.md)         | Select a dependency variant per platform: guarded pin lines (`[windows]`) matched against the `-Djenesis.platform.<token>=true` flags, with an unguarded fallback | `java build/jenesis/Execute.java`  |
-| 33 | [`platform-guard-pom`](demo-33-platform-guard-pom/README.md)  | The same guards in a `pom.xml`'s `<!--jenesis.pin-->` block: switch a transitive's pinned version per platform, each variant checksummed | `java build/jenesis/Execute.java`  |
-| 34 | [`custom-assembler`](demo-34-custom-assembler/README.md)     | Wrap the assembler to preprocess sources before the regular flow      | `java build/Demo.java`             |
-| 35 | [`custom-jmod`](demo-35-custom-jmod/README.md)               | Wrap the assembler to pack extra content into a `.jmod`, `jlink` it into a runtime, and `jpackage` that into a runnable app | `java build/Demo.java`             |
-| 36 | [`internal-module`](demo-36-internal-module/README.md)       | Move that preprocessing into a build module loaded from local source | `java build/Demo.java`             |
-| 37 | [`external-module`](demo-37-external-module/README.md)       | Resolve the same build module as a published coordinate | `java build/Demo.java`             |
-| 38 | [`custom-maven`](demo-38-custom-maven/README.md)             | Drive a multi-module Maven build via `MavenProject.make(root, assembler)`, no `Project` | `java build/Demo.java`             |
-| 39 | [`custom-modular`](demo-39-custom-modular/README.md)         | The same via `ModularProject.make(root, assembler)` for modules       | `java build/Demo.java`             |
-| 40 | [`custom-build`](demo-40-custom-build/README.md)             | No `Project` at all: wire a `BuildExecutor` by hand                   | `java build/Demo.java`             |
-| 41 | [`docker-isolation`](demo-41-docker-isolation/README.md)     | A standard build whose test and artifact `main` both grab host secrets, and how Docker confines them | `java build/jenesis/Project.java`  |
-| 42 | [`supply-chain-security`](demo-42-supply-chain-security/README.md) | Two modules that must *not* build: an unpinned dependency rejected by strict pinning, and a wrong checksum rejected always | `java build/Demo.java`             |
-| 43 | [`publishing`](demo-43-publishing/README.md)                 | Assemble a Maven Central ready bundle (POM metadata + sources/javadoc jars) and resolve it back | `java build/Demo.java`             |
-| 44 | [`native-image`](demo-44-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Project.java`  |
-| 45 | [`build-cache`](demo-45-build-cache/README.md)               | A content-addressed build cache serving step outputs across builds - project-local (`-Djenesis.project.cache`), shared via a URI (`-Djenesis.cache.uri=`), or local layered in front of a remote; shown by bootstrapping it then serving a full `-Djenesis.executor.rebuild=true` from it | `java build/jenesis/Project.java`  |
-| 46 | [`jpx`](demo-46-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
+| 32 | [`module-override`](demo-32-module-override/README.md)       | Require an API whose packages a dependency already ships: Tomcat Embed exports the `jakarta.servlet` packages under its own module name, so `@jenesis.override` places a package-less `jakarta.servlet` that reads the carrier and drops the artifact that would carry them twice | `java build/jenesis/Execute.java`  |
+| 33 | [`platform-guard`](demo-33-platform-guard/README.md)         | Select a dependency variant per platform: guarded pin lines (`[windows]`) matched against the `-Djenesis.platform.<token>=true` flags, with an unguarded fallback | `java build/jenesis/Execute.java`  |
+| 34 | [`platform-guard-pom`](demo-34-platform-guard-pom/README.md)  | The same guards in a `pom.xml`'s `<!--jenesis.pin-->` block: switch a transitive's pinned version per platform, each variant checksummed | `java build/jenesis/Execute.java`  |
+| 35 | [`custom-assembler`](demo-35-custom-assembler/README.md)     | Wrap the assembler to preprocess sources before the regular flow      | `java build/Demo.java`             |
+| 36 | [`custom-jmod`](demo-36-custom-jmod/README.md)               | Wrap the assembler to pack extra content into a `.jmod`, `jlink` it into a runtime, and `jpackage` that into a runnable app | `java build/Demo.java`             |
+| 37 | [`internal-module`](demo-37-internal-module/README.md)       | Move that preprocessing into a build module loaded from local source | `java build/Demo.java`             |
+| 38 | [`external-module`](demo-38-external-module/README.md)       | Resolve the same build module as a published coordinate | `java build/Demo.java`             |
+| 39 | [`custom-maven`](demo-39-custom-maven/README.md)             | Drive a multi-module Maven build via `MavenProject.make(root, assembler)`, no `Project` | `java build/Demo.java`             |
+| 40 | [`custom-modular`](demo-40-custom-modular/README.md)         | The same via `ModularProject.make(root, assembler)` for modules       | `java build/Demo.java`             |
+| 41 | [`custom-build`](demo-41-custom-build/README.md)             | No `Project` at all: wire a `BuildExecutor` by hand                   | `java build/Demo.java`             |
+| 42 | [`docker-isolation`](demo-42-docker-isolation/README.md)     | A standard build whose test and artifact `main` both grab host secrets, and how Docker confines them | `java build/jenesis/Project.java`  |
+| 43 | [`supply-chain-security`](demo-43-supply-chain-security/README.md) | Two modules that must *not* build: an unpinned dependency rejected by strict pinning, and a wrong checksum rejected always | `java build/Demo.java`             |
+| 44 | [`publishing`](demo-44-publishing/README.md)                 | Assemble a Maven Central ready bundle (POM metadata + sources/javadoc jars) and resolve it back | `java build/Demo.java`             |
+| 45 | [`native-image`](demo-45-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Project.java`  |
+| 46 | [`build-cache`](demo-46-build-cache/README.md)               | A content-addressed build cache serving step outputs across builds - project-local (`-Djenesis.project.cache`), shared via a URI (`-Djenesis.cache.uri=`), or local layered in front of a remote; shown by bootstrapping it then serving a full `-Djenesis.executor.rebuild=true` from it | `java build/jenesis/Project.java`  |
+| 47 | [`jpx`](demo-47-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -233,7 +234,7 @@ Two more outputs round out the packaging menu, both opt-in `packaging.properties
 shown on `java-modular-executable`. `jmod=true` and `jlink=true` build
 the lower-level pieces `jpackage` uses internally: a `.jmod` staged beside the modular
 jar, and a `jlink` runtime image trimmed to the module graph under `stage/runtime`,
-runnable from its own `bin/java -m` - the foundation [`custom-jmod`](demo-35-custom-jmod/README.md) later
+runnable from its own `bin/java -m` - the foundation [`custom-jmod`](demo-36-custom-jmod/README.md) later
 builds on. And two no-runtime forms: `bundle=true` writes a `bundle.zip` of just the
 jars plus an `application.properties` to unzip onto an off-the-shelf JRE base (its own
 [`bundle`](demo-07-bundle/README.md) demo unpacks the zip and runs it on a stock JRE; also
@@ -677,7 +678,46 @@ file. What keeps reading the *resolved* closure is everything that describes wha
 was fetched: the SBOM, the license and vulnerability checks, and the inventory
 `pin` reads - so a rewritten jar's bytes never reach a `@jenesis.pin` checksum.
 
-## 21. Selecting a variant per platform - [`platform-guard`](demo-32-platform-guard/README.md), [`platform-guard-pom`](demo-33-platform-guard-pom/README.md)
+## 21. Overriding a shaded module - [`module-override`](demo-32-module-override/README.md)
+
+The module system gives every package exactly one owning module, and a library
+that needs an API declares `requires` on the module that owns it. Tomcat Embed is
+the notable exception, and the exception is a mistake on its side: instead of
+depending on the Jakarta Servlet API it copies the API's packages into its own jar
+and declares a module descriptor that exports them under its own name. The module
+`org.apache.tomcat.embed.core` exports `jakarta.servlet` and `jakarta.servlet.http`
+itself; `org.apache.tomcat.embed.el` claims `jakarta.el`, and
+`org.apache.tomcat.embed.websocket` claims `jakarta.websocket` and
+`jakarta.websocket.client`. Two modules then export one package, which a module
+descriptor is supposed to make impossible, and only Tomcat can fix it.
+
+Until it does, a modular application has two bad options. `requires jakarta.servlet`
+resolves the API artifact as well and the module path carries the package twice -
+`module demo.override reads package jakarta.servlet from both jakarta.servlet and
+org.apache.tomcat.embed.core`. Requiring `org.apache.tomcat.embed.core` instead
+compiles, but writes a server implementation into the module's descriptor and its
+published pom, where an API belongs.
+
+`@jenesis.override jakarta.servlet org.apache.tomcat.embed.core` states the
+relationship once. Jenesis places a module named `jakarta.servlet` that holds no
+packages and requires the carrier `transitive`, so reading it reads Tomcat's copy
+under the API's name - readability is what `requires` grants, and the packages come
+from the carrier's own unqualified exports. And it drops every resolved artifact
+declaring the overridden module, so the closure holds those packages once, whether
+that artifact was required directly or arrived through somebody else's pom. Because
+the generated pom is the resolved closure, a Maven consumer flattening this project
+onto a class path gets one copy too, and the declaration reaches Jenesis consumers
+through the `Jenesis-Overrides` manifest header.
+
+The descriptor still says `requires jakarta.servlet`, which is the point: the
+published contract names the API, not the server implementing it here. Two limits
+follow from the placed module holding no code. A qualified `exports ... to
+jakarta.servlet` or `opens ... to jakarta.servlet` grants access to it rather than
+to the carrier that does the reflecting, so open to the carrier or unqualified. And
+requiring it reads everything the carrier exports, so code can compile against
+`org.apache.catalina` while only declaring `requires jakarta.servlet`.
+
+## 22. Selecting a variant per platform - [`platform-guard`](demo-33-platform-guard/README.md), [`platform-guard-pom`](demo-34-platform-guard-pom/README.md)
 
 The `module-classifier` demo committed one classified variant explicitly; `platform-guard`
 declares several and lets the build pick. A `@jenesis.pin` line may end with a
@@ -715,7 +755,7 @@ that matched the local platform is refreshed, every other line is preserved
 byte-for-byte, and a guarded key stays in the comment block rather than migrating
 into `<dependencyManagement>`.
 
-## 22. Customizing the build - [`custom-assembler`](demo-34-custom-assembler/README.md)
+## 23. Customizing the build - [`custom-assembler`](demo-35-custom-assembler/README.md)
 
 The remaining demos open up the template. `custom-assembler` keeps the standard
 MODULAR_TO_MAVEN flow but **wraps** the stock `InferredMultiProjectAssembler` so each
@@ -733,7 +773,7 @@ transformation is simply interposed in front of it. Any step that produces a
 `sources/` tree (template expansion, code generation, license headers) fits the
 same shape. This demo is launched with `java build/Demo.java`.
 
-[`custom-jmod`](demo-35-custom-jmod/README.md) is a sibling example of the same wrapping technique, applied to a
+[`custom-jmod`](demo-36-custom-jmod/README.md) is a sibling example of the same wrapping technique, applied to a
 different extension point. It enables the stock `jmod`, `jlink`, and `jpackage`
 steps (a committed `packaging.properties` with `jmod=true`, `jlink=true`, and
 `jpackage=app-image`, read by the stock `new InferredMultiProjectAssembler()`)
@@ -748,7 +788,7 @@ the jmod's config section, it travels `jmod -> jlink runtime -> jpackage image`,
 the launched app reads it back from its own `<java.home>/conf/` - content a jar cannot
 carry into a packaged runtime. Also `java build/Demo.java`.
 
-## 23. Preprocessing in a reusable build module - [`internal-module`](demo-36-internal-module/README.md), [`external-module`](demo-37-external-module/README.md)
+## 24. Preprocessing in a reusable build module - [`internal-module`](demo-37-internal-module/README.md), [`external-module`](demo-38-external-module/README.md)
 
 `internal-module` does the same preprocessing as `custom-assembler`, but moves it
 out of an inline step and into a **build module** - a `BuildExecutorModule`
@@ -767,7 +807,7 @@ Java module name in the default `main` group.
 Together these show that build logic itself is just another module - it can be
 authored inline, loaded from source, or consumed as a versioned artifact.
 
-## 24. Driving the build without `Project` - [`custom-maven`](demo-38-custom-maven/README.md), [`custom-modular`](demo-39-custom-modular/README.md)
+## 25. Driving the build without `Project` - [`custom-maven`](demo-39-custom-maven/README.md), [`custom-modular`](demo-40-custom-modular/README.md)
 
 The previous customizations still went through `Project`. These two go a step
 further: they drive a multi-module build directly from a hand-written
@@ -790,7 +830,7 @@ adapted with a one-line wrapper so each discovered descriptor becomes a
 `Project` itself uses) when you need a custom repository, strict pinning, or a
 specific digest.
 
-## 25. Dropping the template entirely - [`custom-build`](demo-40-custom-build/README.md)
+## 26. Dropping the template entirely - [`custom-build`](demo-41-custom-build/README.md)
 
 The last demo removes `Project`, the layout, and the assembler altogether and
 wires a `BuildExecutor` **by hand** in one `main` method. There is no `pom.xml`
@@ -808,7 +848,7 @@ step down to the `BuildExecutor` primitives and build exactly the graph you want
 Run it with `java build/Demo.java`, then `java -cp target/jar/output/artifacts/classes.jar
 sample.Sample`.
 
-## 26. Confining the build with Docker - [`docker-isolation`](demo-41-docker-isolation/README.md)
+## 27. Confining the build with Docker - [`docker-isolation`](demo-42-docker-isolation/README.md)
 
 A build executes untrusted code even when nothing about it is customised: the
 stock pipeline runs your tests (and whatever your test dependencies pull in), and
@@ -830,7 +870,7 @@ mounted **read-only**: dependencies must be pre-cached, and `export` fails insid
 the container. It needs a Docker daemon, so it is a local exercise rather than a
 CI one. There are no assertions; each actor just reports what it managed to do.
 
-## 27. Supply-chain security - [`supply-chain-security`](demo-42-supply-chain-security/README.md)
+## 28. Supply-chain security - [`supply-chain-security`](demo-43-supply-chain-security/README.md)
 
 Pinning has two halves, and this demo shows both by getting them wrong on purpose.
 `supply-chain-security` has two modules and a `build/Demo.java` that asserts each
@@ -847,7 +887,7 @@ The new idea is **strict pinning vs. checksum verification**: the former decides
 dependency is the exact artifact you vetted. Unlike every other demo, this one is
 a project that must *not* build.
 
-## 28. Publishing to Maven Central - [`publishing`](demo-43-publishing/README.md)
+## 29. Publishing to Maven Central - [`publishing`](demo-44-publishing/README.md)
 
 The final demo closes the loop from sources to a release. Publishing to Central is
 two jobs - **produce a correct bundle** and **upload it** - and Jenesis owns the
@@ -874,7 +914,7 @@ to the `release` goal, a rehearsal by default, and its `environment` step hands 
 version this build stamped to the release tool so it is stated once rather than
 passed twice.
 
-## 29. Ahead-of-time native image - [`native-image`](demo-44-native-image/README.md)
+## 30. Ahead-of-time native image - [`native-image`](demo-45-native-image/README.md)
 
 `native-image` revisits the runnable-artifact idea from section 4 from the other
 end. There, `jpackage` bundled your bytecode with a `jlink`-trimmed JVM; here
@@ -912,7 +952,7 @@ successor: jpackage for a faithful bundle of the JVM you tested against, native-
 when startup latency and footprint dominate. Like `docker-isolation`, it needs tooling
 the CI runners lack (GraalVM), so it is a local exercise.
 
-## 30. A shared build cache - [`build-cache`](demo-45-build-cache/README.md)
+## 31. A shared build cache - [`build-cache`](demo-46-build-cache/README.md)
 
 Every build already caches incrementally under `target/`: each step is
 content-hashed on its inputs and outputs, so a warm rebuild only re-runs what
@@ -941,7 +981,7 @@ interface, and the local folder is the on-disk analogue - point several checkout
 or a CI workspace and a laptop at one folder and a step compiled once is reused
 wherever its inputs match.
 
-## 31. Running a released program - [`jpx`](demo-46-jpx/README.md)
+## 32. Running a released program - [`jpx`](demo-47-jpx/README.md)
 
 Every demo so far built something. `jpx` builds nothing: it resolves a *published*
 module (or Maven artifact), installs its runtime closure once into

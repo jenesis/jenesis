@@ -1,7 +1,7 @@
 Platform guard demo (Maven)
 ===========================
 
-The `pom.xml` counterpart of `../demo-32-platform-guard`: a pin line in the
+The `pom.xml` counterpart of `../demo-33-platform-guard`: a pin line in the
 `<!--jenesis.pin ... -->` comment block may end with a bracketed **guard**, and
 the line whose guard matches the active platform tokens wins. The rules are the
 same as for `@jenesis.pin` tags in a `module-info.java`.
@@ -60,7 +60,7 @@ not declaring the dependency directly. And a guard cannot force in a
 **classifier**: dependency management matches classifiers as part of the
 coordinate key and never adds one to a declaration, in Jenesis exactly as in
 Maven itself. Per-platform classifier selection exists only for Java modules
-(see `../demo-30-module-classifier` and `../demo-32-platform-guard`), where a
+(see `../demo-30-module-classifier` and `../demo-33-platform-guard`), where a
 module name has exactly one artifact on the module path and the classifier is
 therefore a value, not an identity.
 

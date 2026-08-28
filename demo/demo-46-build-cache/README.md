@@ -111,7 +111,7 @@ body), and the server treats it as a read, bumping the entry's recency just as a
 Layout
 ------
 
-    demo/demo-45-build-cache
+    demo/demo-46-build-cache
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- pom.xml              Maven coordinates and <sourceDirectory>, no dependencies
     `-- sources/sample/Sample.java
