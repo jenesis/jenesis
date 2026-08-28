@@ -86,7 +86,7 @@ public class LicenseCheck implements BuildStep {
                     continue;
                 }
                 licensesByCoordinate.put(coordinate,
-                        licensesByKey.getOrDefault(key.substring(second + 1), new ArrayList<>()));
+                        licensesByKey.getOrDefault(key.substring(second + 1), List.of()));
                 if (key.substring(second + 1, third).equals("maven")) {
                     strict.add(coordinate);
                 }

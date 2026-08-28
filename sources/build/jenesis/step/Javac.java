@@ -1,6 +1,7 @@
 package build.jenesis.step;
 
 import module java.base;
+import java.util.jar.Attributes;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -348,7 +349,7 @@ public class Javac extends JdkProcessBuildStep {
             try (InputStream in = Files.newInputStream(candidate)) {
                 manifest = new Manifest(in);
             }
-            if (manifest.getMainAttributes().getValue("Multi-Release") != null) {
+            if (manifest.getMainAttributes().getValue(Attributes.Name.MULTI_RELEASE) != null) {
                 return true;
             }
         }

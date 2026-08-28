@@ -1,6 +1,7 @@
 package build.jenesis.step;
 
 import module java.base;
+import java.util.jar.Attributes;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -120,7 +121,7 @@ public class Sbom implements BuildStep {
         String fileName = base + "." + format.extension();
         Files.writeString(embedded.resolve(fileName), document);
         Manifest manifest = new Manifest();
-        manifest.getMainAttributes().putValue("Manifest-Version", "1.0");
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
         manifest.getMainAttributes().putValue("Sbom-Format", "CycloneDX");
         manifest.getMainAttributes().putValue("Sbom-Location", "META-INF/sbom/" + fileName);
         try (OutputStream out = Files.newOutputStream(context.next().resolve(Versions.MANIFEST))) {

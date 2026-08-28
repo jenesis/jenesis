@@ -1062,7 +1062,7 @@ public class ModularJarResolverTest {
                                              Map<Integer, String> versions) throws IOException {
         Manifest manifest = new Manifest();
         manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
-        manifest.getMainAttributes().putValue("Multi-Release", "true");
+        manifest.getMainAttributes().put(Attributes.Name.MULTI_RELEASE, "true");
         Path file = Files.createTempFile(jars, module, ".jar");
         try (JarOutputStream jarOutputStream = new JarOutputStream(Files.newOutputStream(file), manifest)) {
             jarOutputStream.putNextEntry(new JarEntry("module-info.class"));

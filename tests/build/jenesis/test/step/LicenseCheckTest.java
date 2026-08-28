@@ -1,6 +1,7 @@
 package build.jenesis.test.step;
 
 import module java.base;
+import java.util.jar.Attributes;
 import module org.junit.jupiter.api;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
@@ -196,7 +197,7 @@ public class LicenseCheckTest {
     private static void writeSbomJar(Path jar, String sbomLocation, String sbom) throws IOException {
         Files.createDirectories(jar.getParent());
         Manifest manifest = new Manifest();
-        manifest.getMainAttributes().putValue("Manifest-Version", "1.0");
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
         manifest.getMainAttributes().putValue("Sbom-Location", sbomLocation);
         try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar), manifest)) {
             out.putNextEntry(new JarEntry(sbomLocation));
@@ -208,7 +209,7 @@ public class LicenseCheckTest {
     private static void writeFileJar(Path jar, String entryName, String content) throws IOException {
         Files.createDirectories(jar.getParent());
         Manifest manifest = new Manifest();
-        manifest.getMainAttributes().putValue("Manifest-Version", "1.0");
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
         try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar), manifest)) {
             out.putNextEntry(new JarEntry(entryName));
             out.write(content.getBytes(StandardCharsets.UTF_8));
