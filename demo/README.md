@@ -90,7 +90,7 @@ Quick index
 | 29 | [`module-layout`](demo-29-module-layout/README.md)           | Explicitly select the pure MODULAR layout (via `jenesis.properties`): resolve by module name, emit a modular jar with no `pom.xml` | `java build/jenesis/Project.java`  |
 | 30 | [`module-classifier`](demo-30-module-classifier/README.md)   | Pin a classified variant of a module (`:jdk-flow:0.4.3`): the build fetches the classifier artifact, validated by checksum and asserted at runtime | `java build/jenesis/Execute.java`  |
 | 31 | [`module-alias`](demo-31-module-alias/README.md)             | Give a plain jar with no module identity (no `module-info`, no `Automatic-Module-Name`) a stable name with `@jenesis.alias`, so it can be `requires`d and `opens`d like any module - shown with args4j 2.33 - then a `modules.properties` rewrites the closure into explicit named modules with `jdeps`, so the alias becomes linkable into a `jlink` image | `java build/jenesis/Execute.java`  |
-| 32 | [`module-override`](demo-32-module-override/README.md)       | Require an API whose packages a dependency already ships: Tomcat Embed exports the `jakarta.servlet` packages under its own module name, so `@jenesis.override` places a package-less `jakarta.servlet` that reads the carrier and drops the artifact that would carry them twice | `java build/jenesis/Execute.java`  |
+| 32 | [`module-override`](demo-32-module-override/README.md)       | Require an API whose packages a dependency already ships: Tomcat Embed exports the `jakarta.servlet` and `jakarta.el` packages under its own module names, so a modular library that states `requires jakarta.servlet` in its descriptor - here the Jakarta Server Pages API - cannot share a module path with it. `@jenesis.override` places package-less modules of those names that read the carriers, and drops the artifacts that would carry the packages twice | `java build/jenesis/Execute.java`  |
 | 33 | [`platform-guard`](demo-33-platform-guard/README.md)         | Select a dependency variant per platform: guarded pin lines (`[windows]`) matched against the `-Djenesis.platform.<token>=true` flags, with an unguarded fallback | `java build/jenesis/Execute.java`  |
 | 34 | [`platform-guard-pom`](demo-34-platform-guard-pom/README.md)  | The same guards in a `pom.xml`'s `<!--jenesis.pin-->` block: switch a transitive's pinned version per platform, each variant checksummed | `java build/jenesis/Execute.java`  |
 | 35 | [`custom-assembler`](demo-35-custom-assembler/README.md)     | Wrap the assembler to preprocess sources before the regular flow      | `java build/Demo.java`             |
@@ -683,39 +683,53 @@ was fetched: the SBOM, the license and vulnerability checks, and the inventory
 The module system gives every package exactly one owning module, and a library
 that needs an API declares `requires` on the module that owns it. Tomcat Embed is
 the notable exception, and the exception is a mistake on its side: instead of
-depending on the Jakarta Servlet API it copies the API's packages into its own jar
-and declares a module descriptor that exports them under its own name. The module
-`org.apache.tomcat.embed.core` exports `jakarta.servlet` and `jakarta.servlet.http`
-itself; `org.apache.tomcat.embed.el` claims `jakarta.el`, and
+depending on the Jakarta APIs it copies their packages into its own jars and
+declares module descriptors that export them under its own names.
+`org.apache.tomcat.embed.core` exports `jakarta.servlet` and
+`jakarta.servlet.http`, `org.apache.tomcat.embed.el` claims `jakarta.el`, and
 `org.apache.tomcat.embed.websocket` claims `jakarta.websocket` and
 `jakarta.websocket.client`. Two modules then export one package, which a module
 descriptor is supposed to make impossible, and only Tomcat can fix it.
 
-Until it does, a modular application has two bad options. `requires jakarta.servlet`
-resolves the API artifact as well and the module path carries the package twice -
-`module demo.override reads package jakarta.servlet from both jakarta.servlet and
-org.apache.tomcat.embed.core`. Requiring `org.apache.tomcat.embed.core` instead
-compiles, but writes a server implementation into the module's descriptor and its
-published pom, where an API belongs.
+The damage is not confined to code you write. A *modular* library built against
+the servlet API names it the only way a module can, in its descriptor: the Jakarta
+Server Pages API states `requires transitive jakarta.servlet` and
+`requires transitive jakarta.el`. Modules of those names must be on the path or it
+does not resolve, and a module can neither read a package from a module that does
+not declare it nor be talked out of the name it states. Tomcat supplies the
+packages but not the names, so the demo without its override tags fails twice
+over - once for the library, once for the module's own requires:
 
-`@jenesis.override jakarta.servlet org.apache.tomcat.embed.core` states the
-relationship once. Jenesis places a module named `jakarta.servlet` that holds no
-packages and requires the carrier `transitive`, so reading it reads Tomcat's copy
-under the API's name - readability is what `requires` grants, and the packages come
-from the carrier's own unqualified exports. And it drops every resolved artifact
-declaring the overridden module, so the closure holds those packages once, whether
-that artifact was required directly or arrived through somebody else's pom. Because
-the generated pom is the resolved closure, a Maven consumer flattening this project
-onto a class path gets one copy too, and the declaration reaches Jenesis consumers
-through the `Jenesis-Overrides` manifest header.
+    error: module not found: jakarta.el
+    error: module demo.override reads package jakarta.servlet
+           from both jakarta.servlet and org.apache.tomcat.embed.core
 
-The descriptor still says `requires jakarta.servlet`, which is the point: the
-published contract names the API, not the server implementing it here. Two limits
-follow from the placed module holding no code. A qualified `exports ... to
-jakarta.servlet` or `opens ... to jakarta.servlet` grants access to it rather than
-to the carrier that does the reflecting, so open to the carrier or unqualified. And
-requiring it reads everything the carrier exports, so code can compile against
-`org.apache.catalina` while only declaring `requires jakarta.servlet`.
+There is no arrangement of `requires` that satisfies both. `@jenesis.override
+jakarta.servlet org.apache.tomcat.embed.core` states the relationship once per
+module. Jenesis places a module of that name that holds no packages and requires
+the carrier `transitive`, so reading it reads Tomcat's copy under the API's name -
+readability is what `requires` grants, and the packages come from the carrier's
+own unqualified exports. And it drops every resolved artifact declaring the
+overridden module, so the closure holds those packages once, whether that artifact
+was required directly or arrived through somebody else's pom. The Server Pages
+API, compiled against the real servlet API and never recompiled, then resolves and
+reads Tomcat:
+
+    jakarta.servlet.jsp.JspFactory is read from jakarta.servlet.jsp
+    jakarta.servlet.jsp declares transitive jakarta.servlet
+
+Because the generated pom is the resolved closure, a Maven consumer flattening
+this project onto a class path gets one copy too, and the declaration reaches
+Jenesis consumers through the `Jenesis-Overrides` manifest header. The descriptor
+still says `requires jakarta.servlet`, which is the point: the published contract
+names the API, not the server implementing it here.
+
+Two limits follow from the placed module holding no code. A qualified
+`exports ... to jakarta.servlet` or `opens ... to jakarta.servlet` grants access to
+it rather than to the carrier that does the reflecting, so open to the carrier or
+unqualified. And requiring it reads everything the carrier exports, so code can
+compile against `org.apache.catalina` while only declaring `requires
+jakarta.servlet`.
 
 ## 22. Selecting a variant per platform - [`platform-guard`](demo-33-platform-guard/README.md), [`platform-guard-pom`](demo-34-platform-guard-pom/README.md)
 

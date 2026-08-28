@@ -1,27 +1,19 @@
 package demo.override;
 
-import jakarta.servlet.http.HttpServlet;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.Filter;
+import jakarta.servlet.jsp.JspFactory;
+import java.lang.module.ModuleDescriptor;
 
 public class Main {
 
-    public static class Greeting extends HttpServlet {
-        @Override
-        protected void doGet(HttpServletRequest request, HttpServletResponse response) {
-            response.setStatus(HttpServletResponse.SC_OK);
-        }
-    }
-
     public static void main(String[] args) {
-        System.out.println("jakarta.servlet is read from "
-                + HttpServlet.class.getModule().getName()
-                + ", required as "
-                + Main.class.getModule().getDescriptor().requires().stream()
-                        .map(java.lang.module.ModuleDescriptor.Requires::name)
-                        .filter(name -> name.equals("jakarta.servlet"))
-                        .findFirst()
-                        .orElseThrow());
-        System.out.println("servlet type: " + Greeting.class.getName());
+        System.out.println(Filter.class.getName() + " is read from " + Filter.class.getModule().getName());
+        System.out.println(JspFactory.class.getName() + " is read from " + JspFactory.class.getModule().getName());
+        for (ModuleDescriptor.Requires requires : JspFactory.class.getModule().getDescriptor().requires()) {
+            if (requires.name().equals("jakarta.servlet") || requires.name().equals("jakarta.el")) {
+                System.out.println("jakarta.servlet.jsp declares " + requires);
+            }
+        }
+        System.out.println("filter: " + TimingFilter.class.getName());
     }
 }
