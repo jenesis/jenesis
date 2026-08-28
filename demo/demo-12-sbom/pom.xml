@@ -8,7 +8,7 @@
 
     <name>SBOM Demo</name>
     <description>A demonstration module that ships a CycloneDX software bill of materials.</description>
-    <url>https://github.com/raphw/jenesis</url>
+    <url>https://github.com/jenesis/jenesis</url>
 
     <licenses>
         <license>
@@ -26,7 +26,7 @@
     </developers>
 
     <scm>
-        <url>https://github.com/raphw/jenesis</url>
+        <url>https://github.com/jenesis/jenesis</url>
     </scm>
 
     <build>

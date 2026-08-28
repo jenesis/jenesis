@@ -32,7 +32,7 @@
 #   JENESIS_VERSION       Release version to install (default: latest GitHub release);
 #                         ignored when a ref is given
 #   JENESIS_TARGET        Target project directory (default: current working directory)
-#   JENESIS_GITHUB_REPO   Source repository, owner/name (default: raphw/jenesis)
+#   JENESIS_GITHUB_REPO   Source repository, owner/name (default: jenesis/jenesis)
 #   JENESIS_MODE          auto (default) | vendor | submodule
 #
 # After the script completes, build the project with:
@@ -41,7 +41,7 @@
 #
 set -e
 
-GITHUB_REPO="${JENESIS_GITHUB_REPO:-raphw/jenesis}"
+GITHUB_REPO="${JENESIS_GITHUB_REPO:-jenesis/jenesis}"
 MODE="${JENESIS_MODE:-auto}"
 
 say() { echo "jenesis-install: $*"; }

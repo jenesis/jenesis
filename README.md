@@ -1,8 +1,8 @@
 Jenesis
 =======
 
-[![release](https://img.shields.io/github/v/release/raphw/jenesis?label=release)](https://github.com/raphw/jenesis/releases/latest)
-![build](https://github.com/raphw/jenesis/actions/workflows/build.yml/badge.svg)
+[![release](https://img.shields.io/github/v/release/jenesis/jenesis?label=release)](https://github.com/jenesis/jenesis/releases/latest)
+![build](https://github.com/jenesis/jenesis/actions/workflows/build.yml/badge.svg)
 
 > ### [Jenesis](https://jenesis.build) - a modern Java build tool
 > _Java-native config, plugin-free, with `module-info.java` treated as a feature, not an afterthought._
@@ -26,7 +26,7 @@ Pick whichever fits how you want to manage versions; all three land at the same 
 ```bash
 sdk install jenesis && jenesis-init      # SDKMAN, then initialise a project
 curl -fsSL https://get.jenesis.build | bash   # bootstrap into the current project
-git submodule add --depth 1 https://github.com/raphw/jenesis.git .jenesis \
+git submodule add --depth 1 https://github.com/jenesis/jenesis.git .jenesis \
     && ln -s ../.jenesis/sources/build/jenesis build/jenesis
 ```
 
@@ -150,7 +150,7 @@ Two conventions govern the code here:
   serialized state, so a knob in a non-`transient` field re-runs the step when it changes while a value
   hard-coded in a method body does not - changing a step's *logic* invalidates nothing on its own.
 
-Bugs, questions and design discussion belong in the [issue tracker](https://github.com/raphw/jenesis/issues).
+Bugs, questions and design discussion belong in the [issue tracker](https://github.com/jenesis/jenesis/issues).
 
 License
 -------
