@@ -650,6 +650,32 @@ public class JavacTest {
                 .doesNotContain("--processor-path\n");
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void leaves_the_build_folder_out_of_the_classes_entirely(boolean process) throws IOException {
+        Path folder = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(folder.resolve("Sample.java"), "package sample;\npublic class Sample { }\n");
+        Files.writeString(folder.resolve("kept"), "resource");
+        Path configuration = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/build.jenesis"));
+        Files.writeString(configuration.resolve("xjc.properties"), "package=sample\n");
+        Files.writeString(configuration.resolve("order.xsd"), "<schema/>");
+
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                                sources,
+                                Map.of(Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "sample/kept")).content().isEqualTo("resource");
+        assertThat(next.resolve(Javac.CLASSES + "META-INF/build.jenesis"))
+                .as("the build's own folder holds configuration and generator inputs, "
+                        + "so not even an empty directory of it reaches the artifact")
+                .doesNotExist();
+    }
+
     private Path plainJar(Path file) throws IOException {
         Path classes = compile(file.getParent().resolve("plain-classes"), "plain/Lib.java", """
                 package plain;
