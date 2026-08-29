@@ -166,7 +166,11 @@ public class Javac extends JdkProcessBuildStep {
                 Files.walkFileTree(sources, new SimpleFileVisitor<>() {
                     @Override
                     public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                        Files.createDirectories(target.resolve(sources.relativize(dir)));
+                        Path relative = sources.relativize(dir);
+                        if (BuildStep.underBuildJenesis(relative)) {
+                            return FileVisitResult.SKIP_SUBTREE;
+                        }
+                        Files.createDirectories(target.resolve(relative));
                         return FileVisitResult.CONTINUE;
                     }
 
