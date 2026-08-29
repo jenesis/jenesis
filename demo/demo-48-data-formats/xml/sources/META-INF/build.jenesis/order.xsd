@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:tns="https://jenesis.build/demo/order"
+           targetNamespace="https://jenesis.build/demo/order"
+           elementFormDefault="qualified">
+    <xs:element name="order" type="tns:Order"/>
+    <xs:complexType name="Order">
+        <xs:sequence>
+            <xs:element name="item" type="tns:Item" maxOccurs="unbounded"/>
+        </xs:sequence>
+        <xs:attribute name="id" type="xs:string" use="required"/>
+    </xs:complexType>
+    <xs:complexType name="Item">
+        <xs:sequence>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="quantity" type="xs:int"/>
+        </xs:sequence>
+    </xs:complexType>
+</xs:schema>
