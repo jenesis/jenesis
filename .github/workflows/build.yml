@@ -89,6 +89,9 @@ jobs:
           - { name: docker-isolation, dir: demo-42-docker-isolation, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: build-cache, dir: demo-46-build-cache, entry: build/jenesis/Project.java, flags: -Djenesis.project.cache, verify: 'find target -name classes.jar -print -quit | grep -q . && find .jenesis/cache -type d -print -quit | grep -q .' }
           - { name: jpx, dir: demo-47-jpx, entry: build/Demo.java, verify: 'test "$(find target/jpx -name jpx.properties | wc -l)" -eq 2' }
+          - { name: data-formats, dir: demo-48-data-formats, entry: build/jenesis/Project.java, verify: 'test "$(find target -name classes.jar | wc -l)" -eq 3 && jar tf "$(find target -path "*module-xml*" -name classes.jar | head -1)" | grep -q "demo/order/Order.class" && jar tf "$(find target -path "*module-protobuf*" -name classes.jar | head -1)" | grep -q "demo/greeting/GreeterGrpc.class" && jar tf "$(find target -path "*module-avro*" -name classes.jar | head -1)" | grep -q "demo/user/User.class"' }
+          - { name: service-contracts, dir: demo-49-service-contracts, entry: build/jenesis/Project.java, verify: 'jar tf "$(find target -path "*module-soap*" -name classes.jar | head -1)" | grep -q "demo/greeter/GreeterService.class" && jar tf "$(find target -path "*module-rest*" -name classes.jar | head -1)" | grep -q "demo/greeting/DefaultApi.class"' }
+          - { name: jmh, dir: demo-50-jmh, entry: build/jenesis/Execute.java, verify: 'jar tf "$(find target -name classes.jar | head -1)" | grep -q "META-INF/BenchmarkList"' }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

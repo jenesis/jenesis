@@ -9,8 +9,8 @@ a multi-release JAR, infer code-quality tools, bring in other JVM languages and
 lint them too, customize or replace the build template itself, lock down the
 supply chain, assemble a release for Maven Central, compile a module ahead of
 time into a GraalVM native binary, share build outputs through a content-addressed
-cache, and finally run somebody else's released program without building anything
-at all.
+cache, generate sources from a schema, and finally run somebody else's released
+program without building anything at all.
 
 Every demo has its own `build/jenesis` symlink into this repository's
 `sources/build/jenesis`, so each runs in isolation from inside its own directory
@@ -106,6 +106,9 @@ Quick index
 | 45 | [`native-image`](demo-45-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Project.java`  |
 | 46 | [`build-cache`](demo-46-build-cache/README.md)               | A content-addressed build cache serving step outputs across builds - project-local (`-Djenesis.project.cache`), shared via a URI (`-Djenesis.cache.uri=`), or local layered in front of a remote; shown by bootstrapping it then serving a full `-Djenesis.executor.rebuild=true` from it | `java build/jenesis/Project.java`  |
 | 47 | [`jpx`](demo-47-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
+| 48 | [`data-formats`](demo-48-data-formats/README.md)             | Generate sources as part of the build: three modules, three wire formats - an XML schema through `xjc`, a `.proto` through `protoc` and its gRPC plugin, an Avro schema through `avro-tools` - each turned on by its own config file and compiled into its module | `java build/jenesis/Project.java`  |
+| 49 | [`service-contracts`](demo-49-service-contracts/README.md)   | The same generation for service contracts: a WSDL through `wsimport` and an OpenAPI document through the OpenAPI Generator, of whose generated project only the source folder is collected | `java build/jenesis/Project.java`  |
+| 50 | [`jmh`](demo-50-jmh/README.md)                               | Generate, compile and run a JMH benchmark: the harness comes from an annotation processor declared with `@jenesis.plugin`, JMH and its unnamed dependencies get module names with `@jenesis.alias`, and `@jenesis.main` runs it | `java build/jenesis/Execute.java`  |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -995,7 +998,70 @@ interface, and the local folder is the on-disk analogue - point several checkout
 or a CI workspace and a laptop at one folder and a step compiled once is reused
 wherever its inputs match.
 
-## 32. Running a released program - [`jpx`](demo-47-jpx/README.md)
+## 32. Generating sources - [`data-formats`](demo-48-data-formats/README.md), [`service-contracts`](demo-49-service-contracts/README.md), [`jmh`](demo-50-jmh/README.md)
+
+Not every source file is written by hand. `data-formats` builds three modules from
+three schemas: `order.xsd` through the JAXB binding compiler, `greeting.proto` through
+`protoc` and its gRPC plugin, `user.avsc` through `avro-tools`. Each module keeps one
+hand-written class calling the generated types, so a build that compiles proves the
+generation took part in it.
+
+Generation is opted in the way the linters are - by a config file, not a plugin
+declaration. Dropping an `xjc.properties`, a `protoc.properties` or an `avro.properties`
+into a module's configuration folder activates that generator; its contents configure it,
+and an empty file is enough.
+
+The input goes in `META-INF/build.jenesis/` under the module's sources, which the compiler
+never copies into the artifact - so a schema is an input to the build and nothing more, and
+none of these jars carries the `.xsd`, `.proto` or `.avsc` it was built from. An input that
+*should* ship lives in a folder the config file names instead (`folders=schema`), resolved
+against the module's source and resource roots, so it can sit in a package beside the code.
+`service-contracts` needs both: its OpenAPI document stays out of the jar, while its WSDL is
+packaged, because a JAX-WS client reads its description at run time.
+
+Whichever folder they come from, the build links the file kinds a tool compiles into a
+folder named after the tool, and the tool reads that folder and nothing else: `xjc/` holds
+the `.xsd` and `.xjb` files, `protoc/` the `.proto` files. So where a contract lives is a
+question the configuration answers once, and moving it changes no step's inputs.
+
+Each tool resolves in a dependency group named after it, pinned independently of the
+module's own dependencies, and runs as the `generator` stage of the Java toolchain,
+immediately before the compiler chain:
+
+    generated/<tool>/prepare -> generated/<tool>/tool/generate -> compiled/javac -> classes -> artifacts/jar
+
+Which fixes what sees what. The compiler and everything after it - tests, `javadoc`, the
+jar - see the generated classes. The inferred linters and formatters run *before*
+generation and read the module's own sources only, so generated code is never linted or
+reformatted.
+
+One split is worth stating plainly. `jaxb-xjc`, `protoc` and `avro-tools` are build tools
+and live in their own groups. What the generated classes *import* - `jakarta.xml.bind`,
+`protobuf-java`, `avro` - is a dependency of the artifact you ship, so each module declares
+it like any other. `pin` writes both closures, each under its own group.
+
+`protoc` is the first tool the build resolves that is not a jar at all: Google publishes it
+as a native executable per operating system and chipset under a Maven classifier, and so is
+the gRPC plugin. The coordinate that resolves differs per machine, so `protobuf/pom.xml`
+carries one checksum pin per platform, each guarded with the platform it is for.
+
+`service-contracts` moves one level up, from a data model to the client side of a service:
+a WSDL through `wsimport`, an OpenAPI document through the OpenAPI Generator. It also shows
+the one generator that cannot infer its input - a `.xsd`, a `.proto` and an `.avsc` announce
+themselves by extension, an OpenAPI document is a `.yaml` like any other - so
+`openapi.properties` names it, and shows a generator that writes a whole project of which
+only the source folder is collected.
+
+`jmh` needs no generator module at all, and is here to show where the line is. JMH generates
+its harness with an **annotation processor**, which `@jenesis.plugin` already resolves onto
+the processor path - so nothing about JMH is built into the tool. What the demo adds is the
+rest of the story: `@jenesis.alias` gives `jmh-core` a module name it does not ship, `exports
+demo.bench.jmh_generated to jmh.core` exports a package that exists only after generation, and
+`@jenesis.main` runs the benchmark, so `java build/jenesis/Execute.java` prints a result table.
+The processor itself needs no name, because a processor whose jar cannot be a module is passed
+on the processor class path instead of the processor module path.
+
+## 33. Running a released program - [`jpx`](demo-47-jpx/README.md)
 
 Every demo so far built something. `jpx` builds nothing: it resolves a *published*
 module (or Maven artifact), installs its runtime closure once into

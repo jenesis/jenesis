@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package demo;
+
+option java_package = "demo.greeting";
+option java_outer_classname = "GreetingProto";
+
+message Greeting {
+  string text = 1;
+  int32 count = 2;
+}
+
+service Greeter {
+  rpc Greet (Greeting) returns (Greeting);
+}
