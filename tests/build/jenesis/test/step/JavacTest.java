@@ -652,6 +652,42 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void falls_back_to_the_processor_class_path_for_a_jar_that_cannot_be_a_module(boolean process)
+            throws IOException {
+        Files.createDirectories(sources.resolve(BuildStep.SOURCES));
+        Files.writeString(sources.resolve(BuildStep.SOURCES).resolve("module-info.java"),
+                "module sample { exports sample; }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }\n");
+        Path processorRoot = Files.createDirectories(root.resolve("processor").resolve("resolved"));
+        Files.copy(buildProcessorJar(Files.createDirectories(root.resolve("plain")), "plain", "Plain", null),
+                processorRoot.resolve("org.example%2Fplain-processor%2F1.0.jar"));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("plugin/plugin/maven/plain", "resolved/org.example%2Fplain-processor%2F1.0.jar");
+        index.store(root.resolve("processor").resolve(BuildStep.DEPENDENCIES));
+
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("processors/artifacts", new BuildStepArgument(root.resolve("processor"), Map.of(
+                Path.of("resolved/org.example%2Fplain-processor%2F1.0.jar"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javac.CLASSES + "gen/GeneratedPlain.class"))
+                .as("an artifact with no module identity carries no name a module path could derive, "
+                        + "so the processor still runs, from the processor class path")
+                .isNotEmptyFile();
+        String args = Files.readString(supplement.resolve("javac.args"));
+        assertThat(args)
+                .contains("--processor-path")
+                .doesNotContain("--processor-module-path");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void leaves_the_build_folder_out_of_the_classes_entirely(boolean process) throws IOException {
         Path folder = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample"));
         Files.writeString(folder.resolve("Sample.java"), "package sample;\npublic class Sample { }\n");

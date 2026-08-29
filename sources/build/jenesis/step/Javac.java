@@ -242,7 +242,15 @@ public class Javac extends JdkProcessBuildStep {
                         .append("\"\n");
             }
             if (!processorPath.isEmpty()) {
-                args.append(pathPlacement.modular() ? "--processor-module-path\n\"" : "--processor-path\n\"")
+                boolean processorModules = pathPlacement.modular();
+                if (processorModules) {
+                    try {
+                        ModuleFinder.of(processorPath.stream().map(Path::of).toArray(Path[]::new)).findAll();
+                    } catch (FindException _) {
+                        processorModules = false;
+                    }
+                }
+                args.append(processorModules ? "--processor-module-path\n\"" : "--processor-path\n\"")
                         .append(String.join(File.pathSeparator, processorPath).replace("\\", "\\\\").replace("\"", "\\\""))
                         .append("\"\n");
             }
