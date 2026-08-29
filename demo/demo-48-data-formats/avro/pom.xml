@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>build.jenesis.demo</groupId>
+        <artifactId>data-formats</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>data-formats-avro</artifactId>
+
+    <build>
+        <sourceDirectory>sources</sourceDirectory>
+    </build>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>2.22</version>
+                <!--Checksum/SHA-256/21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0-->
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>2.22.1</version>
+                <!--Checksum/SHA-256/941ff029bcdb93e83d209ce516c1a7fb8bbac07d0a2fa122f5bf194b2cd7b4f4-->
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>2.22.1</version>
+                <!--Checksum/SHA-256/7dcd7e53bec1f56c7ad278bd1ca0840bebcc595d61ce44d6a8439abb75b965b2-->
+            </dependency>
+            <dependency>
+                <groupId>commons-codec</groupId>
+                <artifactId>commons-codec</artifactId>
+                <version>1.19.0</version>
+                <!--Checksum/SHA-256/5c3881e4f556855e9c532927ee0c9dfde94cc66760d5805c031a59887070af5f-->
+            </dependency>
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>2.20.0</version>
+                <!--Checksum/SHA-256/df90bba0fe3cb586b7f164e78fe8f8f4da3f2dd5c27fa645f888100ccc25dd72-->
+            </dependency>
+            <dependency>
+                <groupId>org.apache.avro</groupId>
+                <artifactId>avro</artifactId>
+                <version>1.12.2</version>
+                <!--Checksum/SHA-256/6522e2a146b859ad158bb024dcc3b0bc826680794a2523b0881dafcbd59ce2df-->
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-compress</artifactId>
+                <version>1.28.0</version>
+                <!--Checksum/SHA-256/e1522945218456f3649a39bc4afd70ce4bd466221519dba7d378f2141a4642ca-->
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>3.18.0</version>
+                <!--Checksum/SHA-256/4eeeae8d20c078abb64b015ec158add383ac581571cddc45c68f0c9ae0230720-->
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>2.0.18</version>
+                <!--Checksum/SHA-256/44508fd1576500688c790b190acdd16fec4f8c79a3e0b900afd70503cf055f55-->
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.avro</groupId>
+            <artifactId>avro</artifactId>
+            <version>1.12.2</version>
+        </dependency>
+    </dependencies>
+    <!--jenesis.pin
+    avro/maven/org.apache.avro/avro-tools 1.12.2 SHA-256/6220e8bc089aaf917cdad4cd358bd651fc0394c0e5ddb8b36da402012c294a68
+    -->
+</project>

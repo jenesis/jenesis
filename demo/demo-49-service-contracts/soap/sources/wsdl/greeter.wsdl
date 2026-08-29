@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions name="Greeter"
+             targetNamespace="https://jenesis.build/demo/greeter"
+             xmlns:tns="https://jenesis.build/demo/greeter"
+             xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+             xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+             xmlns="http://schemas.xmlsoap.org/wsdl/">
+    <types>
+        <xsd:schema targetNamespace="https://jenesis.build/demo/greeter">
+            <xsd:element name="greet" type="xsd:string"/>
+            <xsd:element name="greetResponse" type="xsd:string"/>
+        </xsd:schema>
+    </types>
+    <message name="greetRequest"><part name="parameters" element="tns:greet"/></message>
+    <message name="greetResponse"><part name="parameters" element="tns:greetResponse"/></message>
+    <portType name="GreeterPort">
+        <operation name="greet">
+            <input message="tns:greetRequest"/>
+            <output message="tns:greetResponse"/>
+        </operation>
+    </portType>
+    <binding name="GreeterBinding" type="tns:GreeterPort">
+        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+        <operation name="greet">
+            <soap:operation soapAction="greet"/>
+            <input><soap:body use="literal"/></input>
+            <output><soap:body use="literal"/></output>
+        </operation>
+    </binding>
+    <service name="GreeterService">
+        <port name="GreeterPort" binding="tns:GreeterBinding">
+            <soap:address location="https://example.invalid/greeter"/>
+        </port>
+    </service>
+</definitions>

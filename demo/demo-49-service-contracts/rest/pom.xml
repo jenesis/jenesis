@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>build.jenesis.demo</groupId>
+        <artifactId>service-contracts</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>service-contracts-rest</artifactId>
+
+    <build>
+        <sourceDirectory>sources</sourceDirectory>
+    </build>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>2.21</version>
+                <!--Checksum/SHA-256/53ca085f4a150f703f49e1aabd935bd03b43e1ea3d55d135438292af22cef56b-->
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>2.21.5</version>
+                <!--Checksum/SHA-256/b64b5874162b503a0e58a8f7758266e8dd9f91bf49e3a59ae0b5f47589a231b7-->
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>2.21.5</version>
+                <!--Checksum/SHA-256/507418c0fafd38b2b2cfb704521630da613a8e4cc8381195a6f418017883e2c0-->
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
+                <version>2.21.5</version>
+                <!--Checksum/SHA-256/e941f9718d16a649614cb06711de06da34722afff9cee0b7725fc5318638304c-->
+            </dependency>
+            <dependency>
+                <groupId>jakarta.annotation</groupId>
+                <artifactId>jakarta.annotation-api</artifactId>
+                <version>3.0.0</version>
+                <!--Checksum/SHA-256/b01f55552284cfb149411e64eabca75e942d26d2e1786b32914250e4330afaa2-->
+            </dependency>
+            <dependency>
+                <groupId>org.openapitools</groupId>
+                <artifactId>jackson-databind-nullable</artifactId>
+                <version>0.2.11</version>
+                <!--Checksum/SHA-256/07417c949d66a67eb8bc1e919f3f1f13a741badf8b4fcbd39ac16a509d38d34c-->
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.21.5</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>2.21.5</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openapitools</groupId>
+            <artifactId>jackson-databind-nullable</artifactId>
+            <version>0.2.11</version>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+    </dependencies>
+    <!--jenesis.pin
+    openapi/maven/org.openapitools/openapi-generator-cli 7.25.0 SHA-256/41ce4f6b07f196676439d710759fa1ced7a08066d06ff1bf314681470289efae
+    -->
+</project>
