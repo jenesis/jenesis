@@ -85,6 +85,16 @@ switches itself on when its configuration file is present in a configuration fol
 opted out with its `jenesis.<kind>.<tool>=false` property. The inferred assembler wires the modules; a new
 tool is a new module in the same shape, plus a demo.
 
+**A tool reads one folder, the inference fills it.** A generator module (`XjcModule`,
+`ProtocModule`, …) declares the folder it reads - `xjc/`, `protoc/` - and reads nothing else:
+it never searches `sources/` or `resources/`, and it never learns where a contract lives. The
+inferred module binds the configured `folders` (default `META-INF/build.jenesis`) into that
+folder, filtered to the file kinds the tool compiles and keeping each file's path below the
+folder it came from, so moving a contract elsewhere changes no step's inputs. An input the
+tool identifies by name rather than by kind - a catalog, an OpenAPI document - is linked
+under the customary name the tool expects, so renaming the file in the project does not
+re-run the step either.
+
 **A module configures only its own children.** Every `Inferred*Module` holds one
 `Function<Child, BuildExecutorModule>` per module it wires, named exactly like the child it configures and
 defaulting to the identity, or to `null` when that child's `jenesis.*` property switches it off; `null`

@@ -83,4 +83,34 @@ public interface BuildStep extends Serializable {
         }
         return null;
     }
+
+    static List<String> selectByExtension(List<Path> folders, String extension) throws IOException {
+        List<String> selected = new ArrayList<>();
+        for (Path folder : folders) {
+            Files.walkFileTree(folder, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    if (file.getFileName().toString().endsWith(extension)) {
+                        selected.add(file.toString());
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        }
+        selected.sort(null);
+        return selected;
+    }
+
+    static Path selectByName(List<Path> folders, String name) throws IOException {
+        for (Path folder : folders) {
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(folder, name + ".*")) {
+                for (Path candidate : stream) {
+                    if (Files.isRegularFile(candidate)) {
+                        return candidate;
+                    }
+                }
+            }
+        }
+        return null;
+    }
 }
