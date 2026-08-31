@@ -14,7 +14,8 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
 
     public static final String XJC = "xjc",
             PROTOC = "protoc",
-            AVRO = "avro";
+            AVRO = "avro",
+            WSIMPORT = "wsimport";
 
     public static final String PREPARE = "prepare", TOOL = "tool";
 
@@ -23,6 +24,7 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     private static final Set<String> XJC_KEYS = Set.of("folders", "package", "catalog", "arguments");
     private static final Set<String> PROTOC_KEYS = Set.of("folders", "classifier", "plugins", "arguments");
     private static final Set<String> AVRO_KEYS = Set.of("folders", "arguments");
+    private static final Set<String> WSIMPORT_KEYS = Set.of("folders", "package", "location", "catalog", "arguments");
 
     private final SequencedSet<Path> configuration;
     private final Map<String, Repository> repositories;
@@ -31,6 +33,7 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     private final Function<XjcModule, BuildExecutorModule> xjc;
     private final Function<ProtocModule, BuildExecutorModule> protoc;
     private final Function<AvroModule, BuildExecutorModule> avro;
+    private final Function<WsImportModule, BuildExecutorModule> wsimport;
 
     public InferredSourceGenerationModule(SequencedSet<Path> configuration,
                                           Map<String, Repository> repositories,
@@ -38,7 +41,8 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
         this(configuration, repositories, resolvers, null,
                 enabledBy("jenesis.generate.xjc"),
                 enabledBy("jenesis.generate.protoc"),
-                enabledBy("jenesis.generate.avro"));
+                enabledBy("jenesis.generate.avro"),
+                enabledBy("jenesis.generate.wsimport"));
     }
 
     private InferredSourceGenerationModule(SequencedSet<Path> configuration,
@@ -47,7 +51,8 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                                            Pinning pinning,
                                            Function<XjcModule, BuildExecutorModule> xjc,
                                            Function<ProtocModule, BuildExecutorModule> protoc,
-                                           Function<AvroModule, BuildExecutorModule> avro) {
+                                           Function<AvroModule, BuildExecutorModule> avro,
+                                           Function<WsImportModule, BuildExecutorModule> wsimport) {
         this.configuration = configuration;
         this.repositories = repositories;
         this.resolvers = resolvers;
@@ -55,6 +60,7 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
         this.xjc = xjc;
         this.protoc = protoc;
         this.avro = avro;
+        this.wsimport = wsimport;
     }
 
     private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
@@ -62,19 +68,23 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     }
 
     public InferredSourceGenerationModule pinning(Pinning pinning) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport);
     }
 
     public InferredSourceGenerationModule xjc(Function<XjcModule, BuildExecutorModule> xjc) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport);
     }
 
     public InferredSourceGenerationModule protoc(Function<ProtocModule, BuildExecutorModule> protoc) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport);
     }
 
     public InferredSourceGenerationModule avro(Function<AvroModule, BuildExecutorModule> avro) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport);
+    }
+
+    public InferredSourceGenerationModule wsimport(Function<WsImportModule, BuildExecutorModule> wsimport) {
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport);
     }
 
     @Override
@@ -111,6 +121,18 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                             new LinkedHashMap<>()),
                     avro.apply(new AvroModule(repositories, resolvers)
                             .pinning(pinning)
+                            .arguments(words(properties, "arguments"))));
+        }
+        properties = read(WSIMPORT, WSIMPORT_KEYS, wsimport);
+        if (properties != null) {
+            generate(buildExecutor, inherited.sequencedKeySet(), WSIMPORT,
+                    prepare(properties, WsImportModule.FOLDER,
+                            Set.of(WsImportModule.DESCRIPTION, WsImportModule.BINDING),
+                            named(properties, "catalog", WsImportModule.CATALOG)),
+                    wsimport.apply(new WsImportModule(repositories, resolvers)
+                            .pinning(pinning)
+                            .packageName(properties.value("package"))
+                            .location(properties.value("location"))
                             .arguments(words(properties, "arguments"))));
         }
     }
