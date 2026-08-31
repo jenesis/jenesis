@@ -721,6 +721,8 @@ public record Project(
                                                        only and %{name}&#45;&#45;%{reset} escapes a double dash
 
                     %{header}Build-configuration files (in a module's build.jenesis config location; presence activates, contents configure;
+                    the source generators read their input from META-INF/build.jenesis/ in the module's sources, which the
+                    compiler never copies into the artifact, unless folders=<paths> in their config file names other folders;
                     MAVEN modules also read src/main/build.jenesis and src/test/build.jenesis for main- or test-scoped configuration):%{reset}
                       %{name}packaging.properties%{reset}    Extra deliverables: jmod/jlink/bundle/launcher/native (booleans), jpackage=<type>
                       %{name}sbom.properties%{reset}         CycloneDX SBOM format=json|xml|none (SBOM is on by default; -Djenesis.sbom.cyclonedx=false disables)
@@ -731,6 +733,8 @@ public record Project(
                       %{name}graal.properties%{reset}        GraalVM native-image reachability agent during the test run
                       %{name}pitest.properties%{reset}       PIT mutation testing
                       %{name}javaformat.properties%{reset}   Java source formatter=google|palantir
+                      %{name}xjc.properties%{reset}          Generate Java sources from the module's XML schemas (.xsd, .xjb) with the
+                                                 JAXB binding compiler (folders, package, catalog, arguments)
                       %{name}spdx.properties%{reset}         Extend the license alias/category tables
                       %{name}process-<tool>.properties%{reset} Extra command-line arguments merged into a forked tool (javac, javadoc, jar, jlink, jpackage, ...);
                                                  process-test.properties targets only the forked test JVM, merged over process-java.properties
@@ -1009,7 +1013,13 @@ public record Project(
 
                     Build-configuration files, in a module's build.jenesis config location (a
                     module's META-INF/build.jenesis/ folder, plus the project configuration
-                    locations). Presence activates the feature, contents configure it:
+                    locations). Presence activates the feature, contents configure it. The source
+                    generators read their input (schemas, definitions, descriptions) from
+                    META-INF/build.jenesis/ under the module's sources as well, which the compiler
+                    never copies into the artifact; folders=<paths> names other folders instead,
+                    resolved against the module's source and resource roots, so an input that has
+                    to ship can live beside the code. Each generator reads only the file kinds it
+                    compiles out of those folders:
 
                       packaging.properties
                           Extra deliverables: jmod/jlink/bundle/launcher/native (booleans),
@@ -1028,6 +1038,13 @@ public record Project(
                       graal.properties  GraalVM native-image reachability agent during tests.
                       pitest.properties  PIT mutation testing.
                       javaformat.properties  Java source formatter=google|palantir.
+                      xjc.properties
+                          Generate Java sources from the module's XML schemas with the JAXB
+                          binding compiler (folders, package, catalog, arguments). Every .xsd in
+                          the folders is compiled and every .xjb passed as a binding. The
+                          generated package is compiled into the module, so module-info.java may
+                          export it; what the generated code imports (jakarta.xml.bind) stays a
+                          declared dependency of the module.
                       spdx.properties  Extend the license alias/category tables.
                       process-<tool>.properties
                           Extra command-line arguments merged into a forked tool (javac, javadoc,
