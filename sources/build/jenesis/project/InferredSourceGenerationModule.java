@@ -12,36 +12,43 @@ import build.jenesis.step.Bind;
 
 public class InferredSourceGenerationModule implements BuildExecutorModule {
 
-    public static final String XJC = "xjc";
+    public static final String XJC = "xjc",
+            PROTOC = "protoc";
 
     public static final String PREPARE = "prepare", TOOL = "tool";
 
     private static final String FOLDERS = "META-INF/build.jenesis";
 
     private static final Set<String> XJC_KEYS = Set.of("folders", "package", "catalog", "arguments");
+    private static final Set<String> PROTOC_KEYS = Set.of("folders", "classifier", "plugins", "arguments");
 
     private final SequencedSet<Path> configuration;
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
     private final Function<XjcModule, BuildExecutorModule> xjc;
+    private final Function<ProtocModule, BuildExecutorModule> protoc;
 
     public InferredSourceGenerationModule(SequencedSet<Path> configuration,
                                           Map<String, Repository> repositories,
                                           Map<String, Resolver> resolvers) {
-        this(configuration, repositories, resolvers, null, enabledBy("jenesis.generate.xjc"));
+        this(configuration, repositories, resolvers, null,
+                enabledBy("jenesis.generate.xjc"),
+                enabledBy("jenesis.generate.protoc"));
     }
 
     private InferredSourceGenerationModule(SequencedSet<Path> configuration,
                                            Map<String, Repository> repositories,
                                            Map<String, Resolver> resolvers,
                                            Pinning pinning,
-                                           Function<XjcModule, BuildExecutorModule> xjc) {
+                                           Function<XjcModule, BuildExecutorModule> xjc,
+                                           Function<ProtocModule, BuildExecutorModule> protoc) {
         this.configuration = configuration;
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
         this.xjc = xjc;
+        this.protoc = protoc;
     }
 
     private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
@@ -49,11 +56,15 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     }
 
     public InferredSourceGenerationModule pinning(Pinning pinning) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc);
     }
 
     public InferredSourceGenerationModule xjc(Function<XjcModule, BuildExecutorModule> xjc) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc);
+    }
+
+    public InferredSourceGenerationModule protoc(Function<ProtocModule, BuildExecutorModule> protoc) {
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc);
     }
 
     @Override
@@ -68,6 +79,19 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                             .pinning(pinning)
                             .packageName(properties.value("package"))
                             .arguments(words(properties, "arguments"))));
+        }
+        properties = read(PROTOC, PROTOC_KEYS, protoc);
+        if (properties != null) {
+            ProtocModule module = new ProtocModule(repositories, resolvers)
+                    .pinning(pinning)
+                    .plugins(plugins(properties))
+                    .arguments(words(properties, "arguments"));
+            String classifier = properties.value("classifier");
+            generate(buildExecutor, inherited.sequencedKeySet(), PROTOC,
+                    prepare(properties, ProtocModule.FOLDER,
+                            Set.of(ProtocModule.DEFINITION),
+                            new LinkedHashMap<>()),
+                    protoc.apply(classifier == null ? module : module.classifier(classifier)));
         }
     }
 
@@ -136,6 +160,23 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     private static String extension(String file) {
         int dot = file.lastIndexOf('.');
         return dot < 0 ? "" : file.substring(dot);
+    }
+
+    private static SequencedMap<String, String> plugins(SequencedProperties properties) {
+        SequencedMap<String, String> plugins = new LinkedHashMap<>();
+        List<String> entries = properties.entries("plugins");
+        if (entries == null) {
+            return plugins;
+        }
+        for (String entry : entries) {
+            int assign = entry.indexOf('=');
+            if (assign < 1 || assign == entry.length() - 1) {
+                throw new IllegalArgumentException("Malformed protoc plugin: " + entry
+                        + " (expected <name>=<groupId>/<artifactId>)");
+            }
+            plugins.put(entry.substring(0, assign).trim(), entry.substring(assign + 1).trim());
+        }
+        return plugins;
     }
 
     private static List<String> words(SequencedProperties properties, String key) {
