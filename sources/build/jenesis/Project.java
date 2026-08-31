@@ -735,6 +735,9 @@ public record Project(
                       %{name}javaformat.properties%{reset}   Java source formatter=google|palantir
                       %{name}xjc.properties%{reset}          Generate Java sources from the module's XML schemas (.xsd, .xjb) with the
                                                  JAXB binding compiler (folders, package, catalog, arguments)
+                      %{name}protoc.properties%{reset}       Generate Java sources from the module's protocol buffer definitions (.proto)
+                                                 with protoc, a native executable resolved per platform (folders, classifier,
+                                                 plugins=<name>=<groupId>/<artifactId>, arguments)
                       %{name}spdx.properties%{reset}         Extend the license alias/category tables
                       %{name}process-<tool>.properties%{reset} Extra command-line arguments merged into a forked tool (javac, javadoc, jar, jlink, jpackage, ...);
                                                  process-test.properties targets only the forked test JVM, merged over process-java.properties
@@ -1045,6 +1048,14 @@ public record Project(
                           generated package is compiled into the module, so module-info.java may
                           export it; what the generated code imports (jakarta.xml.bind) stays a
                           declared dependency of the module.
+                      protoc.properties
+                          Generate Java sources from the module's protocol buffer definitions
+                          (folders, classifier, plugins, arguments). Every .proto in the folders
+                          is compiled, and the folders are the include path, so an import
+                          resolves as it is written. protoc is a native executable, resolved per
+                          operating system and chipset from a Maven classifier, so each platform
+                          needs its own checksum pin; plugins=<name>=<groupId>/<artifactId>
+                          resolves a protoc plugin the same way, in its own protoc-<name> group.
                       spdx.properties  Extend the license alias/category tables.
                       process-<tool>.properties
                           Extra command-line arguments merged into a forked tool (javac, javadoc,
