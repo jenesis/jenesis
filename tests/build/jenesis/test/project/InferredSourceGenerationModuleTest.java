@@ -47,6 +47,23 @@ public class InferredSourceGenerationModuleTest {
     }
 
     @Test
+    public void wires_every_generator_its_configuration_file_names() throws IOException {
+        Files.writeString(project.resolve("avro.properties"), "");
+        Files.writeString(project.resolve("wsimport.properties"), "package=demo.greeter\n");
+        Files.writeString(project.resolve("openapi.properties"), "specification=greeting.yaml\n");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("generated", generation(), "project");
+        executor.execute("generated/avro/tool/required", "generated/wsimport/tool/required", "generated/openapi/tool/required");
+
+        assertThat(required("avro")).containsExactly("avro/runtime/maven/org.apache.avro/avro-tools/RELEASE");
+        assertThat(required("wsimport")).containsExactly("wsimport/runtime/maven/com.sun.xml.ws/jaxws-tools/RELEASE");
+        assertThat(required("openapi"))
+                .containsExactly("openapi/runtime/maven/org.openapitools/openapi-generator-cli/RELEASE");
+    }
+
+    @Test
     public void binds_the_configured_folders_into_the_tool_folder() throws IOException {
         Files.writeString(project.resolve("xjc.properties"), "folders=contracts\n");
         Files.writeString(
@@ -71,6 +88,24 @@ public class InferredSourceGenerationModuleTest {
     }
 
     @Test
+    public void binds_a_named_file_under_the_name_the_tool_expects() throws IOException {
+        Files.writeString(project.resolve("openapi.properties"), "specification=greeting.yaml\n");
+        Files.writeString(
+                Files.createDirectories(project.resolve(BuildStep.SOURCES + "META-INF/build.jenesis")).resolve("greeting.yaml"),
+                "openapi: 3.0.0");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("generated", generation(), "project");
+        executor.execute("generated/openapi/prepare");
+
+        Path bound = root.resolve("generated").resolve("openapi").resolve("prepare").resolve("output").resolve("openapi");
+        assertThat(bound.resolve("openapi.yaml"))
+                .as("the configured specification reaches the tool under the name it expects")
+                .isNotEmptyFile();
+    }
+
+    @Test
     public void rejects_an_unknown_xjc_property() throws IOException {
         Files.writeString(project.resolve("xjc.properties"), "packages=demo.order\n");
 
@@ -82,6 +117,15 @@ public class InferredSourceGenerationModuleTest {
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .rootCause()
                 .hasMessageContaining("Unknown xjc property: packages");
+    }
+
+    private Set<String> required(String tool) throws IOException {
+        return SequencedProperties.ofFiles(root.resolve("generated")
+                .resolve(tool)
+                .resolve("tool")
+                .resolve("required")
+                .resolve("output")
+                .resolve(BuildStep.REQUIRES)).stringPropertyNames();
     }
 
     private InferredSourceGenerationModule generation() {

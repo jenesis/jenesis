@@ -15,7 +15,8 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     public static final String XJC = "xjc",
             PROTOC = "protoc",
             AVRO = "avro",
-            WSIMPORT = "wsimport";
+            WSIMPORT = "wsimport",
+            OPENAPI = "openapi";
 
     public static final String PREPARE = "prepare", TOOL = "tool";
 
@@ -25,6 +26,7 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     private static final Set<String> PROTOC_KEYS = Set.of("folders", "classifier", "plugins", "arguments");
     private static final Set<String> AVRO_KEYS = Set.of("folders", "arguments");
     private static final Set<String> WSIMPORT_KEYS = Set.of("folders", "package", "location", "catalog", "arguments");
+    private static final Set<String> OPENAPI_KEYS = Set.of("folders", "specification", "generator", "package", "sources", "arguments");
 
     private final SequencedSet<Path> configuration;
     private final Map<String, Repository> repositories;
@@ -34,6 +36,7 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     private final Function<ProtocModule, BuildExecutorModule> protoc;
     private final Function<AvroModule, BuildExecutorModule> avro;
     private final Function<WsImportModule, BuildExecutorModule> wsimport;
+    private final Function<OpenApiModule, BuildExecutorModule> openapi;
 
     public InferredSourceGenerationModule(SequencedSet<Path> configuration,
                                           Map<String, Repository> repositories,
@@ -42,7 +45,8 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                 enabledBy("jenesis.generate.xjc"),
                 enabledBy("jenesis.generate.protoc"),
                 enabledBy("jenesis.generate.avro"),
-                enabledBy("jenesis.generate.wsimport"));
+                enabledBy("jenesis.generate.wsimport"),
+                enabledBy("jenesis.generate.openapi"));
     }
 
     private InferredSourceGenerationModule(SequencedSet<Path> configuration,
@@ -52,7 +56,8 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                                            Function<XjcModule, BuildExecutorModule> xjc,
                                            Function<ProtocModule, BuildExecutorModule> protoc,
                                            Function<AvroModule, BuildExecutorModule> avro,
-                                           Function<WsImportModule, BuildExecutorModule> wsimport) {
+                                           Function<WsImportModule, BuildExecutorModule> wsimport,
+                                           Function<OpenApiModule, BuildExecutorModule> openapi) {
         this.configuration = configuration;
         this.repositories = repositories;
         this.resolvers = resolvers;
@@ -61,6 +66,7 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
         this.protoc = protoc;
         this.avro = avro;
         this.wsimport = wsimport;
+        this.openapi = openapi;
     }
 
     private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
@@ -68,23 +74,27 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     }
 
     public InferredSourceGenerationModule pinning(Pinning pinning) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi);
     }
 
     public InferredSourceGenerationModule xjc(Function<XjcModule, BuildExecutorModule> xjc) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi);
     }
 
     public InferredSourceGenerationModule protoc(Function<ProtocModule, BuildExecutorModule> protoc) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi);
     }
 
     public InferredSourceGenerationModule avro(Function<AvroModule, BuildExecutorModule> avro) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi);
     }
 
     public InferredSourceGenerationModule wsimport(Function<WsImportModule, BuildExecutorModule> wsimport) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi);
+    }
+
+    public InferredSourceGenerationModule openapi(Function<OpenApiModule, BuildExecutorModule> openapi) {
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi);
     }
 
     @Override
@@ -134,6 +144,23 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                             .packageName(properties.value("package"))
                             .location(properties.value("location"))
                             .arguments(words(properties, "arguments"))));
+        }
+        properties = read(OPENAPI, OPENAPI_KEYS, openapi);
+        if (properties != null) {
+            OpenApiModule module = new OpenApiModule(repositories, resolvers)
+                    .pinning(pinning)
+                    .packageName(properties.value("package"))
+                    .arguments(words(properties, "arguments"));
+            String generator = properties.value("generator");
+            if (generator != null) {
+                module = module.generator(generator);
+            }
+            String sources = properties.value("sources");
+            generate(buildExecutor, inherited.sequencedKeySet(), OPENAPI,
+                    prepare(properties, OpenApiModule.FOLDER,
+                            OpenApiModule.DOCUMENTS,
+                            named(properties, "specification", OpenApiModule.SPECIFICATION)),
+                    openapi.apply(sources == null ? module : module.sourceFolder(sources)));
         }
     }
 
