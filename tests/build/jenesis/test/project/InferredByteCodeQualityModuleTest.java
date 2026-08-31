@@ -45,6 +45,22 @@ public class InferredByteCodeQualityModuleTest {
                 .doesNotExist();
     }
 
+    @Test
+    public void the_spotbugs_override_switches_off_spotbugs() throws IOException {
+        Files.writeString(project.resolve("spotbugs-exclude.xml"), "<FindBugsFilter/>");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("quality",
+                new InferredByteCodeQualityModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()).spotbugs(null),
+                "project");
+        executor.execute();
+
+        assertThat(root.resolve("quality").resolve("spotbugs"))
+                .as("SpotBugs is not wired once its configurator is dropped, even with a filter file present")
+                .doesNotExist();
+    }
+
     private BuildExecutor newExecutor() throws IOException {
         return BuildExecutor.of(root,
                 Duration.ZERO,
