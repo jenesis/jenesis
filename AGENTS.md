@@ -85,6 +85,14 @@ switches itself on when its configuration file is present in a configuration fol
 opted out with its `jenesis.<kind>.<tool>=false` property. The inferred assembler wires the modules; a new
 tool is a new module in the same shape, plus a demo.
 
+**A module configures only its own children.** Every `Inferred*Module` holds one
+`Function<Child, BuildExecutorModule>` per module it wires, named exactly like the child it configures and
+defaulting to the identity, or to `null` when that child's `jenesis.*` property switches it off; `null`
+skips the child, and so does a configurator that returns `null`. A caller reaches further down by nesting -
+`assembler.toolchain(toolchain -> toolchain.compiler(compiler -> compiler.javac(javac -> …)))` - and no
+module ever exposes a configurator for a module it does not wire itself, so a new child is a new
+configurator on its own parent, never a new component on the assembler.
+
 **Fail loudly, name the fix.** Bad input is an `IllegalArgumentException` whose message says what was given
 and what would be valid; a missing prerequisite is an `IllegalStateException` that names it. Nothing
 silently falls back, and a lenient wildcard selector is the one deliberate exception, documented as such.

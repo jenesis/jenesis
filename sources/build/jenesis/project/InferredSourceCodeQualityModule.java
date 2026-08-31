@@ -22,38 +22,38 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
-    private final boolean checkstyle;
-    private final boolean pmd;
-    private final boolean detekt;
-    private final boolean ktlint;
-    private final boolean scalastyle;
-    private final boolean scalafmt;
-    private final boolean codenarc;
+    private final Function<CheckstyleModule, BuildExecutorModule> checkstyle;
+    private final Function<PmdModule, BuildExecutorModule> pmd;
+    private final Function<DetektModule, BuildExecutorModule> detekt;
+    private final Function<KtlintModule, BuildExecutorModule> ktlint;
+    private final Function<ScalastyleModule, BuildExecutorModule> scalastyle;
+    private final Function<ScalafmtModule, BuildExecutorModule> scalafmt;
+    private final Function<CodeNarcModule, BuildExecutorModule> codenarc;
 
     public InferredSourceCodeQualityModule(SequencedSet<Path> configuration,
                                            Map<String, Repository> repositories,
                                            Map<String, Resolver> resolvers) {
         this(configuration, repositories, resolvers, null,
-                Boolean.parseBoolean(System.getProperty("jenesis.source.checkstyle", "true")),
-                Boolean.parseBoolean(System.getProperty("jenesis.source.pmd", "true")),
-                Boolean.parseBoolean(System.getProperty("jenesis.source.detekt", "true")),
-                Boolean.parseBoolean(System.getProperty("jenesis.source.ktlint", "true")),
-                Boolean.parseBoolean(System.getProperty("jenesis.source.scalastyle", "true")),
-                Boolean.parseBoolean(System.getProperty("jenesis.source.scalafmt", "true")),
-                Boolean.parseBoolean(System.getProperty("jenesis.source.codenarc", "true")));
+                enabledBy("jenesis.source.checkstyle"),
+                enabledBy("jenesis.source.pmd"),
+                enabledBy("jenesis.source.detekt"),
+                enabledBy("jenesis.source.ktlint"),
+                enabledBy("jenesis.source.scalastyle"),
+                enabledBy("jenesis.source.scalafmt"),
+                enabledBy("jenesis.source.codenarc"));
     }
 
     private InferredSourceCodeQualityModule(SequencedSet<Path> configuration,
                                             Map<String, Repository> repositories,
                                             Map<String, Resolver> resolvers,
                                             Pinning pinning,
-                                            boolean checkstyle,
-                                            boolean pmd,
-                                            boolean detekt,
-                                            boolean ktlint,
-                                            boolean scalastyle,
-                                            boolean scalafmt,
-                                            boolean codenarc) {
+                                            Function<CheckstyleModule, BuildExecutorModule> checkstyle,
+                                            Function<PmdModule, BuildExecutorModule> pmd,
+                                            Function<DetektModule, BuildExecutorModule> detekt,
+                                            Function<KtlintModule, BuildExecutorModule> ktlint,
+                                            Function<ScalastyleModule, BuildExecutorModule> scalastyle,
+                                            Function<ScalafmtModule, BuildExecutorModule> scalafmt,
+                                            Function<CodeNarcModule, BuildExecutorModule> codenarc) {
         this.configuration = configuration;
         this.repositories = repositories;
         this.resolvers = resolvers;
@@ -67,42 +67,46 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
         this.codenarc = codenarc;
     }
 
+    private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
+        return Boolean.parseBoolean(System.getProperty(property, "true")) ? module -> module : null;
+    }
+
     public InferredSourceCodeQualityModule pinning(Pinning pinning) {
         return new InferredSourceCodeQualityModule(configuration, repositories, resolvers, pinning,
                 checkstyle, pmd, detekt, ktlint, scalastyle, scalafmt, codenarc);
     }
 
-    public InferredSourceCodeQualityModule checkstyle(boolean checkstyle) {
+    public InferredSourceCodeQualityModule checkstyle(Function<CheckstyleModule, BuildExecutorModule> checkstyle) {
         return new InferredSourceCodeQualityModule(configuration, repositories, resolvers, pinning,
                 checkstyle, pmd, detekt, ktlint, scalastyle, scalafmt, codenarc);
     }
 
-    public InferredSourceCodeQualityModule pmd(boolean pmd) {
+    public InferredSourceCodeQualityModule pmd(Function<PmdModule, BuildExecutorModule> pmd) {
         return new InferredSourceCodeQualityModule(configuration, repositories, resolvers, pinning,
                 checkstyle, pmd, detekt, ktlint, scalastyle, scalafmt, codenarc);
     }
 
-    public InferredSourceCodeQualityModule detekt(boolean detekt) {
+    public InferredSourceCodeQualityModule detekt(Function<DetektModule, BuildExecutorModule> detekt) {
         return new InferredSourceCodeQualityModule(configuration, repositories, resolvers, pinning,
                 checkstyle, pmd, detekt, ktlint, scalastyle, scalafmt, codenarc);
     }
 
-    public InferredSourceCodeQualityModule ktlint(boolean ktlint) {
+    public InferredSourceCodeQualityModule ktlint(Function<KtlintModule, BuildExecutorModule> ktlint) {
         return new InferredSourceCodeQualityModule(configuration, repositories, resolvers, pinning,
                 checkstyle, pmd, detekt, ktlint, scalastyle, scalafmt, codenarc);
     }
 
-    public InferredSourceCodeQualityModule scalastyle(boolean scalastyle) {
+    public InferredSourceCodeQualityModule scalastyle(Function<ScalastyleModule, BuildExecutorModule> scalastyle) {
         return new InferredSourceCodeQualityModule(configuration, repositories, resolvers, pinning,
                 checkstyle, pmd, detekt, ktlint, scalastyle, scalafmt, codenarc);
     }
 
-    public InferredSourceCodeQualityModule scalafmt(boolean scalafmt) {
+    public InferredSourceCodeQualityModule scalafmt(Function<ScalafmtModule, BuildExecutorModule> scalafmt) {
         return new InferredSourceCodeQualityModule(configuration, repositories, resolvers, pinning,
                 checkstyle, pmd, detekt, ktlint, scalastyle, scalafmt, codenarc);
     }
 
-    public InferredSourceCodeQualityModule codenarc(boolean codenarc) {
+    public InferredSourceCodeQualityModule codenarc(Function<CodeNarcModule, BuildExecutorModule> codenarc) {
         return new InferredSourceCodeQualityModule(configuration, repositories, resolvers, pinning,
                 checkstyle, pmd, detekt, ktlint, scalastyle, scalafmt, codenarc);
     }

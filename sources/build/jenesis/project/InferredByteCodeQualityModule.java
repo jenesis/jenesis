@@ -16,20 +16,20 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
-    private final boolean spotbugs;
+    private final Function<SpotBugsModule, BuildExecutorModule> spotbugs;
 
     public InferredByteCodeQualityModule(SequencedSet<Path> configuration,
                                          Map<String, Repository> repositories,
                                          Map<String, Resolver> resolvers) {
         this(configuration, repositories, resolvers, null,
-                Boolean.parseBoolean(System.getProperty("jenesis.validator.spotbugs", "true")));
+                enabledBy("jenesis.validator.spotbugs"));
     }
 
     private InferredByteCodeQualityModule(SequencedSet<Path> configuration,
                                           Map<String, Repository> repositories,
                                           Map<String, Resolver> resolvers,
                                           Pinning pinning,
-                                          boolean spotbugs) {
+                                          Function<SpotBugsModule, BuildExecutorModule> spotbugs) {
         this.configuration = configuration;
         this.repositories = repositories;
         this.resolvers = resolvers;
@@ -37,11 +37,15 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
         this.spotbugs = spotbugs;
     }
 
+    private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
+        return Boolean.parseBoolean(System.getProperty(property, "true")) ? module -> module : null;
+    }
+
     public InferredByteCodeQualityModule pinning(Pinning pinning) {
         return new InferredByteCodeQualityModule(configuration, repositories, resolvers, pinning, spotbugs);
     }
 
-    public InferredByteCodeQualityModule spotbugs(boolean spotbugs) {
+    public InferredByteCodeQualityModule spotbugs(Function<SpotBugsModule, BuildExecutorModule> spotbugs) {
         return new InferredByteCodeQualityModule(configuration, repositories, resolvers, pinning, spotbugs);
     }
 

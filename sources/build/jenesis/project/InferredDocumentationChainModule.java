@@ -24,21 +24,49 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
+    private final Function<Javadoc, BuildStep> javadoc;
+    private final Function<DokkaDocumentationModule, BuildExecutorModule> dokka;
+    private final Function<ScalaDocumentationModule, BuildExecutorModule> scaladoc;
+    private final Function<GroovyDocumentationModule, BuildExecutorModule> groovydoc;
 
     public InferredDocumentationChainModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null);
+        this(repositories, resolvers, null, step -> step, module -> module, module -> module, module -> module);
     }
 
     private InferredDocumentationChainModule(Map<String, Repository> repositories,
                                              Map<String, Resolver> resolvers,
-                                             Pinning pinning) {
+                                             Pinning pinning,
+                                             Function<Javadoc, BuildStep> javadoc,
+                                             Function<DokkaDocumentationModule, BuildExecutorModule> dokka,
+                                             Function<ScalaDocumentationModule, BuildExecutorModule> scaladoc,
+                                             Function<GroovyDocumentationModule, BuildExecutorModule> groovydoc) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
+        this.javadoc = javadoc;
+        this.dokka = dokka;
+        this.scaladoc = scaladoc;
+        this.groovydoc = groovydoc;
     }
 
     public InferredDocumentationChainModule pinning(Pinning pinning) {
-        return new InferredDocumentationChainModule(repositories, resolvers, pinning);
+        return new InferredDocumentationChainModule(repositories, resolvers, pinning, javadoc, dokka, scaladoc, groovydoc);
+    }
+
+    public InferredDocumentationChainModule javadoc(Function<Javadoc, BuildStep> javadoc) {
+        return new InferredDocumentationChainModule(repositories, resolvers, pinning, javadoc, dokka, scaladoc, groovydoc);
+    }
+
+    public InferredDocumentationChainModule dokka(Function<DokkaDocumentationModule, BuildExecutorModule> dokka) {
+        return new InferredDocumentationChainModule(repositories, resolvers, pinning, javadoc, dokka, scaladoc, groovydoc);
+    }
+
+    public InferredDocumentationChainModule scaladoc(Function<ScalaDocumentationModule, BuildExecutorModule> scaladoc) {
+        return new InferredDocumentationChainModule(repositories, resolvers, pinning, javadoc, dokka, scaladoc, groovydoc);
+    }
+
+    public InferredDocumentationChainModule groovydoc(Function<GroovyDocumentationModule, BuildExecutorModule> groovydoc) {
+        return new InferredDocumentationChainModule(repositories, resolvers, pinning, javadoc, dokka, scaladoc, groovydoc);
     }
 
     @Override
@@ -47,7 +75,7 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
         SequencedSet<String> documentInputs = new LinkedHashSet<>(inherited.sequencedKeySet());
         documentInputs.add(SCAN);
         buildExecutor.addModule(DOCUMENT,
-                new Document(repositories, resolvers, pinning),
+                new Document(repositories, resolvers, pinning, javadoc, dokka, scaladoc, groovydoc),
                 documentInputs);
     }
 
@@ -106,7 +134,11 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
 
     private record Document(Map<String, Repository> repositories,
                             Map<String, Resolver> resolvers,
-                            Pinning pinning) implements BuildExecutorModule {
+                            Pinning pinning,
+                            Function<Javadoc, BuildStep> javadoc,
+                            Function<DokkaDocumentationModule, BuildExecutorModule> dokka,
+                            Function<ScalaDocumentationModule, BuildExecutorModule> scaladoc,
+                            Function<GroovyDocumentationModule, BuildExecutorModule> groovydoc) implements BuildExecutorModule {
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
@@ -115,62 +147,76 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                 throw new IllegalStateException("Document sub-module is missing its upstream scan input");
             }
             SequencedProperties scan = SequencedProperties.ofFiles(scanFolder.resolve(SCAN_FILE));
-            boolean hasJava = scan.flag(JAVADOC);
-            boolean hasGroovy = scan.flag(GROOVYDOC);
-            boolean hasScala = scan.flag(SCALADOC);
-            boolean hasKotlin = scan.flag(DOKKA);
+            boolean hasJava = scan.flag(JAVADOC) && javadoc != null;
+            boolean hasGroovy = scan.flag(GROOVYDOC) && groovydoc != null;
+            boolean hasScala = scan.flag(SCALADOC) && scaladoc != null;
+            boolean hasKotlin = scan.flag(DOKKA) && dokka != null;
 
             SequencedSet<String> sourceInputs = new LinkedHashSet<>(inherited.sequencedKeySet());
             sourceInputs.remove(PREVIOUS + SCAN);
 
             SequencedSet<String> outputs = new LinkedHashSet<>();
             if (hasKotlin && !hasScala && !hasGroovy) {
-                buildExecutor.addModule(DOKKA,
-                        new DokkaDocumentationModule(repositories, resolvers).pinning(pinning),
-                        sourceInputs);
-                outputs.add(DOKKA);
+                document(buildExecutor, sourceInputs, outputs, DOKKA,
+                        dokka.apply(new DokkaDocumentationModule(repositories, resolvers).pinning(pinning)));
             } else if (hasGroovy && !hasScala && !hasKotlin) {
-                buildExecutor.addModule(GROOVYDOC,
-                        new GroovyDocumentationModule(repositories, resolvers).pinning(pinning).includeJava(hasJava),
-                        sourceInputs);
-                outputs.add(GROOVYDOC);
+                document(buildExecutor, sourceInputs, outputs, GROOVYDOC,
+                        groovydoc.apply(new GroovyDocumentationModule(repositories, resolvers)
+                                .pinning(pinning)
+                                .includeJava(hasJava)));
             } else if (hasScala && !hasJava && !hasKotlin && !hasGroovy) {
-                buildExecutor.addModule(SCALADOC,
-                        new ScalaDocumentationModule(repositories, resolvers).pinning(pinning),
-                        sourceInputs);
-                outputs.add(SCALADOC);
+                document(buildExecutor, sourceInputs, outputs, SCALADOC,
+                        scaladoc.apply(new ScalaDocumentationModule(repositories, resolvers).pinning(pinning)));
             } else if (hasJava && !hasKotlin && !hasScala && !hasGroovy) {
-                buildExecutor.addStep(JAVADOC,
-                        new Javadoc(ProcessHandler.Factory.of()).classpath(true),
-                        sourceInputs);
-                outputs.add(JAVADOC);
+                document(buildExecutor, sourceInputs, outputs, JAVADOC,
+                        javadoc.apply(new Javadoc(ProcessHandler.Factory.of()).classpath(true)));
             } else {
                 if (hasJava) {
-                    buildExecutor.addStep(JAVADOC,
-                            new Javadoc(ProcessHandler.Factory.of()).classpath(true),
-                            sourceInputs);
-                    outputs.add(JAVADOC);
+                    document(buildExecutor, sourceInputs, outputs, JAVADOC,
+                            javadoc.apply(new Javadoc(ProcessHandler.Factory.of()).classpath(true)));
                 }
                 if (hasKotlin) {
-                    buildExecutor.addModule(DOKKA,
-                            new DokkaDocumentationModule(repositories, resolvers).pinning(pinning).within(DOKKA),
-                            sourceInputs);
-                    outputs.add(DOKKA);
+                    document(buildExecutor, sourceInputs, outputs, DOKKA,
+                            dokka.apply(new DokkaDocumentationModule(repositories, resolvers)
+                                    .pinning(pinning)
+                                    .within(DOKKA)));
                 }
                 if (hasScala) {
-                    buildExecutor.addModule(SCALADOC,
-                            new ScalaDocumentationModule(repositories, resolvers).pinning(pinning).within(SCALADOC),
-                            sourceInputs);
-                    outputs.add(SCALADOC);
+                    document(buildExecutor, sourceInputs, outputs, SCALADOC,
+                            scaladoc.apply(new ScalaDocumentationModule(repositories, resolvers)
+                                    .pinning(pinning)
+                                    .within(SCALADOC)));
                 }
                 if (hasGroovy) {
-                    buildExecutor.addModule(GROOVYDOC,
-                            new GroovyDocumentationModule(repositories, resolvers).pinning(pinning).within(GROOVYDOC),
-                            sourceInputs);
-                    outputs.add(GROOVYDOC);
+                    document(buildExecutor, sourceInputs, outputs, GROOVYDOC,
+                            groovydoc.apply(new GroovyDocumentationModule(repositories, resolvers)
+                                    .pinning(pinning)
+                                    .within(GROOVYDOC)));
                 }
             }
             buildExecutor.addStep(AGGREGATE, new Aggregate(), outputs);
+        }
+
+        private static void document(BuildExecutor buildExecutor,
+                                     SequencedSet<String> inputs,
+                                     SequencedSet<String> outputs,
+                                     String name,
+                                     BuildExecutorModule module) {
+            if (module != null) {
+                buildExecutor.addModule(name, module, inputs);
+                outputs.add(name);
+            }
+        }
+
+        private static void document(BuildExecutor buildExecutor,
+                                     SequencedSet<String> inputs,
+                                     SequencedSet<String> outputs,
+                                     String name,
+                                     BuildStep step) {
+            if (step != null) {
+                buildExecutor.addStep(name, step, inputs);
+                outputs.add(name);
+            }
         }
     }
 

@@ -46,7 +46,9 @@ public class InferredComplianceModuleTest {
         Path configuration = Files.createDirectories(root.resolve("configuration"));
         Files.writeString(configuration.resolve("licensing.properties"), "allowed=Apache\n");
         Files.writeString(configuration.resolve("vulnerability.properties"), "severity=high\n");
-        InferredComplianceModule disabled = new InferredComplianceModule(new LinkedHashSet<>(List.of(configuration))).enabled(false);
+        InferredComplianceModule disabled = new InferredComplianceModule(new LinkedHashSet<>(List.of(configuration)))
+                .license(null)
+                .vulnerability(null);
         assertThatThrownBy(() -> execute(disabled, "compliance/license/check"))
                 .rootCause()
                 .hasMessageContaining("license");

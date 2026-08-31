@@ -121,6 +121,22 @@ public class JavaToolchainModuleTest {
     }
 
     @Test
+    public void an_absent_archiver_omits_the_artifacts_stage() throws IOException {
+        Path sources = Files.createDirectories(input.resolve(BuildStep.SOURCES + "other"));
+        try (BufferedWriter writer = Files.newBufferedWriter(sources.resolve("Sample.java"))) {
+            writer.append("package other;");
+            writer.newLine();
+            writer.append("public class Sample { }");
+            writer.newLine();
+        }
+        buildExecutor.addSource("input", input);
+        buildExecutor.addModule("output", new JavaToolchainModule().archiver(null), "input");
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        assertThat(steps).containsKey("output/classes");
+        assertThat(steps).doesNotContainKey("output/artifacts");
+    }
+
+    @Test
     public void test_with_require_engine_throws_when_no_engine_resolves() throws IOException {
         Path sources = Files.createDirectories(input.resolve(BuildStep.SOURCES + "other"));
         try (BufferedWriter writer = Files.newBufferedWriter(sources.resolve("Sample.java"))) {

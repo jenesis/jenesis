@@ -45,6 +45,22 @@ public class InferredSourceCodeQualityModuleTest {
                 .doesNotExist();
     }
 
+    @Test
+    public void the_checkstyle_override_switches_off_checkstyle() throws IOException {
+        Files.writeString(project.resolve("checkstyle.xml"), "<module name=\"Checker\"/>");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("quality",
+                new InferredSourceCodeQualityModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()).checkstyle(null),
+                "project");
+        executor.execute();
+
+        assertThat(root.resolve("quality").resolve("checkstyle"))
+                .as("Checkstyle is not wired once its configurator is dropped, even with checkstyle.xml present")
+                .doesNotExist();
+    }
+
     private BuildExecutor newExecutor() throws IOException {
         return BuildExecutor.of(root,
                 Duration.ZERO,

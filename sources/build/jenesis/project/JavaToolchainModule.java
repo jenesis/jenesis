@@ -72,9 +72,11 @@ public record JavaToolchainModule(BuildExecutorModule generator,
                     Stream.of(classes),
                     inherited.sequencedKeySet().stream()));
         }
-        buildExecutor.addModule(ARTIFACTS, archiver, Stream.concat(
-                Stream.of(classes),
-                inherited.sequencedKeySet().stream()));
+        if (archiver != null) {
+            buildExecutor.addModule(ARTIFACTS, archiver, Stream.concat(
+                    Stream.of(classes),
+                    inherited.sequencedKeySet().stream()));
+        }
     }
 
     @Override

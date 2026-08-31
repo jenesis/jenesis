@@ -26,27 +26,56 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
     private final PathPlacement pathPlacement;
+    private final Function<Javac, BuildStep> javac;
+    private final Function<KotlinCompilerModule, BuildExecutorModule> kotlinc;
+    private final Function<ScalaCompilerModule, BuildExecutorModule> scalac;
+    private final Function<GroovyCompilerModule, BuildExecutorModule> groovyc;
 
     public InferredCompilerChainModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, PathPlacement.INFERRED);
+        this(repositories, resolvers, null, PathPlacement.INFERRED,
+                step -> step, module -> module, module -> module, module -> module);
     }
 
     private InferredCompilerChainModule(Map<String, Repository> repositories,
                                         Map<String, Resolver> resolvers,
                                         Pinning pinning,
-                                        PathPlacement pathPlacement) {
+                                        PathPlacement pathPlacement,
+                                        Function<Javac, BuildStep> javac,
+                                        Function<KotlinCompilerModule, BuildExecutorModule> kotlinc,
+                                        Function<ScalaCompilerModule, BuildExecutorModule> scalac,
+                                        Function<GroovyCompilerModule, BuildExecutorModule> groovyc) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
+        this.javac = javac;
+        this.kotlinc = kotlinc;
+        this.scalac = scalac;
+        this.groovyc = groovyc;
     }
 
     public InferredCompilerChainModule pinning(Pinning pinning) {
-        return new InferredCompilerChainModule(repositories, resolvers, pinning, pathPlacement);
+        return new InferredCompilerChainModule(repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc);
     }
 
     public InferredCompilerChainModule pathPlacement(PathPlacement pathPlacement) {
-        return new InferredCompilerChainModule(repositories, resolvers, pinning, pathPlacement);
+        return new InferredCompilerChainModule(repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc);
+    }
+
+    public InferredCompilerChainModule javac(Function<Javac, BuildStep> javac) {
+        return new InferredCompilerChainModule(repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc);
+    }
+
+    public InferredCompilerChainModule kotlinc(Function<KotlinCompilerModule, BuildExecutorModule> kotlinc) {
+        return new InferredCompilerChainModule(repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc);
+    }
+
+    public InferredCompilerChainModule scalac(Function<ScalaCompilerModule, BuildExecutorModule> scalac) {
+        return new InferredCompilerChainModule(repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc);
+    }
+
+    public InferredCompilerChainModule groovyc(Function<GroovyCompilerModule, BuildExecutorModule> groovyc) {
+        return new InferredCompilerChainModule(repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc);
     }
 
     @Override
@@ -55,7 +84,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
         SequencedSet<String> compileInputs = new LinkedHashSet<>(inherited.sequencedKeySet());
         compileInputs.add(SCAN);
         buildExecutor.addModule(COMPILE,
-                new Compile(repositories, resolvers, pinning, pathPlacement),
+                new Compile(repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc),
                 compileInputs);
     }
 
@@ -118,7 +147,11 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
     private record Compile(Map<String, Repository> repositories,
                            Map<String, Resolver> resolvers,
                            Pinning pinning,
-                           PathPlacement pathPlacement) implements BuildExecutorModule {
+                           PathPlacement pathPlacement,
+                           Function<Javac, BuildStep> javac,
+                           Function<KotlinCompilerModule, BuildExecutorModule> kotlinc,
+                           Function<ScalaCompilerModule, BuildExecutorModule> scalac,
+                           Function<GroovyCompilerModule, BuildExecutorModule> groovyc) implements BuildExecutorModule {
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
@@ -127,10 +160,10 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 throw new IllegalStateException("Compile sub-module is missing its upstream scan input");
             }
             SequencedProperties scan = SequencedProperties.ofFiles(scanFolder.resolve(SCAN_FILE));
-            boolean hasJava = scan.flag(JAVAC);
-            boolean hasKotlin = scan.flag(KOTLINC);
-            boolean hasScala = scan.flag(SCALAC);
-            boolean hasGroovy = scan.flag(GROOVYC);
+            boolean hasJava = scan.flag(JAVAC) && javac != null;
+            boolean hasKotlin = scan.flag(KOTLINC) && kotlinc != null;
+            boolean hasScala = scan.flag(SCALAC) && scalac != null;
+            boolean hasGroovy = scan.flag(GROOVYC) && groovyc != null;
             boolean hasResource = scan.flag(RESOURCE);
 
             SequencedSet<String> sourceInputs = new LinkedHashSet<>(inherited.sequencedKeySet());
@@ -138,41 +171,45 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
 
             SequencedSet<String> dependencies = new LinkedHashSet<>(sourceInputs);
             if (hasKotlin) {
-                buildExecutor.addModule(KOTLINC,
-                        new KotlinCompilerModule(repositories, resolvers)
-                                .pinning(pinning)
-                                .includeResources(!hasJava && !hasScala && !hasGroovy),
-                        dependencies);
-                SequencedSet<String> updated = new LinkedHashSet<>(dependencies);
-                updated.add(KOTLINC + "/" + KotlinCompilerModule.CLASSES);
-                dependencies = updated;
+                BuildExecutorModule compiler = kotlinc.apply(new KotlinCompilerModule(repositories, resolvers)
+                        .pinning(pinning)
+                        .includeResources(!hasJava && !hasScala && !hasGroovy));
+                if (compiler != null) {
+                    buildExecutor.addModule(KOTLINC, compiler, dependencies);
+                    SequencedSet<String> updated = new LinkedHashSet<>(dependencies);
+                    updated.add(KOTLINC + "/" + KotlinCompilerModule.CLASSES);
+                    dependencies = updated;
+                }
             }
             if (hasScala) {
-                buildExecutor.addModule(SCALAC,
-                        new ScalaCompilerModule(repositories, resolvers)
-                                .pinning(pinning)
-                                .includeResources(!hasJava && !hasKotlin && !hasGroovy),
-                        dependencies);
-                SequencedSet<String> updated = new LinkedHashSet<>(dependencies);
-                updated.add(SCALAC + "/" + ScalaCompilerModule.CLASSES);
-                dependencies = updated;
+                BuildExecutorModule compiler = scalac.apply(new ScalaCompilerModule(repositories, resolvers)
+                        .pinning(pinning)
+                        .includeResources(!hasJava && !hasKotlin && !hasGroovy));
+                if (compiler != null) {
+                    buildExecutor.addModule(SCALAC, compiler, dependencies);
+                    SequencedSet<String> updated = new LinkedHashSet<>(dependencies);
+                    updated.add(SCALAC + "/" + ScalaCompilerModule.CLASSES);
+                    dependencies = updated;
+                }
             }
             if (hasJava) {
-                buildExecutor.addStep(JAVAC,
-                        new Javac(ProcessHandler.Factory.of())
-                                .includeResources(!hasKotlin && !hasScala && !hasGroovy)
-                                .pathPlacement(pathPlacement),
-                        dependencies);
-                SequencedSet<String> updated = new LinkedHashSet<>(dependencies);
-                updated.add(JAVAC);
-                dependencies = updated;
+                BuildStep compiler = javac.apply(new Javac(ProcessHandler.Factory.of())
+                        .includeResources(!hasKotlin && !hasScala && !hasGroovy)
+                        .pathPlacement(pathPlacement));
+                if (compiler != null) {
+                    buildExecutor.addStep(JAVAC, compiler, dependencies);
+                    SequencedSet<String> updated = new LinkedHashSet<>(dependencies);
+                    updated.add(JAVAC);
+                    dependencies = updated;
+                }
             }
             if (hasGroovy) {
-                buildExecutor.addModule(GROOVYC,
-                        new GroovyCompilerModule(repositories, resolvers)
-                                .pinning(pinning)
-                                .includeResources(!hasJava && !hasKotlin && !hasScala),
-                        dependencies);
+                BuildExecutorModule compiler = groovyc.apply(new GroovyCompilerModule(repositories, resolvers)
+                        .pinning(pinning)
+                        .includeResources(!hasJava && !hasKotlin && !hasScala));
+                if (compiler != null) {
+                    buildExecutor.addModule(GROOVYC, compiler, dependencies);
+                }
             }
             int compilers = (hasJava ? 1 : 0) + (hasKotlin ? 1 : 0) + (hasScala ? 1 : 0) + (hasGroovy ? 1 : 0);
             if (hasResource && compilers != 1) {

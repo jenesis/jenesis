@@ -20,18 +20,18 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
     private final boolean verify;
-    private final boolean java;
-    private final boolean ktlint;
-    private final boolean scalafmt;
+    private final Function<BuildExecutorModule, BuildExecutorModule> java;
+    private final Function<KtlintFormatModule, BuildExecutorModule> ktlint;
+    private final Function<ScalafmtFormatModule, BuildExecutorModule> scalafmt;
 
     public InferredSourceFormattingModule(SequencedSet<Path> configuration,
                                           Map<String, Repository> repositories,
                                           Map<String, Resolver> resolvers) {
         this(configuration, repositories, resolvers, null,
                 !Boolean.getBoolean("jenesis.format.rewrite"),
-                Boolean.parseBoolean(System.getProperty("jenesis.format.java", "true")),
-                Boolean.parseBoolean(System.getProperty("jenesis.format.ktlint", "true")),
-                Boolean.parseBoolean(System.getProperty("jenesis.format.scalafmt", "true")));
+                enabledBy("jenesis.format.java"),
+                enabledBy("jenesis.format.ktlint"),
+                enabledBy("jenesis.format.scalafmt"));
     }
 
     private InferredSourceFormattingModule(SequencedSet<Path> configuration,
@@ -39,9 +39,9 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                                            Map<String, Resolver> resolvers,
                                            Pinning pinning,
                                            boolean verify,
-                                           boolean java,
-                                           boolean ktlint,
-                                           boolean scalafmt) {
+                                           Function<BuildExecutorModule, BuildExecutorModule> java,
+                                           Function<KtlintFormatModule, BuildExecutorModule> ktlint,
+                                           Function<ScalafmtFormatModule, BuildExecutorModule> scalafmt) {
         this.configuration = configuration;
         this.repositories = repositories;
         this.resolvers = resolvers;
@@ -52,6 +52,10 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         this.scalafmt = scalafmt;
     }
 
+    private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
+        return Boolean.parseBoolean(System.getProperty(property, "true")) ? module -> module : null;
+    }
+
     public InferredSourceFormattingModule pinning(Pinning pinning) {
         return new InferredSourceFormattingModule(configuration, repositories, resolvers, pinning, verify, java, ktlint, scalafmt);
     }
@@ -60,15 +64,15 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         return new InferredSourceFormattingModule(configuration, repositories, resolvers, pinning, verify, java, ktlint, scalafmt);
     }
 
-    public InferredSourceFormattingModule java(boolean java) {
+    public InferredSourceFormattingModule java(Function<BuildExecutorModule, BuildExecutorModule> java) {
         return new InferredSourceFormattingModule(configuration, repositories, resolvers, pinning, verify, java, ktlint, scalafmt);
     }
 
-    public InferredSourceFormattingModule ktlint(boolean ktlint) {
+    public InferredSourceFormattingModule ktlint(Function<KtlintFormatModule, BuildExecutorModule> ktlint) {
         return new InferredSourceFormattingModule(configuration, repositories, resolvers, pinning, verify, java, ktlint, scalafmt);
     }
 
-    public InferredSourceFormattingModule scalafmt(boolean scalafmt) {
+    public InferredSourceFormattingModule scalafmt(Function<ScalafmtFormatModule, BuildExecutorModule> scalafmt) {
         return new InferredSourceFormattingModule(configuration, repositories, resolvers, pinning, verify, java, ktlint, scalafmt);
     }
 

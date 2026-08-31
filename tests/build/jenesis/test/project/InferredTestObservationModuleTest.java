@@ -10,7 +10,7 @@ import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.InferredTestObservationModule;
-import build.jenesis.project.ObservabilityEngine;
+import build.jenesis.project.TestModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,16 +22,11 @@ public class InferredTestObservationModuleTest {
     @Test
     public void wires_jacoco_when_a_jacoco_properties_file_is_present() throws IOException {
         Files.writeString(project.resolve("jacoco.properties"), "");
-        List<ObservabilityEngine> observed = new ArrayList<>();
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("observed", new InferredTestObservationModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of(), null, engines -> {
-            observed.addAll(engines);
-            return (_, _) -> {};
-        }), "project");
+        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
         executor.execute("observed/jacoco/required");
 
-        assertThat(observed).extracting(ObservabilityEngine::name).containsExactly("jacoco");
         Path requiredOutput = root.resolve("observed").resolve("jacoco").resolve("required").resolve("output");
         SequencedProperties requires = SequencedProperties.ofFiles(requiredOutput.resolve(BuildStep.REQUIRES));
         assertThat(requires.stringPropertyNames())
@@ -40,16 +35,11 @@ public class InferredTestObservationModuleTest {
 
     @Test
     public void does_not_wire_an_engine_without_a_config_file() throws IOException {
-        List<ObservabilityEngine> observed = new ArrayList<>();
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("observed", new InferredTestObservationModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of(), null, engines -> {
-            observed.addAll(engines);
-            return (_, _) -> {};
-        }), "project");
+        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
         executor.execute();
 
-        assertThat(observed).isEmpty();
         assertThat(root.resolve("observed").resolve("jacoco"))
                 .as("no observation engine is wired without its config file")
                 .doesNotExist();
@@ -58,17 +48,43 @@ public class InferredTestObservationModuleTest {
     @Test
     public void the_observe_override_switches_off_jacoco() throws IOException {
         Files.writeString(project.resolve("jacoco.properties"), "");
-        List<ObservabilityEngine> observed = new ArrayList<>();
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("observed", new InferredTestObservationModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of(), null, engines -> {
-            observed.addAll(engines);
-            return (_, _) -> {};
-        }).jacoco(false), "project");
+        executor.addModule("observed", observation().test(_ -> (_, _) -> {}).jacoco(null), "project");
         executor.execute();
 
-        assertThat(observed).isEmpty();
         assertThat(root.resolve("observed").resolve("jacoco")).doesNotExist();
+    }
+
+    @Test
+    public void the_test_configurator_decorates_the_inferred_test_module() throws IOException {
+        Files.writeString(project.resolve("jacoco.properties"), "");
+        List<TestModule> decorated = new ArrayList<>();
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", observation().test(module -> {
+            decorated.add(module);
+            return (_, _) -> {};
+        }), "project");
+        executor.execute("observed/jacoco/required");
+
+        assertThat(decorated)
+                .as("the observation module hands its own test module to the configurator")
+                .hasSize(1);
+    }
+
+    @Test
+    public void the_test_override_switches_off_the_test_run_and_its_reports() throws IOException {
+        Files.writeString(project.resolve("jacoco.properties"), "");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", observation().test(null), "project");
+        executor.execute();
+
+        assertThat(root.resolve("observed").resolve("test")).doesNotExist();
+        assertThat(root.resolve("observed").resolve("jacoco"))
+                .as("an observation report is not wired without the test run it observes")
+                .doesNotExist();
     }
 
     @Test
@@ -76,9 +92,7 @@ public class InferredTestObservationModuleTest {
         Files.writeString(project.resolve("pitest.properties"), "targetClasses=sample.*\ntargetTests=sample.*\n");
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("observed",
-                new InferredTestObservationModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of(), null, _ -> (_, _) -> {}),
-                "project");
+        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
         executor.execute("observed/mutate/required");
 
         Path requiredOutput = root.resolve("observed").resolve("mutate").resolve("required").resolve("output");
@@ -93,9 +107,7 @@ public class InferredTestObservationModuleTest {
     public void does_not_wire_mutate_without_a_pitest_config() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("observed",
-                new InferredTestObservationModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of(), null, _ -> (_, _) -> {}),
-                "project");
+        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
         executor.execute();
 
         assertThat(root.resolve("observed").resolve("mutate"))
@@ -108,12 +120,14 @@ public class InferredTestObservationModuleTest {
         Files.writeString(project.resolve("pitest.properties"), "targetClasses=sample.*\n");
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("observed",
-                new InferredTestObservationModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of(), null, _ -> (_, _) -> {}).pitest(false),
-                "project");
+        executor.addModule("observed", observation().test(_ -> (_, _) -> {}).pitest(null), "project");
         executor.execute();
 
         assertThat(root.resolve("observed").resolve("mutate")).doesNotExist();
+    }
+
+    private InferredTestObservationModule observation() {
+        return new InferredTestObservationModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of());
     }
 
     private BuildExecutor newExecutor() throws IOException {

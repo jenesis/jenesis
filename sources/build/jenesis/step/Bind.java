@@ -37,13 +37,17 @@ public class Bind implements BuildStep {
         return new Bind(Map.of(Path.of(""), Path.of(METADATA)));
     }
 
-    public static void configured(BuildExecutor buildExecutor,
-                                  SequencedSet<String> inputs,
-                                  String name,
-                                  boolean enabled,
-                                  Path configurationFile,
-                                  Supplier<? extends BuildExecutorModule> module) {
-        if (!enabled || configurationFile == null) {
+    public static <M extends BuildExecutorModule> void configured(BuildExecutor buildExecutor,
+                                                                  SequencedSet<String> inputs,
+                                                                  String name,
+                                                                  Function<M, BuildExecutorModule> configurator,
+                                                                  Path configurationFile,
+                                                                  Supplier<M> module) {
+        if (configurator == null || configurationFile == null) {
+            return;
+        }
+        BuildExecutorModule configured = configurator.apply(module.get());
+        if (configured == null) {
             return;
         }
         buildExecutor.addModule(name, (nested, inherited) -> {
@@ -53,24 +57,27 @@ public class Bind implements BuildStep {
             SequencedSet<String> toolInputs = new LinkedHashSet<>();
             toolInputs.add("configuration");
             toolInputs.addAll(inherited.sequencedKeySet());
-            nested.addModule("tool", module.get(), toolInputs);
+            nested.addModule("tool", configured, toolInputs);
         }, inputs);
     }
 
-    public static void configuredByProperties(BuildExecutor buildExecutor,
-                                              SequencedSet<String> inputs,
-                                              String name,
-                                              boolean enabled,
-                                              Path configurationProperties,
-                                              Function<SequencedProperties, ? extends BuildExecutorModule> module)
+    public static <M extends BuildExecutorModule> void configuredByProperties(BuildExecutor buildExecutor,
+                                                                              SequencedSet<String> inputs,
+                                                                              String name,
+                                                                              Function<M, BuildExecutorModule> configurator,
+                                                                              Path configurationProperties,
+                                                                              Function<SequencedProperties, M> module)
             throws IOException {
-        if (!enabled || configurationProperties == null || !Files.isRegularFile(configurationProperties)) {
+        if (configurator == null || configurationProperties == null || !Files.isRegularFile(configurationProperties)) {
             return;
         }
-        SequencedProperties properties = SequencedProperties.ofFiles(configurationProperties);
-        BuildExecutorModule candidate = module.apply(properties);
-        if (candidate != null) {
-            buildExecutor.addModule(name, candidate, inputs);
+        M candidate = module.apply(SequencedProperties.ofFiles(configurationProperties));
+        if (candidate == null) {
+            return;
+        }
+        BuildExecutorModule configured = configurator.apply(candidate);
+        if (configured != null) {
+            buildExecutor.addModule(name, configured, inputs);
         }
     }
 
