@@ -33,6 +33,22 @@ public class InferredJavaToolchainModuleTest {
     }
 
     @Test
+    public void the_generator_override_switches_off_source_generation() throws IOException {
+        Path sources = Files.createDirectories(input.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sources.resolve("Sample.java"), "package sample; public class Sample { }");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("input", input);
+        executor.addModule("output", toolchain().generator(null), "input");
+        executor.execute();
+
+        assertThat(root.resolve("output").resolve("generated"))
+                .as("no generation stage is wired once the generator configurator is dropped")
+                .doesNotExist();
+        assertThat(root.resolve("output").resolve("artifacts")).exists();
+    }
+
+    @Test
     public void a_toolchain_without_a_compiler_names_what_is_missing() {
         assertThatThrownBy(() -> toolchain().compiler(null).accept(null, new LinkedHashMap<>()))
                 .isInstanceOf(IllegalStateException.class)

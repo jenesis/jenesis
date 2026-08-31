@@ -12,9 +12,19 @@ import build.jenesis.SequencedProperties;
 public class Bind implements BuildStep {
 
     private final Map<Path, Path> paths;
+    private final Set<String> extensions;
 
     public Bind(Map<Path, Path> paths) {
+        this(paths, null);
+    }
+
+    private Bind(Map<Path, Path> paths, Set<String> extensions) {
         this.paths = paths;
+        this.extensions = extensions;
+    }
+
+    public Bind extensions(Set<String> extensions) {
+        return new Bind(paths, extensions);
     }
 
     public static Bind asSources() {
@@ -102,16 +112,26 @@ public class Bind implements BuildStep {
                     if (!Objects.equals(target.getParent(), context.next())) {
                         Files.createDirectories(target.getParent());
                     }
+                    boolean filtered = extensions != null && Files.isDirectory(source);
                     Files.walkFileTree(source, new SimpleFileVisitor<>() {
                         @Override
                         public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                            Files.createDirectories(target.resolve(source.relativize(dir)));
+                            if (!filtered) {
+                                Files.createDirectories(target.resolve(source.relativize(dir)));
+                            }
                             return FileVisitResult.CONTINUE;
                         }
 
                         @Override
                         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                            BuildStep.linkOrCopy(target.resolve(source.relativize(file)), file);
+                            if (filtered && extensions.stream().noneMatch(file.getFileName().toString()::endsWith)) {
+                                return FileVisitResult.CONTINUE;
+                            }
+                            Path resolved = target.resolve(source.relativize(file));
+                            if (filtered) {
+                                Files.createDirectories(resolved.getParent());
+                            }
+                            BuildStep.linkOrCopy(resolved, file);
                             return FileVisitResult.CONTINUE;
                         }
                     });
