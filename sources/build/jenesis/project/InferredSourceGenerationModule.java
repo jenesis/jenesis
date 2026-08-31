@@ -13,7 +13,8 @@ import build.jenesis.step.Bind;
 public class InferredSourceGenerationModule implements BuildExecutorModule {
 
     public static final String XJC = "xjc",
-            PROTOC = "protoc";
+            PROTOC = "protoc",
+            AVRO = "avro";
 
     public static final String PREPARE = "prepare", TOOL = "tool";
 
@@ -21,6 +22,7 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
 
     private static final Set<String> XJC_KEYS = Set.of("folders", "package", "catalog", "arguments");
     private static final Set<String> PROTOC_KEYS = Set.of("folders", "classifier", "plugins", "arguments");
+    private static final Set<String> AVRO_KEYS = Set.of("folders", "arguments");
 
     private final SequencedSet<Path> configuration;
     private final Map<String, Repository> repositories;
@@ -28,13 +30,15 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final Function<XjcModule, BuildExecutorModule> xjc;
     private final Function<ProtocModule, BuildExecutorModule> protoc;
+    private final Function<AvroModule, BuildExecutorModule> avro;
 
     public InferredSourceGenerationModule(SequencedSet<Path> configuration,
                                           Map<String, Repository> repositories,
                                           Map<String, Resolver> resolvers) {
         this(configuration, repositories, resolvers, null,
                 enabledBy("jenesis.generate.xjc"),
-                enabledBy("jenesis.generate.protoc"));
+                enabledBy("jenesis.generate.protoc"),
+                enabledBy("jenesis.generate.avro"));
     }
 
     private InferredSourceGenerationModule(SequencedSet<Path> configuration,
@@ -42,13 +46,15 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                                            Map<String, Resolver> resolvers,
                                            Pinning pinning,
                                            Function<XjcModule, BuildExecutorModule> xjc,
-                                           Function<ProtocModule, BuildExecutorModule> protoc) {
+                                           Function<ProtocModule, BuildExecutorModule> protoc,
+                                           Function<AvroModule, BuildExecutorModule> avro) {
         this.configuration = configuration;
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
         this.xjc = xjc;
         this.protoc = protoc;
+        this.avro = avro;
     }
 
     private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
@@ -56,15 +62,19 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     }
 
     public InferredSourceGenerationModule pinning(Pinning pinning) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro);
     }
 
     public InferredSourceGenerationModule xjc(Function<XjcModule, BuildExecutorModule> xjc) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro);
     }
 
     public InferredSourceGenerationModule protoc(Function<ProtocModule, BuildExecutorModule> protoc) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro);
+    }
+
+    public InferredSourceGenerationModule avro(Function<AvroModule, BuildExecutorModule> avro) {
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro);
     }
 
     @Override
@@ -92,6 +102,16 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                             Set.of(ProtocModule.DEFINITION),
                             new LinkedHashMap<>()),
                     protoc.apply(classifier == null ? module : module.classifier(classifier)));
+        }
+        properties = read(AVRO, AVRO_KEYS, avro);
+        if (properties != null) {
+            generate(buildExecutor, inherited.sequencedKeySet(), AVRO,
+                    prepare(properties, AvroModule.FOLDER,
+                            Set.of(AvroModule.SCHEMA_FILE, AvroModule.PROTOCOL_FILE),
+                            new LinkedHashMap<>()),
+                    avro.apply(new AvroModule(repositories, resolvers)
+                            .pinning(pinning)
+                            .arguments(words(properties, "arguments"))));
         }
     }
 

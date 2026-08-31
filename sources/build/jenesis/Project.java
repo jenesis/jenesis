@@ -738,6 +738,8 @@ public record Project(
                       %{name}protoc.properties%{reset}       Generate Java sources from the module's protocol buffer definitions (.proto)
                                                  with protoc, a native executable resolved per platform (folders, classifier,
                                                  plugins=<name>=<groupId>/<artifactId>, arguments)
+                      %{name}avro.properties%{reset}         Generate Java sources from the module's Avro schemas (.avsc) and protocols
+                                                 (.avpr) (folders, arguments)
                       %{name}spdx.properties%{reset}         Extend the license alias/category tables
                       %{name}process-<tool>.properties%{reset} Extra command-line arguments merged into a forked tool (javac, javadoc, jar, jlink, jpackage, ...);
                                                  process-test.properties targets only the forked test JVM, merged over process-java.properties
@@ -1056,6 +1058,9 @@ public record Project(
                           operating system and chipset from a Maven classifier, so each platform
                           needs its own checksum pin; plugins=<name>=<groupId>/<artifactId>
                           resolves a protoc plugin the same way, in its own protoc-<name> group.
+                      avro.properties
+                          Generate Java sources from the module's Avro schemas (.avsc) and
+                          protocols (.avpr), each in its own step (folders, arguments).
                       spdx.properties  Extend the license alias/category tables.
                       process-<tool>.properties
                           Extra command-line arguments merged into a forked tool (javac, javadoc,
