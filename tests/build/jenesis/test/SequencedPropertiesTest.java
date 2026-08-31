@@ -27,6 +27,45 @@ public class SequencedPropertiesTest {
     }
 
     @Test
+    public void reads_a_trimmed_value_and_treats_a_blank_one_as_absent() {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("named", "  value  ");
+        properties.setProperty("blank", "   ");
+        assertThat(properties.value("named")).isEqualTo("value");
+        assertThat(properties.value("blank")).as("a blank value reads as an absent one").isNull();
+        assertThat(properties.value("absent")).isNull();
+        assertThat(properties.value("blank", "fallback")).isEqualTo("fallback");
+        assertThat(properties.value("named", "fallback")).isEqualTo("value");
+    }
+
+    @Test
+    public void reads_a_flag_with_its_default_when_absent() {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("on", " true ");
+        properties.setProperty("off", "false");
+        properties.setProperty("blank", "");
+        assertThat(properties.flag("on")).isTrue();
+        assertThat(properties.flag("off")).isFalse();
+        assertThat(properties.flag("absent")).isFalse();
+        assertThat(properties.flag("blank", true)).as("a blank value falls back to the default").isTrue();
+        assertThat(properties.flag("off", true)).isFalse();
+    }
+
+    @Test
+    public void reads_comma_separated_entries_without_blanks() {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("listed", " one , two ,, three ");
+        properties.setProperty("separators", ",,,");
+        properties.setProperty("blank", "  ");
+        assertThat(properties.entries("listed")).containsExactly("one", "two", "three");
+        assertThat(properties.entries("separators"))
+                .as("a value that lists nothing is empty, not absent")
+                .isEmpty();
+        assertThat(properties.entries("blank")).isNull();
+        assertThat(properties.entries("absent")).isNull();
+    }
+
+    @Test
     public void can_traverse_string_properties_in_order() {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("k2", "v2");

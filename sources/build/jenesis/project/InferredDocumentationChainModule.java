@@ -115,10 +115,10 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                 throw new IllegalStateException("Document sub-module is missing its upstream scan input");
             }
             SequencedProperties scan = SequencedProperties.ofFiles(scanFolder.resolve(SCAN_FILE));
-            boolean hasJava = Boolean.parseBoolean(scan.getProperty(JAVADOC));
-            boolean hasGroovy = Boolean.parseBoolean(scan.getProperty(GROOVYDOC));
-            boolean hasScala = Boolean.parseBoolean(scan.getProperty(SCALADOC));
-            boolean hasKotlin = Boolean.parseBoolean(scan.getProperty(DOKKA));
+            boolean hasJava = scan.flag(JAVADOC);
+            boolean hasGroovy = scan.flag(GROOVYDOC);
+            boolean hasScala = scan.flag(SCALADOC);
+            boolean hasKotlin = scan.flag(DOKKA);
 
             SequencedSet<String> sourceInputs = new LinkedHashSet<>(inherited.sequencedKeySet());
             sourceInputs.remove(PREVIOUS + SCAN);

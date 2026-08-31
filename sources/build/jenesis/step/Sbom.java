@@ -32,8 +32,8 @@ public class Sbom implements BuildStep {
     public static Sbom configured(Path properties) throws IOException {
         String format = properties == null
                 ? "json"
-                : SequencedProperties.ofFiles(properties).getProperty("format", "json");
-        return switch (format.trim().toLowerCase(Locale.ROOT)) {
+                : SequencedProperties.ofFiles(properties).value("format", "json");
+        return switch (format.toLowerCase(Locale.ROOT)) {
             case "json" -> new Sbom().format(CycloneDx.Format.JSON);
             case "xml" -> new Sbom().format(CycloneDx.Format.XML);
             case "none" -> null;

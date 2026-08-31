@@ -127,8 +127,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
                 if (module != null) {
                     SequencedProperties properties = SequencedProperties.ofFiles(module);
-                    if (properties.getProperty("test") != null
-                            && !Boolean.parseBoolean(properties.getProperty("abstract"))) {
+                    if (properties.getProperty("test") != null && !properties.flag("abstract")) {
                         sub.addModule("observed", observe.apply(new InferredTestObservationModule(
                                 descriptor.configuration(),
                                 repositories,
@@ -233,27 +232,13 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 return new Packaging(false, false, false, false, false, null, null);
             }
             SequencedProperties configuration = SequencedProperties.ofFiles(properties);
-            return new Packaging(flag(configuration, "jmod"),
-                    flag(configuration, "jlink"),
-                    flag(configuration, "bundle"),
-                    flag(configuration, "launcher"),
-                    flag(configuration, "native"),
-                    value(configuration, "jpackage"),
-                    value(configuration, "docker"));
-        }
-
-        private static boolean flag(SequencedProperties configuration, String key) {
-            String value = configuration.getProperty(key);
-            return value != null && Boolean.parseBoolean(value.trim());
-        }
-
-        private static String value(SequencedProperties configuration, String key) {
-            String value = configuration.getProperty(key);
-            if (value == null) {
-                return null;
-            }
-            String trimmed = value.trim();
-            return trimmed.isEmpty() ? null : trimmed;
+            return new Packaging(configuration.flag("jmod"),
+                    configuration.flag("jlink"),
+                    configuration.flag("bundle"),
+                    configuration.flag("launcher"),
+                    configuration.flag("native"),
+                    configuration.value("jpackage"),
+                    configuration.value("docker"));
         }
     }
 
