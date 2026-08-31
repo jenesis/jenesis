@@ -39,8 +39,8 @@ public class ModularizeModule implements BuildExecutorModule {
         if (properties == null) {
             return null;
         }
-        String mode = SequencedProperties.ofFiles(properties).getProperty("mode", "declared");
-        return switch (mode.trim().toLowerCase(Locale.ROOT)) {
+        String mode = SequencedProperties.ofFiles(properties).value("mode", "declared");
+        return switch (mode.toLowerCase(Locale.ROOT)) {
             case "declared" -> false;
             case "synthetic" -> true;
             case "none" -> null;

@@ -65,6 +65,13 @@ property is added in three places - the constructor that reads it, the `help` te
 `skill` where it fits), and the reference table in the user documentation; the `properties` selector picks it
 up by itself.
 
+**Configuration files are read through `SequencedProperties`.** A file is read with the type's own accessors -
+`value`, `value(key, default)`, `flag`, `flag(key, default)`, `entries` - which trim and treat a blank value
+as an absent one, so no reader hand-rolls that again. `getProperty` stays the raw `Properties` contract for
+the few readers that must tell an empty value from a missing one (an alias line whose emptiness removes an
+entry). Parsing that only one file owns - a whitespace-separated `arguments` line, a `<name>=<coordinate>`
+plugin list, a key whitelist - stays a private static in that reader.
+
 **Steps are pure functions of folders.** A `BuildStep` reads its `arguments` (one folder per predecessor) and
 writes into `context.next()`, nothing else. It is `Serializable` and its serialised form is part of the cache
 key, so every value that should trigger a re-run is a non-`transient` field and every field is serialisable

@@ -56,7 +56,7 @@ public class MavenRepositoryStaging implements BuildStep {
                 continue;
             }
             Coordinates coordinates = parseCoordinates(pom);
-            if (Boolean.parseBoolean(inventory.getProperty(prefix + ".abstract"))) {
+            if (inventory.flag(prefix + ".abstract")) {
                 abstractArtifactIds.add(coordinates.artifactId());
                 continue;
             }
