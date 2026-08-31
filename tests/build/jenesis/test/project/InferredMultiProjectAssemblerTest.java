@@ -13,10 +13,11 @@ import build.jenesis.HashDigestFunction;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.InferredComplianceModule;
+import build.jenesis.project.InferredDocumentationModule;
 import build.jenesis.project.InferredMultiProjectAssembler;
+import build.jenesis.project.InferredTestObservationModule;
 import build.jenesis.project.ProjectModule;
 import build.jenesis.project.ProjectModuleDescriptor;
-import build.jenesis.project.TestModule;
 import build.jenesis.step.JPackage;
 import build.jenesis.step.ProcessBuildStep;
 
@@ -429,17 +430,21 @@ public class InferredMultiProjectAssemblerTest {
         InferredMultiProjectAssembler assembler = new InferredMultiProjectAssembler();
         assertThat(assembler.check().apply(null)).as("check configurator defaults to identity").isNull();
         assertThat(assembler.format().apply(null)).as("format configurator defaults to identity").isNull();
+        assertThat(assembler.compliance().apply(null)).as("compliance configurator defaults to identity").isNull();
         assertThat(assembler.toolchain().apply(null)).as("toolchain configurator defaults to identity").isNull();
         assertThat(assembler.observe().apply(null)).as("observe configurator defaults to identity").isNull();
-        assertThat(assembler.test().apply(null)).as("test configurator defaults to identity").isNull();
-        assertThat(assembler.compliance().apply(null)).as("compliance configurator defaults to identity").isNull();
+        assertThat(assembler.documentation().apply(null)).as("documentation configurator defaults to identity").isNull();
 
-        Function<TestModule, BuildExecutorModule> custom = test -> test.requireEngine(false);
-        assertThat(assembler.test(custom).test()).as("the test wither stores the configurator").isSameAs(custom);
+        Function<InferredTestObservationModule, BuildExecutorModule> custom = observe -> observe.test(null);
+        assertThat(assembler.observe(custom).observe()).as("the observe wither stores the configurator").isSameAs(custom);
 
         Function<InferredComplianceModule, BuildExecutorModule> customCompliance = compliance -> compliance;
         assertThat(assembler.compliance(customCompliance).compliance())
                 .as("the compliance wither stores the configurator").isSameAs(customCompliance);
+
+        Function<InferredDocumentationModule, BuildExecutorModule> customDocumentation = documentation -> documentation;
+        assertThat(assembler.documentation(customDocumentation).documentation())
+                .as("the documentation wither stores the configurator").isSameAs(customDocumentation);
     }
 
     private static SequencedProperties readProperties(Path path) throws IOException {

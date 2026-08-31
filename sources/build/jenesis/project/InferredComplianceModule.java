@@ -18,24 +18,36 @@ public class InferredComplianceModule implements BuildExecutorModule {
     private static final Set<String> VULNERABILITY_KEYS = Set.of("severity", "warn", "osv.endpoint");
 
     private final SequencedSet<Path> configuration;
-    private final boolean enabled;
+    private final Function<BuildExecutorModule, BuildExecutorModule> license;
+    private final Function<BuildExecutorModule, BuildExecutorModule> vulnerability;
 
     public InferredComplianceModule(SequencedSet<Path> configuration) {
-        this(configuration, Boolean.parseBoolean(System.getProperty("jenesis.compliance", "true")));
+        this(configuration, enabledBy("jenesis.compliance"), enabledBy("jenesis.compliance"));
     }
 
-    private InferredComplianceModule(SequencedSet<Path> configuration, boolean enabled) {
+    private InferredComplianceModule(SequencedSet<Path> configuration,
+                                     Function<BuildExecutorModule, BuildExecutorModule> license,
+                                     Function<BuildExecutorModule, BuildExecutorModule> vulnerability) {
         this.configuration = configuration;
-        this.enabled = enabled;
+        this.license = license;
+        this.vulnerability = vulnerability;
     }
 
-    public InferredComplianceModule enabled(boolean enabled) {
-        return new InferredComplianceModule(configuration, enabled);
+    private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
+        return Boolean.parseBoolean(System.getProperty(property, "true")) ? module -> module : null;
+    }
+
+    public InferredComplianceModule license(Function<BuildExecutorModule, BuildExecutorModule> license) {
+        return new InferredComplianceModule(configuration, license, vulnerability);
+    }
+
+    public InferredComplianceModule vulnerability(Function<BuildExecutorModule, BuildExecutorModule> vulnerability) {
+        return new InferredComplianceModule(configuration, license, vulnerability);
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-        Bind.configuredByProperties(buildExecutor, inherited.sequencedKeySet(), LICENSE, enabled,
+        Bind.configuredByProperties(buildExecutor, inherited.sequencedKeySet(), LICENSE, license,
                 BuildStep.locate(configuration, "licensing.properties"),
                 properties -> {
                     if (properties.stringPropertyNames().isEmpty()) {
@@ -44,7 +56,7 @@ public class InferredComplianceModule implements BuildExecutorModule {
                     return (nested, nestedInherited) -> nested.addStep("check",
                             licenseCheck(properties), nestedInherited.sequencedKeySet().stream());
                 });
-        Bind.configuredByProperties(buildExecutor, inherited.sequencedKeySet(), VULNERABILITY, enabled,
+        Bind.configuredByProperties(buildExecutor, inherited.sequencedKeySet(), VULNERABILITY, vulnerability,
                 BuildStep.locate(configuration, "vulnerability.properties"),
                 properties -> {
                     if (properties.stringPropertyNames().isEmpty()) {

@@ -24,10 +24,10 @@ import build.jenesis.step.Sbom;
 
 public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityModule, BuildExecutorModule> check,
                                             Function<InferredSourceFormattingModule, BuildExecutorModule> format,
-                                            Function<JavaToolchainModule, BuildExecutorModule> toolchain,
+                                            Function<InferredComplianceModule, BuildExecutorModule> compliance,
+                                            Function<InferredJavaToolchainModule, BuildExecutorModule> toolchain,
                                             Function<InferredTestObservationModule, BuildExecutorModule> observe,
-                                            Function<TestModule, BuildExecutorModule> test,
-                                            Function<InferredComplianceModule, BuildExecutorModule> compliance) implements MultiProjectAssembler<ProjectModuleDescriptor> {
+                                            Function<InferredDocumentationModule, BuildExecutorModule> documentation) implements MultiProjectAssembler<ProjectModuleDescriptor> {
 
     public InferredMultiProjectAssembler() {
         this(module -> module,
@@ -39,27 +39,27 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
     }
 
     public InferredMultiProjectAssembler check(Function<InferredSourceCodeQualityModule, BuildExecutorModule> check) {
-        return new InferredMultiProjectAssembler(check, format, toolchain, observe, test, compliance);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, observe, documentation);
     }
 
     public InferredMultiProjectAssembler format(Function<InferredSourceFormattingModule, BuildExecutorModule> format) {
-        return new InferredMultiProjectAssembler(check, format, toolchain, observe, test, compliance);
-    }
-
-    public InferredMultiProjectAssembler toolchain(Function<JavaToolchainModule, BuildExecutorModule> toolchain) {
-        return new InferredMultiProjectAssembler(check, format, toolchain, observe, test, compliance);
-    }
-
-    public InferredMultiProjectAssembler observe(Function<InferredTestObservationModule, BuildExecutorModule> observe) {
-        return new InferredMultiProjectAssembler(check, format, toolchain, observe, test, compliance);
-    }
-
-    public InferredMultiProjectAssembler test(Function<TestModule, BuildExecutorModule> test) {
-        return new InferredMultiProjectAssembler(check, format, toolchain, observe, test, compliance);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, observe, documentation);
     }
 
     public InferredMultiProjectAssembler compliance(Function<InferredComplianceModule, BuildExecutorModule> compliance) {
-        return new InferredMultiProjectAssembler(check, format, toolchain, observe, test, compliance);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, observe, documentation);
+    }
+
+    public InferredMultiProjectAssembler toolchain(Function<InferredJavaToolchainModule, BuildExecutorModule> toolchain) {
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, observe, documentation);
+    }
+
+    public InferredMultiProjectAssembler observe(Function<InferredTestObservationModule, BuildExecutorModule> observe) {
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, observe, documentation);
+    }
+
+    public InferredMultiProjectAssembler documentation(Function<InferredDocumentationModule, BuildExecutorModule> documentation) {
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, observe, documentation);
     }
 
     @Override
@@ -103,13 +103,10 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             }
             sub.addModule("compliance", compliance.apply(new InferredComplianceModule(descriptor.configuration())),
                     Stream.concat(descriptor.manifests().stream(), descriptor.artifacts().stream()));
-            sub.addModule("binary", toolchain.apply(new JavaToolchainModule()
-                            .compiler(new InferredCompilerChainModule(repositories, resolvers)
+            sub.addModule("binary", toolchain.apply(
+                            new InferredJavaToolchainModule(descriptor.configuration(), repositories, resolvers)
                                     .pinning(descriptor.pinning())
-                                    .pathPlacement(descriptor.pathPlacement()))
-                            .validator(new InferredByteCodeQualityModule(descriptor.configuration(), repositories, resolvers)
-                                    .pinning(descriptor.pinning()))
-                            .archiver(new Jar(factory, Jar.Sort.CLASSES).asModule("jar"))),
+                                    .pathPlacement(descriptor.pathPlacement())),
                     Stream.of(
                             Stream.of("prepare"),
                             inputs(descriptor, closure),
@@ -128,17 +125,12 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 if (module != null) {
                     SequencedProperties properties = SequencedProperties.ofFiles(module);
                     if (properties.getProperty("test") != null && !properties.flag("abstract")) {
-                        sub.addModule("observed", observe.apply(new InferredTestObservationModule(
-                                descriptor.configuration(),
-                                repositories,
-                                resolvers,
-                                descriptor.pinning(),
-                                engines -> test.apply(new TestModule(repositories, resolvers)
-                                        .observe(engines)
+                        sub.addModule("observed", observe.apply(
+                                new InferredTestObservationModule(descriptor.configuration(), repositories, resolvers)
                                         .pinning(descriptor.pinning())
                                         .pathPlacement(descriptor.pathPlacement())
-                                        .moduleName(properties.getProperty("module")))
-                                )), Stream.concat(Stream.of("prepare", "binary"), inputs(descriptor, closure)));
+                                        .moduleName(properties.getProperty("module"))),
+                                Stream.concat(Stream.of("prepare", "binary"), inputs(descriptor, closure)));
                     }
                 }
             }
@@ -149,18 +141,10 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                 inherited.sequencedKeySet()), descriptor.sources());
             }
             if (descriptor.documentation()) {
-                sub.addModule("documentation", (module, inherited) -> {
-                    module.addModule("generate",
-                            new InferredDocumentationChainModule(repositories, resolvers)
-                                    .pinning(descriptor.pinning()),
-                            inherited.sequencedKeySet());
-                    module.addStep("archive",
-                            new Jar(factory, Jar.Sort.JAVADOC),
-                            "generate/"
-                                    + InferredDocumentationChainModule.DOCUMENT
-                                    + "/"
-                                    + InferredDocumentationChainModule.AGGREGATE);
-                }, Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
+                sub.addModule("documentation",
+                        documentation.apply(new InferredDocumentationModule(repositories, resolvers)
+                                .pinning(descriptor.pinning())),
+                        Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             }
             if (packaging.jmod()) {
                 sub.addStep("jmod",
