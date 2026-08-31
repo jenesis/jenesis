@@ -742,6 +742,8 @@ public record Project(
                                                  (.avpr) (folders, arguments)
                       %{name}wsimport.properties%{reset}     Generate a JAX-WS client from the module's WSDL descriptions (.wsdl, .xjb);
                                                  location=<url> is required (folders, package, catalog, arguments)
+                      %{name}openapi.properties%{reset}      Generate sources from an OpenAPI document (.yaml, .json) with the OpenAPI
+                                                 Generator (folders, specification, generator, package, sources, arguments)
                       %{name}spdx.properties%{reset}         Extend the license alias/category tables
                       %{name}process-<tool>.properties%{reset} Extra command-line arguments merged into a forked tool (javac, javadoc, jar, jlink, jpackage, ...);
                                                  process-test.properties targets only the forked test JVM, merged over process-java.properties
@@ -1071,6 +1073,13 @@ public record Project(
                           at run time - a class-path path for a description the module ships, an
                           endpoint otherwise - because wsimport would otherwise compile the path
                           the build read it from into the artifact.
+                      openapi.properties
+                          Generate sources from an OpenAPI document (folders, specification,
+                          generator, package, sources, arguments). A lone .yaml or .json in the
+                          folders is the specification; a module that offers several names one
+                          with specification=<file>. The generator writes a whole project and
+                          only its source folder (default src/main/java, renamed with
+                          sources=<path>) is collected into the module.
                       spdx.properties  Extend the license alias/category tables.
                       process-<tool>.properties
                           Extra command-line arguments merged into a forked tool (javac, javadoc,
