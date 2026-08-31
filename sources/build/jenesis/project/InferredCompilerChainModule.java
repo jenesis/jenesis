@@ -127,11 +127,11 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 throw new IllegalStateException("Compile sub-module is missing its upstream scan input");
             }
             SequencedProperties scan = SequencedProperties.ofFiles(scanFolder.resolve(SCAN_FILE));
-            boolean hasJava = Boolean.parseBoolean(scan.getProperty(JAVAC));
-            boolean hasKotlin = Boolean.parseBoolean(scan.getProperty(KOTLINC));
-            boolean hasScala = Boolean.parseBoolean(scan.getProperty(SCALAC));
-            boolean hasGroovy = Boolean.parseBoolean(scan.getProperty(GROOVYC));
-            boolean hasResource = Boolean.parseBoolean(scan.getProperty(RESOURCE));
+            boolean hasJava = scan.flag(JAVAC);
+            boolean hasKotlin = scan.flag(KOTLINC);
+            boolean hasScala = scan.flag(SCALAC);
+            boolean hasGroovy = scan.flag(GROOVYC);
+            boolean hasResource = scan.flag(RESOURCE);
 
             SequencedSet<String> sourceInputs = new LinkedHashSet<>(inherited.sequencedKeySet());
             sourceInputs.remove(PREVIOUS + SCAN);

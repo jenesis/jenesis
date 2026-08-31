@@ -68,14 +68,14 @@ public class InferredComplianceModule implements BuildExecutorModule {
             }
         }
         return new LicenseCheck()
-                .allowed(licenses(properties.getProperty("allowed")))
-                .denied(licenses(properties.getProperty("denied")))
-                .unknown(unknown(properties.getProperty("unknown")))
+                .allowed(licenses(properties.entries("allowed")))
+                .denied(licenses(properties.entries("denied")))
+                .unknown(unknown(properties.value("unknown")))
                 .overrides(overrides);
     }
 
     private static OsvDownload osvDownload(SequencedProperties properties) {
-        String endpoint = properties.getProperty("osv.endpoint");
+        String endpoint = properties.value("osv.endpoint");
         return endpoint == null ? new OsvDownload() : new OsvDownload().endpoint(URI.create(endpoint));
     }
 
@@ -86,29 +86,19 @@ public class InferredComplianceModule implements BuildExecutorModule {
             }
         }
         return new VulnerabilityCheck()
-                .failOn(severity(properties.getProperty("severity")))
-                .warn(Boolean.parseBoolean(properties.getProperty("warn", "false")));
+                .failOn(severity(properties.value("severity")))
+                .warn(properties.flag("warn"));
     }
 
-    private static SequencedSet<String> licenses(String value) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        SequencedSet<String> entries = new LinkedHashSet<>();
-        for (String entry : value.split(",")) {
-            String trimmed = entry.trim();
-            if (!trimmed.isEmpty()) {
-                entries.add(trimmed);
-            }
-        }
-        return entries.isEmpty() ? null : entries;
+    private static SequencedSet<String> licenses(List<String> entries) {
+        return entries == null || entries.isEmpty() ? null : new LinkedHashSet<>(entries);
     }
 
     private static LicenseCheck.Unknown unknown(String value) {
         if (value == null) {
             return LicenseCheck.Unknown.FAIL;
         }
-        return switch (value.trim().toLowerCase(Locale.ROOT)) {
+        return switch (value.toLowerCase(Locale.ROOT)) {
             case "ignore" -> LicenseCheck.Unknown.IGNORE;
             case "warn" -> LicenseCheck.Unknown.WARN;
             default -> LicenseCheck.Unknown.FAIL;
@@ -120,7 +110,7 @@ public class InferredComplianceModule implements BuildExecutorModule {
             return null;
         }
         try {
-            return VulnerabilityCheck.Severity.valueOf(value.trim().toUpperCase(Locale.ROOT));
+            return VulnerabilityCheck.Severity.valueOf(value.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException _) {
             return null;
         }

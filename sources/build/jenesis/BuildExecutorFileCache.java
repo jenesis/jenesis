@@ -24,28 +24,22 @@ public record BuildExecutorFileCache(Path root,
             } catch (IOException _) {
             }
         }
-        String digest = properties.getProperty("digest"),
-                steps = properties.getProperty("steps"),
-                versions = properties.getProperty("versions"),
-                size = properties.getProperty("size"),
-                ttl = properties.getProperty("ttl"),
-                touch = properties.getProperty("touch"),
-                lru = properties.getProperty("lru"),
-                compressed = properties.getProperty("compressed"),
-                read = properties.getProperty("read"),
-                write = properties.getProperty("write");
+        String steps = properties.value("steps"),
+                versions = properties.value("versions"),
+                size = properties.value("size"),
+                ttl = properties.value("ttl");
         this(root,
-                digest == null ? "SHA-256" : digest,
+                properties.value("digest", "SHA-256"),
                 true,
-                steps == null ? 250 : Integer.parseInt(steps.trim()),
-                versions == null ? 10 : Integer.parseInt(versions.trim()),
-                size == null ? 0 : Long.parseLong(size.trim()),
-                ttl == null ? null : Duration.parse(ttl.trim()),
-                touch == null || Boolean.parseBoolean(touch.trim()),
-                lru == null || Boolean.parseBoolean(lru.trim()),
-                compressed != null && Boolean.parseBoolean(compressed.trim()),
-                read == null || Boolean.parseBoolean(read.trim()),
-                write == null || Boolean.parseBoolean(write.trim()));
+                steps == null ? 250 : Integer.parseInt(steps),
+                versions == null ? 10 : Integer.parseInt(versions),
+                size == null ? 0 : Long.parseLong(size),
+                ttl == null ? null : Duration.parse(ttl),
+                properties.flag("touch", true),
+                properties.flag("lru", true),
+                properties.flag("compressed"),
+                properties.flag("read", true),
+                properties.flag("write", true));
     }
 
     @Override

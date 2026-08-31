@@ -29,6 +29,44 @@ public class SequencedProperties extends Properties {
         return properties;
     }
 
+    public String value(String key) {
+        String value = getProperty(key);
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    public String value(String key, String defaultValue) {
+        String value = value(key);
+        return value == null ? defaultValue : value;
+    }
+
+    public boolean flag(String key) {
+        return flag(key, false);
+    }
+
+    public boolean flag(String key, boolean defaultValue) {
+        String value = value(key);
+        return value == null ? defaultValue : Boolean.parseBoolean(value);
+    }
+
+    public List<String> entries(String key) {
+        String value = value(key);
+        if (value == null) {
+            return null;
+        }
+        List<String> entries = new ArrayList<>();
+        for (String entry : value.split(",")) {
+            String trimmed = entry.trim();
+            if (!trimmed.isEmpty()) {
+                entries.add(trimmed);
+            }
+        }
+        return entries;
+    }
+
     public void store(Path file) throws IOException {
         try (Writer writer = Files.newBufferedWriter(file)) {
             store(writer, null);

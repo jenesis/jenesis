@@ -76,11 +76,11 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
         Bind.configuredByProperties(buildExecutor, inherited.sequencedKeySet(), JAVA, java,
                 BuildStep.locate(configuration, "javaformat.properties"),
-                properties -> switch (properties.getProperty("formatter")) {
+                properties -> switch (properties.value("formatter")) {
                     case "google" -> new GoogleJavaFormatModule(repositories, resolvers).pinning(pinning).verify(verify);
                     case "palantir" -> new PalantirJavaFormatModule(repositories, resolvers).pinning(pinning).verify(verify);
                     case null -> null;
-                    default -> throw new IllegalArgumentException("Unknown Java format: " + properties.getProperty("formatter"));
+                    default -> throw new IllegalArgumentException("Unknown Java format: " + properties.value("formatter"));
                 });
         Bind.configured(buildExecutor, inherited.sequencedKeySet(), KTLINT, ktlint,
                 KtlintFormatModule.configurationFile(configuration),

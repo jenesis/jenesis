@@ -110,8 +110,8 @@ public class Inventory implements BuildStep {
                 if (tests == null) {
                     tests = properties.getProperty("test");
                 }
-                abstractTest |= Boolean.parseBoolean(properties.getProperty("abstract"));
-                modular |= Boolean.parseBoolean(properties.getProperty("modular"));
+                abstractTest |= properties.flag("abstract");
+                modular |= properties.flag("modular");
             }
             Path metadataFile = folder.resolve(METADATA);
             if (Files.isRegularFile(metadataFile)) {
