@@ -19,8 +19,8 @@ import build.jenesis.step.ProcessHandler;
 public class AvroModule implements BuildExecutorModule {
 
     public static final String FOLDER = "avro/";
-    public static final String SCHEMA = "schema", PROTOCOL = "protocol";
-    public static final String SCHEMA_FILE = ".avsc", PROTOCOL_FILE = ".avpr";
+    public static final String SCHEMA = ".avsc", PROTOCOL = ".avpr";
+    public static final String GENERATE_SCHEMA = "generate-schema", GENERATE_PROTOCOL = "generate-protocol";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
 
     private static final String MAVEN_GROUP = "org.apache.avro";
@@ -80,11 +80,11 @@ public class AvroModule implements BuildExecutorModule {
         SequencedSet<String> compileInputs = new LinkedHashSet<>();
         compileInputs.add(DEPENDENCIES);
         compileInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(SCHEMA,
-                new Compile(tool, SCHEMA, SCHEMA_FILE, arguments, printing),
+        buildExecutor.addStep(GENERATE_SCHEMA,
+                new Compile(tool, "schema", SCHEMA, arguments, printing),
                 compileInputs);
-        buildExecutor.addStep(PROTOCOL,
-                new Compile(tool, PROTOCOL, PROTOCOL_FILE, arguments, printing),
+        buildExecutor.addStep(GENERATE_PROTOCOL,
+                new Compile(tool, "protocol", PROTOCOL, arguments, printing),
                 compileInputs);
     }
 

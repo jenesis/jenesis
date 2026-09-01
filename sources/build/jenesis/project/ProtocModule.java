@@ -164,15 +164,10 @@ public class ProtocModule implements BuildExecutorModule {
         private final List<String> arguments;
 
         private Generate(String tool, List<String> plugins, List<String> arguments, Boolean printing) {
-            super("protoc", ProcessHandler.OfProcess.of(List.of()), printing == null ? ProcessBuildStep.printing("protoc") : printing);
+            super("protoc", ProcessHandler.OfProcess.ofStaged(), printing == null ? ProcessBuildStep.printing("protoc") : printing);
             this.tool = tool;
             this.plugins = plugins;
             this.arguments = arguments;
-        }
-
-        @Override
-        protected List<String> commands() {
-            return List.of();
         }
 
         @Override

@@ -76,8 +76,8 @@ public abstract class ProcessBuildStep implements BuildStep {
                 : Boolean.parseBoolean(specific);
     }
 
-    protected List<String> commands() {
-        return List.of(command);
+    protected List<String> configurations() {
+        return factory instanceof ProcessHandler.Staged ? List.of() : List.of(command);
     }
 
     protected int execute(ProcessHandler handler, Path output, Path error, ProcessHandler.Tee tee)
@@ -121,7 +121,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                 continue;
             }
             SequencedMap<String, String> folderMap = new LinkedHashMap<>();
-            for (String name : commands()) {
+            for (String name : configurations()) {
                 Path file = entry.getValue().folder().resolve(PROCESS + name + ".properties");
                 if (Files.exists(file)) {
                     SequencedProperties.ofFiles(file).forEachProperty(folderMap::put);

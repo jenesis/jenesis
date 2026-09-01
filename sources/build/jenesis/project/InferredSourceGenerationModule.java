@@ -127,7 +127,7 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
         if (properties != null) {
             generate(buildExecutor, inherited.sequencedKeySet(), AVRO,
                     prepare(properties, AvroModule.FOLDER,
-                            Set.of(AvroModule.SCHEMA_FILE, AvroModule.PROTOCOL_FILE),
+                            Set.of(AvroModule.SCHEMA, AvroModule.PROTOCOL),
                             new LinkedHashMap<>()),
                     avro.apply(new AvroModule(repositories, resolvers)
                             .pinning(pinning)
