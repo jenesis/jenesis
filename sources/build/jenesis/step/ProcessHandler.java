@@ -11,6 +11,10 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
     record Tee(Executor executor, Consumer<String> out, Consumer<String> err) {
     }
 
+    @FunctionalInterface
+    interface Staged extends Function<List<String>, OfProcess> {
+    }
+
     private static Charset encoding() {
         String name = System.getProperty("native.encoding");
         if (name == null) {
@@ -242,6 +246,10 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
 
         public static Function<List<String>, OfProcess> of(List<String> program) {
             return arguments -> new OfProcess(Stream.concat(program.stream(), arguments.stream()).toList());
+        }
+
+        public static Staged ofStaged() {
+            return OfProcess::new;
         }
 
         @Override

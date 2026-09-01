@@ -718,7 +718,7 @@ public class TestModule implements BuildExecutorModule {
         }
 
         @Override
-        protected List<String> commands() {
+        protected List<String> configurations() {
             return List.of("java", "test");
         }
 
