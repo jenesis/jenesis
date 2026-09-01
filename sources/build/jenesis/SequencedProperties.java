@@ -67,6 +67,14 @@ public class SequencedProperties extends Properties {
         return entries;
     }
 
+    public List<String> words(String key) {
+        String value = value(key);
+        if (value == null) {
+            return List.of();
+        }
+        return List.of(value.split("\\s+"));
+    }
+
     public void store(Path file) throws IOException {
         try (Writer writer = Files.newBufferedWriter(file)) {
             store(writer, null);

@@ -204,8 +204,8 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                 Path javacProperties = argument.folder().resolve(ProcessBuildStep.PROCESS + "javac.properties");
                 if (Files.exists(javacProperties)) {
                     SequencedProperties loaded = SequencedProperties.ofFiles(javacProperties);
-                    String value = loaded.getProperty("--release");
-                    if (value != null && !value.isEmpty()) {
+                    String value = loaded.value("--release");
+                    if (value != null) {
                         release = value;
                     }
                 }
