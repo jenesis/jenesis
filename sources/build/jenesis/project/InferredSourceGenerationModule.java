@@ -108,14 +108,14 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                     xjc.apply(new XjcModule(repositories, resolvers)
                             .pinning(pinning)
                             .packageName(properties.value("package"))
-                            .arguments(words(properties, "arguments"))));
+                            .arguments(properties.words("arguments"))));
         }
         properties = read(PROTOC, PROTOC_KEYS, protoc);
         if (properties != null) {
             ProtocModule module = new ProtocModule(repositories, resolvers)
                     .pinning(pinning)
                     .plugins(plugins(properties))
-                    .arguments(words(properties, "arguments"));
+                    .arguments(properties.words("arguments"));
             String classifier = properties.value("classifier");
             generate(buildExecutor, inherited.sequencedKeySet(), PROTOC,
                     prepare(properties, ProtocModule.FOLDER,
@@ -131,7 +131,7 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                             new LinkedHashMap<>()),
                     avro.apply(new AvroModule(repositories, resolvers)
                             .pinning(pinning)
-                            .arguments(words(properties, "arguments"))));
+                            .arguments(properties.words("arguments"))));
         }
         properties = read(WSIMPORT, WSIMPORT_KEYS, wsimport);
         if (properties != null) {
@@ -143,14 +143,14 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                             .pinning(pinning)
                             .packageName(properties.value("package"))
                             .location(properties.value("location"))
-                            .arguments(words(properties, "arguments"))));
+                            .arguments(properties.words("arguments"))));
         }
         properties = read(OPENAPI, OPENAPI_KEYS, openapi);
         if (properties != null) {
             OpenApiModule module = new OpenApiModule(repositories, resolvers)
                     .pinning(pinning)
                     .packageName(properties.value("package"))
-                    .arguments(words(properties, "arguments"));
+                    .arguments(properties.words("arguments"));
             String generator = properties.value("generator");
             if (generator != null) {
                 module = module.generator(generator);
@@ -246,10 +246,5 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
             plugins.put(entry.substring(0, assign).trim(), entry.substring(assign + 1).trim());
         }
         return plugins;
-    }
-
-    private static List<String> words(SequencedProperties properties, String key) {
-        String value = properties.value(key);
-        return value == null ? List.of() : List.of(value.split("\\s+"));
     }
 }

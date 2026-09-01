@@ -199,7 +199,7 @@ public class PiTestModule implements BuildExecutorModule {
             if (candidates.isEmpty() || sources.isEmpty()) {
                 return CompletableFuture.completedStage(null);
             }
-            if (!matches(candidates, config.getProperty("targetTests", "*"))) {
+            if (!matches(candidates, config.value("targetTests", "*"))) {
                 return CompletableFuture.completedStage(null);
             }
             Path report = Files.createDirectories(context.next().resolve(BuildStep.REPORTS + "pitest"));
@@ -212,13 +212,13 @@ public class PiTestModule implements BuildExecutorModule {
                     "--reportDir", report.toString(),
                     "--classPath", String.join(",", classPath),
                     "--sourceDirs", String.join(",", sources),
-                    "--targetClasses", config.getProperty("targetClasses", "*"),
-                    "--targetTests", config.getProperty("targetTests", "*"),
-                    "--outputFormats", config.getProperty("outputFormats", "XML"),
+                    "--targetClasses", config.value("targetClasses", "*"),
+                    "--targetTests", config.value("targetTests", "*"),
+                    "--outputFormats", config.value("outputFormats", "XML"),
                     "--mutableCodePaths", code.toString(),
                     "--timestampedReports", "false",
-                    "--failWhenNoMutations", config.getProperty("failWhenNoMutations", "false")));
-            String mutators = config.getProperty("mutators");
+                    "--failWhenNoMutations", config.value("failWhenNoMutations", "false")));
+            String mutators = config.value("mutators");
             if (mutators != null) {
                 commands.add("--mutators");
                 commands.add(mutators);

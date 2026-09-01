@@ -66,6 +66,19 @@ public class SequencedPropertiesTest {
     }
 
     @Test
+    public void reads_a_command_line_as_whitespace_separated_words() {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("arguments", "  --library native   --additional-properties useJakartaEe=true ");
+        properties.setProperty("blank", "   ");
+        assertThat(properties.words("arguments"))
+                .containsExactly("--library", "native", "--additional-properties", "useJakartaEe=true");
+        assertThat(properties.words("blank"))
+                .as("an unconfigured command line adds no arguments rather than an empty one")
+                .isEmpty();
+        assertThat(properties.words("absent")).isEmpty();
+    }
+
+    @Test
     public void can_traverse_string_properties_in_order() {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("k2", "v2");
