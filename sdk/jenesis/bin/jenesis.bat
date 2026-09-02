@@ -34,6 +34,7 @@ set "STAMP="
 if exist "!VENDORED!\jenesis.version" (
     for /f "usebackq delims=" %%v in ("!VENDORED!\jenesis.version") do if not defined STAMP set "STAMP=%%v"
 )
+if defined STAMP set "STAMP=!STAMP:"=!"
 if not defined STAMP set "STAMP=!VERSION!"
 
 set "TARGET_HOME="
