@@ -3,6 +3,7 @@ package build.jenesis.test.project;
 import module java.base;
 import module java.compiler;
 import module org.junit.jupiter.api;
+import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
@@ -22,7 +23,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class JaCoCoModuleRunTest {
 
-    private static final String VERSION = "0.8.14";
+    private static final String PINS = """
+            jacoco/maven/args4j/args4j 2.0.28 SHA-256/11b029a602e787e2bc08eb3b77eda1a4f5e8b263d22e3c5d6220cd5c51f30b18
+            jacoco/maven/org.jacoco/org.jacoco.agent/jar/runtime 0.8.14 SHA-256/3fb76eea65f81bd9415202bab34b6571728841dff1ab8e6bbe81adc2e299face
+            jacoco/maven/org.jacoco/org.jacoco.cli 0.8.14 SHA-256/12d5d78351c638efeea71ac840f6a5cf7bcff89001ddb05eb89f956d1079a2c6
+            jacoco/maven/org.jacoco/org.jacoco.core 0.8.14 SHA-256/28abbf0eea5a08e4f24097f2fbac663ca17c341c25c3a04d90d6cd325943c995
+            jacoco/maven/org.jacoco/org.jacoco.report 0.8.14 SHA-256/a3e2026060ab8b8d5c650706406234bb4c033dfd5376afeb8b1666e8ed27c453
+            jacoco/maven/org.ow2.asm/asm 9.9 SHA-256/03d99a74ad1ee5c71334ef67437f4ef4fe3488caa7c96d8645abc73c8e2017d4
+            jacoco/maven/org.ow2.asm/asm-commons 9.9 SHA-256/db2f6f26150bbe7c126606b4a1151836bcc22a1e05a423b3585698bece995ff8
+            jacoco/maven/org.ow2.asm/asm-tree 9.9 SHA-256/42178f3775c9c63f9e5e1446747d29b4eca4d91bd6e75e5c43cfa372a47d38c6
+            """;
+
 
     @TempDir
     private Path root, dependencies, classes, sources;
@@ -83,8 +94,7 @@ public class JaCoCoModuleRunTest {
                 "1.3.0 SHA-256/48e2df636cab6563ced64dcdff8abb2355627cb236ef0bf37598682ddf742f1b");
         versions.setProperty("main/maven/org.apiguardian/apiguardian-api",
                 "1.1.2 SHA-256/b509448ac506d607319f182537f0b35d71007582ec741832a1f111e5b5b70b38");
-        versions.setProperty("jacoco/maven/org.jacoco/org.jacoco.agent/jar/runtime", VERSION);
-        versions.setProperty("jacoco/maven/org.jacoco/org.jacoco.cli", VERSION);
+        versions.load(new StringReader(PINS));
         versions.store(dependencies.resolve(BuildStep.VERSIONS));
 
         BuildExecutor executor = newExecutor();
@@ -100,7 +110,7 @@ public class JaCoCoModuleRunTest {
                 "dependencies", "classes");
         executor.addModule(
                 "coverage",
-                new JaCoCoModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver())),
+                new JaCoCoModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT),
                 "test", "classes", "sources", "dependencies");
         executor.execute();
 
