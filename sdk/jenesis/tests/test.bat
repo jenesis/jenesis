@@ -102,7 +102,7 @@ REM [8/8] jenesis: a stamp naming a version that is not installed builds from th
 echo [8/8] jenesis on an uninstalled stamp
 set "UNSTAMPED=%TMPDIR%\unstamped"
 xcopy /s /e /y /i /q "%PROJ%" "%UNSTAMPED%" >nul
-(echo^\|set /p="0.0.0-ABSENT")> "%UNSTAMPED%\build\jenesis\jenesis.version"
+<nul set /p ="0.0.0-ABSENT">"%UNSTAMPED%\build\jenesis\jenesis.version"
 pushd "%UNSTAMPED%"
 call "%SDK_HOME%\bin\jenesis.bat" help > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
