@@ -29,8 +29,8 @@ set "PROJ=%TMPDIR%\proj"
 mkdir "%PROJ%"
 set "OUTFILE=%TMPDIR%\out.txt"
 
-REM [1/5] jenesis-version on fresh directory: exit 1, reports missing build/jenesis
-echo [1/5] jenesis-version on fresh directory
+REM [1/7] jenesis-version on fresh directory: exit 1, reports missing build/jenesis
+echo [1/7] jenesis-version on fresh directory
 call "%SDK_HOME%\bin\jenesis-version.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
 if not "!RC!"=="1" goto :fail
@@ -38,8 +38,8 @@ findstr /c:"sdk is at version !VERSION!" "%OUTFILE%" >nul || goto :fail
 findstr /c:"no build/jenesis found" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [2/5] jenesis-init: populates build\jenesis and writes jenesis.version
-echo [2/5] jenesis-init
+REM [2/7] jenesis-init: populates build\jenesis and writes jenesis.version
+echo [2/7] jenesis-init
 call "%SDK_HOME%\bin\jenesis-init.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 if errorlevel 1 goto :fail
 if not exist "%PROJ%\build\jenesis\" goto :fail
@@ -49,22 +49,22 @@ for /f "usebackq delims=" %%v in ("%PROJ%\build\jenesis\jenesis.version") do if 
 if not "!RECORDED!"=="!VERSION!" goto :fail
 echo   ok
 
-REM [3/5] jenesis-version on initialised project: exit 0, reports matching version
-echo [3/5] jenesis-version on initialised project
+REM [3/7] jenesis-version on initialised project: exit 0, reports matching version
+echo [3/7] jenesis-version on initialised project
 call "%SDK_HOME%\bin\jenesis-version.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 if errorlevel 1 goto :fail
 findstr /c:"build/jenesis is at version !VERSION!" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [4/5] jenesis-validate: reports zero drift against the bundled sources
-echo [4/5] jenesis-validate
+REM [4/7] jenesis-validate: reports zero drift against the bundled sources
+echo [4/7] jenesis-validate
 call "%SDK_HOME%\bin\jenesis-validate.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 findstr /c:"0 differs, 0 missing, 0 additional" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [5/5] jenesis: the launcher resolves the engine from the SDK and dispatches to it;
+REM [5/7] jenesis: the launcher resolves the engine from the SDK and dispatches to it;
 REM `help` is a print-only goal, so it runs offline once a project descriptor exists.
-echo [5/5] jenesis help
+echo [5/7] jenesis help
 if not exist "%PROJ%\sources\" mkdir "%PROJ%\sources"
 (echo module sdktest {})> "%PROJ%\sources\module-info.java"
 pushd "%PROJ%"
@@ -73,6 +73,30 @@ set "RC=!ERRORLEVEL!"
 popd
 if not "!RC!"=="0" goto :fail
 findstr /c:"a Java build tool" "%OUTFILE%" >nul || goto :fail
+echo   ok
+
+REM [6/7] jenesis-run: runs the installed version directly, without the version lookup
+echo [6/7] jenesis-run
+pushd "%PROJ%"
+call "%SDK_HOME%\bin\jenesis-run.bat" help > "%OUTFILE%" 2>&1
+set "RC=!ERRORLEVEL!"
+popd
+if not "!RC!"=="0" goto :fail
+findstr /c:"a Java build tool" "%OUTFILE%" >nul || goto :fail
+echo   ok
+
+REM [7/7] jenesis: a stamp naming a version that is not installed fails, naming both fixes
+echo [7/7] jenesis on an uninstalled stamp
+set "UNSTAMPED=%TMPDIR%\unstamped"
+if not exist "%UNSTAMPED%\build\jenesis\" mkdir "%UNSTAMPED%\build\jenesis"
+(echo^|set /p="0.0.0-ABSENT")> "%UNSTAMPED%\build\jenesis\jenesis.version"
+pushd "%UNSTAMPED%"
+call "%SDK_HOME%\bin\jenesis.bat" help > "%OUTFILE%" 2>&1
+set "RC=!ERRORLEVEL!"
+popd
+if "!RC!"=="0" goto :fail
+findstr /c:"0.0.0-ABSENT" "%OUTFILE%" >nul || goto :fail
+findstr /c:"jenesis-run" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
 rmdir /s /q "%TMPDIR%" >nul 2>&1

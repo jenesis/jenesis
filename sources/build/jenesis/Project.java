@@ -765,7 +765,10 @@ public record Project(
                     Three equivalent launchers, all forwarding selectors to a `BuildExecutor` wired
                     to the configured layout:
 
-                      - the installed `jenesis` CLI (release zip / SDKMAN);
+                      - the installed `jenesis` CLI (release zip / SDKMAN), which reads
+                        `build/jenesis/jenesis.version` and runs that version, installing it
+                        first where the package manager can; `jenesis-run` skips the lookup
+                        and runs the installed version as it stands;
                       - `java <Project.java> [selectors...]` on a source-mode script in the tree;
                       - `Project.build(selectors...)` from Java code when embedding the build.
 
