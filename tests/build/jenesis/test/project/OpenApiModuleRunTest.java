@@ -2,6 +2,7 @@ package build.jenesis.test.project;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
@@ -17,7 +18,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class OpenApiModuleRunTest {
 
-    private static final String VERSION = "7.25.0";
+    private static final String PINS = """
+            openapi/maven/org.openapitools/openapi-generator-cli 7.25.0 SHA-256/41ce4f6b07f196676439d710759fa1ced7a08066d06ff1bf314681470289efae
+            """;
+
 
     private static final String SPECIFICATION = """
             openapi: 3.0.3
@@ -40,7 +44,7 @@ public class OpenApiModuleRunTest {
     @BeforeEach
     public void writeProject() throws IOException {
         SequencedProperties versions = new SequencedProperties();
-        versions.setProperty("openapi/maven/org.openapitools/openapi-generator-cli", VERSION);
+        versions.load(new StringReader(PINS));
         versions.store(project.resolve(BuildStep.VERSIONS));
     }
 
@@ -87,7 +91,8 @@ public class OpenApiModuleRunTest {
     }
 
     private OpenApiModule newModule() {
-        return new OpenApiModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver()));
+        return new OpenApiModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver()))
+                .pinning(Pinning.STRICT);
     }
 
     private BuildExecutor newExecutor() throws IOException {

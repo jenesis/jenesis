@@ -2,6 +2,7 @@ package build.jenesis.test.project;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
@@ -17,7 +18,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class AvroModuleRunTest {
 
-    private static final String VERSION = "1.12.2";
+    private static final String PINS = """
+            avro/maven/org.apache.avro/avro-tools 1.12.2 SHA-256/6220e8bc089aaf917cdad4cd358bd651fc0394c0e5ddb8b36da402012c294a68
+            """;
+
 
     private static final String SCHEMA = """
             {
@@ -41,7 +45,7 @@ public class AvroModuleRunTest {
     @BeforeEach
     public void writeProject() throws IOException {
         SequencedProperties versions = new SequencedProperties();
-        versions.setProperty("avro/maven/org.apache.avro/avro-tools", VERSION);
+        versions.load(new StringReader(PINS));
         versions.store(project.resolve(BuildStep.VERSIONS));
     }
 
@@ -86,7 +90,8 @@ public class AvroModuleRunTest {
     }
 
     private AvroModule newModule() {
-        return new AvroModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver()));
+        return new AvroModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver()))
+                .pinning(Pinning.STRICT);
     }
 
     private BuildExecutor newExecutor() throws IOException {
