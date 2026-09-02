@@ -4,34 +4,47 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 JENESIS_HOME="$(dirname "$SCRIPT_DIR")"
 
 DIR="$PWD"
-STAMP=""
+VENDORED=""
 while :; do
-    if [ -f "$DIR/build/jenesis/jenesis.version" ]; then
-        STAMP="$(cat "$DIR/build/jenesis/jenesis.version")"
+    if [ -d "$DIR/build/jenesis" ]; then
+        VENDORED="$DIR/build/jenesis"
         break
     fi
     [ "$DIR" = "/" ] && break
     DIR="$(dirname "$DIR")"
 done
 
-if [ -z "$STAMP" ]; then
+if [ -z "$VENDORED" ]; then
     exec "$SCRIPT_DIR/jenesis-run" "$@"
 fi
 
-for candidate in "$JENESIS_HOME"/sources/*-sources.jar; do
-    if [ -f "$candidate" ]; then
-        JAR_NAME="$(basename "$candidate" .jar)"
-        VERSION="${JAR_NAME#build.jenesis-}"
-        VERSION="${VERSION%-sources}"
-        if [ "$STAMP" = "$VERSION" ]; then
-            exec "$SCRIPT_DIR/jenesis-run" "$@"
+version() {
+    local jar
+    for jar in "$1"/sources/*-sources.jar; do
+        if [ -f "$jar" ]; then
+            jar="$(basename "$jar" .jar)"
+            jar="${jar#build.jenesis-}"
+            printf '%s' "${jar%-sources}"
+            return 0
         fi
-        break
-    fi
-done
+    done
+    return 1
+}
+
+STAMP=""
+if [ -f "$VENDORED/jenesis.version" ]; then
+    STAMP="$(cat "$VENDORED/jenesis.version")"
+fi
+if [ -z "$STAMP" ]; then
+    STAMP="$(version "$JENESIS_HOME")" || STAMP=""
+fi
 
 locate() {
     local home
+    if [ "$(version "$JENESIS_HOME" 2>/dev/null || true)" = "$1" ]; then
+        printf '%s' "$JENESIS_HOME"
+        return 0
+    fi
     for home in \
             "${SDKMAN_DIR:-$HOME/.sdkman}/candidates/jenesis/$1" \
             "$(dirname "$JENESIS_HOME")/$1" \
@@ -55,36 +68,91 @@ locate() {
     return 1
 }
 
-TARGET_HOME="$(locate "$STAMP")" || TARGET_HOME=""
-
 sdkman() {
     command -v sdk >/dev/null 2>&1 && return 0
     [ -s "${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh" ]
 }
 
-if [ -z "$TARGET_HOME" ] && sdkman; then
-    echo "jenesis: build/jenesis is at ${STAMP}, installing that version via SDKMAN" >&2
-    (
-        set +e
-        if ! command -v sdk >/dev/null 2>&1; then
-            # shellcheck disable=SC1090
-            . "${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh" >/dev/null 2>&1
-        fi
-        command -v sdk >/dev/null 2>&1 || exit 1
-        printf 'n\n' | sdk install jenesis "$STAMP" >&2
-    ) || true
+fromSource() {
+    if [ ! -f "$VENDORED/Project.java" ]; then
+        echo "jenesis: ${VENDORED} carries no Project.java, so there is nothing to run from source" >&2
+        exit 1
+    fi
+    local java
+    if [ -n "${JAVA_HOME:-}" ] && [ -x "${JAVA_HOME}/bin/java" ]; then
+        java="${JAVA_HOME}/bin/java"
+    elif command -v java >/dev/null 2>&1; then
+        java="java"
+    else
+        echo "jenesis: no Java runtime found - set JAVA_HOME or add 'java' to PATH (Java 25 or newer required)" >&2
+        exit 1
+    fi
+    exec "$java" ${JAVA_OPTS:-} "$VENDORED/Project.java" "$@"
+}
+
+digestOf() {
+    (cd "$1" && find . -name '*.java' | LC_ALL=C sort | xargs "$HASH" | "$HASH" | cut -d' ' -f1)
+}
+
+if command -v sha256sum >/dev/null 2>&1; then
+    HASH=sha256sum
+elif command -v shasum >/dev/null 2>&1; then
+    HASH="shasum -a 256"
+else
+    fromSource "$@"
+fi
+
+TARGET_HOME=""
+if [ -n "$STAMP" ]; then
     TARGET_HOME="$(locate "$STAMP")" || TARGET_HOME=""
+    if [ -z "$TARGET_HOME" ] && sdkman; then
+        echo "jenesis: build/jenesis records ${STAMP}, installing that version via SDKMAN" >&2
+        (
+            set +e
+            if ! command -v sdk >/dev/null 2>&1; then
+                # shellcheck disable=SC1090
+                . "${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh" >/dev/null 2>&1
+            fi
+            command -v sdk >/dev/null 2>&1 || exit 1
+            printf 'n\n' | sdk install jenesis "$STAMP" >&2
+        ) || true
+        TARGET_HOME="$(locate "$STAMP")" || TARGET_HOME=""
+    fi
 fi
 
 if [ -z "$TARGET_HOME" ]; then
-    echo "jenesis: ${DIR}/build/jenesis is at version ${STAMP}, which is not installed" >&2
-    if sdkman; then
-        echo "jenesis: install it with 'sdk install jenesis ${STAMP}', or run the installed version with 'jenesis-run'" >&2
-    else
-        echo "jenesis: install that version with your package manager, or run the installed version with 'jenesis-run'" >&2
-    fi
-    exit 1
+    echo "jenesis: no installed Jenesis matches ${VENDORED}, building from its sources" >&2
+    fromSource "$@"
 fi
+
+REFERENCE=""
+for jar in "$TARGET_HOME"/sources/*-sources.jar; do
+    [ -f "$jar" ] && REFERENCE="$jar" && break
+done
+if [ -z "$REFERENCE" ]; then
+    echo "jenesis: ${TARGET_HOME} ships no sources to verify against, building from ${VENDORED}" >&2
+    fromSource "$@"
+fi
+
+EXTRACTED="$(mktemp -d)"
+trap 'rm -rf "$EXTRACTED"' EXIT
+if command -v unzip >/dev/null 2>&1; then
+    unzip -qq -o "$REFERENCE" 'build/jenesis/*' -d "$EXTRACTED" >/dev/null 2>&1 || true
+elif command -v jar >/dev/null 2>&1; then
+    (cd "$EXTRACTED" && jar xf "$REFERENCE" build/jenesis) >/dev/null 2>&1 || true
+fi
+if [ ! -d "$EXTRACTED/build/jenesis" ]; then
+    echo "jenesis: could not read the sources of ${TARGET_HOME}, building from ${VENDORED}" >&2
+    fromSource "$@"
+fi
+
+if [ "$(digestOf "$VENDORED")" != "$(digestOf "$EXTRACTED/build/jenesis")" ]; then
+    echo "jenesis: ${VENDORED} does not match the sources of Jenesis ${STAMP}, building from it instead" >&2
+    fromSource "$@"
+fi
+
+rm -rf "$EXTRACTED"
+trap - EXIT
 
 if [ -x "$TARGET_HOME/bin/jenesis-run" ]; then
     exec "$TARGET_HOME/bin/jenesis-run" "$@"
