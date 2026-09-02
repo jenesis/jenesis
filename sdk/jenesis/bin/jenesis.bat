@@ -1,40 +1,60 @@
 @echo off
 setlocal EnableDelayedExpansion
+set "SCRIPT_DIR=%~dp0"
 for %%i in ("%~dp0..") do set "JENESIS_HOME=%%~fi"
 
-set "JAVA="
-if defined JAVA_HOME (
-    if exist "%JAVA_HOME%\bin\java.exe" set "JAVA=%JAVA_HOME%\bin\java.exe"
+set "STAMP="
+set "FOUND_DIR="
+set "DIR=%CD%"
+:findstamp
+if exist "!DIR!\build\jenesis\jenesis.version" (
+    for /f "usebackq delims=" %%v in ("!DIR!\build\jenesis\jenesis.version") do if not defined STAMP set "STAMP=%%v"
+    set "FOUND_DIR=!DIR!"
+    goto :stampdone
 )
-if not defined JAVA (
-    where java >nul 2>&1
-    if errorlevel 1 (
-        echo jenesis: no Java runtime found - set JAVA_HOME or add 'java' to PATH ^(Java 25 or newer required^) 1>&2
-        exit /b 1
+for %%i in ("!DIR!\..") do set "PARENT=%%~fi"
+if "!PARENT!"=="!DIR!" goto :stampdone
+set "DIR=!PARENT!"
+goto :findstamp
+:stampdone
+
+if not defined STAMP (
+    call "%SCRIPT_DIR%jenesis-run.bat" %*
+    exit /b !errorlevel!
+)
+
+set "VERSION="
+for %%f in ("%JENESIS_HOME%\sources\*-sources.jar") do (
+    if not defined VERSION (
+        set "VERSION=%%~nf"
+        if /i "!VERSION:~0,14!"=="build.jenesis-" set "VERSION=!VERSION:~14!"
+        if /i "!VERSION:~-8!"=="-sources" set "VERSION=!VERSION:~0,-8!"
     )
-    set "JAVA=java"
+)
+if "!STAMP!"=="!VERSION!" (
+    call "%SCRIPT_DIR%jenesis-run.bat" %*
+    exit /b !errorlevel!
 )
 
-set "JAVA_VERSION="
-for /f "usebackq tokens=3" %%v in (`""!JAVA!" -version 2^>^&1 ^| findstr /i version"`) do (
-    if not defined JAVA_VERSION set "JAVA_VERSION=%%~v"
+set "TARGET_HOME="
+for %%h in (
+    "%USERPROFILE%\scoop\apps\jenesis\!STAMP!"
+    "%JENESIS_HOME%\..\!STAMP!"
+) do (
+    if not defined TARGET_HOME (
+        if exist "%%~h\bin" set "TARGET_HOME=%%~fh"
+    )
 )
-if not defined JAVA_VERSION (
-    echo jenesis: failed to determine Java version from '!JAVA! -version' 1>&2
+
+if not defined TARGET_HOME (
+    echo jenesis: !FOUND_DIR!\build\jenesis is at version !STAMP!, which is not installed 1>&2
+    echo jenesis: install that version, or run the installed version with 'jenesis-run' 1>&2
     exit /b 1
 )
 
-set "JAVA_MAJOR="
-for /f "tokens=1 delims=." %%m in ("!JAVA_VERSION!") do set "JAVA_MAJOR=%%m"
-echo !JAVA_MAJOR!| findstr /r "^[0-9][0-9]*$" >nul
-if errorlevel 1 (
-    echo jenesis: Java 25 or newer required, but '!JAVA!' reports version '!JAVA_VERSION!' 1>&2
-    exit /b 1
+if exist "!TARGET_HOME!\bin\jenesis-run.bat" (
+    call "!TARGET_HOME!\bin\jenesis-run.bat" %*
+    exit /b !errorlevel!
 )
-if !JAVA_MAJOR! LSS 25 (
-    echo jenesis: Java 25 or newer required, but '!JAVA!' reports version '!JAVA_VERSION!' 1>&2
-    exit /b 1
-)
-
-"!JAVA!" %JAVA_OPTS% -p "!JENESIS_HOME!\lib" -m build.jenesis %*
-exit /b %ERRORLEVEL%
+call "!TARGET_HOME!\bin\jenesis.bat" %*
+exit /b !errorlevel!

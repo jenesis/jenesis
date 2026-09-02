@@ -3,24 +3,90 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 JENESIS_HOME="$(dirname "$SCRIPT_DIR")"
 
-if [ -n "${JAVA_HOME:-}" ] && [ -x "${JAVA_HOME}/bin/java" ]; then
-    JAVA="${JAVA_HOME}/bin/java"
-elif command -v java >/dev/null 2>&1; then
-    JAVA="java"
-else
-    echo "jenesis: no Java runtime found - set JAVA_HOME or add 'java' to PATH (Java 25 or newer required)" >&2
+DIR="$PWD"
+STAMP=""
+while :; do
+    if [ -f "$DIR/build/jenesis/jenesis.version" ]; then
+        STAMP="$(cat "$DIR/build/jenesis/jenesis.version")"
+        break
+    fi
+    [ "$DIR" = "/" ] && break
+    DIR="$(dirname "$DIR")"
+done
+
+if [ -z "$STAMP" ]; then
+    exec "$SCRIPT_DIR/jenesis-run" "$@"
+fi
+
+for candidate in "$JENESIS_HOME"/sources/*-sources.jar; do
+    if [ -f "$candidate" ]; then
+        JAR_NAME="$(basename "$candidate" .jar)"
+        VERSION="${JAR_NAME#build.jenesis-}"
+        VERSION="${VERSION%-sources}"
+        if [ "$STAMP" = "$VERSION" ]; then
+            exec "$SCRIPT_DIR/jenesis-run" "$@"
+        fi
+        break
+    fi
+done
+
+locate() {
+    local home
+    for home in \
+            "${SDKMAN_DIR:-$HOME/.sdkman}/candidates/jenesis/$1" \
+            "$(dirname "$JENESIS_HOME")/$1" \
+            "$HOME/scoop/apps/jenesis/$1"; do
+        if [ -d "$home/bin" ]; then
+            printf '%s' "$home"
+            return 0
+        fi
+    done
+    if command -v brew >/dev/null 2>&1; then
+        home="$(brew --cellar jenesis 2>/dev/null)/$1"
+        if [ -d "$home/bin" ]; then
+            printf '%s' "$home"
+            return 0
+        fi
+        if [ -d "$home/libexec/bin" ]; then
+            printf '%s' "$home/libexec"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+TARGET_HOME="$(locate "$STAMP")" || TARGET_HOME=""
+
+sdkman() {
+    command -v sdk >/dev/null 2>&1 && return 0
+    [ -s "${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh" ]
+}
+
+if [ -z "$TARGET_HOME" ] && sdkman; then
+    echo "jenesis: build/jenesis is at ${STAMP}, installing that version via SDKMAN" >&2
+    (
+        set +e
+        if ! command -v sdk >/dev/null 2>&1; then
+            # shellcheck disable=SC1090
+            . "${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh" >/dev/null 2>&1
+        fi
+        command -v sdk >/dev/null 2>&1 || exit 1
+        printf 'n\n' | sdk install jenesis "$STAMP" >&2
+    ) || true
+    TARGET_HOME="$(locate "$STAMP")" || TARGET_HOME=""
+fi
+
+if [ -z "$TARGET_HOME" ]; then
+    echo "jenesis: ${DIR}/build/jenesis is at version ${STAMP}, which is not installed" >&2
+    if sdkman; then
+        echo "jenesis: install it with 'sdk install jenesis ${STAMP}', or run the installed version with 'jenesis-run'" >&2
+    else
+        echo "jenesis: install that version with your package manager, or run the installed version with 'jenesis-run'" >&2
+    fi
     exit 1
 fi
 
-if ! JAVA_VERSION_OUTPUT="$("$JAVA" -version 2>&1)"; then
-    echo "jenesis: failed to invoke '$JAVA -version'" >&2
-    exit 1
+if [ -x "$TARGET_HOME/bin/jenesis-run" ]; then
+    exec "$TARGET_HOME/bin/jenesis-run" "$@"
 fi
-JAVA_MAJOR="$(printf '%s\n' "$JAVA_VERSION_OUTPUT" | awk -F'"' '/version/ {split($2, parts, /[._-]/); print parts[1]+0; exit}')"
-if [ "${JAVA_MAJOR:-0}" -lt 25 ] 2>/dev/null; then
-    JAVA_REPORTED="$(printf '%s\n' "$JAVA_VERSION_OUTPUT" | awk -F'"' '/version/ {print $2; exit}')"
-    echo "jenesis: Java 25 or newer required, but '$JAVA' reports version '${JAVA_REPORTED:-unknown}'" >&2
-    exit 1
-fi
-
-exec "$JAVA" ${JAVA_OPTS:-} -p "$JENESIS_HOME/lib" -m build.jenesis "$@"
+exec "$TARGET_HOME/bin/jenesis" "$@"
