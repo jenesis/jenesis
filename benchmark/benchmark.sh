@@ -14,7 +14,7 @@ GRAALVM_HOME="${GRAALVM_HOME:-}"
 RUNS_COLD="${RUNS_COLD:-5}"
 RUNS_WARM="${RUNS_WARM:-3}"
 ENGINE="build/jenesis"; [ -f $ENGINE/Project.java ] || ENGINE="sources/build/jenesis"
-LAUNCHER="$ROOT/.jenesis/launcher"
+TOOL="$ROOT/.jenesis/tool"
 EXE=""; NICMD=""; case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) EXE=".exe"; NICMD=".cmd";; esac
 NATIVE="$ROOT/.jenesis/benchmark-image"
 NATIVE_BIN="$NATIVE$EXE"
@@ -87,26 +87,26 @@ bench_warm() {
   result "$walls" "$runs" "$worst"
 }
 
-build_launcher() {
-  [ -d "$LAUNCHER" ] && return 0
-  note "Precompiling the engine to $LAUNCHER"
-  rm -rf "$LAUNCHER"; javac -d "$LAUNCHER" $(find -L "$ENGINE" -name '*.java')
+build_tool() {
+  [ -d "$TOOL" ] && return 0
+  note "Precompiling the engine to $TOOL"
+  rm -rf "$TOOL"; javac -d "$TOOL" $(find -L "$ENGINE" -name '*.java')
 }
 
 build_native() {
   [ -x "$NATIVE_BIN" ] && return 0
   [ -n "$GRAALVM_HOME" ] || { warn "GRAALVM_HOME not set - skipping the native launcher"; return 1; }
-  build_launcher
+  build_tool
   note "Capturing reachability metadata and building the native launcher (one-off)"
   local cfg; cfg="$(mktemp -d)"
   "$GRAALVM_HOME/bin/java" $LAYOUT -Djenesis.process.factory=tool -Djenesis.test.skip=true \
       -agentlib:native-image-agent=config-output-dir="$cfg" \
-      -cp "$LAUNCHER" build.jenesis.Project build >/dev/null 2>&1
+      -cp "$TOOL" build.jenesis.Project build >/dev/null 2>&1
   rm -rf target
   "$GRAALVM_HOME/bin/native-image$NICMD" --no-fallback --add-modules jdk.compiler,jdk.jartool \
       -H:IncludeResourceBundles=com.sun.tools.javac.resources.compiler,com.sun.tools.javac.resources.javac,com.sun.tools.javac.resources.ct,sun.tools.jar.resources.jar \
       -H:ConfigurationFileDirectories="$cfg" \
-      -cp "$LAUNCHER" build.jenesis.Project "$NATIVE" >/dev/null 2>&1 \
+      -cp "$TOOL" build.jenesis.Project "$NATIVE" >/dev/null 2>&1 \
     && echo "native launcher (in-process javac): $NATIVE_BIN" || { warn "native-image build failed"; return 1; }
 }
 
@@ -117,21 +117,21 @@ M_F()  { echo "$1 package -o -q -ntp"; }
 # as the Maven baseline and the comparison stays like-for-like (as it was before the default).
 LAYOUT="-Djenesis.project.layout=maven"
 SRC_NT="java $LAYOUT -Djenesis.test.skip=true $ENGINE/Project.java build"
-JAVAC_NT="java $LAYOUT -Djenesis.test.skip=true -cp $LAUNCHER build.jenesis.Project build"
+JAVAC_NT="java $LAYOUT -Djenesis.test.skip=true -cp $TOOL build.jenesis.Project build"
 NATIVE_NT="$NATIVE_BIN $LAYOUT -Djenesis.test.skip=true build"
 SRC_F="java $LAYOUT $ENGINE/Project.java build"
 
 table_launch() {
   note "Table: build-tool launch overhead (run 'help', no project work)"
-  build_launcher
+  build_tool
   bench_warm "source"      "$RUNS_WARM" "java $ENGINE/Project.java help" "java $ENGINE/Project.java help"
-  bench_warm "precompiled" "$RUNS_WARM" "java -cp $LAUNCHER build.jenesis.Project help" "java -cp $LAUNCHER build.jenesis.Project help"
+  bench_warm "precompiled" "$RUNS_WARM" "java -cp $TOOL build.jenesis.Project help" "java -cp $TOOL build.jenesis.Project help"
   build_native && bench_warm "native" "$RUNS_WARM" "$NATIVE_BIN help" "$NATIVE_BIN help"
 }
 
 table_compile() {
   note "Table: compile + package, tests compiled but not run"
-  build_launcher; build_native
+  build_tool; build_native
   local m; m="$(M_NT "$MVN")"
   echo "-- cold (empty target/) --"
   bench "maven3"      "$RUNS_COLD" "rm -rf target" "$m"
@@ -182,10 +182,10 @@ table_maven() {
 }
 
 table_aot() {
-  note "Table: Java AOT cache (JEP 514/515) for the compiled launcher - JVM, not Graal"
-  build_launcher
-  local jar="$ROOT/.jenesis/launcher.jar" aot="$ROOT/.jenesis/build.aot"
-  rm -f "$jar"; jar --create --file "$jar" -C "$LAUNCHER" .
+  note "Table: Java AOT cache (JEP 514/515) for the compiled tool - JVM, not Graal"
+  build_tool
+  local jar="$ROOT/.jenesis/tool.jar" aot="$ROOT/.jenesis/build.aot"
+  rm -f "$jar"; jar --create --file "$jar" -C "$TOOL" .
   local B="$LAYOUT -Djenesis.test.skip=true -cp $jar build.jenesis.Project build"
   local J="java $B" JA="java -XX:AOTCache=$aot $B"
   local H="java -cp $jar build.jenesis.Project help" HA="java -XX:AOTCache=$aot -cp $jar build.jenesis.Project help"
@@ -217,9 +217,9 @@ table_aot() {
 
 table_pinning() {
   note "Table: dependency pinning - default (checksums verified) vs versions (checksums stripped)"
-  build_launcher
-  local def="java $LAYOUT -Djenesis.test.skip=true -cp $LAUNCHER build.jenesis.Project build"
-  local ver="java $LAYOUT -Djenesis.dependency.pin=versions -Djenesis.test.skip=true -cp $LAUNCHER build.jenesis.Project build"
+  build_tool
+  local def="java $LAYOUT -Djenesis.test.skip=true -cp $TOOL build.jenesis.Project build"
+  local ver="java $LAYOUT -Djenesis.dependency.pin=versions -Djenesis.test.skip=true -cp $TOOL build.jenesis.Project build"
   echo "-- cold (Dependencies step runs; default validates artifact digests) --"
   bench "default"      "$RUNS_COLD" "rm -rf target" "$def"
   bench "pin=versions" "$RUNS_COLD" "rm -rf target" "$ver"

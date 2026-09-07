@@ -779,9 +779,15 @@ public record Project(
                     to the configured layout:
 
                       - the installed `jenesis` CLI (release zip / SDKMAN), which reads
-                        `build/jenesis/jenesis.version` and runs that version, installing it
-                        first where the package manager can; `jenesis-run` skips the lookup
-                        and runs the installed version as it stands;
+                        `build/jenesis/jenesis.version`, installs that version where the
+                        package manager can, verifies `build/jenesis` against the published
+                        sources of it and only then runs the compiled engine; a tree that
+                        does not match is refused, never built from. `jenesis-run` skips
+                        the lookup and runs the installed version as it stands, so a
+                        refused project still builds as a standard build off the released
+                        engine - only the two routes below run the vendored one, and a
+                        project that vendors a changed engine may drive it from an entry
+                        point of its own rather than the usual `Project.java`;
                       - `java <Project.java> [selectors...]` on a source-mode script in the tree;
                       - `Project.build(selectors...)` from Java code when embedding the build.
 
@@ -791,8 +797,8 @@ public record Project(
                     Source mode recompiles the build's own engine and `Project.java` on every
                     invocation. While the build code is unchanged, skip that recompile:
 
-                      javac -d .jenesis/launcher $(find build/jenesis/ -name '*.java')
-                      java -cp .jenesis/launcher build.jenesis.Project [selectors...]
+                      javac -d .jenesis/tool build/jenesis/Project.java
+                      java -cp .jenesis/tool build.jenesis.Project [selectors...]
 
                     Or ahead-of-time compile that launcher with GraalVM `native-image` for
                     near-instant startup. The native binary detects the native-image runtime and
@@ -802,10 +808,10 @@ public record Project(
 
                       java -Djenesis.process.factory=fork \\
                           -agentlib:native-image-agent=config-output-dir=.jenesis/native-config \\
-                          -cp .jenesis/launcher build.jenesis.Project build
+                          -cp .jenesis/tool build.jenesis.Project build
                       native-image --no-fallback \\
                           -H:ConfigurationFileDirectories=.jenesis/native-config \\
-                          -cp .jenesis/launcher build.jenesis.Project jenesis
+                          -cp .jenesis/tool build.jenesis.Project jenesis
                       ./jenesis [selectors...]
 
                     Capture that metadata from builds exercising the layouts and steps you use.

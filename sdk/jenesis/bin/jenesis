@@ -7,6 +7,7 @@ DIR="$PWD"
 VENDORED=""
 while :; do
     if [ -d "$DIR/build/jenesis" ]; then
+        ROOT="$DIR"
         VENDORED="$DIR/build/jenesis"
         break
     fi
@@ -17,6 +18,37 @@ done
 if [ -z "$VENDORED" ]; then
     exec "$SCRIPT_DIR/jenesis-run" "$@"
 fi
+
+refuse() {
+    echo "jenesis: $1" >&2
+    cat >&2 <<EOM
+jenesis: refusing to run - this launcher only executes a released Jenesis whose published
+    sources match ${VENDORED} exactly, so that no unreviewed build code ever runs under it.
+
+The released engine still builds this project as a standard build, which is often all a
+project needs. Neither of these executes the vendored build code:
+
+    . jenesis-switch            switch this shell to the version the project records
+    jenesis-run [selectors]     run the installed engine as it stands
+
+Only where the project truly needs its own engine, run the vendored sources yourself, from
+the project root at ${ROOT}. Read the project's build instructions first: Project.java is
+the usual entry point, but a project that vendors a changed engine states why it does, and
+may drive it from one of its own.
+
+    java build/jenesis/Project.java [selectors]
+
+Source mode recompiles the engine on every invocation. To pay that once instead:
+
+    javac build/jenesis/Project.java
+    java build.jenesis.Project [selectors]
+
+Warning: those commands execute unreviewed code with the rights of your build and can
+break the encapsulation the released engine gives you. Only run builds from sources you
+trust.
+EOM
+    exit 1
+}
 
 version() {
     local jar
@@ -37,6 +69,9 @@ if [ -f "$VENDORED/jenesis.version" ]; then
 fi
 if [ -z "$STAMP" ]; then
     STAMP="$(version "$JENESIS_HOME")" || STAMP=""
+fi
+if [ -z "$STAMP" ]; then
+    refuse "${VENDORED} records no version in jenesis.version and ${JENESIS_HOME} ships no sources to assume one from"
 fi
 
 locate() {
@@ -73,23 +108,6 @@ sdkman() {
     [ -s "${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh" ]
 }
 
-fromSource() {
-    if [ ! -f "$VENDORED/Project.java" ]; then
-        echo "jenesis: ${VENDORED} carries no Project.java, so there is nothing to run from source" >&2
-        exit 1
-    fi
-    local java
-    if [ -n "${JAVA_HOME:-}" ] && [ -x "${JAVA_HOME}/bin/java" ]; then
-        java="${JAVA_HOME}/bin/java"
-    elif command -v java >/dev/null 2>&1; then
-        java="java"
-    else
-        echo "jenesis: no Java runtime found - set JAVA_HOME or add 'java' to PATH (Java 25 or newer required)" >&2
-        exit 1
-    fi
-    exec "$java" ${JAVA_OPTS:-} "$VENDORED/Project.java" "$@"
-}
-
 digestOf() {
     (cd "$1" && find . -name '*.java' | LC_ALL=C sort | xargs "$HASH" | "$HASH" | cut -d' ' -f1)
 }
@@ -99,39 +117,36 @@ if command -v sha256sum >/dev/null 2>&1; then
 elif command -v shasum >/dev/null 2>&1; then
     HASH="shasum -a 256"
 else
-    fromSource "$@"
+    refuse "no SHA-256 tool found - install 'sha256sum' or 'shasum', without one ${VENDORED} cannot be verified"
 fi
 
-TARGET_HOME=""
-if [ -n "$STAMP" ]; then
+TARGET_HOME="$(locate "$STAMP")" || TARGET_HOME=""
+if [ -z "$TARGET_HOME" ] && sdkman; then
+    echo "jenesis: build/jenesis records ${STAMP}, installing that version via SDKMAN" >&2
+    (
+        set +e
+        if ! command -v sdk >/dev/null 2>&1; then
+            # shellcheck disable=SC1090
+            . "${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh" >/dev/null 2>&1
+        fi
+        command -v sdk >/dev/null 2>&1 || exit 1
+        printf 'n\n' | sdk install jenesis "$STAMP" >&2
+    ) || true
     TARGET_HOME="$(locate "$STAMP")" || TARGET_HOME=""
-    if [ -z "$TARGET_HOME" ] && sdkman; then
-        echo "jenesis: build/jenesis records ${STAMP}, installing that version via SDKMAN" >&2
-        (
-            set +e
-            if ! command -v sdk >/dev/null 2>&1; then
-                # shellcheck disable=SC1090
-                . "${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh" >/dev/null 2>&1
-            fi
-            command -v sdk >/dev/null 2>&1 || exit 1
-            printf 'n\n' | sdk install jenesis "$STAMP" >&2
-        ) || true
-        TARGET_HOME="$(locate "$STAMP")" || TARGET_HOME=""
-    fi
 fi
-
 if [ -z "$TARGET_HOME" ]; then
-    echo "jenesis: no installed Jenesis matches ${VENDORED}, building from its sources" >&2
-    fromSource "$@"
+    refuse "no installed Jenesis matches the ${STAMP} that ${VENDORED} records, and it could not be installed - install it with 'sdk install jenesis ${STAMP}' or from https://jenesis.build"
 fi
 
 REFERENCE=""
 for jar in "$TARGET_HOME"/sources/*-sources.jar; do
-    [ -f "$jar" ] && REFERENCE="$jar" && break
+    if [ -f "$jar" ]; then
+        REFERENCE="$jar"
+        break
+    fi
 done
 if [ -z "$REFERENCE" ]; then
-    echo "jenesis: ${TARGET_HOME} ships no sources to verify against, building from ${VENDORED}" >&2
-    fromSource "$@"
+    refuse "Jenesis ${STAMP} at ${TARGET_HOME} ships no sources jar, so ${VENDORED} cannot be verified against it"
 fi
 
 EXTRACTED="$(mktemp -d)"
@@ -142,19 +157,17 @@ elif command -v jar >/dev/null 2>&1; then
     (cd "$EXTRACTED" && jar xf "$REFERENCE" build/jenesis) >/dev/null 2>&1 || true
 fi
 if [ ! -d "$EXTRACTED/build/jenesis" ]; then
-    echo "jenesis: could not read the sources of ${TARGET_HOME}, building from ${VENDORED}" >&2
-    fromSource "$@"
+    refuse "the sources of Jenesis ${STAMP} in ${REFERENCE} could not be read, so ${VENDORED} cannot be verified against them"
 fi
 
 if [ "$(digestOf "$VENDORED")" != "$(digestOf "$EXTRACTED/build/jenesis")" ]; then
-    echo "jenesis: ${VENDORED} does not match the sources of Jenesis ${STAMP}, building from it instead" >&2
-    fromSource "$@"
+    refuse "${VENDORED} does not match the sources of Jenesis ${STAMP}"
 fi
 
 rm -rf "$EXTRACTED"
 trap - EXIT
 
-if [ -x "$TARGET_HOME/bin/jenesis-run" ]; then
-    exec "$TARGET_HOME/bin/jenesis-run" "$@"
+if [ ! -x "$TARGET_HOME/bin/jenesis-run" ]; then
+    refuse "Jenesis ${STAMP} at ${TARGET_HOME} ships no executable bin/jenesis-run to dispatch to"
 fi
-exec "$TARGET_HOME/bin/jenesis" "$@"
+exec "$TARGET_HOME/bin/jenesis-run" "$@"

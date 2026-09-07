@@ -12,7 +12,7 @@ Running
     benchmark/benchmark.sh all         # every table
 
 Subcommands: `launch`, `compile`, `full`, `maven`, `pinning`, `aot`, `all`. (`aot` measures *Java AOT* - JDK 25's
-command-line AOT cache for the compiled launcher, JEP 514/515, captured via a recording run; this is the JVM cache,
+command-line AOT cache for the compiled tool, JEP 514/515, captured via a recording run; this is the JVM cache,
 *not* Graal `native-image`. It mirrors the `launch` and `compile` scenarios - launch overhead, cold, warm no-op,
 one-line edit and spurious touch - and needs JDK 25+.)
 
@@ -27,8 +27,8 @@ Configuration (environment variables, all optional):
 | `RUNS_COLD`    | `5`            | repetitions for cold builds                                          |
 | `RUNS_WARM`    | `3`            | repetitions for warm and incremental builds                         |
 
-The script prepares what it needs: it precompiles the engine into `.jenesis/launcher` for the precompiled
-launcher, and (when `GRAALVM_HOME` is set) captures reachability metadata and builds a native launcher once.
+The script prepares what it needs: it precompiles the engine into `.jenesis/tool` for the precompiled
+rows, and (when `GRAALVM_HOME` is set) captures reachability metadata and builds a native launcher once.
 
 It is `bash` (not POSIX `sh`) and runs on Linux, macOS and Windows (Git Bash). Where GNU `time` is absent
 (macOS, Windows) it falls back to the shell's `time` keyword for wall-clock, and where `/proc/net/dev` is

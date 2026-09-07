@@ -29,8 +29,8 @@ set "PROJ=%TMPDIR%\proj"
 mkdir "%PROJ%"
 set "OUTFILE=%TMPDIR%\out.txt"
 
-REM [1/8] jenesis-version on fresh directory: exit 1, reports missing build/jenesis
-echo [1/8] jenesis-version on fresh directory
+REM [1/9] jenesis-version on fresh directory: exit 1, reports missing build/jenesis
+echo [1/9] jenesis-version on fresh directory
 call "%SDK_HOME%\bin\jenesis-version.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
 if not "!RC!"=="1" goto :fail
@@ -38,8 +38,8 @@ findstr /c:"sdk is at version !VERSION!" "%OUTFILE%" >nul || goto :fail
 findstr /c:"no build/jenesis found" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [2/8] jenesis-init: populates build\jenesis and writes jenesis.version
-echo [2/8] jenesis-init
+REM [2/9] jenesis-init: populates build\jenesis and writes jenesis.version
+echo [2/9] jenesis-init
 call "%SDK_HOME%\bin\jenesis-init.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 if errorlevel 1 goto :fail
 if not exist "%PROJ%\build\jenesis\" goto :fail
@@ -49,22 +49,22 @@ for /f "usebackq delims=" %%v in ("%PROJ%\build\jenesis\jenesis.version") do if 
 if not "!RECORDED!"=="!VERSION!" goto :fail
 echo   ok
 
-REM [3/8] jenesis-version on initialised project: exit 0, reports matching version
-echo [3/8] jenesis-version on initialised project
+REM [3/9] jenesis-version on initialised project: exit 0, reports matching version
+echo [3/9] jenesis-version on initialised project
 call "%SDK_HOME%\bin\jenesis-version.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 if errorlevel 1 goto :fail
 findstr /c:"build/jenesis is at version !VERSION!" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [4/8] jenesis-validate: reports zero drift against the bundled sources
-echo [4/8] jenesis-validate
+REM [4/9] jenesis-validate: reports zero drift against the bundled sources
+echo [4/9] jenesis-validate
 call "%SDK_HOME%\bin\jenesis-validate.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 findstr /c:"0 differs, 0 missing, 0 additional" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [5/8] jenesis: the launcher resolves the engine from the SDK and dispatches to it;
+REM [5/9] jenesis: the launcher resolves the engine from the SDK and dispatches to it;
 REM `help` is a print-only goal, so it runs offline once a project descriptor exists.
-echo [5/8] jenesis help
+echo [5/9] jenesis help
 if not exist "%PROJ%\sources\" mkdir "%PROJ%\sources"
 (echo module sdktest {})> "%PROJ%\sources\module-info.java"
 pushd "%PROJ%"
@@ -75,8 +75,8 @@ if not "!RC!"=="0" goto :fail
 findstr /c:"a Java build tool" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [6/8] jenesis-run: runs the installed version directly, without the version lookup
-echo [6/8] jenesis-run
+REM [6/9] jenesis-run: runs the installed version directly, without the version lookup
+echo [6/9] jenesis-run
 pushd "%PROJ%"
 call "%SDK_HOME%\bin\jenesis-run.bat" help > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
@@ -85,8 +85,8 @@ if not "!RC!"=="0" goto :fail
 findstr /c:"a Java build tool" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [7/8] jenesis: a patched vendored tree is never run from the installed engine
-echo [7/8] jenesis refuses an engine the vendored sources do not match
+REM [7/9] jenesis: a patched vendored tree is refused, never run and never built from
+echo [7/9] jenesis refuses an engine the vendored sources do not match
 set "PATCHED=%TMPDIR%\patched"
 xcopy /s /e /y /i /q "%PROJ%" "%PATCHED%" >nul
 echo // local patch>> "%PATCHED%\build\jenesis\Platform.java"
@@ -94,12 +94,23 @@ pushd "%PATCHED%"
 call "%SDK_HOME%\bin\jenesis.bat" help > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
 popd
-if not "!RC!"=="0" goto :fail
+if not "!RC!"=="1" goto :fail
 findstr /c:"does not match the sources" "%OUTFILE%" >nul || goto :fail
+findstr /c:"refusing to run" "%OUTFILE%" >nul || goto :fail
+findstr /c:"a Java build tool" "%OUTFILE%" >nul && goto :fail
+findstr /c:"jenesis-run [selectors]" "%OUTFILE%" >nul || goto :fail
+findstr /c:"builds this project as a standard build" "%OUTFILE%" >nul || goto :fail
+findstr /c:"Neither of these executes the vendored build code" "%OUTFILE%" >nul || goto :fail
+findstr /c:"java build\jenesis\Project.java [selectors]" "%OUTFILE%" >nul || goto :fail
+findstr /c:"javac build\jenesis\Project.java" "%OUTFILE%" >nul || goto :fail
+findstr /c:"the project root at %PATCHED%" "%OUTFILE%" >nul || goto :fail
+findstr /c:"may drive it from one of its own" "%OUTFILE%" >nul || goto :fail
+findstr /c:"those commands execute unreviewed code" "%OUTFILE%" >nul || goto :fail
+findstr /c:"run builds from sources you" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [8/8] jenesis: a stamp naming a version that is not installed builds from the vendored sources
-echo [8/8] jenesis on an uninstalled stamp
+REM [8/9] jenesis: a stamp naming a version that cannot be installed is refused, not built
+echo [8/9] jenesis on an uninstalled stamp
 set "UNSTAMPED=%TMPDIR%\unstamped"
 xcopy /s /e /y /i /q "%PROJ%" "%UNSTAMPED%" >nul
 <nul set /p ="0.0.0-ABSENT">"%UNSTAMPED%\build\jenesis\jenesis.version"
@@ -107,8 +118,26 @@ pushd "%UNSTAMPED%"
 call "%SDK_HOME%\bin\jenesis.bat" help > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
 popd
-if not "!RC!"=="0" goto :fail
+if not "!RC!"=="1" goto :fail
 findstr /c:"no installed Jenesis matches" "%OUTFILE%" >nul || goto :fail
+findstr /c:"refusing to run" "%OUTFILE%" >nul || goto :fail
+echo   ok
+
+REM [9/9] jenesis-validate: a class file beside its source is inert and stays unreported,
+REM one whose source is gone is live code and is named
+echo [9/9] jenesis-validate on locally compiled classes
+set "COMPILED=%TMPDIR%\compiled"
+xcopy /s /e /y /i /q "%PROJ%" "%COMPILED%" >nul
+pushd "%COMPILED%"
+javac -nowarn build\jenesis\Project.java >nul 2>&1
+popd
+if not exist "%COMPILED%\build\jenesis\Project.class" goto :fail
+call "%SDK_HOME%\bin\jenesis-validate.bat" "%COMPILED%" > "%OUTFILE%" 2>&1
+findstr /c:"0 differs, 0 missing, 0 additional" "%OUTFILE%" >nul || goto :fail
+del "%COMPILED%\build\jenesis\BuildExecutorCallback.java"
+call "%SDK_HOME%\bin\jenesis-validate.bat" "%COMPILED%" > "%OUTFILE%" 2>&1
+findstr /c:"build/jenesis/BuildExecutorCallback.class additional" "%OUTFILE%" >nul || goto :fail
+findstr /c:"build/jenesis/BuildExecutorCallback.java missing" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
 rmdir /s /q "%TMPDIR%" >nul 2>&1
