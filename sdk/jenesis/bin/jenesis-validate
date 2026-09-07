@@ -108,6 +108,15 @@ for target in "${TARGETS[@]}"; do
         while IFS= read -r path; do
             rel="${path#"$CUR_ROOT"/}"
             if [ ! -f "$JAR_ROOT/$rel" ]; then
+                case "$rel" in
+                    *.class)
+                        shadowing="${rel%.class}"
+                        shadowing="${shadowing%%\$*}.java"
+                        if [ -f "$CUR_ROOT/$shadowing" ]; then
+                            continue
+                        fi
+                        ;;
+                esac
                 echo "${path_prefix}build/jenesis/$rel additional"
                 ADDITIONAL=$((ADDITIONAL + 1))
             fi

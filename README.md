@@ -47,7 +47,7 @@ What is in this repository
 | `sources/` | The build tool itself, module `build.jenesis` - including `Project`, `Execute` and `Jpx`. |
 | `tests/` | Its tests, module `build.jenesis.test`. |
 | `demo/` | ~46 self-contained example projects, one per feature, indexed by [`demo/README.md`](demo/README.md). |
-| `sdk/` | The SDKMAN distribution layout and its shell-script tests (`sdk/jenesis`, `sdk/jpx`). `jenesis` runs the version recorded in a project's `build/jenesis/jenesis.version`, installing it where the package manager can; `jenesis-run` runs the installed version as it stands. |
+| `sdk/` | The SDKMAN distribution layout and its shell-script tests (`sdk/jenesis`, `sdk/jpx`). `jenesis` reads the version recorded in a project's `build/jenesis/jenesis.version`, installs it where the package manager can, verifies the vendored sources against the published ones and runs the compiled engine - a tree that does not match is refused, so `jenesis` never executes unreviewed build code; `jenesis-run` runs the installed version as it stands, and `jenesis-switch` moves the shell to the recorded one. Both stay on the released engine, so a refused project still builds as a standard build; only running the vendored sources yourself - in source mode, or off classes compiled once with `javac` - executes the vendored engine. |
 | `build/jenesis` | A symlink to `sources/build/jenesis`, so the project builds itself with itself. |
 | `benchmark/` | The performance harness and its methodology, see [`benchmark/README.md`](benchmark/README.md). |
 | `install.sh` | The script served at `get.jenesis.build`. |

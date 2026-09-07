@@ -7,6 +7,7 @@ set "VENDORED="
 set "DIR=%CD%"
 :findvendored
 if exist "!DIR!\build\jenesis\" (
+    set "ROOT=!DIR!"
     set "VENDORED=!DIR!\build\jenesis"
     goto :vendoreddone
 )
@@ -36,31 +37,36 @@ if exist "!VENDORED!\jenesis.version" (
 )
 if defined STAMP set "STAMP=!STAMP:"=!"
 if not defined STAMP set "STAMP=!VERSION!"
+if not defined STAMP (
+    set "REASON=!VENDORED! records no version in jenesis.version and %JENESIS_HOME% ships no sources to assume one from"
+    goto :refuse
+)
 
 set "TARGET_HOME="
 if "!STAMP!"=="!VERSION!" (
     set "TARGET_HOME=%JENESIS_HOME%"
 ) else (
-    for %%h in (
-        "%USERPROFILE%\scoop\apps\jenesis\!STAMP!"
-        "%JENESIS_HOME%\..\!STAMP!"
-    ) do (
-        if not defined TARGET_HOME (
-            if exist "%%~h\bin\" set "TARGET_HOME=%%~fh"
+    call :find
+    if not defined TARGET_HOME (
+        where scoop >nul 2>&1
+        if not errorlevel 1 (
+            echo jenesis: build/jenesis records !STAMP!, installing that version via Scoop 1>&2
+            call scoop install jenesis@!STAMP! 1>&2
+            call :find
         )
     )
 )
 
 if not defined TARGET_HOME (
-    echo jenesis: no installed Jenesis matches !VENDORED!, building from its sources 1>&2
-    goto :fromsource
+    set "REASON=no installed Jenesis matches the !STAMP! that !VENDORED! records, and it could not be installed - install it with 'scoop install jenesis@!STAMP!' or from https://jenesis.build"
+    goto :refuse
 )
 
 set "REFERENCE="
 for %%f in ("!TARGET_HOME!\sources\*-sources.jar") do if not defined REFERENCE set "REFERENCE=%%~ff"
 if not defined REFERENCE (
-    echo jenesis: !TARGET_HOME! ships no sources to verify against, building from !VENDORED! 1>&2
-    goto :fromsource
+    set "REASON=Jenesis !STAMP! at !TARGET_HOME! ships no sources jar, so !VENDORED! cannot be verified against it"
+    goto :refuse
 )
 
 set "EXTRACTED=%TEMP%\jenesis-verify-%RANDOM%%RANDOM%"
@@ -70,8 +76,8 @@ jar xf "!REFERENCE!" build/jenesis >nul 2>&1
 popd
 if not exist "!EXTRACTED!\build\jenesis\" (
     rmdir /s /q "!EXTRACTED!" 2>nul
-    echo jenesis: could not read the sources of !TARGET_HOME!, building from !VENDORED! 1>&2
-    goto :fromsource
+    set "REASON=the sources of Jenesis !STAMP! in !REFERENCE! could not be read, so !VENDORED! cannot be verified against them"
+    goto :refuse
 )
 
 set "DIGEST_A="
@@ -81,41 +87,62 @@ for /f "usebackq delims=" %%d in (`powershell -NoProfile -ExecutionPolicy Bypass
 rmdir /s /q "!EXTRACTED!" 2>nul
 
 if not defined DIGEST_A (
-    echo jenesis: could not digest !VENDORED!, building from it 1>&2
-    goto :fromsource
+    set "REASON=!VENDORED! could not be digested, so it cannot be verified"
+    goto :refuse
 )
 if not defined DIGEST_B (
-    echo jenesis: could not digest the sources of !TARGET_HOME!, building from !VENDORED! 1>&2
-    goto :fromsource
+    set "REASON=the sources of Jenesis !STAMP! could not be digested, so !VENDORED! cannot be verified against them"
+    goto :refuse
 )
 if not "!DIGEST_A!"=="!DIGEST_B!" (
-    echo jenesis: !VENDORED! does not match the sources of Jenesis !STAMP!, building from it instead 1>&2
-    goto :fromsource
+    set "REASON=!VENDORED! does not match the sources of Jenesis !STAMP!"
+    goto :refuse
 )
 
-if exist "!TARGET_HOME!\bin\jenesis-run.bat" (
-    call "!TARGET_HOME!\bin\jenesis-run.bat" %*
-    exit /b !errorlevel!
+if not exist "!TARGET_HOME!\bin\jenesis-run.bat" (
+    set "REASON=Jenesis !STAMP! at !TARGET_HOME! ships no bin\jenesis-run.bat to dispatch to"
+    goto :refuse
 )
-call "!TARGET_HOME!\bin\jenesis.bat" %*
+call "!TARGET_HOME!\bin\jenesis-run.bat" %*
 exit /b !errorlevel!
 
-:fromsource
-if not exist "!VENDORED!\Project.java" (
-    echo jenesis: !VENDORED! carries no Project.java, so there is nothing to run from source 1>&2
-    exit /b 1
-)
-set "JAVA="
-if defined JAVA_HOME (
-    if exist "%JAVA_HOME%\bin\java.exe" set "JAVA=%JAVA_HOME%\bin\java.exe"
-)
-if not defined JAVA (
-    where java >nul 2>&1
-    if errorlevel 1 (
-        echo jenesis: no Java runtime found - set JAVA_HOME or add 'java' to PATH ^(Java 25 or newer required^) 1>&2
-        exit /b 1
+:find
+for %%h in (
+    "%USERPROFILE%\scoop\apps\jenesis\!STAMP!"
+    "%JENESIS_HOME%\..\!STAMP!"
+) do (
+    if not defined TARGET_HOME (
+        if exist "%%~h\bin\" set "TARGET_HOME=%%~fh"
     )
-    set "JAVA=java"
 )
-"!JAVA!" %JAVA_OPTS% "!VENDORED!\Project.java" %*
-exit /b !errorlevel!
+exit /b 0
+
+:refuse
+echo jenesis: !REASON! 1>&2
+echo jenesis: refusing to run - this launcher only executes a released Jenesis whose published 1>&2
+echo     sources match !VENDORED! exactly, so that no unreviewed build code ever runs under it. 1>&2
+echo. 1>&2
+echo The released engine still builds this project as a standard build, which is often all a 1>&2
+echo project needs. Neither of these executes the vendored build code: 1>&2
+echo. 1>&2
+echo     jenesis-run [selectors]         run the installed engine as it stands 1>&2
+echo     scoop install jenesis@!STAMP!   install and switch to the version the project records 1>&2
+echo. 1>&2
+echo On a POSIX shell, '. jenesis-switch' switches to the recorded version in one step. 1>&2
+echo. 1>&2
+echo Only where the project truly needs its own engine, run the vendored sources yourself, from 1>&2
+echo the project root at !ROOT!. Read the project's build instructions first: Project.java is 1>&2
+echo the usual entry point, but a project that vendors a changed engine states why it does, and 1>&2
+echo may drive it from one of its own. 1>&2
+echo. 1>&2
+echo     java build\jenesis\Project.java [selectors] 1>&2
+echo. 1>&2
+echo Source mode recompiles the engine on every invocation. To pay that once instead: 1>&2
+echo. 1>&2
+echo     javac build\jenesis\Project.java 1>&2
+echo     java build.jenesis.Project [selectors] 1>&2
+echo. 1>&2
+echo Warning: those commands execute unreviewed code with the rights of your build and can 1>&2
+echo break the encapsulation the released engine gives you. Only run builds from sources you 1>&2
+echo trust. 1>&2
+exit /b 1

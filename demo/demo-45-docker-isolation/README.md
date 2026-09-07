@@ -189,7 +189,7 @@ to execute at all**. The build is described declaratively - a `pom.xml` or
 and nothing in that description runs code. So an *untrusted* project can be built
 by a *trusted, external* Jenesis that you already have. Installed through SDKMAN,
 `jenesis` runs the SDK's own copy of `Project.main(...)` against the current
-directory and never touches the project's `build/` sources:
+directory and never executes the project's `build/` sources:
 
     sdk install jenesis
     jenesis                 # builds the project in . with the SDK's trusted engine
@@ -200,9 +200,22 @@ build engine itself is the one you trust. (Running `jenesis` directly limits you
 system-property configuration; that is the price of not executing the project's
 build code.)
 
-And if a project does vendor `build/jenesis/`, you do not have to trust it on
-faith. `jenesis-validate` extracts the SDK's bundled engine sources and
-SHA-256-compares them file by file against the project's linked `build/jenesis`,
+Where the project does vendor `build/jenesis/`, `jenesis` reads it only to hash
+it: it installs the version the tree records, compares the vendored sources
+against the published ones of that release, and refuses to run at all when they
+differ. The refusal separates the two ways forward. `jenesis-switch` and
+`jenesis-run` still execute the released engine, so the project builds as a
+standard build and no vendored code runs - often all it needs. Running the
+vendored sources yourself, in source mode or off classes you compiled once with
+`javac`, executes the vendored engine itself, which is the untrusted part, and
+the refusal says so - along with the reminder that `Project.java` is only the
+usual entry point, and a project vendoring its own engine may drive it from
+another. Running a modified engine stays a decision you take knowingly rather
+than one the launcher takes for you.
+
+You do not have to take that refusal on faith either, and you can ask for the
+detail before you build. `jenesis-validate` extracts the SDK's bundled engine
+sources and SHA-256-compares them file by file against the project's linked `build/jenesis`,
 reporting any `differs` / `missing` / `additional` file and whether the recorded
 version matches:
 
