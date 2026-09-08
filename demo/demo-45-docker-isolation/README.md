@@ -204,7 +204,7 @@ Where the project does vendor `build/jenesis/`, `jenesis` reads it only to hash
 it: it installs the version the tree records, compares the vendored sources
 against the published ones of that release, and refuses to run at all when they
 differ. The refusal separates the two ways forward. `jenesis-switch` and
-`jenesis-run` still execute the released engine, so the project builds as a
+`jenesis-make` still execute the released engine, so the project builds as a
 standard build and no vendored code runs - often all it needs. Running the
 vendored sources yourself, in source mode or off classes you compiled once with
 `javac`, executes the vendored engine itself, which is the untrusted part, and
