@@ -2089,9 +2089,9 @@ public record Project(
     private void watch(String... selectors) throws IOException {
         Path absoluteRoot = root().toAbsolutePath().normalize();
         Set<Path> excluded = new LinkedHashSet<>();
-        excluded.add((target().isAbsolute() ? target() : absoluteRoot.resolve(target())).normalize());
+        excluded.add(target().toAbsolutePath().normalize());
         if (artifacts() != null) {
-            excluded.add((artifacts().isAbsolute() ? artifacts() : absoluteRoot.resolve(artifacts())).normalize());
+            excluded.add(artifacts().toAbsolutePath().normalize());
         }
         new ProjectWatch(absoluteRoot, excluded, 200L).watch(() -> {
             try {
