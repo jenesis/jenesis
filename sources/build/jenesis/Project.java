@@ -445,7 +445,8 @@ public record Project(
                                                 Narrow it to one tool with %{name}-Djenesis.print.<command>%{reset},
                                                 as %{name}-Djenesis.print.javac%{reset} or %{name}-Djenesis.print.tests%{reset}
                       %{name}-Djenesis.print.command%{reset}   Print those command lines without their output
-                      %{name}-Djenesis.print.fetch%{reset}     Print each artifact downloaded from a repository
+                      %{name}-Djenesis.print.fetch%{reset}     Name each artifact as it is fetched from a repository -
+                                                what a long, quiet resolve is busy with
                       %{name}-Djenesis.print.cache%{reset}     Print each step served from or written to the cache
                       %{name}-Djenesis.print.checksum%{reset}  Print each step's input and output checksums, to
                                                 see what made a step re-run
