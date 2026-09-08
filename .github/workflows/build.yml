@@ -18,49 +18,49 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         demo:
-          - { name: java-pom, dir: demo-01-java-pom, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
-          - { name: java-pom-dependencies, dir: demo-01-java-pom, entry: build/jenesis/Project.java dependencies, verify: 'find target -name graph.properties | grep -q .' }
-          - { name: java-modular, dir: demo-02-java-modular, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
-          - { name: java-modular-as-modular, dir: demo-02-java-modular, entry: build/jenesis/Project.java, flags: -Djenesis.project.layout=modular, verify: 'find target -name classes.jar | grep -q .' }
-          - { name: java-pom-multi, dir: demo-03-java-pom-multi, entry: build/jenesis/Project.java, verify: 'test "$(find target -name classes.jar | wc -l)" -ge 2' }
-          - { name: java-modular-multi, dir: demo-04-java-modular-multi, entry: build/jenesis/Project.java, verify: 'test "$(find target -name classes.jar | wc -l)" -ge 2' }
-          - { name: java-modular-multi-as-modular, dir: demo-04-java-modular-multi, entry: build/jenesis/Project.java, flags: -Djenesis.project.layout=modular, verify: 'test "$(find target -name classes.jar | wc -l)" -ge 2' }
-          - { name: java-pom-multi-module, dir: demo-03-java-pom-multi, entry: build/jenesis/Project.java +greeter, verify: 'find target -path "*module-greeter*" -name classes.jar | grep -q .' }
-          - { name: java-pom-multi-test-filter, dir: demo-03-java-pom-multi, entry: build/jenesis/Project.java, flags: "-Djenesis.test.filter=.*GreeterTest#prefix_is_a_greeting", verify: 'grep -rqs prefix_is_a_greeting target' }
-          - { name: java-pom-multi-test-engine, dir: demo-03-java-pom-multi, entry: build/jenesis/Project.java, flags: -Djenesis.test.engine=junit-platform, verify: 'find target -type d -path "*test/executed*" | grep -q .' }
-          - { name: java-pom-multi-test-reporting, dir: demo-03-java-pom-multi, entry: build/jenesis/Project.java, flags: -Djenesis.test.reporting=true, verify: 'find target -path "*reports/tests*" -name "TEST-*.xml" | grep -q . && find target -path "*reports/tests*" -name "junit-platform-events-*.xml" | grep -q .' }
-          - { name: java-modular-multi-module, dir: demo-04-java-modular-multi, entry: build/jenesis/Project.java +greeter-test, verify: 'find target -path "*greeter*" -name classes.jar | grep -q .' }
-          - { name: java-modular-multi-test-filter, dir: demo-04-java-modular-multi, entry: build/jenesis/Project.java, flags: "-Djenesis.test.filter=.*GreeterTest#prefix_is_a_greeting", verify: 'grep -rqs prefix_is_a_greeting target' }
-          - { name: java-modular-multi-dependencies-without-tests, dir: demo-04-java-modular-multi, entry: build/jenesis/Project.java dependencies, flags: "-Djenesis.tree.format=compact -Djenesis.tree.tests=false", verify: 'java -Djenesis.print.progress=false -Djenesis.tree.format=compact -Djenesis.tree.tests=false build/jenesis/Project.java dependencies > target/tree-without-tests.txt && grep -q "(module-app)" target/tree-without-tests.txt && ! grep -q "(module-greeter-test)" target/tree-without-tests.txt' }
-          - { name: java-modular-multi-abstract-test-module, dir: demo-04-java-modular-multi, entry: build/jenesis/Project.java stage, flags: -Djenesis.stage.tests=true, verify: 'find target -path "*module-greeter-testing*" -name classes.jar | grep -q . && test -f target/stage/maven/output/demo/greeter/demo.greeter/1-SNAPSHOT/demo.greeter-1-SNAPSHOT-tests.jar && ! find target/stage/modular/output target/stage/maven/output -name "*greeter.testing*" | grep -q . && ! grep -q "demo.greeter.testing" target/stage/maven/output/demo/greeter/demo.greeter/1-SNAPSHOT/demo.greeter-1-SNAPSHOT.pom' }
-          - { name: java-modular-jmod-jlink, dir: demo-06-java-modular-executable, entry: build/jenesis/Project.java stage, flags: -Djenesis.project.properties=image, verify: 'find target -name "*.jmod" | grep -q . && find target -path "*bin*" \( -name java -o -name java.exe \) | grep -q .' }
+          - { name: java-pom, dir: demo-01-java-pom, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
+          - { name: java-pom-dependencies, dir: demo-01-java-pom, entry: build/jenesis/Make.java dependencies, verify: 'find target -name graph.properties | grep -q .' }
+          - { name: java-modular, dir: demo-02-java-modular, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
+          - { name: java-modular-as-modular, dir: demo-02-java-modular, entry: build/jenesis/Make.java, flags: -Djenesis.project.layout=modular, verify: 'find target -name classes.jar | grep -q .' }
+          - { name: java-pom-multi, dir: demo-03-java-pom-multi, entry: build/jenesis/Make.java, verify: 'test "$(find target -name classes.jar | wc -l)" -ge 2' }
+          - { name: java-modular-multi, dir: demo-04-java-modular-multi, entry: build/jenesis/Make.java, verify: 'test "$(find target -name classes.jar | wc -l)" -ge 2' }
+          - { name: java-modular-multi-as-modular, dir: demo-04-java-modular-multi, entry: build/jenesis/Make.java, flags: -Djenesis.project.layout=modular, verify: 'test "$(find target -name classes.jar | wc -l)" -ge 2' }
+          - { name: java-pom-multi-module, dir: demo-03-java-pom-multi, entry: build/jenesis/Make.java +greeter, verify: 'find target -path "*module-greeter*" -name classes.jar | grep -q .' }
+          - { name: java-pom-multi-test-filter, dir: demo-03-java-pom-multi, entry: build/jenesis/Make.java, flags: "-Djenesis.test.filter=.*GreeterTest#prefix_is_a_greeting", verify: 'grep -rqs prefix_is_a_greeting target' }
+          - { name: java-pom-multi-test-engine, dir: demo-03-java-pom-multi, entry: build/jenesis/Make.java, flags: -Djenesis.test.engine=junit-platform, verify: 'find target -type d -path "*test/executed*" | grep -q .' }
+          - { name: java-pom-multi-test-reporting, dir: demo-03-java-pom-multi, entry: build/jenesis/Make.java, flags: -Djenesis.test.reporting=true, verify: 'find target -path "*reports/tests*" -name "TEST-*.xml" | grep -q . && find target -path "*reports/tests*" -name "junit-platform-events-*.xml" | grep -q .' }
+          - { name: java-modular-multi-module, dir: demo-04-java-modular-multi, entry: build/jenesis/Make.java +greeter-test, verify: 'find target -path "*greeter*" -name classes.jar | grep -q .' }
+          - { name: java-modular-multi-test-filter, dir: demo-04-java-modular-multi, entry: build/jenesis/Make.java, flags: "-Djenesis.test.filter=.*GreeterTest#prefix_is_a_greeting", verify: 'grep -rqs prefix_is_a_greeting target' }
+          - { name: java-modular-multi-dependencies-without-tests, dir: demo-04-java-modular-multi, entry: build/jenesis/Make.java dependencies, flags: "-Djenesis.tree.format=compact -Djenesis.tree.tests=false", verify: 'java -Djenesis.print.progress=false -Djenesis.tree.format=compact -Djenesis.tree.tests=false build/jenesis/Make.java dependencies > target/tree-without-tests.txt && grep -q "(module-app)" target/tree-without-tests.txt && ! grep -q "(module-greeter-test)" target/tree-without-tests.txt' }
+          - { name: java-modular-multi-abstract-test-module, dir: demo-04-java-modular-multi, entry: build/jenesis/Make.java stage, flags: -Djenesis.stage.tests=true, verify: 'find target -path "*module-greeter-testing*" -name classes.jar | grep -q . && test -f target/stage/maven/output/demo/greeter/demo.greeter/1-SNAPSHOT/demo.greeter-1-SNAPSHOT-tests.jar && ! find target/stage/modular/output target/stage/maven/output -name "*greeter.testing*" | grep -q . && ! grep -q "demo.greeter.testing" target/stage/maven/output/demo/greeter/demo.greeter/1-SNAPSHOT/demo.greeter-1-SNAPSHOT.pom' }
+          - { name: java-modular-jmod-jlink, dir: demo-06-java-modular-executable, entry: build/jenesis/Make.java stage, flags: -Djenesis.project.properties=image, verify: 'find target -name "*.jmod" | grep -q . && find target -path "*bin*" \( -name java -o -name java.exe \) | grep -q .' }
           - { name: java-pom-executable, dir: demo-05-java-pom-executable, entry: build/Demo.java }
-          - { name: java-pom-bundle, dir: demo-05-java-pom-executable, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=bundle, verify: 'find target -type d -name bundle | grep -q .' }
-          - { name: java-pom-docker, dir: demo-05-java-pom-executable, entry: build/jenesis/Project.java stage, flags: -Djenesis.project.properties=docker, verify: 'grep -q "^ENTRYPOINT .*--class-path" target/stage/docker/output/*/Dockerfile && find target -path "*stage/docker/output/*/classpath*" -name "*.jar" | grep -q .' }
+          - { name: java-pom-bundle, dir: demo-05-java-pom-executable, entry: build/jenesis/Make.java, flags: -Djenesis.project.properties=bundle, verify: 'find target -type d -name bundle | grep -q .' }
+          - { name: java-pom-docker, dir: demo-05-java-pom-executable, entry: build/jenesis/Make.java stage, flags: -Djenesis.project.properties=docker, verify: 'grep -q "^ENTRYPOINT .*--class-path" target/stage/docker/output/*/Dockerfile && find target -path "*stage/docker/output/*/classpath*" -name "*.jar" | grep -q .' }
           - { name: java-pom-launcher, dir: demo-05-java-pom-executable, entry: build/DemoLauncher.java }
-          - { name: java-pom-launcher-profile, dir: demo-05-java-pom-executable, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=launcher, verify: 'find target -path "*launcher*" -name "*.jar" -path "*output*" | grep -q .' }
+          - { name: java-pom-launcher-profile, dir: demo-05-java-pom-executable, entry: build/jenesis/Make.java, flags: -Djenesis.project.properties=launcher, verify: 'find target -path "*launcher*" -name "*.jar" -path "*output*" | grep -q .' }
           - { name: java-modular-executable, dir: demo-06-java-modular-executable, entry: build/Demo.java }
-          - { name: java-modular-bundle, dir: demo-06-java-modular-executable, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=bundle, verify: 'find target -type d -name bundle | grep -q .' }
-          - { name: java-modular-docker, dir: demo-06-java-modular-executable, entry: build/jenesis/Project.java stage, flags: -Djenesis.project.properties=docker, verify: 'grep -q "^ENTRYPOINT .*--module-path.*--module.*demo.modular.executable/sample.Sample" target/stage/docker/output/*/Dockerfile && find target -path "*stage/docker/output/*/modulepath*" -name "*.jar" | grep -q .' }
+          - { name: java-modular-bundle, dir: demo-06-java-modular-executable, entry: build/jenesis/Make.java, flags: -Djenesis.project.properties=bundle, verify: 'find target -type d -name bundle | grep -q .' }
+          - { name: java-modular-docker, dir: demo-06-java-modular-executable, entry: build/jenesis/Make.java stage, flags: -Djenesis.project.properties=docker, verify: 'grep -q "^ENTRYPOINT .*--module-path.*--module.*demo.modular.executable/sample.Sample" target/stage/docker/output/*/Dockerfile && find target -path "*stage/docker/output/*/modulepath*" -name "*.jar" | grep -q .' }
           - { name: java-modular-launcher, dir: demo-06-java-modular-executable, entry: build/DemoLauncher.java }
-          - { name: java-modular-launcher-profile, dir: demo-06-java-modular-executable, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=launcher, verify: 'find target -path "*launcher*" -name "*.jar" -path "*output*" | grep -q .' }
+          - { name: java-modular-launcher-profile, dir: demo-06-java-modular-executable, entry: build/jenesis/Make.java, flags: -Djenesis.project.properties=launcher, verify: 'find target -path "*launcher*" -name "*.jar" -path "*output*" | grep -q .' }
           - { name: bundle, dir: demo-07-bundle, entry: build/Demo.java }
           - { name: java-multi-release, dir: demo-08-java-multi-release, entry: build/jenesis/Execute.java }
           - { name: javac-arguments, dir: demo-09-javac-arguments, entry: build/jenesis/Execute.java }
-          - { name: annotations, dir: demo-10-annotations, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
-          - { name: java-quality, dir: demo-13-java-quality, entry: build/jenesis/Project.java, verify: 'find target -type d -name checkstyle | grep -q . && find target -type d -name pmd | grep -q . && find target -type d -name spotbugs | grep -q .' }
-          - { name: kotlin, dir: demo-18-kotlin, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
-          - { name: kotlin-documentation, dir: demo-18-kotlin, entry: build/jenesis/Project.java, flags: -Djenesis.project.documentation=true, verify: 'find target -type d -name documentation | grep -q .' }
-          - { name: kotlin-quality, dir: demo-19-kotlin-quality, entry: build/jenesis/Project.java, verify: 'find target -type d -name detekt | grep -q . && find target -type d -name ktlint | grep -q .' }
-          - { name: scala, dir: demo-21-scala, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
-          - { name: scala-documentation, dir: demo-21-scala, entry: build/jenesis/Project.java, flags: -Djenesis.project.documentation=true, verify: 'find target -type d -name documentation | grep -q .' }
-          - { name: scala-quality, dir: demo-22-scala-quality, entry: build/jenesis/Project.java, verify: 'find target -type d -name scalastyle | grep -q .' }
-          - { name: groovy, dir: demo-23-groovy, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
-          - { name: groovy-documentation, dir: demo-23-groovy, entry: build/jenesis/Project.java, flags: -Djenesis.project.documentation=true, verify: 'find target -type d -name documentation | grep -q .' }
-          - { name: groovy-quality, dir: demo-24-groovy-quality, entry: build/jenesis/Project.java, verify: 'find target -type d -name codenarc | grep -q .' }
-          - { name: code-coverage, dir: demo-25-code-coverage, entry: build/jenesis/Project.java, verify: 'find target -path "*reports/jacoco/coverage/Calculator.html" | grep -q .' }
-          - { name: maven-exclusions, dir: demo-30-maven-exclusions, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q . && ! find target -path "*resolved*" -name "commons-lang3*" | grep -q .' }
-          - { name: module-layout, dir: demo-32-module-layout, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
+          - { name: annotations, dir: demo-10-annotations, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
+          - { name: java-quality, dir: demo-13-java-quality, entry: build/jenesis/Make.java, verify: 'find target -type d -name checkstyle | grep -q . && find target -type d -name pmd | grep -q . && find target -type d -name spotbugs | grep -q .' }
+          - { name: kotlin, dir: demo-18-kotlin, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
+          - { name: kotlin-documentation, dir: demo-18-kotlin, entry: build/jenesis/Make.java, flags: -Djenesis.project.documentation=true, verify: 'find target -type d -name documentation | grep -q .' }
+          - { name: kotlin-quality, dir: demo-19-kotlin-quality, entry: build/jenesis/Make.java, verify: 'find target -type d -name detekt | grep -q . && find target -type d -name ktlint | grep -q .' }
+          - { name: scala, dir: demo-21-scala, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
+          - { name: scala-documentation, dir: demo-21-scala, entry: build/jenesis/Make.java, flags: -Djenesis.project.documentation=true, verify: 'find target -type d -name documentation | grep -q .' }
+          - { name: scala-quality, dir: demo-22-scala-quality, entry: build/jenesis/Make.java, verify: 'find target -type d -name scalastyle | grep -q .' }
+          - { name: groovy, dir: demo-23-groovy, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
+          - { name: groovy-documentation, dir: demo-23-groovy, entry: build/jenesis/Make.java, flags: -Djenesis.project.documentation=true, verify: 'find target -type d -name documentation | grep -q .' }
+          - { name: groovy-quality, dir: demo-24-groovy-quality, entry: build/jenesis/Make.java, verify: 'find target -type d -name codenarc | grep -q .' }
+          - { name: code-coverage, dir: demo-25-code-coverage, entry: build/jenesis/Make.java, verify: 'find target -path "*reports/jacoco/coverage/Calculator.html" | grep -q .' }
+          - { name: maven-exclusions, dir: demo-30-maven-exclusions, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q . && ! find target -path "*resolved*" -name "commons-lang3*" | grep -q .' }
+          - { name: module-layout, dir: demo-32-module-layout, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: module-classifier, dir: demo-33-module-classifier, entry: build/jenesis/Execute.java }
           - { name: platform-guard, dir: demo-36-platform-guard, entry: build/jenesis/Execute.java }
           - { name: platform-guard-legacy, dir: demo-36-platform-guard, entry: build/jenesis/Execute.java, flags: -Djenesis.platform.legacy=true }
@@ -75,22 +75,23 @@ jobs:
           - { name: custom-build, dir: demo-44-custom-build, entry: build/Demo.java }
           - { name: supply-chain-security, dir: demo-46-supply-chain-security, entry: build/Demo.java }
           - { name: publishing, dir: demo-47-publishing, entry: build/Demo.java }
-          - { name: kotlin-plugin, dir: demo-20-kotlin-plugin, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
-          - { name: sbom, dir: demo-14-sbom, entry: build/jenesis/Project.java, verify: 'find target -name "*.cdx.json" | grep -q .' }
+          - { name: kotlin-plugin, dir: demo-20-kotlin-plugin, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
+          - { name: sbom, dir: demo-14-sbom, entry: build/jenesis/Make.java, verify: 'find target -name "*.cdx.json" | grep -q .' }
           - { name: compliance, dir: demo-15-compliance, entry: build/Demo.java }
           - { name: vulnerabilities, dir: demo-16-vulnerabilities, entry: build/Demo.java }
-          - { name: profiles, dir: demo-17-profiles, entry: build/jenesis/Project.java, flags: -Djenesis.project.properties=release, verify: 'find target -type d -path "*assemble/sources*" | grep -q .' }
+          - { name: profiles, dir: demo-17-profiles, entry: build/jenesis/Make.java, flags: -Djenesis.project.properties=release, verify: 'find target -type d -path "*assemble/sources*" | grep -q .' }
           - { name: test-selection, dir: demo-26-test-selection, entry: build/Demo.java }
-          - { name: pitest, dir: demo-27-pitest, entry: build/jenesis/Project.java, verify: 'find target -path "*reports/pitest/mutations.xml" -exec grep -l "calc.Calculator" {} + | grep -q .' }
+          - { name: pitest, dir: demo-27-pitest, entry: build/jenesis/Make.java, verify: 'find target -path "*reports/pitest/mutations.xml" -exec grep -l "calc.Calculator" {} + | grep -q .' }
           - { name: agents, dir: demo-29-agents, entry: build/Demo.java, verify: 'find target -name classes.jar | grep -q .' }
-          - { name: bom, dir: demo-31-bom, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
+          - { name: bom, dir: demo-31-bom, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: module-alias, dir: demo-34-module-alias, entry: 'build/jenesis/Execute.java -name Ada -shout', verify: 'find target -name classes.jar | grep -q .' }
           - { name: module-override, dir: demo-35-module-override, entry: build/jenesis/Execute.java, verify: 'find target -name jakarta.servlet.jar | grep -q . && find target -name jakarta.el.jar | grep -q . && find target -name "jakarta.servlet.jsp-*.jar" | grep -q . && ! find target -name "jakarta.servlet-*.jar" | grep -q . && ! find target -name "jakarta.el-*.jar" | grep -q .' }
-          - { name: docker-isolation, dir: demo-45-docker-isolation, entry: build/jenesis/Project.java, verify: 'find target -name classes.jar | grep -q .' }
-          - { name: build-cache, dir: demo-49-build-cache, entry: build/jenesis/Project.java, flags: -Djenesis.project.cache, verify: 'find target -name classes.jar -print -quit | grep -q . && find .jenesis/cache -type d -print -quit | grep -q .' }
+          - { name: docker-isolation, dir: demo-45-docker-isolation, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
+          - { name: build-cache, dir: demo-49-build-cache, entry: build/jenesis/Make.java, flags: -Djenesis.project.cache, verify: 'find target -name classes.jar -print -quit | grep -q . && find .jenesis/cache -type d -print -quit | grep -q .' }
+          - { name: startup, dir: demo-51-startup, entry: build/jenesis/Make.java, flags: -Djenesis.make.daemon=true, verify: 'find target -name classes.jar -print -quit | grep -q . && find ../.jenesis/tool -name "Project.class" -print -quit | grep -q .' }
           - { name: jpx, dir: demo-50-jpx, entry: build/Demo.java, verify: 'test "$(find target/jpx -name jpx.properties | wc -l)" -eq 2' }
-          - { name: data-formats, dir: demo-11-data-formats, entry: build/jenesis/Project.java, verify: 'test "$(find target -name classes.jar | wc -l)" -eq 3 && jar tf "$(find target -path "*module-xml*" -name classes.jar | head -1)" | grep -q "demo/order/Order.class" && jar tf "$(find target -path "*module-protobuf*" -name classes.jar | head -1)" | grep -q "demo/greeting/GreeterGrpc.class" && jar tf "$(find target -path "*module-avro*" -name classes.jar | head -1)" | grep -q "demo/user/User.class"' }
-          - { name: service-contracts, dir: demo-12-service-contracts, entry: build/jenesis/Project.java, verify: 'jar tf "$(find target -path "*module-soap*" -name classes.jar | head -1)" | grep -q "demo/greeter/GreeterService.class" && jar tf "$(find target -path "*module-rest*" -name classes.jar | head -1)" | grep -q "demo/greeting/DefaultApi.class"' }
+          - { name: data-formats, dir: demo-11-data-formats, entry: build/jenesis/Make.java, verify: 'test "$(find target -name classes.jar | wc -l)" -eq 3 && jar tf "$(find target -path "*module-xml*" -name classes.jar | head -1)" | grep -q "demo/order/Order.class" && jar tf "$(find target -path "*module-protobuf*" -name classes.jar | head -1)" | grep -q "demo/greeting/GreeterGrpc.class" && jar tf "$(find target -path "*module-avro*" -name classes.jar | head -1)" | grep -q "demo/user/User.class"' }
+          - { name: service-contracts, dir: demo-12-service-contracts, entry: build/jenesis/Make.java, verify: 'jar tf "$(find target -path "*module-soap*" -name classes.jar | head -1)" | grep -q "demo/greeter/GreeterService.class" && jar tf "$(find target -path "*module-rest*" -name classes.jar | head -1)" | grep -q "demo/greeting/DefaultApi.class"' }
           - { name: jmh, dir: demo-28-jmh, entry: build/jenesis/Execute.java, verify: 'jar tf "$(find target -name classes.jar | head -1)" | grep -q "META-INF/BenchmarkList"' }
     runs-on: ${{ matrix.os }}
     steps:
@@ -144,7 +145,7 @@ jobs:
       - name: Native image demo
         shell: bash
         working-directory: demo/demo-48-native-image
-        run: java -Djenesis.dependency.pin=strict build/jenesis/Project.java stage
+        run: java -Djenesis.dependency.pin=strict build/jenesis/Make.java stage
 
       - name: Verify native image
         shell: bash
@@ -186,7 +187,7 @@ jobs:
 
       - name: Project layout ${{ matrix.layout }}
         shell: bash
-        run: java -Djenesis.dependency.pin=strict -Djenesis.project.layout=${{ matrix.layout }} build/jenesis/Project.java stage
+        run: java -Djenesis.dependency.pin=strict -Djenesis.project.layout=${{ matrix.layout }} build/jenesis/Make.java stage
 
       - name: Upload target on failure
         if: failure()
@@ -220,7 +221,7 @@ jobs:
                -Djenesis.project.sources=true \
                -Djenesis.test.skip=true \
                -Djenesis.project.metadata=project.properties \
-               build/jenesis/Project.java stage
+               build/jenesis/Make.java stage
 
       - name: Populate SDK layout
         shell: bash

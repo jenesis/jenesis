@@ -18,7 +18,7 @@ goto :findvendored
 :vendoreddone
 
 if not defined VENDORED (
-    call "%SCRIPT_DIR%jenesis-run.bat" %*
+    call "%SCRIPT_DIR%jenesis-make.bat" %*
     exit /b !errorlevel!
 )
 
@@ -99,11 +99,11 @@ if not "!DIGEST_A!"=="!DIGEST_B!" (
     goto :refuse
 )
 
-if not exist "!TARGET_HOME!\bin\jenesis-run.bat" (
-    set "REASON=Jenesis !STAMP! at !TARGET_HOME! ships no bin\jenesis-run.bat to dispatch to"
+if not exist "!TARGET_HOME!\bin\jenesis-make.bat" (
+    set "REASON=Jenesis !STAMP! at !TARGET_HOME! ships no bin\jenesis-make.bat to dispatch to"
     goto :refuse
 )
-call "!TARGET_HOME!\bin\jenesis-run.bat" %*
+call "!TARGET_HOME!\bin\jenesis-make.bat" %*
 exit /b !errorlevel!
 
 :find
@@ -125,21 +125,21 @@ echo. 1>&2
 echo The released engine still builds this project as a standard build, which is often all a 1>&2
 echo project needs. Neither of these executes the vendored build code: 1>&2
 echo. 1>&2
-echo     jenesis-run [selectors]         run the installed engine as it stands 1>&2
+echo     jenesis-make [selectors]         run the installed engine as it stands 1>&2
 echo     scoop install jenesis@!STAMP!   install and switch to the version the project records 1>&2
 echo. 1>&2
 echo On a POSIX shell, '. jenesis-switch' switches to the recorded version in one step. 1>&2
 echo. 1>&2
 echo Only where the project truly needs its own engine, run the vendored sources yourself, from 1>&2
-echo the project root at !ROOT!. Read the project's build instructions first: Project.java is 1>&2
+echo the project root at !ROOT!. Read the project's build instructions first: Make.java is 1>&2
 echo the usual entry point, but a project that vendors a changed engine states why it does, and 1>&2
 echo may drive it from one of its own. 1>&2
 echo. 1>&2
-echo     java build\jenesis\Project.java [selectors] 1>&2
+echo     java build\jenesis\Make.java [selectors] 1>&2
 echo. 1>&2
 echo Source mode recompiles the engine on every invocation. To pay that once instead: 1>&2
 echo. 1>&2
-echo     javac build\jenesis\Project.java 1>&2
+echo     javac build\jenesis\Make.java 1>&2
 echo     java build.jenesis.Project [selectors] 1>&2
 echo. 1>&2
 echo Warning: those commands execute unreviewed code with the rights of your build and can 1>&2

@@ -14,7 +14,7 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 Jenesis auto-detects the MODULAR_TO_MAVEN layout, resolves the Kotlin compiler,
 resolves the plugin, and compiles the module - emitting the generated

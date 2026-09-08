@@ -23,7 +23,7 @@ On the host (the leak)
 Build the project. The build compiles and runs the test, which reads both secrets
 and overwrites the file:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
     cat ~/.demo-credentials          # now reads: overwritten by the test
 
 JUnit captures the test's console output, so the proof that the test ran is the
@@ -117,7 +117,7 @@ one extra flag in this repository, explained next:
 
     java -Djenesis.project.docker=true \
          -Djenesis.project.docker.mount=../../sources \
-         build/jenesis/Project.java
+         build/jenesis/Make.java
 
 `jenesis.project.docker` runs the whole build - the test included - inside the
 container, so the build-time actor is confined the same way: the test prints
@@ -161,7 +161,7 @@ Docker mounts the local Maven and Jenesis repositories (`~/.m2`, `~/.jenesis`)
 repository but not populate it - warm the cache with a host build first), and
 `export` fails: publishing writes into those repositories, so
 
-    java -Djenesis.project.docker=true build/jenesis/Project.java export
+    java -Djenesis.project.docker=true build/jenesis/Make.java export
 
 aborts with an `AccessDeniedException` from `MavenRepositoryExport`. Stage inside
 the container if you want (`stage` only writes under `target/`), but run `export`
@@ -175,7 +175,7 @@ The build is code too, and the chicken-and-egg problem
 
 Docker confines what the build *runs*, but there is a deeper trap with builds
 whose logic ships as code. A Jenesis build is launched with
-`java build/jenesis/Project.java`, and a customised one with `java build/Demo.java`
+`java build/jenesis/Make.java`, and a customised one with `java build/Demo.java`
 - in both cases you execute the project's own `build/` sources to build it. That
 is the chicken and egg: to find out what the build does you have to run it, and
 running it is exactly the thing you wanted to vet first. Reading the sources by
@@ -204,7 +204,7 @@ Where the project does vendor `build/jenesis/`, `jenesis` reads it only to hash
 it: it installs the version the tree records, compares the vendored sources
 against the published ones of that release, and refuses to run at all when they
 differ. The refusal separates the two ways forward. `jenesis-switch` and
-`jenesis-run` still execute the released engine, so the project builds as a
+`jenesis-make` still execute the released engine, so the project builds as a
 standard build and no vendored code runs - often all it needs. Running the
 vendored sources yourself, in source mode or off classes you compiled once with
 `javac`, executes the vendored engine itself, which is the untrusted part, and
@@ -222,7 +222,7 @@ version matches:
     jenesis-validate        # confirm the linked engine is the unmodified SDK version
 
 A clean report means the embedded engine is byte-for-byte the trusted one, so
-`java build/jenesis/Project.java` runs exactly the code SDKMAN shipped - not a
+`java build/jenesis/Make.java` runs exactly the code SDKMAN shipped - not a
 tampered fork.
 
 Shipping the app as a container image with `bundle`
@@ -234,7 +234,7 @@ without `jpackage`, `jlink`, or `native-image`. A `packaging.properties` with
 `bundle=true` in the configuration location selects the bundle; build a portable
 bundle:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 That stages a `bundle.zip` under `target/` carrying everything the app needs to
 launch, with no assumptions about the host:

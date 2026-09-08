@@ -48,7 +48,7 @@ first run downloads args4j from Maven Central.
 The second half of the demo links the same module into a self-contained runtime
 image, which needs the `stage` goal:
 
-    java build/jenesis/Project.java stage
+    java build/jenesis/Make.java stage
 
 Layout
 ------
@@ -213,6 +213,6 @@ linked image runs the rewrite.
 Pinning
 -------
 
-`java build/jenesis/Project.java pin` records the aliased target like any other
+`java build/jenesis/Make.java pin` records the aliased target like any other
 Maven dependency - `@jenesis.pin args4j/args4j <version> SHA-256/...` - and never
 pins the alias name itself. This demo ships already pinned.

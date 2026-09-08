@@ -11,7 +11,7 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 Jenesis auto-detects the MODULAR_TO_MAVEN layout (a `module-info.java`, no
 `pom.xml`), resolves the Kotlin compiler, compiles the module, and emits a
@@ -87,5 +87,5 @@ module `kotlin.stdlib`, plus the non-modular transitives as
 Kotlin compiler toolchain in its own `kotlinc` group (each
 `kotlinc/maven/...` coordinate with a version and SHA-256 checksum). Because the
 groups are separate, the running compiler is locked independently of the
-`kotlin.stdlib` the module ships against. Run `java build/jenesis/Project.java
+`kotlin.stdlib` the module ships against. Run `java build/jenesis/Make.java
 pin` to record or refresh the tags; re-running leaves the declaration unchanged.

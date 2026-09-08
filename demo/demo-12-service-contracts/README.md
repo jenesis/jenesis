@@ -8,7 +8,7 @@ contract. Two modules, two contract languages.
 Run it
 ------
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 | Module | Config file                            | Input                 | Ships? | Generator | Generated |
 | ------ | -------------------------------------- | --------------------- | --- | --------- | --------- |

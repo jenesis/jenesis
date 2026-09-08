@@ -12,7 +12,7 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 Jenesis compiles the Kotlin module (resolving the pinned Kotlin compiler) and
 runs every tool whose configuration file it finds. The first build downloads the
@@ -53,7 +53,7 @@ normal build fails if a `.kt` file is not already ktlint-formatted, but never
 rewrites it. To apply ktlint and rewrite the sources in place, run the build
 with the rewrite switch:
 
-    java -Djenesis.format.rewrite=true build/jenesis/Project.java
+    java -Djenesis.format.rewrite=true build/jenesis/Make.java
 
 This is the Kotlin equivalent of the `google-java-format` rewrite shown in
 `../demo-13-java-quality`. The formatters for the other JVM languages work the
@@ -65,5 +65,5 @@ Pinning
 The Kotlin compiler is pinned in its own `kotlinc` group, locked independently of
 the `kotlin.stdlib` the module ships against (see `../demo-18-kotlin`). detekt and
 ktlint each resolve a floating `RELEASE` in their own group; run
-`java build/jenesis/Project.java pin` to record them with checksums when you want
+`java build/jenesis/Make.java pin` to record them with checksums when you want
 a fully reproducible tool chain.

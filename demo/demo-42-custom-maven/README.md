@@ -39,7 +39,7 @@ It sits between `../demo-03-java-pom-multi` (the same shape of project driven by
 `Project` entry point) and a build wired entirely by hand: a
 "custom but not so custom" build that reuses the stock toolchain through one
 convenience call. The launcher avoids going through `Project` - no layout, no goals,
-no `java build/jenesis/Project.java` - yet without wiring every step by hand either,
+no `java build/jenesis/Make.java` - yet without wiring every step by hand either,
 because `MavenProject.make(root, assembler)` supplies sane defaults for the
 repositories, resolvers, and digest a normal build would configure.
 

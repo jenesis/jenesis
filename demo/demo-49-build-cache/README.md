@@ -37,7 +37,7 @@ this directory.
 **1. Bootstrap the cache.** A normal build populates `.jenesis/cache` while it
 compiles:
 
-    java -Djenesis.project.cache build/jenesis/Project.java
+    java -Djenesis.project.cache build/jenesis/Make.java
 
     [EXECUTED]  .../compile/javac in 0.07 seconds
     [EXECUTED]  .../binary/classes in 0.02 seconds
@@ -51,7 +51,7 @@ forced miss that would normally re-run from scratch. The build cache lives outsi
 
     java -Djenesis.project.cache \
          -Djenesis.executor.rebuild=true \
-         build/jenesis/Project.java
+         build/jenesis/Make.java
 
     [EXECUTED]  .../compile/javac in 0.00 seconds
     [EXECUTED]  .../binary/classes in 0.00 seconds
@@ -88,7 +88,7 @@ The shared cache can be used **two ways**.
 **As a replacement** - the shared cache only, no local tier (e.g. an ephemeral CI
 runner whose disk is thrown away anyway):
 
-    java -Djenesis.cache.uri=file:///mnt/team/jenesis-cache build/jenesis/Project.java
+    java -Djenesis.cache.uri=file:///mnt/team/jenesis-cache build/jenesis/Make.java
 
 **Layered behind the local cache** - set both `-Djenesis.project.cache` *and*
 `-Djenesis.cache.uri=...`, and Jenesis wires a `BuildExecutorLayeredCache`: every
@@ -100,13 +100,36 @@ checkout never re-downloads what the first already fetched:
     java -Djenesis.project.cache \
          -Djenesis.cache.uri=https://cache.example.com \
          -Djenesis.cache.project=acme -Djenesis.cache.key=alice \
-         build/jenesis/Project.java
+         build/jenesis/Make.java
 
 Serving a step from the local tier means no `GET` reaches the server - which would
 let that shared entry age toward eviction there even though it is in active use. So
 a local hit also sends the server a best-effort `HEAD` (it never transfers the
 body), and the server treats it as a read, bumping the entry's recency just as a
 `GET` would. Each tier keeps its own LRU and both stay warm.
+
+A step that stays local
+-----------------------
+
+Not every step is worth sending over a network. A step that copies a module's
+resolved dependencies into its own folder produces a large output from files the
+machine already has, so uploading it costs more than re-running it would. Such a
+step declines the shared tier:
+
+    public class Copy implements BuildStep {
+
+        @Override
+        public boolean shouldCacheRemotely() {
+            return false;
+        }
+
+        ...
+    }
+
+Nothing else changes: the step is still cached under `.jenesis/cache`, so a
+rebuild on this machine still skips the work, and it is neither fetched from,
+stored in nor announced to a cache server. The default is `true`, so a step that
+says nothing is cached in both tiers as before.
 
 Layout
 ------

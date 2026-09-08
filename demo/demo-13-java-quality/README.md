@@ -17,7 +17,7 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 Jenesis auto-detects the MODULAR_TO_MAVEN layout (a `module-info.java`, no
 `pom.xml`), compiles the module, and runs every tool whose configuration file it
@@ -128,10 +128,10 @@ formatted, which makes it a continuous-integration gate. Try it by indenting
 To apply the formatter and rewrite the sources in place, run the build with the
 rewrite switch:
 
-    java -Djenesis.format.rewrite=true build/jenesis/Project.java
+    java -Djenesis.format.rewrite=true build/jenesis/Make.java
 
 The same switch drives `ktlint` and `scalafmt` in the language demos. After a
-rewrite, a plain `java build/jenesis/Project.java` passes the verify gate again.
+rewrite, a plain `java build/jenesis/Make.java` passes the verify gate again.
 
 Pinning
 -------
@@ -139,7 +139,7 @@ Pinning
 Each tool resolves in its own group (`checkstyle`, `pmd`, `spotbugs`,
 `google-java-format`), kept separate from the module's `main`-group
 dependencies, and floats a `RELEASE` version until pinned. Running
-`java build/jenesis/Project.java pin` records every resolved tool jar with its
+`java build/jenesis/Make.java pin` records every resolved tool jar with its
 `SHA-256` into `@jenesis.pin` tags, exactly as the other demos pin their
 compilers. These closures are large (PMD's CLI bundle alone pulls in well over a
 hundred artifacts), which is why the `module-info.java` here carries so many pin

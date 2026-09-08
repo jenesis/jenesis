@@ -35,7 +35,7 @@ public class Demo {
         Process process = new ProcessBuilder(
                 java,
                 "-Djenesis.test.incremental",
-                "build/jenesis/Project.java")
+                "build/jenesis/Make.java")
                 .inheritIO()
                 .start();
         if (process.waitFor() != 0) {

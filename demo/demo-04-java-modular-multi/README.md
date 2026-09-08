@@ -14,7 +14,7 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 Layout
 ------
@@ -50,7 +50,7 @@ sibling module resolves from within the build while `org.slf4j` is fetched from
 the Jenesis module overlay (`https://repo.jenesis.build/module/`).
 
 MODULAR_TO_MAVEN emits a modular jar and a generated `pom.xml` for each module.
-`java build/jenesis/Project.java stage` lays the artifacts out as both a module
+`java build/jenesis/Make.java stage` lays the artifacts out as both a module
 repository (`target/stage/modular/output`, keyed by Java module name) and a Maven
 repository (`target/stage/maven/output`, keyed by the generated coordinate), and
 `export` publishes each. The sibling resolves as the Maven coordinate read from
@@ -139,12 +139,12 @@ A `+<module>` selector builds just that module's subtree. `+greeter` builds the
 `greeter` library alone - note it runs *no* tests, because in the modular layout
 the tests live in a separate `@jenesis.test` module:
 
-    java build/jenesis/Project.java +greeter
+    java build/jenesis/Make.java +greeter
 
 That test module is selected on its own as `+greeter-test`, which builds it and
 runs the tests against `greeter`:
 
-    java build/jenesis/Project.java +greeter-test
+    java build/jenesis/Make.java +greeter-test
 
 A module's own dependencies come along automatically: `+app` builds `app` and,
 because it requires the sibling, `greeter` too - but no unrelated module.
@@ -153,7 +153,7 @@ Under the hood a selector is a slash-delimited path of graph steps, with two
 wildcards: `:` matches a single path segment and `::` matches any depth. So
 `::/jar` runs the `jar` step of every module wherever it sits in the tree:
 
-    java build/jenesis/Project.java '::/jar'
+    java build/jenesis/Make.java '::/jar'
 
 Wildcards are lenient (non-matching branches are skipped), and once a module is
 reached its own pipeline steps run - so a wildcard chooses *which steps* you ask
@@ -163,7 +163,7 @@ Test runs are narrowed with `-Djenesis.test.filter`, a comma-separated list of
 `<class-regex>[#<method>]` patterns; the regex matches the fully-qualified class
 name. `greeter-test` ships two tests, so this runs only one of them:
 
-    java -Djenesis.test.filter='.*GreeterTest#prefix_is_a_greeting' build/jenesis/Project.java
+    java -Djenesis.test.filter='.*GreeterTest#prefix_is_a_greeting' build/jenesis/Make.java
 
 The test step's summary then reports `1 tests successful` instead of the default
 `2`. The `-D` flag must come **before** the source file - anything after it is
@@ -183,7 +183,7 @@ Java module name against the Jenesis module repository and emits modular jars wi
 *no* `pom.xml` at all (`stage` then produces only `target/stage/modular`, keyed by
 Java module name). Force it from the command line with the layout override:
 
-    java -Djenesis.project.layout=modular build/jenesis/Project.java
+    java -Djenesis.project.layout=modular build/jenesis/Make.java
 
 (`jenesis.project.layout` accepts `auto`, `maven`, `modular`, `modular_to_maven`.)
 Use MODULAR when the modules are only ever consumed as Java modules; keep the default
@@ -211,7 +211,7 @@ themselves:
         requires demo.greeter;
     }
 
-Running `java build/jenesis/Project.java pin` records the resolved external
+Running `java build/jenesis/Make.java pin` records the resolved external
 version closure back into the module declarations and is idempotent. The
 intra-project `demo.greeter` dependency is never pinned, since coordinates
 produced within the project are resolved from the build itself rather than
@@ -224,7 +224,7 @@ To see what each module resolves, run the `dependencies` selector. It prints eac
 module's resolved dependency graph, one block per module and scope, with every
 node carrying its resolved module name and declared license:
 
-    java build/jenesis/Project.java dependencies
+    java build/jenesis/Make.java dependencies
 
     main/compile (module-greeter-test)
     maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (module demo.greeter, local)
@@ -262,7 +262,7 @@ carries it. When a graph grows large and the external closure is just noise, pas
 `-Djenesis.tree.format=compact` to keep only the local modules and fold the
 external dependencies into counts:
 
-    java -Djenesis.tree.format=compact build/jenesis/Project.java dependencies
+    java -Djenesis.tree.format=compact build/jenesis/Make.java dependencies
 
     main/compile (module-greeter-test)
     maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (module demo.greeter, local)
@@ -278,7 +278,7 @@ once inside the largest tree that reaches it and collapsed in the others.
 modules that are declared with `@jenesis.test`, which are not part of what the
 project releases, and it does so under either format:
 
-    java -Djenesis.tree.format=compact -Djenesis.tree.tests=false build/jenesis/Project.java dependencies
+    java -Djenesis.tree.format=compact -Djenesis.tree.tests=false build/jenesis/Make.java dependencies
 
     main/compile (module-app)
     maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (module demo.greeter, local)

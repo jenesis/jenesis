@@ -70,7 +70,7 @@ makes a build reproducible and resistant to a swapped artifact - but it also mea
 a pinned project never picks up a newer version on its own. To deliberately refresh
 the pins, run `pin` with `-Djenesis.dependency.pin=ignore`:
 
-    java -Djenesis.dependency.pin=ignore build/jenesis/Project.java pin
+    java -Djenesis.dependency.pin=ignore build/jenesis/Make.java pin
 
 `ignore` drops every existing Jenesis pin: versions float to the latest the
 repository offers, and the recorded checksums are not consulted. `pin` then
