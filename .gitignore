@@ -1,5 +1,10 @@
 target/
 .jenesis/
+# Nothing here writes class files outside those two any more, but this file is
+# also the vendored engine's own .gitignore in every project that tracks it as a
+# submodule, where an older engine compiled beside these sources. Without the
+# rule, updating such a project surfaces that stale output as a dirty submodule.
+*.class
 /sdk/jenesis/*
 !/sdk/jenesis/bin/
 !/sdk/jenesis/tests/
