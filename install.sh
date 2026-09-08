@@ -37,7 +37,7 @@
 #
 # After the script completes, build the project with:
 #
-#     java build/jenesis/Project.java
+#     java build/jenesis/Make.java
 #
 set -e
 
@@ -165,7 +165,7 @@ if [ -n "$SUBMODULE_PATH" ]; then
         || die "failed to stage the updated submodule pointer"
 
     say "updated submodule '${SUBMODULE_PATH}' to ${REF} (staged in the superproject; commit when ready)"
-    say "next: run 'java build/jenesis/Project.java' from ${TARGET}"
+    say "next: run 'java build/jenesis/Make.java' from ${TARGET}"
     exit 0
 fi
 
@@ -224,4 +224,4 @@ mkdir -p "$TARGET/build"
 cp -R "$SRC_DIR" "$DEST"
 printf '%s' "$STAMP" > "$DEST/jenesis.version"
 say "installed Jenesis ${STAMP} to ${DEST}"
-say "next: run 'java build/jenesis/Project.java' from ${TARGET}"
+say "next: run 'java build/jenesis/Make.java' from ${TARGET}"

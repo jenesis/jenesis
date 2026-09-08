@@ -37,7 +37,7 @@ this directory.
 **1. Bootstrap the cache.** A normal build populates `.jenesis/cache` while it
 compiles:
 
-    java -Djenesis.project.cache build/jenesis/Project.java
+    java -Djenesis.project.cache build/jenesis/Make.java
 
     [EXECUTED]  .../compile/javac in 0.07 seconds
     [EXECUTED]  .../binary/classes in 0.02 seconds
@@ -51,7 +51,7 @@ forced miss that would normally re-run from scratch. The build cache lives outsi
 
     java -Djenesis.project.cache \
          -Djenesis.executor.rebuild=true \
-         build/jenesis/Project.java
+         build/jenesis/Make.java
 
     [EXECUTED]  .../compile/javac in 0.00 seconds
     [EXECUTED]  .../binary/classes in 0.00 seconds
@@ -88,7 +88,7 @@ The shared cache can be used **two ways**.
 **As a replacement** - the shared cache only, no local tier (e.g. an ephemeral CI
 runner whose disk is thrown away anyway):
 
-    java -Djenesis.cache.uri=file:///mnt/team/jenesis-cache build/jenesis/Project.java
+    java -Djenesis.cache.uri=file:///mnt/team/jenesis-cache build/jenesis/Make.java
 
 **Layered behind the local cache** - set both `-Djenesis.project.cache` *and*
 `-Djenesis.cache.uri=...`, and Jenesis wires a `BuildExecutorLayeredCache`: every
@@ -100,7 +100,7 @@ checkout never re-downloads what the first already fetched:
     java -Djenesis.project.cache \
          -Djenesis.cache.uri=https://cache.example.com \
          -Djenesis.cache.project=acme -Djenesis.cache.key=alice \
-         build/jenesis/Project.java
+         build/jenesis/Make.java
 
 Serving a step from the local tier means no `GET` reaches the server - which would
 let that shared entry age toward eviction there even though it is in active use. So

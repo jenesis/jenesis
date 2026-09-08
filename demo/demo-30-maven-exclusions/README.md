@@ -9,7 +9,7 @@ transitive is gone.
 Build it
 --------
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 The build compiles the sources and runs `ExclusionTest`, which checks the class
 path directly:
@@ -101,7 +101,7 @@ rather than ignored.
 Pinned dependencies
 -------------------
 
-This demo ships **already pinned**: `java build/jenesis/Project.java pin` records
+This demo ships **already pinned**: `java build/jenesis/Make.java pin` records
 the resolved closure into `<dependencyManagement>` with `SHA-256` checksums.
 Because `commons-lang3` is excluded, it is absent from that closure - the pinned
 set contains `commons-text` and the JUnit test dependencies, but no Lang.

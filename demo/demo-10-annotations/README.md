@@ -15,7 +15,7 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 Jenesis auto-detects the MODULAR_TO_MAVEN layout (a `module-info.java`, no
 `pom.xml`), resolves the processor, runs it, and emits a modular jar alongside a

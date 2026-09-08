@@ -11,7 +11,7 @@ property unset disables selection. It is meant mainly for **watching** a project
 where the build re-runs on every save and a fast, narrowed test pass keeps the
 feedback loop tight:
 
-    java -Djenesis.project.watch=true -Djenesis.test.incremental build/jenesis/Project.java
+    java -Djenesis.project.watch=true -Djenesis.test.incremental build/jenesis/Make.java
 
 It is a development-loop optimisation, not a correctness gate: continuous
 integration should keep running the whole suite (a plain `build` with selection

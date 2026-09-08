@@ -29,7 +29,7 @@ produced platform launcher with your arguments. The packaged app prints:
 (Because no SLF4J backend is bundled, SLF4J prints a one-time "no providers" notice
 and uses a no-op logger - the `slf4j-api` jar is still bundled and on the app's
 classpath.) With no arguments it greets `world`. Building the plain
-`java build/jenesis/Project.java` (the default `build` target, which stops before the
+`java build/jenesis/Make.java` (the default `build` target, which stops before the
 package phase) compiles and jars the module exactly as `../demo-02-java-modular`
 does, without producing an image.
 
@@ -144,7 +144,7 @@ are modular-only: a `.jmod` and a custom runtime are built from *modules*, so a
 classpath project (`../demo-05-java-pom-executable`) has nothing to pack or link.
 With `jmod=true` and `jlink=true` in `packaging.properties`, run:
 
-    java build/jenesis/Project.java stage
+    java build/jenesis/Make.java stage
 
 `jmod=true` wires a `jmod` step that packs the module into a `.jmod`,
 the modular-package format that - unlike a jar - can also carry native libraries,
@@ -186,7 +186,7 @@ at the end of this page). For that, a `bundle=true` line in `packaging.propertie
 wires a per-module `bundle` step that writes a single `bundle/bundle.zip` for every
 module with a main class:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
     bundle.zip
     |-- application.properties     mainClass=sample.Sample, mainModule=demo.modular.executable
@@ -221,7 +221,7 @@ That Dockerfile does not have to be written by hand either: a `docker` key in
 `jpackage` takes its type. This demo commits `docker=eclipse-temurin:25-jre` as a
 `docker` profile:
 
-    java -Djenesis.project.properties=docker build/jenesis/Project.java stage
+    java -Djenesis.project.properties=docker build/jenesis/Make.java stage
 
     target/stage/docker/output/module-sources/
     |-- Dockerfile
@@ -249,7 +249,7 @@ you run with `java -jar foo.jar` - without flattening the dependencies into a fa
 jar, so modularity survives. The target resolves the published
 `build.jenesis:build.jenesis.launcher` from Maven Central and shades it into the jar:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
     demo.modular.executable.jar
     |-- META-INF/MANIFEST.MF                  Main-Class: build.jenesis.launcher.Launcher

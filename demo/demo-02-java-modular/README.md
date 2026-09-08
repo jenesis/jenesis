@@ -13,7 +13,7 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 Layout
 ------
@@ -52,7 +52,7 @@ Java module name against the Jenesis module repository and emits a modular jar w
 *no* `pom.xml` at all (`stage` then produces only `target/stage/modular`). Force it
 from the command line with the layout override:
 
-    java -Djenesis.project.layout=modular build/jenesis/Project.java
+    java -Djenesis.project.layout=modular build/jenesis/Make.java
 
 (`jenesis.project.layout` accepts `auto`, `maven`, `modular`, `modular_to_maven`.)
 Use MODULAR when the artifact is only ever consumed as a Java module and you do not
@@ -78,7 +78,7 @@ short for `<group>/module/<name>` with the default group `main`; 1 slash is a Ma
     }
 
 The version is required to resolve the module (the overlay serves
-`org.slf4j/<version>/org.slf4j.jar`). Running `java build/jenesis/Project.java
+`org.slf4j/<version>/org.slf4j.jar`). Running `java build/jenesis/Make.java
 pin` rewrites the resolved version back into the tag and is idempotent. A pin may
 also carry a content checksum (`@jenesis.pin org.slf4j/slf4j-api 2.0.16
 SHA-256/<hex>`), which `Dependencies` then verifies on every fetch.
@@ -97,7 +97,7 @@ To see what the build resolves, run the `dependencies` selector. It prints each
 module's resolved dependency graph, annotated with the resolved module name and
 the declared license:
 
-    java build/jenesis/Project.java dependencies
+    java build/jenesis/Make.java dependencies
 
     main/compile (module)
     maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT License}

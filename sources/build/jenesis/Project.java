@@ -409,7 +409,7 @@ public record Project(
                     %{header}Usage:%{reset}
                       Pass selectors as command-line arguments to the build launcher
                       (the installed %{name}jenesis%{reset} CLI, a source-mode
-                      %{name}Project.java%{reset} script, or a programmatic
+                      %{name}Make.java%{reset} script, or a programmatic
                       %{name}Project.build(...)%{reset} call from Java code).
                     
                     Without selectors, the default target (%{name}build%{reset}) is executed.
@@ -468,6 +468,58 @@ public record Project(
                       %{name}docker.mountWritable%{reset} <h[:c],...> Extra writable container mounts
                       %{name}docker.env%{reset} <N[=V],...>           Forward host env vars (name) or set them (name=value)
                     
+                    %{header}Daemon (-Djenesis.daemon.<key>=<value>):%{reset}
+                      Hands the build to a reused JVM, which keeps the compiled engine and a warm
+                      JIT between calls. Running compiled - the installed CLI - uses one by
+                      default, because that is the repeated local invocation it pays off for.
+                      Source mode does not, because CI and container builds run once and would
+                      only carry the overhead. %{name}jenesis.make.daemon%{reset} decides either way (see below);
+                      the settings here configure the daemon process itself.
+                      %{name}idle%{reset} <s>                       Exit after idling this many seconds (default: 10800)
+                      %{name}options%{reset} <args>                 JVM options for the daemon process itself, whitespace
+                                                       separated (default: %{name}-Xmx2g%{reset}, since a JVM left to itself
+                                                       would idle on a quarter of the machine's memory);
+                                                       the build's own %{name}-Djenesis.*%{reset} travel per call
+                      %{name}--stop%{reset} as the only selector shuts the daemon for this project down. One
+                      daemon serves one project, and only the %{name}-Djenesis.*%{reset} properties are per call:
+                      they are cleared and set again around every build, so no call sees another's.
+                      Everything a running JVM cannot change is its identity instead - the build
+                      sources, the environment, the JVM arguments and any non-%{name}jenesis%{reset} %{name}-D%{reset} - and a
+                      call that differs in any of them replaces the daemon rather than being served
+                      by one configured for something else. A second concurrent build is refused
+                      exactly as it is without a daemon, and a dockerized build is refused since it
+                      replaces the running process.
+
+                    %{header}Make (java build/jenesis/Make.java [selectors...]):%{reset}
+                      The entry point. It carries no build logic and references no engine class, so
+                      the Java launcher compiles one small file rather than the whole engine: it reaches
+                      its own main in 0.4 seconds, where a file declaring %{name}Project%{reset} takes 1.5. It
+                      then runs the build, in a daemon where one is wanted.
+                      %{name}-Djenesis.make.compile%{reset} <boolean>  Compile the build sources once and run from those
+                                                       classes, over a class loader of their own (default: true).
+                                                       One batch compile beats the Java launcher compiling class by
+                                                       class as it loads them, so this wins even on a build that
+                                                       runs once: 3.6s against 8.0s here, and 0.8s once cached
+                      %{name}-Djenesis.make.classes%{reset} <path>    Where those classes land, relative to the root
+                                                       (default: alongside the sources they came from)
+                      %{name}-Djenesis.make.daemon%{reset} <boolean>   The same, but hand the build to a reused JVM, which
+                                                       keeps a warm JIT between calls (default: false)
+                      All three are read from jenesis.properties at the project root as well, which
+                      is where a project wanting a daemon asks for one.
+
+                      What the daemon saves is compiling speed, not setup: a build has no script
+                      to parse, and spends its time inside javac, which a JVM that has already
+                      compiled a few modules runs faster. So it pays in proportion to how much a
+                      build compiles - nothing at all on a build that compiles little, where the
+                      socket costs more than the warm code saves, and about a third off a
+                      five-module project. It is the last increment, not the first: compiling the
+                      build sources once is what removes the large fixed cost, and needs no
+                      process left running.
+                      %{name}Project%{reset} itself is the configuration API - %{name}new Project().version(...)%{reset} and
+                      %{name}Project.build(...)%{reset} - and is no longer an entry point. A project driving its own
+                      entry point reuses Make from a file beside it, as
+                      %{name}System.exit(new Make("build.Demo").run(selectors))%{reset}.
+
                     %{header}Executor (-Djenesis.executor.<key>=<value>):%{reset}
                       %{name}concurrency%{reset} <n>                  Run at most <n> build steps at once; %{name}0%{reset} (the
                                                        default) leaves the build unbounded, and a negative
@@ -787,18 +839,29 @@ public record Project(
                         refused project still builds as a standard build off the released
                         engine - only the two routes below run the vendored one, and a
                         project that vendors a changed engine may drive it from an entry
-                        point of its own rather than the usual `Project.java`;
-                      - `java <Project.java> [selectors...]` on a source-mode script in the tree;
+                        point of its own rather than the usual `Make.java`;
+                      - `java build/jenesis/Make.java [selectors...]` on a source-mode script in
+                        the tree. `Make` carries no build logic and references no engine class, so
+                        the Java launcher compiles one small file rather than the whole engine, and it
+                        compiles the engine once into classes it reuses: 3.6s for a build that runs
+                        once against 8.0s, and 0.8s for a repeat. `jenesis.make.daemon=true` hands
+                        the build to a reused JVM on top of that, which is off by default since
+                        compiling once already removes most of what it would save. `--stop` shuts
+                        one down, and a project driving its own entry
+                        point reuses Make as `new Make("build.Demo").run(selectors)`, which
+                        returns the status to exit with;
                       - `Project.build(selectors...)` from Java code when embedding the build.
+                        `Project` is the configuration API and has no `main`; `Make` is the entry point.
 
                     No selector runs the default target (`build`); several, space-separated, run
                     several entry points in one invocation.
 
-                    Source mode recompiles the build's own engine and `Project.java` on every
-                    invocation. While the build code is unchanged, skip that recompile:
+                    Source mode compiles whatever the named file reaches, on every invocation.
+                    `Make` reaches almost nothing, so that cost is small; the engine behind it is
+                    compiled once into `.jenesis/tool` and reused. To drive those classes yourself:
 
                       javac -d .jenesis/tool build/jenesis/Project.java
-                      java -cp .jenesis/tool build.jenesis.Project [selectors...]
+                      java -cp .jenesis/tool build.jenesis.Make [selectors...]
 
                     Or ahead-of-time compile that launcher with GraalVM `native-image` for
                     near-instant startup. The native binary detects the native-image runtime and
@@ -1126,6 +1189,11 @@ public record Project(
                           Also cache steps locally on disk, layered in front of the remote (empty
                           resolves to .jenesis/cache under the root); a local hit HEAD-touches the
                           remote to keep its LRU warm.
+                      compile
+                          In source mode only, compile the engine into .jenesis/tool once and run
+                          every later invocation from those classes, rebuilding them whenever the
+                          sources change. Halves the launch cost; the launcher still compiles this
+                          file before the build starts, so an installed `jenesis` stays faster.
 
                     Pinning and resolution:
 
@@ -1307,7 +1375,7 @@ public record Project(
                     dependency, offer to pin it. The `pin` selector records resolved versions and
                     content checksums back into the build descriptor, idempotently:
 
-                      java build/jenesis/Project.java pin
+                      java build/jenesis/Make.java pin
 
                     It writes pom.xml (`<dependencyManagement>` versions with
                     `<!--Checksum/<algo>/<hex>-->`, and qualified compiler closures in a
@@ -2292,20 +2360,40 @@ public record Project(
         return this.build(selectors);
     }
 
-    public static void main(String... selectors) {
+    public static SequencedMap<String, Path> perform(String... selectors) {
         try {
             loadJenesisProperties(Path.of(System.getProperty("jenesis.project.root", ".")));
-            new Project().doMain(selectors);
+            return new Project().doMain(selectors);
         } catch (Throwable t) {
-            if (t instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-            t.printStackTrace();
-            System.err.println();
-            System.err.println("The build failed with the error above. If you meant to look up how to"
-                    + " invoke Jenesis, pass `help` as the only argument on the command line, or `skill`"
-                    + " for an agent-oriented briefing.");
-            System.exit(1);
+            report(t);
+            return null;
         }
+    }
+
+    public static int run(String mainClass, String... selectors) {
+        if (mainClass.equals(Project.class.getName())) {
+            return perform(selectors) == null ? 1 : 0;
+        }
+        try {
+            loadJenesisProperties(Path.of(System.getProperty("jenesis.project.root", ".")));
+            Class.forName(mainClass, true, Project.class.getClassLoader())
+                    .getMethod("main", String[].class)
+                    .invoke(null, (Object) selectors);
+            return 0;
+        } catch (Throwable t) {
+            report(t);
+            return 1;
+        }
+    }
+
+    private static void report(Throwable t) {
+        if (t instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+        }
+        t.printStackTrace();
+        System.err.println();
+        System.err.println("The build failed with the error above. If you meant to look up how to"
+                + " invoke Jenesis, pass `help` as the only argument on the command line, or `skill`"
+                + " for an agent-oriented briefing.");
     }
 }

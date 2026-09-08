@@ -16,7 +16,7 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 The project ships a `jacoco.properties` marker file, so a plain build collects
 coverage. Jenesis compiles the project, runs the test
@@ -74,5 +74,5 @@ Pinning
 -------
 
 JUnit is pinned in the POM the usual way. JaCoCo's agent and CLI resolve a
-floating `RELEASE` in the `jacoco` group; run `java build/jenesis/Project.java
+floating `RELEASE` in the `jacoco` group; run `java build/jenesis/Make.java
 pin` to record them with checksums when you want a reproducible tool chain.

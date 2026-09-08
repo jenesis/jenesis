@@ -63,7 +63,7 @@ jobs:
                -Djenesis.project.documentation=true \
                -Djenesis.dependency.pin=strict \
                -Djenesis.project.metadata=project.properties \
-               build/jenesis/Project.java stage
+               build/jenesis/Make.java stage
 
       - name: Package SDKMAN archive
         env:

@@ -13,7 +13,7 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 Layout
 ------
@@ -106,18 +106,18 @@ to part of the graph.
 A `+<module>` selector builds just that module's subtree. `+greeter` builds the
 `greeter` library and runs its tests, without touching `app`:
 
-    java build/jenesis/Project.java +greeter
+    java build/jenesis/Make.java +greeter
 
 A module's own dependencies come along automatically: `+app` builds `app` and,
 because it depends on the sibling, `greeter` too - but no unrelated module:
 
-    java build/jenesis/Project.java +app
+    java build/jenesis/Make.java +app
 
 Under the hood a selector is a slash-delimited path of graph steps, with two
 wildcards: `:` matches a single path segment and `::` matches any depth. So
 `::/jar` runs the `jar` step of every module wherever it sits in the tree:
 
-    java build/jenesis/Project.java '::/jar'
+    java build/jenesis/Make.java '::/jar'
 
 Wildcards are lenient (non-matching branches are skipped), and once a module is
 reached its own pipeline steps run - so a wildcard chooses *which steps* you ask
@@ -127,7 +127,7 @@ Test runs are narrowed with `-Djenesis.test.filter`, a comma-separated list of
 `<class-regex>[#<method>]` patterns; the regex matches the fully-qualified class
 name. `greeter` ships two tests, so this runs only one of them:
 
-    java -Djenesis.test.filter='.*GreeterTest#prefix_is_a_greeting' build/jenesis/Project.java
+    java -Djenesis.test.filter='.*GreeterTest#prefix_is_a_greeting' build/jenesis/Make.java
 
 The test step's summary then reports `1 tests successful` instead of the default
 `2`. The `-D` flag must come **before** the source file - anything after it is
@@ -138,7 +138,7 @@ the test framework's own grouping mechanism - JUnit Platform tags, JUnit 4
 categories, or TestNG groups. `GreeterTest#prefix_is_a_greeting` is annotated
 `@Tag("slow")`, so this again runs only that one test, this time by tag:
 
-    java -Djenesis.test.tag=slow build/jenesis/Project.java
+    java -Djenesis.test.tag=slow build/jenesis/Make.java
 
 Passing `-Djenesis.test.parallel` runs the matched tests in parallel, letting
 the test framework execute them concurrently where its configuration allows.
@@ -165,7 +165,7 @@ This demo ships **already pinned**. External dependencies are pinned in
         <!--Checksum/SHA-256/...-->
     </dependency>
 
-Running `java build/jenesis/Project.java pin` walks the build outputs and writes
+Running `java build/jenesis/Make.java pin` walks the build outputs and writes
 the resolved version closure into each module's `<dependencyManagement>`; it is
 idempotent. That closure is project-wide, so the pinned JUnit test artifacts land
 in both modules' managed dependencies even though only `greeter` runs tests -
@@ -183,7 +183,7 @@ module's resolved dependency graph in one block per module and scope (each block
 headed by `<scope> (<module>)`), with every node carrying its resolved module name
 and declared license:
 
-    java build/jenesis/Project.java dependencies
+    java build/jenesis/Make.java dependencies
 
     main/compile (module-app)
     maven/org.junit.jupiter/junit-jupiter 5.11.3 [compile] (module org.junit.jupiter) {Eclipse Public License v2.0}

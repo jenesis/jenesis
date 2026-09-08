@@ -11,7 +11,7 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 Jenesis auto-detects the MODULAR_TO_MAVEN layout (a `module-info.java`, no
 `pom.xml`), resolves the Scala compiler, compiles the module, and emits a
@@ -80,5 +80,5 @@ the Scala compiler toolchain in its own `scalac` group (each
 `scalac/maven/...` coordinate with a version and SHA-256 checksum). The latest
 Scala `<release>` on Maven Central is often a release candidate, so pinning is
 what keeps an otherwise floating build from drifting onto a fresh `-RC`. Run
-`java build/jenesis/Project.java pin` to record or refresh the tags; re-running
+`java build/jenesis/Make.java pin` to record or refresh the tags; re-running
 leaves the declaration unchanged.

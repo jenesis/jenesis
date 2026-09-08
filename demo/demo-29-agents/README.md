@@ -41,7 +41,7 @@ The runner switches the OpenTelemetry exporters off through the standard
 and logs its banner. The first build downloads JUnit, Mockito, and the (large)
 OpenTelemetry agent, so it takes a while.
 
-You can also drive the two halves directly: `java build/jenesis/Project.java`
+You can also drive the two halves directly: `java build/jenesis/Make.java`
 builds and tests (Mockito), and `java build/jenesis/Execute.java Ada Lovelace`
 runs the application (OpenTelemetry).
 
@@ -151,7 +151,7 @@ the test module. Because an XML comment cannot contain a double dash, write
 Pinning
 -------
 
-Agents are pinned like any other dependency. `java build/jenesis/Project.java
+Agents are pinned like any other dependency. `java build/jenesis/Make.java
 pin` records the OpenTelemetry agent's version and checksum in the main module,
 and Mockito together with its agent transitives (Byte Buddy, Objenesis) in the
 test module - so a strict-pinned build (`-Djenesis.dependency.pin=strict`)

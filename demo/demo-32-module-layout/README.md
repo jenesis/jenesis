@@ -11,14 +11,14 @@ coordinates end to end.
 Run it
 ------
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 `requires org.slf4j` is satisfied by fetching `org.slf4j` as a named module from
 the module repository. Building leaves **no `pom.xml`** anywhere under `target/`
 (contrast `../demo-02-java-modular`, the same project under MODULAR_TO_MAVEN, which
 emits one). Staging shows the same split:
 
-    java build/jenesis/Project.java stage      # target/stage/modular only - no target/stage/maven
+    java build/jenesis/Make.java stage      # target/stage/modular only - no target/stage/maven
 
 `export` then publishes the modular jar (and any `.jmod`) into the local Jenesis
 module repository (`~/.jenesis`), keyed by module name and version, with no Maven
@@ -35,7 +35,7 @@ before the build:
 
     jenesis.project.layout=modular
 
-So the demo runs with the stock `java build/jenesis/Project.java`, no custom
+So the demo runs with the stock `java build/jenesis/Make.java`, no custom
 launcher. The command line wins over the file, so a one-off
 `-Djenesis.project.layout=modular` on any modular project does the same thing
 without the file (exactly what `../demo-02-java-modular` runs to force this layout
@@ -91,7 +91,7 @@ differently under each layout.
 Under **MODULAR** (this demo) the node is a Java module name resolved from the
 module repository - no Maven coordinate, no Maven scope:
 
-    java build/jenesis/Project.java dependencies
+    java build/jenesis/Make.java dependencies
 
     main/compile (module-sources)
     module/org.slf4j 2.0.16 (module org.slf4j)

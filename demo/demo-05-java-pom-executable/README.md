@@ -28,7 +28,7 @@ produced platform launcher with your arguments. The packaged app prints:
 
 (`commons-lang3`'s `StringUtils.capitalize` upper-cased the leading `a`, proving the
 bundled dependency is on the launched app's classpath.) With no arguments it greets
-`World`. Building the plain `java build/jenesis/Project.java` (the default `build`
+`World`. Building the plain `java build/jenesis/Make.java` (the default `build`
 target, which stops before the package phase) compiles and jars the project exactly
 as `../demo-01-java-pom` does, without producing an image.
 
@@ -99,7 +99,7 @@ only your jars onto an off-the-shelf JRE base. For that, a `bundle=true` line in
 `packaging.properties` wires a per-module `bundle` step that writes a single
 `bundle/bundle.zip` for every module with a main class:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
     bundle.zip
     |-- application.properties     mainClass=sample.Sample
@@ -124,7 +124,7 @@ Writing that Dockerfile by hand is the one manual step left, so a `docker` key i
 build cannot infer, and this demo commits `docker=eclipse-temurin:25-jre` as a
 `docker` profile:
 
-    java -Djenesis.project.properties=docker build/jenesis/Project.java stage
+    java -Djenesis.project.properties=docker build/jenesis/Make.java stage
 
     target/stage/docker/output/module/
     |-- Dockerfile
