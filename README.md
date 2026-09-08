@@ -50,6 +50,7 @@ What is in this repository
 | `build/jenesis` | A symlink to `sources/build/jenesis`, so the project builds itself with itself. |
 | `benchmark/` | The performance harness and its methodology, see [`benchmark/README.md`](benchmark/README.md). |
 | `install.sh` | The script served at `get.jenesis.build`. |
+| `install.test.sh` | Its tests: each mode is installed into a throwaway project and built, run by CI on every platform. |
 | `pom.xml` | A plain Maven build of the same sources, kept as a fallback (below). |
 
 Building it
