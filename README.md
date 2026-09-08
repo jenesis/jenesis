@@ -26,8 +26,7 @@ Pick whichever fits how you want to manage versions; all three land at the same 
 ```bash
 sdk install jenesis && jenesis-init      # SDKMAN, then initialise a project
 curl -fsSL https://get.jenesis.build | bash   # bootstrap into the current project
-git submodule add --depth 1 https://github.com/jenesis/jenesis.git .jenesis \
-    && ln -s ../.jenesis/sources/build/jenesis build/jenesis
+curl -fsSL https://get.jenesis.build | JENESIS_MODE=submodule bash   # ... as a git submodule
 ```
 
 Then, from the project root:
