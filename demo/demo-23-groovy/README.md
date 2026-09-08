@@ -11,7 +11,7 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 Jenesis auto-detects the MODULAR_TO_MAVEN layout (a `module-info.java`, no
 `pom.xml`), scans the sources, resolves the Groovy compiler, compiles
@@ -106,5 +106,5 @@ repository, since the Groovy compiler resolves through Maven). Without a declare
 version both would float to the latest release - which for Groovy currently
 includes pre-release builds - so pinning keeps the module on the stable `5.0.6`
 while the compiler toolchain stays on `6.0.0-alpha-1`. Run
-`java build/jenesis/Project.java pin` to record or refresh the pins; re-running
+`java build/jenesis/Make.java pin` to record or refresh the pins; re-running
 leaves the module declaration unchanged.

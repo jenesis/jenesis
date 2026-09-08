@@ -87,12 +87,12 @@ OUT="$(cd "$PROJ" && "${SDK_HOME}/bin/jenesis" help 2>&1)" || dump_and_fail "jen
 printf '%s' "$OUT" | grep -qF "a Java build tool" || dump_and_fail "jenesis help did not print the usage banner" "$OUT"
 echo "  ok"
 
-# [6/10] jenesis: a project stamped with the SDK's own version dispatches to jenesis-run
+# [6/10] jenesis: a project stamped with the SDK's own version dispatches to jenesis-make
 echo "[6/10] jenesis on a matching stamp"
 OUT="$(cd "$PROJ" && "${SDK_HOME}/bin/jenesis" help 2>&1)" || dump_and_fail "jenesis help exited non-zero" "$OUT"
 printf '%s' "$OUT" | grep -qF "a Java build tool" || dump_and_fail "matching stamp did not run the installed version" "$OUT"
-OUT="$(cd "$PROJ" && "${SDK_HOME}/bin/jenesis-run" help 2>&1)" || dump_and_fail "jenesis-run help exited non-zero" "$OUT"
-printf '%s' "$OUT" | grep -qF "a Java build tool" || dump_and_fail "jenesis-run did not print the usage banner" "$OUT"
+OUT="$(cd "$PROJ" && "${SDK_HOME}/bin/jenesis-make" help 2>&1)" || dump_and_fail "jenesis-make help exited non-zero" "$OUT"
+printf '%s' "$OUT" | grep -qF "a Java build tool" || dump_and_fail "jenesis-make did not print the usage banner" "$OUT"
 echo "  ok"
 
 # [7/10] jenesis: a patched vendored tree is refused, never run and never built from
@@ -109,13 +109,13 @@ printf '%s' "$OUT" | grep -qF "does not match the sources" || dump_and_fail "the
 printf '%s' "$OUT" | grep -qF "refusing to run" || dump_and_fail "a patched tree was not refused" "$OUT"
 if printf '%s' "$OUT" | grep -qF "a Java build tool"; then dump_and_fail "a patched tree still ran the build" "$OUT"; fi
 printf '%s' "$OUT" | grep -qF ". jenesis-switch" || dump_and_fail "the refusal did not point at jenesis-switch" "$OUT"
-printf '%s' "$OUT" | grep -qF "jenesis-run [selectors]" || dump_and_fail "the refusal did not point at jenesis-run" "$OUT"
+printf '%s' "$OUT" | grep -qF "jenesis-make [selectors]" || dump_and_fail "the refusal did not point at jenesis-make" "$OUT"
 printf '%s' "$OUT" | grep -qF "builds this project as a standard build" || dump_and_fail "the refusal did not offer the released engine" "$OUT"
 printf '%s' "$OUT" | grep -qF "Neither of these executes the vendored build code" || dump_and_fail "the refusal did not separate the trusted routes" "$OUT"
-printf '%s' "$OUT" | grep -qF "java build/jenesis/Project.java [selectors]" || dump_and_fail "the refusal did not point at source mode" "$OUT"
-printf '%s' "$OUT" | grep -qF "javac build/jenesis/Project.java" || dump_and_fail "the refusal did not point at the compiled tool" "$OUT"
+printf '%s' "$OUT" | grep -qF "java build/jenesis/Make.java [selectors]" || dump_and_fail "the refusal did not point at source mode" "$OUT"
+printf '%s' "$OUT" | grep -qF "javac build/jenesis/Make.java" || dump_and_fail "the refusal did not point at the compiled tool" "$OUT"
 printf '%s' "$OUT" | grep -qF "the project root at $PATCHED" || dump_and_fail "the refusal did not name the project root" "$OUT"
-printf '%s' "$OUT" | grep -qF "Project.java is" || dump_and_fail "the refusal did not name the usual entry point" "$OUT"
+printf '%s' "$OUT" | grep -qF "Make.java is" || dump_and_fail "the refusal did not name the usual entry point" "$OUT"
 printf '%s' "$OUT" | grep -qF "may drive it from one of its own" || dump_and_fail "the refusal did not allow for a custom entry point" "$OUT"
 printf '%s' "$OUT" | grep -qF "those commands execute unreviewed code" || dump_and_fail "the refusal did not warn about the vendored routes" "$OUT"
 printf '%s' "$OUT" | grep -qF "run builds from sources you" || dump_and_fail "the refusal did not warn about untrusted sources" "$OUT"

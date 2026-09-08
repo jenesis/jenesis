@@ -75,10 +75,10 @@ if not "!RC!"=="0" goto :fail
 findstr /c:"a Java build tool" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [6/9] jenesis-run: runs the installed version directly, without the version lookup
-echo [6/9] jenesis-run
+REM [6/9] jenesis-make: runs the installed version directly, without the version lookup
+echo [6/9] jenesis-make
 pushd "%PROJ%"
-call "%SDK_HOME%\bin\jenesis-run.bat" help > "%OUTFILE%" 2>&1
+call "%SDK_HOME%\bin\jenesis-make.bat" help > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
 popd
 if not "!RC!"=="0" goto :fail
@@ -98,11 +98,11 @@ if not "!RC!"=="1" goto :fail
 findstr /c:"does not match the sources" "%OUTFILE%" >nul || goto :fail
 findstr /c:"refusing to run" "%OUTFILE%" >nul || goto :fail
 findstr /c:"a Java build tool" "%OUTFILE%" >nul && goto :fail
-findstr /c:"jenesis-run [selectors]" "%OUTFILE%" >nul || goto :fail
+findstr /c:"jenesis-make [selectors]" "%OUTFILE%" >nul || goto :fail
 findstr /c:"builds this project as a standard build" "%OUTFILE%" >nul || goto :fail
 findstr /c:"Neither of these executes the vendored build code" "%OUTFILE%" >nul || goto :fail
-findstr /c:"java build\jenesis\Project.java [selectors]" "%OUTFILE%" >nul || goto :fail
-findstr /c:"javac build\jenesis\Project.java" "%OUTFILE%" >nul || goto :fail
+findstr /c:"java build\jenesis\Make.java [selectors]" "%OUTFILE%" >nul || goto :fail
+findstr /c:"javac build\jenesis\Make.java" "%OUTFILE%" >nul || goto :fail
 findstr /c:"the project root at %PATCHED%" "%OUTFILE%" >nul || goto :fail
 findstr /c:"may drive it from one of its own" "%OUTFILE%" >nul || goto :fail
 findstr /c:"those commands execute unreviewed code" "%OUTFILE%" >nul || goto :fail

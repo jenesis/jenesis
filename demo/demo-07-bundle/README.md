@@ -85,7 +85,7 @@ Layout
 With a `module-info.java` and no `pom.xml`, Jenesis auto-detects the
 MODULAR_TO_MAVEN layout, exactly as `../demo-02-java-modular` does, and resolves the
 declared `org.slf4j` module through the Jenesis module repository. Plain
-`java build/jenesis/Project.java` (no bundle target) compiles and jars the module
+`java build/jenesis/Make.java` (no bundle target) compiles and jars the module
 without producing a bundle.
 
 Deploying onto a JRE base

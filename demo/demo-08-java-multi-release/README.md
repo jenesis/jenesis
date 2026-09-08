@@ -35,7 +35,7 @@ Build it
 To build the JAR without launching it, run the project goal directly from this
 directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 The `javac` step compiles `module-info.java`, `Sample.java`, and the baseline
 `Platform.java` at release 21, then runs a second pass over

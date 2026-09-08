@@ -53,7 +53,7 @@ hash over a downloaded pom is meaningless - the reference takes no checksum,
 checksum comments inside the fetched BOM are not read, and its entries carry
 versions only. The workflow is instead: declare the BOM, then run
 
-    java build/jenesis/Project.java pin
+    java build/jenesis/Make.java pin
 
 which pins each artifact the build resolves through the BOM - here
 `slf4j-api`, with a hash computed over the downloaded jar. That pin is
@@ -71,12 +71,12 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 Both integrity models satisfy strict pinning: `org.apache.commons.lang3` through the file
 BOM's hashed entries, `org.slf4j` through the imported pins:
 
-    java -Djenesis.dependency.pin=strict build/jenesis/Project.java
+    java -Djenesis.dependency.pin=strict build/jenesis/Make.java
 
 The BOM file format
 -------------------
@@ -169,7 +169,7 @@ keep managing resolution while the pins float, so a repin upgrades the whole
 curation in one step and rewrites the pins it entails. The inverse migration
 is
 
-    java -Djenesis.pin.bom=flatten build/jenesis/Project.java pin
+    java -Djenesis.pin.bom=flatten build/jenesis/Make.java pin
 
 which removes the `@jenesis.bom` declarations and pins the resolved closure
 in full, turning this demo's module-info into its `@jenesis.pin` equivalent.

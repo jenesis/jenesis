@@ -16,11 +16,11 @@ Build it
 
 A plain build is the development build - no extras:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 Select the `release` profile to build for publication:
 
-    java -Djenesis.project.properties=release build/jenesis/Project.java stage
+    java -Djenesis.project.properties=release build/jenesis/Make.java stage
 
 The release build additionally stages a `-sources.jar` next to the jar and enforces
 strict dependency pinning, ready for `export`. The CycloneDX SBOM is emitted

@@ -1,7 +1,7 @@
 package build;
 
 import module java.base;
-import build.jenesis.Execute;
+import build.jenesis.Execution;
 import build.jenesis.Project;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -73,7 +73,7 @@ public class Demo {
                         new InferredMultiProjectAssembler(),
                         Map.of("module", repository),
                         Map.of("module", new ModularJarResolver(true))));
-        System.exit(new Execute(project).execute(args));
+        System.exit(new Execution(project).execute(args));
     }
 
     private record PreprocessingAssembler(

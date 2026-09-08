@@ -67,7 +67,7 @@ therefore a value, not an identity.
 Re-pinning
 ----------
 
-`java build/jenesis/Project.java pin` applies the same guard matching: only the
+`java build/jenesis/Make.java pin` applies the same guard matching: only the
 line that matched the local platform is refreshed from the resolved closure,
 keeping its guard, and every non-matching line is preserved byte-for-byte. A
 key that carries a guard stays in the comment block and is never migrated into

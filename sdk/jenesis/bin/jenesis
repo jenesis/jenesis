@@ -16,7 +16,7 @@ while :; do
 done
 
 if [ -z "$VENDORED" ]; then
-    exec "$SCRIPT_DIR/jenesis-run" "$@"
+    exec "$SCRIPT_DIR/jenesis-make" "$@"
 fi
 
 refuse() {
@@ -29,18 +29,18 @@ The released engine still builds this project as a standard build, which is ofte
 project needs. Neither of these executes the vendored build code:
 
     . jenesis-switch            switch this shell to the version the project records
-    jenesis-run [selectors]     run the installed engine as it stands
+    jenesis-make [selectors]     run the installed engine as it stands
 
 Only where the project truly needs its own engine, run the vendored sources yourself, from
-the project root at ${ROOT}. Read the project's build instructions first: Project.java is
+the project root at ${ROOT}. Read the project's build instructions first: Make.java is
 the usual entry point, but a project that vendors a changed engine states why it does, and
 may drive it from one of its own.
 
-    java build/jenesis/Project.java [selectors]
+    java build/jenesis/Make.java [selectors]
 
 Source mode recompiles the engine on every invocation. To pay that once instead:
 
-    javac build/jenesis/Project.java
+    javac build/jenesis/Make.java
     java build.jenesis.Project [selectors]
 
 Warning: those commands execute unreviewed code with the rights of your build and can
@@ -167,7 +167,7 @@ fi
 rm -rf "$EXTRACTED"
 trap - EXIT
 
-if [ ! -x "$TARGET_HOME/bin/jenesis-run" ]; then
-    refuse "Jenesis ${STAMP} at ${TARGET_HOME} ships no executable bin/jenesis-run to dispatch to"
+if [ ! -x "$TARGET_HOME/bin/jenesis-make" ]; then
+    refuse "Jenesis ${STAMP} at ${TARGET_HOME} ships no executable bin/jenesis-make to dispatch to"
 fi
-exec "$TARGET_HOME/bin/jenesis-run" "$@"
+exec "$TARGET_HOME/bin/jenesis-make" "$@"

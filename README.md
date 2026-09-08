@@ -33,7 +33,7 @@ git submodule add --depth 1 https://github.com/jenesis/jenesis.git .jenesis \
 Then, from the project root:
 
 ```bash
-java build/jenesis/Project.java                        # build
+java build/jenesis/Make.java                        # build
 java build/jenesis/Jpx.java org.junit.platform.console --version   # run a published module
 ```
 
@@ -47,7 +47,7 @@ What is in this repository
 | `sources/` | The build tool itself, module `build.jenesis` - including `Project`, `Execute` and `Jpx`. |
 | `tests/` | Its tests, module `build.jenesis.test`. |
 | `demo/` | ~46 self-contained example projects, one per feature, indexed by [`demo/README.md`](demo/README.md). |
-| `sdk/` | The SDKMAN distribution layout and its shell-script tests (`sdk/jenesis`, `sdk/jpx`). `jenesis` reads the version recorded in a project's `build/jenesis/jenesis.version`, installs it where the package manager can, verifies the vendored sources against the published ones and runs the compiled engine - a tree that does not match is refused, so `jenesis` never executes unreviewed build code; `jenesis-run` runs the installed version as it stands, and `jenesis-switch` moves the shell to the recorded one. Both stay on the released engine, so a refused project still builds as a standard build; only running the vendored sources yourself - in source mode, or off classes compiled once with `javac` - executes the vendored engine. |
+| `sdk/` | The SDKMAN distribution layout and its shell-script tests (`sdk/jenesis`, `sdk/jpx`). `jenesis` reads the version recorded in a project's `build/jenesis/jenesis.version`, installs it where the package manager can, verifies the vendored sources against the published ones and runs the compiled engine - a tree that does not match is refused, so `jenesis` never executes unreviewed build code; `jenesis-make` runs the installed version as it stands, and `jenesis-switch` moves the shell to the recorded one. Both stay on the released engine, so a refused project still builds as a standard build; only running the vendored sources yourself - in source mode, or off classes compiled once with `javac` - executes the vendored engine. |
 | `build/jenesis` | A symlink to `sources/build/jenesis`, so the project builds itself with itself. |
 | `benchmark/` | The performance harness and its methodology, see [`benchmark/README.md`](benchmark/README.md). |
 | `install.sh` | The script served at `get.jenesis.build`. |
@@ -60,8 +60,8 @@ The project builds itself. Because `build/jenesis` is a symlink into `sources/`,
 the engine that runs:
 
 ```bash
-java build/jenesis/Project.java          # compile, test, package
-java build/jenesis/Project.java stage    # also lay out the release tree under target/stage/
+java build/jenesis/Make.java          # compile, test, package
+java build/jenesis/Make.java stage    # also lay out the release tree under target/stage/
 ```
 
 A root `pom.xml` is present, so the layout auto-detects as `MAVEN`; the CI builds it under all four layouts.
@@ -89,7 +89,7 @@ Every feature has a runnable project under `demo/`, each with its own `build/jen
 isolation from inside its own directory:
 
 ```bash
-cd demo/demo-01-java-pom && java build/jenesis/Project.java
+cd demo/demo-01-java-pom && java build/jenesis/Make.java
 ```
 
 Most are driven by the shipped `Project.java`; the ones that customise or drive the build themselves ship a
@@ -137,7 +137,7 @@ Working on the code
 Read [jenesis.build](https://jenesis.build) first: the concepts a contributor needs - the step graph, layouts,
 incremental change detection, the extension points - are documented there rather than duplicated here. Beyond
 that the source is the reference, every public type under `sources/build/jenesis/` being small enough to read
-end to end, with the tests as executable documentation of the API. `java build/jenesis/Project.java skill`
+end to end, with the tests as executable documentation of the API. `java build/jenesis/Make.java skill`
 prints the same material as an agent briefing.
 
 Two conventions govern the code here:

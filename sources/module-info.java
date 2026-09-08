@@ -4,7 +4,7 @@
  * A build tool for Java projects, written and configured in Java itself.
  *
  * @jenesis.release 25
- * @jenesis.main build.jenesis.Project
+ * @jenesis.main build.jenesis.Make
  */
 module build.jenesis {
 
@@ -12,6 +12,7 @@ module build.jenesis {
     requires java.xml;
 
     exports build.jenesis;
+    exports build.jenesis.daemon;
     exports build.jenesis.docker;
     exports build.jenesis.maven;
     exports build.jenesis.module;

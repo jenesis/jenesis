@@ -1,7 +1,7 @@
 package build;
 
 import module java.base;
-import build.jenesis.Execute;
+import build.jenesis.Execution;
 import build.jenesis.Project;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
@@ -41,7 +41,7 @@ public class Demo {
         // produced module so its main prints the rewritten greeting - the result
         // the plugin set out to produce. Execute reads the build's inventory to
         // find the module and its runtime, so nothing is located by hand.
-        System.exit(new Execute(project).execute(args));
+        System.exit(new Execution(project).execute(args));
     }
 
     private record PreprocessingAssembler(
