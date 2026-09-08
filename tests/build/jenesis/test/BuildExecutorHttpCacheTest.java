@@ -3,6 +3,7 @@ package build.jenesis.test;
 import module java.base;
 import module jdk.httpserver;
 import module org.junit.jupiter.api;
+import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorHttpCache;
 import build.jenesis.BuildStepResult;
 
@@ -65,6 +66,23 @@ public class BuildExecutorHttpCacheTest {
     }
 
     @Test
+    public void a_step_that_declines_a_remote_cache_reaches_no_server() throws IOException {
+        BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo");
+        byte[] step = {1};
+        SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
+        Files.writeString(output.resolve("file"), "result");
+        cache.store(Runnable::run, "step", step, in, false, output, "", Map.of());
+        assertThat(cache.fetch(Runnable::run, "step", step, in, false, target)).isEmpty();
+        cache.touch(Runnable::run, "step", step, in, false);
+        assertThat(blobs).as("nothing was uploaded").isEmpty();
+        assertThat(heads).as("and nothing was asked for").isEmpty();
+        assertThat(keys).isEmpty();
+        cache.store(Runnable::run, "step", step, in, true,
+                output, "", Map.of());
+        assertThat(blobs).as("the same step without the declaration is stored").hasSize(1);
+    }
+
+    @Test
     public void stores_and_fetches_round_trip() throws IOException {
         BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo");
         byte[] step = {1};
@@ -72,8 +90,8 @@ public class BuildExecutorHttpCacheTest {
         Files.writeString(output.resolve("file"), "result");
         Files.createDirectory(output.resolve("nested"));
         Files.writeString(output.resolve("nested").resolve("inner"), "deep");
-        cache.store(Runnable::run, "step", step, in, output);
-        Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", step, in, target);
+        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
+        Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", step, in, true, target);
         assertThat(result).isPresent();
         assertThat(target.resolve("file")).content().isEqualTo("result");
         assertThat(target.resolve("nested").resolve("inner")).content().isEqualTo("deep");
@@ -84,12 +102,7 @@ public class BuildExecutorHttpCacheTest {
     @Test
     public void fetch_returns_empty_on_miss() throws IOException {
         BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo");
-        Optional<BuildStepResult> result = cache.fetch(
-                Runnable::run,
-                "step",
-                new byte[]{1},
-                inputs("source", "file", new byte[]{9}),
-                target);
+        Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, target);
         assertThat(result).isEmpty();
     }
 
@@ -99,9 +112,9 @@ public class BuildExecutorHttpCacheTest {
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
         new BuildExecutorHttpCache(uri).key("team-alpha").project("demo").write(false)
-                .store(Runnable::run, "step", step, in, output);
+                .store(Runnable::run, "step", step, in, true, output, "", Map.of());
         assertThat(blobs).isEmpty();
-        assertThat(new BuildExecutorHttpCache(uri).key("team-alpha").project("demo").fetch(Runnable::run, "step", step, in, target)).isEmpty();
+        assertThat(new BuildExecutorHttpCache(uri).key("team-alpha").project("demo").fetch(Runnable::run, "step", step, in, true, target)).isEmpty();
     }
 
     @Test
@@ -110,9 +123,9 @@ public class BuildExecutorHttpCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, in, output);
+        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
         assertThat(blobs).isNotEmpty();
-        assertThat(cache.fetch(Runnable::run, "step", step, in, target)).isEmpty();
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target)).isEmpty();
     }
 
     @Test
@@ -120,7 +133,7 @@ public class BuildExecutorHttpCacheTest {
         Files.createDirectory(output.resolve("nested"));
         Files.writeString(output.resolve("nested").resolve("inner"), "deep");
         new BuildExecutorHttpCache(uri).key("team-alpha").project("demo")
-                .store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), output);
+                .store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, output, "", Map.of());
         List<String> names = new ArrayList<>();
         try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(blobs.values().iterator().next()))) {
             for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
@@ -142,10 +155,10 @@ public class BuildExecutorHttpCacheTest {
         BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo");
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
-        cache.store(Runnable::run, "step", step, in, output);
+        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
 
         Path restored = Files.createTempDirectory("restored");
-        assertThat(cache.fetch(Runnable::run, "step", step, in, restored)).isPresent();
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, restored)).isPresent();
         assertThat(restored.resolve("empty-dir")).isDirectory();
         assertThat(restored.resolve("nested").resolve("deeper").resolve("leaf")).content().isEqualTo("leaf");
     }
@@ -158,7 +171,7 @@ public class BuildExecutorHttpCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, in, output);
+        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
         String identifier = blobs.keySet().iterator().next();
         ByteArrayOutputStream malicious = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(malicious)) {
@@ -168,7 +181,7 @@ public class BuildExecutorHttpCacheTest {
         blobs.put(identifier, malicious.toByteArray());
 
         Path restored = Files.createTempDirectory("restored");
-        assertThat(cache.fetch(Runnable::run, "step", step, in, restored)).isEmpty();
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, restored)).isEmpty();
         assertThat(restored.getParent().resolve("escaped-dir")).doesNotExist();
     }
 
@@ -188,8 +201,7 @@ public class BuildExecutorHttpCacheTest {
                     URI.create("http://localhost:" + hanging.getLocalPort() + "/cache"))
                     .key("team-alpha").project("demo");
             long started = System.nanoTime();
-            assertThat(cache.fetch(Runnable::run, "step", new byte[]{1},
-                    inputs("source", "file", new byte[]{9}), Files.createTempDirectory("hung"))).isEmpty();
+            assertThat(cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, Files.createTempDirectory("hung"))).isEmpty();
             assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(20));
             accepting.interrupt();
         } finally {
@@ -203,7 +215,7 @@ public class BuildExecutorHttpCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, in, output);
+        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
         String identifier = blobs.keySet().iterator().next();
         ByteArrayOutputStream malicious = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(malicious)) {
@@ -213,7 +225,7 @@ public class BuildExecutorHttpCacheTest {
         }
         blobs.put(identifier, malicious.toByteArray());
         Files.writeString(target.resolve("stale"), "leftover");
-        assertThat(cache.fetch(Runnable::run, "step", step, in, target)).isEmpty();
+        assertThat(cache.fetch(Runnable::run, "step", step, in, true, target)).isEmpty();
         try (Stream<Path> contents = Files.list(target)) {
             assertThat(contents.findAny()).isEmpty();
         }
@@ -222,7 +234,7 @@ public class BuildExecutorHttpCacheTest {
     @Test
     public void omits_headers_when_key_and_project_are_unset() throws IOException {
         new BuildExecutorHttpCache(uri)
-                .fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), target);
+                .fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, target);
         assertThat(keys).containsExactly("null");
         assertThat(projects).containsExactly("null");
     }
@@ -256,7 +268,7 @@ public class BuildExecutorHttpCacheTest {
 
         Files.writeString(output.resolve("file"), "x".repeat(100_000));
         new BuildExecutorHttpCache(URI.create("http://localhost:" + rejecting.getLocalPort())).key("team-alpha").project("demo")
-                .store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), output);
+                .store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, output, "", Map.of());
         responder.join(2_000);
         rejecting.close();
         assertThat(bodySeen).isFalse();
@@ -268,9 +280,9 @@ public class BuildExecutorHttpCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
-        cache.store(Runnable::run, "step", step, in, output);
+        cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
         String identifier = blobs.keySet().iterator().next();
-        cache.touch(Runnable::run, "step", step, in);
+        cache.touch(Runnable::run, "step", step, in, true);
         assertThat(heads).containsExactly(identifier);
         assertThat(keys).contains("team-alpha");
         assertThat(projects).contains("demo");
@@ -279,7 +291,7 @@ public class BuildExecutorHttpCacheTest {
     @Test
     public void touch_is_skipped_when_reading_is_disabled() throws IOException {
         new BuildExecutorHttpCache(uri).key("team-alpha").project("demo").read(false)
-                .touch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}));
+                .touch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true);
         assertThat(heads).isEmpty();
     }
 

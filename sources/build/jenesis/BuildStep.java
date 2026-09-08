@@ -42,6 +42,10 @@ public interface BuildStep extends Serializable {
         return arguments.values().stream().anyMatch(BuildStepArgument::hasChanged);
     }
 
+    default boolean shouldCacheRemotely() {
+        return true;
+    }
+
     CompletionStage<BuildStepResult> apply(Executor executor,
                                            BuildStepContext context,
                                            SequencedMap<String, BuildStepArgument> arguments) throws IOException;
