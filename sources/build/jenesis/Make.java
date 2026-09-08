@@ -19,10 +19,6 @@ public final class Make {
     }
 
     private Make(String mainClass, Path root, Path classes, boolean daemon, boolean compile) {
-        if (mainClass == null || mainClass.isBlank()) {
-            throw new IllegalArgumentException("A build needs the name of the class whose main it should run,"
-                    + " such as build.jenesis.Project or a project's own build/Demo.java entry point");
-        }
         this.mainClass = mainClass;
         this.root = root;
         this.classes = classes;
@@ -66,18 +62,34 @@ public final class Make {
     }
 
     private int run(SequencedMap<String, String> collected, String... selectors) throws Exception {
-        Path entry = entry();
-        if (entry == null) {
-            return daemon
-                    ? dispatched(Make.class.getClassLoader(), installed(), engine(), collected, selectors)
-                    : invoke(Make.class.getClassLoader(), collected, selectors);
+        CodeSource code = Make.class.getProtectionDomain().getCodeSource();
+        Path location;
+        try {
+            location = code == null ? null : Path.of(code.getLocation().toURI());
+        } catch (URISyntaxException _) {
+            location = null;
         }
         boolean stop = selectors.length == 1 && selectors[0].equals("--stop");
+        if (location == null || !location.getFileName().toString().endsWith(".java")) {
+            if (!daemon) {
+                return invoke(Make.class.getClassLoader(), collected, selectors);
+            }
+            String modules = System.getProperty("jdk.module.path");
+            String classPath = location == null ? System.getProperty("java.class.path") : location.toString();
+            Path engine = location == null || Files.isRegularFile(location)
+                    ? location
+                    : location.resolve("build").resolve("jenesis");
+            return dispatched(Make.class.getClassLoader(),
+                    modules != null ? List.of("-p", modules) : List.of("-cp", classPath),
+                    engine == null ? "" : fingerprint(engine, files(engine, ""), ""),
+                    collected,
+                    selectors);
+        }
         if (!daemon && !compile && !stop) {
             return invoke(Make.class.getClassLoader(), collected, selectors);
         }
-        Path build = entry.getParent();
-        String seed = seedOf(build);
+        Path build = location.getParent();
+        String seed = fingerprint(build, files(build, ".java"), classes.toString());
         Path folder = precompiled(build, seed);
         try (URLClassLoader loader = new URLClassLoader(
                 new URL[] { folder.toUri().toURL() },
@@ -89,46 +101,31 @@ public final class Make {
         }
     }
 
-    private static String engine() throws IOException {
-        CodeSource code = Make.class.getProtectionDomain().getCodeSource();
-        Path location;
-        try {
-            location = Path.of(code.getLocation().toURI());
-        } catch (URISyntaxException e) {
-            throw new IllegalStateException("Cannot resolve where the running engine was loaded from", e);
-        }
+    private static String fingerprint(Path folder, List<Path> files, String salt) throws IOException {
+        HashDigestFunction function = new HashDigestFunction("SHA-256");
         MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is unavailable to fingerprint " + location, e);
+            throw new IllegalStateException(e);
         }
-        if (Files.isRegularFile(location)) {
-            digest.update(Files.readAllBytes(location));
-            return HexFormat.of().formatHex(digest.digest());
-        }
-        Path folder = location.resolve("build").resolve("jenesis");
-        try (Stream<Path> walk = Files.walk(folder, FileVisitOption.FOLLOW_LINKS)) {
-            for (Path file : walk.filter(Files::isRegularFile).sorted().toList()) {
-                digest.update(folder.relativize(file).toString().getBytes(StandardCharsets.UTF_8));
-                digest.update(Files.readAllBytes(file));
-            }
+        digest.update(salt.getBytes(StandardCharsets.UTF_8));
+        for (Path file : files) {
+            digest.update(folder.relativize(file).toString().getBytes(StandardCharsets.UTF_8));
+            digest.update(function.hash(file));
         }
         return HexFormat.of().formatHex(digest.digest());
     }
 
-    private List<String> installed() {
-        String modules = System.getProperty("jdk.module.path");
-        if (modules != null) {
-            return List.of("-p", modules);
+    private static List<Path> files(Path folder, String suffix) throws IOException {
+        if (Files.isRegularFile(folder)) {
+            return List.of(folder);
         }
-        CodeSource code = Make.class.getProtectionDomain().getCodeSource();
-        try {
-            return code == null
-                    ? List.of("-cp", System.getProperty("java.class.path"))
-                    : List.of("-cp", Path.of(code.getLocation().toURI()).toString());
-        } catch (URISyntaxException _) {
-            return List.of("-cp", System.getProperty("java.class.path"));
+        try (Stream<Path> walk = Files.walk(folder, FileVisitOption.FOLLOW_LINKS)) {
+            return walk.filter(Files::isRegularFile)
+                    .filter(file -> file.getFileName().toString().endsWith(suffix))
+                    .sorted()
+                    .toList();
         }
     }
 
@@ -168,20 +165,6 @@ public final class Make {
         return location == null || location.isBlank() ? root : root.resolve(location).normalize();
     }
 
-    private static Path entry() {
-        CodeSource code = Make.class.getProtectionDomain().getCodeSource();
-        if (code == null) {
-            return null;
-        }
-        Path entry;
-        try {
-            entry = Path.of(code.getLocation().toURI());
-        } catch (URISyntaxException _) {
-            return null;
-        }
-        return entry.getFileName().toString().endsWith(".java") ? entry : null;
-    }
-
     private static boolean configured(String name, boolean fallback) {
         String property = configured(name);
         return property == null ? fallback : Boolean.parseBoolean(property);
@@ -203,27 +186,6 @@ public final class Make {
             throw new UncheckedIOException("Cannot read " + file + " to decide how to run the build", e);
         }
         return properties.getProperty(name);
-    }
-
-    private String seedOf(Path build) throws IOException {
-        MessageDigest digest;
-        try {
-            digest = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is unavailable to fingerprint " + build, e);
-        }
-        digest.update(classes.toString().getBytes(StandardCharsets.UTF_8));
-        for (Path source : sourcesOf(build)) {
-            digest.update(build.relativize(source).toString().getBytes(StandardCharsets.UTF_8));
-            digest.update(Files.readAllBytes(source));
-        }
-        return HexFormat.of().formatHex(digest.digest());
-    }
-
-    private static List<Path> sourcesOf(Path build) throws IOException {
-        try (Stream<Path> walk = Files.walk(build, FileVisitOption.FOLLOW_LINKS)) {
-            return walk.filter(file -> file.getFileName().toString().endsWith(".java")).sorted().toList();
-        }
     }
 
     private Path precompiled(Path build, String seed) throws IOException {
@@ -255,7 +217,7 @@ public final class Make {
             Files.createDirectories(classes);
             arguments.addAll(List.of("-d", classes.toString()));
         }
-        sourcesOf(build).forEach(source -> arguments.add(source.toString()));
+        files(build, ".java").forEach(source -> arguments.add(source.toString()));
         StringWriter out = new StringWriter(), error = new StringWriter();
         if (javac.run(new PrintWriter(out), new PrintWriter(error), arguments.toArray(String[]::new)) != 0) {
             throw new IllegalStateException("Failed to compile the build sources under "

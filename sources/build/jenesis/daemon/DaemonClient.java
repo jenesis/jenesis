@@ -1,6 +1,7 @@
 package build.jenesis.daemon;
 
 import module java.base;
+import build.jenesis.HashDigestFunction;
 import build.jenesis.Project;
 
 public final class DaemonClient {
@@ -59,9 +60,21 @@ public final class DaemonClient {
     public int dispatch(String seed, String... selectors) throws IOException, InterruptedException {
         boolean stop = selectors.length == 1 && selectors[0].equals("--stop");
         String[] arguments = stop ? new String[0] : selectors;
-        String fingerprint = fingerprintOf(seed.isBlank()
+        SequencedMap<String, String> environment = new TreeMap<>(System.getenv())
+                .entrySet()
+                .stream()
+                .filter(entry -> !VOLATILE.contains(entry.getKey()))
+                .collect(LinkedHashMap::new, (map, entry) -> map.put(entry.getKey(), entry.getValue()), Map::putAll);
+        for (String argument : ProcessHandle.current().info().arguments().orElse(new String[0])) {
+            if (argument.startsWith("-D") && !argument.startsWith("-Djenesis.")
+                    || argument.startsWith("-X")
+                    || argument.equals("-ea")) {
+                environment.put(argument, "");
+            }
+        }
+        String fingerprint = fingerprint(seed.isBlank()
                 ? Stream.of(path.getLast().split(File.pathSeparator)).map(Path::of).toList()
-                : List.of(), seed, environment());
+                : List.of(), seed, environment);
         for (int attempt = 0; attempt < 2; attempt++) {
             Integer code = request(fingerprint, stop, arguments);
             if (code != null) {
@@ -76,29 +89,14 @@ public final class DaemonClient {
                 + " - see daemon.log there, or set -Djenesis.make.daemon=false to build without it");
     }
 
-    private static SequencedMap<String, String> environment() {
-        SequencedMap<String, String> environment = new TreeMap<>(System.getenv())
-                .entrySet()
-                .stream()
-                .filter(entry -> !VOLATILE.contains(entry.getKey()))
-                .collect(LinkedHashMap::new, (map, entry) -> map.put(entry.getKey(), entry.getValue()), Map::putAll);
-        for (String argument : ProcessHandle.current().info().arguments().orElse(new String[0])) {
-            if (argument.startsWith("-D") && !argument.startsWith("-Djenesis.")) {
-                environment.put(argument, "");
-            } else if (argument.startsWith("-X") || argument.equals("-ea")) {
-                environment.put(argument, "");
-            }
-        }
-        return environment;
-    }
-
-    private static String fingerprintOf(Collection<Path> files, String seed, SequencedMap<String, String> environment)
+    private static String fingerprint(Collection<Path> files, String seed, SequencedMap<String, String> environment)
             throws IOException {
+        HashDigestFunction function = new HashDigestFunction("SHA-256");
         MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is unavailable to fingerprint " + files, e);
+            throw new IllegalStateException(e);
         }
         digest.update(seed.getBytes(StandardCharsets.UTF_8));
         environment.forEach((name, value) -> {
@@ -111,11 +109,11 @@ public final class DaemonClient {
                 try (Stream<Path> walk = Files.walk(file, FileVisitOption.FOLLOW_LINKS)) {
                     for (Path nested : walk.filter(Files::isRegularFile).sorted().toList()) {
                         digest.update(file.relativize(nested).toString().getBytes(StandardCharsets.UTF_8));
-                        digest.update(Files.readAllBytes(nested));
+                        digest.update(function.hash(nested));
                     }
                 }
             } else if (Files.isRegularFile(file)) {
-                digest.update(Files.readAllBytes(file));
+                digest.update(function.hash(file));
             }
         }
         return HexFormat.of().formatHex(digest.digest());
@@ -208,7 +206,13 @@ public final class DaemonClient {
         }
     }
 
-    private List<String> command(String fingerprint) {
+    private void start(String fingerprint) throws IOException, InterruptedException {
+        Path port = folder.resolve("daemon.port");
+        Files.createDirectories(folder);
+        if (Files.isRegularFile(port)) {
+            request(fingerprint, true);
+        }
+        Files.deleteIfExists(port);
         List<String> command = new ArrayList<>();
         command.add(ProcessHandle.current().info().command().orElseThrow(() -> new IllegalStateException(
                 "Cannot resolve the running Java executable to start a build daemon"
@@ -230,17 +234,7 @@ public final class DaemonClient {
         }
         command.add(root.toString());
         command.add(fingerprint);
-        return command;
-    }
-
-    private void start(String fingerprint) throws IOException, InterruptedException {
-        Path port = folder.resolve("daemon.port");
-        Files.createDirectories(folder);
-        if (Files.isRegularFile(port)) {
-            request(fingerprint, true);
-        }
-        Files.deleteIfExists(port);
-        new ProcessBuilder(command(fingerprint))
+        new ProcessBuilder(command)
                 .directory(root.toFile())
                 .redirectErrorStream(true)
                 .redirectOutput(ProcessBuilder.Redirect.appendTo(folder.resolve("daemon.log").toFile()))
