@@ -60,10 +60,14 @@ surprised by the environment. Choose the reading deliberately: `Boolean.getBoole
 `getProperty(...) != null` means presence alone switches it on, `parseBoolean(getProperty(..., "true"))` means
 an opt-out. Environment variables are fallbacks for the repository settings only
 (`MAVEN_REPOSITORY_URI`, `JENESIS_REPOSITORY_TOKEN`, …). `jenesis.properties` at the project root and the
-profile files feed the same properties; `Project.main` loads them before anything is constructed. A new
-property is added in three places - the constructor that reads it, the `help` text in `Project.java` (and
-`skill` where it fits), and the reference table in the user documentation; the `properties` selector picks it
-up by itself.
+profile files feed the same properties; `Project.perform` and `Project.run` load them before anything is
+constructed. A new property is added in three places - the constructor that reads it, the catalogue behind the
+`configuration` selector in `Project.java`, and the reference table in the user documentation. That catalogue
+is the tool's own property reference: one line per property, `<key>|<default>|<description>`, printed with the
+value in force, so **adding, renaming or removing a property means editing it in the same commit** - a
+`jenesis.*` the code reads and the catalogue does not list is a bug, and so is a line whose default has drifted
+from the constructor that reads it. `help` and `skill` point at `configuration` rather than listing properties,
+so neither grows for a new property; `help` grows for a new selector.
 
 **Configuration files are read through `SequencedProperties`.** A file is read with the type's own accessors -
 `value`, `value(key, default)`, `flag`, `flag(key, default)`, `entries` for a comma-separated list, `words`

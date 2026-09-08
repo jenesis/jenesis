@@ -66,7 +66,8 @@ public record Project(
             METADATA = "metadata",
             HELP = "help",
             SKILL = "skill",
-            PROPERTIES = "properties";
+            PROPERTIES = "properties",
+            CONFIGURATION = "configuration";
 
     @FunctionalInterface
     public interface Layout {
@@ -401,408 +402,70 @@ public record Project(
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
             System.out.println(("""
                     %{title}Jenesis%{reset} - a Java build tool, written and configured in Java.
-                    
+
                     %{header}Active configuration:%{reset}
                       layout      %{name}%{layout}%{reset}
                       assembler   %{name}%{assembler}%{reset}
-                    
-                    %{header}Usage:%{reset}
-                      Pass selectors as command-line arguments to the build launcher
-                      (the installed %{name}jenesis%{reset} CLI, a source-mode
-                      %{name}Make.java%{reset} script, or a programmatic
-                      %{name}Project.build(...)%{reset} call from Java code).
-                    
-                    Without selectors, the default target (%{name}build%{reset}) is executed.
-                    
-                    %{header}Selectors (available in every layout):%{reset}
-                      %{name}build%{reset}        Resolve, compile, package, and test every module
-                      %{name}stage%{reset}        Stage produced artifacts into a local repository
-                      %{name}export%{reset}       Export the staged repository as the build deliverable
-                      %{name}pin%{reset}          Rewrite version/checksum pins into pom.xml or module-info.java
-                      %{name}dependencies%{reset} Print each module's resolved dependency graph (with licenses)
-                      %{name}ide%{reset}          Generate IntelliJ IDEA, VS Code, and Eclipse project metadata
-                      %{name}metadata%{reset}     Refresh the metadata module outputs
-                      %{name}help%{reset}         Print this message
-                      %{name}skill%{reset}        Print an agent-oriented onboarding briefing (plain text)
-                      %{name}properties%{reset}   Print the active -Djenesis.* system properties, sorted by key
-                    
-                    %{header}Module-scoped selector:%{reset}
-                      A selector starting with %{name}+%{reset} is shorthand for a single project module:
-                      %{name}+<module>%{reset} resolves to the module's subgraph inside %{name}build%{reset} (it does
-                      not run %{name}stage%{reset}, %{name}export%{reset}, or %{name}pin%{reset}; invoke those explicitly if needed).
-                      %{name}+<module>/<step>%{reset} drills further into a specific step inside that
-                      module, e.g. %{name}+myModule/compile/dependencies/resolved%{reset}.
-                      <module> matches the source folder that holds the module's pom.xml
-                      or module-info.java. A module in a nested folder is written with %{name}+%{reset}
-                      between the segments (a %{name}/%{reset} starts the step tail): the module in
-                      %{name}foo/bar%{reset} is selected as %{name}+foo+bar%{reset}, its compile step as
-                      %{name}+foo+bar/compile%{reset}. Run %{name}build%{reset} once and look at the printed
-                      module-* lines to discover available module names.
-                    
-                    %{header}Wildcards in selectors:%{reset}
-                      %{name}:%{reset}   matches a single path segment, e.g. %{name}build/:/java%{reset} matches
-                          the %{name}java%{reset} step of every direct child of %{name}build%{reset}.
-                      %{name}::%{reset}  matches any depth (zero or more segments), e.g. %{name}::/test%{reset}
-                          matches every %{name}test%{reset} step anywhere in the tree.
-                      Both wildcards are lenient: branches that fail to match are silently
-                      skipped, so a typo in the tail of a %{name}::%{reset} selector produces no error.
-                    
-                    %{header}System properties (-Djenesis.project.<key>=<value>):%{reset}
-                      Read by the default %{name}new Project()%{reset} constructor as the starting
-                      defaults, so they apply unless a wired value overrides them
-                      (an explicit %{name}.layout(...)%{reset}, %{name}.target(...)%{reset}, and so on wins).
-                      %{name}root%{reset}, %{name}target%{reset}, %{name}artifacts%{reset}          Override input/output locations
-                      %{name}layout%{reset}                           auto, maven, modular, or modular_to_maven
-                      %{name}sources%{reset}, %{name}documentation%{reset}           Assemble source/javadoc jars
-                      %{name}metadata%{reset}                         Path-separated list of extra metadata files
-                      %{name}configuration%{reset}                    Directories the inferred tools search for config files (default: build.jenesis/ under the root; empty skips them; @ splices the default)
-                      %{name}boms%{reset}                             Path-separated locations of local pin-<name>.properties files (default: configuration)
-                      %{name}version%{reset}                          Project version
-                      %{name}digest%{reset}                           Algorithm for pin and dependency checksums (default: SHA-256)
-                      %{name}watch%{reset}                            Rebuild the selected target whenever a source file changes (Ctrl+C to stop)
-                      %{name}docker%{reset}[, %{name}docker.image%{reset}]           Wrap the build in a container; the root, JDK, local
-                                                      repositories, and all configured out-of-root locations
-                                                      (target, artifacts, configuration, boms, metadata,
-                                                      file caches) are mounted at their host paths
-                      %{name}docker.mount%{reset} <h[:c],...>         Extra read-only container mounts (host or host:container)
-                      %{name}docker.mountWritable%{reset} <h[:c],...> Extra writable container mounts
-                      %{name}docker.env%{reset} <N[=V],...>           Forward host env vars (name) or set them (name=value)
-                    
-                    %{header}Daemon (-Djenesis.daemon.<key>=<value>):%{reset}
-                      Hands the build to a reused JVM, which keeps the compiled engine and a warm
-                      JIT between calls. Running compiled - the installed CLI - uses one by
-                      default, because that is the repeated local invocation it pays off for.
-                      Source mode does not, because CI and container builds run once and would
-                      only carry the overhead. %{name}jenesis.make.daemon%{reset} decides either way (see below);
-                      the settings here configure the daemon process itself.
-                      %{name}idle%{reset} <s>                       Exit after idling this many seconds (default: 10800)
-                      %{name}options%{reset} <args>                 JVM options for the daemon process itself, whitespace
-                                                       separated (default: %{name}-Xmx2g%{reset}, since a JVM left to itself
-                                                       would idle on a quarter of the machine's memory);
-                                                       the build's own %{name}-Djenesis.*%{reset} travel per call
-                      %{name}--stop%{reset} as the only selector shuts the daemon for this project down. One
-                      daemon serves one project, and only the %{name}-Djenesis.*%{reset} properties are per call:
-                      they are cleared and set again around every build, so no call sees another's.
-                      Everything a running JVM cannot change is its identity instead - the build
-                      sources, the environment, the JVM arguments and any non-%{name}jenesis%{reset} %{name}-D%{reset} - and a
-                      call that differs in any of them replaces the daemon rather than being served
-                      by one configured for something else. A second concurrent build is refused
-                      exactly as it is without a daemon, and a dockerized build is refused since it
-                      replaces the running process.
 
-                    %{header}Make (java build/jenesis/Make.java [selectors...]):%{reset}
-                      The entry point. It carries no build logic and references no engine class, so
-                      the Java launcher compiles one small file rather than the whole engine: it reaches
-                      its own main in 0.4 seconds, where a file declaring %{name}Project%{reset} takes 1.5. It
-                      then runs the build, in a daemon where one is wanted.
-                      %{name}-Djenesis.make.compile%{reset} <boolean>  Compile the build sources once and run from those
-                                                       classes, over a class loader of their own (default: true).
-                                                       One batch compile beats the Java launcher compiling class by
-                                                       class as it loads them, so this wins even on a build that
-                                                       runs once: 3.6s against 8.0s here, and 0.8s once cached
-                      %{name}-Djenesis.make.classes%{reset} <path>    Where those classes land, relative to the root
-                                                       (default: alongside the sources they came from)
-                      %{name}-Djenesis.make.daemon%{reset} <boolean>   The same, but hand the build to a reused JVM, which
-                                                       keeps a warm JIT between calls (default: false)
-                      All three are read from jenesis.properties at the project root as well, which
-                      is where a project wanting a daemon asks for one.
+                    %{header}Getting started:%{reset}
+                      Jenesis infers the build from the project's own layout, so there is no build
+                      script to write. Pass selectors as command-line arguments; without one,
+                      %{name}build%{reset} runs.
 
-                      What the daemon saves is compiling speed, not setup: a build has no script
-                      to parse, and spends its time inside javac, which a JVM that has already
-                      compiled a few modules runs faster. So it pays in proportion to how much a
-                      build compiles - nothing at all on a build that compiles little, where the
-                      socket costs more than the warm code saves, and about a third off a
-                      five-module project. It is the last increment, not the first: compiling the
-                      build sources once is what removes the large fixed cost, and needs no
-                      process left running.
-                      %{name}Project%{reset} itself is the configuration API - %{name}new Project().version(...)%{reset} and
-                      %{name}Project.build(...)%{reset} - and is no longer an entry point. A project driving its own
-                      entry point reuses Make from a file beside it, as
-                      %{name}System.exit(new Make("build.Demo").run(selectors))%{reset}.
+                        %{name}java build/jenesis/Make.java%{reset}         Build every module
+                        %{name}java build/jenesis/Make.java stage%{reset}   Run another selector
+                        %{name}jenesis stage%{reset}                        The same on the installed CLI
 
-                    %{header}Executor (-Djenesis.executor.<key>=<value>):%{reset}
-                      %{name}concurrency%{reset} <n>                  Run at most <n> build steps at once; %{name}0%{reset} (the
-                                                       default) leaves the build unbounded, and a negative
-                                                       value is rejected
-                      %{name}timeout%{reset} <duration>               Abort a step that outruns this ISO-8601 duration
-                                                       (default: PT0S, no timeout)
-                      %{name}digest%{reset} <algorithm>               MessageDigest algorithm behind the content and
-                                                       step hashes that drive the cache (default: MD5)
-                      %{name}rebuild%{reset}                          Wipe target/ before building so every step
-                                                       recomputes (default: false); prefer letting the
-                                                       incremental cache decide what is stale
-                      %{name}aggregate%{reset}                        Collect independent step failures into one report
-                                                       instead of failing at the first (default: false)
+                      Every step prints a line naming its place in the build graph, and those
+                      names are the selector grammar: run %{name}build%{reset} once and read them back.
 
-                    %{header}Tool execution (-Djenesis.process.<key>=<value>):%{reset}
-                      %{name}concurrency%{reset} <n>                  Run at most <n> JDK tool runs at once, across every
-                                                       step that runs one; %{name}0%{reset} (the default) leaves them
-                                                       unbounded, and a negative value is rejected. It
-                                                       caps the tools underneath the step limit above,
-                                                       which counts every kind of step
-                      %{name}factory%{reset} <tool|fork>              How a JDK tool runs: %{name}tool%{reset} (the default) invokes it
-                                                       in-process through its ToolProvider, %{name}fork%{reset} starts
-                                                       a separate process for it, which a stricter
-                                                       sandbox can require
+                    %{header}Selectors:%{reset}
+                      %{name}build%{reset}         Resolve, compile, package, and test every module
+                      %{name}stage%{reset}         Stage produced artifacts into a local repository
+                      %{name}export%{reset}        Export the staged repository as the build deliverable
+                      %{name}pin%{reset}           Rewrite version/checksum pins into pom.xml or module-info.java
+                      %{name}dependencies%{reset}  Print each module's resolved dependency graph
+                      %{name}ide%{reset}           Generate IntelliJ IDEA, VS Code, and Eclipse project metadata
+                      %{name}metadata%{reset}      Refresh the metadata module outputs
+                      %{name}configuration%{reset} Print every setting with the value in force, one per line
+                      %{name}properties%{reset}    Print only the %{name}-Djenesis.*%{reset} properties that are set
+                      %{name}help%{reset}          Print this message
+                      %{name}skill%{reset}         Print the briefing for a coding agent
 
-                    %{header}Printing (-Djenesis.print.<key>=<value>):%{reset}
-                      %{name}progress%{reset}                         Print the build progress lines (default: true)
-                      %{name}checksum%{reset}                         Print each step's input/output file checksums
-                      %{name}command%{reset}                          Print each external tool command line as it runs
-                      %{name}process%{reset}                          Stream each external tool's command and output to the console as it runs (override per command, e.g. %{name}javac%{reset}, %{name}tests%{reset})
-                      %{name}fetch%{reset}                            Print each artifact downloaded from a repository
-                      %{name}cache%{reset}                            Print each step served from or written to the build cache
-                      %{name}docker%{reset}                           Print the Docker image when a build/run is wrapped (default: true)
-                    
-                    %{header}Pinning (-Djenesis.dependency.pin=<mode>):%{reset}
-                      %{name}strict%{reset} fails the build on any unpinned artifact; %{name}ignore%{reset} floats
-                      versions to the latest and skips checksum verification, keeping a
-                      managed version only where the declaration itself has none, while a
-                      versioned @jenesis.bom reference floats to the latest published BOM
-                      whose entries keep managing resolution (refresh the pins by running
-                      the %{name}pin%{reset} step under it); %{name}versions%{reset} keeps the
-                      pinned versions but skips checksum verification. Unset keeps existing
-                      pins but tolerates missing ones.
+                      %{name}+<module>%{reset} narrows the build to one module and %{name}+<module>/<step>%{reset} to a
+                      single step inside it; %{name}:%{reset} matches one path segment and %{name}::%{reset} any depth,
+                      as in %{name}::/test%{reset}.
 
-                    %{header}Maven resolution (-Djenesis.resolver.maven=<strategy>):%{reset}
-                      Which version a Maven coordinate resolves to. %{name}maven%{reset} (the default)
-                      follows Maven: the declaration nearest the root wins, except that a
-                      version range is a hard requirement, and a conflict involving one is
-                      decided against the repository metadata as the highest published
-                      version satisfying every competing range. %{name}closest%{reset} keeps the
-                      nearest declaration even against a competing range. %{name}latest%{reset} and
-                      %{name}release%{reset} ignore every declared and pinned version and take the
-                      newest version, or the newest non-snapshot release, that the
-                      repository's metadata publishes - an upgrade probe rather than a
-                      reproducible build, since a checksum pinned for another version stops
-                      applying.
+                    %{header}Watching what a step does:%{reset}
+                      A step prints its name and its timing, and nothing of the tool underneath.
+                      To see into one:
+                      %{name}-Djenesis.print.process%{reset}   Stream each external tool's command line and its
+                                                output to the console as it runs - the first thing
+                                                to reach for when a step fails or will not finish.
+                                                Narrow it to one tool with %{name}-Djenesis.print.<command>%{reset},
+                                                as %{name}-Djenesis.print.javac%{reset} or %{name}-Djenesis.print.tests%{reset}
+                      %{name}-Djenesis.print.command%{reset}   Print those command lines without their output
+                      %{name}-Djenesis.print.fetch%{reset}     Print each artifact downloaded from a repository
+                      %{name}-Djenesis.print.cache%{reset}     Print each step served from or written to the cache
+                      %{name}-Djenesis.print.checksum%{reset}  Print each step's input and output checksums, to
+                                                see what made a step re-run
+                      %{name}-Djenesis.print.progress=false%{reset}
+                                                Drop the progress lines themselves
 
-                    %{header}Modular resolution (-Djenesis.resolver.module=<mode>):%{reset}
-                      What a modular resolution does with the versions a %{name}module-info%{reset}
-                      records for its own requirements, which rank behind a pin and ahead of
-                      an inline %{name}<module>/<version>%{reset}. %{name}first%{reset} (the default) keeps the one
-                      the nearest descriptor recorded and drops every later disagreement
-                      silently; %{name}ignore%{reset} never keeps one, so an unpinned module resolves to
-                      whatever the repository serves as its latest; %{name}fail%{reset} rejects two
-                      descriptors that disagree about a module's version. A pinned module
-                      takes its pin under every mode.
+                    %{header}Configuration:%{reset}
+                      Every setting is a %{name}-Djenesis.<area>.<name>%{reset} property, and %{name}jenesis.properties%{reset}
+                      at the project root sets the same keys. %{name}configuration%{reset} prints all of them
+                      with the value in force and where it came from, one per line to grep:
 
-                    %{header}Dependency tree (-Djenesis.tree.<key>=<value>):%{reset}
-                      %{name}format%{reset} <full|compact>            What the %{name}dependencies%{reset} selector prints. %{name}full%{reset} (the
-                                                       default) prints every module's graph in full;
-                                                       %{name}compact%{reset} keeps only the modules the build produces
-                                                       itself and folds the external closure into counts
-                      %{name}tests%{reset} <true|false>               Print the modules that are declared with
-                                                       %{name}@jenesis.test%{reset} (default: true); false
-                                                       leaves them out of either format, as they are not
-                                                       part of what the project releases
+                        java build/jenesis/Make.java configuration | grep print
 
-                    %{header}Pin step (-Djenesis.pin.<key>=<value>):%{reset}
-                      %{name}checksum%{reset} <true|false>          Record content checksums in pins (default: true);
-                                                       false writes versions only
-                      %{name}bom%{reset} <keep|flatten>             %{name}keep%{reset} (default) writes no pin for a dependency a
-                                                       BOM already supplies (removing a now-redundant
-                                                       pin line) and pins each versioned @jenesis.bom
-                                                       reference with its file hash; a Maven BOM takes
-                                                       no hash, so its reference is pinned by version
-                                                       and its entries never cover - each resolved
-                                                       artifact it manages is pinned with its computed
-                                                       checksum instead; %{name}flatten%{reset} removes
-                                                       the @jenesis.bom declarations and pins the
-                                                       resolved closure in full
+                      A module is configured by the %{name}@jenesis.*%{reset} tags on its %{name}module-info.java%{reset}
+                      and by the files in its %{name}build.jenesis%{reset} folder.
 
-                    %{header}Platform (-Djenesis.platform.<token>=<true|false>):%{reset}
-                      The active platform starts from the detected operating system and
-                      chipset (%{name}windows%{reset}/%{name}linux%{reset}/%{name}macos%{reset} plus %{name}x86_64%{reset}/%{name}aarch64%{reset}). A
-                      %{name}<token>=true%{reset} flag adds a token and %{name}<token>=false%{reset} removes a
-                      detected one, selecting platform-guarded pins (see the guard
-                      suffix below); e.g. %{name}-Djenesis.platform.linux=false
-                      -Djenesis.platform.windows=true%{reset} cross-resolves a Windows closure.
-
-                    %{header}Repositories (-Djenesis.repository.<key>=<value>):%{reset}
-                      %{name}insecure%{reset}                          Allow plaintext (%{name}http://%{reset}) repository fetches;
-                                                      by default only %{name}https://%{reset} and %{name}file://%{reset} are
-                                                      accepted and a credential is never forwarded
-                                                      across a redirect to another host
-                      %{name}retries%{reset}                           Retries after a failed fetch (default %{name}2%{reset}):
-                                                      HTTP 429 and 5xx responses and dropped connections
-                                                      are retried with exponential backoff, honoring
-                                                      %{name}Retry-After%{reset}; %{name}0%{reset} disables
-                      %{name}backoff%{reset}                           Initial wait in milliseconds between retries,
-                                                      doubling per attempt (default %{name}125%{reset})
-                      The Maven and Jenesis module repositories take a %{name}uri%{reset} (remote),
-                      %{name}local%{reset} (on-disk cache) and %{name}token%{reset} (bearer credential) under
-                      %{name}jenesis.maven.<key>%{reset} and %{name}jenesis.module.<key>%{reset}; each falls back to the
-                      %{name}MAVEN_REPOSITORY_<KEY>%{reset} / %{name}JENESIS_REPOSITORY_<KEY>%{reset} environment variable.
-                      The %{name}uri%{reset} accepts a comma-separated list queried left to right; a
-                      %{name}<url>|<id>|...%{reset} entry only serves group ids (Maven) or module ids
-                      (Jenesis) that equal an %{name}<id>%{reset} or sit below it at a dot boundary.
-                      An %{name}@%{reset} entry splices in the default configuration (the environment
-                      value, else the built-in default) and %{name}@<name>%{reset} the value of that
-                      property or environment variable; unresolved or circular references fail.
-
-                    %{header}Tests (-Djenesis.test.<key>=<value>):%{reset}
-                      %{name}skip%{reset}                             Skip executing tests
-                      %{name}engine%{reset} <name>                    Force the test engine (%{name}junit-platform%{reset},
-                                                      %{name}junit4%{reset}, %{name}testng%{reset}); unset auto-detects it
-                                                      from the resolved test dependencies
-                      %{name}filter%{reset} <patterns>                Comma-separated %{name}<classRegex>[#<method>]%{reset} entries
-                                                      restricting which tests run; a previous result is
-                                                      reused only under the identical filter
-                      %{name}tag%{reset} <expressions>                Comma-separated tags; only tests carrying one of
-                                                      them run. %{name}junit-platform%{reset} reads each entry as a tag
-                                                      expression, so %{name}!(slow)%{reset} excludes; %{name}testng%{reset} matches
-                                                      them against its groups; %{name}junit4%{reset} rejects them
-                      %{name}force%{reset}                            Execute the tests even where a previous run
-                                                      already covered them, for flaky tests and debugging
-                      %{name}incremental%{reset} [<digest>]           Re-run only the tests a change can reach: a fast
-                                                      feedback aid for %{name}watch%{reset} loops, not a correctness gate.
-                                                      Static selection cannot see reflection or other indirect
-                                                      couplings, so conclude with a full run once a change is
-                                                      done. The value names the change-detection digest; omit it for %{name}MD5%{reset}
-                      %{name}parallel%{reset}                         Let the engine execute the matched tests
-                                                      concurrently, where its own configuration allows it
-                      %{name}reporting%{reset}                        Write test reports into the module's
-                                                      %{name}reports/tests%{reset} folder, which %{name}stage%{reset} collects.
-                                                      %{name}junit-platform%{reset} writes both the legacy JUnit XML
-                                                      that CI report plugins read and the Open Test
-                                                      Reporting XML; %{name}testng%{reset} writes its own report there;
-                                                      %{name}junit4%{reset} has no reporter and writes none
-
-                    %{header}Staging (-Djenesis.stage.<key>=<value>):%{reset}
-                      %{name}tests%{reset}                            Stage test-variant artifacts alongside main artifacts;
-                                                       a module marked %{name}@jenesis.test abstract%{reset} is never staged
-                    
-                    %{header}Build cache (-Djenesis.cache.uri=<uri>):%{reset}
-                      Reuse step outputs across builds. A %{name}file://%{reset} URI is an on-disk
-                      cache, tuned by an optional %{name}cache.properties%{reset} at its root; an
-                      %{name}http(s)://%{reset} URL is a remote cache server, configured through
-                      %{name}jenesis.cache.<key>%{reset}: %{name}project%{reset} names the project and %{name}key%{reset} the access
-                      key (both sent as headers), %{name}timeout%{reset} bounds the connect attempt
-                      (default %{name}PT1S%{reset}) and %{name}insecure%{reset} permits the key over plaintext http
-                      off loopback. Reads block the build; writes run on a background
-                      thread. Trace them with %{name}-Djenesis.print.cache%{reset}.
-                      %{name}-Djenesis.project.cache%{reset} keeps a project-local cache (a filesystem
-                      path; empty resolves to %{name}.jenesis/cache%{reset} under the project root);
-                      with a remote configured it layers in front, and a local hit still
-                      sends the remote a HEAD touch so its LRU stays warm.
-
-                    %{header}Cache invalidation:%{reset}
-                      Changes to the sources of the project being built are always
-                      detected. When working on the build itself, in-code-only changes
-                      to a custom build step are not detected because the incremental
-                      cache keys each step by its serialized form; bump the step class's
-                      %{name}serialVersionUID%{reset} to force re-execution of such steps, or pass
-                      %{name}-Djenesis.executor.rebuild=true%{reset} for a full rebuild.
-                    
-                    %{header}Custom Javadoc tags in module-info.java:%{reset}
-                      %{name}@jenesis.release%{reset} <V>             Java release target
-                      %{name}@jenesis.main%{reset} <class>            Main class for the module
-                      %{name}@jenesis.test%{reset} [<module>|abstract]
-                                                       Mark module as a test variant of <module>; the
-                                                       %{name}abstract%{reset} form declares no tests of its own but
-                                                       supplies infrastructure to modules that do, is
-                                                       never executed and never staged
-                      %{name}@jenesis.pin%{reset} <group>/<repo>/<coord> <ver> [<algo>/<hex>] [<guard>]
-                                                       Pin a dependency version and checksum
-                                                       (<module> is short for <group>/module/<module>,
-                                                       <groupId>/<artifactId> for <group>/maven/<groupId>/<artifactId>);
-                                                       an optional trailing %{name}[<token>,<token>...]%{reset} guard applies
-                                                       the pin only when those tokens are in the active platform,
-                                                       with an unguarded line for the same coordinate as fallback
-                      %{name}@jenesis.alias%{reset} <module> <groupId>/<artifactId>[/<type>[/<classifier>]]
-                                                       Alias a module name to a Maven artifact (MODULAR_TO_MAVEN
-                                                       layout only): requiring <module> resolves the artifact and
-                                                       its dependency graph under that stable name, so also a
-                                                       non-modular artifact can be required without relying on a
-                                                       derived automatic module name; the declaration carries no
-                                                       version - a @jenesis.pin or BOM entry for the coordinate
-                                                       states it and is the place for a checksum, failing which
-                                                       a coordinate the closure already resolves is taken at
-                                                       that version unchanged, and only a coordinate nothing
-                                                       else pulls in is negotiated as LATEST
-                      %{name}@jenesis.exclude%{reset} <module> <groupId>/<artifactId>...
-                                                       Drop transitive dependencies from what requiring <module>
-                                                       resolves (MODULAR_TO_MAVEN layout only), for the upstream
-                                                       pom that declares a dependency it should not; one line
-                                                       names one module and any number of targets, repeated lines
-                                                       for a module add to each other, and each target is an
-                                                       exact <groupId>/<artifactId>. An excluded dependency takes
-                                                       the subtree it pulled in with it and never reaches the
-                                                       resolved closure, so it is absent from the compile and
-                                                       runtime paths and from the generated pom alike. Excluding
-                                                       from a module that is not required is an error
-                      %{name}@jenesis.override%{reset} <module> <module>...
-                                                       Replace a module with the modules that already carry its
-                                                       packages (MODULAR_TO_MAVEN layout only), for a dependency
-                                                       that shades another module's content, as Tomcat Embed
-                                                       shades the Jakarta Servlet API. Jenesis puts a module of
-                                                       that name on the module path which contains no packages
-                                                       and requires the named carriers transitively, so requiring
-                                                       it reads the carrier's copy, and it drops every resolved
-                                                       artifact that declares the overridden module, so neither
-                                                       the module path nor the generated pom carries the packages
-                                                       twice. One line names one module and any number of
-                                                       carriers, repeated lines for a module add to each other,
-                                                       and a carrier no resolved dependency declares is an error
-                      %{name}@jenesis.bom%{reset} <token> [<ver> [<algo>/<hex>]] [<guard>]
-                                                       Import managed versions from a BOM; the token follows the
-                                                       pin grammar: a bare <module> (short for <group>/module/<module>)
-                                                       names a BOM properties file in the module repository, fetched
-                                                       at <ver> or floating latest without one, and
-                                                       <groupId>/<artifactId> (short for <group>/maven/...) names a
-                                                       Maven BOM whose pom's <dependencyManagement> is imported with
-                                                       nested import-scoped BOMs flattened (no checksum: pom bytes
-                                                       are not stable across repositories); a token of
-                                                       [<group>/]pin-<name>.properties reads that file
-                                                       from the project's BOM locations (jenesis.project.boms,
-                                                       default: the configuration locations) instead; local
-                                                       @jenesis.pin lines override BOM entries
-                      %{name}@jenesis.attach%{reset} <token> [<arguments...>]
-                                                       Attach a library as a Java agent (-javaagent) to the java
-                                                       commands of the declaring module: an Execute run of its
-                                                       @jenesis.main class and its test executions; the token
-                                                       follows the pin grammar without a version (the version
-                                                       comes from a declared dependency, @jenesis.pin, or a BOM,
-                                                       or floats latest), and everything after the token is
-                                                       passed verbatim as the agent options; a coordinate that
-                                                       is also required stays on the class or module path and
-                                                       attaches as the same artifact; MAVEN modules declare the
-                                                       same lines in a project-level %{name}<!--jenesis.attach ... -->%{reset}
-                                                       comment, where a test-scoped match attaches to test runs
-                                                       only and %{name}&#45;&#45;%{reset} escapes a double dash
-
-                    %{header}Build-configuration files (in a module's build.jenesis config location; presence activates, contents configure;
-                    the source generators read their input from META-INF/build.jenesis/ in the module's sources, which the
-                    compiler never copies into the artifact, unless folders=<paths> in their config file names other folders;
-                    MAVEN modules also read src/main/build.jenesis and src/test/build.jenesis for main- or test-scoped configuration):%{reset}
-                      %{name}packaging.properties%{reset}    Extra deliverables: jmod/jlink/bundle/launcher/native (booleans), jpackage=<type>
-                      %{name}sbom.properties%{reset}         CycloneDX SBOM format=json|xml|none (SBOM is on by default; -Djenesis.sbom.cyclonedx=false disables)
-                      %{name}bom.properties%{reset}          Publish the module's resolved closure as a repository BOM, <module>/<version>/<module>.properties (Jenesis repository only)
-                      %{name}licensing.properties%{reset}    License compliance check (allowed/denied/unknown/override.<coord>)
-                      %{name}vulnerability.properties%{reset} OSV vulnerability check (severity, warn)
-                      %{name}jacoco.properties%{reset}       JaCoCo test-coverage report
-                      %{name}graal.properties%{reset}        GraalVM native-image reachability agent during the test run
-                      %{name}pitest.properties%{reset}       PIT mutation testing
-                      %{name}javaformat.properties%{reset}   Java source formatter=google|palantir
-                      %{name}xjc.properties%{reset}          Generate Java sources from the module's XML schemas (.xsd, .xjb) with the
-                                                 JAXB binding compiler (folders, package, catalog, arguments)
-                      %{name}protoc.properties%{reset}       Generate Java sources from the module's protocol buffer definitions (.proto)
-                                                 with protoc, a native executable resolved per platform (folders, classifier,
-                                                 plugins=<name>=<groupId>/<artifactId>, arguments)
-                      %{name}avro.properties%{reset}         Generate Java sources from the module's Avro schemas (.avsc) and protocols
-                                                 (.avpr) (folders, arguments)
-                      %{name}wsimport.properties%{reset}     Generate a JAX-WS client from the module's WSDL descriptions (.wsdl, .xjb);
-                                                 location=<url> is required (folders, package, catalog, arguments)
-                      %{name}openapi.properties%{reset}      Generate sources from an OpenAPI document (.yaml, .json) with the OpenAPI
-                                                 Generator (folders, specification, generator, package, sources, arguments)
-                      %{name}spdx.properties%{reset}         Extend the license alias/category tables
-                      %{name}process-<tool>.properties%{reset} Extra command-line arguments merged into a forked tool (javac, javadoc, jar, jlink, jpackage, ...);
-                                                 process-test.properties targets only the forked test JVM, merged over process-java.properties
-                      The inferred linters and other formatters activate instead from their own native config
-                      files (checkstyle.xml, pmd.xml, spotbugs-exclude.xml, .editorconfig, .scalafmt.conf, ...).
-
-                    See https://jenesis.build for the full documentation.
+                    %{header}Reading further:%{reset}
+                      %{name}https://jenesis.build/tool%{reset}  The documentation
+                      %{name}configuration%{reset}               Every setting, its value and what it does
+                      %{name}skill%{reset}                       The whole tool as a briefing for a coding agent
                     """)
                     .replace("%{layout}", layout)
                     .replace("%{assembler}", assembler)
@@ -818,632 +481,292 @@ public record Project(
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
             System.out.println(("""
-                    # Jenesis - operating instructions for coding agents
+                    # Jenesis build tool - operating instructions
 
-                    You are operating inside a Jenesis-built Java project. This briefing tells you
-                    how to drive the build, inspect intermediate state, and avoid the cache pitfalls
-                    that catch agents most often. https://jenesis.build is the full documentation;
-                    use this document as the working minimum.
+                    You are in a Jenesis-built Java project. Use this to drive the build, read its
+                    state, and avoid the cache mistakes that catch agents. Full documentation:
+                    https://jenesis.build/tool. `help` prints a short human orientation.
 
                     ## 1. Invoke the build
 
-                    Three equivalent launchers, all forwarding selectors to a `BuildExecutor` wired
-                    to the configured layout:
+                      java build/jenesis/Make.java [selectors...]  source mode, always available
+                      jenesis [selectors...]                       installed CLI
+                      Project.build(selectors...)                  embedding it in Java
 
-                      - the installed `jenesis` CLI (release zip / SDKMAN), which reads
-                        `build/jenesis/jenesis.version`, installs that version where the
-                        package manager can, verifies `build/jenesis` against the published
-                        sources of it and only then runs the compiled engine; a tree that
-                        does not match is refused, never built from. `jenesis-run` skips
-                        the lookup and runs the installed version as it stands, so a
-                        refused project still builds as a standard build off the released
-                        engine - only the two routes below run the vendored one, and a
-                        project that vendors a changed engine may drive it from an entry
-                        point of its own rather than the usual `Make.java`;
-                      - `java build/jenesis/Make.java [selectors...]` on a source-mode script in
-                        the tree. `Make` carries no build logic and references no engine class, so
-                        the Java launcher compiles one small file rather than the whole engine, and it
-                        compiles the engine once into classes it reuses: 3.6s for a build that runs
-                        once against 8.0s, and 0.8s for a repeat. `jenesis.make.daemon=true` hands
-                        the build to a reused JVM on top of that, which is off by default since
-                        compiling once already removes most of what it would save. `--stop` shuts
-                        one down, and a project driving its own entry
-                        point reuses Make as `new Make("build.Demo").run(selectors)`, which
-                        returns the status to exit with;
-                      - `Project.build(selectors...)` from Java code when embedding the build.
-                        `Project` is the configuration API and has no `main`; `Make` is the entry point.
+                    `Make` is the entry point, `Project` the configuration API and has no `main`. No
+                    selector runs `build`; several, space-separated, run in one invocation.
 
-                    No selector runs the default target (`build`); several, space-separated, run
-                    several entry points in one invocation.
+                    The installed `jenesis` verifies `build/jenesis` against the released sources
+                    named in `build/jenesis/jenesis.version` and refuses a tree that differs, while
+                    `jenesis-make` runs the installed engine as it stands. Only source mode and
+                    embedding run the project's vendored build code.
 
-                    Source mode compiles whatever the named file reaches, on every invocation.
-                    `Make` reaches almost nothing, so that cost is small; the engine behind it is
-                    compiled once into `.jenesis/tool` and reused. To drive those classes yourself:
+                    `Make` compiles the engine once and reuses those classes. Drive them yourself:
 
                       javac -d .jenesis/tool build/jenesis/Project.java
                       java -cp .jenesis/tool build.jenesis.Make [selectors...]
 
-                    Or ahead-of-time compile that launcher with GraalVM `native-image` for
-                    near-instant startup. The native binary detects the native-image runtime and
-                    forks the JDK `javac`/`jar` tools (keep a JDK on `JAVA_HOME`/`PATH`); the
-                    incremental cache serializes build steps, so the image needs reachability
-                    metadata captured from a real build:
+                    A project with its own entry point calls `new Make("build.Demo").run(selectors)`,
+                    which returns the status to exit with. For a GraalVM native launcher, read the
+                    documentation: it needs reachability metadata captured from a real build, a JDK
+                    on PATH, and it cannot load foreign build modules.
 
-                      java -Djenesis.process.factory=fork \\
-                          -agentlib:native-image-agent=config-output-dir=.jenesis/native-config \\
-                          -cp .jenesis/tool build.jenesis.Project build
-                      native-image --no-fallback \\
-                          -H:ConfigurationFileDirectories=.jenesis/native-config \\
-                          -cp .jenesis/tool build.jenesis.Project jenesis
-                      ./jenesis [selectors...]
+                    ## 2. Take the layout the project infers
 
-                    Capture that metadata from builds exercising the layouts and steps you use.
-                    Loading foreign build modules (the class-loader bridge) needs a full JVM and is
-                    not supported on this path. Rebuild the precompiled or native launcher whenever
-                    the build sources change; it only accelerates launching the build, the project
-                    is still recompiled by the build graph whenever its own sources change.
+                      maven             pom.xml per module; jar plus pom.xml
+                      modular           module-info.java per module; modular jar, no pom
+                      modular_to_maven  module-info.java per module; modular jar plus generated pom
 
-                    ## 2. Choose a layout when needed
+                    `auto` picks maven for a root pom.xml, else modular_to_maven; it never picks
+                    plain modular. Override only with cause: -Djenesis.project.layout=<name>.
 
-                    The layout decides how modules are discovered and what gets staged:
+                    ## 3. Read target/, never delete it
 
-                      maven  pom.xml per module; emits a classic jar plus pom.xml.
-                      modular  module-info.java per module; emits a modular jar, no pom.xml.
-                      modular_to_maven
-                          module-info.java per module; emits a modular jar plus a generated
-                          pom.xml, staged as both a module and a Maven repo.
+                    Outputs live under %{target}:
 
-                    Trust the default: `auto` picks `maven` when a root `pom.xml` is present,
-                    otherwise `modular_to_maven` for a `module-info.java` project. It never picks
-                    plain `modular`, which you must force. Override with
-                    `-Djenesis.project.layout=<name>` only when you need something else.
+                      build/<step path>/output/      what a step produced (jars, *.properties)
+                      build/<step path>/supplement/  argument files and intermediates
+                      stage/<layout>/output/         the tree `stage` builds and `export` publishes
 
-                    ## 3. Inspect target/
+                    Never delete target/ and never pass -Djenesis.executor.rebuild=true for a clean
+                    slate: each step is keyed by its inputs, so a build re-runs exactly what changed
+                    and wiping only forces repeated work. A folder ending in `~` is a running step's
+                    staging area, renamed into place on success. One build at a time per target: the
+                    root holds an exclusive .jenesis.lock and a second process fails fast.
 
-                    Every build output lives under the project's target folder, here:
+                    ## 4. Turn a folder into a selector
 
-                      %{target}
+                    target/build/ mirrors the build graph, so any folder under it is a selector: drop
+                    the `target/` prefix and any trailing `/output` or `/supplement`.
 
-                    Shape under target/:
+                      target/build/maven/compose/module/<m>/produce/assemble/binary/artifacts/output
+                      -> build/maven/compose/module/<m>/produce/assemble/binary/artifacts
 
-                      build/
-                          Per-step output trees mirroring the build graph 1:1. Walk this to see a
-                          step's actual output.
-                      build/.../<step>/output/
-                          Files the step produced (jars, the conventional *.properties, ...).
-                      build/.../<step>/supplement/
-                          Auxiliary files (argument files, intermediates).
-                      stage/<layout>/output/
-                          The tree built by `stage`, ready for `export`, nested under a layout
-                          sub-step. MAVEN produces a Maven-repository layout under
-                          stage/maven/output; MODULAR produces <module>/<version>/ under
-                          stage/modular/output; MODULAR_TO_MAVEN stages both, and `export`
-                          publishes each.
+                    ## 5. Address the graph
 
-                    Do not delete target/ and do not pass `-Djenesis.executor.rebuild=true` to wipe
-                    it. Jenesis tracks source changes and predecessor checksums on every step and
-                    re-runs exactly the steps whose inputs changed; clearing the cache by hand only
-                    forces the next build to repeat work it would otherwise skip. Browse the path
-                    when debugging a selector or diffing a behaviour change, but leave it in place.
+                      build stage export pin dependencies ide metadata configuration properties help skill
+                          Top-level entry points; ide[/idea|/vscode|/eclipse] drills into one tool.
+                      +<module>         module subgraph inside `build` (not stage/export/pin).
+                                        <module> is the source folder holding its pom.xml or
+                                        module-info.java; nested, foo/bar is written +foo+bar.
+                      +<module>/<step>  one step in it, e.g. +foo+bar/compile/dependencies/resolved
+                      :                 one path segment, e.g. build/:/java
+                      ::                any depth, e.g. ::/test. Lenient: a typo matches nothing
+                                        silently, so confirm a selector ran what you meant.
 
-                    Run only one build at a time against a target: the build root carries an
-                    exclusive lock (`.jenesis.lock`) and a second process fails fast with "Another
-                    build process is already building ..." rather than the two corrupting each
-                    other's staged steps. Folders ending in `~` are a running step's staging area,
-                    renamed into place atomically on success; ignore them when inspecting, and
-                    expect a crashed build's leftover staging to be replaced on the next run.
+                    ## 6. Read per-module state from the properties files
 
-                    ## 4. Derive a selector from target/ for minimal recreation
+                    Each per-module step writes these into its output folder. Read them rather than
+                    inventing a side channel; the schemas are constants on the writing step.
 
-                    Because target/build/ mirrors the build graph 1:1, any folder under it doubles
-                    as a selector. To rebuild a single artifact after a source edit:
+                      metadata.properties   project, artifact, version, name, description, url,
+                                            license.<id>.{name,url}, developer.<id>.{name,email},
+                                            scm.{connection,developerConnection,url}. Project-level
+                                            overrides live in the file that
+                                            -Djenesis.project.metadata=<path> names, conventionally
+                                            project.properties.
+                      module.properties     graph state: path, module, test, main
+                      identity.properties   <repository>/<coordinate> -> path or empty
+                      requires.properties   <group>/<scope>/<repository>/<coordinate> -> empty, or
+                                            <algo>/<hex> when pinned
+                      versions.properties   <group>/<repository>/<coordinate> -> <version>[ <algo>/<hex>]
+                      boms.properties       bom/<...> -> [<version>[ <algo>/<hex>]] references and
+                                            entry/<...> -> expanded entries; merged below versions
+                      exclusions.properties <group>/<scope>/<repository>/<coordinate> -> comma-separated
+                                            <groupId>/<artifactId>
+                      inventory.properties  what staging reads: artifacts, sources, documentation,
+                                            pom, runtime, prefixed
 
-                      1. Find the step folder, e.g.
-                         target/build/maven/compose/module/<m>/produce/assemble/binary/artifacts/
-                      2. Strip the `target/` prefix and any trailing `/output` or `/supplement`.
-                      3. Pass what remains as a selector, e.g.
-                         build/maven/compose/module/<m>/produce/assemble/binary/artifacts
+                    ## 7. Bump serialVersionUID after editing a build step
 
-                    The executor walks that subgraph and re-runs only steps whose serialized form or
-                    predecessor checksums changed. Combine with wildcards (`:`, `::`) to scope to
-                    several modules, or use `+<module>` to address a module by its source-folder
-                    name without typing the full path.
+                    A step is keyed by the digest of its serialized form plus every predecessor's
+                    checksums. Project sources are always detected, but editing a step's *code* does
+                    not change its serialized form, so its output stays cached. Bump that class's
+                    `serialVersionUID` to force it to re-run; prefer that over executor.rebuild.
 
-                    ## 5. Read per-module state from properties files
+                    ## 8. Configure a module with @jenesis tags on module-info.java
 
-                    Every per-module step writes properties files into its output folder. Read these
-                    to learn what a step decided; never invent a side channel. The names are
-                    constants on `BuildStep`:
+                    Token grammar, shared below: `<group>/<repo>/<coordinate>`, where a bare
+                    `<module>` abbreviates `<group>/module/<module>` and `<groupId>/<artifactId>`
+                    abbreviates `<group>/maven/<groupId>/<artifactId>`. A trailing `[<token>,...]`
+                    guard applies a line only on a matching platform, with an unguarded line for the
+                    same coordinate as fallback. alias, exclude and override are MODULAR_TO_MAVEN
+                    only.
 
-                      metadata.properties
-                          POM-style descriptive metadata (`project`, `artifact`, `version`, `name`,
-                          `description`, `url`, `license.<id>.{name,url}`,
-                          `developer.<id>.{name,email}`,
-                          `scm.{connection,developerConnection,url}`). Project-level overrides live
-                          in the file pointed at by `-Djenesis.project.metadata=<path>`
-                          (conventionally project.properties).
-                      module.properties
-                          Graph state only (`path`, `module`, `test`, `main`). Framework-managed.
-                      identity.properties  `<repository>/<coordinate>` -> path-or-empty.
-                      requires.properties
-                          `<group>/<scope>/<repository>/<coordinate>` -> empty or `<algo>/<hex>`
-                          checksum when pinned; scope rides in the key.
-                      versions.properties
-                          `<group>/<repository>/<coordinate>` -> `<version>[ <algo>/<hex>]`. Bill
-                          of materials for the resolution.
-                      boms.properties
-                          `bom/<group>/<repository>/<coordinate>` -> `[<version>[ <algo>/<hex>]]`
-                          BOM references to fetch (empty version floats to latest), and
-                          `entry/<group>/<repository>/<coordinate>` -> `<version>[ <algo>/<hex>]`
-                          entries expanded from module-local BOM files; merged below
-                          versions.properties.
-                      exclusions.properties
-                          `<group>/<scope>/<repository>/<coordinate>` -> comma-separated
-                          `<groupId>/<artifactId>` exclusions.
-                      inventory.properties
-                          Per-module summary used by staging (artifacts, sources, documentation,
-                          pom, runtime classpath, prefixed).
-
-                    Each file's exact schema is defined by the constants on the step that writes it,
-                    under `sources/build/jenesis/`.
-
-                    ## 6. Address the graph with selectors
-
-                      build, stage, export, pin, dependencies, ide, metadata, help, skill
-                          Top-level entry points.
-                      ide[/idea|/vscode|/eclipse]
-                          Generate IDE project metadata at the project root from each module's
-                          inventory; drill into one tool with the sub-step name.
-                      +<module>
-                          Module subgraph inside `build` (does not run stage/export/pin). The
-                          <module> matches the source folder of the pom.xml / module-info.java; a
-                          nested folder uses `+` between segments (foo/bar -> +foo+bar).
-                      +<module>/<step>
-                          Drill into one step inside that module, e.g.
-                          +foo+bar/compile/dependencies/resolved.
-                      :
-                          Single-segment wildcard (`build/:/java` matches every direct child's
-                          `java` step).
-                      ::
-                          Multi-segment wildcard. Lenient: typos in a `::` tail silently match
-                          nothing, so verify a selector before assuming it ran something.
-
-                    ## 7. Respect the cache model when editing build steps
-
-                    Every `BuildStep` is `Serializable`. The incremental cache keys each step by the
-                    digest of its serialized form (fields plus the class's `serialVersionUID`) AND
-                    the checksums of every predecessor folder's contents.
-
-                    Project source changes are always detected. Changes to a build step's *code*
-                    (the body of `apply(...)`, switched tool flags, ...) do NOT alter the serialized
-                    form, so cached outputs are NOT invalidated. After such an edit, bump that step
-                    class's `serialVersionUID` to force re-execution. That, not
-                    `-Djenesis.executor.rebuild=true` or deleting target/, is the way to nudge the
-                    cache; rebuild is appropriate only while iterating on the build itself when a
-                    step's code change is not yet reflected by a bump, never as a routine clean
-                    slate.
-
-                    ## 8. Write Javadoc tags on module-info.java when configuring a module
-
-                      @jenesis.release <V>  Java release target.
-                      @jenesis.main <class>  Main class for the module.
-                      @jenesis.test [<module>|abstract]  Mark this module as a test variant of
-                          <module>. The abstract form declares no tests of its own but supplies
-                          infrastructure to modules that do; it runs no tests and is never staged.
-                      @jenesis.pin <group>/<repo>/<coord> <ver> [<algo>/<hex>] [<guard>]
-                          Pin a dependency's version and optionally its content checksum. A bare
-                          <module> abbreviates <group>/module/<module>, and <groupId>/<artifactId>
-                          abbreviates <group>/maven/<groupId>/<artifactId>. A trailing
-                          [<token>,...] guard applies the pin only when those tokens are in the
-                          active platform, with an unguarded line for the same coordinate as
-                          fallback.
+                      @jenesis.release <V>   Java release target
+                      @jenesis.main <class>  main class
+                      @jenesis.test [<module>|abstract]
+                          Test variant of <module>. `abstract` supplies infrastructure only: declares
+                          no tests, runs none, is never staged.
+                      @jenesis.pin <token> <ver> [<algo>/<hex>] [<guard>]
+                          Pin a version and optionally a content checksum.
                       @jenesis.alias <module> <groupId>/<artifactId>[/<type>[/<classifier>]]
-                          Alias a module name to a Maven artifact (MODULAR_TO_MAVEN only).
-                          Requiring <module> resolves the artifact and its graph under that stable
-                          name, so a non-modular artifact can be required without relying on a
-                          derived automatic module name. The target follows the Maven pin token
-                          grammar and carries no version: a @jenesis.pin or BOM entry states it and
-                          is the place for a checksum, failing which a coordinate the closure
-                          already resolves is taken at that version unchanged, and only a
-                          coordinate nothing else pulls in is negotiated as LATEST.
+                          Require a Maven artifact under a stable module name, so a non-modular jar
+                          needs no derived automatic name. Carries no version: a pin or BOM entry
+                          states it and is the place for a checksum; failing that the version the
+                          closure already resolves is kept, and only a coordinate nothing else pulls
+                          in is negotiated as LATEST.
                       @jenesis.exclude <module> <groupId>/<artifactId>...
-                          Drop transitive dependencies from what requiring <module> resolves
-                          (MODULAR_TO_MAVEN only), for the upstream pom that declares a dependency
-                          it should not. One line names one module and any number of targets,
-                          repeated lines add to each other, and each target is an exact
-                          <groupId>/<artifactId>. An excluded dependency takes the subtree it
-                          pulled in with it and never reaches the resolved closure, so it is absent
-                          from the compile and runtime paths and from the generated pom alike.
-                          Excluding from a module that is not required is an error.
-                      @jenesis.override <module> <module>...
-                          Replace a module with the modules that already carry its packages
-                          (MODULAR_TO_MAVEN only), for a dependency that shades another module's
-                          content, as Tomcat Embed shades the Jakarta Servlet API. Jenesis places
-                          a module of that name that contains no packages and requires the carriers
-                          transitively, so requiring it reads the carrier's copy, and it drops every
-                          resolved artifact declaring the overridden module, so neither the module
-                          path nor the generated pom carries those packages twice. One line names
-                          one module and any number of carriers, repeated lines add to each other,
-                          and a carrier no resolved dependency declares is an error. The declaration
-                          travels to consumers through the Jenesis-Overrides manifest header.
+                          Drop transitive dependencies of <module>, each with the subtree it pulled
+                          in, from the compile path, runtime path and generated pom alike. Repeated
+                          lines add up. Excluding from a module that is not required is an error.
+                      @jenesis.override <module> <carrier>...
+                          Replace a module with the modules already carrying its packages, for a
+                          dependency that shades another module (Tomcat Embed shades the Servlet
+                          API). Jenesis substitutes an empty module requiring the carriers
+                          transitively and drops every resolved artifact declaring the overridden
+                          module, so the packages appear once. Reaches consumers through the
+                          Jenesis-Overrides manifest header. A carrier nothing declares is an error.
                       @jenesis.bom <token> [<ver> [<algo>/<hex>]] [<guard>]
-                          Import managed versions from a BOM. The token follows the pin grammar: a
-                          bare <module> (abbreviating <group>/module/<module>) names a BOM
-                          properties file in the module repository, fetched at <ver> or floating
-                          latest without one; <groupId>/<artifactId> (abbreviating
-                          <group>/maven/...) names a Maven BOM whose pom's <dependencyManagement>
-                          is imported, nested import-scoped BOMs flattened - it takes no checksum,
-                          as pom bytes are not stable across repositories. A token of
-                          [<group>/]pin-<name>.properties (a dash never occurs in a module name)
-                          reads that file from the project's BOM locations (jenesis.project.boms,
-                          default: the configuration locations; fixed, never profile-resolved). BOM
-                          file keys omit the group (bare <module>, <groupId>/<artifactId>, or
-                          explicit <repo>/<coordinate>); local @jenesis.pin lines override BOM
+                          Import managed versions. A bare <module> names a BOM properties file in the
+                          module repository, floating latest without a version; <groupId>/<artifactId>
+                          names a Maven BOM whose <dependencyManagement> is imported with nested
+                          import-scoped BOMs flattened, and takes no checksum because pom bytes are
+                          not stable across repositories; [<group>/]pin-<name>.properties reads a
+                          local file from jenesis.project.boms. Local @jenesis.pin lines override BOM
                           entries, and the last declared BOM wins a conflict.
                       @jenesis.attach <token> [<arguments...>]
-                          Attach a library as a Java agent (-javaagent) to the java commands of the
-                          declaring module: an Execute run of its @jenesis.main class and its test
-                          executions. The token follows the pin grammar without a version; the
-                          version comes from a declared dependency, @jenesis.pin or a BOM entry, or
-                          floats latest. Everything after the token is passed verbatim as the agent
-                          options. A coordinate that is also required stays on the class or module
-                          path and attaches as the same artifact. MAVEN modules declare the same
-                          lines in a project-level <!--jenesis.attach ... --> comment; there a
-                          test-scoped dependency match attaches to test runs only, and &#45;&#45;
-                          escapes a double dash.
+                          Attach a library as a -javaagent to this module's Execute run and its test
+                          runs. The token carries no version: it comes from a declared dependency, a
+                          pin or a BOM, else floats latest. Everything after the token is passed
+                          verbatim as agent options. MAVEN modules declare the same lines in a
+                          project-level <!--jenesis.attach ... --> comment, where a test-scoped match
+                          attaches to test runs only and &#45;&#45; escapes a double dash.
 
-                    Build-configuration files, in a module's build.jenesis config location (a
-                    module's META-INF/build.jenesis/ folder, plus the project configuration
-                    locations). Presence activates the feature, contents configure it. The source
-                    generators read their input (schemas, definitions, descriptions) from
-                    META-INF/build.jenesis/ under the module's sources as well, which the compiler
-                    never copies into the artifact; folders=<paths> names other folders instead,
-                    resolved against the module's source and resource roots, so an input that has
-                    to ship can live beside the code. Each generator reads only the file kinds it
-                    compiles out of those folders:
+                    ## 9. Activate a tool by dropping in its configuration file
 
-                      packaging.properties
-                          Extra deliverables: jmod/jlink/bundle/launcher/native (booleans),
-                          jpackage=<type>.
-                      sbom.properties
-                          CycloneDX SBOM format=json|xml|none. The SBOM is on by default; this file
-                          only tunes it (disable entirely with -Djenesis.sbom.cyclonedx=false).
-                      bom.properties
-                          Publish the module's resolved closure as a repository BOM; export writes
-                          it to <module>/<version>/<module>.properties (Jenesis repository only;
-                          the Maven export never carries it).
-                      licensing.properties
-                          License compliance check (allowed/denied/unknown/override.<coord>).
-                      vulnerability.properties  OSV vulnerability check (severity, warn).
-                      jacoco.properties  JaCoCo test-coverage report.
-                      graal.properties  GraalVM native-image reachability agent during tests.
-                      pitest.properties  PIT mutation testing.
-                      javaformat.properties  Java source formatter=google|palantir.
-                      xjc.properties
-                          Generate Java sources from the module's XML schemas with the JAXB
-                          binding compiler (folders, package, catalog, arguments). Every .xsd in
-                          the folders is compiled and every .xjb passed as a binding. The
-                          generated package is compiled into the module, so module-info.java may
-                          export it; what the generated code imports (jakarta.xml.bind) stays a
-                          declared dependency of the module.
-                      protoc.properties
-                          Generate Java sources from the module's protocol buffer definitions
-                          (folders, classifier, plugins, arguments). Every .proto in the folders
-                          is compiled, and the folders are the include path, so an import
-                          resolves as it is written. protoc is a native executable, resolved per
-                          operating system and chipset from a Maven classifier, so each platform
-                          needs its own checksum pin; plugins=<name>=<groupId>/<artifactId>
-                          resolves a protoc plugin the same way, in its own protoc-<name> group.
-                      avro.properties
-                          Generate Java sources from the module's Avro schemas (.avsc) and
-                          protocols (.avpr), each in its own step (folders, arguments).
-                      wsimport.properties
-                          Generate a JAX-WS client from the module's WSDL descriptions
-                          (folders, package, location, catalog, arguments). Every .wsdl in the
-                          folders is compiled and every .xjb passed as a binding.
-                          location=<url> is required and states where the description is served
-                          at run time - a class-path path for a description the module ships, an
-                          endpoint otherwise - because wsimport would otherwise compile the path
-                          the build read it from into the artifact.
-                      openapi.properties
-                          Generate sources from an OpenAPI document (folders, specification,
-                          generator, package, sources, arguments). A lone .yaml or .json in the
-                          folders is the specification; a module that offers several names one
-                          with specification=<file>. The generator writes a whole project and
-                          only its source folder (default src/main/java, renamed with
-                          sources=<path>) is collected into the module.
-                      spdx.properties  Extend the license alias/category tables.
-                      process-<tool>.properties
-                          Extra command-line arguments merged into a forked tool (javac, javadoc,
-                          jar, jlink, jpackage, ...); process-test.properties targets only the
-                          forked test JVM, merged over process-java.properties.
+                    A file in the module's build.jenesis location (its META-INF/build.jenesis/ folder
+                    plus the project configuration locations) activates the feature; its contents
+                    configure it. Generators read their inputs from META-INF/build.jenesis/ in the
+                    sources, which the compiler never copies into the artifact, unless folders=<paths>
+                    names other folders; each reads only the file kinds it compiles.
 
-                    The inferred linters and the ktlint/scalafmt formatters activate instead from
-                    their own native config files (checkstyle.xml, pmd.xml, spotbugs-exclude.xml,
-                    .editorconfig, .scalafmt.conf, ...).
+                      packaging.properties      jmod/jlink/bundle/launcher/native booleans, jpackage=<type>
+                      sbom.properties           CycloneDX format=json|xml|none; the SBOM is on by
+                                                default, -Djenesis.sbom.cyclonedx=false disables it
+                      bom.properties            publish the resolved closure as a repository BOM
+                                                (Jenesis repository only)
+                      licensing.properties      license check: allowed/denied/unknown/override.<coord>
+                      vulnerability.properties  OSV check: severity, warn
+                      jacoco.properties         test-coverage report
+                      graal.properties          native-image reachability agent during the test run
+                      pitest.properties         PIT mutation testing
+                      javaformat.properties     formatter=google|palantir
+                      xjc.properties            JAXB: every .xsd compiled, every .xjb a binding; the
+                                                generated package is compiled into the module
+                                                (folders, package, catalog, arguments)
+                      protoc.properties         every .proto compiled, the folders are the include
+                                                path; protoc is a per-platform native executable, so
+                                                each platform needs its own checksum pin
+                                                (folders, classifier, plugins=<name>=<g>/<a>, arguments)
+                      avro.properties           .avsc and .avpr, each in its own step (folders, arguments)
+                      wsimport.properties       JAX-WS client from .wsdl; location=<url> is required
+                                                and states where the description is served at run time
+                                                (folders, package, catalog, arguments)
+                      openapi.properties        OpenAPI Generator; a lone .yaml/.json is the
+                                                specification, else name it with specification=<file>;
+                                                only its source folder is collected
+                                                (folders, generator, package, sources, arguments)
+                      spdx.properties           extend the license alias/category tables
+                      process-<tool>.properties extra arguments for a forked tool (javac, javadoc, jar,
+                                                jlink, jpackage, ...); process-test.properties targets
+                                                the test JVM, merged over process-java.properties
 
-                    ## 9. Set system properties for one-off overrides
+                    Linters and the ktlint/scalafmt formatters activate from their own native config
+                    files instead (checkstyle.xml, pmd.xml, spotbugs-exclude.xml, .editorconfig,
+                    .scalafmt.conf, ...).
 
-                    Project (-Djenesis.project.<key>=<value>):
+                    ## 10. Override one build with -Djenesis.* properties
 
-                      root, target, artifacts  Override input/output locations.
-                      layout  auto, maven, modular, modular_to_maven.
-                      sources, documentation  Assemble sources / javadoc jars.
-                      metadata  Path-separated list of extra metadata files.
-                      configuration
-                          Directories searched for the inferred tools' config files (default
-                          build.jenesis/ under the root; the bare root is not searched, so a
-                          conventional file dropped there cannot alter the build; empty uses only
-                          each module's own folders). Path-separated; an @ entry splices the
-                          default, @<name> a property or env value.
-                      boms
-                          Path-separated locations of local pin-<name>.properties files (default:
-                          configuration; never profile-resolved). An @ entry splices the
-                          configuration locations, @<name> a property or env value.
-                      version  Stamp a version onto every produced artifact.
-                      digest  Algorithm for pin and dependency checksums (default SHA-256).
-                      watch
-                          Rebuild the selected target whenever a source file changes (Ctrl+C to
-                          stop).
-                      cache
-                          Also cache steps locally on disk, layered in front of the remote (empty
-                          resolves to .jenesis/cache under the root); a local hit HEAD-touches the
-                          remote to keep its LRU warm.
-                      compile
-                          In source mode only, compile the engine into .jenesis/tool once and run
-                          every later invocation from those classes, rebuilding them whenever the
-                          sources change. Halves the launch cost; the launcher still compiles this
-                          file before the build starts, so an installed `jenesis` stays faster.
+                    Run `configuration` for every setting with the value in force, one per line and
+                    built to grep:
 
-                    Pinning and resolution:
+                      java build/jenesis/Make.java configuration                    every setting
+                      java build/jenesis/Make.java configuration | grep test        one area
+                      java build/jenesis/Make.java configuration | grep -F "[set]"  what this
+                                                                                    project changed
 
-                      -Djenesis.dependency.pin=strict|versions|ignore
-                          strict fails on any unpinned artifact; versions keeps pinned versions but
-                          skips checksum verification; ignore floats to the latest and skips
-                          checksums, keeping a managed version only where the declaration has none,
-                          while a versioned @jenesis.bom reference floats to the latest published
-                          BOM whose entries keep managing resolution (refresh pins via the pin
-                          step).
-                      -Djenesis.resolver.maven=maven|latest|release|closest
-                          Which version a Maven coordinate resolves to. maven (the default) follows
-                          Maven: the nearest declaration wins, a version range is a hard
-                          requirement, and a conflict involving one is decided against the
-                          repository metadata. closest keeps the nearest declaration even against a
-                          competing range. latest and release ignore every declared and pinned
-                          version and take the newest published version or newest non-snapshot
-                          release - an upgrade probe, not a reproducible build.
-                      -Djenesis.resolver.module=first|ignore|fail
-                          What a modular resolution does with the versions a module-info records
-                          for its requirements, which rank behind a pin and ahead of an inline
-                          <module>/<version>. first (the default) keeps the nearest descriptor's
-                          and drops later disagreements silently; ignore keeps none, so an unpinned
-                          module resolves to the repository's latest; fail rejects two descriptors
-                          that disagree. A pinned module takes its pin under every mode.
-                      -Djenesis.pin.checksum=true|false
-                          Record content checksums in pins (default true); false writes versions
-                          only.
-                      -Djenesis.pin.bom=keep|flatten
-                          keep (default) writes no pin for a dependency a BOM already supplies (a
-                          now-redundant pin line is removed) and pins each versioned @jenesis.bom
-                          reference with its file hash; a Maven BOM takes no hash, so its reference
-                          is pinned by version and its entries never cover - each resolved artifact
-                          it manages is pinned with its computed checksum instead. flatten removes
-                          the @jenesis.bom declarations and pins the resolved closure in full
-                          (platform-guarded BOM declarations fail flattening).
-                      -Djenesis.platform.<token>=true|false
-                          The active platform starts from the detected OS and chipset
-                          (windows/linux/macos plus x86_64/aarch64); =true adds a token and =false
-                          removes a detected one, selecting which platform-guarded pins apply.
+                    Each line reads `jenesis.<key>=<value> [set|default|unset] <what it does>`, so
+                    the catalogue and the state of the build come out together. jenesis.properties at
+                    the project root sets the same keys and profiles layer over it; `properties`
+                    prints only the ones that are set.
 
-                    Dependency tree (-Djenesis.tree.<key>=<value>):
+                    Reach for these without looking them up:
 
-                      format <full|compact>
-                          What the `dependencies` selector prints. full (the default) prints every
-                          module's graph in full; compact keeps only the modules the build produces
-                          itself and folds the external closure into counts.
-                      tests <true|false>
-                          Print the modules declared as the test variant of another module (default
-                          true); false leaves them out of either format, as they are not part of
-                          what the project releases.
+                      -Djenesis.print.process          stream a tool's command line and output as it
+                                                       runs - the first move when a step fails or
+                                                       will not finish; narrow it with
+                                                       print.<command>, as print.javac
+                      -Djenesis.dependency.pin=strict  fail the build on any unpinned artifact
+                      -Djenesis.test.filter=<regex>    run one test class or method
+                      -Djenesis.executor.rebuild       wipe target/ - avoid it, see section 7
 
-                    Repositories:
-
-                      -Djenesis.repository.insecure=true
-                          Allow plaintext (http://) fetches; by default only https:// and file://
-                          are accepted, and a credential is never forwarded across a redirect to
-                          another host.
-                      -Djenesis.repository.retries
-                          Retries after a failed fetch (default 2): HTTP 429 and 5xx responses and
-                          dropped connections are retried with exponential backoff, honoring
-                          Retry-After. 0 disables.
-                      -Djenesis.repository.backoff
-                          Initial backoff in milliseconds between retries, doubling per attempt
-                          (default 125).
-                      -Djenesis.maven.uri|local|token
-                          Maven repository remote URL, local cache and bearer token (env fallbacks
-                          MAVEN_REPOSITORY_URI/LOCAL/TOKEN); a comma-separated URL list is queried
-                          left to right, and a <url>|<group>|... entry only serves matching group
-                          ids. An @ entry splices the default (env value, then built-in), @<name> a
-                          property or env value.
-                      -Djenesis.module.uri|local|token
-                          Jenesis module repository, likewise (env fallbacks
-                          JENESIS_REPOSITORY_URI/LOCAL/TOKEN); a <url>|<module>|... entry only
-                          serves matching module ids.
-                      -Djenesis.cache.uri=<uri>
-                          Reuse step outputs across builds: a file:// URI is an on-disk cache
-                          (tuned by a cache.properties at its root), an http(s) URL a remote
-                          server. For a server, -Djenesis.cache.project and -Djenesis.cache.key
-                          authorise it (env fallbacks JENESIS_CACHE_PROJECT/KEY);
-                          -Djenesis.cache.connect, -Djenesis.cache.read and
-                          -Djenesis.cache.insecure tune it.
-
-                    Executor and tool execution:
-
-                      -Djenesis.executor.concurrency=<n>
-                          Run at most n build steps at once (default 0: no limit).
-                      -Djenesis.executor.timeout=PT5M  Per-step timeout.
-                      -Djenesis.executor.digest=<algo>
-                          MessageDigest algorithm for content and serialization hashes (default
-                          MD5).
-                      -Djenesis.executor.aggregate=true
-                          Collect independent step failures into one report instead of failing at
-                          the first.
-                      -Djenesis.executor.rebuild=true
-                          Wipe target/ before building. Avoid this; rely on the incremental cache
-                          to recompute what actually changed.
-                      -Djenesis.process.concurrency=<n>
-                          Run at most n JDK tool runs at once, across every step that runs one
-                          (default 0: no limit).
-                      -Djenesis.process.factory=fork
-                          Fork JDK tools (jar, javadoc, ...) into separate processes instead of
-                          invoking them in-process. Use under stricter sandboxes.
-
-                    Tests (-Djenesis.test.<key>=<value>):
-
-                      skip  Skip test execution.
-                      engine <name>
-                          Force the engine (junit-platform, junit4, testng); unset auto-detects it
-                          from the resolved dependencies.
-                      filter <patterns>
-                          Comma-separated <classRegex>[#<method>] entries restricting which tests
-                          run. A previous result is reused only under the identical filter.
-                      tag <expressions>
-                          Comma-separated tags; only tests carrying one of them run. junit-platform
-                          reads each entry as a tag expression, so !(slow) excludes; testng matches
-                          them against its groups; junit4 rejects them.
-                      force
-                          Execute the tests even where a previous run already covered them, for
-                          flaky tests and debugging.
-                      incremental [<digest>] Re-run only the tests a change can reach: a fast
-                          feedback aid for watch loops, not a correctness gate. Static selection
-                          cannot see reflection or other indirect couplings, so conclude a
-                          developed change with a full run. The value names the change-detection
-                          digest; a bare flag picks MD5.
-                      parallel
-                          Let the engine execute the matched tests concurrently, where its own
-                          configuration allows it.
-                      reporting
-                          Write test reports into the module's reports/tests folder, which `stage`
-                          collects. junit-platform writes both the legacy JUnit XML that CI report
-                          plugins read and the Open Test Reporting XML; testng writes its own
-                          report there; junit4 has no reporter and writes none.
-
-                      -Djenesis.stage.tests=true
-                          Stage test-variant artifacts alongside main artifacts. A module marked
-                          `@jenesis.test abstract` is never staged.
-
-                    Printing (-Djenesis.print.<key>=<value>):
-
-                      progress  Build progress lines (default true; false suppresses).
-                      checksum  Each step's input/output file checksums.
-                      command  Each external tool command line as it runs.
-                      process
-                          Stream each external tool's command and output as it runs; override per
-                          command with -Djenesis.print.<command> (e.g. javac, tests).
-                      fetch  Each artifact downloaded from a repository.
-                      cache  Each step served from or written to the build cache.
-                      docker
-                          The Docker image notice when a build or run is wrapped in a container
-                          (default true; false suppresses).
-
-                    ## 10. Launch a built main class with the Execute companion
-
-                    To run a module's main class against the built artifacts, use the companion
-                    launcher rather than wiring `java` yourself:
+                    ## 11. Run a built main class with Execute
 
                       java build/jenesis/Execute.java [args...]
-                      jenesis-exec [args...]  (installed CLI)
+                      jenesis-exec [args...]
 
-                    Execute runs the build, scans inventories for a module with a main class, and
-                    launches it on the resolved runtime classpath / module path. If exactly one
-                    module declares a main it is picked implicitly; otherwise disambiguate with
-                    `-Djenesis.execute.module=<path>`, the module's source folder (a nested one as
-                    either `server/ui` or `server+ui`), and `-Djenesis.execute.mainClass=<fqcn>`.
-                    Wrap the launched program in Docker independently of the build with
-                    `-Djenesis.execute.docker=true` and, optionally,
-                    `-Djenesis.execute.docker.image=<reference>` plus
-                    `-Djenesis.execute.docker.mount` (read-only) / `.mountWritable` (read-write)
-                    bind mounts and `.env=<name[=value],...>` to forward host environment
-                    variables. Execute is a separate entry point: Project's
-                    `build`/`stage`/... selectors do NOT apply to it, and its `jenesis.execute.*`
-                    properties do NOT apply to plain `Project` invocations.
+                    Execute builds, finds the module declaring a main class and launches it on the
+                    resolved runtime paths. Where more than one declares a main, name it with
+                    -Djenesis.execute.module=<source folder> (nested: server/ui or server+ui) and
+                    -Djenesis.execute.mainClass=<fqcn>. Wrap the program alone in Docker with
+                    -Djenesis.execute.docker=true, plus .docker.image, .docker.mount (read-only),
+                    .docker.mountWritable and .docker.env. Execute is its own entry point: build
+                    selectors do not apply to it, nor its properties to a plain build.
 
-                    ## 11. Recommend pinning dependencies
+                    ## 12. Recommend pinning dependencies
 
-                    Recommend pinning external dependencies so the build resolves the same artifacts
-                    on every machine (and inside a native image). When you add or change a
-                    dependency, offer to pin it. The `pin` selector records resolved versions and
-                    content checksums back into the build descriptor, idempotently:
+                    Pin external dependencies so every machine resolves the same artifacts, and offer
+                    to pin whenever you add or change one. `pin` records resolved versions and
+                    checksums back into pom.xml (<dependencyManagement> with <!--Checksum/<algo>/<hex>-->
+                    and a <!--jenesis.pin ... --> comment) or module-info.java (@jenesis.pin tags),
+                    idempotently, refreshing only the lines matching the local platform. Enforce
+                    coverage with -Djenesis.dependency.pin=strict; refresh with
+                    -Djenesis.dependency.pin=ignore and the `pin` selector.
 
-                      java build/jenesis/Make.java pin
+                    ## 13. Copy a demo: they are the recipe book
 
-                    It writes pom.xml (`<dependencyManagement>` versions with
-                    `<!--Checksum/<algo>/<hex>-->`, and qualified compiler closures in a
-                    `<!--jenesis.pin ... -->` comment) or module-info.java (`@jenesis.pin` tags),
-                    per layout. A trailing `[<token>,...]` guard scopes a pin to a platform; the pin
-                    step refreshes only the line matching the local platform and preserves the rest.
-                    The same pins can be written by hand. Enforce coverage with
-                    `-Djenesis.dependency.pin=strict`, which fails the build on any unpinned
-                    artifact, or refresh them with `-Djenesis.dependency.pin=ignore` and the `pin`
-                    step.
+                    51 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
+                    matching the task and copy its shape rather than inventing configuration.
 
-                    ## 12. Study a demo for a worked example
+                    If this project vendors Jenesis as a git submodule they are already on disk:
+                    resolve the `build/jenesis` symlink and the demos sit under the root it points
+                    into, conventionally `.jenesis/upstream/demo/`. Otherwise read them at
+                    https://github.com/jenesis/jenesis/tree/main/demo.
 
-                    Before writing build configuration, read the demo matching the scenario; each is
-                    a minimal, self-contained, runnable project, so copy its shape rather than
-                    inventing one:
+                      Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
+                                         04 java-modular-multi, 32 module-layout (forcing MODULAR)
+                      Runnable output    05, 06 java-*-executable (jpackage), 07 bundle (jars for a
+                                         stock JRE), 08 java-multi-release, 48 native-image (GraalVM)
+                      Compiler control   09 javac-arguments (process-javac.properties),
+                                         10 annotations (an annotation processor via @jenesis.plugin)
+                      Generated sources  11 data-formats (xjc, protoc, avro),
+                                         12 service-contracts (wsimport, OpenAPI)
+                      Other languages    18 kotlin, 20 kotlin-plugin, 21 scala, 23 groovy
+                      Quality gates      13 java-quality, 19 kotlin-quality, 22 scala-quality,
+                                         24 groovy-quality
+                      Tests              25 code-coverage (JaCoCo), 26 test-selection (incremental),
+                                         27 pitest (mutation), 28 jmh (benchmark harness)
+                      Dependencies       29 agents (@jenesis.attach), 30 maven-exclusions, 31 bom,
+                                         33 module-classifier, 34 module-alias, 35 module-override,
+                                         36, 37 platform-guard (per-platform variants)
+                      Supply chain       14 sbom, 15 compliance (licenses), 16 vulnerabilities (OSV),
+                                         17 profiles, 46 supply-chain-security (what must fail)
+                      Extending it       38 custom-assembler, 39 custom-jmod, 40 internal-module,
+                                         41 external-module, 42 custom-maven, 43 custom-modular,
+                                         44 custom-build (no Project at all)
+                      Operating it       45 docker-isolation, 47 publishing (Maven Central),
+                                         49 build-cache, 50 jpx (run a released program without
+                                         building), 51 startup (what launching costs)
 
-                      java-pom  POM layout: plain javac plus a pinned Maven dependency.
-                      java-pom-multi  Multi-module POM (a library and a consumer module).
-                      java-modular
-                          MODULAR_TO_MAVEN: a pinned named-module dependency, emits a modular jar
-                          plus a generated POM.
-                      java-modular-multi
-                          Multi-module MODULAR_TO_MAVEN (a library and a consumer requiring it plus
-                          an external named module).
-                      kotlin/scala/groovy
-                          Mixed-language compiler chains; the compiler closure resolves in its own
-                          group, isolated from the project's.
-                      java-quality
-                          Inferred code-quality tools turned on by a config file: Checkstyle, PMD,
-                          SpotBugs and a verifying formatter; the kotlin/scala/groovy-quality demos
-                          do the same per language.
-                      code-coverage
-                          Inferred test observation: JaCoCo records coverage during the test run,
-                          enabled by a jacoco.properties.
-                      custom-assembler
-                          Wrap `InferredMultiProjectAssembler` to preprocess sources before the
-                          regular flow.
-                      custom-build
-                          A hand-wired `BuildExecutor`, no `Project`, layout or assembler (code
-                          generation step).
-                      internal-module,  Load a build module (a `BuildExecutorModule` plugin)
-                      external-module  from local source or from a coordinate.
+                    ## 14. When stuck, read the source
 
-                    They live under `demo/` in the repository, indexed by `demo/README.md`, and
-                    online at https://github.com/jenesis/jenesis/tree/main/demo.
+                    Every public type lives under `sources/build/jenesis/` and is short enough to read
+                    end to end; `tests/` documents the public API by example.
 
-                    ## 13. Read further when stuck
-
-                    https://jenesis.build is the full documentation. Useful chapters: "Core
-                    concepts" (build steps, the build graph, how the layouts wire modules);
-                    "Dependencies" and "Pinning" (resolution, exclusions, aliases, pins, bills of
-                    materials); "Packaging" and "Publishing" (stage / export / release and the
-                    handoff to a release tool); "Extending the build" (writing a step, wrapping the
-                    assembler, wiring a graph by hand); "Reference" (every selector, configuration
-                    key and built-in step).
-
-                      Source repository  https://github.com/jenesis/jenesis
-                      Issue tracker  https://github.com/jenesis/jenesis/issues
-                      Releases
-                          https://github.com/jenesis/jenesis/releases (changelog, downloads, the
-                          matching git tag per published version)
-
-                    When stuck, read the source: every public type lives under
-                    `sources/build/jenesis/` and is small enough to read end-to-end. Tests under
-                    `tests/` double as executable documentation for the public API.
-
-                    Run `help` for the same material with color, oriented at humans.
+                      https://jenesis.build/tool          documentation, including the full reference
+                      https://github.com/jenesis/jenesis  source, issues and releases
                     """).replace("%{target}", target.toAbsolutePath().normalize().toString()));
         }
     }
@@ -2259,7 +1582,133 @@ public record Project(
         }
     }
 
+    private static void printConfiguration() {
+        String catalogue = """
+                project.root|.|Folder the build reads the project from
+                project.target|target|Folder the build writes its outputs to
+                project.artifacts||Folder resolved dependencies are cached in
+                project.layout|auto|auto|maven|modular|modular_to_maven; auto reads the project
+                project.sources|false|Assemble a sources jar for every module
+                project.documentation|false|Assemble a javadoc jar for every module
+                project.version||Version stamped onto every produced artifact
+                project.digest|SHA-256|Algorithm for pin and dependency checksums
+                project.metadata||Path-separated extra metadata files
+                project.configuration|build.jenesis|Path-separated folders searched for tool configuration files; @ splices the default
+                project.boms||Path-separated locations of local pin-<name>.properties; default: the configuration folders
+                project.properties||Comma-separated profiles layered over jenesis.properties
+                project.global||Location of a global properties file read before the project's own
+                project.watch|false|Rebuild the selected target whenever a source file changes
+                project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
+                project.docker|false|Run the whole build inside a container
+                project.docker.image||Image for that container
+                project.docker.mount||Extra read-only container mounts, host[:container],...
+                project.docker.mountWritable||Extra writable container mounts
+                project.docker.env||Host environment variables to forward, name[=value],...
+                make.compile|true|Compile the build sources once and run from those classes
+                make.classes||Where those classes land, relative to the root; default: beside the sources
+                make.daemon|false|Hand the build to a reused JVM; --stop as the only selector shuts it down
+                daemon.idle|10800|Seconds an idle daemon waits before exiting
+                daemon.options|-Xmx2g|JVM options for the daemon process itself, whitespace separated
+                executor.concurrency|0|Run at most this many build steps at once; 0 is unbounded
+                executor.timeout|PT0S|ISO-8601 timeout per step; PT0S is no timeout
+                executor.digest|MD5|Algorithm behind the content and step hashes that drive the cache
+                executor.rebuild|false|Wipe target/ before building; prefer letting the cache decide
+                executor.aggregate|false|Collect independent step failures into one report
+                process.concurrency|0|Run at most this many JDK tool runs at once; 0 is unbounded
+                process.factory|tool|tool|fork; fork runs a JDK tool in a process of its own
+                print.progress|true|The build progress lines
+                print.process|false|Stream each external tool's command line and output as it runs
+                print.<command>||The same for one tool only, as print.javac or print.tests
+                print.command|false|Each external tool command line, without its output
+                print.checksum|false|Each step's input and output checksums
+                print.fetch|false|Each artifact downloaded from a repository
+                print.cache|false|Each step served from or written to the build cache
+                print.docker|true|The image notice when a build or run is containerized
+                print.jreleaser|true|The JReleaser command line when a release runs
+                dependency.pin||strict|versions|ignore; unset keeps existing pins and tolerates missing ones
+                resolver.maven|maven|maven|closest|latest|release: which version a Maven coordinate resolves to
+                resolver.module|first|first|ignore|fail: what to do with the versions a module-info records
+                pin.checksum|true|Record content checksums in the pins that the pin selector writes
+                pin.bom|keep|keep|flatten: whether pinning keeps BOM references or resolves them away
+                platform.<token>||true adds a platform token and false removes one, selecting guarded pins
+                repository.insecure|false|Allow plaintext http:// repository fetches
+                repository.retries|2|Retries after a failed fetch; 0 disables
+                repository.backoff|125|Initial retry backoff in milliseconds, doubling per attempt
+                repository.connect.timeout|10000|Connect timeout for a repository fetch, in milliseconds
+                repository.read.timeout|30000|Read timeout for a repository fetch, in milliseconds
+                maven.uri||Maven remotes, comma-separated and queried left to right (env MAVEN_REPOSITORY_URI)
+                maven.local||Local Maven cache folder (env MAVEN_REPOSITORY_LOCAL)
+                maven.token||Bearer token for the Maven remote (env MAVEN_REPOSITORY_TOKEN)
+                module.uri||Jenesis module remotes, likewise (env JENESIS_REPOSITORY_URI)
+                module.local||Local module cache folder (env JENESIS_REPOSITORY_LOCAL)
+                module.token||Bearer token for the module remote (env JENESIS_REPOSITORY_TOKEN)
+                cache.uri||Build cache: a file:// folder, or an http(s):// cache server
+                cache.project||Project name sent to a cache server (env JENESIS_CACHE_PROJECT)
+                cache.key||Access key sent to a cache server (env JENESIS_CACHE_KEY)
+                cache.connect|PT1S|Connect timeout for a cache server
+                cache.read|PT10S|Read timeout for a cache server
+                cache.insecure|false|Permit the cache key over plaintext http off loopback
+                test.skip||Skip executing tests; presence alone switches it on
+                test.engine||junit-platform|junit4|testng; unset detects it from the resolved dependencies
+                test.filter||Comma-separated <classRegex>[#<method>] entries restricting which tests run
+                test.tag||Comma-separated tag expressions; only tests carrying one of them run
+                test.force|false|Execute tests even where a previous run already covered them
+                test.incremental||Run only the tests a change can reach; the value names the digest
+                test.parallel|false|Let the engine execute the matched tests concurrently
+                test.reporting|false|Write test reports into the module's reports/tests folder
+                stage.tests|false|Stage test-variant artifacts alongside the main ones
+                tree.format|full|full|compact: what the dependencies selector prints
+                tree.tests|true|Include test-variant modules in that output
+                execute.module||Module to run, named by its source folder (server/ui or server+ui)
+                execute.mainClass||Main class to run, overriding the module's @jenesis.main
+                execute.docker|false|Run the launched program in a container, independently of the build
+                execute.docker.image||Image for that container
+                execute.docker.mount||Extra read-only container mounts
+                execute.docker.mountWritable||Extra writable container mounts
+                execute.docker.env||Host environment variables to forward
+                sbom.cyclonedx|true|Emit a CycloneDX SBOM; sbom.properties selects its format
+                compliance|true|Run the license and vulnerability checks their configuration files activate
+                source.checkstyle|true|Checkstyle, activated by a checkstyle.xml
+                source.pmd|true|PMD, activated by a pmd.xml
+                validator.spotbugs|true|SpotBugs, activated by a spotbugs-exclude.xml
+                source.detekt|true|detekt, activated by a detekt.yml
+                source.ktlint|true|ktlint linting, activated by an .editorconfig
+                source.scalastyle|true|Scalastyle, activated by a scalastyle-config.xml
+                source.scalafmt|true|scalafmt checking, activated by a .scalafmt.conf
+                source.codenarc|true|CodeNarc, activated by a codenarc.groovy
+                format.java|true|The Java formatter a javaformat.properties selects
+                format.ktlint|true|ktlint formatting
+                format.scalafmt|true|scalafmt formatting
+                format.rewrite|false|Let the formatters rewrite sources instead of verifying them
+                generate.xjc|true|JAXB generation, activated by an xjc.properties
+                generate.protoc|true|protoc generation, activated by a protoc.properties
+                generate.avro|true|Avro generation, activated by an avro.properties
+                generate.wsimport|true|JAX-WS generation, activated by a wsimport.properties
+                generate.openapi|true|OpenAPI generation, activated by an openapi.properties
+                observe.jacoco|true|JaCoCo coverage, activated by a jacoco.properties
+                observe.native|true|native-image reachability agent, activated by a graal.properties
+                mutate.pitest|true|PIT mutation testing, activated by a pitest.properties
+                jreleaser.executable|jreleaser|The JReleaser executable a release runs
+                jreleaser.command|full-release|The JReleaser command a release runs
+                jreleaser.config||JReleaser configuration file
+                jreleaser.dryRun|true|Run JReleaser without actually publishing
+                """;
+        for (String line : catalogue.lines().toList()) {
+            String[] entry = line.split("\\|", 3);
+            String name = "jenesis." + entry[0];
+            String value = System.getProperty(name);
+            String assignment = name + "=" + (value == null ? entry[1] : value);
+            String state = value != null ? "[set]" : entry[1].isEmpty() ? "[unset]" : "[default]";
+            String prefix = assignment + " ".repeat(Math.max(1, 46 - assignment.length())) + state;
+            System.out.println(prefix + " ".repeat(Math.max(1, 56 - prefix.length())) + entry[2]);
+        }
+    }
+
     SequencedMap<String, Path> doMain(String... selectors) throws IOException, InterruptedException {
+        if (selectors.length == 1 && selectors[0].equals(CONFIGURATION)) {
+            printConfiguration();
+            return Collections.emptyNavigableMap();
+        }
         if (selectors.length == 1 && selectors[0].equals(PROPERTIES)) {
             SortedMap<String, String> properties = new TreeMap<>();
             for (String name : System.getProperties().stringPropertyNames()) {
