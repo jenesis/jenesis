@@ -11,11 +11,21 @@ public final class Make {
     private final boolean compile;
 
     public Make(String mainClass) {
-        this(mainClass,
-                root(),
-                classes(configured("jenesis.make.classes")),
-                configured("jenesis.make.daemon", false),
-                configured("jenesis.make.compile", true));
+        if (mainClass == null || mainClass.isBlank()) {
+            throw new IllegalArgumentException("A build needs the name of the class whose main it should run,"
+                    + " such as build.jenesis.Project or a project's own build/Demo.java entry point");
+        }
+        this.mainClass = mainClass;
+        root = Path.of(System.getProperty("jenesis.make.root", "")).toAbsolutePath().normalize();
+        try {
+            loadProperties(root);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot read the properties that configure this build", e);
+        }
+        String location = System.getProperty("jenesis.make.classes");
+        classes = location == null || location.isBlank() ? root : root.resolve(location).normalize();
+        daemon = Boolean.parseBoolean(System.getProperty("jenesis.make.daemon", "false"));
+        compile = Boolean.parseBoolean(System.getProperty("jenesis.make.compile", "true"));
     }
 
     private Make(String mainClass, Path root, Path classes, boolean daemon, boolean compile) {
@@ -164,15 +174,6 @@ public final class Make {
         return 0;
     }
 
-    private static Path root() {
-        return Path.of(System.getProperty("jenesis.make.root", "")).toAbsolutePath().normalize();
-    }
-
-    private static Path classes(String location) {
-        Path root = root();
-        return location == null || location.isBlank() ? root : root.resolve(location).normalize();
-    }
-
     public static SequencedSet<Path> loadProperties(Path path) throws IOException {
         Path base = path.resolve("jenesis.properties");
         Properties project = read(base);
@@ -277,20 +278,6 @@ public final class Make {
             properties.load(reader);
         }
         return properties;
-    }
-
-    private static boolean configured(String name, boolean fallback) {
-        String property = configured(name);
-        return property == null ? fallback : Boolean.parseBoolean(property);
-    }
-
-    private static String configured(String name) {
-        try {
-            loadProperties(root());
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-        return System.getProperty(name);
     }
 
     private Path precompiled(Path build, String seed) throws IOException {
