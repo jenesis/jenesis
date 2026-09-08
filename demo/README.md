@@ -110,6 +110,7 @@ Quick index
 | 48 | [`native-image`](demo-48-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
 | 49 | [`build-cache`](demo-49-build-cache/README.md)               | A content-addressed build cache serving step outputs across builds - project-local (`-Djenesis.project.cache`), shared via a URI (`-Djenesis.cache.uri=`), or local layered in front of a remote; shown by bootstrapping it then serving a full `-Djenesis.executor.rebuild=true` from it | `java build/jenesis/Make.java`  |
 | 50 | [`jpx`](demo-50-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
+| 51 | [`startup`](demo-51-startup/README.md)                       | What the entry point costs: `Make.java` names no engine class, so the Java launcher compiles one small file rather than the whole engine, and then compiles the build sources once and runs from those classes - 8.0s to 3.6s for a build that runs once, and 0.8s for a repeat. `jenesis.make.daemon` adds a reused JVM on top | `java build/jenesis/Make.java` |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1152,6 +1153,29 @@ The group is the top isolation axis: a project's own dependencies live in the
 `main` group (where `compile` and `runtime` are scopes within it, runtime
 inheriting compile), and a *resolved compiler* lives in its own group (`kotlinc`,
 `scalac`, `groovyc`), so it never mixes with the project's own dependencies.
+
+## 34. What starting a build costs - [`startup`](demo-51-startup/README.md)
+
+The Java launcher compiles the file you name, plus everything it references,
+before any of its code runs. So the entry point decides what a build costs before
+the build can decide anything, and a file declaring `Project` costs its whole
+closure - about 1.5 seconds before `main` is reached.
+
+`Make.java` is that entry point and names no engine class, so the Java launcher has
+one small file to compile. It then compiles the build sources once and runs the
+build from those classes, which is on by default because a single batch compile
+beats the Java launcher compiling class by class as it loads them: 8.0 seconds down to
+3.6 for a build that runs once, and 0.8 for a repeat.
+
+`jenesis.make.daemon` adds a reused JVM on top, keeping a warm JIT between calls.
+It is off by default, since compiling once already removes the large fixed cost.
+What it saves after that is compiling speed rather than setup - a Jenesis build
+has no script to parse, and spends its time inside javac, which a JVM that has
+already compiled a few modules runs faster - so it is worth nothing on a build
+that compiles little and about a third on a five-module one. The daemon serves one project, one request at a time; only `-Djenesis.*`
+flags travel with a call, cleared and set again around every build, while
+anything a running JVM cannot change - the build sources, the environment, the
+JVM arguments - replaces the daemon instead. `--stop` shuts it down.
 
 Current pin state of the demos: every demo is committed pinned with checksums.
 `java-pom`, `java-pom-multi`, `java-modular`, and `java-modular-multi` pin their

@@ -108,6 +108,29 @@ a local hit also sends the server a best-effort `HEAD` (it never transfers the
 body), and the server treats it as a read, bumping the entry's recency just as a
 `GET` would. Each tier keeps its own LRU and both stay warm.
 
+A step that stays local
+-----------------------
+
+Not every step is worth sending over a network. A step that copies a module's
+resolved dependencies into its own folder produces a large output from files the
+machine already has, so uploading it costs more than re-running it would. Such a
+step declines the shared tier:
+
+    public class Copy implements BuildStep {
+
+        @Override
+        public boolean shouldCacheRemotely() {
+            return false;
+        }
+
+        ...
+    }
+
+Nothing else changes: the step is still cached under `.jenesis/cache`, so a
+rebuild on this machine still skips the work, and it is neither fetched from,
+stored in nor announced to a cache server. The default is `true`, so a step that
+says nothing is cached in both tiers as before.
+
 Layout
 ------
 
