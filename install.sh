@@ -10,7 +10,7 @@
 #   * submodule - track Jenesis as a git submodule. An existing one (a .gitmodules
 #                 entry whose URL points at the Jenesis repo) is checked out to the
 #                 requested ref; a project that has none gets one added, at
-#                 .jenesis/upstream, with build/jenesis linked into it. Either way
+#                 build/.upstream, with build/jenesis linked into it. Either way
 #                 the new commit is staged in the superproject.
 #
 # Auto picks submodule when the project already tracks one and vendor otherwise,
@@ -37,7 +37,7 @@
 #   JENESIS_TARGET        Target project directory (default: current working directory)
 #   JENESIS_GITHUB_REPO   Source repository, owner/name (default: jenesis/jenesis)
 #   JENESIS_MODE          auto (default) | vendor | submodule
-#   JENESIS_SUBMODULE_PATH  Where a newly added submodule goes (default: .jenesis/upstream)
+#   JENESIS_SUBMODULE_PATH  Where a newly added submodule goes (default: build/.upstream)
 #
 # After the script completes, build the project with:
 #
@@ -141,7 +141,7 @@ if [ "$MODE" = "submodule" ] && [ -z "$SUBMODULE_PATH" ]; then
     command -v git >/dev/null 2>&1 || die "JENESIS_MODE=submodule requires git, which was not found"
     git -C "$TARGET" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
         || die "JENESIS_MODE=submodule needs a git repository at ${TARGET} - run 'git init' there first, or use JENESIS_MODE=vendor"
-    SUBMODULE_PATH="${JENESIS_SUBMODULE_PATH:-.jenesis/upstream}"
+    SUBMODULE_PATH="${JENESIS_SUBMODULE_PATH:-build/.upstream}"
     SUBMODULE_NAME="$SUBMODULE_PATH"
     [ -e "$TARGET/$SUBMODULE_PATH" ] \
         && die "cannot add a submodule at '${SUBMODULE_PATH}': something is already there"
@@ -194,7 +194,13 @@ if [ -n "$SUBMODULE_PATH" ]; then
         fi
         mkdir -p "$TARGET/build"
         if [ ! -e "$LINK" ] && [ ! -L "$LINK" ]; then
-            ln -s "../${SUBMODULE_PATH}/sources/build/jenesis" "$LINK" \
+            # The link lives in build/, so a submodule under build/ is named from
+            # there directly and anything else steps back out to the root first.
+            case "$SUBMODULE_PATH" in
+                build/*) LINK_TARGET="${SUBMODULE_PATH#build/}/sources/build/jenesis" ;;
+                *)       LINK_TARGET="../${SUBMODULE_PATH}/sources/build/jenesis" ;;
+            esac
+            ln -s "$LINK_TARGET" "$LINK" \
                 || die "failed to link build/jenesis into '${SUBMODULE_PATH}' - this filesystem may not support symbolic links, so use JENESIS_MODE=vendor"
             git -C "$TARGET" add "build/jenesis" >/dev/null 2>&1 || true
             say "linked build/jenesis to ${SUBMODULE_PATH}/sources/build/jenesis"

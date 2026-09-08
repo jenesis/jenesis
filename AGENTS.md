@@ -146,5 +146,5 @@ A release is a manual run of the release workflow from the Actions tab, so any c
 optional `sha` input names the commit (default: the head it runs on) and its optional `tag` input names the
 tag (default: the next minor of the highest `vX.Y.Z` tag). The workflow stages, signs, publishes to Maven
 Central, SDKMAN, Homebrew and Scoop, and cuts the `vX.Y.Z` tag. `jenesis-launcher`, `jenesis-modules` and
-`jenesis-repository` pin this repository as the `.jenesis/upstream` git submodule; after a release they are
+`jenesis-repository` pin this repository as the `build/.upstream` git submodule; after a release they are
 moved to the release commit.

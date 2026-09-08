@@ -82,17 +82,17 @@ if [ "$SYMLINKS" = "1" ]; then
     repository submodule
     install submodule JENESIS_MODE=submodule \
         || fail "adding a submodule: $(cat "$TMP/submodule.log")"
-    grep -q 'path = .jenesis/upstream' "$TMP/submodule/.gitmodules" \
-        || fail "no submodule recorded at .jenesis/upstream"
+    grep -q 'path = build/.upstream' "$TMP/submodule/.gitmodules" \
+        || fail "no submodule recorded at build/.upstream"
     grep -q 'shallow = true' "$TMP/submodule/.gitmodules" || fail "the submodule was not recorded as shallow"
     [ -L "$TMP/submodule/build/jenesis" ] || fail "build/jenesis was not linked into the submodule"
     [ -f "$TMP/submodule/build/jenesis/Make.java" ] || fail "the build/jenesis link does not resolve"
     git -C "$TMP/submodule" diff --cached --name-only | grep -q '.gitmodules' \
         || fail "the submodule was not staged in the superproject"
     builds submodule || fail "a submodule project does not build: $(cat "$TMP/submodule.build.log")"
-    [ -z "$(git -C "$TMP/submodule/.jenesis/upstream" status --porcelain)" ] \
+    [ -z "$(git -C "$TMP/submodule/build/.upstream" status --porcelain)" ] \
         || fail "building dirtied the submodule, so its path collides with the build's own state"
-    pass "adds a submodule at .jenesis/upstream, links it, and the project builds"
+    pass "adds a submodule at build/.upstream, links it, and the project builds"
 
     install submodule JENESIS_MODE=submodule \
         || fail "re-running against an existing submodule: $(cat "$TMP/submodule.log")"

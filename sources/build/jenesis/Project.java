@@ -515,8 +515,8 @@ public record Project(
 
                     `Make` compiles the engine once and reuses those classes. Drive them yourself:
 
-                      javac -d .jenesis/tool build/jenesis/Project.java
-                      java -cp .jenesis/tool build.jenesis.Make [selectors...]
+                      javac -d .jenesis/classes build/jenesis/Project.java
+                      java -cp .jenesis/classes build.jenesis.Make [selectors...]
 
                     A project with its own entry point calls `new Make("build.Demo").run(selectors)`,
                     which returns the status to exit with. For a GraalVM native launcher, read the
@@ -752,7 +752,7 @@ public record Project(
 
                     If this project vendors Jenesis as a git submodule they are already on disk:
                     resolve the `build/jenesis` symlink and the demos sit under the root it points
-                    into, conventionally `.jenesis/upstream/demo/`. Otherwise read them at
+                    into, conventionally `build/.upstream/demo/`. Otherwise read them at
                     https://github.com/jenesis/jenesis/tree/main/demo.
 
                       Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
@@ -1522,7 +1522,7 @@ public record Project(
                 make.profiles||Comma-separated profiles layered over jenesis.properties
                 make.global||Folder holding the user-global .jenesis/jenesis.properties; default: the home folder
                 make.compile|true|Compile the build sources once and run from those classes
-                make.classes||Where those classes land, relative to the root; default: beside the sources
+                make.classes|.jenesis/classes|Where those classes land, relative to the root
                 make.daemon|false|Hand the build to a reused JVM; --stop as the only selector shuts it down
                 daemon.idle|10800|Seconds an idle daemon waits before exiting
                 daemon.options|-Xmx2g|JVM options for the daemon process itself, whitespace separated

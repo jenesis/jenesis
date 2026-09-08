@@ -1,7 +1,5 @@
 target/
 .jenesis/
-cache/
-*.class
 /sdk/jenesis/*
 !/sdk/jenesis/bin/
 !/sdk/jenesis/tests/
