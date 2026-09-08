@@ -2,7 +2,7 @@ package build.jenesis.test;
 
 import module java.base;
 import module org.junit.jupiter.api;
-import build.jenesis.Execute;
+import build.jenesis.Execution;
 import build.jenesis.Project;
 import build.jenesis.SequencedProperties;
 import sample.Sample;
@@ -11,7 +11,7 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class ExecuteTest {
+public class ExecutionTest {
 
     @TempDir
     private Path root;
@@ -24,23 +24,23 @@ public class ExecuteTest {
 
     @Test
     public void defaults_carry_no_overrides() {
-        Execute execute = new Execute(new Project());
+        Execution execute = new Execution(new Project());
         assertThat(execute.mainClass()).isNull();
         assertThat(execute.module()).isNull();
     }
 
     @Test
     public void main_class_setter_returns_fresh_instance() {
-        Execute original = new Execute(new Project());
-        Execute updated = original.mainClass("foo.Bar");
+        Execution original = new Execution(new Project());
+        Execution updated = original.mainClass("foo.Bar");
         assertThat(updated.mainClass()).isEqualTo("foo.Bar");
         assertThat(original.mainClass()).isNull();
     }
 
     @Test
     public void module_setter_returns_fresh_instance() {
-        Execute original = new Execute(new Project());
-        Execute updated = original.module("sub");
+        Execution original = new Execution(new Project());
+        Execution updated = original.module("sub");
         assertThat(updated.module()).isEqualTo("sub");
         assertThat(original.module()).isNull();
     }
@@ -48,14 +48,14 @@ public class ExecuteTest {
     @Test
     public void system_property_picks_up_main_class() {
         System.setProperty("jenesis.execute.mainClass", "foo.Bar");
-        Execute execute = new Execute(new Project());
+        Execution execute = new Execution(new Project());
         assertThat(execute.mainClass()).isEqualTo("foo.Bar");
     }
 
     @Test
     public void system_property_picks_up_module() {
         System.setProperty("jenesis.execute.module", "sub");
-        Execute execute = new Execute(new Project());
+        Execution execute = new Execution(new Project());
         assertThat(execute.module()).isEqualTo("sub");
     }
 
@@ -63,7 +63,7 @@ public class ExecuteTest {
     public void explicit_overrides_win_over_system_properties() {
         System.setProperty("jenesis.execute.mainClass", "ignored.Main");
         System.setProperty("jenesis.execute.module", "ignored");
-        Execute execute = new Execute(new Project())
+        Execution execute = new Execution(new Project())
                 .mainClass("a.B")
                 .module("sub");
         assertThat(execute.mainClass()).isEqualTo("a.B");
@@ -76,7 +76,7 @@ public class ExecuteTest {
         Path alpha = writeInventory("alpha", "alpha", null, null, null);
         Project.Layout layout = layoutWithModules(Map.of("module-alpha", alpha));
         Project project = new Project().root(root).target(target).layout(layout);
-        assertThatThrownBy(() -> new Execute(project).execute())
+        assertThatThrownBy(() -> new Execution(project).execute())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No module declares a main class");
     }
@@ -90,7 +90,7 @@ public class ExecuteTest {
                 "module-alpha", alpha,
                 "module-beta", beta));
         Project project = new Project().root(root).target(target).layout(layout);
-        assertThatThrownBy(() -> new Execute(project).execute())
+        assertThatThrownBy(() -> new Execution(project).execute())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Multiple modules declare a main class")
                 .hasMessageContaining("foo.Alpha")
@@ -103,7 +103,7 @@ public class ExecuteTest {
         Path alpha = writeInventory("alpha", "alpha", null, null, null);
         Project.Layout layout = layoutWithModules(Map.of("module-alpha", alpha));
         Project project = new Project().root(root).target(target).layout(layout);
-        assertThatThrownBy(() -> new Execute(project).module("alpha").execute())
+        assertThatThrownBy(() -> new Execution(project).module("alpha").execute())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No module at path: alpha");
     }
@@ -114,7 +114,7 @@ public class ExecuteTest {
         Path alpha = writeInventory("alpha", "alpha", "foo.Alpha", null, "missing.jar");
         Project.Layout layout = layoutWithModules(Map.of("module-alpha", alpha));
         Project project = new Project().root(root).target(target).layout(layout);
-        assertThatThrownBy(() -> new Execute(project).execute())
+        assertThatThrownBy(() -> new Execution(project).execute())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Missing runtime artifact");
     }
@@ -127,7 +127,7 @@ public class ExecuteTest {
         writeInventoryFile(alpha, "alpha", Sample.class.getName(), null, alpha.relativize(classesJar).toString());
         Project.Layout layout = layoutWithModules(Map.of("module-alpha", alpha));
         Project project = new Project().root(root).target(target).layout(layout);
-        int code = new Execute(project).execute();
+        int code = new Execution(project).execute();
         assertThat(code).isEqualTo(0);
     }
 
@@ -164,7 +164,7 @@ public class ExecuteTest {
                 .artifacts(artifacts)
                 .layout(Project.Layout.MAVEN)
                 .tests(false);
-        int code = new Execute(project).execute();
+        int code = new Execution(project).execute();
         assertThat(code).isEqualTo(0);
     }
 
@@ -176,7 +176,7 @@ public class ExecuteTest {
         writeInventoryFile(alpha, "alpha", "ignored.OldMain", null, alpha.relativize(classesJar).toString());
         Project.Layout layout = layoutWithModules(Map.of("module-alpha", alpha));
         Project project = new Project().root(root).target(target).layout(layout);
-        int code = new Execute(project).mainClass(Sample.class.getName()).execute();
+        int code = new Execution(project).mainClass(Sample.class.getName()).execute();
         assertThat(code).isEqualTo(0);
     }
 
