@@ -452,10 +452,21 @@ public record Project(
                       %{name}-Djenesis.print.progress=false%{reset}
                                                 Drop the progress lines themselves
 
+                      To always build this way, keep the setting in your own
+                      %{name}~/.jenesis/jenesis.properties%{reset} rather than typing it (see below).
+
                     %{header}Configuration:%{reset}
-                      Every setting is a %{name}-Djenesis.<area>.<name>%{reset} property, and %{name}jenesis.properties%{reset}
-                      at the project root sets the same keys. %{name}configuration%{reset} prints all of them
-                      with the value in force and where it came from, one per line to grep:
+                      Every setting is a %{name}-Djenesis.<area>.<name>%{reset} property. Three places set
+                      them, each overriding the one before it:
+
+                        %{name}~/.jenesis/jenesis.properties%{reset}  Your own defaults, for every project
+                        %{name}jenesis.properties%{reset}             The project's own, committed with it
+                        %{name}-Djenesis.<key>=<value>%{reset}        This one run
+
+                      So a taste in output lives in your home folder and travels with you,
+                      while a build server that has no such file is unaffected by it.
+                      %{name}configuration%{reset} prints every setting with the value in force and whether
+                      it is set or default, one per line to grep:
 
                         java build/jenesis/Make.java configuration | grep print
 
@@ -688,8 +699,9 @@ public record Project(
 
                     Each line reads `jenesis.<key>=<value> [set|default|unset] <what it does>`, so
                     the catalogue and the state of the build come out together. jenesis.properties at
-                    the project root sets the same keys and profiles layer over it; `properties`
-                    prints only the ones that are set.
+                    the project root sets the same keys, over your own
+                    ~/.jenesis/jenesis.properties and under a -D; `properties` prints only the ones
+                    that are set.
 
                     Reach for these without looking them up:
 
