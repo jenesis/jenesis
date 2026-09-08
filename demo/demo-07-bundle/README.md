@@ -18,7 +18,7 @@ From this directory, pass the arguments you want the app to receive:
     java build/Demo.java Ada Lovelace
 
 `Demo.java` runs the build with the stock
-`new Project().assembler(new InferredMultiProjectAssembler())` - the bundle target is
+`new Project(Path.of(".")).assembler(new InferredMultiProjectAssembler())` - the bundle target is
 selected by the committed `packaging.properties` at this demo's root, which sets
 `bundle=true` - then unpacks the produced `bundle.zip` and launches the app out of it
 on this JDK's own `java`, exactly as a JRE-based deployment would. It prints:

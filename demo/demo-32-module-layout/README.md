@@ -40,7 +40,7 @@ launcher. The command line wins over the file, so a one-off
 `-Djenesis.project.layout=modular` on any modular project does the same thing
 without the file (exactly what `../demo-02-java-modular` runs to force this layout
 on the same sources that otherwise auto-detect MODULAR_TO_MAVEN), and an in-code
-build can call `new Project().layout(Project.Layout.MODULAR)` directly.
+build can call `new Project(Path.of(".")).layout(Project.Layout.MODULAR)` directly.
 
 Layout
 ------

@@ -193,12 +193,13 @@ public record Execution(Project project, String mainClass, String module) {
 
     public static void main(String... arguments) {
         try {
-            Project.loadJenesisProperties(Path.of(System.getProperty("jenesis.project.root", ".")));
+            Path root = Path.of(System.getProperty("jenesis.make.root", "."));
+            Make.loadProperties(root);
             Make.Result result = new Make(Project.class.getName()).build(Project.BUILD);
             if (result.code() != 0) {
                 System.exit(result.code());
             }
-            Project project = new Project();
+            Project project = new Project(root);
             int code = new Execution(project).execute(result.outputs(), arguments);
             if (code != 0) {
                 System.exit(code);

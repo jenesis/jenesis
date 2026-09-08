@@ -18,7 +18,7 @@ receive on its command line:
     java build/Demo.java Ada Lovelace
 
 `Demo.java` builds the `stage` goal with the stock
-`new Project().assembler(new InferredMultiProjectAssembler())` - packaging is
+`new Project(Path.of(".")).assembler(new InferredMultiProjectAssembler())` - packaging is
 selected by the committed `packaging.properties` at this demo's root, which sets
 `jpackage=app-image` - then reads the image folder from the `stage/packages` entry
 of the map that `build("stage")` returns (a fixed build target) and launches the
@@ -221,7 +221,7 @@ That Dockerfile does not have to be written by hand either: a `docker` key in
 `jpackage` takes its type. This demo commits `docker=eclipse-temurin:25-jre` as a
 `docker` profile:
 
-    java -Djenesis.project.properties=docker build/jenesis/Make.java stage
+    java -Djenesis.make.profiles=docker build/jenesis/Make.java stage
 
     target/stage/docker/output/module-sources/
     |-- Dockerfile

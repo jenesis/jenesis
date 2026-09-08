@@ -40,7 +40,7 @@ public class Demo {
         // jmod, jlink and jpackage are selected by the committed packaging.properties in this
         // directory (jmod=true / jlink=true / jpackage=app-image), which Jenesis reads from
         // the configuration location, so the wrapped stock assembler needs no extra wiring.
-        Project project = new Project()
+        Project project = new Project(Path.of("."))
                 .assembler(new ConfigJmodAssembler(new InferredMultiProjectAssembler()));
 
         SequencedMap<String, Path> outputs = project.build("stage");

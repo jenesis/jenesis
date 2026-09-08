@@ -35,7 +35,7 @@ import build.jenesis.project.ProjectModuleDescriptor;
 public class Demo {
 
     static void main(String[] args) throws Exception {
-        Project project = new Project()
+        Project project = new Project(Path.of("."))
                 .assembler(new PreprocessingAssembler(new InferredMultiProjectAssembler(), Path.of("plugin")));
         // Build the project (running the substitution plugin) and launch the
         // produced module so its main prints the rewritten greeting - the result

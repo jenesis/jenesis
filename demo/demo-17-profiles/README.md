@@ -9,7 +9,7 @@ attaches source jars and chains to a `supply-chain` profile that enforces strict
 dependency pinning.
 
 There is no profile registry and no plugin: a profile is selected by naming it in
-`jenesis.project.properties`, and profiles compose by chaining to each other.
+`jenesis.make.profiles`, and profiles compose by chaining to each other.
 
 Build it
 --------
@@ -20,7 +20,7 @@ A plain build is the development build - no extras:
 
 Select the `release` profile to build for publication:
 
-    java -Djenesis.project.properties=release build/jenesis/Make.java stage
+    java -Djenesis.make.profiles=release build/jenesis/Make.java stage
 
 The release build additionally stages a `-sources.jar` next to the jar and enforces
 strict dependency pinning, ready for `export`. The CycloneDX SBOM is emitted
@@ -47,7 +47,7 @@ the build is configured, by the `main` launcher:
 
 - `jenesis.properties` at the project root is the **base file**. It is always
   loaded when present, and it is optional - this demo ships none.
-- `jenesis.project.properties` is a **comma-separated list of profile names** to
+- `jenesis.make.profiles` is a **comma-separated list of profile names** to
   load. Each name `<name>` resolves to a `jenesis-<name>.properties` file relative
   to the folder of the file that names it (a `.properties` suffix on the name is
   ignored, so `release` and `release.properties` both name the `jenesis-release.properties`
@@ -57,18 +57,18 @@ the build is configured, by the `main` launcher:
   ahead of the location itself (module-local before project-wide), so a profile can
   carry its own `checkstyle.xml`, `packaging.properties`, and so on. A profile may
   therefore exist as just a properties file, just a folder, or both.
-- Profiles **chain**: any loaded file may itself set `jenesis.project.properties`
+- Profiles **chain**: any loaded file may itself set `jenesis.make.profiles`
   to pull in more, transitively, until everything is loaded. Here `release`
   chains to `supply-chain`:
 
       jenesis-release.properties        jenesis.project.sources=true
-                                        jenesis.project.properties=supply-chain
+                                        jenesis.make.profiles=supply-chain
       jenesis-supply-chain.properties   jenesis.dependency.pin=strict
 
   so selecting `release` also applies `supply-chain`.
 - A user-global `jenesis.properties` is loaded for **every** project as the
   weakest layer - shared personal defaults. It lives in `~/.jenesis/`;
-  `jenesis.project.global` moves that folder (default `$HOME`) or, set to an empty
+  `jenesis.make.global` moves that folder (default `$HOME`) or, set to an empty
   string, switches it off, and a missing file is ignored. It may declare its own
   profiles too, relative to its `.jenesis` folder.
 - **Precedence**, highest first: an explicit `-D` on the command line, then the

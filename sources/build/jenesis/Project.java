@@ -503,7 +503,7 @@ public record Project(
 
                       java build/jenesis/Make.java [selectors...]  source mode, always available
                       jenesis [selectors...]                       installed CLI
-                      Project.build(selectors...)                  embedding it in Java
+                      new Project(root).build(selectors...)        embedding it in Java
 
                     `Make` is the entry point, `Project` the configuration API and has no `main`. No
                     selector runs `build`; several, space-separated, run in one invocation.
@@ -704,6 +704,13 @@ public record Project(
                     ~/.jenesis/jenesis.properties and under a -D; `properties` prints only the ones
                     that are set.
 
+                    Two namespaces, split by who reads them. `jenesis.make.*` belongs to the entry
+                    point: where the project is (root), which profiles to layer (profiles), where
+                    the user-global file lives (global), and how the engine is compiled and reused
+                    (compile, classes, daemon). `jenesis.project.*` belongs to the build itself.
+                    Only -Djenesis.make.root can say where the project is - a properties file cannot,
+                    because the root is what locates that file.
+
                     Reach for these without looking them up:
 
                       -Djenesis.print.process          stream a tool's command line and output as it
@@ -878,12 +885,12 @@ public record Project(
         }
     }
 
-    public Project() {
-        Path resolvedRoot = Path.of(".");
-        String rootOverride = System.getProperty("jenesis.project.root");
-        if (rootOverride != null) {
-            resolvedRoot = Path.of(rootOverride);
+    public Project(Path root) {
+        if (root == null) {
+            throw new IllegalArgumentException("A project needs the folder it is built from,"
+                    + " such as Path.of(\".\") for the working directory");
         }
+        Path resolvedRoot = root;
         if (resolvedRoot.isAbsolute()) {
             Path absoluteCwd = Path.of("").toAbsolutePath().normalize();
             Path absoluteRoot = resolvedRoot.normalize();
@@ -914,17 +921,7 @@ public record Project(
             resolvedBoms = new LinkedHashSet<>();
             locations(bomsOverride, resolvedRoot, resolvedConfiguration, new HashSet<>(), resolvedBoms);
         }
-        String profilesOverride = System.getProperty("jenesis.project.properties");
-        SequencedSet<Path> resolvedProfiles = profilesOverride == null
-                ? Collections.emptyNavigableSet()
-                : Arrays.stream(profilesOverride.split(","))
-                .map(String::trim)
-                .filter(value -> !value.isEmpty())
-                .map(value -> value.endsWith(".properties")
-                        ? value.substring(0, value.length() - ".properties".length())
-                        : value)
-                .map(Path::of)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+        SequencedSet<Path> resolvedProfiles = Collections.emptyNavigableSet();
         Path resolvedTarget = Path.of("target");
         String targetOverride = System.getProperty("jenesis.project.target");
         if (targetOverride != null) {
@@ -1506,98 +1503,8 @@ public record Project(
         });
     }
 
-    public static void loadJenesisProperties(Path path) throws IOException {
-        Path base = path.resolve("jenesis.properties");
-        SequencedProperties project = Files.isRegularFile(base) ? SequencedProperties.ofFiles(base) : null;
-        if (project != null) {
-            requireApplicable(base, project, false);
-        }
-        String location = System.getProperty("jenesis.project.global");
-        if (location == null && project != null) {
-            location = project.getProperty("jenesis.project.global");
-        }
-        if (location == null) {
-            location = System.getProperty("user.home");
-        }
-        SequencedProperties user = null;
-        Path home = null;
-        if (!location.isEmpty()) {
-            home = Path.of(location).resolve(".jenesis");
-            Path file = home.resolve("jenesis.properties");
-            user = Files.isRegularFile(file) ? SequencedProperties.ofFiles(file) : null;
-            if (user != null) {
-                requireApplicable(file, user, true);
-            }
-        }
-        Set<Path> loaded = new LinkedHashSet<>();
-        Deque<Path> pending = new ArrayDeque<>();
-        addProfiles(pending, path, System.getProperty("jenesis.project.properties"));
-        if (project != null) {
-            addProfiles(pending, path, project.getProperty("jenesis.project.properties"));
-        }
-        loadProfiles(loaded, pending, path);
-        if (user != null) {
-            addProfiles(pending, home, user.getProperty("jenesis.project.properties"));
-            loadProfiles(loaded, pending, home);
-        }
-        if (project != null) {
-            apply(project);
-        }
-        if (user != null) {
-            apply(user);
-        }
-    }
-
-    private static void loadProfiles(Set<Path> loaded, Deque<Path> pending, Path base) throws IOException {
-        while (!pending.isEmpty()) {
-            Path file = pending.removeFirst().normalize();
-            if (!loaded.add(file) || !Files.isRegularFile(file)) {
-                continue;
-            }
-            SequencedProperties properties = SequencedProperties.ofFiles(file);
-            requireApplicable(file, properties, true);
-            addProfiles(pending, base, properties.getProperty("jenesis.project.properties"));
-            apply(properties);
-        }
-    }
-
-    private static void requireApplicable(Path file, SequencedProperties properties, boolean located) {
-        if (properties.getProperty("jenesis.project.root") != null) {
-            throw new IllegalStateException("jenesis.project.root cannot be set in " + file
-                    + ": the project root locates this file, so it is resolved before the file is read"
-                    + " (pass -Djenesis.project.root on the command line instead)");
-        }
-        if (located && properties.getProperty("jenesis.project.global") != null) {
-            throw new IllegalStateException("jenesis.project.global cannot be set in " + file
-                    + ": the user-global location is resolved from the command line or the project's"
-                    + " jenesis.properties before this file is read");
-        }
-    }
-
-    private static void apply(SequencedProperties properties) {
-        for (String name : properties.stringPropertyNames()) {
-            System.getProperties().putIfAbsent(name, properties.getProperty(name));
-        }
-    }
-
-    private static void addProfiles(Deque<Path> pending, Path base, String list) {
-        if (list == null) {
-            return;
-        }
-        for (String name : list.split(",")) {
-            String trimmed = name.trim();
-            if (trimmed.endsWith(".properties")) {
-                trimmed = trimmed.substring(0, trimmed.length() - ".properties".length());
-            }
-            if (!trimmed.isEmpty()) {
-                pending.add(base.resolve("jenesis-" + trimmed + ".properties"));
-            }
-        }
-    }
-
     private static void printConfiguration() {
         String catalogue = """
-                project.root|.|Folder the build reads the project from
                 project.target|target|Folder the build writes its outputs to
                 project.artifacts||Folder resolved dependencies are cached in
                 project.layout|auto|auto|maven|modular|modular_to_maven; auto reads the project
@@ -1608,8 +1515,6 @@ public record Project(
                 project.metadata||Path-separated extra metadata files
                 project.configuration|build.jenesis|Path-separated folders searched for tool configuration files; @ splices the default
                 project.boms||Path-separated locations of local pin-<name>.properties; default: the configuration folders
-                project.properties||Comma-separated profiles layered over jenesis.properties
-                project.global||Location of a global properties file read before the project's own
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
                 project.docker|false|Run the whole build inside a container
@@ -1617,6 +1522,9 @@ public record Project(
                 project.docker.mount||Extra read-only container mounts, host[:container],...
                 project.docker.mountWritable||Extra writable container mounts
                 project.docker.env||Host environment variables to forward, name[=value],...
+                make.root|.|Folder Make looks for the project in; only settable on the command line
+                make.profiles||Comma-separated profiles layered over jenesis.properties
+                make.global||Folder holding the user-global .jenesis/jenesis.properties; default: the home folder
                 make.compile|true|Compile the build sources once and run from those classes
                 make.classes||Where those classes land, relative to the root; default: beside the sources
                 make.daemon|false|Hand the build to a reused JVM; --stop as the only selector shuts it down
@@ -1822,22 +1730,20 @@ public record Project(
         return this.build(selectors);
     }
 
-    public static SequencedMap<String, Path> perform(String... selectors) {
+    public static SequencedMap<String, Path> perform(Path root, SequencedSet<Path> profiles, String... selectors) {
         try {
-            loadJenesisProperties(Path.of(System.getProperty("jenesis.project.root", ".")));
-            return new Project().doMain(selectors);
+            return new Project(root).profiles(profiles.toArray(Path[]::new)).doMain(selectors);
         } catch (Throwable t) {
             report(t);
             return null;
         }
     }
 
-    public static int run(String mainClass, String... selectors) {
+    public static int run(String mainClass, Path root, SequencedSet<Path> profiles, String... selectors) {
         if (mainClass.equals(Project.class.getName())) {
-            return perform(selectors) == null ? 1 : 0;
+            return perform(root, profiles, selectors) == null ? 1 : 0;
         }
         try {
-            loadJenesisProperties(Path.of(System.getProperty("jenesis.project.root", ".")));
             Class.forName(mainClass, true, Project.class.getClassLoader())
                     .getMethod("main", String[].class)
                     .invoke(null, (Object) selectors);

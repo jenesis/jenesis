@@ -19,7 +19,7 @@ public class Demo {
         // Wrap the stock InferredMultiProjectAssembler so that every module's Java
         // sources pass through a preprocessing step before the regular compile,
         // jar, and test flow runs unchanged.
-        new Project()
+        new Project(Path.of("."))
                 .assembler(new PreprocessingAssembler(new InferredMultiProjectAssembler()))
                 .build(args);
     }

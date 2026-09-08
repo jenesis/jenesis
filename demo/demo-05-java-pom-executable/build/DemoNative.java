@@ -43,7 +43,7 @@ public class DemoNative {
         }
         Path configuration = Files.createTempDirectory("packaging-");
         Files.writeString(configuration.resolve("packaging.properties"), "jpackage=" + type + "\n");
-        Project project = new Project()
+        Project project = new Project(Path.of("."))
                 .configuration(configuration)
                 .assembler(new InferredMultiProjectAssembler());
 

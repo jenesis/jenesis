@@ -58,7 +58,7 @@ The preprocessing is delivered by a custom assembler that wraps the stock one.
 `InferredMultiProjectAssembler`; this demo passes a `PreprocessingAssembler` that
 holds the stock assembler as a delegate:
 
-        new Project()
+        new Project(Path.of("."))
                 .assembler(new PreprocessingAssembler(new InferredMultiProjectAssembler()))
 
 For each module the wrapper does three things:

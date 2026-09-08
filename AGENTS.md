@@ -43,7 +43,7 @@ used). Records, sealed types, pattern switches and unnamed variables (`_`) are t
 
 **Immutable records with withers.** Configuration objects are records or final classes whose state never
 changes after construction. Each exposes one method per component, named exactly like the component, that
-returns a new instance with that value replaced (`new Project().version("1.0.0").sources(true)`,
+returns a new instance with that value replaced (`new Project(Path.of(".")).version("1.0.0").sources(true)`,
 `new BuildExecutor.Configuration().concurrency(4)`). No setters, no builders, no `with` prefix.
 
 **System properties are the defaults.** Every setting is a `jenesis.<area>.<name>` system property, read
@@ -68,6 +68,14 @@ value in force, so **adding, renaming or removing a property means editing it in
 `jenesis.*` the code reads and the catalogue does not list is a bug, and so is a line whose default has drifted
 from the constructor that reads it. `help` and `skill` point at `configuration` rather than listing properties,
 so neither grows for a new property; `help` grows for a new selector.
+
+**`jenesis.make.*` and `jenesis.project.*` split by who reads them.** `Make` and the main methods it launches
+read `jenesis.make.*`: where the project is (`root`), which profiles to layer (`profiles`), where the
+user-global file lives (`global`), and how the engine is compiled and reused (`compile`, `classes`, `daemon`).
+All of it has to be read before a `Project` can exist, which is why it belongs to the entry point rather than
+to the project. Everything the `Project` record reads for itself is `jenesis.project.*`. `Project` therefore
+takes its root as a required constructor argument and its profiles as a value handed in by the entry point -
+neither is a property it reads, and no `jenesis.project.*` key is read outside it.
 
 **Configuration files are read through `SequencedProperties`.** A file is read with the type's own accessors -
 `value`, `value(key, default)`, `flag`, `flag(key, default)`, `entries` for a comma-separated list, `words`

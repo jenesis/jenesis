@@ -24,7 +24,7 @@ public class Demo {
         // Packaging is selected by the committed packaging.properties in this directory
         // (jpackage=app-image), which Jenesis reads from the configuration location for
         // every module - so the stock InferredMultiProjectAssembler needs no extra wiring.
-        Project project = new Project()
+        Project project = new Project(Path.of("."))
                 .assembler(new InferredMultiProjectAssembler());
 
         // `stage/packages` is a fixed build target: building `stage` returns a map keyed
