@@ -143,6 +143,7 @@ class BuildExecutorDefault implements BuildExecutor {
                 BiConsumer<Boolean, Throwable> completion = callback.step(
                         location + identity,
                         new LinkedHashSet<>(summaries.keySet()));
+                boolean cacheRemotely = step.shouldCacheRemotely();
                 if (!consistent || step.shouldRun(arguments)) {
                     Path next = target.resolve(BuildExecutorModule.encode(identity) + "~");
                     if (Files.exists(next)) {
@@ -152,11 +153,11 @@ class BuildExecutorDefault implements BuildExecutor {
                     Path nextOutput = Files.createDirectory(next.resolve("output"));
                     Path nextSupplement = Files.createDirectory(next.resolve("supplement"));
                     long fetchStarted = System.nanoTime();
-                    Optional<BuildStepResult> cached = cache.fetch(
-                            executor,
+                    Optional<BuildStepResult> cached = cache.fetch(executor,
                             location + identity,
                             currentStepHash,
                             inputs,
+                            cacheRemotely,
                             nextOutput);
                     boolean fromCache = cached.isPresent();
                     if (fromCache) {
@@ -215,7 +216,14 @@ class BuildExecutorDefault implements BuildExecutor {
                                     executor.execute(() -> {
                                         long storeStarted = System.nanoTime();
                                         try {
-                                            cache.store(executor, stored, currentStepHash, inputs, previous.output());
+                                            cache.store(executor,
+                                                    location + identity,
+                                                    currentStepHash,
+                                                    inputs,
+                                                    cacheRemotely,
+                                                    previous.output(),
+                                                    hash.algorithm(),
+                                                    checksums);
                                         } catch (IOException _) {
                                         }
                                         callback.stored(stored, System.nanoTime() - storeStarted);
@@ -250,7 +258,7 @@ class BuildExecutorDefault implements BuildExecutor {
                     }
                     completion.accept(false, null);
                     try {
-                        cache.touch(executor, location + identity, currentStepHash, inputs);
+                        cache.touch(executor, location + identity, currentStepHash, inputs, cacheRemotely);
                     } catch (IOException _) {
                     }
                     return CompletableFuture.completedStage(Map.of(identity, Map.of(

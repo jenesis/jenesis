@@ -6,6 +6,8 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
+import build.jenesis.BuildStepArgument;
+import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
@@ -83,6 +85,60 @@ public class BuildExecutorCacheTest implements Serializable {
         assertThat(cache.storeStep).isEqualTo(BuildStepHashFunction.ofSerializationDigest("MD5").hash(buildStep));
         assertThat(cache.storeInputs).containsOnlyKeys("source");
         assertThat(cache.storeOutput.resolve("file")).content().isEqualTo("foobar");
+    }
+
+    @Test
+    public void offers_the_output_checksums_and_their_digest_when_storing() throws IOException {
+        Files.writeString(source.resolve("file"), "foo");
+        RecordingCache cache = new RecordingCache(false);
+        BuildStep buildStep = (_, context, arguments) -> {
+            Files.writeString(
+                    context.next().resolve("file"),
+                    Files.readString(arguments.get("source").folder().resolve("file")) + "bar");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        };
+        runStep(cache, buildStep);
+        assertThat(cache.storeDigest).isEqualTo("MD5");
+        assertThat(cache.storeChecksums).containsOnlyKeys(Path.of("file"));
+        assertThat(cache.storeChecksums.get(Path.of("file")))
+                .as("the checksums are the executor's own, so a cache that addresses files by content hashes nothing")
+                .isEqualTo(hash.hash(cache.storeOutput.resolve("file")));
+    }
+
+    @Test
+    public void carries_the_steps_remote_caching_declaration_to_every_call() throws IOException {
+        Files.writeString(source.resolve("file"), "foo");
+        RecordingCache cache = new RecordingCache(false);
+        runStep(cache, new LocalOnlyStep());
+        assertThat(cache.fetchRemote).isFalse();
+        assertThat(cache.storeRemote).isFalse();
+        RecordingCache upToDate = new RecordingCache(false);
+        runStep(upToDate, new LocalOnlyStep());
+        assertThat(upToDate.touchRemote).isFalse();
+        RecordingCache remote = new RecordingCache(false);
+        runStep(remote, (_, context, _) -> {
+            Files.writeString(context.next().resolve("file"), "bar");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        });
+        assertThat(remote.fetchRemote).as("a step that says nothing is cached anywhere").isTrue();
+        assertThat(remote.storeRemote).isTrue();
+    }
+
+    private static final class LocalOnlyStep implements BuildStep {
+
+        @Override
+        public boolean shouldCacheRemotely() {
+            return false;
+        }
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            Files.writeString(context.next().resolve("file"), "local");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
     }
 
     @Test
@@ -232,7 +288,10 @@ public class BuildExecutorCacheTest implements Serializable {
         private volatile String fetchIdentity, storeIdentity, touchIdentity;
         private volatile byte[] fetchStep, storeStep, touchStep;
         private volatile SequencedMap<String, Map<Path, byte[]>> fetchInputs, storeInputs, touchInputs;
+        private volatile boolean fetchRemote = true, storeRemote = true, touchRemote = true;
         private volatile Path storeOutput;
+        private volatile String storeDigest;
+        private volatile Map<Path, byte[]> storeChecksums;
 
         private RecordingCache(boolean hit) {
             this.hit = hit;
@@ -247,11 +306,13 @@ public class BuildExecutorCacheTest implements Serializable {
         public void touch(Executor executor,
                           String identity,
                           byte[] step,
-                          SequencedMap<String, Map<Path, byte[]>> inputs) {
+                          SequencedMap<String, Map<Path, byte[]>> inputs,
+                          boolean remote) {
             touches.incrementAndGet();
             touchIdentity = identity;
             touchStep = step;
             touchInputs = inputs;
+            touchRemote = remote;
         }
 
         @Override
@@ -259,11 +320,13 @@ public class BuildExecutorCacheTest implements Serializable {
                                                String identity,
                                                byte[] step,
                                                SequencedMap<String, Map<Path, byte[]>> inputs,
+                                               boolean remote,
                                                Path target) throws IOException {
             fetches.incrementAndGet();
             fetchIdentity = identity;
             fetchStep = step;
             fetchInputs = inputs;
+            fetchRemote = remote;
             if (!hit) {
                 return Optional.empty();
             }
@@ -276,12 +339,18 @@ public class BuildExecutorCacheTest implements Serializable {
                           String identity,
                           byte[] step,
                           SequencedMap<String, Map<Path, byte[]>> inputs,
-                          Path output) {
+                          boolean remote,
+                          Path output,
+                          String digest,
+                          Map<Path, byte[]> checksums) {
             stores.incrementAndGet();
             storeIdentity = identity;
             storeStep = step;
             storeInputs = inputs;
+            storeRemote = remote;
             storeOutput = output;
+            storeDigest = digest;
+            storeChecksums = checksums;
         }
     }
 
@@ -324,6 +393,7 @@ public class BuildExecutorCacheTest implements Serializable {
                                                String identity,
                                                byte[] step,
                                                SequencedMap<String, Map<Path, byte[]>> inputs,
+                                               boolean remote,
                                                Path target) {
             return Optional.empty();
         }
@@ -333,7 +403,10 @@ public class BuildExecutorCacheTest implements Serializable {
                           String identity,
                           byte[] step,
                           SequencedMap<String, Map<Path, byte[]>> inputs,
-                          Path output) {
+                          boolean remote,
+                          Path output,
+                          String digest,
+                          Map<Path, byte[]> checksums) {
             stores.incrementAndGet();
         }
     }

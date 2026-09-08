@@ -24,6 +24,7 @@ class JenesisClassLoaderBridge implements AutoCloseable {
     private MethodHandle foreignAccept;
     private MethodHandle foreignApply;
     private MethodHandle foreignShouldRun;
+    private MethodHandle foreignShouldCacheRemotely;
 
     private MethodHandle foreignContextCtor;
     private MethodHandle foreignArgumentCtor;
@@ -70,6 +71,14 @@ class JenesisClassLoaderBridge implements AutoCloseable {
                 MethodType.methodType(CompletionStage.class, Executor.class, foreignBuildStepContext, SequencedMap.class));
         foreignShouldRun = lookup.findVirtual(foreignBuildStep, "shouldRun",
                 MethodType.methodType(boolean.class, SequencedMap.class));
+        MethodHandle shouldCacheRemotely;
+        try {
+            shouldCacheRemotely = lookup.findVirtual(foreignBuildStep, "shouldCacheRemotely",
+                    MethodType.methodType(boolean.class));
+        } catch (NoSuchMethodException _) {
+            shouldCacheRemotely = null;
+        }
+        foreignShouldCacheRemotely = shouldCacheRemotely;
         foreignContextCtor = lookup.findConstructor(foreignBuildStepContext,
                 MethodType.methodType(void.class, Path.class, Path.class, Path.class));
         foreignArgumentCtor = lookup.findConstructor(foreignBuildStepArgument,
@@ -98,6 +107,7 @@ class JenesisClassLoaderBridge implements AutoCloseable {
         foreignAccept = null;
         foreignApply = null;
         foreignShouldRun = null;
+        foreignShouldCacheRemotely = null;
         foreignContextCtor = null;
         foreignArgumentCtor = null;
         foreignResultNext = null;
@@ -213,6 +223,20 @@ class JenesisClassLoaderBridge implements AutoCloseable {
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
             try {
                 return (boolean) bridge.foreignShouldRun.invoke(foreignStep, bridge.toForeignArguments(arguments));
+            } catch (RuntimeException | Error e) {
+                throw e;
+            } catch (Throwable t) {
+                throw new RuntimeException(t);
+            }
+        }
+
+        @Override
+        public boolean shouldCacheRemotely() {
+            if (bridge.foreignShouldCacheRemotely == null) {
+                return true;
+            }
+            try {
+                return (boolean) bridge.foreignShouldCacheRemotely.invoke(foreignStep);
             } catch (RuntimeException | Error e) {
                 throw e;
             } catch (Throwable t) {

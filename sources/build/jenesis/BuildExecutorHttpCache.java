@@ -78,8 +78,9 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                                            String identity,
                                            byte[] step,
                                            SequencedMap<String, Map<Path, byte[]>> inputs,
+                                           boolean remote,
                                            Path target) throws IOException {
-        if (!read) {
+        if (!read || !remote) {
             return Optional.empty();
         }
         HttpURLConnection connection = connect("GET", step, inputs);
@@ -104,8 +105,11 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                       String identity,
                       byte[] step,
                       SequencedMap<String, Map<Path, byte[]>> inputs,
-                      Path output) throws IOException {
-        if (write) {
+                      boolean remote,
+                      Path output,
+                      String digest,
+                      Map<Path, byte[]> checksums) throws IOException {
+        if (write && remote) {
             upload(step, inputs, output);
         }
     }
@@ -119,8 +123,9 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
     public void touch(Executor executor,
                       String identity,
                       byte[] step,
-                      SequencedMap<String, Map<Path, byte[]>> inputs) {
-        if (!read) {
+                      SequencedMap<String, Map<Path, byte[]>> inputs,
+                      boolean remote) {
+        if (!read || !remote) {
             return;
         }
         try {
