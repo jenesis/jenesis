@@ -123,7 +123,7 @@ Publishing for real
 Two more steps turn the staged bundle into a Central release, and Jenesis hands
 both to tools that own them:
 
-- **A local publish** is built in. `java build/jenesis/Project.java export` copies
+- **A local publish** is built in. `java build/jenesis/Make.java export` copies
   the staged tree into your local Maven repository (`~/.m2`, or
   `MAVEN_REPOSITORY_LOCAL`) with the `maven-metadata-local.xml` / `_remote.repositories`
   markers - a genuine publish, just to a local repository, so a project on the
@@ -144,7 +144,7 @@ That division is about credentials and signing keys, not about who types the
 command, so the build does offer to run the release tool for you. A `jreleaser.yml`
 at the project root adds a `release/jreleaser` step to the `release` goal:
 
-    java build/jenesis/Project.java release
+    java build/jenesis/Make.java release
 
 It is a rehearsal by default - JReleaser runs with `--dry-run`, performing every
 local phase and skipping every remote one - and publishing takes the explicit

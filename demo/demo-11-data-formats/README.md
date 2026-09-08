@@ -8,7 +8,7 @@ generator writes are compiled into that module like any hand-written package.
 Run it
 ------
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 | Module     | Config file                          | Input                    | Generator | Generated |
 | ---------- | ------------------------------------ | ------------------------ | --------- | --------- |
@@ -80,7 +80,7 @@ declares it in its own `pom.xml`:
 `pin` writes both closures, each under its own group, so the tool and the runtime
 API are versioned independently:
 
-    java build/jenesis/Project.java pin
+    java build/jenesis/Make.java pin
 
 A native tool, resolved per platform
 ------------------------------------

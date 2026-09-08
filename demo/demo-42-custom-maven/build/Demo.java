@@ -9,7 +9,7 @@ import build.jenesis.project.ProjectModuleDescriptor;
 
 /**
  * A "custom but not so custom" build: it does not go through {@code Project} (no
- * layout, no goals, no `java build/jenesis/Project.java`), yet it does not wire
+ * layout, no goals, no `java build/jenesis/Make.java`), yet it does not wire
  * every step by hand either. Instead it uses the convenience
  * {@code MavenProject.make(root, assembler)} overload, which discovers the
  * multi-module Maven project under {@code root} and supplies sane defaults for

@@ -29,7 +29,7 @@ public class Demo {
                         : "java").toString());
 
         System.out.println("== Building and testing (Mockito attaches to the test JVM) ==");
-        run(new ProcessBuilder(java, "build/jenesis/Project.java"));
+        run(new ProcessBuilder(java, "build/jenesis/Make.java"));
 
         System.out.println();
         System.out.println("== Running the application (OpenTelemetry attaches to the app JVM) ==");

@@ -12,7 +12,7 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 Jenesis auto-detects the MAVEN layout from the `pom.xml`, resolves and downloads
 `commons-lang3` from Maven Central (or `~/.m2`), and compiles `Sample.java`
@@ -37,7 +37,7 @@ To see what the build resolves, run the `dependencies` selector. It prints each
 module's resolved dependency graph, annotated with the resolved module name and
 the declared license:
 
-    java build/jenesis/Project.java dependencies
+    java build/jenesis/Make.java dependencies
 
     main/compile (module)
     maven/org.apache.commons/commons-lang3 3.14.0 [compile] (module org.apache.commons.lang3) {Apache-2.0}
@@ -52,7 +52,7 @@ Opening it in your IDE
 If you want to run or debug this project from an IDE, the `ide` selector generates
 the project metadata for you (run a sub-step like `ide/idea` for just one editor):
 
-    java build/jenesis/Project.java ide
+    java build/jenesis/Make.java ide
 
 It writes IntelliJ IDEA, VS Code, and Eclipse files at the project root from the
 resolved sources and dependencies - see *Generating IDE metadata* in the root
@@ -61,7 +61,7 @@ README for details.
 Pinned dependency
 -----------------
 
-This demo ships **already pinned**. `java build/jenesis/Project.java pin`
+This demo ships **already pinned**. `java build/jenesis/Make.java pin`
 records the resolved dependency (with its content checksum) in the POM's
 `<dependencyManagement>` block:
 

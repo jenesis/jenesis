@@ -12,7 +12,7 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 Jenesis compiles the Scala module (resolving the pinned Scala compiler) and runs
 every tool whose configuration file it finds. The first build downloads the
@@ -51,7 +51,7 @@ normal build fails if a `.scala` file is not already formatted, but never
 rewrites it. To apply scalafmt and rewrite the sources in place, run the build
 with the rewrite switch:
 
-    java -Djenesis.format.rewrite=true build/jenesis/Project.java
+    java -Djenesis.format.rewrite=true build/jenesis/Make.java
 
 This mirrors the `google-java-format` and `ktlint` rewrites in
 `../demo-13-java-quality` and `../demo-19-kotlin-quality`.
@@ -61,5 +61,5 @@ Pinning
 
 The Scala compiler is pinned in its own `scalac` group (see `../demo-21-scala`).
 Scalastyle and scalafmt each resolve a floating `RELEASE` in their own group;
-run `java build/jenesis/Project.java pin` to record them with checksums when you
+run `java build/jenesis/Make.java pin` to record them with checksums when you
 want a fully reproducible tool chain.

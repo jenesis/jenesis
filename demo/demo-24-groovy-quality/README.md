@@ -12,7 +12,7 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 Jenesis compiles the Groovy module (resolving the pinned Groovy compiler) and
 runs CodeNarc against the sources. The first build downloads the compiler and
@@ -50,5 +50,5 @@ Pinning
 
 The Groovy compiler is pinned in its own `groovyc` group (see `../demo-23-groovy`).
 CodeNarc resolves a floating `RELEASE` in its own `codenarc` group; run
-`java build/jenesis/Project.java pin` to record it with checksums when you want a
+`java build/jenesis/Make.java pin` to record it with checksums when you want a
 fully reproducible tool chain.

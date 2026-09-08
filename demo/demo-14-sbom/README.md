@@ -16,7 +16,7 @@ Build it
 
 From this directory:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 A plain build emits the SBOM: it is on by default. The project ships an optional
 `sbom.properties` that sets `format=json`, which is also the default when no file is

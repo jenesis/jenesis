@@ -18,7 +18,7 @@ result table:
     StringBench.concatenated         8  avgt    2   86.257          ns/op
     StringBench.concatenated        64  avgt    2  767.785          ns/op
 
-`java build/jenesis/Project.java` builds without running it.
+`java build/jenesis/Make.java` builds without running it.
 
 Generation, without a generator module
 --------------------------------------

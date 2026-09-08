@@ -33,12 +33,12 @@ location, which the native compilation reads.
 then the running JDK's own `bin/` (`java.home`), then `PATH` - so either run the build
 with a GraalVM JDK:
 
-    ~/.sdkman/candidates/java/25.0.3-graal/bin/java build/jenesis/Project.java stage
+    ~/.sdkman/candidates/java/25.0.3-graal/bin/java build/jenesis/Make.java stage
 
 or keep your usual JDK 25 and point `GRAALVM_HOME` at a GraalVM install (here one
 managed by [SDKMAN](https://sdkman.io/), `sdk install java 25.0.3-graal`):
 
-    GRAALVM_HOME=~/.sdkman/candidates/java/25.0.3-graal java build/jenesis/Project.java stage
+    GRAALVM_HOME=~/.sdkman/candidates/java/25.0.3-graal java build/jenesis/Make.java stage
 
 The build compiles the modules, runs the test under the agent, then runs
 `native-image` over the produced module path. The image build is the slow step (a

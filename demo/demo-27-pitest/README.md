@@ -14,7 +14,7 @@ block alongside the normal test run, so the suite runs as usual *and* PIT then
 assesses how good it is. There is no flag and no plugin to register; the plain
 build runs it:
 
-    java build/jenesis/Project.java
+    java build/jenesis/Make.java
 
 The build resolves PIT and its JUnit 5 plugin into their own `pitest` dependency
 group (separate from the project's dependencies), runs the analysis against the

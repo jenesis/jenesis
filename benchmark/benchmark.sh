@@ -116,15 +116,15 @@ M_F()  { echo "$1 package -o -q -ntp"; }
 # the Maven jar; pin the Maven layout so a Jenesis build produces the same single artifact
 # as the Maven baseline and the comparison stays like-for-like (as it was before the default).
 LAYOUT="-Djenesis.project.layout=maven"
-SRC_NT="java $LAYOUT -Djenesis.test.skip=true $ENGINE/Project.java build"
+SRC_NT="java $LAYOUT -Djenesis.test.skip=true $ENGINE/Make.java build"
 JAVAC_NT="java $LAYOUT -Djenesis.test.skip=true -cp $TOOL build.jenesis.Project build"
 NATIVE_NT="$NATIVE_BIN $LAYOUT -Djenesis.test.skip=true build"
-SRC_F="java $LAYOUT $ENGINE/Project.java build"
+SRC_F="java $LAYOUT $ENGINE/Make.java build"
 
 table_launch() {
   note "Table: build-tool launch overhead (run 'help', no project work)"
   build_tool
-  bench_warm "source"      "$RUNS_WARM" "java $ENGINE/Project.java help" "java $ENGINE/Project.java help"
+  bench_warm "source"      "$RUNS_WARM" "java $ENGINE/Make.java help" "java $ENGINE/Make.java help"
   bench_warm "precompiled" "$RUNS_WARM" "java -cp $TOOL build.jenesis.Project help" "java -cp $TOOL build.jenesis.Project help"
   build_native && bench_warm "native" "$RUNS_WARM" "$NATIVE_BIN help" "$NATIVE_BIN help"
 }

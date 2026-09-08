@@ -36,7 +36,7 @@ closure, directly or transitively, and only one variant of a module name can be
 selected, mirroring the module path's own uniqueness rule. The leading colon
 cannot collide with a real version: a legal Maven version never contains `:`,
 and a parseable `module-info.class` version must start with a digit. Re-pinning
-(`java build/jenesis/Project.java pin`) round-trips the qualifier.
+(`java build/jenesis/Make.java pin`) round-trips the qualifier.
 
 The module repository serves the variant under the fused filename
 `mutiny.zero/0.4.3/mutiny.zero-jdk-flow.jar` (a dash cannot occur in a Java
