@@ -7,12 +7,15 @@
 #   * vendor    - copy the bootstrap sources from a release's sources jar into
 #                 build/jenesis (self-contained, no git required). This is the
 #                 default for projects that do not track Jenesis as a submodule.
-#   * submodule - when the project already tracks Jenesis as a git submodule
-#                 (a .gitmodules entry whose URL points at the Jenesis repo), the
-#                 existing submodule is checked out to the requested ref instead,
-#                 and the new commit is staged in the superproject.
+#   * submodule - track Jenesis as a git submodule. An existing one (a .gitmodules
+#                 entry whose URL points at the Jenesis repo) is checked out to the
+#                 requested ref; a project that has none gets one added, at
+#                 .jenesis/upstream, with build/jenesis linked into it. Either way
+#                 the new commit is staged in the superproject.
 #
-# The mode is detected automatically; override with JENESIS_MODE.
+# Auto picks submodule when the project already tracks one and vendor otherwise,
+# so an existing setup keeps working and a fresh project stays self-contained.
+# Ask for JENESIS_MODE=submodule to have one added.
 #
 # By default the latest published release is installed. An optional argument
 # pins an arbitrary git ref instead - a tag, a commit, or a branch:
@@ -34,6 +37,7 @@
 #   JENESIS_TARGET        Target project directory (default: current working directory)
 #   JENESIS_GITHUB_REPO   Source repository, owner/name (default: jenesis/jenesis)
 #   JENESIS_MODE          auto (default) | vendor | submodule
+#   JENESIS_SUBMODULE_PATH  Where a newly added submodule goes (default: .jenesis/upstream)
 #
 # After the script completes, build the project with:
 #
@@ -128,9 +132,24 @@ if [ "$MODE" != "vendor" ]; then
     fi
 fi
 
+# Asked for a submodule and the project has none yet: add one. The checkout,
+# the ref and the staging are the same work as an update, so this only creates
+# the entry and then falls through to the block below. Auto never adds one - it
+# takes a submodule the project already tracks, and vendors otherwise.
+CREATED_SUBMODULE=0
 if [ "$MODE" = "submodule" ] && [ -z "$SUBMODULE_PATH" ]; then
     command -v git >/dev/null 2>&1 || die "JENESIS_MODE=submodule requires git, which was not found"
-    die "JENESIS_MODE=submodule but no Jenesis submodule (a .gitmodules entry for ${GITHUB_REPO}) was found under ${TARGET}"
+    git -C "$TARGET" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+        || die "JENESIS_MODE=submodule needs a git repository at ${TARGET} - run 'git init' there first, or use JENESIS_MODE=vendor"
+    SUBMODULE_PATH="${JENESIS_SUBMODULE_PATH:-.jenesis/upstream}"
+    SUBMODULE_NAME="$SUBMODULE_PATH"
+    [ -e "$TARGET/$SUBMODULE_PATH" ] \
+        && die "cannot add a submodule at '${SUBMODULE_PATH}': something is already there"
+    say "adding Jenesis as a submodule at '${SUBMODULE_PATH}'"
+    git -C "$TARGET" submodule add --depth 1 "https://github.com/${GITHUB_REPO}.git" "$SUBMODULE_PATH" >/dev/null 2>&1 \
+        || git -C "$TARGET" submodule add "https://github.com/${GITHUB_REPO}.git" "$SUBMODULE_PATH" >/dev/null 2>&1 \
+        || die "failed to add the Jenesis submodule at '${SUBMODULE_PATH}'"
+    CREATED_SUBMODULE=1
 fi
 
 # --- submodule mode: move the existing submodule to the requested ref --------
@@ -164,7 +183,26 @@ if [ -n "$SUBMODULE_PATH" ]; then
     git -C "$TARGET" add "$SUBMODULE_PATH" \
         || die "failed to stage the updated submodule pointer"
 
-    say "updated submodule '${SUBMODULE_PATH}' to ${REF} (staged in the superproject; commit when ready)"
+    # A project that vendored Jenesis before, or one that never had it, has no
+    # build/jenesis pointing into the submodule yet. Without that link the entry
+    # point the documentation names is not there, so the install is not usable.
+    if [ "$CREATED_SUBMODULE" = "1" ]; then
+        LINK="$TARGET/build/jenesis"
+        if [ -d "$LINK" ] && [ ! -L "$LINK" ]; then
+            say "replacing the vendored build/jenesis with a link into the submodule"
+            rm -rf "$LINK"
+        fi
+        mkdir -p "$TARGET/build"
+        if [ ! -e "$LINK" ] && [ ! -L "$LINK" ]; then
+            ln -s "../${SUBMODULE_PATH}/sources/build/jenesis" "$LINK" \
+                || die "failed to link build/jenesis into '${SUBMODULE_PATH}' - this filesystem may not support symbolic links, so use JENESIS_MODE=vendor"
+            git -C "$TARGET" add "build/jenesis" >/dev/null 2>&1 || true
+            say "linked build/jenesis to ${SUBMODULE_PATH}/sources/build/jenesis"
+        fi
+        say "added submodule '${SUBMODULE_PATH}' at ${REF} (staged in the superproject; commit when ready)"
+    else
+        say "updated submodule '${SUBMODULE_PATH}' to ${REF} (staged in the superproject; commit when ready)"
+    fi
     say "next: run 'java build/jenesis/Make.java' from ${TARGET}"
     exit 0
 fi
