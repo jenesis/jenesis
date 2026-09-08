@@ -298,23 +298,6 @@ public class ProjectTest {
     }
 
     @Test
-    public void a_build_without_an_entry_class_is_rejected() {
-        assertThatThrownBy(() -> new Make(null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("needs the name of the class whose main it should run");
-        assertThatThrownBy(() -> new Make(" "))
-                .as("a blank name names no class either")
-                .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    public void a_project_without_a_folder_is_rejected() {
-        assertThatThrownBy(() -> new Project(null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("needs the folder it is built from");
-    }
-
-    @Test
     public void system_property_overrides_target() {
         System.setProperty("jenesis.project.target", "custom-target");
         assertThat(new Project(Path.of(".")).target()).isEqualTo(Path.of("custom-target"));

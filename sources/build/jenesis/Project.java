@@ -886,10 +886,6 @@ public record Project(
     }
 
     public Project(Path root) {
-        if (root == null) {
-            throw new IllegalArgumentException("A project needs the folder it is built from,"
-                    + " such as Path.of(\".\") for the working directory");
-        }
         Path resolvedRoot = root;
         if (resolvedRoot.isAbsolute()) {
             Path absoluteCwd = Path.of("").toAbsolutePath().normalize();

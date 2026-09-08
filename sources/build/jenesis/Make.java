@@ -11,10 +11,6 @@ public final class Make {
     private final boolean compile;
 
     public Make(String mainClass) {
-        if (mainClass == null || mainClass.isBlank()) {
-            throw new IllegalArgumentException("A build needs the name of the class whose main it should run,"
-                    + " such as build.jenesis.Project or a project's own build/Demo.java entry point");
-        }
         this.mainClass = mainClass;
         root = Path.of(System.getProperty("jenesis.make.root", "")).toAbsolutePath().normalize();
         try {
