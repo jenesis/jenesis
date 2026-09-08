@@ -4,6 +4,9 @@ import module java.base;
 import module org.junit.jupiter.api;
 import build.jenesis.daemon.DaemonServer;
 
+import org.assertj.core.api.InstanceOfAssertFactories;
+
+import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Isolated
@@ -102,6 +105,24 @@ public class DaemonServerTest {
         Exchange exchange = request(token(), "fingerprint", "build.jenesis.test.daemon.DaemonEntry", false, Map.of(), "one");
         assertThat(exchange.code()).isEqualTo(0);
         assertThat(exchange.out()).contains("DaemonEntry saw [one]");
+    }
+
+    @Test
+    public void lists_every_setting_with_the_value_in_force() throws IOException {
+        Exchange exchange = request(token(), "fingerprint", false, Map.of("jenesis.test.skip", "true"),
+                "configuration");
+        assertThat(exchange.code()).isEqualTo(0);
+        assertThat(exchange.out().lines().filter(line -> line.startsWith("jenesis.")).count())
+                .as("the catalogue lists every setting, not only the ones that are set")
+                .isGreaterThan(100);
+        assertThat(exchange.out().lines().filter(line -> line.startsWith("jenesis.project.digest=")).toList())
+                .singleElement(as(InstanceOfAssertFactories.STRING))
+                .contains("SHA-256")
+                .contains("[default]");
+        assertThat(exchange.out().lines().filter(line -> line.startsWith("jenesis.test.skip=")).toList())
+                .singleElement(as(InstanceOfAssertFactories.STRING))
+                .as("a property the request set is reported as set")
+                .contains("[set]");
     }
 
     private record Exchange(Integer code, String out, boolean rejected, boolean stale) {
