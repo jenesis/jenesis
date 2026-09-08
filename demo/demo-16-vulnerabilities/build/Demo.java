@@ -7,7 +7,7 @@ public class Demo {
 
     static void main(String[] args) throws IOException {
         expectFailure("log4j-core 2.14.1's critical Log4Shell advisory at the configured severity threshold",
-                () -> new Project().build());
+                () -> new Project(Path.of(".")).build());
         System.out.println();
         System.out.println("The vulnerability check blocked the build, as expected.");
     }

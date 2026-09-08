@@ -1,6 +1,7 @@
 package build.jenesis.daemon;
 
 import module java.base;
+import build.jenesis.Make;
 import build.jenesis.Project;
 
 public final class DaemonServer {
@@ -182,12 +183,12 @@ public final class DaemonServer {
                       String mainClass,
                       SequencedMap<String, String> properties,
                       SequencedMap<String, String> outputs,
-                      String... selectors) {
+                      String... selectors) throws IOException {
         PrintStream systemOut = System.out, systemErr = System.err;
         try {
             reset();
             properties.forEach(System::setProperty);
-            System.setProperty("jenesis.project.root", root.toString());
+            System.setProperty("jenesis.make.root", root.toString());
             System.setProperty("jenesis.make.daemon", "false");
             anchor("jenesis.project.target", root.resolve("target"));
             anchor("jenesis.project.artifacts", root.resolve(".jenesis").resolve("artifacts"));
@@ -198,10 +199,11 @@ public final class DaemonServer {
                     throw new IllegalStateException("A dockerized build cannot run in the daemon, because it replaces"
                             + " the running process - unset jenesis.project.docker or run build/jenesis/Make.java");
                 }
+                SequencedSet<Path> profiles = Make.loadProperties(root);
                 if (!mainClass.equals(Project.class.getName())) {
-                    return Project.run(mainClass, selectors);
+                    return Project.run(mainClass, root, profiles, selectors);
                 }
-                SequencedMap<String, Path> produced = Project.perform(selectors);
+                SequencedMap<String, Path> produced = Project.perform(root, profiles, selectors);
                 if (produced == null) {
                     return 1;
                 }

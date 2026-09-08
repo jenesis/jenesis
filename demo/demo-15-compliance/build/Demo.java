@@ -7,7 +7,7 @@ public class Demo {
 
     static void main(String[] args) throws IOException {
         expectFailure("a GPL dependency under a permissive-only license policy",
-                () -> new Project().build());
+                () -> new Project(Path.of(".")).build());
         System.out.println();
         System.out.println("The license check blocked the build, as expected.");
     }

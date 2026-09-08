@@ -46,7 +46,7 @@ public class Demo {
         // module repository's <module>/<version>/<module>.jar shape, so the path
         // is fully determined; nothing is located by scanning the filesystem.
         Files.createDirectories(Path.of("target"));
-        Path modular = new Project()
+        Path modular = new Project(Path.of("."))
                 .root(Path.of("plugin"))
                 .target(Path.of("target", "plugin"))
                 .version("1")
@@ -68,7 +68,7 @@ public class Demo {
 
         // Build the project (the resolved plugin rewrites ${greeting} first) and
         // launch the produced module so its main prints the substituted greeting.
-        Project project = new Project()
+        Project project = new Project(Path.of("."))
                 .assembler(new PreprocessingAssembler(
                         new InferredMultiProjectAssembler(),
                         Map.of("module", repository),

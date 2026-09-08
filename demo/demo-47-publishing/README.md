@@ -14,7 +14,7 @@ Run it
     java build/Demo.java
 
 `build/Demo.java` configures publication explicitly on the `Project` builder -
-`new Project().target(...).sources(true).documentation(true).version("1.0.0").metadata(Path.of("project.properties"))` -
+`new Project(Path.of(".")).target(...).sources(true).documentation(true).version("1.0.0").metadata(Path.of("project.properties"))` -
 and runs the `stage` target. That materializes the release tree in Maven
 repository layout, and `build` hands back the staging step's folder under the
 `stage/maven` key:

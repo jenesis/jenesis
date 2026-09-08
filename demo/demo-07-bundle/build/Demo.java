@@ -23,7 +23,7 @@ public class Demo {
         // The bundle target is selected by the committed packaging.properties in this
         // directory (bundle=true), which Jenesis reads from the configuration location, so
         // the default build writes a bundle/bundle.zip for every module with a main class.
-        Project project = new Project()
+        Project project = new Project(Path.of("."))
                 .assembler(new InferredMultiProjectAssembler());
         project.build("build");
 

@@ -25,7 +25,7 @@ public class DemoLauncher {
         // build.jenesis/launcher/packaging.properties (launcher=true) outranks the module's
         // own packaging.properties (jpackage), so the same project builds an app image by
         // default and the executable jar under this profile.
-        Project project = new Project()
+        Project project = new Project(Path.of("."))
                 .profiles(Path.of("launcher"))
                 .assembler(new InferredMultiProjectAssembler());
         project.build("build");

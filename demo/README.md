@@ -76,7 +76,7 @@ Quick index
 | 14 | [`sbom`](demo-14-sbom/README.md)                             | Emit a CycloneDX SBOM (embedded in the jar, staged as a report, and attached to the Maven repo for publication), on by default; an optional `sbom.properties` selects the format (`json`, `xml`, or `none` to disable) | `java build/jenesis/Make.java`  |
 | 15 | [`compliance`](demo-15-compliance/README.md)               | License gate over the resolved dependencies: each declared license is SPDX-normalized and checked against an allow/deny policy in `licensing.properties`; ships a GPL dependency rejected by a permissive-only policy | `java build/Demo.java`             |
 | 16 | [`vulnerabilities`](demo-16-vulnerabilities/README.md)     | Known-vulnerability gate: a `vulnerability.properties` file queries OSV.dev for the resolved coordinates and fails at or above a severity threshold; ships a deliberately vulnerable `log4j-core` 2.14.1 (Log4Shell) | `java build/Demo.java`             |
-| 17 | [`profiles`](demo-17-profiles/README.md)                     | Build profiles: a `release` profile selected with `-Djenesis.project.properties=release` turns on source jars and chains to a `supply-chain` profile that enforces strict dependency pinning (the SBOM is emitted automatically) | `java build/jenesis/Make.java`  |
+| 17 | [`profiles`](demo-17-profiles/README.md)                     | Build profiles: a `release` profile selected with `-Djenesis.make.profiles=release` turns on source jars and chains to a `supply-chain` profile that enforces strict dependency pinning (the SBOM is emitted automatically) | `java build/jenesis/Make.java`  |
 | 18 | [`kotlin`](demo-18-kotlin/README.md)                         | Java + Kotlin in one module; exports a pure-Kotlin package            | `java build/jenesis/Make.java`  |
 | 19 | [`kotlin-quality`](demo-19-kotlin-quality/README.md)         | Inferred code quality for Kotlin: detekt and ktlint, with ktlint also verifying formatting | `java build/jenesis/Make.java`  |
 | 20 | [`kotlin-plugin`](demo-20-kotlin-plugin/README.md)           | Run a Kotlin compiler plugin (kotlinx.serialization) declared with `@jenesis.plugin kotlinc <repo>/<coord>`, passed to the compiler as `-Xplugin=` | `java build/jenesis/Make.java`  |
@@ -260,7 +260,7 @@ base, so image environment belongs in a base image rather than in build configur
 The build never invokes a container tool, so it needs no Docker installation to
 produce the file:
 
-    java -Djenesis.project.properties=docker build/jenesis/Make.java stage
+    java -Djenesis.make.profiles=docker build/jenesis/Make.java stage
     docker build -t sample target/stage/docker/output/module
 
 The new idea is that **the build produces a runnable artifact, not just a jar**, and
@@ -449,12 +449,12 @@ build never reaches the network unless asked.
 ## 11. Build profiles - [`profiles`](demo-17-profiles/README.md)
 
 `profiles` shows how a named set of properties switches features on together. A
-profile is a `*.properties` file at the project root; `jenesis.project.properties`
+profile is a `*.properties` file at the project root; `jenesis.make.profiles`
 selects one (or a comma-separated list, the `.properties` suffix optional), loaded
 before the build is configured. Profiles compose by chaining - a loaded file may
-set `jenesis.project.properties` itself to pull in more. The demo's `release`
+set `jenesis.make.profiles` itself to pull in more. The demo's `release`
 profile turns on source jars and chains to a `supply-chain` profile that enforces
-strict dependency pinning, so `-Djenesis.project.properties=release` produces a
+strict dependency pinning, so `-Djenesis.make.profiles=release` produces a
 hardened publication build in one switch (the SBOM from section 8 is emitted
 automatically either way). Every property a profile sets is a default, so the
 command line always wins. The always-loaded base is `jenesis.properties` (optional).
@@ -651,7 +651,7 @@ root selects the layout: `jenesis.project.layout=modular`. The launcher loads th
 file before the build, so the stock `java build/jenesis/Make.java` picks the
 pure MODULAR layout with no custom launcher (the command-line
 `-Djenesis.project.layout=modular` wins over it, and an in-code build can call
-`new Project().layout(Project.Layout.MODULAR)`).
+`new Project(Path.of(".")).layout(Project.Layout.MODULAR)`).
 
 The new idea is the **layout choice**. A `module-info.java` with no `pom.xml`
 auto-detects MODULAR_TO_MAVEN, which translates each `requires` into a Maven
@@ -845,7 +845,7 @@ MODULAR_TO_MAVEN flow but **wraps** the stock `InferredMultiProjectAssembler` so
 module's sources pass through a preprocessing step (a `${greeting}` substitution)
 before compile, jar, and test run unchanged:
 
-    new Project()
+    new Project(Path.of("."))
             .assembler(new PreprocessingAssembler(new InferredMultiProjectAssembler()))
 
 The trick is small and reusable: the wrapper adds a `preprocess` step that
