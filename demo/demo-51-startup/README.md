@@ -97,7 +97,7 @@ by constructing it, from a second source-mode file beside its entry point:
     }
 
 `Make` compiles everything under the folder its own file sits in, so a custom
-`build/Demo.java` lands in `.jenesis/tool` beside the engine and the daemon runs
+`build/Demo.java` lands in `.jenesis/classes` beside the engine and the daemon runs
 that class's `main`. It has to be a separate file from `build/Demo.java` itself,
 for the same reason `Make.java` is separate from `Project.java`: the file you
 name is the one the launcher compiles.

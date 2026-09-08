@@ -19,7 +19,9 @@ public final class Make {
             throw new UncheckedIOException("Cannot read the properties that configure this build", e);
         }
         String location = System.getProperty("jenesis.make.classes");
-        classes = location == null || location.isBlank() ? root : root.resolve(location).normalize();
+        classes = location == null || location.isBlank()
+                ? root.resolve(".jenesis").resolve("classes")
+                : root.resolve(location).normalize();
         daemon = Boolean.parseBoolean(System.getProperty("jenesis.make.daemon", "false"));
         compile = Boolean.parseBoolean(System.getProperty("jenesis.make.compile", "true"));
     }
@@ -133,12 +135,29 @@ public final class Make {
         if (Files.isRegularFile(folder)) {
             return List.of(folder);
         }
-        try (Stream<Path> walk = Files.walk(folder, FileVisitOption.FOLLOW_LINKS)) {
-            return walk.filter(Files::isRegularFile)
-                    .filter(file -> file.getFileName().toString().endsWith(suffix))
-                    .sorted()
-                    .toList();
-        }
+        List<Path> files = new ArrayList<>();
+        Files.walkFileTree(folder, Set.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
+                if (directory.equals(folder)) {
+                    return FileVisitResult.CONTINUE;
+                }
+                String name = directory.getFileName().toString();
+                return Character.isJavaIdentifierStart(name.codePointAt(0))
+                        && name.codePoints().skip(1).allMatch(Character::isJavaIdentifierPart)
+                        ? FileVisitResult.CONTINUE
+                        : FileVisitResult.SKIP_SUBTREE;
+            }
+
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+                if (file.getFileName().toString().endsWith(suffix)) {
+                    files.add(file);
+                }
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        return files.stream().sorted().toList();
     }
 
     private int dispatched(ClassLoader loader,
