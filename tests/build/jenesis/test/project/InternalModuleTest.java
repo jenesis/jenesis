@@ -461,6 +461,51 @@ public class InternalModuleTest {
         }
     }
 
+    @Test
+    public void honours_the_modules_own_pin() throws IOException {
+        // Every other test here hands a repository that answers any version with the same jar, which is exactly
+        // why this went unnoticed: an internal module's @jenesis.pin lines were parsed and then dropped, so the
+        // module resolved unpinned and a version-insensitive stub could not tell the difference. This one records
+        // the coordinate it was asked for, which is where the pin either shows up or does not.
+        Path source = writeModuleSource(work.resolve("plugin"),
+                """
+                        /** @jenesis.pin build.jenesis 9.9.9 */
+                        module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }
+                        """,
+                Map.of("test/plugin/Plugin.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutor;
+                        import build.jenesis.BuildExecutorModule;
+                        import build.jenesis.BuildStepResult;
+                        import java.nio.file.Files;
+                        import java.nio.file.Path;
+                        import java.util.SequencedMap;
+                        import java.util.concurrent.CompletableFuture;
+                        public class Plugin implements BuildExecutorModule {
+                            public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
+                                executor.addStep("marker", (_, context, _) -> {
+                                    Files.writeString(context.next().resolve("out.txt"), "pinned");
+                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                });
+                            }
+                        }
+                        """));
+
+        List<String> asked = Collections.synchronizedList(new ArrayList<>());
+        buildExecutor.addModule("internal", new InternalModule(
+                "module",
+                null,
+                source)
+                .repositories(Map.of("module", recording(asked, Map.of("build.jenesis", jenesisJar))))
+                .resolvers(Map.of("module", new ModularJarResolver(true))));
+
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        assertThat(steps.get("internal/marker").resolve("out.txt")).content().isEqualTo("pinned");
+        // The version, not merely the name: unpinned asks for the bare coordinate, which is what this caught.
+        assertThat(asked).isNotEmpty().allSatisfy(coordinate ->
+                assertThat(coordinate).isEqualTo("build.jenesis/9.9.9"));
+    }
+
     private static Path writeModuleSource(Path target, String moduleInfo, Map<String, String> sources) throws IOException {
         Files.createDirectories(target);
         Files.writeString(target.resolve("module-info.java"), moduleInfo);
@@ -470,6 +515,15 @@ public class InternalModuleTest {
             Files.writeString(file, entry.getValue());
         }
         return target;
+    }
+
+    /** Answers like {@link #versionInsensitive}, but records every coordinate it was asked for. */
+    private static Repository recording(List<String> asked, Map<String, Path> files) {
+        Repository delegate = versionInsensitive(files);
+        return (executor, coordinate) -> {
+            asked.add(coordinate);
+            return delegate.fetch(executor, coordinate);
+        };
     }
 
     private static Repository versionInsensitive(Map<String, Path> files) {
