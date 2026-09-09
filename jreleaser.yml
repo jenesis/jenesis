@@ -34,9 +34,6 @@ files:
     - path: 'target/stage/maven/output/build/jenesis/build.jenesis/{{projectVersion}}/build.jenesis-{{projectVersion}}.jar'
     - path: 'target/stage/maven/output/build/jenesis/build.jenesis/{{projectVersion}}/build.jenesis-{{projectVersion}}-sources.jar'
 
-# The sdk zip is the distribution artifact: uploaded to the GitHub release like any
-# file, and then published to SDKMAN by the packager (release + set as default -
-# what the sdkman-release-action and sdkman-default-action steps used to do).
 distributions:
   jenesis:
     type: JAVA_BINARY
@@ -59,6 +56,17 @@ distributions:
       candidate: jenesis
       command: MAJOR
       releaseNotesUrl: 'https://github.com/jenesis/jenesis/releases/tag/v{{projectVersion}}'
+  jpx:
+    type: JAVA_BINARY
+    java:
+      mainClass: build.jenesis.Jpx
+    artifacts:
+      - path: 'sdk/jpx-{{projectVersion}}.zip'
+    sdkman:
+      active: ALWAYS
+      candidate: jpx
+      command: MAJOR
+      releaseNotesUrl: 'https://github.com/jenesis/jenesis/releases/tag/v{{projectVersion}}'
 
 deploy:
   maven:
@@ -70,7 +78,6 @@ deploy:
         stagingRepositories:
           - target/stage/maven/output
 
-# Broadcast the release on SDKMAN's channels (same vendor credentials as the packager).
 announce:
   sdkman:
     active: ALWAYS

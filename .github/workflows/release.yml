@@ -65,19 +65,23 @@ jobs:
                -Djenesis.project.metadata=project.properties \
                build/jenesis/Make.java stage
 
-      - name: Package SDKMAN archive
+      - name: Package SDKMAN archives
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           git clean -fdX sdk/
-          mkdir -p sdk/jenesis/lib sdk/jenesis/sources
+          mkdir -p sdk/jenesis/lib sdk/jenesis/sources sdk/jpx/lib
           cp "target/stage/maven/output/build/jenesis/build.jenesis/${VERSION}/build.jenesis-${VERSION}.jar" sdk/jenesis/lib/
           cp "target/stage/maven/output/build/jenesis/build.jenesis/${VERSION}/build.jenesis-${VERSION}-sources.jar" sdk/jenesis/sources/
+          cp "target/stage/maven/output/build/jenesis/build.jenesis/${VERSION}/build.jenesis-${VERSION}.jar" sdk/jpx/lib/
           cp LICENSE sdk/jenesis/LICENSE
-          BASE="jenesis-${VERSION}"
-          ln -sfn sdk/jenesis "${BASE}"
-          zip -r "sdk/${BASE}.zip" "${BASE}" -x "${BASE}/tests/*"
-          rm "${BASE}"
+          cp LICENSE sdk/jpx/LICENSE
+          for CANDIDATE in jenesis jpx; do
+            BASE="${CANDIDATE}-${VERSION}"
+            ln -sfn "sdk/${CANDIDATE}" "${BASE}"
+            zip -r "sdk/${BASE}.zip" "${BASE}" -x "${BASE}/tests/*"
+            rm "${BASE}"
+          done
 
       - name: JReleaser deploy
         uses: jreleaser/release-action@90ac653bb9c79d11179e65d81499f3f34527dcd5 # 2.5.0
