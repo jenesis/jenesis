@@ -95,9 +95,13 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
           CHECKSUM: ${{ steps.package.outputs.checksum }}
-          CONSUMER_KEY: ${{ secrets.SDKMAN_CONSUMER_KEY }}
-          CONSUMER_TOKEN: ${{ secrets.SDKMAN_CONSUMER_TOKEN }}
+          CONSUMER_KEY: ${{ secrets.SDKMAN_JPX_CONSUMER_KEY }}
+          CONSUMER_TOKEN: ${{ secrets.SDKMAN_JPX_CONSUMER_TOKEN }}
         run: |
+          if [ -z "${CONSUMER_KEY}" ] || [ -z "${CONSUMER_TOKEN}" ]; then
+            echo "No SDKMAN credentials for the jpx candidate: set the SDKMAN_JPX_CONSUMER_KEY and SDKMAN_JPX_CONSUMER_TOKEN secrets." >&2
+            exit 1
+          fi
           DOWNLOAD="https://github.com/jenesis/jenesis/releases/download/v${VERSION}/jpx-${VERSION}.zip"
           NOTES="https://github.com/jenesis/jenesis/releases/tag/v${VERSION}"
           vendor() {
