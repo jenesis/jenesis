@@ -49,7 +49,7 @@ What is in this repository
 
 | Path | Contents |
 |------|----------|
-| `sources/` | The build tool itself, module `build.jenesis` - including `Project`, `Execute` and `Jpx`. |
+| `sources/` | The build tool itself, module `build.jenesis` - including `Make`, `Project`, `Execute` and `Jpx`. |
 | `tests/` | Its tests, module `build.jenesis.test`. |
 | `demo/` | ~46 self-contained example projects, one per feature, indexed by [`demo/README.md`](demo/README.md). |
 | `sdk/` | The SDKMAN distribution layout and its shell-script tests (`sdk/jenesis`, `sdk/jpx`). `jenesis` reads the version recorded in a project's `build/jenesis/jenesis.version`, installs it where the package manager can, verifies the vendored sources against the published ones and runs the compiled engine - a tree that does not match is refused, so `jenesis` never executes unreviewed build code; `jenesis-make` runs the installed version as it stands, and `jenesis-switch` moves the shell to the recorded one. Both stay on the released engine, so a refused project still builds as a standard build; only running the vendored sources yourself - in source mode, or off classes compiled once with `javac` - executes the vendored engine. |
@@ -99,7 +99,7 @@ isolation from inside its own directory:
 cd demo/demo-01-java-pom && java build/jenesis/Make.java
 ```
 
-Most are driven by the shipped `Project.java`; the ones that customise or drive the build themselves ship a
+Most are driven by the shipped `Make.java`; the ones that customise or drive the build themselves ship a
 `build/Demo.java` instead. [`demo/README.md`](demo/README.md) is a guided tour and says which is which. A new
 feature is expected to arrive with a demo, because CI runs them all.
 
