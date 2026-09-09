@@ -2,6 +2,7 @@ package build.jenesis.project;
 
 import module java.base;
 import build.jenesis.Pinning;
+import build.jenesis.Platform;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
@@ -144,7 +145,7 @@ public class InternalModule implements BuildExecutorModule {
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
         buildExecutor.addSource(SOURCE, Bind.asSources(), source);
         buildExecutor.addStep(REQUIRES,
-                new ParseModuleInfo(group, prefix, additionalDependencies),
+                new ParseModuleInfo(group, prefix, additionalDependencies, new Platform()),
                 Stream.concat(Stream.of(SOURCE), inherited.sequencedKeySet().stream()));
         buildExecutor.addStep(DEPENDENCIES,
                 new Dependencies(repositories, resolvers).pinning(pinning),
@@ -180,7 +181,8 @@ public class InternalModule implements BuildExecutorModule {
 
     private record ParseModuleInfo(String group,
                                    String prefix,
-                                   SequencedSet<String> additionalDependencies) implements BuildStep {
+                                   SequencedSet<String> additionalDependencies,
+                                   Platform platform) implements BuildStep {
 
         @Override
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
@@ -221,7 +223,28 @@ public class InternalModule implements BuildExecutorModule {
             }
             info.plugins().forEach((coordinate, group) -> properties.setProperty(group + "/plugin/" + coordinate, ""));
             properties.store(context.next().resolve(BuildStep.REQUIRES));
-            SequencedProperties versions = pinnedVersions(arguments);
+            // The module's own @jenesis.pin lines, then whatever the surrounding project pinned. Its own win:
+            // an internal module states the API it is written against, and the project around it may legitimately
+            // depend on a different version of the same artifact for its own reasons.
+            //
+            // Until this was written the module's pins were parsed and then dropped, so an internal module was
+            // resolved unpinned however precisely it had declared itself. Unpinned does not fail - it takes
+            // whatever the module repositories answer with, and the local one is prepended, so in practice a
+            // plugin compiled against whichever build of the tool had last been exported to ~/.jenesis. Observed
+            // downstream: two plugins pinning 0.12.0 while compiling against a local 0.0.0-LOCAL jar from three
+            // months earlier, with nothing in any log to say so.
+            SequencedMap<String, String> pinned = new LinkedHashMap<>(info.versions());
+            for (Map.Entry<String, SequencedMap<String, String>> variant : info.variants().entrySet()) {
+                String selected = platform.select(variant.getKey(),
+                        pinned.get(variant.getKey()),
+                        variant.getValue());
+                if (selected != null) {
+                    pinned.put(variant.getKey(), selected);
+                }
+            }
+            SequencedProperties versions = new SequencedProperties();
+            pinned.forEach(versions::setProperty);
+            pinnedVersions(arguments).forEachProperty(versions::putIfAbsent);
             if (!versions.isEmpty()) {
                 versions.store(context.next().resolve(BuildStep.VERSIONS));
             }
