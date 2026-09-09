@@ -62,6 +62,18 @@ distributions:
       mainClass: build.jenesis.Jpx
     artifacts:
       - path: 'sdk/jpx-{{projectVersion}}.zip'
+    brew:
+      active: ALWAYS
+      formulaName: jpx
+      repository:
+        owner: jenesis
+        name: homebrew-tap
+    scoop:
+      active: ALWAYS
+      packageName: jpx
+      repository:
+        owner: jenesis
+        name: scoop-bucket
     sdkman:
       active: ALWAYS
       candidate: jpx
