@@ -29,6 +29,12 @@ curl -fsSL https://get.jenesis.build | bash   # bootstrap into the current proje
 curl -fsSL https://get.jenesis.build | JENESIS_MODE=submodule bash   # ... as a git submodule
 ```
 
+`jpx` is its own SDKMAN candidate, installed on its own where only the module runner is wanted:
+
+```bash
+sdk install jpx
+```
+
 Then, from the project root:
 
 ```bash
@@ -126,7 +132,8 @@ are optional:
 
 The workflow builds with `jenesis.project.version` set, then hands `target/stage/maven/output/` to
 [JReleaser](https://jreleaser.org) (`jreleaser.yml`), which signs and uploads to Maven Central, publishes the
-`sdk/jenesis-<version>.zip` distribution to SDKMAN, Homebrew and Scoop, and cuts the matching `v<version>` tag.
+`sdk/jenesis-<version>.zip` distribution to SDKMAN, Homebrew and Scoop and the `sdk/jpx-<version>.zip`
+distribution to SDKMAN as the `jpx` candidate, and cuts the matching `v<version>` tag.
 `project.properties` carries the POM metadata that a module declaration cannot express.
 
 Credentials never enter the build: it stops at the unsigned, validated bundle.
