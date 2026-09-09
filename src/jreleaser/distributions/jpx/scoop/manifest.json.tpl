@@ -1,6 +1,6 @@
 {
     "version": "{{projectVersion}}",
-    "description": "Runs a published module or Maven artifact with one command - npx for the module path.",
+    "description": "Runs a published module or Maven artifact with one command - npx for Java.",
     "homepage": "{{projectLinkHomepage}}",
     "license": "{{projectLicense}}",
     "url": "{{distributionUrl}}",

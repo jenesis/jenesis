@@ -12,7 +12,7 @@ Jenesis
 no daemon. Modules declared with `module-info.java` drive the build, every step is content-hashed so unchanged
 work is reused, and every dependency can be pinned by version *and* by the checksum of the artifact. It needs a
 JDK 25 or newer, and nothing else. This repository also holds **jpx**, which runs an already-published module
-with one command - `npx` for the module path.
+or Maven artifact with one command - `npx` for Java.
 
 📖 **The user documentation lives at [jenesis.build](https://jenesis.build).** Everything about using the
 tool - layouts, dependencies, pinning, packaging, publishing, and the jpx command - is there. What follows is
