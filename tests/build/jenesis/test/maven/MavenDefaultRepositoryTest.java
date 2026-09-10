@@ -456,6 +456,72 @@ public class MavenDefaultRepositoryTest {
     }
 
     @Test
+    public void stops_probing_sidecars_once_the_strongest_validated() throws IOException, NoSuchAlgorithmException {
+        Files.writeString(Files
+                .createDirectories(repository.resolve("group/artifact/1"))
+                .resolve("artifact-1.jar"), "foo");
+        byte[] hash = MessageDigest.getInstance("SHA512").digest("foo".getBytes(StandardCharsets.UTF_8));
+        Files.writeString(repository.resolve("group/artifact/1/artifact-1.jar.sha512"),
+                HexFormat.of().formatHex(hash));
+        Files.writeString(repository.resolve("group/artifact/1/artifact-1.jar.sha1"),
+                HexFormat.of().formatHex(new byte[20]));
+        Map<String, URI> validations = new LinkedHashMap<>();
+        validations.put("SHA512", repository.toUri());
+        validations.put("SHA1", repository.toUri());
+        Path dependency = result.resolve("dependency.jar");
+        try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(),
+                local,
+                validations, _ -> {}).fetch(Runnable::run,
+                "group",
+                "artifact",
+                "1",
+                "jar",
+                null,
+                null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, dependency);
+        }
+        assertThat(dependency).content().isEqualTo("foo");
+        assertThat(local.resolve("group/artifact/1/artifact-1.jar.sha512"))
+                .content().isEqualTo(HexFormat.of().formatHex(hash));
+        assertThat(local.resolve("group/artifact/1/artifact-1.jar.sha1"))
+                .as("a weaker sidecar must not be read once a stronger one validated")
+                .doesNotExist();
+    }
+
+    @Test
+    public void stops_probing_sidecars_of_a_cached_artifact_once_the_strongest_validated()
+            throws IOException, NoSuchAlgorithmException {
+        Files.writeString(Files
+                .createDirectories(local.resolve("group/artifact/1"))
+                .resolve("artifact-1.jar"), "foo");
+        byte[] hash = MessageDigest.getInstance("SHA512").digest("foo".getBytes(StandardCharsets.UTF_8));
+        Files.writeString(Files
+                .createDirectories(repository.resolve("group/artifact/1"))
+                .resolve("artifact-1.jar.sha512"), HexFormat.of().formatHex(hash));
+        Files.writeString(repository.resolve("group/artifact/1/artifact-1.jar.sha1"),
+                HexFormat.of().formatHex(new byte[20]));
+        Map<String, URI> validations = new LinkedHashMap<>();
+        validations.put("SHA512", repository.toUri());
+        validations.put("SHA1", repository.toUri());
+        Path dependency = result.resolve("dependency.jar");
+        try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(),
+                local,
+                validations, _ -> {}).fetch(Runnable::run,
+                "group",
+                "artifact",
+                "1",
+                "jar",
+                null,
+                null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, dependency);
+        }
+        assertThat(dependency).content().isEqualTo("foo");
+        assertThat(local.resolve("group/artifact/1/artifact-1.jar.sha1"))
+                .as("a weaker sidecar must not be read once a stronger one validated")
+                .doesNotExist();
+    }
+
+    @Test
     public void can_fetch_metadata() throws IOException {
         Files.writeString(Files
                 .createDirectories(repository.resolve("group/artifact"))
