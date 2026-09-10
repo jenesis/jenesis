@@ -8,7 +8,9 @@ JUnit Platform Console Launcher, asked for its `--version`, named twice: once by
 its Java **module name** and once by its **Maven coordinate**. Both name a
 version, and both are verified against the installation's SHA-256 before the JVM
 starts. Two further runs exercise that hash: one supplies only the first 32 hex
-characters of it, and one supplies a digest that does not match and is refused.
+characters of it, and one supplies a digest that does not match and is refused. A
+fourth run **pins** instead of launching: it installs and verifies as the others
+do, then prints the two commands the run stands for rather than starting it.
 
 This is the only demo with nothing of its own to compile. There is no `pom.xml`,
 no `module-info.java` and no `sources/` folder: everything it runs was released by
@@ -37,6 +39,10 @@ what it launched:
     OS: Linux 7.0.0-28-generic amd64
 
     [... and the module name once more, with a 32-character prefix ...]
+
+    jpx --pin --hash=ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452aa1e2dd org.junit.platform.console@6.1.3 --version
+      [pinned]   jpx --hash=SHA-256/ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452aa1e2dd org.junit.platform.console@6.1.3 --version
+      [expands]  /path/to/bin/java -p target/jpx/modular_to_maven/org.junit.platform.console@6.1.3/org.apiguardian.api-1.1.2.jar:...:target/jpx/modular_to_maven/org.junit.platform.console@6.1.3/org.opentest4j.reporting.tooling.spi-0.2.5.jar -m org.junit.platform.console/org.junit.platform.console.ConsoleLauncher --version
 
     jpx --hash=ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452ac0ffee org.junit.platform.console@6.1.3 --version
       [blocked]  Checksum mismatch for org.junit.platform.console@6.1.3: expected a digest starting with 9b60...c0ffee but computed 9b60...cfd3e8
@@ -114,7 +120,7 @@ only `ed5600ef861c7e86cab68c134c6ca0cf` - the first 32 hex characters, which is
 also the shortest accepted. Anything shorter is refused outright rather than
 checked loosely: 32 hex characters is 128 bits, the floor at which a prefix still
 pins the bytes. A leading `SHA-256/` is stripped, so the `checksum` line can be
-pasted in verbatim. The fourth run supplies a full-length digest ending in
+pasted in verbatim. The last run supplies a full-length digest ending in
 `c0ffee` instead of `cfd3e8` - the shape a transcription slip takes - and is
 blocked before the JVM starts:
 
@@ -124,6 +130,49 @@ blocked before the JVM starts:
 Nothing about that failure depends on the version being wrong or the download
 having gone astray: the same message is what a tampered jar produces, because the
 check is over bytes rather than over names.
+
+Pinning the run instead of making it
+------------------------------------
+
+`--pin` is the demo's fourth run. Everything a real run does still happens - the
+target is resolved, the closure is installed, and `--hash` is checked - and only
+the last step is replaced: two commands are printed and the JVM is never started.
+
+    java build/jenesis/Jpx.java --pin org.junit.platform.console --version
+
+The first line is the **jpx command that repeats this run**, written so it
+reproduces. Whatever was typed, the printed form always names the version that
+was resolved and always carries `--hash`, taken from the installation's own
+`checksum` line, and it never carries `--pin` itself: the run above named no
+version at all, and what comes back is
+
+    jpx --hash=SHA-256/ed5600ef...aa1e2dd org.junit.platform.console@6.1.3 --version
+
+which is the line to paste into a CI step, a README or a script. `--modular` and
+`--docker` are carried through where they were given, because they change what
+gets installed and where it runs.
+
+That digest is never taken on trust. `--pin` verifies the installed jars before it
+prints anything, against `--hash` where one was given and against the
+installation's own `checksum` where none was, so a jar swapped underneath an
+existing installation fails the pin rather than being pinned. A short prefix comes
+back at full length: pass `--hash=ed5600ef861c7e86cab68c134c6ca0cf` and the printed
+command carries all 64 characters.
+
+The second line is the **java command that one expands to**: the JVM jpx itself
+runs on, the module or class path with every jar named in full, whatever the
+installation records in `javaOptions`, and the entry point as
+`-m <module>/<main-class>` or as a bare class name. A real launch moves the two
+long path options into a temporary argument file, which is deleted as the process
+exits and would be useless in a printed line, so this form spells them out. Take
+it where jpx should not sit in front of the program at all - a service unit, a
+container image, a profiler's launch configuration. With `--docker`, this is the
+`docker run` command, mounts and all.
+
+Both are calls on the installation, one step short of the process:
+
+    jpx.install(<target>).verify(<hash>).pinned(<arguments>)
+    jpx.install(<target>).verify(<hash>).command(<arguments>)
 
 Where it resolves from
 ----------------------
