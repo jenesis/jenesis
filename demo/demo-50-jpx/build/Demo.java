@@ -44,6 +44,13 @@ public class Demo {
         // shortest prefix accepted, and it is matched against the recomputed digest.
         launch(jpx, "org.junit.platform.console@6.1.3", "ed5600ef861c7e86cab68c134c6ca0cf");
 
+        // A pinning run stops short of the JVM: the program is resolved, installed and
+        // verified exactly as for a real run, and two commands are printed instead of
+        // launching it - the jpx command that repeats the run reproducibly, and the
+        // java command that one expands to.
+        pin(jpx, "org.junit.platform.console@6.1.3",
+                "ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452aa1e2dd");
+
         // A digest that does not match the installed jars refuses to launch, on the
         // run that installed them and on every run after it.
         reject(jpx, "org.junit.platform.console@6.1.3",
@@ -66,6 +73,14 @@ public class Demo {
         if (status != 0) {
             throw new IllegalStateException(target + " exited with status " + status);
         }
+    }
+
+    private static void pin(Jpx jpx, String target, String hash) throws Exception {
+        System.out.println();
+        System.out.println("jpx --pin --hash=" + hash + " " + target + " --version");
+        Jpx.Installation installation = jpx.install(target).verify(hash);
+        System.out.println("  [pinned]   " + String.join(" ", installation.pinned(List.of("--version"))));
+        System.out.println("  [expands]  " + String.join(" ", installation.command(List.of("--version"))));
     }
 
     private static void reject(Jpx jpx, String target, String hash) throws Exception {
