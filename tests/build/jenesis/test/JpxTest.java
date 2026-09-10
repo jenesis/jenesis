@@ -536,6 +536,88 @@ public class JpxTest {
     }
 
     @Test
+    public void command_spells_out_the_paths_instead_of_writing_an_argument_file() throws IOException {
+        Path folder = Files.createDirectories(work.resolve("crafted@1.0"));
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("mainModule", "tool.main");
+        properties.setProperty("mainClass", "toolmain.Main");
+        properties.setProperty("modulepath", "tool-main.jar");
+        properties.setProperty("classpath", "legacy.jar");
+        properties.store(folder.resolve(Jpx.PROPERTIES));
+        Jpx.Installation installation = new Jpx.Installation(folder, new HashDigestFunction("SHA-256"));
+
+        List<String> command = installation.command(List.of("run"));
+
+        assertThat(command.getFirst())
+                .as("a printed command names the JVM that would run it")
+                .isEqualTo(Path.of(System.getProperty("java.home"),
+                        "bin",
+                        File.separatorChar == '\\' ? "java.exe" : "java").toString());
+        assertThat(command)
+                .as("a command that is only printed cannot lean on a temporary argument file")
+                .containsSubsequence(
+                        "-p", folder.resolve("tool-main.jar").toString(),
+                        "-cp", folder.resolve("legacy.jar").toString(),
+                        "-m", "tool.main/toolmain.Main",
+                        "run");
+        try (Stream<Path> entries = Files.list(folder)) {
+            assertThat(entries.filter(entry -> entry.getFileName().toString().endsWith(".args")))
+                    .as("nothing is written for a command that is not run")
+                    .isEmpty();
+        }
+    }
+
+    @Test
+    public void docker_command_mounts_the_installation_and_spells_out_the_paths()
+            throws IOException, InterruptedException {
+        addMavenTool();
+        Jpx.Installation installation = jpx().install("org.example:tool-main@1.0");
+        RecordingDocker docker = new RecordingDocker(work);
+
+        List<String> command = installation.command(null, List.of("argument"), docker);
+
+        assertThat(docker.host).isEqualTo(installation.folder());
+        assertThat(docker.readOnly).isTrue();
+        assertThat(command).startsWith("docker", "run", "recording-image");
+        assertThat(docker.javaArgs).containsSubsequence("-cp", "toolmain.Main", "argument");
+        try (Stream<Path> entries = Files.list(installation.folder())) {
+            assertThat(entries.filter(entry -> entry.getFileName().toString().endsWith(".args")))
+                    .as("nothing is written for a command that is not run")
+                    .isEmpty();
+        }
+    }
+
+    @Test
+    public void pinned_command_names_the_resolved_version_and_the_installed_digest() throws IOException {
+        addPlainTool("2.0");
+        addMavenMetadata("plain-tool", "2.0", "1.0", "2.0");
+        Jpx.Installation installation = jpx().install("org.example:plain-tool");
+
+        List<String> pinned = installation.pinned(List.of("run"));
+
+        assertThat(pinned)
+                .as("a target that named no version pins the one it resolved to, so the command repeats")
+                .containsExactly("jpx",
+                        "--hash=" + installation.properties().getProperty("checksum"),
+                        "org.example:plain-tool@2.0",
+                        "run");
+    }
+
+    @Test
+    public void pinned_command_carries_the_options_and_the_named_entry_point() throws IOException {
+        addMavenTool();
+        Jpx.Installation installation = jpx().install("org.example:tool-main@1.0");
+
+        List<String> pinned = installation.pinned(List.of("--docker"), "other.Main", List.of("run"));
+
+        assertThat(pinned).containsExactly("jpx",
+                "--docker",
+                "--hash=" + installation.properties().getProperty("checksum"),
+                "org.example:tool-main@1.0/other.Main",
+                "run");
+    }
+
+    @Test
     public void java_arguments_add_all_module_path_for_a_legacy_installation() throws IOException {
         Path folder = Files.createDirectories(work.resolve("crafted@1.0"));
         SequencedProperties properties = new SequencedProperties();
@@ -696,6 +778,14 @@ public class JpxTest {
         public int execute(List<String> javaArgs) {
             this.javaArgs = javaArgs;
             return 42;
+        }
+
+        @Override
+        public List<String> command(List<String> javaArgs) {
+            this.javaArgs = javaArgs;
+            List<String> command = new ArrayList<>(List.of("docker", "run", image()));
+            command.addAll(javaArgs);
+            return command;
         }
     }
 

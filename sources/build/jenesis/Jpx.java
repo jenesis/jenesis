@@ -125,6 +125,45 @@ public record Jpx(Path storage,
             }
         }
 
+        public List<String> command(List<String> arguments) throws IOException {
+            return command(null, arguments);
+        }
+
+        public List<String> command(String mainClass, List<String> arguments) throws IOException {
+            List<String> command = new ArrayList<>();
+            command.add(Path.of(System.getProperty("java.home"), "bin", File.separatorChar == '\\' ? "java.exe" : "java").toString());
+            command.addAll(javaArguments(mainClass, arguments, null));
+            return command;
+        }
+
+        public List<String> command(String mainClass, List<String> arguments, DockerizedJava docker)
+                throws IOException, InterruptedException {
+            return docker.mount(folder, folder.toString(), true)
+                    .command(javaArguments(mainClass, arguments, null));
+        }
+
+        public List<String> pinned(List<String> arguments) throws IOException {
+            return pinned(Collections.emptyList(), null, arguments);
+        }
+
+        public List<String> pinned(List<String> options, String mainClass, List<String> arguments) throws IOException {
+            SequencedProperties properties = properties();
+            String name = properties.getProperty("name"), version = properties.getProperty("version");
+            String checksum = properties.getProperty("checksum");
+            if (name == null || version == null || checksum == null) {
+                throw new IllegalStateException("The installation " + folder.getFileName()
+                        + " does not record a name, a version and a checksum"
+                        + " - reinstall the target to pin what it resolved to");
+            }
+            List<String> command = new ArrayList<>();
+            command.add("jpx");
+            command.addAll(options);
+            command.add("--hash=" + checksum);
+            command.add(name + "@" + version + (mainClass == null ? "" : "/" + mainClass));
+            command.addAll(arguments);
+            return command;
+        }
+
         public List<String> javaArguments(String mainClass, List<String> arguments, Path argumentFile)
                 throws IOException {
             SequencedProperties properties = properties();
@@ -139,7 +178,16 @@ public record Jpx(Path storage,
             SequencedMap<String, String> options = new LinkedHashMap<>();
             options.put("-p", modulepath == null ? null : join(modulepath));
             options.put("-cp", classpath == null ? null : join(classpath));
-            command.addAll(ProcessBuildStep.argumentFile(argumentFile, options));
+            if (argumentFile == null) {
+                options.forEach((option, value) -> {
+                    if (value != null && !value.isEmpty()) {
+                        command.add(option);
+                        command.add(value);
+                    }
+                });
+            } else {
+                command.addAll(ProcessBuildStep.argumentFile(argumentFile, options));
+            }
             if (modulepath != null) {
                 command.addAll(ModuleGraph.load(properties));
             }
@@ -176,7 +224,7 @@ public record Jpx(Path storage,
     }
 
     public static final String HELP = """
-            Usage: jpx [--modular] [--docker[=<image>]] [--hash=<checksum>] <target> [argument...]
+            Usage: jpx [--modular] [--docker[=<image>]] [--hash=<checksum>] [--pin] <target> [argument...]
 
             Runs the main entry point of a published module, resolving and installing
             it on first use.
@@ -208,17 +256,26 @@ public record Jpx(Path storage,
                                   an image, a minimal hardened image is used
               --hash=<checksum>   verify the installed jars against a SHA-256 digest
                                   prefix (at least 32 hex characters) before launching
+              --pin               print two commands instead of launching the program:
+                                  the jpx command that repeats this run reproducibly,
+                                  with the resolved version and the installation's
+                                  digest spelled out, and the java command it expands
+                                  to. The jars are verified before anything is printed
+                                  - against --hash where one is given, and against the
+                                  installation's own digest otherwise - so a printed
+                                  command is one that runs
               --help              print this help""";
 
     public static void main(String... arguments) throws IOException, InterruptedException {
         PathPlacement placement = PathPlacement.INFERRED;
-        boolean dockerized = false;
+        boolean dockerized = false, pin = false;
         String image = null, checksum = null;
         int target = 0;
         while (target < arguments.length && arguments[target].startsWith("--")) {
             switch (arguments[target]) {
                 case "--modular" -> placement = PathPlacement.MODULE_PATH;
                 case "--docker" -> dockerized = true;
+                case "--pin" -> pin = true;
                 case "--help" -> {
                     System.out.println(HELP);
                     System.exit(0);
@@ -249,17 +306,34 @@ public record Jpx(Path storage,
                     + "not Maven coordinates: " + command.name());
         }
         Installation installation = new Jpx(placement).install(command);
+        if (checksum == null && pin) {
+            checksum = installation.properties().getProperty("checksum");
+        }
         if (checksum != null) {
             installation.verify(checksum);
         }
         List<String> remaining = List.of(arguments).subList(target + 1, arguments.length);
+        List<String> options = new ArrayList<>();
+        if (placement == PathPlacement.MODULE_PATH) {
+            options.add("--modular");
+        }
+        DockerizedJava docker = null;
         if (dockerized) {
             Path workingDirectory = Path.of("").toAbsolutePath();
-            System.exit(installation.launch(command.mainClass(), remaining, image == null
+            docker = image == null
                     ? new DockerizedJava(workingDirectory)
-                    : new DockerizedJava(workingDirectory, image)));
-        } else {
+                    : new DockerizedJava(workingDirectory, image);
+            options.add(image == null ? "--docker" : "--docker=" + image);
+        }
+        if (pin) {
+            System.out.println(String.join(" ", installation.pinned(options, command.mainClass(), remaining)));
+            System.out.println(String.join(" ", docker == null
+                    ? installation.command(command.mainClass(), remaining)
+                    : installation.command(command.mainClass(), remaining, docker)));
+        } else if (docker == null) {
             System.exit(installation.launch(command.mainClass(), remaining));
+        } else {
+            System.exit(installation.launch(command.mainClass(), remaining, docker));
         }
     }
 
