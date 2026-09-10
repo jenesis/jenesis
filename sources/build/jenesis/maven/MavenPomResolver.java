@@ -100,8 +100,8 @@ public class MavenPomResolver implements MavenResolver {
         Traversal traversal = dependencies(executor,
                 MavenRepository.of(repositories.getOrDefault(Resolver.base(prefix), Repository.empty())),
                 new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of()), true, null, Set.of(), null, null),
-                new HashMap<>(),
-                new HashMap<>(),
+                new ConcurrentHashMap<>(),
+                new ConcurrentHashMap<>(),
                 prefix);
         SequencedMap<String, String> resolved = new LinkedHashMap<>();
         traversal.dependencies().forEach((key, value) -> resolved.put(
@@ -151,8 +151,8 @@ public class MavenPomResolver implements MavenResolver {
                         Set.of(),
                         null,
                         null),
-                new HashMap<>(),
-                new HashMap<>(),
+                new ConcurrentHashMap<>(),
+                new ConcurrentHashMap<>(),
                 null).dependencies();
     }
 
@@ -208,8 +208,8 @@ public class MavenPomResolver implements MavenResolver {
             Map<MavenDependencyKey, MavenDependencyValue> managedCoordinates,
             MavenDependencyScope scope,
             String prefix) throws IOException {
-        Map<DependencyCoordinate, UnresolvedPom> unresolved = new HashMap<>();
-        Map<DependencyCoordinate, ResolvedPom> resolved = new HashMap<>();
+        Map<DependencyCoordinate, UnresolvedPom> unresolved = new ConcurrentHashMap<>();
+        Map<DependencyCoordinate, ResolvedPom> resolved = new ConcurrentHashMap<>();
         Map<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>(managedCoordinates);
         SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = new LinkedHashMap<>();
         SequencedMap<String, MavenDependencyKey> roots = new LinkedHashMap<>();
@@ -276,8 +276,8 @@ public class MavenPomResolver implements MavenResolver {
                                                                                String version,
                                                                                MavenDependencyScope scope)
             throws IOException {
-        Map<DependencyCoordinate, UnresolvedPom> unresolved = new HashMap<>();
-        Map<DependencyCoordinate, ResolvedPom> resolved = new HashMap<>();
+        Map<DependencyCoordinate, UnresolvedPom> unresolved = new ConcurrentHashMap<>();
+        Map<DependencyCoordinate, ResolvedPom> resolved = new ConcurrentHashMap<>();
         return dependencies(executor,
                 repository,
                 new ContextualPom(resolveOrCached(executor,
@@ -377,7 +377,7 @@ public class MavenPomResolver implements MavenResolver {
                                                       String prefix,
                                                       List<Resolver.Edge> edges) throws IOException {
         SequencedSet<MavenDependencyKey> conflicting = new LinkedHashSet<>();
-        Queue<ContextualPom> queue = new ArrayDeque<>();
+        Queue<PendingPom> queue = new ArrayDeque<>();
         do {
             for (Map.Entry<MavenDependencyKey, MavenDependencyValue> entry : current.pom().dependencies().entrySet()) {
                 if (current.exclusions().contains(MavenDependencyName.EXCLUDE_ALL)) {
@@ -456,19 +456,48 @@ public class MavenPomResolver implements MavenResolver {
                         exclusions.addAll(value.exclusions());
                     }
                     if (!exclusions.contains(MavenDependencyName.EXCLUDE_ALL)) {
-                        ResolvedPom pom = resolveOrCached(executor,
+                        queue.add(new PendingPom(dispatch(executor,
                                 repository,
                                 entry.getKey().groupId(),
                                 entry.getKey().artifactId(),
                                 version,
                                 resolved,
-                                unresolved);
-                        queue.add(new ContextualPom(pom, false, scope, exclusions, entry.getKey(), value.version()));
+                                unresolved), scope, exclusions, entry.getKey(), value.version()));
                     }
                 }
             }
-        } while ((current = queue.poll()) != null);
+            PendingPom pending = queue.poll();
+            current = pending == null ? null : pending.awaited();
+        } while (current != null);
         return conflicting;
+    }
+
+    private CompletableFuture<ResolvedPom> dispatch(Executor executor,
+                                                    MavenRepository repository,
+                                                    String groupId,
+                                                    String artifactId,
+                                                    String version,
+                                                    Map<DependencyCoordinate, ResolvedPom> resolved,
+                                                    Map<DependencyCoordinate, UnresolvedPom> unresolved) {
+        ResolvedPom cached = resolved.get(new DependencyCoordinate(groupId, artifactId, version));
+        if (cached != null) {
+            return CompletableFuture.completedFuture(cached);
+        }
+        CompletableFuture<ResolvedPom> pending = new CompletableFuture<>();
+        executor.execute(() -> {
+            try {
+                pending.complete(resolveOrCached(executor,
+                        repository,
+                        groupId,
+                        artifactId,
+                        version,
+                        resolved,
+                        unresolved));
+            } catch (Throwable t) {
+                pending.completeExceptionally(t);
+            }
+        });
+        return pending;
     }
 
     private static void bindChecksum(MavenDependencyKey key,
@@ -595,7 +624,11 @@ public class MavenPomResolver implements MavenResolver {
             throws IOException, SAXException, ParserConfigurationException {
         Document document;
         try (inputStream) {
-            document = factory.newDocumentBuilder().parse(inputStream);
+            DocumentBuilder builder;
+            synchronized (factory) {
+                builder = factory.newDocumentBuilder();
+            }
+            document = builder.parse(inputStream);
         }
         String namespace = document.getDocumentElement().getNamespaceURI();
         return switch (namespace == null ? NAMESPACE_4_0_0 : namespace) {
@@ -1284,6 +1317,25 @@ public class MavenPomResolver implements MavenResolver {
                                  Set<MavenDependencyName> exclusions,
                                  MavenDependencyKey origin,
                                  String originVersion) {
+    }
+
+    private record PendingPom(CompletableFuture<ResolvedPom> pom,
+                              MavenDependencyScope scope,
+                              Set<MavenDependencyName> exclusions,
+                              MavenDependencyKey origin,
+                              String originVersion) {
+
+        private ContextualPom awaited() throws IOException {
+            try {
+                return new ContextualPom(pom.join(), false, scope, exclusions, origin, originVersion);
+            } catch (CompletionException e) {
+                switch (e.getCause()) {
+                    case IOException cause -> throw cause;
+                    case RuntimeException cause -> throw cause;
+                    case null, default -> throw e;
+                }
+            }
+        }
     }
 
     private record Traversal(SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies,
