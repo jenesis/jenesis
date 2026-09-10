@@ -255,59 +255,30 @@ public class MavenDefaultRepository implements MavenRepository {
             if (Files.exists(cached)) {
                 boolean valid = true;
                 if (validate) {
-                    Map<LazyRepositoryItem, byte[]> results = new HashMap<>();
                     for (Map.Entry<String, URI> entry : validations.entrySet()) {
                         LazyRepositoryItem item = fetch(
                                 entry.getValue(),
                                 path + "." + entry.getKey().toLowerCase(Locale.ROOT),
                                 false);
+                        Optional<InputStream> candidate = item.toLazyInputStream();
+                        if (candidate.isEmpty()) {
+                            continue;
+                        }
+                        byte[] published;
+                        try (InputStream inputStream = candidate.get()) {
+                            published = inputStream.readAllBytes();
+                        }
+                        valid = Arrays.equals(toChecksum(published), digest(entry.getKey(), cached));
                         if (valid) {
-                            MessageDigest digest;
+                            item.storeIfNotPresent(published);
+                        } else if (writable) {
                             try {
-                                digest = MessageDigest.getInstance(entry.getKey());
-                            } catch (NoSuchAlgorithmException e) {
-                                throw new IllegalStateException(e);
-                            }
-                            try (FileChannel channel = FileChannel.open(cached)) {
-                                ByteBuffer buffer = ByteBuffer.allocate(1 << 16);
-                                while (channel.read(buffer) != -1) {
-                                    buffer.flip();
-                                    digest.update(buffer);
-                                    buffer.clear();
-                                }
-                            }
-                            Optional<InputStream> candidate = item.toLazyInputStream();
-                            if (candidate.isPresent()) {
-                                byte[] expected;
-                                try (InputStream inputStream = candidate.get()) {
-                                    expected = inputStream.readAllBytes();
-                                }
-                                results.put(item, expected);
-                                String text = new String(expected, StandardCharsets.UTF_8).strip();
-                                int end = 0;
-                                while (end < text.length() && !Character.isWhitespace(text.charAt(end))) {
-                                    end++;
-                                }
-                                valid = Arrays.equals(
-                                        HexFormat.of().parseHex(text.substring(0, end)),
-                                        digest.digest());
-                            }
-                        } else {
-                            results.put(item, null);
-                        }
-                    }
-                    if (valid) {
-                        for (Map.Entry<LazyRepositoryItem, byte[]> entry : results.entrySet()) {
-                            entry.getKey().storeIfNotPresent(entry.getValue());
-                        }
-                    } else if (writable) {
-                        try {
-                            Files.delete(cached);
-                            for (LazyRepositoryItem item : results.keySet()) {
+                                Files.delete(cached);
                                 item.deleteIfPresent();
+                            } catch (IOException _) {
                             }
-                        } catch (IOException _) {
                         }
+                        break;
                     }
                 }
                 if (valid) {
@@ -321,19 +292,13 @@ public class MavenDefaultRepository implements MavenRepository {
                 }
             }
         }
-        Map<LazyRepositoryItem, MessageDigest> digests = new HashMap<>();
+        SequencedMap<LazyRepositoryItem, MessageDigest> digests = new LinkedHashMap<>();
         if (validate) {
             for (Map.Entry<String, URI> entry : validations.entrySet()) {
-                LazyRepositoryItem item = fetch(entry.getValue(),
-                        path + "." + entry.getKey().toLowerCase(Locale.ROOT),
-                        false);
-                MessageDigest digest;
-                try {
-                    digest = MessageDigest.getInstance(entry.getKey());
-                } catch (NoSuchAlgorithmException e) {
-                    throw new IllegalStateException(e);
-                }
-                digests.put(item, digest);
+                digests.put(fetch(entry.getValue(),
+                                path + "." + entry.getKey().toLowerCase(Locale.ROOT),
+                                false),
+                        digest(entry.getKey()));
             }
         }
         URI uri = repository.resolve(path);
@@ -348,7 +313,7 @@ public class MavenDefaultRepository implements MavenRepository {
     }
 
     private static Optional<Path> download(URI uri,
-                                           Map<LazyRepositoryItem, MessageDigest> digests,
+                                           SequencedMap<LazyRepositoryItem, MessageDigest> digests,
                                            String prefix,
                                            String suffix,
                                            String token,
@@ -395,43 +360,63 @@ public class MavenDefaultRepository implements MavenRepository {
                     buffer.clear();
                 }
             }
-            String invalid = null;
-            Map<LazyRepositoryItem, byte[]> results = new HashMap<>();
             for (Map.Entry<LazyRepositoryItem, MessageDigest> entry : digests.entrySet()) {
                 Optional<InputStream> candidate = entry.getKey().toLazyInputStream();
-                if (candidate.isPresent()) {
-                    byte[] expected;
-                    try (InputStream inputStream = candidate.get()) {
-                        expected = inputStream.readAllBytes();
-                    }
-                    results.put(entry.getKey(), expected);
-                    String text = new String(expected, StandardCharsets.UTF_8).strip();
-                    int end = 0;
-                    while (end < text.length() && !Character.isWhitespace(text.charAt(end))) {
-                        end++;
-                    }
-                    if (!Arrays.equals(
-                            HexFormat.of().parseHex(text.substring(0, end)),
-                            entry.getValue().digest())) {
-                        invalid = entry.getValue().getAlgorithm();
-                        break;
-                    }
+                if (candidate.isEmpty()) {
+                    continue;
                 }
-            }
-            if (invalid != null) {
-                for (LazyRepositoryItem item : digests.keySet()) {
-                    item.deleteIfPresent();
+                byte[] published;
+                try (InputStream inputStream = candidate.get()) {
+                    published = inputStream.readAllBytes();
                 }
-                throw new IllegalStateException("Failed checksum validation for " + invalid);
-            }
-            for (Map.Entry<LazyRepositoryItem, byte[]> entry : results.entrySet()) {
-                entry.getKey().storeIfNotPresent(entry.getValue());
+                if (!Arrays.equals(toChecksum(published), entry.getValue().digest())) {
+                    for (LazyRepositoryItem item : digests.keySet()) {
+                        item.deleteIfPresent();
+                    }
+                    throw new IllegalStateException("Failed checksum validation for "
+                            + uri
+                            + " against its "
+                            + entry.getValue().getAlgorithm()
+                            + " checksum");
+                }
+                entry.getKey().storeIfNotPresent(published);
+                break;
             }
         } catch (Throwable t) {
             Files.deleteIfExists(temporary);
             throw t;
         }
         return Optional.of(temporary);
+    }
+
+    private static MessageDigest digest(String algorithm) {
+        try {
+            return MessageDigest.getInstance(algorithm);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("Unknown checksum algorithm: " + algorithm, e);
+        }
+    }
+
+    private static byte[] digest(String algorithm, Path file) throws IOException {
+        MessageDigest digest = digest(algorithm);
+        try (FileChannel channel = FileChannel.open(file)) {
+            ByteBuffer buffer = ByteBuffer.allocate(1 << 16);
+            while (channel.read(buffer) != -1) {
+                buffer.flip();
+                digest.update(buffer);
+                buffer.clear();
+            }
+        }
+        return digest.digest();
+    }
+
+    private static byte[] toChecksum(byte[] published) {
+        String text = new String(published, StandardCharsets.UTF_8).strip();
+        int end = 0;
+        while (end < text.length() && !Character.isWhitespace(text.charAt(end))) {
+            end++;
+        }
+        return HexFormat.of().parseHex(text.substring(0, end));
     }
 
     private static Path move(Path source, Path target) throws IOException {
@@ -492,7 +477,7 @@ public class MavenDefaultRepository implements MavenRepository {
 
     record LatentRepositoryItem(Path path,
                                 URI uri,
-                                Map<LazyRepositoryItem, MessageDigest> digests,
+                                SequencedMap<LazyRepositoryItem, MessageDigest> digests,
                                 String prefix,
                                 String suffix,
                                 String token,
