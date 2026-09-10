@@ -33,41 +33,41 @@ set "TMPDIR=%TEMP%\jpx-tests-%RANDOM%-%RANDOM%"
 mkdir "%TMPDIR%" || exit /b 1
 set "OUTFILE=%TMPDIR%\out.txt"
 
-REM [1/6] --help prints the usage and exits 0
-echo [1/6] jpx --help
+REM [1/7] --help prints the usage and exits 0
+echo [1/7] jpx --help
 call "%SDK_HOME%\bin\jpx.bat" --help > "%OUTFILE%" 2>&1
 if errorlevel 1 goto :fail
 findstr /c:"Usage: jpx" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [2/6] no target prints the usage and exits 64
-echo [2/6] jpx without a target
+REM [2/7] no target prints the usage and exits 64
+echo [2/7] jpx without a target
 call "%SDK_HOME%\bin\jpx.bat" > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
 if not "!RC!"=="64" goto :fail
 findstr /c:"Usage: jpx" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [3/6] an unknown option prints the usage and exits 64
-echo [3/6] jpx with an unknown option
+REM [3/7] an unknown option prints the usage and exits 64
+echo [3/7] jpx with an unknown option
 call "%SDK_HOME%\bin\jpx.bat" --unknown target > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
 if not "!RC!"=="64" goto :fail
 findstr /c:"Unknown option: --unknown" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [4/6] a malformed --hash is rejected before any resolution work
-echo [4/6] jpx with a malformed --hash
+REM [4/7] a malformed --hash is rejected before any resolution work
+echo [4/7] jpx with a malformed --hash
 call "%SDK_HOME%\bin\jpx.bat" --hash=xyz target > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
 if "!RC!"=="0" goto :fail
 findstr /c:"at least 32 hex characters" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [5/6] install and launch a sample tool from a file-backed Maven repository;
+REM [5/7] install and launch a sample tool from a file-backed Maven repository;
 REM the redirected home deliberately has no .m2 repository, so the installation
 REM must succeed without a local Maven cache to materialize into.
-echo [5/6] jpx install and launch
+echo [5/7] jpx install and launch
 mkdir "%TMPDIR%\src\exampletool"
 mkdir "%TMPDIR%\classes"
 mkdir "%TMPDIR%\home"
@@ -104,8 +104,8 @@ if not exist "%DESCRIPTOR%" goto :fail
 findstr /c:"classpath=org.example%%2Ftool%%2F1.0.jar" "%DESCRIPTOR%" >nul || goto :fail
 echo   ok
 
-REM [6/6] --hash verifies the recorded checksum prefix and rejects a mismatch
-echo [6/6] jpx --hash verification
+REM [6/7] --hash verifies the recorded checksum prefix and rejects a mismatch
+echo [6/7] jpx --hash verification
 set "CHECKSUM="
 for /f "usebackq tokens=1* delims=/" %%a in (`findstr /b /c:"checksum=SHA-256/" "%DESCRIPTOR%"`) do (
     if not defined CHECKSUM set "CHECKSUM=%%b"
@@ -118,6 +118,18 @@ call "%SDK_HOME%\bin\jpx.bat" --hash=00000000000000000000000000000000 org.exampl
 set "RC=!ERRORLEVEL!"
 if "!RC!"=="0" goto :fail
 findstr /c:"Checksum mismatch" "%OUTFILE%" >nul || goto :fail
+echo   ok
+
+REM [7/7] --pin prints the reproducible command instead of running the tool, filling
+REM in the version the target left out and the digest of what was installed
+echo [7/7] jpx --pin
+del /q "%TMPDIR%\marker.txt" >nul 2>&1
+call "%SDK_HOME%\bin\jpx.bat" --pin org.example:tool "%TMPDIR%\marker.txt" > "%OUTFILE%" 2>&1
+set "RC=!ERRORLEVEL!"
+if not "!RC!"=="0" goto :fail
+findstr /c:"jpx --hash=SHA-256/!CHECKSUM! org.example:tool@1.0" "%OUTFILE%" >nul || goto :fail
+findstr /c:"exampletool.Main" "%OUTFILE%" >nul || goto :fail
+if exist "%TMPDIR%\marker.txt" goto :fail
 echo   ok
 
 rmdir /s /q "%TMPDIR%" >nul 2>&1
