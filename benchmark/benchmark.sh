@@ -74,7 +74,7 @@ bench() {
     read -r wall rx tx rc <<<"$(timeit "$cmd")"
     walls+="$wall
 "
-    [ "$rc" != 0 ] && { printf 'FAILED (rc=%s)\n' "$rc"; tail -3 "$LOG" >&2; return 1; }
+    [ "$rc" != 0 ] && { printf 'FAILED (rc=%s)\n' "$rc"; tail -25 "$LOG" >&2; return 1; }
     [ "$rx" != na ] && [ "$((rx+tx))" -gt "$worst" ] && worst=$((rx+tx))
   done
   result "$walls" "$runs" "$worst"
@@ -88,7 +88,7 @@ bench_warm() {
     read -r wall rx tx rc <<<"$(timeit "$cmd")"
     walls+="$wall
 "
-    [ "$rc" != 0 ] && { printf 'FAILED (rc=%s)\n' "$rc"; tail -3 "$LOG" >&2; return 1; }
+    [ "$rc" != 0 ] && { printf 'FAILED (rc=%s)\n' "$rc"; tail -25 "$LOG" >&2; return 1; }
     [ "$rx" != na ] && [ "$((rx+tx))" -gt "$worst" ] && worst=$((rx+tx))
   done
   result "$walls" "$runs" "$worst"
