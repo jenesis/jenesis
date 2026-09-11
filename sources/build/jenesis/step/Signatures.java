@@ -34,7 +34,7 @@ public class Signatures extends ProcessBuildStep {
     public Signatures(Map<String, Repository> repositories, String path) {
         this(repositories,
                 path,
-                configured(),
+                Verification.fromProperty(),
                 new LinkedHashMap<>(),
                 System.getProperty("jenesis.signature.command", "gpg"),
                 null);
@@ -52,11 +52,6 @@ public class Signatures extends ProcessBuildStep {
         this.verification = verification;
         this.declared = declared;
         this.command = command;
-    }
-
-    private static Verification configured() {
-        Verification verification = Verification.fromProperty();
-        return verification == null ? Verification.NONE : verification;
     }
 
     public Signatures verification(Verification verification) {

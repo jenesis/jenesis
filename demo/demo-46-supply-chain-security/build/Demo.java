@@ -58,12 +58,12 @@ public class Demo {
         expectSignature("rotated: the declared key is not the one that signed the artifact",
                 false, home, "all", "rotated");
 
-        // 5. The default scope verifies only what pin is about to write fresh. This
+        // 5. The unpinned scope verifies only what pin is about to write fresh. This
         // coordinate already carries a pin checksum, so nothing is re-verified and
         // even the contradicting declaration is left alone: signatures are an
         // update-time check, and the pin carries the earlier verdict forward.
-        expectSignature("rotated: an already-pinned coordinate is not re-verified by default",
-                true, home, null, "rotated");
+        expectSignature("rotated: an already-pinned coordinate is not re-verified under unpinned",
+                true, home, "unpinned", "rotated");
 
         // 6. The same rejection, with the key taken from a local list instead of an
         // inline declaration. A list is only ever read from disk - one fetched from a

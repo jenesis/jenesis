@@ -636,9 +636,9 @@ public record Project(
                           serves many modules; `pin` keeps the reference and never expands it, and a
                           list is never resolved from a repository, since one that had to be
                           downloaded would itself need verifying. Scope is
-                          set by jenesis.dependency.signature: none, unpinned (only coordinates that
-                          arrive without a pin checksum), all, or strict, which additionally rejects
-                          an artifact that publishes no signature. A coordinate's POM is verified
+                          set by jenesis.dependency.signature, which defaults to none: unpinned checks
+                          only coordinates that arrive without a pin checksum, all checks every one, and
+                          strict additionally rejects an artifact that publishes no signature. A coordinate's POM is verified
                           with the artifact and must carry the same signer, which closes the gap that
                           POMs are read but never pinned. The verifier is an ordinary forked
                           tool, so process-gpg.properties adds arguments to it and jenesis.print.gpg
@@ -856,17 +856,16 @@ public record Project(
                     }
                 }
             }
-            Verification configured = Verification.fromProperty();
+            Verification verification = Verification.fromProperty();
             Map<String, Repository> repositories = null;
             for (String path : paths) {
                 Path file = root.resolve(path).resolve(fileName);
                 if (!Files.isRegularFile(file)) {
                     continue;
                 }
-                SequencedMap<String, SequencedSet<String>> declared = declarations.apply(file, project.signatures());
-                Verification verification = configured == null
-                        ? declared.isEmpty() ? Verification.NONE : Verification.UNPINNED
-                        : configured;
+                SequencedMap<String, SequencedSet<String>> declared = verification == Verification.NONE
+                        ? new LinkedHashMap<>()
+                        : declarations.apply(file, project.signatures());
                 SequencedSet<String> predecessors = new LinkedHashSet<>(inherited.sequencedKeySet());
                 if (verification != Verification.NONE) {
                     if (repositories == null) {
@@ -1633,7 +1632,7 @@ public record Project(
                 project.documentation|false|Assemble a javadoc jar for every module
                 project.version||Version stamped onto every produced artifact
                 project.digest|SHA-256|Algorithm for pin and dependency checksums
-                dependency.signature|none|Signature scope `pin` verifies: none|unpinned|all|strict; defaults to unpinned where @jenesis.signature is declared
+                dependency.signature|none|Signature scope `pin` verifies: none|unpinned|all|strict
                 signature.command|gpg|Binary `pin` forks to verify detached OpenPGP signatures; process-gpg.properties adds arguments
                 project.metadata||Path-separated extra metadata files
                 project.configuration|build.jenesis|Path-separated folders searched for tool configuration files; @ splices the default
