@@ -106,6 +106,10 @@ build_native() {
   build_tool
   note "Capturing reachability metadata and building the native launcher (one-off)"
   local cfg; cfg="$(mktemp -d)"
+  # The agent records only what the run actually executes, and step hashing serialises
+  # each step - a record whose components were never reached is missing from the image
+  # and fails it later. The capture therefore runs cold, so every step is hashed.
+  rm -rf target
   "$GRAALVM_HOME/bin/java" $LAYOUT -Djenesis.process.factory=tool -Djenesis.test.skip=true \
       -agentlib:native-image-agent=config-output-dir="$cfg" \
       -cp "$TOOL" build.jenesis.Make build >/dev/null 2>&1
