@@ -208,7 +208,7 @@ differ. The refusal separates the two ways forward. `jenesis-switch` and
 standard build and no vendored code runs - often all it needs. Running the
 vendored sources yourself, in source mode or off classes you compiled once with
 `javac`, executes the vendored engine itself, which is the untrusted part, and
-the refusal says so - along with the reminder that `Project.java` is only the
+the refusal says so - along with the reminder that `Make.java` is only the
 usual entry point, and a project vendoring its own engine may drive it from
 another. Running a modified engine stays a decision you take knowingly rather
 than one the launcher takes for you.

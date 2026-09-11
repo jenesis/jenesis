@@ -128,7 +128,7 @@ echo. 1>&2
 echo     jenesis-make [selectors]         run the installed engine as it stands 1>&2
 echo     scoop install jenesis@!STAMP!   install and switch to the version the project records 1>&2
 echo. 1>&2
-echo On a POSIX shell, '. jenesis-switch' switches to the recorded version in one step. 1>&2
+echo From cmd.exe, jenesis-switch switches this session to the recorded version in one step. 1>&2
 echo. 1>&2
 echo Only where the project truly needs its own engine, run the vendored sources yourself, from 1>&2
 echo the project root at !ROOT!. Read the project's build instructions first: Make.java is 1>&2
@@ -137,12 +137,10 @@ echo may drive it from one of its own. 1>&2
 echo. 1>&2
 echo     java build\jenesis\Make.java [selectors] 1>&2
 echo. 1>&2
-echo Source mode recompiles the engine on every invocation. To pay that once instead: 1>&2
+echo The first such run compiles the engine into .jenesis\classes, and later runs reuse it 1>&2
+echo until the vendored sources change. 1>&2
 echo. 1>&2
-echo     javac build\jenesis\Make.java 1>&2
-echo     java build.jenesis.Project [selectors] 1>&2
-echo. 1>&2
-echo Warning: those commands execute unreviewed code with the rights of your build and can 1>&2
+echo Warning: that command executes unreviewed code with the rights of your build and can 1>&2
 echo break the encapsulation the released engine gives you. Only run builds from sources you 1>&2
 echo trust. 1>&2
 exit /b 1
