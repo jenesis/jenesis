@@ -219,7 +219,7 @@ jobs:
 
       - name: Test the installer
         shell: bash
-        run: bash install.test.sh
+        run: bash installation/install.test.sh
 
   sdk:
     strategy:
