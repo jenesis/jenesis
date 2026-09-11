@@ -15,9 +15,11 @@ public class VerificationTest {
     }
 
     @Test
-    public void from_property_is_null_when_unset() {
+    public void from_property_is_none_when_unset() {
         System.clearProperty("jenesis.dependency.signature");
-        assertThat(Verification.fromProperty()).isNull();
+        assertThat(Verification.fromProperty())
+                .as("verification is opt-in, so an unset property checks nothing")
+                .isEqualTo(Verification.NONE);
     }
 
     @Test

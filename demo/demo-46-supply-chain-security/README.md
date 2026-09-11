@@ -23,7 +23,7 @@ Run it
     [blocked] tampered: a dependency whose pinned checksum does not match
     [ok]      signed: pin records the key that signed an undeclared coordinate
     [blocked] rotated: the declared key is not the one that signed the artifact
-    [ok]      rotated: an already-pinned coordinate is not re-verified by default
+    [ok]      rotated: an already-pinned coordinate is not re-verified under unpinned
 
 The signature half is self-contained and reaches no network, and **nothing binary is
 committed**: `Demo.java` builds a byte-reproducible jar, generates a throwaway key in a
@@ -102,17 +102,18 @@ sees it.
 Scope: what a pin run actually verifies
 ---------------------------------------
 
-`jenesis.dependency.signature` selects how much each `pin` run checks. It defaults to
-`unpinned` wherever a `@jenesis.signature` line is declared, and to `none` otherwise.
+`jenesis.dependency.signature` selects how much each `pin` run checks, and defaults to `none`. Verification
+is opt-in: a declaration alone does not switch it on, so set the property in `jenesis.properties` the way any
+other project default is set.
 
 | Value      | Verifies                                                          |
 |------------|-------------------------------------------------------------------|
 | `none`     | nothing                                                           |
-| `unpinned` | only coordinates that arrived without a pin checksum (the default) |
+| `unpinned` | only coordinates that arrived without a pin checksum |
 | `all`      | every external coordinate                                         |
 | `strict`   | every external coordinate, and an unsigned one fails              |
 
-The last line of the demo is the one worth reading twice. Under the default scope the
+The last line of the demo is the one worth reading twice. Under `unpinned` the
 `rotated` project **builds**, contradiction and all, because its coordinate already
 carries a pin checksum and so is not something this run is establishing. That is not an
 oversight: it is the delta that makes this cheap. A routine version bump verifies a

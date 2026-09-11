@@ -9,7 +9,7 @@ public enum Verification {
     public static Verification fromProperty() {
         String property = System.getProperty("jenesis.dependency.signature");
         if (property == null) {
-            return null;
+            return NONE;
         }
         try {
             return Verification.valueOf(property.toUpperCase(Locale.ROOT));
