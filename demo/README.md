@@ -105,7 +105,7 @@ Quick index
 | 43 | [`custom-modular`](demo-43-custom-modular/README.md)         | The same via `ModularProject.make(root, assembler)` for modules       | `java build/Demo.java`             |
 | 44 | [`custom-build`](demo-44-custom-build/README.md)             | No `Project` at all: wire a `BuildExecutor` by hand                   | `java build/Demo.java`             |
 | 45 | [`docker-isolation`](demo-45-docker-isolation/README.md)     | A standard build whose test and artifact `main` both grab host secrets, and how Docker confines them | `java build/jenesis/Make.java`  |
-| 46 | [`supply-chain-security`](demo-46-supply-chain-security/README.md) | Two modules that must *not* build: an unpinned dependency rejected by strict pinning, and a wrong checksum rejected always | `java build/Demo.java`             |
+| 46 | [`supply-chain-security`](demo-46-supply-chain-security/README.md) | Three questions about a dependency and what answers each: may we use one we cannot verify (strict pinning), are these the bytes we vetted (a checksum), and were they the ones upstream produced (`@jenesis.signature`, verified by `pin` against a local gpg) | `java build/Demo.java`             |
 | 47 | [`publishing`](demo-47-publishing/README.md)                 | Assemble a Maven Central ready bundle (POM metadata + sources/javadoc jars) and resolve it back | `java build/Demo.java`             |
 | 48 | [`native-image`](demo-48-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
 | 49 | [`build-cache`](demo-49-build-cache/README.md)               | A content-addressed build cache serving step outputs across builds - project-local (`-Djenesis.project.cache`), shared via a URI (`-Djenesis.cache.uri=`), or local layered in front of a remote; shown by bootstrapping it then serving a full `-Djenesis.executor.rebuild=true` from it | `java build/jenesis/Make.java`  |
@@ -965,10 +965,31 @@ dependency); the tampered one fails **regardless** of strict pinning, because th
 `Dependencies` step checks every fetched artifact against its pin and rejects a mismatch -
 exactly what would catch a swapped or compromised artifact.
 
-The new idea is **strict pinning vs. checksum verification**: the former decides
+Neither hash answers *who produced these bytes*, though - a checksum is taken from
+whatever the repository served, so a swapped artifact is written in as an accepted
+pin just the same. `@jenesis.signature` records the OpenPGP key that signed a
+coordinate's artifact: the fingerprint first, then the coordinates it covers,
+because one key normally signs many, and a Maven token may end in `/*` to cover a
+whole groupId. `pin` verifies the detached signature beside the artifact with a
+local gpg before it writes a checksum, and fails when the signer is not among the
+keys declared for that coordinate. A **`signed`** project declares no key yet and has one
+recorded for it; a **`rotated`** one declares another key and
+is blocked, even though its signature is perfectly valid - only the comparison
+against the declaration can see that. A third project declares nothing yet, and
+`pin` records the key it verified, which is what adding a dependency really looks
+like. That half is self-contained and commits nothing binary: the demo builds a
+byte-reproducible jar, generates a throwaway key, signs the jar and publishes both
+to a `file:` repository under `target/`, so nothing reaches the network.
+
+The new ideas are **strict pinning vs. checksum verification** - the former decides
 *whether* an unverified dependency may be used at all, the latter proves a pinned
-dependency is the exact artifact you vetted. Unlike every other demo, this one is
-a project that must *not* build.
+dependency is the exact artifact you vetted - and **provenance as an update-time
+check**. A signature line carries no version, so vetting a key once covers every
+future release that key signs, where a hash covers exactly one file. Its scope
+defaults to `unpinned`: only what `pin` is about to write fresh, which is why the
+demo's last case shows `rotated` building happily, its contradiction untouched,
+because its pin already carries the earlier verdict forward. An ordinary build reads
+none of this and needs no gpg at all.
 
 ## 30. Publishing to Maven Central - [`publishing`](demo-47-publishing/README.md)
 

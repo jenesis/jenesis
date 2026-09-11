@@ -11,8 +11,10 @@ import build.jenesis.Platform;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.PinPom;
 import build.jenesis.step.Inventory;
+import build.jenesis.step.Signatures;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class PinPomTest {
 
@@ -583,5 +585,74 @@ public class PinPomTest {
         assertThat(result).doesNotContain("<artifactId>internal</artifactId>");
         assertThat(result).contains("<artifactId>external</artifactId>");
         assertThat(result).contains("<artifactId>managed</artifactId>");
+    }
+
+    private void writeSignatures(Map<String, String> entries) throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        entries.forEach(properties::setProperty);
+        properties.store(input.resolve(Signatures.SIGNATURES));
+    }
+
+    private static String pom(String body) {
+        return """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                """ + body + "</project>\n";
+    }
+
+    @Test
+    public void records_the_verified_signing_key_in_its_own_comment() throws IOException {
+        Path file = Files.writeString(root.resolve("pom.xml"), pom(""));
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        writeSignatures(Map.of("main/maven/org.example/lib", "OpenPGP/B4D5"));
+        String result = run(file);
+        assertThat(result).contains("<!--jenesis.signature");
+        assertThat(result).contains("OpenPGP/B4D5 main/maven/org.example/lib");
+    }
+
+    @Test
+    public void preserves_a_declared_signature_for_a_coordinate_outside_the_closure() throws IOException {
+        Path file = Files.writeString(root.resolve("pom.xml"), pom("""
+                    <!--jenesis.signature
+                    OpenPGP/CAFE main/maven/org.example/other
+                    -->
+                """));
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        writeSignatures(Map.of("main/maven/org.example/lib", "OpenPGP/B4D5"));
+        String result = run(file);
+        assertThat(result)
+                .as("a hand-written signature nothing resolves survives the rewrite")
+                .contains("OpenPGP/CAFE main/maven/org.example/other");
+        assertThat(result).contains("OpenPGP/B4D5 main/maven/org.example/lib");
+    }
+
+    @Test
+    public void reads_declared_signatures_under_their_canonical_token() throws IOException {
+        Path file = Files.writeString(root.resolve("pom.xml"), pom("""
+                    <!--jenesis.signature
+                    OpenPGP/B4D5 org.example/lib org.example/*
+                    OpenPGP/FEED tool/maven/org.example/other
+                    -->
+                """));
+        assertThat(PinPom.declaredSignatures(file, new LinkedHashSet<>(Set.of(root))))
+                .containsEntry("OpenPGP/B4D5",
+                        new TreeSet<>(Set.of("main/maven/org.example/lib", "main/maven/org.example/*")))
+                .containsEntry("OpenPGP/FEED", new TreeSet<>(Set.of("tool/maven/org.example/other")));
+    }
+
+    @Test
+    public void rejects_a_signature_declaration_without_a_fingerprint() throws IOException {
+        Path file = Files.writeString(root.resolve("pom.xml"), pom("""
+                    <!--jenesis.signature
+                    OpenPGP/B4D5
+                    -->
+                """));
+        assertThatThrownBy(() -> PinPom.declaredSignatures(file, new LinkedHashSet<>(Set.of(root))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expected <algorithm>/<fingerprint> <token>...");
     }
 }

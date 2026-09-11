@@ -11,6 +11,7 @@ import build.jenesis.Platform;
 import build.jenesis.SequencedProperties;
 import build.jenesis.module.PinModuleInfo;
 import build.jenesis.step.Inventory;
+import build.jenesis.step.Signatures;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -798,5 +799,203 @@ public class PinModuleInfoTest {
         assertThatThrownBy(() -> run(file, step -> step.flatten(true)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Cannot flatten platform-guarded BOM declaration");
+    }
+
+    private void writeSignatures(Map<String, String> entries) throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        entries.forEach(properties::setProperty);
+        properties.store(input.resolve(Signatures.SIGNATURES));
+    }
+
+    @Test
+    public void records_the_verified_signing_key_beside_the_pin() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        writeSignatures(Map.of("main/maven/org.example/lib", "OpenPGP/B4D5"));
+        String result = run(file);
+        assertThat(result).contains("@jenesis.pin org.example/lib 1.0 SHA-256/cafebabe");
+        assertThat(result).contains("@jenesis.signature OpenPGP/B4D5 org.example/lib");
+    }
+
+    @Test
+    public void preserves_a_declared_signature_for_a_coordinate_outside_the_closure() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.signature OpenPGP/CAFE org.example/other
+                 */
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        writeSignatures(Map.of("main/maven/org.example/lib", "OpenPGP/B4D5"));
+        String result = run(file);
+        assertThat(result)
+                .as("a hand-written signature nothing resolves survives the rewrite")
+                .contains("@jenesis.signature OpenPGP/CAFE org.example/other");
+        assertThat(result).contains("@jenesis.signature OpenPGP/B4D5 org.example/lib");
+    }
+
+    @Test
+    public void replaces_a_declared_signature_when_the_recorded_key_is_the_same() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.signature OpenPGP/B4D5 org.example/lib
+                 */
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        writeSignatures(Map.of("main/maven/org.example/lib", "OpenPGP/B4D5"));
+        String result = run(file);
+        assertThat(result.split("@jenesis\\.signature", -1))
+                .as("the coordinate keeps exactly one signature line")
+                .hasSize(2);
+    }
+
+    @Test
+    public void reads_declared_signatures_under_their_canonical_token() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.signature OpenPGP/B4D5 org.example/lib some.module
+                 * @jenesis.signature OpenPGP/FEED tool/maven/org.example/other org.example/*
+                 */
+                module foo {
+                }
+                """);
+        assertThat(PinModuleInfo.declaredSignatures(file, new LinkedHashSet<>(Set.of(root))))
+                .containsEntry("OpenPGP/B4D5",
+                        new TreeSet<>(Set.of("main/maven/org.example/lib", "main/module/some.module")))
+                .containsEntry("OpenPGP/FEED",
+                        new TreeSet<>(Set.of("tool/maven/org.example/other", "main/maven/org.example/*")));
+    }
+
+    @Test
+    public void rejects_a_signature_declaration_without_a_fingerprint() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.signature OpenPGP/B4D5
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> PinModuleInfo.declaredSignatures(file, new LinkedHashSet<>(Set.of(root))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expected <algorithm>/<fingerprint> <token>...");
+    }
+
+    @Test
+    public void adds_no_line_for_a_coordinate_a_group_wildcard_already_covers() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.signature OpenPGP/B4D5 org.example/*
+                 */
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        writeSignatures(Map.of("main/maven/org.example/lib", "OpenPGP/B4D5"));
+        String result = run(file);
+        assertThat(result).contains("@jenesis.signature OpenPGP/B4D5 org.example/*");
+        assertThat(result)
+                .as("a hand-written wildcard is not buried under a generated line for each artifact")
+                .doesNotContain("org.example/lib OpenPGP")
+                .doesNotContain("OpenPGP/B4D5 org.example/lib");
+    }
+
+    @Test
+    public void groups_every_coordinate_one_key_signed_onto_one_line() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe",
+                "maven/org.example/other", "2.0 SHA-256/cafebabe"));
+        writeSignatures(Map.of("main/maven/org.example/lib", "OpenPGP/B4D5",
+                "main/maven/org.example/other", "OpenPGP/B4D5"));
+        String result = run(file);
+        assertThat(result).contains("@jenesis.signature OpenPGP/B4D5 org.example/lib org.example/other");
+    }
+
+    private void writeList(String name, String content) throws IOException {
+        Files.writeString(root.resolve(name), content);
+    }
+
+    @Test
+    public void reads_a_local_key_list_a_declaration_names() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.signature signature-vendor.properties
+                 */
+                module foo {
+                }
+                """);
+        writeList("signature-vendor.properties", """
+                OpenPGP/B4D5 = org.example/* some.module
+                OpenPGP/CAFE = org.other/lib
+                """);
+        assertThat(PinModuleInfo.declaredSignatures(file, new LinkedHashSet<>(Set.of(root))))
+                .containsEntry("OpenPGP/B4D5",
+                        new TreeSet<>(Set.of("main/maven/org.example/*", "main/module/some.module")))
+                .containsEntry("OpenPGP/CAFE", new TreeSet<>(Set.of("main/maven/org.other/lib")));
+    }
+
+    @Test
+    public void keeps_a_key_list_reference_and_adds_nothing_it_already_covers() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.signature signature-vendor.properties
+                 */
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        String result = run(file);
+        assertThat(result)
+                .as("the reference is preserved verbatim, never expanded into the file")
+                .contains("@jenesis.signature signature-vendor.properties")
+                .doesNotContain("OpenPGP/");
+    }
+
+    @Test
+    public void rejects_a_declaration_naming_a_list_that_is_not_on_disk() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.signature signature-missing.properties
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> PinModuleInfo.declaredSignatures(file, new LinkedHashSet<>(Set.of(root))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No signature-missing.properties found")
+                .hasMessageContaining("jenesis.project.signatures");
+    }
+
+    @Test
+    public void refuses_to_resolve_a_key_list_from_a_repository() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.signature org.example/vendor-keys
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> PinModuleInfo.declaredSignatures(file, new LinkedHashSet<>(Set.of(root))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("a list that had to be downloaded would itself need verifying");
     }
 }

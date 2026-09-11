@@ -7,8 +7,8 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
-import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
+import build.jenesis.step.Signatures;
 
 public class PinModuleInfo implements BuildStep {
 
@@ -16,6 +16,8 @@ public class PinModuleInfo implements BuildStep {
     private static final Pattern JAVADOC_END = Pattern.compile("\\*/\\s*$");
     private static final Pattern PIN_TAG = Pattern.compile("^\\s*\\*\\s*@jenesis\\.pin\\s+(\\S+)(\\s+.*)?$");
     private static final Pattern BOM_TAG = Pattern.compile("^\\s*\\*\\s*@jenesis\\.bom\\s+(\\S+)(\\s+.*)?$");
+    private static final Pattern SIGNATURE_TAG = Pattern.compile(
+            "^\\s*\\*\\s*@jenesis\\.signature\\s+(\\S+)(\\s+.*)?$");
 
     private final String prefix;
     private final String path;
@@ -117,8 +119,9 @@ public class PinModuleInfo implements BuildStep {
                 references.putIfAbsent(reference.getKey(), reference.getValue());
             }
         }
+        SequencedMap<String, String> signatures = Signatures.recorded(arguments.values());
         for (Path file : moduleInfoFiles) {
-            updateModuleInfo(file, entries, covered, references, flatten, platform);
+            updateModuleInfo(file, entries, covered, references, signatures, flatten, platform);
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
@@ -141,10 +144,27 @@ public class PinModuleInfo implements BuildStep {
         return dependency.checksum().isEmpty() ? null : dependency.checksum();
     }
 
+    public static SequencedMap<String, SequencedSet<String>> declaredSignatures(Path file,
+                                                                                SequencedSet<Path> locations)
+            throws IOException {
+        SequencedMap<String, SequencedSet<String>> declared = new TreeMap<>();
+        if (!Files.isRegularFile(file)) {
+            return declared;
+        }
+        for (String line : Files.readAllLines(file)) {
+            Matcher matcher = SIGNATURE_TAG.matcher(line);
+            if (matcher.matches()) {
+                Signatures.declare(declared, matcher.group(1), matcher.group(2), line.trim(), file.toString(), locations);
+            }
+        }
+        return declared;
+    }
+
     private static void updateModuleInfo(Path file,
                                          SequencedMap<String, String> entries,
                                          Set<String> covered,
                                          SequencedMap<String, String> references,
+                                         SequencedMap<String, String> signatures,
                                          boolean flatten,
                                          Platform platform) throws IOException {
         String existing = Files.readString(file);
@@ -155,7 +175,7 @@ public class PinModuleInfo implements BuildStep {
         int moduleStart = moduleDeclarationMatcher.start();
         String prelude = existing.substring(0, moduleStart);
         String body = existing.substring(moduleStart);
-        String updatedPrelude = updateJavadoc(prelude, entries, covered, references, flatten, platform);
+        String updatedPrelude = updateJavadoc(prelude, entries, covered, references, signatures, flatten, platform);
         String updated = updatedPrelude + body;
         if (!updated.equals(existing)) {
             Files.writeString(file, updated);
@@ -234,6 +254,7 @@ public class PinModuleInfo implements BuildStep {
                                         SequencedMap<String, String> entries,
                                         Set<String> covered,
                                         SequencedMap<String, String> references,
+                                        SequencedMap<String, String> signatures,
                                         boolean flatten,
                                         Platform platform) {
         int javadocEnd = -1;
@@ -246,15 +267,15 @@ public class PinModuleInfo implements BuildStep {
             javadocStart = prelude.lastIndexOf("/**", javadocEnd);
         }
         if (javadocStart < 0 || javadocEnd < 0) {
-            if (entries.isEmpty()) {
+            if (entries.isEmpty() && signatures.isEmpty()) {
                 return prelude;
             }
-            return prelude + renderJavadoc(entries) + "\n";
+            return prelude + renderJavadoc(entries, signatures) + "\n";
         }
         String before = prelude.substring(0, javadocStart);
         String javadoc = prelude.substring(javadocStart, javadocEnd);
         String after = prelude.substring(javadocEnd);
-        String rewritten = rewriteJavadoc(javadoc, entries, covered, references, flatten, platform);
+        String rewritten = rewriteJavadoc(javadoc, entries, covered, references, signatures, flatten, platform);
         return before + rewritten + after;
     }
 
@@ -265,6 +286,7 @@ public class PinModuleInfo implements BuildStep {
                                          SequencedMap<String, String> entries,
                                          Set<String> covered,
                                          SequencedMap<String, String> references,
+                                         SequencedMap<String, String> signatures,
                                          boolean flatten,
                                          Platform platform) {
         List<String> lines = new ArrayList<>(List.of(javadoc.split("\\n", -1)));
@@ -379,7 +401,60 @@ public class PinModuleInfo implements BuildStep {
             tags.add(" * @jenesis.pin " + entry.getKey() + " " + entry.getValue());
         }
         lines.addAll(insertAt, tags);
+        rewriteSignatures(lines, signatures);
         return String.join("\n", lines);
+    }
+
+    private static void rewriteSignatures(List<String> lines, SequencedMap<String, String> signatures) {
+        SequencedMap<String, SequencedSet<String>> merged = new TreeMap<>();
+        SequencedSet<String> imported = new LinkedHashSet<>();
+        int insertAt = -1, index = 0;
+        Iterator<String> it = lines.iterator();
+        while (it.hasNext()) {
+            String line = it.next();
+            Matcher matcher = SIGNATURE_TAG.matcher(line);
+            if (matcher.matches()) {
+                if (insertAt < 0) {
+                    insertAt = index;
+                }
+                                String rest = matcher.group(2) == null ? "" : matcher.group(2).trim();
+                if (rest.isEmpty()) {
+                    imported.add(matcher.group(1));
+                } else {
+                    Signatures.declare(merged, matcher.group(1), rest, line.trim(), "the module declaration");
+                }
+                it.remove();
+            } else {
+                index++;
+            }
+        }
+        signatures.forEach((token, fingerprint) -> {
+            if (merged.values().stream().flatMap(Collection::stream).noneMatch(
+                    declaration -> Signatures.covers(declaration, token))) {
+                merged.computeIfAbsent(fingerprint, _ -> new TreeSet<>()).add(token);
+            }
+        });
+        if (merged.isEmpty() && imported.isEmpty()) {
+            return;
+        }
+        if (insertAt < 0) {
+            for (int lineIndex = lines.size() - 1; lineIndex >= 0; lineIndex--) {
+                if (lines.get(lineIndex).contains("*/")) {
+                    insertAt = lineIndex;
+                    break;
+                }
+            }
+            if (insertAt < 0) {
+                insertAt = Math.max(1, lines.size() - 1);
+            }
+        }
+        List<String> tags = new ArrayList<>();
+        imported.forEach(reference -> tags.add(" * @jenesis.signature " + reference));
+        merged.forEach((fingerprint, tokens) -> tags.add(" * @jenesis.signature "
+                + fingerprint
+                + " "
+                + tokens.stream().map(PinModuleInfo::shorten).collect(Collectors.joining(" "))));
+        lines.addAll(insertAt, tags);
     }
 
     private static void rewriteBoms(List<String> lines,
@@ -475,10 +550,35 @@ public class PinModuleInfo implements BuildStep {
         return token.indexOf('/', first + 1) < 0 ? "main/maven/" + token : token;
     }
 
-    private static String renderJavadoc(SequencedMap<String, String> entries) {
+    private static String shorten(String token) {
+        if (token.startsWith("main/module/")) {
+            return token.substring("main/module/".length());
+        }
+        if (token.startsWith("main/maven/")) {
+            String coordinate = token.substring("main/maven/".length());
+            int slash = coordinate.indexOf('/');
+            if (slash > 0 && slash == coordinate.lastIndexOf('/')) {
+                return coordinate;
+            }
+        }
+        return token;
+    }
+
+    private static String renderJavadoc(SequencedMap<String, String> entries,
+                                        SequencedMap<String, String> signatures) {
         StringBuilder sb = new StringBuilder("/**\n");
         for (Map.Entry<String, String> entry : entries.entrySet()) {
             sb.append(" * @jenesis.pin ").append(entry.getKey()).append(" ").append(entry.getValue()).append("\n");
+        }
+        SequencedMap<String, SequencedSet<String>> grouped = new TreeMap<>();
+        signatures.forEach((token, fingerprint) ->
+                grouped.computeIfAbsent(fingerprint, _ -> new TreeSet<>()).add(token));
+        for (Map.Entry<String, SequencedSet<String>> entry : grouped.entrySet()) {
+            sb.append(" * @jenesis.signature ")
+                    .append(entry.getKey())
+                    .append(" ")
+                    .append(entry.getValue().stream().map(PinModuleInfo::shorten).collect(Collectors.joining(" ")))
+                    .append("\n");
         }
         sb.append(" */");
         return sb.toString();

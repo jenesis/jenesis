@@ -7,8 +7,8 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
-import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
+import build.jenesis.step.Signatures;
 
 public class PinPom implements BuildStep {
 
@@ -19,6 +19,8 @@ public class PinPom implements BuildStep {
     private static final Pattern CHECKSUM_COMMENT = Pattern.compile("[ \\t]*<!--\\s*Checksum/[^>]*-->\\s*\\n");
     private static final Pattern INDENT = Pattern.compile("\\n([ \\t]+)<");
     private static final Pattern PIN_COMMENT = Pattern.compile("(?s)([ \\t]*)<!--\\s*jenesis\\.pin\\b(.*?)-->\\s*\\n");
+    private static final Pattern SIGNATURE_COMMENT = Pattern.compile(
+            "(?s)([ \\t]*)<!--\\s*jenesis\\.signature\\b(.*?)-->\\s*\\n");
 
     private final String prefix;
     private final String path;
@@ -59,13 +61,16 @@ public class PinPom implements BuildStep {
         SequencedMap<String, Inventory.Dependency> closure = Inventory.closure(arguments.values(), path);
         Set<String> internal = collectInternal(Inventory.identities(arguments.values()));
         SequencedMap<String, String> entries = collectEntries(closure, internal, hashFunction);
+        SequencedMap<String, String> signatures = Signatures.recorded(arguments.values());
         for (Path pomFile : pomFiles) {
-            updatePom(pomFile, entries);
+            updatePom(pomFile, entries, signatures);
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
-    private void updatePom(Path pomFile, SequencedMap<String, String> entries) throws IOException {
+    private void updatePom(Path pomFile,
+                           SequencedMap<String, String> entries,
+                           SequencedMap<String, String> signatures) throws IOException {
         String existing = Files.readString(pomFile);
         Matcher dependencyManagementMatcher = DEPENDENCY_MANAGEMENT.matcher(existing);
         String indent;
@@ -122,10 +127,110 @@ public class PinPom implements BuildStep {
             }
             updated = updated.substring(0, projectCloseMatcher.start() + 1) + requires + updated.substring(projectCloseMatcher.start() + 1);
         }
+        updated = updateSignatures(updated, signatures, indent, pomFile);
         updated = stripDirectDependencyChecksums(updated);
         if (!updated.equals(existing)) {
             Files.writeString(pomFile, updated);
         }
+    }
+
+    private static String updateSignatures(String content,
+                                           SequencedMap<String, String> signatures,
+                                           String indent,
+                                           Path pomFile) {
+        Matcher matcher = SIGNATURE_COMMENT.matcher(content);
+        boolean declared = matcher.find();
+        SequencedMap<String, SequencedSet<String>> merged = new TreeMap<>();
+        SequencedSet<String> imported = new LinkedHashSet<>();
+        if (declared) {
+            for (String line : matcher.group(2).replace("&#45;", "-").split("\n")) {
+                String trimmed = line.trim().replaceAll("\\s+", " ");
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+                int space = trimmed.indexOf(' ');
+                if (space < 1) {
+                    imported.add(trimmed);
+                } else {
+                    Signatures.declare(merged, trimmed.substring(0, space),
+                            trimmed.substring(space + 1), trimmed, pomFile.toString());
+                }
+            }
+        }
+        signatures.forEach((token, fingerprint) -> {
+            if (merged.values().stream().flatMap(Collection::stream).noneMatch(
+                    declaration -> Signatures.covers(declaration, token))) {
+                merged.computeIfAbsent(fingerprint, _ -> new TreeSet<>()).add(token);
+            }
+        });
+        String block = merged.isEmpty() && imported.isEmpty() ? "" : renderSignatures(merged, imported, indent);
+        if (declared) {
+            return SIGNATURE_COMMENT.matcher(content).replaceFirst(Matcher.quoteReplacement(block));
+        }
+        if (block.isEmpty()) {
+            return content;
+        }
+        Matcher projectCloseMatcher = PROJECT_CLOSE.matcher(content);
+        if (!projectCloseMatcher.find()) {
+            throw new IllegalStateException("No </project> tag in " + pomFile);
+        }
+        return content.substring(0, projectCloseMatcher.start() + 1)
+                + block
+                + content.substring(projectCloseMatcher.start() + 1);
+    }
+
+    private static String renderSignatures(SequencedMap<String, SequencedSet<String>> entries,
+                                           SequencedSet<String> imported,
+                                           String indent) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(indent).append("<!--jenesis.signature\n");
+        imported.forEach(reference -> sb.append(indent).append(reference).append("\n"));
+        entries.forEach((fingerprint, tokens) -> sb.append(indent)
+                .append((fingerprint + " " + String.join(" ", tokens)).replace("--", "&#45;&#45;"))
+                .append("\n"));
+        sb.append(indent).append("-->\n");
+        return sb.toString();
+    }
+
+    public static SequencedMap<String, SequencedSet<String>> declaredSignatures(Path pomFile,
+                                                                                SequencedSet<Path> locations)
+            throws IOException {
+        if (!Files.isRegularFile(pomFile)) {
+            return new TreeMap<>();
+        }
+        Matcher matcher = SIGNATURE_COMMENT.matcher(Files.readString(pomFile));
+        return matcher.find()
+                ? parseSignatures(matcher.group(2), pomFile.toString(), locations)
+                : new TreeMap<>();
+    }
+
+    private static SequencedMap<String, SequencedSet<String>> parseSignatures(String block,
+                                                                              String origin,
+                                                                              SequencedSet<Path> locations)
+            throws IOException {
+        SequencedMap<String, SequencedSet<String>> declared = new TreeMap<>();
+        for (String line : block.replace("&#45;", "-").split("\n")) {
+            String trimmed = line.trim().replaceAll("\\s+", " ");
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            int space = trimmed.indexOf(' ');
+            Signatures.declare(declared,
+                    space < 1 ? trimmed : trimmed.substring(0, space),
+                    space < 1 ? null : trimmed.substring(space + 1),
+                    trimmed,
+                    origin,
+                    locations);
+        }
+        return declared;
+    }
+
+    private static String expand(String token) {
+        int first = token.indexOf('/');
+        if (first < 0) {
+            return "main/module/" + token;
+        }
+        return token.indexOf('/', first + 1) < 0 ? "main/maven/" + token : token;
     }
 
     static SequencedMap<String, String> collectEntries(SequencedMap<String, Inventory.Dependency> closure,
@@ -227,14 +332,6 @@ public class PinPom implements BuildStep {
             }
         }
         return preserved;
-    }
-
-    private static String expand(String token) {
-        int first = token.indexOf('/');
-        if (first < 0) {
-            return "main/module/" + token;
-        }
-        return token.indexOf('/', first + 1) < 0 ? "main/maven/" + token : token;
     }
 
     private static String renderRequires(SequencedMap<String, String> qualified, List<String> preserved, String indent) {
