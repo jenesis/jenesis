@@ -99,7 +99,14 @@ public class Signatures extends ProcessBuildStep {
         List<String> prefix = new ArrayList<>(prepended(properties(arguments)));
         prefix.addAll(VERIFY);
         SequencedMap<String, Inventory.Dependency> closure = Inventory.closure(arguments.values(), path);
-        Set<String> internal = internal(Inventory.identities(arguments.values()));
+        Set<String> internal = new LinkedHashSet<>();
+        for (String identity : Inventory.identities(arguments.values())) {
+            internal.add(identity);
+            int firstSlash = identity.indexOf('/'), lastSlash = identity.lastIndexOf('/');
+            if (firstSlash > 0 && lastSlash > firstSlash) {
+                internal.add(identity.substring(0, lastSlash));
+            }
+        }
         Set<Path> verifiedElsewhere = new HashSet<>();
         closure.forEach((key, dependency) -> {
             String coordinate = key.substring(dependency.group().length() + 1);
@@ -136,7 +143,10 @@ public class Signatures extends ProcessBuildStep {
             if (coordinate.startsWith("module/") && verifiedElsewhere.contains(jar)) {
                 continue;
             }
-            Repository repository = repository(coordinate);
+            int repositorySlash = coordinate.indexOf('/');
+            Repository repository = repositorySlash < 1
+                    ? null
+                    : repositories.get(Resolver.base(coordinate.substring(0, repositorySlash)));
             if (repository == null) {
                 continue;
             }
@@ -156,7 +166,12 @@ public class Signatures extends ProcessBuildStep {
                 continue;
             }
             String fingerprint = ALGORITHM + "/" + status.fingerprint().toUpperCase(Locale.ROOT);
-            SequencedSet<String> accepted = accepted(token);
+            SequencedSet<String> accepted = new LinkedHashSet<>();
+            for (Map.Entry<String, SequencedSet<String>> declaration : declared.entrySet()) {
+                if (declaration.getValue().stream().anyMatch(value -> covers(value, token))) {
+                    accepted.add(declaration.getKey());
+                }
+            }
             if (!accepted.isEmpty() && accepted.stream().anyMatch(fingerprint::equalsIgnoreCase)) {
                 verified.put(token, fingerprint);
                 continue;
@@ -168,13 +183,49 @@ public class Signatures extends ProcessBuildStep {
                         + " then run pin again");
                 continue;
             }
-            String descriptor = repository instanceof MavenRepository ? descriptor(coordinate, version) : null;
-            if (descriptor != null) {
-                String failure = descriptor(executor, context, prefix, repository, descriptor, fingerprint);
-                if (failure != null) {
-                    violations.add(token + " " + version + ": " + failure);
-                    continue;
+            MavenDependencyKey.Versioned pomKey = null;
+            if (repository instanceof MavenRepository) {
+                try {
+                    pomKey = MavenDependencyKey.parse(relative);
+                } catch (IllegalArgumentException _) {
+                    pomKey = null;
                 }
+            }
+            String pomFailure = null;
+            if (pomKey != null) {
+                String descriptor = new MavenDependencyKey(pomKey.key().groupId(),
+                        pomKey.key().artifactId(),
+                        "pom",
+                        null).coordinate(null, version);
+                Path pomSignature = materialise(executor, context, repository, descriptor, true);
+                Path pom = pomSignature == null
+                        ? null
+                        : materialise(executor, context, repository, descriptor, false);
+                if (pomSignature == null) {
+                    if (verification == Verification.STRICT) {
+                        pomFailure = "its artifact is signed but its POM publishes no signature";
+                    }
+                } else if (pom == null) {
+                    pomFailure = "a signature is published for its POM but the POM itself did not resolve";
+                } else {
+                    Status pomStatus = verify(executor, context, prefix, pom, pomSignature);
+                    String signer = pomStatus.fingerprint() == null
+                            ? null
+                            : ALGORITHM + "/" + pomStatus.fingerprint().toUpperCase(Locale.ROOT);
+                    if (pomStatus.failure() != null) {
+                        pomFailure = "for its POM, " + pomStatus.failure()
+                                + "; a repository that re-serialises POMs invalidates them, so resolve from"
+                                + " one that serves the published bytes";
+                    } else if (signer == null) {
+                        pomFailure = "gpg reported no validated signature for its POM";
+                    } else if (!signer.equalsIgnoreCase(fingerprint)) {
+                        pomFailure = "its POM is signed by " + signer + " but its artifact by " + fingerprint;
+                    }
+                }
+            }
+            if (pomFailure != null) {
+                violations.add(token + " " + version + ": " + pomFailure);
+                continue;
             }
             recorded.put(token, fingerprint);
         }
@@ -187,22 +238,32 @@ public class Signatures extends ProcessBuildStep {
         properties.store(context.next().resolve(SIGNATURES));
         SequencedMap<String, String> reported = new TreeMap<>(verified);
         reported.putAll(recorded);
-        report(context, reported, unsigned, skipped, violations);
+        StringBuilder builder = new StringBuilder();
+        if (reported.isEmpty()) {
+            builder.append("No dependency signatures were verified.\n");
+        } else {
+            reported.forEach((token, fingerprint) -> builder.append(token)
+                    .append(" ")
+                    .append(fingerprint)
+                    .append("\n"));
+        }
+        SequencedMap<String, List<String>> sections = new LinkedHashMap<>();
+        sections.put("Unsigned", unsigned);
+        sections.put("Unchecked", skipped);
+        sections.put("Rejected", violations);
+        sections.forEach((heading, entries) -> {
+            if (!entries.isEmpty()) {
+                builder.append("\n").append(heading).append(":\n");
+                entries.forEach(entry -> builder.append("  ").append(entry).append("\n"));
+            }
+        });
+        Files.writeString(Files.createDirectories(context.next().resolve(REPORTS + "signatures"))
+                .resolve("signatures.txt"), builder.toString());
         if (!violations.isEmpty()) {
             throw new IllegalStateException("Unverified dependency signatures:\n  "
                     + String.join("\n  ", violations));
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
-    }
-
-    private SequencedSet<String> accepted(String token) {
-        SequencedSet<String> accepted = new LinkedHashSet<>();
-        declared.forEach((fingerprint, tokens) -> {
-            if (tokens.stream().anyMatch(declaration -> covers(declaration, token))) {
-                accepted.add(fingerprint);
-            }
-        });
-        return accepted;
     }
 
     public static void declare(SequencedMap<String, SequencedSet<String>> declared,
@@ -211,19 +272,11 @@ public class Signatures extends ProcessBuildStep {
                                String line,
                                String origin,
                                SequencedSet<Path> locations) throws IOException {
-        if (rest == null || rest.isBlank()) {
-            declareList(declared, fingerprint, locations, line, origin);
-        } else {
+        if (rest != null && !rest.isBlank()) {
             declare(declared, fingerprint, rest, line, origin);
+            return;
         }
-    }
-
-    private static void declareList(SequencedMap<String, SequencedSet<String>> declared,
-                                    String token,
-                                    SequencedSet<Path> locations,
-                                    String line,
-                                    String origin) throws IOException {
-        String name = token.substring(token.lastIndexOf('/') + 1);
+        String name = fingerprint.substring(fingerprint.lastIndexOf('/') + 1);
         if (!name.startsWith(LIST_PREFIX) || !name.endsWith(LIST_SUFFIX)) {
             throw new IllegalArgumentException("Malformed @jenesis.signature declaration '"
                     + line
@@ -242,9 +295,9 @@ public class Signatures extends ProcessBuildStep {
                 continue;
             }
             SequencedProperties properties = SequencedProperties.ofFiles(file);
-            for (String fingerprint : properties.stringPropertyNames()) {
-                declare(declared, fingerprint, properties.getProperty(fingerprint),
-                        fingerprint + " " + properties.getProperty(fingerprint), file.toString());
+            for (String listed : properties.stringPropertyNames()) {
+                declare(declared, listed, properties.getProperty(listed),
+                        listed + " " + properties.getProperty(listed), file.toString());
             }
             return;
         }
@@ -295,34 +348,28 @@ public class Signatures extends ProcessBuildStep {
         }
         String normalized = ALGORITHM + "/" + value.toUpperCase(Locale.ROOT);
         for (String token : tokens.split(" ")) {
-            declared.computeIfAbsent(normalized, _ -> new TreeSet<>()).add(wildcard(expand(token), line, origin));
+            int first = token.indexOf('/');
+            String expanded;
+            if (first < 0) {
+                expanded = "main/module/" + token;
+            } else {
+                expanded = token.indexOf('/', first + 1) < 0 ? "main/maven/" + token : token;
+            }
+            if (expanded.endsWith("/*")) {
+                String[] segments = expanded.split("/");
+                if (segments.length != 4 || !segments[1].equals("maven")) {
+                    throw new IllegalArgumentException("Malformed @jenesis.signature token '"
+                            + expanded
+                            + "' in '"
+                            + line
+                            + "' in "
+                            + origin
+                            + ": a trailing /* covers every artifact of one Maven groupId,"
+                            + " so it needs <groupId>/* or <group>/maven/<groupId>/*");
+                }
+            }
+            declared.computeIfAbsent(normalized, _ -> new TreeSet<>()).add(expanded);
         }
-    }
-
-    private static String wildcard(String token, String line, String origin) {
-        if (!token.endsWith("/*")) {
-            return token;
-        }
-        String[] segments = token.split("/");
-        if (segments.length != 4 || !segments[1].equals("maven")) {
-            throw new IllegalArgumentException("Malformed @jenesis.signature token '"
-                    + token
-                    + "' in '"
-                    + line
-                    + "' in "
-                    + origin
-                    + ": a trailing /* covers every artifact of one Maven groupId,"
-                    + " so it needs <groupId>/* or <group>/maven/<groupId>/*");
-        }
-        return token;
-    }
-
-    private static String expand(String token) {
-        int first = token.indexOf('/');
-        if (first < 0) {
-            return "main/module/" + token;
-        }
-        return token.indexOf('/', first + 1) < 0 ? "main/maven/" + token : token;
     }
 
     public static boolean covers(String declaration, String token) {
@@ -350,11 +397,6 @@ public class Signatures extends ProcessBuildStep {
         return recorded;
     }
 
-    private Repository repository(String coordinate) {
-        int slash = coordinate.indexOf('/');
-        return slash < 1 ? null : repositories.get(Resolver.base(coordinate.substring(0, slash)));
-    }
-
     private Path materialise(Executor executor,
                              BuildStepContext context,
                              Repository repository,
@@ -375,18 +417,6 @@ public class Signatures extends ProcessBuildStep {
             Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
         }
         return target;
-    }
-
-    private static String descriptor(String coordinate, String version) {
-        int slash = coordinate.indexOf('/');
-        MavenDependencyKey.Versioned parsed;
-        try {
-            parsed = MavenDependencyKey.parse(coordinate.substring(slash + 1) + "/" + version);
-        } catch (IllegalArgumentException _) {
-            return null;
-        }
-        return new MavenDependencyKey(parsed.key().groupId(), parsed.key().artifactId(), "pom", null)
-                .coordinate(null, version);
     }
 
     private Status verify(Executor executor, BuildStepContext context, List<String> prefix, Path jar, Path signature)
@@ -411,7 +441,38 @@ public class Signatures extends ProcessBuildStep {
             Thread.currentThread().interrupt();
             throw new InterruptedIOException("Interrupted while verifying " + jar);
         }
-        Status status = status(Files.isRegularFile(output) ? Files.readAllLines(output) : List.of());
+        List<String> lines = Files.isRegularFile(output) ? Files.readAllLines(output) : List.of();
+        String fingerprint = null, failure = null;
+            for (String line : lines) {
+                if (!line.startsWith(STATUS)) {
+                    continue;
+                }
+                String[] tokens = line.substring(STATUS.length()).trim().split(" ");
+                switch (tokens[0]) {
+                    case "VALIDSIG" -> {
+                        if (tokens.length > 10) {
+                            fingerprint = tokens[10];
+                        } else if (tokens.length > 1) {
+                            fingerprint = tokens[1];
+                        }
+                    }
+                    case "BADSIG" -> failure = "the signature does not match the file";
+                    case "EXPKEYSIG" -> failure = "the signing key has expired";
+                    case "REVKEYSIG" -> failure = "the signing key was revoked";
+                    case "NO_PUBKEY" -> failure = "the public key "
+                            + (tokens.length > 1 ? tokens[1] : "")
+                            + " is not available; obtain it, verify it against the project's published keys,"
+                            + " and import it before running pin again";
+                    case "ERRSIG" -> {
+                        if (failure == null) {
+                            failure = "the signature could not be checked";
+                        }
+                    }
+                    default -> {
+                    }
+                }
+            }
+        Status status = new Status(fingerprint, failure);
         if (exitCode != 0 && status.fingerprint() == null && status.failure() == null) {
             throw new IllegalStateException("Unexpected exit code " + exitCode + " and no signature verdict from "
                     + command
@@ -420,112 +481,6 @@ public class Signatures extends ProcessBuildStep {
                     + (Files.isRegularFile(error) ? "\n\nError:\n" + Files.readString(error) : ""));
         }
         return status;
-    }
-
-    private String descriptor(Executor executor,
-                              BuildStepContext context,
-                              List<String> prefix,
-                              Repository repository,
-                              String coordinate,
-                              String fingerprint) throws IOException {
-        Path signature = materialise(executor, context, repository, coordinate, true);
-        if (signature == null) {
-            return verification == Verification.STRICT
-                    ? "its artifact is signed but its POM publishes no signature"
-                    : null;
-        }
-        Path pom = materialise(executor, context, repository, coordinate, false);
-        if (pom == null) {
-            return "a signature is published for its POM but the POM itself did not resolve";
-        }
-        Status status = verify(executor, context, prefix, pom, signature);
-        if (status.failure() != null) {
-            return "for its POM, " + status.failure()
-                    + "; a repository that re-serialises POMs invalidates them, so resolve from one that"
-                    + " serves the published bytes";
-        }
-        if (status.fingerprint() == null) {
-            return "gpg reported no validated signature for its POM";
-        }
-        String signer = ALGORITHM + "/" + status.fingerprint().toUpperCase(Locale.ROOT);
-        return signer.equalsIgnoreCase(fingerprint)
-                ? null
-                : "its POM is signed by " + signer + " but its artifact by " + fingerprint;
-    }
-
-    static Status status(List<String> lines) {
-        String fingerprint = null, failure = null;
-        for (String line : lines) {
-            if (!line.startsWith(STATUS)) {
-                continue;
-            }
-            String[] tokens = line.substring(STATUS.length()).trim().split(" ");
-            switch (tokens[0]) {
-                case "VALIDSIG" -> {
-                    if (tokens.length > 10) {
-                        fingerprint = tokens[10];
-                    } else if (tokens.length > 1) {
-                        fingerprint = tokens[1];
-                    }
-                }
-                case "BADSIG" -> failure = "the signature does not match the file";
-                case "EXPKEYSIG" -> failure = "the signing key has expired";
-                case "REVKEYSIG" -> failure = "the signing key was revoked";
-                case "NO_PUBKEY" -> failure = "the public key "
-                        + (tokens.length > 1 ? tokens[1] : "")
-                        + " is not available; obtain it, verify it against the project's published keys,"
-                        + " and import it before running pin again";
-                case "ERRSIG" -> {
-                    if (failure == null) {
-                        failure = "the signature could not be checked";
-                    }
-                }
-                default -> {
-                }
-            }
-        }
-        return new Status(fingerprint, failure);
-    }
-
-    private static void report(BuildStepContext context,
-                               SequencedMap<String, String> recorded,
-                               List<String> unsigned,
-                               List<String> skipped,
-                               List<String> violations) throws IOException {
-        StringBuilder builder = new StringBuilder();
-        if (recorded.isEmpty()) {
-            builder.append("No dependency signatures were verified.\n");
-        } else {
-            recorded.forEach((token, fingerprint) -> builder.append(token)
-                    .append(" ")
-                    .append(fingerprint)
-                    .append("\n"));
-        }
-        append(builder, "Unsigned", unsigned);
-        append(builder, "Unchecked", skipped);
-        append(builder, "Rejected", violations);
-        Files.writeString(Files.createDirectories(context.next().resolve(REPORTS + "signatures"))
-                .resolve("signatures.txt"), builder.toString());
-    }
-
-    private static void append(StringBuilder builder, String heading, List<String> entries) {
-        if (entries.isEmpty()) {
-            return;
-        }
-        builder.append("\n").append(heading).append(":\n");
-        entries.forEach(entry -> builder.append("  ").append(entry).append("\n"));
-    }
-
-    private static Set<String> internal(Set<String> identities) {
-        Set<String> internal = new LinkedHashSet<>();
-        for (String identity : identities) {
-            internal.add(identity);
-            int firstSlash = identity.indexOf('/'), lastSlash = identity.lastIndexOf('/');
-            if (firstSlash > 0 && lastSlash > firstSlash) {
-                internal.add(identity.substring(0, lastSlash));
-            }
-        }
-        return internal;
     }
 
     record Status(String fingerprint, String failure) {
