@@ -11,7 +11,7 @@ project:
       groupId: build.jenesis
       artifactId: jenesis
       version: '25'
-      mainClass: build.jenesis.Project
+      mainClass: build.jenesis.Make
 
 signing:
   active: ALWAYS
