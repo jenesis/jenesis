@@ -88,8 +88,8 @@ public class SignaturesRunTest {
     }
 
     private SequencedProperties run(Path signature, Verification verification) throws IOException {
-        new Signatures(Map.of("maven", (MavenRepository) (_, _, _, _, _, _, checksum) ->
-                Optional.ofNullable("asc".equals(checksum) && signature != null
+        new Signatures(Map.of("maven", (MavenRepository) (_, _, _, _, type, _, checksum) ->
+                Optional.ofNullable("jar".equals(type) && "asc".equals(checksum) && signature != null
                         ? RepositoryItem.ofFile(signature)
                         : null)), "")
                 .verification(verification)
@@ -116,15 +116,17 @@ public class SignaturesRunTest {
         Files.writeString(jar, "tampered bytes\n");
         assertThatThrownBy(() -> run(detached, Verification.UNPINNED))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("does not match the artifact");
+                .hasMessageContaining("does not match the file");
     }
 
     @Test
     public void rejects_a_signature_from_a_key_gpg_does_not_hold() throws Exception {
         Path stranger = Files.createDirectory(root.resolve("stranger"));
         Files.setPosixFilePermissions(stranger, PosixFilePermissions.fromString("rwx------"));
-        assertThatThrownBy(() -> new Signatures(Map.of("maven", (MavenRepository) (_, _, _, _, _, _, checksum) ->
-                Optional.ofNullable("asc".equals(checksum) ? RepositoryItem.ofFile(detached) : null)), "")
+        assertThatThrownBy(() -> new Signatures(Map.of("maven", (MavenRepository) (_, _, _, _, type, _, checksum) ->
+                Optional.ofNullable("jar".equals(type) && "asc".equals(checksum)
+                        ? RepositoryItem.ofFile(detached)
+                        : null)), "")
                 .verification(Verification.UNPINNED)
                 .factory(ProcessHandler.OfProcess.of(List.of("gpg", "--homedir", stranger.toString())))
                 .apply(Runnable::run,

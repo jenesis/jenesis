@@ -638,7 +638,9 @@ public record Project(
                           downloaded would itself need verifying. Scope is
                           set by jenesis.dependency.signature: none, unpinned (only coordinates that
                           arrive without a pin checksum), all, or strict, which additionally rejects
-                          an artifact that publishes no signature. The verifier is an ordinary forked
+                          an artifact that publishes no signature. A coordinate's POM is verified
+                          with the artifact and must carry the same signer, which closes the gap that
+                          POMs are read but never pinned. The verifier is an ordinary forked
                           tool, so process-gpg.properties adds arguments to it and jenesis.print.gpg
                           shows each invocation.
                       @jenesis.alias <module> <groupId>/<artifactId>[/<type>[/<classifier>]]

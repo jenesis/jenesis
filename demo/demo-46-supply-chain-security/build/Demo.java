@@ -118,6 +118,8 @@ public class Demo {
 
     private static String signed(Path home, Path jar) throws Exception {
         gpg(home, "--detach-sign", "--armor", "--output", jar + ".asc", jar.toString());
+        Path pom = jar.resolveSibling("lib-1.0.pom");
+        gpg(home, "--detach-sign", "--armor", "--output", pom + ".asc", pom.toString());
         Process process = new ProcessBuilder("gpg",
                 "--homedir", home.toString(),
                 "--batch", "--with-colons", "--fingerprint").redirectErrorStream(false).start();

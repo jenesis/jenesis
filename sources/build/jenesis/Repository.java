@@ -7,6 +7,10 @@ public interface Repository {
 
     Optional<RepositoryItem> fetch(Executor executor, String coordinate) throws IOException;
 
+    default Optional<RepositoryItem> signature(Executor executor, String coordinate) throws IOException {
+        return Optional.empty();
+    }
+
     default Repository prepend(Repository repository) {
         return (executor, coordinate) -> {
             Optional<RepositoryItem> candidate = repository.fetch(executor, coordinate);

@@ -60,12 +60,26 @@ public class SignaturesTest {
     }
 
     private static MavenRepository publishing(Path signature) {
-        return (_, _, _, _, _, _, checksum) -> Optional.ofNullable("asc".equals(checksum) && signature != null
-                ? RepositoryItem.ofFile(signature)
-                : null);
+        return publishing(signature, null, null);
+    }
+
+    private static MavenRepository publishing(Path signature, Path pom, Path pomSignature) {
+        return (_, _, _, _, type, _, checksum) -> {
+            Path served = switch (type) {
+                case "jar" -> "asc".equals(checksum) ? signature : null;
+                case "pom" -> "asc".equals(checksum) ? pomSignature : pom;
+                default -> null;
+            };
+            return Optional.ofNullable(served == null ? null : RepositoryItem.ofFile(served));
+        };
     }
 
     private static Function<List<String>, ProcessHandler> reporting(String... status) {
+        return reporting(List.of(status));
+    }
+
+    private static Function<List<String>, ProcessHandler> reporting(List<String>... rounds) {
+        AtomicInteger round = new AtomicInteger();
         return ProcessHandler.OfTool.of(new ToolProvider() {
             @Override
             public String name() {
@@ -74,13 +88,13 @@ public class SignaturesTest {
 
             @Override
             public int run(PrintWriter out, PrintWriter err, String... arguments) {
-                for (String line : status) {
-                    out.println(line);
-                }
-                return status.length == 0 ? 1 : 0;
+                List<String> status = rounds[Math.min(round.getAndIncrement(), rounds.length - 1)];
+                status.forEach(out::println);
+                return status.isEmpty() ? 1 : 0;
             }
         });
     }
+
 
     private static String validated(String fingerprint) {
         return "[GNUPG:] VALIDSIG " + SUBKEY + " 2026-09-11 1000 0 4 0 1 8 00 " + fingerprint;
@@ -151,7 +165,7 @@ public class SignaturesTest {
         resolved("maven/org.example/lib", "1.0", null);
         assertThatThrownBy(() -> run(step(signature("lib"), "[GNUPG:] BADSIG DEADBEEF Example")))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("does not match the artifact");
+                .hasMessageContaining("does not match the file");
     }
 
     @Test
@@ -312,5 +326,59 @@ public class SignaturesTest {
         assertThat(report())
                 .as("a lower-case declaration is the same key, not a contradiction")
                 .contains("main/maven/org.example/lib OpenPGP/" + PRIMARY);
+    }
+
+    @Test
+    public void accepts_a_pom_signed_by_the_key_that_signed_the_artifact() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        Path pom = Files.writeString(root.resolve("lib.pom"), "<project/>");
+        SequencedProperties recorded = run(new Signatures(
+                Map.of("maven", publishing(signature("lib"), pom, signature("pom"))), "")
+                .verification(Verification.UNPINNED)
+                .factory(reporting(List.of(validated(PRIMARY)), List.of(validated(PRIMARY)))));
+        assertThat(recorded.getProperty("main/maven/org.example/lib")).isEqualTo("OpenPGP/" + PRIMARY);
+    }
+
+    @Test
+    public void rejects_a_pom_signed_by_a_key_other_than_the_artifact_key() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        Path pom = Files.writeString(root.resolve("lib.pom"), "<project/>");
+        assertThatThrownBy(() -> run(new Signatures(
+                Map.of("maven", publishing(signature("lib"), pom, signature("pom"))), "")
+                .verification(Verification.UNPINNED)
+                .factory(reporting(List.of(validated(PRIMARY)), List.of(validated(SUBKEY))))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("its POM is signed by OpenPGP/" + SUBKEY)
+                .hasMessageContaining("but its artifact by OpenPGP/" + PRIMARY);
+    }
+
+    @Test
+    public void rejects_a_pom_whose_signature_does_not_match_it() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        Path pom = Files.writeString(root.resolve("lib.pom"), "<project/>");
+        assertThatThrownBy(() -> run(new Signatures(
+                Map.of("maven", publishing(signature("lib"), pom, signature("pom"))), "")
+                .verification(Verification.UNPINNED)
+                .factory(reporting(List.of(validated(PRIMARY)),
+                        List.of("[GNUPG:] BADSIG DEADBEEF Example")))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("for its POM, the signature does not match the file")
+                .hasMessageContaining("re-serialises POMs");
+    }
+
+    @Test
+    public void tolerates_an_unsigned_pom_unless_strict() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        assertThat(run(step(signature("lib"), validated(PRIMARY)))
+                .getProperty("main/maven/org.example/lib")).isEqualTo("OpenPGP/" + PRIMARY);
+    }
+
+    @Test
+    public void rejects_an_unsigned_pom_beside_a_signed_artifact_when_strict() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        assertThatThrownBy(() -> run(step(signature("lib"), validated(PRIMARY))
+                .verification(Verification.STRICT)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("its artifact is signed but its POM publishes no signature");
     }
 }
