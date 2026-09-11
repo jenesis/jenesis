@@ -223,16 +223,6 @@ public class InternalModule implements BuildExecutorModule {
             }
             info.plugins().forEach((coordinate, group) -> properties.setProperty(group + "/plugin/" + coordinate, ""));
             properties.store(context.next().resolve(BuildStep.REQUIRES));
-            // The module's own @jenesis.pin lines, then whatever the surrounding project pinned. Its own win:
-            // an internal module states the API it is written against, and the project around it may legitimately
-            // depend on a different version of the same artifact for its own reasons.
-            //
-            // Until this was written the module's pins were parsed and then dropped, so an internal module was
-            // resolved unpinned however precisely it had declared itself. Unpinned does not fail - it takes
-            // whatever the module repositories answer with, and the local one is prepended, so in practice a
-            // plugin compiled against whichever build of the tool had last been exported to ~/.jenesis. Observed
-            // downstream: two plugins pinning 0.12.0 while compiling against a local 0.0.0-LOCAL jar from three
-            // months earlier, with nothing in any log to say so.
             SequencedMap<String, String> pinned = new LinkedHashMap<>(info.versions());
             for (Map.Entry<String, SequencedMap<String, String>> variant : info.variants().entrySet()) {
                 String selected = platform.select(variant.getKey(),
