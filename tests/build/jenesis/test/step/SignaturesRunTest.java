@@ -26,6 +26,9 @@ public class SignaturesRunTest {
     private String fingerprint;
 
     static boolean gpgAvailable() {
+        if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
+            return false;
+        }
         try {
             return new ProcessBuilder("gpg", "--version")
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)

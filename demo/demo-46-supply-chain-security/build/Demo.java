@@ -24,6 +24,11 @@ public class Demo {
         // A checksum only proves the bytes did not change since they were vetted.
         // The rest of this demo is about who produced them in the first place, which
         // no hash can answer, and which @jenesis.signature records.
+        if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
+            System.out.println("[skipped] the gpg Git for Windows ships reads --homedir as an MSYS path,"
+                    + " so this half needs a POSIX shell");
+            return;
+        }
         if (run(null, List.of("gpg", "--version")) != null) {
             System.out.println("[skipped] gpg is not installed, so signatures cannot be verified here");
             return;

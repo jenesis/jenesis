@@ -4,13 +4,7 @@ import module java.base;
 
 public enum Verification {
 
-    NONE,
-
-    UNPINNED,
-
-    ALL,
-
-    STRICT;
+    NONE, UNPINNED, ALL, STRICT;
 
     public static Verification fromProperty() {
         String property = System.getProperty("jenesis.dependency.signature");
