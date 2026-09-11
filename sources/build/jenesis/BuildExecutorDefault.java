@@ -8,6 +8,8 @@ class BuildExecutorDefault implements BuildExecutor {
             VALIDATE_ORIGINAL = Pattern.compile("[a-zA-Z0-9._%-]+"),
             VALIDATE_RESOLVED = Pattern.compile("[a-zA-Z0-9./_%-]+");
 
+    private static final ConcurrentMap<Path, FileChannel> LOCKS = new ConcurrentHashMap<>();
+
     private final Path target;
     private final Duration timeout;
     private final HashDigestFunction hash;
@@ -430,13 +432,67 @@ class BuildExecutorDefault implements BuildExecutor {
         Set<Selector> initial = Arrays.stream(selectors)
                 .map(s -> new Selector(s, false))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        return doExecute(executor, initial).thenApplyAsync(summaries -> {
-            SequencedMap<String, Path> translated = new LinkedHashMap<>();
-            for (Map.Entry<String, StepSummary> entry : summaries.entrySet()) {
-                translated.put(entry.getKey(), entry.getValue().folder());
-            }
-            return translated;
-        }, executor).whenComplete((_, throwable) -> completion.accept(null, throwable));
+        Path canonical = target.toAbsolutePath().normalize();
+        FileChannel lock = lock(canonical);
+        try {
+            return doExecute(executor, initial).thenApplyAsync(summaries -> {
+                SequencedMap<String, Path> translated = new LinkedHashMap<>();
+                for (Map.Entry<String, StepSummary> entry : summaries.entrySet()) {
+                    translated.put(entry.getKey(), entry.getValue().folder());
+                }
+                return translated;
+            }, executor).whenComplete((_, throwable) -> {
+                release(canonical, lock);
+                completion.accept(null, throwable);
+            });
+        } catch (RuntimeException | Error e) {
+            release(canonical, lock);
+            throw e;
+        }
+    }
+
+    private static FileChannel lock(Path canonical) {
+        FileChannel channel;
+        try {
+            channel = FileChannel.open(canonical.resolve(LOCK_MARKER),
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot open the build lock in " + canonical, e);
+        }
+        if (LOCKS.putIfAbsent(canonical, channel) != null) {
+            close(channel);
+            return null;
+        }
+        FileLock lock;
+        try {
+            lock = channel.tryLock();
+        } catch (IOException e) {
+            LOCKS.remove(canonical);
+            close(channel);
+            throw new UncheckedIOException("Cannot lock the build in " + canonical, e);
+        }
+        if (lock == null) {
+            LOCKS.remove(canonical);
+            close(channel);
+            throw new IllegalStateException("Another build process is already building " + canonical
+                    + ": concurrent builds over one target folder interfere with each other's staged steps");
+        }
+        return channel;
+    }
+
+    private static void release(Path canonical, FileChannel channel) {
+        if (channel != null) {
+            LOCKS.remove(canonical);
+            close(channel);
+        }
+    }
+
+    private static void close(FileChannel channel) {
+        try {
+            channel.close();
+        } catch (IOException _) {
+        }
     }
 
     private CompletionStage<Map<String, StepSummary>> doExecute(Executor executor, Set<Selector> selectors) {
