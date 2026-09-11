@@ -117,7 +117,8 @@ Continuous integration
   commit the result when you change one. Each job uploads its `target/` on failure.
 
 - **`.github/workflows/benchmark.yml`** is on-demand (`workflow_dispatch`) and runs `benchmark/benchmark.sh`
-  unattended on all three runners.
+  unattended on all three runners. It is where the performance figures come from: the tables land in the run
+  summary and as a per-runner artifact, so re-triggering it is the whole reproduction recipe.
 
 - **`.github/workflows/release.yml`** runs after a successful build on `main` - see below.
 

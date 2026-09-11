@@ -2,15 +2,17 @@ name: Build performance benchmarks
 
 # On-demand only: build-performance numbers are environment-sensitive, so this is
 # never run automatically. Trigger it from the Actions tab; results are written to
-# a per-OS text file and uploaded as an artifact. The default set produces every
-# table benchmark.sh knows except the full (with-tests) build, which is slow and
-# gated behind the `full` switch.
+# a per-OS text file, printed into the run summary and uploaded as an artifact.
+# These runs are the figures: a laptop measures a laptop, a workflow anyone can
+# re-trigger measures something a reader can reproduce. The default set produces
+# every table benchmark.sh knows except the full (with-tests) build, which is slow
+# and gated behind the `full` switch.
 on:
   workflow_dispatch:
     inputs:
       tables:
-        description: 'Tables to run (space-separated subset of: launch compile maven pinning aot)'
-        default: 'launch compile maven pinning aot'
+        description: 'Tables to run (space-separated subset of: launch make compile maven pinning aot bootstrap)'
+        default: 'launch make compile maven pinning aot bootstrap'
       full:
         description: 'Also run the full build with the whole test suite (slow, adds ~15-20 min per runner)'
         type: boolean
@@ -20,7 +22,7 @@ on:
         default: '3.9.9'
       maven4_version:
         description: 'Maven 4 version to download for the maven3-vs-4 table'
-        default: '4.0.0-rc-5'
+        default: '4.0.0-rc-6'
       runs_cold:
         description: 'Repetitions per cold scenario'
         default: '5'
@@ -126,6 +128,7 @@ jobs:
         env:
           RUNS_COLD: ${{ inputs.runs_cold }}
           RUNS_WARM: ${{ inputs.runs_warm }}
+          MAVEN_VERSION: ${{ inputs.maven3_version }}
         run: |
           out="benchmark-${{ matrix.os }}.txt"
           {
@@ -142,6 +145,21 @@ jobs:
           for t in $TABLES; do
             bash benchmark/benchmark.sh "$t" 2>&1 | tee -a "$out"
           done
+
+      # The run page carries the tables itself, so a reader compares runners without
+      # downloading three artifacts and a re-trigger is the whole reproduction recipe.
+      - name: Publish results to the run summary
+        if: always()
+        shell: bash
+        run: |
+          out="benchmark-${{ matrix.os }}.txt"
+          [ -f "$out" ] || exit 0
+          {
+            echo "### ${{ matrix.os }} (${{ runner.arch }})"
+            echo '```'
+            cat "$out"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload results
         if: always()
