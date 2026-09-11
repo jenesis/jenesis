@@ -34,6 +34,10 @@ files:
     - path: 'target/stage/maven/output/build/jenesis/build.jenesis/{{projectVersion}}/build.jenesis-{{projectVersion}}.jar'
     - path: 'target/stage/maven/output/build/jenesis/build.jenesis/{{projectVersion}}/build.jenesis-{{projectVersion}}-sources.jar'
 
+# The packager templates live under distributions/ rather than JReleaser's default
+# src/jreleaser/distributions/, because this project has no src/ tree: the sources are
+# in sources/ and tests/, and pom.xml points Maven at those. Each override therefore
+# names its templateDirectory, and a new distribution or packager has to do the same.
 distributions:
   jenesis:
     type: JAVA_BINARY
@@ -41,6 +45,7 @@ distributions:
       - path: 'sdk/jenesis-{{projectVersion}}.zip'
     brew:
       active: ALWAYS
+      templateDirectory: distributions/jenesis/brew
       formulaName: jenesis
       repository:
         owner: jenesis
@@ -66,12 +71,14 @@ distributions:
       - path: 'sdk/jpx-{{projectVersion}}.zip'
     brew:
       active: ALWAYS
+      templateDirectory: distributions/jpx/brew
       formulaName: jpx
       repository:
         owner: jenesis
         name: homebrew-tap
     scoop:
       active: ALWAYS
+      templateDirectory: distributions/jpx/scoop
       packageName: jpx
       repository:
         owner: jenesis
