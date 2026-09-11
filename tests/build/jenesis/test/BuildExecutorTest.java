@@ -131,16 +131,31 @@ public class BuildExecutorTest implements Serializable {
                 lockFile.toString()).redirectErrorStream(true).start();
         try (BufferedReader reader = process.inputReader()) {
             assertThat(reader.readLine()).isEqualTo("locked");
-            assertThatThrownBy(() -> BuildExecutor.of(source2.resolve("target"),
+            BuildExecutor foreign = BuildExecutor.of(source2.resolve("target"),
                     Duration.ZERO,
                     hash,
                     BuildStepHashFunction.ofSerializationDigest("MD5"),
-                    BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0))
+                    BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+            assertThatThrownBy(() -> foreign.execute(Runnable::run))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Another build process is already building");
         } finally {
             process.destroyForcibly();
             process.waitFor();
+        }
+    }
+
+    @Test
+    public void releases_the_target_lock_when_a_build_completes() throws IOException {
+        Files.writeString(source.resolve("file"), "foo");
+        buildExecutor.addSource("source", source);
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        try (FileChannel channel = FileChannel.open(root.resolve(".jenesis.lock"),
+                StandardOpenOption.CREATE,
+                StandardOpenOption.WRITE)) {
+            assertThat(channel.tryLock())
+                    .as("a completed build leaves the lock for the next build, so a daemon does not hold it")
+                    .isNotNull();
         }
     }
 

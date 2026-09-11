@@ -12,8 +12,6 @@ public interface BuildExecutor {
 
     record Configuration(Duration timeout, String digest, boolean verbose, boolean rebuild, boolean aggregate, int concurrency, BuildExecutorCache cache) {
 
-        private static final ConcurrentMap<Path, FileChannel> LOCKS = new ConcurrentHashMap<>();
-
         public Configuration() {
             String location = System.getProperty("jenesis.cache.uri");
             BuildExecutorCache cache;
@@ -111,28 +109,6 @@ public interface BuildExecutor {
             });
         }
         BuildExecutor executor = new BuildExecutorDefault(target, timeout, hash, stepHash, callback, cache, aggregate, concurrency == 0 ? null : new BuildExecutorDefault.Permits(concurrency), "", Map.of());
-        Path canonical = target.toAbsolutePath().normalize();
-        FileChannel channel = FileChannel.open(target.resolve(LOCK_MARKER),
-                StandardOpenOption.CREATE,
-                StandardOpenOption.WRITE);
-        if (Configuration.LOCKS.putIfAbsent(canonical, channel) == null) {
-            FileLock lock;
-            try {
-                lock = channel.tryLock();
-            } catch (IOException e) {
-                Configuration.LOCKS.remove(canonical);
-                channel.close();
-                throw e;
-            }
-            if (lock == null) {
-                Configuration.LOCKS.remove(canonical);
-                channel.close();
-                throw new IllegalStateException("Another build process is already building " + canonical
-                        + ": concurrent builds over one target folder interfere with each other's staged steps");
-            }
-        } else {
-            channel.close();
-        }
         if (!Files.exists(target.resolve(SKIP_MARKER))) {
             Files.createFile(target.resolve(SKIP_MARKER));
         }
