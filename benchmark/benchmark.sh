@@ -132,6 +132,20 @@ stop_daemons() {
   return 0
 }
 
+# A comment appended after the final brace changes the source but not the bytecode it
+# compiles to, so every step downstream of the compile keeps its cached output and the
+# incremental figure flatters the tool: an edit to a main source came out cheaper than
+# one to a test source, because the expensive test compile was never invalidated. This
+# rewrites a field value inside the class instead, which is what a real edit does. BSD
+# date has no %N, so the value is the second plus $RANDOM rather than a nanosecond.
+edit() {
+  local file="$1" tmp="$1.benchmark"
+  { sed -e '/^    static final long EDIT = [0-9]*L;$/d' -e '$d' "$file"
+    printf '    static final long EDIT = %s%sL;\n}\n' "$(date +%s)" "$RANDOM"; } > "$tmp" \
+    && mv "$tmp" "$file"
+}
+export -f edit
+
 M_NT() { echo "$1 package -o -q -ntp -DskipTests"; }
 M_F()  { echo "$1 package -o -q -ntp"; }
 # The repository defaults to MODULAR_TO_MAVEN, which would stage a modular jar on top of
@@ -197,22 +211,22 @@ table_compile() {
   [ -x "$NATIVE_BIN" ] && bench_warm "jenesis-native" "$RUNS_WARM" "rm -rf target; $NATIVE_NT" "$NATIVE_NT"
   echo "-- one-line edit to a test source (no tool's own code changes) --"
   if git diff --quiet -- "$EDIT_TEST" 2>/dev/null; then
-    bench_warm "maven3"      "$RUNS_WARM" "git checkout -- $EDIT_TEST; rm -rf target; $m" "printf '\n//e%s\n' \"\$(date +%s%N)\">>$EDIT_TEST; $m"
-    bench_warm "jenesis-source"  "$RUNS_WARM" "git checkout -- $EDIT_TEST; rm -rf target; $SRC_NT" "printf '\n//e%s\n' \"\$(date +%s%N)\">>$EDIT_TEST; $SRC_NT"
-    bench_warm "jenesis-precompiled" "$RUNS_WARM" "git checkout -- $EDIT_TEST; rm -rf target; $JAVAC_NT" "printf '\n//e%s\n' \"\$(date +%s%N)\">>$EDIT_TEST; $JAVAC_NT"
-    bench_warm "jenesis-daemon" "$RUNS_WARM" "git checkout -- $EDIT_TEST; rm -rf target; $DAEMON_NT" "printf '\n//e%s\n' \"\$(date +%s%N)\">>$EDIT_TEST; $DAEMON_NT"
-    [ -x "$NATIVE_BIN" ] && bench_warm "jenesis-native" "$RUNS_WARM" "git checkout -- $EDIT_TEST; rm -rf target; $NATIVE_NT" "printf '\n//e%s\n' \"\$(date +%s%N)\">>$EDIT_TEST; $NATIVE_NT"
+    bench_warm "maven3"      "$RUNS_WARM" "git checkout -- $EDIT_TEST; rm -rf target; $m" "edit $EDIT_TEST; $m"
+    bench_warm "jenesis-source"  "$RUNS_WARM" "git checkout -- $EDIT_TEST; rm -rf target; $SRC_NT" "edit $EDIT_TEST; $SRC_NT"
+    bench_warm "jenesis-precompiled" "$RUNS_WARM" "git checkout -- $EDIT_TEST; rm -rf target; $JAVAC_NT" "edit $EDIT_TEST; $JAVAC_NT"
+    bench_warm "jenesis-daemon" "$RUNS_WARM" "git checkout -- $EDIT_TEST; rm -rf target; $DAEMON_NT" "edit $EDIT_TEST; $DAEMON_NT"
+    [ -x "$NATIVE_BIN" ] && bench_warm "jenesis-native" "$RUNS_WARM" "git checkout -- $EDIT_TEST; rm -rf target; $NATIVE_NT" "edit $EDIT_TEST; $NATIVE_NT"
     git checkout -- "$EDIT_TEST" 2>/dev/null
   else
     warn "skipping the test-edit table: $EDIT_TEST has uncommitted changes (commit or stash them to measure it)"
   fi
   echo "-- one-line edit to a main source (here also an engine source: jenesis-source recompiles the engine) --"
   if git diff --quiet -- "$EDIT" 2>/dev/null; then
-    bench_warm "maven3"      "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $m" "printf '\n//e%s\n' \"\$(date +%s%N)\">>$EDIT; $m"
-    bench_warm "jenesis-source"  "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $SRC_NT" "printf '\n//e%s\n' \"\$(date +%s%N)\">>$EDIT; $SRC_NT"
-    bench_warm "jenesis-precompiled" "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $JAVAC_NT" "printf '\n//e%s\n' \"\$(date +%s%N)\">>$EDIT; $JAVAC_NT"
-    bench_warm "jenesis-daemon" "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $DAEMON_NT" "printf '\n//e%s\n' \"\$(date +%s%N)\">>$EDIT; $DAEMON_NT"
-    [ -x "$NATIVE_BIN" ] && bench_warm "jenesis-native" "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $NATIVE_NT" "printf '\n//e%s\n' \"\$(date +%s%N)\">>$EDIT; $NATIVE_NT"
+    bench_warm "maven3"      "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $m" "edit $EDIT; $m"
+    bench_warm "jenesis-source"  "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $SRC_NT" "edit $EDIT; $SRC_NT"
+    bench_warm "jenesis-precompiled" "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $JAVAC_NT" "edit $EDIT; $JAVAC_NT"
+    bench_warm "jenesis-daemon" "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $DAEMON_NT" "edit $EDIT; $DAEMON_NT"
+    [ -x "$NATIVE_BIN" ] && bench_warm "jenesis-native" "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $NATIVE_NT" "edit $EDIT; $NATIVE_NT"
     git checkout -- "$EDIT" 2>/dev/null
   else
     warn "skipping the edit table: $EDIT has uncommitted changes (commit or stash them to measure it)"
@@ -296,8 +310,8 @@ table_aot() {
   bench_warm "compiled (jar) + AOT" "$RUNS_WARM" "rm -rf target; $JA" "$JA"
   echo "-- one-line edit to a main source --"
   if git diff --quiet -- "$EDIT" 2>/dev/null; then
-    bench_warm "compiled (jar)"       "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $J"  "printf '\n//e%s\n' \"\$(date +%s%N)\">>$EDIT; $J"
-    bench_warm "compiled (jar) + AOT" "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $JA" "printf '\n//e%s\n' \"\$(date +%s%N)\">>$EDIT; $JA"
+    bench_warm "compiled (jar)"       "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $J"  "edit $EDIT; $J"
+    bench_warm "compiled (jar) + AOT" "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $JA" "edit $EDIT; $JA"
     git checkout -- "$EDIT" 2>/dev/null
   else
     warn "skipping the edit rows: $EDIT has uncommitted changes (commit or stash them to measure it)"
