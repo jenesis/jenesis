@@ -88,6 +88,41 @@ to validate a change before trusting the self-hosted build again. It is a valida
 release tree, no pinning, no staging - so a green `mvn test` means the sources and tests are sound, not that
 the build tool works.
 
+Build performance
+-----------------
+
+Measured on `35e51bbc` - v0.12.0 plus the 23 commits after it - by the on-demand
+[benchmark workflow](.github/workflows/benchmark.yml) on a GitHub `ubuntu-latest` runner, with GraalVM JDK
+25.0.4 and Maven 3.9.9 ([run 34607103168](https://github.com/jenesis/jenesis/actions/runs/34607103168)). Both
+tools compile the same 166 main and 158 test sources with the tests compiled but not executed, from warm
+dependency caches; wall clock comes from `/usr/bin/time` rather than from either tool's own report, as the
+median of five cold runs and of three for the rest.
+
+| Scenario | Maven 3 | Jenesis | + daemon | native image |
+|----------|---------|---------|----------|--------------|
+| cold, empty `target/` | 16.35 s | 14.99 s | 8.39 s | 9.95 s |
+| warm no-op | 2.03 s | 0.66 s | 0.41 s | 0.12 s |
+| one-line edit to a test source | 14.20 s | 12.82 s | 6.47 s | 8.27 s |
+| one-line edit to a main source | 16.49 s | 15.15 s | 7.76 s | 10.00 s |
+| spurious `touch`, content identical | 16.43 s | 0.65 s | 0.46 s | 0.12 s |
+
+The Jenesis column is the `javac`-precompiled engine. Running it from source costs the launcher's own compile
+on top - 0.99 s of launch overhead against 0.18 s, and a full engine rebuild whenever the edited file is an
+engine source, as every main source is in this repository.
+
+The table says two different things. An ordinary edit costs about what Maven costs, because in a single-module
+project a changed main class invalidates nearly every step below it; the daemon and the native launcher are
+where the difference comes from. What the content-addressed cache buys is the last two rows - a rebuild that
+changes nothing costs 0.66 s against 2.03 s, and a file whose timestamp moved while its bytes did not costs
+0.65 s against a full 16.43 s Maven rebuild.
+
+From an empty machine, Maven downloads 9.5 MB of distribution before it can start and then pulls 31.5 MB of
+plugins into an empty repository for a 30.89 s first build. The engine is vendored source: it downloads
+nothing, compiles itself in 5.31 s, fetches 48 KB and builds in 16.38 s.
+
+This is one project on one runner class. [`benchmark/README.md`](benchmark/README.md) has the full tables,
+every platform, and what the figures do and do not support.
+
 Demos
 -----
 
@@ -117,7 +152,7 @@ Continuous integration
 
 - **`.github/workflows/benchmark.yml`** is on-demand (`workflow_dispatch`) and runs `benchmark/benchmark.sh`
   unattended on all three runners. It is where the performance figures come from: the tables land in the run
-  summary and as a per-runner artifact, so re-triggering it is the whole reproduction recipe.
+  summary and as a per-runner artifact, so re-triggering it is the whole reproduction recipe; the *Build performance* table above is one such run.
 
 - **`.github/workflows/release.yml`** runs after a successful build on `main` - see below.
 
