@@ -13,6 +13,9 @@ on:
       tables:
         description: 'Tables to run (space-separated subset of: launch make compile maven pinning aot bootstrap)'
         default: 'launch make compile maven pinning aot bootstrap'
+      runners:
+        description: 'Runners to measure, as a JSON array - narrow it to chase one platform'
+        default: '["ubuntu-latest","macos-latest","windows-latest"]'
       full:
         description: 'Also run the full build with the whole test suite (slow, adds ~15-20 min per runner)'
         type: boolean
@@ -41,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: ${{ fromJSON(inputs.runners) }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
