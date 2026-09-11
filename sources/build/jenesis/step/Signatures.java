@@ -136,7 +136,12 @@ public class Signatures extends ProcessBuildStep {
             if (coordinate.startsWith("module/") && verifiedElsewhere.contains(jar)) {
                 continue;
             }
-            Path signature = signature(executor, context, coordinate, version);
+            Repository repository = repository(coordinate);
+            if (repository == null) {
+                continue;
+            }
+            String relative = coordinate.substring(coordinate.indexOf('/') + 1) + "/" + version;
+            Path signature = materialise(executor, context, repository, relative, true);
             if (signature == null) {
                 unsigned.add(token + " " + version);
                 continue;
@@ -162,6 +167,14 @@ public class Signatures extends ProcessBuildStep {
                         + fingerprint + " to a @jenesis.signature line to accept a key rotation,"
                         + " then run pin again");
                 continue;
+            }
+            String descriptor = repository instanceof MavenRepository ? descriptor(coordinate, version) : null;
+            if (descriptor != null) {
+                String failure = descriptor(executor, context, prefix, repository, descriptor, fingerprint);
+                if (failure != null) {
+                    violations.add(token + " " + version + ": " + failure);
+                    continue;
+                }
             }
             recorded.put(token, fingerprint);
         }
@@ -337,29 +350,19 @@ public class Signatures extends ProcessBuildStep {
         return recorded;
     }
 
-    private Path signature(Executor executor, BuildStepContext context, String coordinate, String version)
-            throws IOException {
+    private Repository repository(String coordinate) {
         int slash = coordinate.indexOf('/');
-        if (slash < 1) {
-            return null;
-        }
-        Repository repository = repositories.get(Resolver.base(coordinate.substring(0, slash)));
-        if (!(repository instanceof MavenRepository maven)) {
-            return null;
-        }
-        MavenDependencyKey.Versioned parsed;
-        try {
-            parsed = MavenDependencyKey.parse(coordinate.substring(slash + 1) + "/" + version);
-        } catch (IllegalArgumentException _) {
-            return null;
-        }
-        RepositoryItem item = maven.fetch(executor,
-                parsed.key().groupId(),
-                parsed.key().artifactId(),
-                parsed.version(),
-                parsed.key().type() == null ? "jar" : parsed.key().type(),
-                parsed.key().classifier(),
-                "asc").orElse(null);
+        return slash < 1 ? null : repositories.get(Resolver.base(coordinate.substring(0, slash)));
+    }
+
+    private Path materialise(Executor executor,
+                             BuildStepContext context,
+                             Repository repository,
+                             String coordinate,
+                             boolean detached) throws IOException {
+        RepositoryItem item = (detached
+                ? repository.signature(executor, coordinate)
+                : repository.fetch(executor, coordinate)).orElse(null);
         if (item == null) {
             return null;
         }
@@ -367,11 +370,23 @@ public class Signatures extends ProcessBuildStep {
         if (file != null) {
             return file;
         }
-        Path target = Files.createTempFile(context.supplement(), "signature", ".asc");
+        Path target = Files.createTempFile(context.supplement(), "fetched", detached ? ".asc" : ".tmp");
         try (InputStream inputStream = item.toInputStream()) {
             Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
         }
         return target;
+    }
+
+    private static String descriptor(String coordinate, String version) {
+        int slash = coordinate.indexOf('/');
+        MavenDependencyKey.Versioned parsed;
+        try {
+            parsed = MavenDependencyKey.parse(coordinate.substring(slash + 1) + "/" + version);
+        } catch (IllegalArgumentException _) {
+            return null;
+        }
+        return new MavenDependencyKey(parsed.key().groupId(), parsed.key().artifactId(), "pom", null)
+                .coordinate(null, version);
     }
 
     private Status verify(Executor executor, BuildStepContext context, List<String> prefix, Path jar, Path signature)
@@ -407,6 +422,37 @@ public class Signatures extends ProcessBuildStep {
         return status;
     }
 
+    private String descriptor(Executor executor,
+                              BuildStepContext context,
+                              List<String> prefix,
+                              Repository repository,
+                              String coordinate,
+                              String fingerprint) throws IOException {
+        Path signature = materialise(executor, context, repository, coordinate, true);
+        if (signature == null) {
+            return verification == Verification.STRICT
+                    ? "its artifact is signed but its POM publishes no signature"
+                    : null;
+        }
+        Path pom = materialise(executor, context, repository, coordinate, false);
+        if (pom == null) {
+            return "a signature is published for its POM but the POM itself did not resolve";
+        }
+        Status status = verify(executor, context, prefix, pom, signature);
+        if (status.failure() != null) {
+            return "for its POM, " + status.failure()
+                    + "; a repository that re-serialises POMs invalidates them, so resolve from one that"
+                    + " serves the published bytes";
+        }
+        if (status.fingerprint() == null) {
+            return "gpg reported no validated signature for its POM";
+        }
+        String signer = ALGORITHM + "/" + status.fingerprint().toUpperCase(Locale.ROOT);
+        return signer.equalsIgnoreCase(fingerprint)
+                ? null
+                : "its POM is signed by " + signer + " but its artifact by " + fingerprint;
+    }
+
     static Status status(List<String> lines) {
         String fingerprint = null, failure = null;
         for (String line : lines) {
@@ -422,7 +468,7 @@ public class Signatures extends ProcessBuildStep {
                         fingerprint = tokens[1];
                     }
                 }
-                case "BADSIG" -> failure = "the signature does not match the artifact";
+                case "BADSIG" -> failure = "the signature does not match the file";
                 case "EXPKEYSIG" -> failure = "the signing key has expired";
                 case "REVKEYSIG" -> failure = "the signing key was revoked";
                 case "NO_PUBKEY" -> failure = "the public key "

@@ -20,6 +20,18 @@ public interface MavenRepository extends Repository {
     }
 
     @Override
+    default Optional<RepositoryItem> signature(Executor executor, String coordinate) throws IOException {
+        MavenDependencyKey.Versioned parsed = MavenDependencyKey.parse(coordinate);
+        return fetch(executor,
+                parsed.key().groupId(),
+                parsed.key().artifactId(),
+                parsed.version(),
+                parsed.key().type() == null ? "jar" : parsed.key().type(),
+                parsed.key().classifier(),
+                "asc");
+    }
+
+    @Override
     default MavenRepository cached(Path folder) {
         return folder == null ? this : caching(Repository.super.cached(folder));
     }

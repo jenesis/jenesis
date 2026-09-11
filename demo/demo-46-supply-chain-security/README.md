@@ -120,6 +120,13 @@ handful of artifacts rather than the whole closure, and the coordinates it skips
 verified when their pin was written. Pass `all` when you want the whole closure re-checked
 anyway, as the demo does for its first two signature cases.
 
+A coordinate's **POM is verified with its artifact**, and must carry the same signer. POMs are read during
+resolution but never pinned, because some servers re-serialise them and a byte checksum would then mismatch
+for no reason. A signature closes that gap directly rather than relying on strict pinning to catch what a
+tampered POM adds - at the cost that a repository which re-serialises POMs invalidates their signatures, so
+resolve from one that serves the published bytes. The demo signs both the jar and the POM, so `pin` forks gpg
+twice for the one coordinate.
+
 Verification is an ordinary forked tool: `process-gpg.properties` in the configuration
 folder adds arguments to every invocation, `jenesis.print.gpg` shows each one, and
 `jenesis.signature.command` names a different binary. A broken invocation fails loudly
