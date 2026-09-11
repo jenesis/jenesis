@@ -463,10 +463,6 @@ public class InternalModuleTest {
 
     @Test
     public void honours_the_modules_own_pin() throws IOException {
-        // Every other test here hands a repository that answers any version with the same jar, which is exactly
-        // why this went unnoticed: an internal module's @jenesis.pin lines were parsed and then dropped, so the
-        // module resolved unpinned and a version-insensitive stub could not tell the difference. This one records
-        // the coordinate it was asked for, which is where the pin either shows up or does not.
         Path source = writeModuleSource(work.resolve("plugin"),
                 """
                         /** @jenesis.pin build.jenesis 9.9.9 */
@@ -501,7 +497,6 @@ public class InternalModuleTest {
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps.get("internal/marker").resolve("out.txt")).content().isEqualTo("pinned");
-        // The version, not merely the name: unpinned asks for the bare coordinate, which is what this caught.
         assertThat(asked).isNotEmpty().allSatisfy(coordinate ->
                 assertThat(coordinate).isEqualTo("build.jenesis/9.9.9"));
     }
@@ -517,7 +512,6 @@ public class InternalModuleTest {
         return target;
     }
 
-    /** Answers like {@link #versionInsensitive}, but records every coordinate it was asked for. */
     private static Repository recording(List<String> asked, Map<String, Path> files) {
         Repository delegate = versionInsensitive(files);
         return (executor, coordinate) -> {

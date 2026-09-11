@@ -146,9 +146,6 @@ public class BuildExecutorHttpCacheTest {
 
     @Test
     public void an_empty_directory_survives_the_round_trip() throws IOException {
-        // A step that leaves an empty output directory - a staging area, a marker, somewhere a later step writes -
-        // must find it there again after a cache hit. Without a directory entry the archive simply has no record
-        // of it, so the restored tree differs from the stored one and the build fails somewhere far from the cache.
         Files.createDirectory(output.resolve("empty-dir"));
         Files.createDirectories(output.resolve("nested").resolve("deeper"));
         Files.writeString(output.resolve("nested").resolve("deeper").resolve("leaf"), "leaf");
@@ -165,8 +162,6 @@ public class BuildExecutorHttpCacheTest {
 
     @Test
     public void a_directory_entry_may_not_escape_the_target() throws IOException {
-        // The directory branch resolves through the same containment check as a file, so an archive cannot create
-        // a directory outside the output by naming one.
         BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo");
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
