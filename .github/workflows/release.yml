@@ -97,12 +97,42 @@ jobs:
           JRELEASER_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
           JRELEASER_GPG_PUBLIC_KEY: ${{ secrets.GPG_PUBLIC_KEY }}
           JRELEASER_GPG_SECRET_KEY: ${{ secrets.GPG_SECRET_KEY }}
-          JRELEASER_SDKMAN_CONSUMER_KEY: ${{ secrets.SDKMAN_CONSUMER_KEY }}
-          JRELEASER_SDKMAN_CONSUMER_TOKEN: ${{ secrets.SDKMAN_CONSUMER_TOKEN }}
-          JRELEASER_DISTRIBUTIONS_JPX_SDKMAN_CONSUMER_KEY: ${{ secrets.SDKMAN_JPX_CONSUMER_KEY }}
-          JRELEASER_DISTRIBUTIONS_JPX_SDKMAN_CONSUMER_TOKEN: ${{ secrets.SDKMAN_JPX_CONSUMER_TOKEN }}
           JRELEASER_HOMEBREW_GITHUB_TOKEN: ${{ secrets.HOMEBREW_GITHUB_TOKEN }}
           JRELEASER_SCOOP_GITHUB_TOKEN: ${{ secrets.SCOOP_GITHUB_TOKEN }}
+
+      - name: Publish the SDKMAN candidates
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          EMAIL: ${{ secrets.SDKMAN_EMAIL }}
+          PASSWORD: ${{ secrets.SDKMAN_PASSWORD }}
+        run: |
+          if [ -z "${EMAIL}" ] || [ -z "${PASSWORD}" ]; then
+            echo "No SDKMAN credentials: set the SDKMAN_EMAIL and SDKMAN_PASSWORD secrets." >&2
+            exit 1
+          fi
+          TOKEN="$(curl -sS --fail-with-body https://state.sdkman.io/login \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg email "${EMAIL}" --arg password "${PASSWORD}" \
+                    '{email: $email, password: $password}')" | jq -r '.token // empty')"
+          if [ -z "${TOKEN}" ]; then
+            echo "SDKMAN returned no token for ${EMAIL}." >&2
+            exit 1
+          fi
+          echo "::add-mask::${TOKEN}"
+          for CANDIDATE in jenesis jpx; do
+            DOWNLOAD="https://github.com/jenesis/jenesis/releases/download/v${VERSION}/${CANDIDATE}-${VERSION}.zip"
+            curl -fsIL -o /dev/null "${DOWNLOAD}"
+            curl -sS --fail-with-body -X POST https://state.sdkman.io/versions \
+              -H "Authorization: Bearer ${TOKEN}" \
+              -H 'Content-Type: application/json' \
+              -d "$(jq -n \
+                      --arg candidate "${CANDIDATE}" \
+                      --arg version "${VERSION}" \
+                      --arg url "${DOWNLOAD}" \
+                      --arg sha256sum "$(sha256sum "sdk/${CANDIDATE}-${VERSION}.zip" | cut -d' ' -f1)" \
+                      '{candidate: $candidate, version: $version, platform: "UNIVERSAL", visible: true,
+                        url: $url, sha256sum: $sha256sum, tags: ["lts", "latest"]}')"
+          done
 
       - name: Upload JReleaser logs
         if: always()

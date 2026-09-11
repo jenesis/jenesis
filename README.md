@@ -133,9 +133,20 @@ are optional:
 
 The workflow builds with `jenesis.project.version` set, then hands `target/stage/maven/output/` to
 [JReleaser](https://jreleaser.org) (`jreleaser.yml`), which signs and uploads to Maven Central, publishes the
-`sdk/jenesis-<version>.zip` distribution to SDKMAN, Homebrew and Scoop and the `sdk/jpx-<version>.zip`
-distribution to SDKMAN as the `jpx` candidate, and cuts the matching `v<version>` tag.
-`project.properties` carries the POM metadata that a module declaration cannot express.
+`sdk/jenesis-<version>.zip` and `sdk/jpx-<version>.zip` distributions to Homebrew and Scoop, and cuts the
+matching `v<version>` tag. `project.properties` carries the POM metadata that a module declaration cannot
+express. A final step publishes both archives to SDKMAN itself, against the vendor API at
+`state.sdkman.io`: it logs in with `SDKMAN_EMAIL` and `SDKMAN_PASSWORD` for a ten-minute token, then posts
+each candidate with its download URL, its SHA-256 and the `lts` and `latest` tags that make it the version
+`sdk install` resolves. The token expires quickly and the archives must already be attached to the release,
+so the step runs after JReleaser, never before it.
+
+That step exists only because JReleaser cannot reach the new API: it hardcodes `https://vendors.sdkman.io`,
+authenticates with `Consumer-Key` and `Consumer-Token` headers, and exposes no property to repoint the host,
+so a vendor account issued as an email and password cannot be used through it. When JReleaser gains support,
+the way back is to uncomment the three `sdkman` blocks in `jreleaser.yml`, delete the **Publish the SDKMAN
+candidates** step, and hand JReleaser the vendor credentials through whatever environment variables it then
+defines. Nothing else in the release depends on the choice.
 
 Credentials never enter the build: it stops at the unsigned, validated bundle.
 
