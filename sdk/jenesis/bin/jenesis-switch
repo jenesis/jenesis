@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
 # jenesis-switch: discover the Jenesis version recorded in
-# build/jenesis/jenesis.version of each target, install it via SDKMAN if
-# needed, and switch the current shell to it. Must be sourced so that
-# 'sdk use' affects the calling shell:
+# build/jenesis/jenesis.version of each target, install it if needed, and
+# switch the current shell to it. SDKMAN, Scoop and Homebrew installations are
+# all found. Must be sourced so that the switch affects the calling shell:
 #
 #     . jenesis-switch [targets...]
 #     source jenesis-switch [targets...]
@@ -17,6 +17,71 @@ if (return 0 2>/dev/null); then
 else
     _JS_SOURCED=0
 fi
+
+_jenesis_switch_locate() {
+    local home
+    for home in \
+            "${SDKMAN_DIR:-$HOME/.sdkman}/candidates/jenesis/$1" \
+            "$HOME/scoop/apps/jenesis/$1"; do
+        if [ -d "$home/bin" ]; then
+            printf '%s' "$home"
+            return 0
+        fi
+    done
+    if command -v brew >/dev/null 2>&1; then
+        home="$(brew --cellar jenesis 2>/dev/null)/$1"
+        if [ -d "$home/bin" ]; then
+            printf '%s' "$home"
+            return 0
+        fi
+        if [ -d "$home/libexec/bin" ]; then
+            printf '%s' "$home/libexec"
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# Homebrew is absent here: a formula carries the one version it was published
+# at, so it can hold a match but cannot fetch the version a project records.
+_jenesis_switch_install() {
+    if ! command -v sdk >/dev/null 2>&1; then
+        local sdkman_init="${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh"
+        if [ -s "$sdkman_init" ]; then
+            # shellcheck disable=SC1090
+            . "$sdkman_init"
+        fi
+    fi
+    if command -v sdk >/dev/null 2>&1; then
+        echo "jenesis-switch: installing Jenesis $1 via SDKMAN"
+        # Answer "n" to SDKMAN's "set as default? (Y/n)" prompt: switching is a
+        # shell-local action, the user can run 'sdk default jenesis X' separately.
+        printf 'n\n' | sdk install jenesis "$1" && return 0
+    fi
+    if command -v scoop >/dev/null 2>&1; then
+        echo "jenesis-switch: installing Jenesis $1 via Scoop"
+        scoop install "jenesis@$1" && return 0
+    fi
+    return 1
+}
+
+_jenesis_switch_path() {
+    local rest="$PATH" out="" entry
+    while [ -n "$rest" ]; do
+        entry="${rest%%:*}"
+        if [ "$rest" = "$entry" ]; then
+            rest=""
+        else
+            rest="${rest#*:}"
+        fi
+        [ "$entry" = "$1" ] && continue
+        [ -n "${_JENESIS_SWITCH_BIN:-}" ] && [ "$entry" = "$_JENESIS_SWITCH_BIN" ] && continue
+        out="${out:+$out:}$entry"
+    done
+    PATH="$1${out:+:$out}"
+    export PATH
+    _JENESIS_SWITCH_BIN="$1"
+}
 
 _jenesis_switch_main() {
     local labeled=0
@@ -67,36 +132,26 @@ _jenesis_switch_main() {
 
     echo "jenesis-switch: discovered version ${discovered_version}"
 
-    if ! command -v sdk >/dev/null 2>&1; then
-        local sdkman_init="${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh"
-        if [ -s "$sdkman_init" ]; then
-            # shellcheck disable=SC1090
-            . "$sdkman_init"
-        fi
+    local home
+    home="$(_jenesis_switch_locate "${discovered_version}")" || home=""
+    if [ -z "$home" ]; then
+        _jenesis_switch_install "${discovered_version}" || true
+        home="$(_jenesis_switch_locate "${discovered_version}")" || home=""
     fi
-    if ! command -v sdk >/dev/null 2>&1; then
-        echo "jenesis-switch: 'sdk' command not found - install SDKMAN from https://sdkman.io" >&2
+    if [ -z "$home" ]; then
+        echo "jenesis-switch: Jenesis ${discovered_version} is not installed and could not be installed - install it with 'sdk install jenesis ${discovered_version}', 'scoop install jenesis@${discovered_version}' or from https://jenesis.build" >&2
         return 1
     fi
 
-    local sdkman_dir="${SDKMAN_DIR:-$HOME/.sdkman}"
-    if [ ! -d "${sdkman_dir}/candidates/jenesis/${discovered_version}" ]; then
-        echo "jenesis-switch: installing Jenesis ${discovered_version} via SDKMAN"
-        # Answer "n" to SDKMAN's "set as default? (Y/n)" prompt: switching is a
-        # shell-local action, the user can run 'sdk default jenesis X' separately.
-        if ! printf 'n\n' | sdk install jenesis "${discovered_version}"; then
-            echo "jenesis-switch: 'sdk install jenesis ${discovered_version}' failed - version is not known to SDKMAN" >&2
+    if [ "$home" = "${SDKMAN_DIR:-$HOME/.sdkman}/candidates/jenesis/${discovered_version}" ] \
+            && command -v sdk >/dev/null 2>&1; then
+        if ! sdk use jenesis "${discovered_version}"; then
+            echo "jenesis-switch: 'sdk use jenesis ${discovered_version}' failed" >&2
             return 1
         fi
-        if [ ! -d "${sdkman_dir}/candidates/jenesis/${discovered_version}" ]; then
-            echo "jenesis-switch: jenesis ${discovered_version} not present after install - version is not known to SDKMAN" >&2
-            return 1
-        fi
-    fi
-
-    if ! sdk use jenesis "${discovered_version}"; then
-        echo "jenesis-switch: 'sdk use jenesis ${discovered_version}' failed" >&2
-        return 1
+    else
+        _jenesis_switch_path "${home}/bin"
+        echo "jenesis-switch: ${home}/bin leads PATH in this shell"
     fi
     echo "jenesis-switch: switched to Jenesis ${discovered_version}"
     return 0
@@ -104,7 +159,7 @@ _jenesis_switch_main() {
 
 if [ "$_JS_SOURCED" = "0" ]; then
     cat >&2 <<'EOM'
-jenesis-switch: this script must be sourced so that 'sdk use' takes effect
+jenesis-switch: this script must be sourced so that the switch takes effect
 in the current shell. Run it as:
 
     . jenesis-switch [targets...]
@@ -115,6 +170,6 @@ fi
 
 _jenesis_switch_main "$@"
 _jenesis_switch_rc=$?
-unset -f _jenesis_switch_main
+unset -f _jenesis_switch_main _jenesis_switch_locate _jenesis_switch_install _jenesis_switch_path
 unset _JS_SOURCED
 return $_jenesis_switch_rc

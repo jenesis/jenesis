@@ -102,10 +102,10 @@ findstr /c:"jenesis-make [selectors]" "%OUTFILE%" >nul || goto :fail
 findstr /c:"builds this project as a standard build" "%OUTFILE%" >nul || goto :fail
 findstr /c:"Neither of these executes the vendored build code" "%OUTFILE%" >nul || goto :fail
 findstr /c:"java build\jenesis\Make.java [selectors]" "%OUTFILE%" >nul || goto :fail
-findstr /c:"javac build\jenesis\Make.java" "%OUTFILE%" >nul || goto :fail
+findstr /c:"compiles the engine into .jenesis\classes" "%OUTFILE%" >nul || goto :fail
 findstr /c:"the project root at %PATCHED%" "%OUTFILE%" >nul || goto :fail
 findstr /c:"may drive it from one of its own" "%OUTFILE%" >nul || goto :fail
-findstr /c:"those commands execute unreviewed code" "%OUTFILE%" >nul || goto :fail
+findstr /c:"that command executes unreviewed code" "%OUTFILE%" >nul || goto :fail
 findstr /c:"run builds from sources you" "%OUTFILE%" >nul || goto :fail
 echo   ok
 

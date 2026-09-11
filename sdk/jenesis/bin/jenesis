@@ -38,12 +38,10 @@ may drive it from one of its own.
 
     java build/jenesis/Make.java [selectors]
 
-Source mode recompiles the engine on every invocation. To pay that once instead:
+The first such run compiles the engine into .jenesis/classes, and later runs reuse it
+until the vendored sources change.
 
-    javac build/jenesis/Make.java
-    java build.jenesis.Project [selectors]
-
-Warning: those commands execute unreviewed code with the rights of your build and can
+Warning: that command executes unreviewed code with the rights of your build and can
 break the encapsulation the released engine gives you. Only run builds from sources you
 trust.
 EOM
@@ -103,9 +101,52 @@ locate() {
     return 1
 }
 
-sdkman() {
-    command -v sdk >/dev/null 2>&1 && return 0
-    [ -s "${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh" ]
+provider() {
+    case "$JENESIS_HOME/" in
+        "${SDKMAN_DIR:-$HOME/.sdkman}/candidates/jenesis/"*) printf sdkman; return 0 ;;
+        "$HOME/scoop/apps/jenesis/"*) printf scoop; return 0 ;;
+    esac
+    local cellar
+    if command -v brew >/dev/null 2>&1; then
+        cellar="$(brew --cellar jenesis 2>/dev/null)" || cellar=""
+        if [ -n "$cellar" ]; then
+            case "$JENESIS_HOME/" in
+                "$cellar/"*) printf brew; return 0 ;;
+            esac
+        fi
+    fi
+    return 1
+}
+
+sdkmanInstall() {
+    command -v sdk >/dev/null 2>&1 || [ -s "${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh" ] || return 1
+    echo "jenesis: build/jenesis records ${1}, installing that version via SDKMAN" >&2
+    (
+        set +e
+        if ! command -v sdk >/dev/null 2>&1; then
+            # shellcheck disable=SC1090
+            . "${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh" >/dev/null 2>&1
+        fi
+        command -v sdk >/dev/null 2>&1 || exit 1
+        printf 'n\n' | sdk install jenesis "$1" >&2
+    )
+}
+
+scoopInstall() {
+    command -v scoop >/dev/null 2>&1 || return 1
+    echo "jenesis: build/jenesis records ${1}, installing that version via Scoop" >&2
+    scoop install "jenesis@$1" >&2
+}
+
+# Homebrew is missing here on purpose: a formula carries the one version it was
+# published at, so brew can hold a matching installation - locate finds it in the
+# cellar - but it cannot fetch the version a project records.
+remedy() {
+    case "$(provider || true)" in
+        scoop) printf "install it with 'scoop install jenesis@%s' or from https://jenesis.build" "$1" ;;
+        brew) printf "Homebrew carries one version per formula, so install %s with 'sdk install jenesis %s', 'scoop install jenesis@%s' or from https://jenesis.build" "$1" "$1" "$1" ;;
+        *) printf "install it with 'sdk install jenesis %s' or from https://jenesis.build" "$1" ;;
+    esac
 }
 
 digestOf() {
@@ -121,21 +162,15 @@ else
 fi
 
 TARGET_HOME="$(locate "$STAMP")" || TARGET_HOME=""
-if [ -z "$TARGET_HOME" ] && sdkman; then
-    echo "jenesis: build/jenesis records ${STAMP}, installing that version via SDKMAN" >&2
-    (
-        set +e
-        if ! command -v sdk >/dev/null 2>&1; then
-            # shellcheck disable=SC1090
-            . "${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh" >/dev/null 2>&1
-        fi
-        command -v sdk >/dev/null 2>&1 || exit 1
-        printf 'n\n' | sdk install jenesis "$STAMP" >&2
-    ) || true
+if [ -z "$TARGET_HOME" ]; then
+    case "$(provider || true)" in
+        scoop) scoopInstall "$STAMP" || sdkmanInstall "$STAMP" || true ;;
+        *) sdkmanInstall "$STAMP" || scoopInstall "$STAMP" || true ;;
+    esac
     TARGET_HOME="$(locate "$STAMP")" || TARGET_HOME=""
 fi
 if [ -z "$TARGET_HOME" ]; then
-    refuse "no installed Jenesis matches the ${STAMP} that ${VENDORED} records, and it could not be installed - install it with 'sdk install jenesis ${STAMP}' or from https://jenesis.build"
+    refuse "no installed Jenesis matches the ${STAMP} that ${VENDORED} records, and it could not be installed - $(remedy "$STAMP")"
 fi
 
 REFERENCE=""
