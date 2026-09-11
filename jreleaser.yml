@@ -51,11 +51,13 @@ distributions:
       repository:
         owner: jenesis
         name: scoop-bucket
-    sdkman:
-      active: ALWAYS
-      candidate: jenesis
-      command: MAJOR
-      releaseNotesUrl: 'https://github.com/jenesis/jenesis/releases/tag/v{{projectVersion}}'
+    # SDKMAN is published from release.yml against state.sdkman.io; JReleaser speaks only the retired vendor API.
+    # Uncomment both blocks and drop that step once JReleaser supports the new API - see README.md.
+    # sdkman:
+      # active: ALWAYS
+      # candidate: jenesis
+      # command: MAJOR
+      # releaseNotesUrl: 'https://github.com/jenesis/jenesis/releases/tag/v{{projectVersion}}'
   jpx:
     type: JAVA_BINARY
     java:
@@ -74,11 +76,11 @@ distributions:
       repository:
         owner: jenesis
         name: scoop-bucket
-    sdkman:
-      active: ALWAYS
-      candidate: jpx
-      command: MAJOR
-      releaseNotesUrl: 'https://github.com/jenesis/jenesis/releases/tag/v{{projectVersion}}'
+    # sdkman:
+      # active: ALWAYS
+      # candidate: jpx
+      # command: MAJOR
+      # releaseNotesUrl: 'https://github.com/jenesis/jenesis/releases/tag/v{{projectVersion}}'
 
 deploy:
   maven:
@@ -90,6 +92,7 @@ deploy:
         stagingRepositories:
           - target/stage/maven/output
 
-announce:
-  sdkman:
-    active: ALWAYS
+# No announce endpoint exists on state.sdkman.io.
+# announce:
+  # sdkman:
+    # active: ALWAYS
