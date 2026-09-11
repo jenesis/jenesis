@@ -2,7 +2,6 @@ package build.jenesis.daemon;
 
 import module java.base;
 import build.jenesis.HashDigestFunction;
-import build.jenesis.Project;
 
 public final class DaemonClient {
 
