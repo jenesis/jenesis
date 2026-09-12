@@ -4,12 +4,12 @@ import module java.base;
 import module org.junit.jupiter.api;
 import java.lang.module.Configuration;
 import java.util.jar.Attributes;
+import build.jenesis.BuildExecutor;
+import build.jenesis.BuildExecutorCache;
+import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
-import build.jenesis.BuildStepArgument;
-import build.jenesis.BuildStepContext;
-import build.jenesis.BuildStepResult;
-import build.jenesis.Checksum;
-import build.jenesis.ChecksumStatus;
+import build.jenesis.BuildStepHashFunction;
+import build.jenesis.HashDigestFunction;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
@@ -26,14 +26,12 @@ public class DependenciesAliasTest {
     private Path root;
     @TempDir
     private Path mavenRepoFolder, work;
-    private Path previous, next, supplement, dependencies;
+    private Path next, dependencies, build;
 
     @BeforeEach
     public void setUp() throws IOException {
-        previous = root.resolve("previous");
-        next = Files.createDirectory(root.resolve("next"));
-        supplement = Files.createDirectory(root.resolve("supplement"));
         dependencies = Files.createDirectory(root.resolve("dependencies"));
+        build = Files.createDirectory(root.resolve("build"));
     }
 
     @Test
@@ -42,10 +40,9 @@ public class DependenciesAliasTest {
         Path original = mavenRepoFolder.resolve("org/example/plain-lib/1.0/plain-lib-1.0.jar");
         byte[] bytes = Files.readAllBytes(original);
 
-        BuildStepResult result = resolve(Map.of("toolkit.lib", "org.example/plain-lib"),
+        resolve(Map.of("toolkit.lib", "org.example/plain-lib"),
                 "org.example/plain-lib/1.0");
 
-        assertThat(result.next()).isTrue();
         Path aliased = next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar");
         assertThat(aliased).exists();
         assertThat(Files.readAllBytes(aliased))
@@ -118,13 +115,11 @@ public class DependenciesAliasTest {
         plainLib();
         resolve(Map.of("toolkit.lib", "org.example/plain-lib"), "org.example/plain-lib/1.0");
         Files.delete(mavenRepoFolder.resolve("org/example/plain-lib/1.0/plain-lib-1.0.jar"));
-        previous = next;
-        next = Files.createDirectory(root.resolve("second"));
+        Files.writeString(dependencies.resolve("touch.txt"), "rerun");
 
-        BuildStepResult result = resolve(Map.of("toolkit.lib", "org.example/plain-lib"),
+        resolve(Map.of("toolkit.lib", "org.example/plain-lib"),
                 "org.example/plain-lib/1.0");
 
-        assertThat(result.next()).isTrue();
         assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar"))
                 .as("a jar renamed by a previous resolution is found again under the name it was given")
                 .exists();
@@ -151,8 +146,8 @@ public class DependenciesAliasTest {
         assertThatThrownBy(() -> resolve(Map.of("toolkit.absent", "org.example/absent-lib"),
                 "org.example/plain-lib/1.0"))
                 .as("an alias renames a jar the tree already holds, it never adds one")
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Module alias toolkit.absent declared by a local @jenesis.alias declaration"
+                .hasStackTraceContaining(IllegalArgumentException.class.getName())
+                .hasStackTraceContaining("Module alias toolkit.absent declared by a local @jenesis.alias declaration"
                         + " does not name a resolved dependency: org.example/absent-lib"
                         + " - require the target or drop the alias");
     }
@@ -169,8 +164,8 @@ public class DependenciesAliasTest {
         assertThatThrownBy(() -> resolve(Map.of("toolkit.amn", "org.example/amn-lib"),
                 "org.example/amn-lib/1.0"))
                 .as("a target that already names itself is required under that name")
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Target of module alias toolkit.amn is already the automatic module lib.target"
+                .hasStackTraceContaining(IllegalArgumentException.class.getName())
+                .hasStackTraceContaining("Target of module alias toolkit.amn is already the automatic module lib.target"
                         + " - require lib.target instead of aliasing org.example/amn-lib");
     }
 
@@ -186,8 +181,8 @@ public class DependenciesAliasTest {
 
         assertThatThrownBy(() -> resolve(Map.of("toolkit.named", "org.example/named-lib"),
                 "org.example/named-lib/1.0"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Target of module alias toolkit.named is already the named module lib.named");
+                .hasStackTraceContaining(IllegalArgumentException.class.getName())
+                .hasStackTraceContaining("Target of module alias toolkit.named is already the named module lib.named");
     }
 
     @Test
@@ -205,8 +200,8 @@ public class DependenciesAliasTest {
                 "org.example/plain-lib/1.0",
                 "org.example/named-lib/1.0"))
                 .as("two modules of one name cannot share a module path")
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Module alias toolkit.lib collides with module toolkit.lib resolved from"
+                .hasStackTraceContaining(IllegalArgumentException.class.getName())
+                .hasStackTraceContaining("Module alias toolkit.lib collides with module toolkit.lib resolved from"
                         + " maven/org.example/named-lib/1.0 - require it directly");
     }
 
@@ -218,9 +213,10 @@ public class DependenciesAliasTest {
                         "toolkit.lib", "org.example/plain-lib",
                         "toolkit.other", "org.example/plain-lib")),
                 "org.example/plain-lib/1.0"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("is aliased as both")
-                .hasMessageContaining("a jar can carry only one module name");
+                .rootCause()
+                .hasStackTraceContaining(IllegalArgumentException.class.getName())
+                .hasStackTraceContaining("is aliased as both")
+                .hasStackTraceContaining("a jar can carry only one module name");
     }
 
     @Test
@@ -237,9 +233,8 @@ public class DependenciesAliasTest {
         jarOf(Files.createDirectories(mavenRepoFolder.resolve("org/example/consumer-lib/1.0"))
                 .resolve("consumer-lib-1.0.jar"), classes, manifest);
 
-        BuildStepResult result = resolve(Map.of(), "org.example/consumer-lib/1.0");
+        resolve(Map.of(), "org.example/consumer-lib/1.0");
 
-        assertThat(result.next()).isTrue();
         assertThat(next.resolve(Dependencies.RESOLVED + "toolkit.lib-1.0.jar"))
                 .as("a declaration travels to every consumer through the manifest of the jar that made it")
                 .exists();
@@ -267,8 +262,8 @@ public class DependenciesAliasTest {
         assertThatThrownBy(() -> resolve(Map.of("toolkit.lib", "org.example/plain-lib"),
                 "org.example/consumer-lib/1.0"))
                 .as("one module name cannot describe two jars, wherever the two declarations come from")
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Module alias toolkit.lib is declared for org.example/plain-lib"
+                .hasStackTraceContaining(IllegalArgumentException.class.getName())
+                .hasStackTraceContaining("Module alias toolkit.lib is declared for org.example/plain-lib"
                         + " by a local @jenesis.alias declaration and for org.example/other-lib by");
     }
 
@@ -377,30 +372,29 @@ public class DependenciesAliasTest {
                 """.formatted(version));
     }
 
-    private BuildStepResult resolve(Map<String, String> aliases, String... coordinates) throws IOException {
+    private Path resolve(Map<String, String> aliases, String... coordinates) throws IOException {
         SequencedProperties requires = new SequencedProperties();
         for (String coordinate : coordinates) {
             requires.setProperty("main/compile/maven/" + coordinate, "");
         }
         requires.store(dependencies.resolve(BuildStep.REQUIRES));
-        Map<Path, Checksum> changed = new LinkedHashMap<>(Map.of(
-                Path.of(BuildStep.REQUIRES),
-                Checksum.of(ChecksumStatus.ADDED)));
         if (!aliases.isEmpty()) {
             SequencedProperties declared = new SequencedProperties();
             aliases.forEach((alias, token) -> declared.setProperty("main/maven/" + alias, token));
             declared.store(dependencies.resolve(BuildStep.ALIASES));
-            changed.put(Path.of(BuildStep.ALIASES), Checksum.of(ChecksumStatus.ADDED));
         }
-        return new Dependencies(
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+        executor.addSource("dependencies", dependencies);
+        executor.addModule("resolved", new Dependencies(
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {
                 })),
-                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(dependencies, changed))))
-                .toCompletableFuture()
-                .join();
+                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))), "dependencies");
+        next = executor.execute().get("resolved");
+        return next;
     }
 
     private Path app(Path modulePath, String moduleInfo, String main) throws IOException {

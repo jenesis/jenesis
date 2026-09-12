@@ -2,7 +2,12 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.BuildExecutor;
+import build.jenesis.BuildExecutorCache;
+import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
+import build.jenesis.BuildStepHashFunction;
+import build.jenesis.HashDigestFunction;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
@@ -21,14 +26,12 @@ public class DependenciesModuleClaimTest {
 
     @TempDir
     private Path root, mavenRepoFolder, work;
-    private Path previous, next, supplement, dependencies;
+    private Path next, dependencies, build;
 
     @BeforeEach
     public void setUp() throws IOException {
-        previous = root.resolve("previous");
-        next = Files.createDirectory(root.resolve("next"));
-        supplement = Files.createDirectory(root.resolve("supplement"));
         dependencies = Files.createDirectory(root.resolve("dependencies"));
+        build = Files.createDirectory(root.resolve("build"));
     }
 
     @Test
@@ -39,8 +42,8 @@ public class DependenciesModuleClaimTest {
         assertThatThrownBy(() -> resolve("org.example/one-lib/1.0", "org.example/two-lib/2.0"))
                 .as("the two are materialized under distinct file names, so only the module they declare"
                         + " shows that the module path could resolve either of them")
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("maven/org.example/one-lib/1.0 and maven/org.example/two-lib/2.0"
+                .hasStackTraceContaining(IllegalArgumentException.class.getName())
+                .hasStackTraceContaining("maven/org.example/one-lib/1.0 and maven/org.example/two-lib/2.0"
                         + " both carry module lib.shared"
                         + " - a module path resolves whichever of the two comes first,"
                         + " so drop one with @jenesis.exclude");
@@ -51,9 +54,8 @@ public class DependenciesModuleClaimTest {
         modularLib("one-lib", "1.0", "lib.one", "one");
         modularLib("two-lib", "2.0", "lib.two", "two");
 
-        BuildStepResult result = resolve("org.example/one-lib/1.0", "org.example/two-lib/2.0");
+        resolve("org.example/one-lib/1.0", "org.example/two-lib/2.0");
 
-        assertThat(result.next()).isTrue();
         assertThat(next.resolve(Dependencies.RESOLVED + "lib.one-1.0.jar")).exists();
         assertThat(next.resolve(Dependencies.RESOLVED + "lib.two-2.0.jar")).exists();
     }
@@ -106,21 +108,23 @@ public class DependenciesModuleClaimTest {
         }
     }
 
-    private BuildStepResult resolve(String... coordinates) throws IOException {
+    private Path resolve(String... coordinates) throws IOException {
         SequencedProperties requires = new SequencedProperties();
         for (String coordinate : coordinates) {
             requires.setProperty("main/compile/maven/" + coordinate, "");
         }
         requires.store(dependencies.resolve(BuildStep.REQUIRES));
-        return new Dependencies(
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+        executor.addSource("dependencies", dependencies);
+        executor.addModule("resolved", new Dependencies(
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {
                 })),
-                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(dependencies, new LinkedHashMap<>(
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED)))))))
-                .toCompletableFuture()
-                .join();
+                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))), "dependencies");
+        next = executor.execute().get("resolved");
+        return next;
     }
 }

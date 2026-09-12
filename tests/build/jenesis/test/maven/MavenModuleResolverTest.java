@@ -1,7 +1,12 @@
 package build.jenesis.test.maven;
 
 import module java.base;
+import build.jenesis.BuildExecutor;
+import build.jenesis.BuildExecutorCache;
+import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
+import build.jenesis.BuildStepHashFunction;
+import build.jenesis.HashDigestFunction;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Checksum;
@@ -747,8 +752,7 @@ public class MavenModuleResolverTest {
                     </dependencies>
                 </project>"""));
         Path folder = Files.createDirectory(workspace.resolve("dependencies"));
-        Path next = Files.createDirectory(workspace.resolve("next"));
-        Path supplement = Files.createDirectory(workspace.resolve("supplement"));
+        Path build = Files.createDirectory(workspace.resolve("build"));
         SequencedProperties requires = new SequencedProperties();
         requires.setProperty("main/compile/module/foo.bar", "");
         requires.store(folder.resolve(BuildStep.REQUIRES));
@@ -757,18 +761,18 @@ public class MavenModuleResolverTest {
         versions.setProperty("main/maven/org.transitive/lib", "2.0 " + libs.get("2.0"));
         versions.store(folder.resolve(BuildStep.VERSIONS));
 
-        new Dependencies(
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+        executor.addSource("dependencies", folder);
+        executor.addModule("resolved", new Dependencies(
                 Map.of("module", discovery,
                         "maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
                 Map.of("module", new MavenModuleResolver("maven", mavenPomResolver, discovery)))
-                .pinning(pinning).resolution()
-                .apply(Runnable::run,
-                        new BuildStepContext(workspace.resolve("previous"), next, supplement),
-                        new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(folder, Map.of(
-                                Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.VERSIONS), Checksum.of(ChecksumStatus.ADDED))))))
-                .toCompletableFuture()
-                .join();
+                .pinning(pinning), "dependencies");
+        Path next = executor.execute().get("resolved");
 
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames())

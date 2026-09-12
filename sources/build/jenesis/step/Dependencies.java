@@ -68,15 +68,13 @@ public class Dependencies implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        buildExecutor.addStep(RESOLVE, resolution(), inherited.sequencedKeySet());
+        buildExecutor.addStep(RESOLVE,
+                new Resolve(repositories, resolvers, pinning, group),
+                inherited.sequencedKeySet());
         SequencedSet<String> verified = new LinkedHashSet<>();
         verified.add(RESOLVE);
         verified.addAll(inherited.sequencedKeySet());
         buildExecutor.addStep(SIGNATURES, new Signatures(repositories), verified);
-    }
-
-    public BuildStep resolution() {
-        return new Resolve(repositories, resolvers, pinning, group);
     }
 
     @Override
