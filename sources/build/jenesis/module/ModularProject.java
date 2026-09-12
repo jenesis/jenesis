@@ -24,6 +24,7 @@ import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Javac;
+import build.jenesis.step.Signatures;
 import build.jenesis.step.Versions;
 
 import static build.jenesis.project.MultiProjectModule.ARTIFACTS;
@@ -162,6 +163,9 @@ public class ModularProject implements BuildExecutorModule {
                         depExec.addStep(ARTIFACTS,
                                 new Dependencies(mergedRepositories, resolvers).pinning(pinning),
                                 artifactInputs);
+                        depExec.addStep(MultiProjectModule.SIGNATURES,
+                                new Signatures(mergedRepositories),
+                                new LinkedHashSet<>(List.of(PREPARE, ARTIFACTS)));
                     }, dependencyDeps);
                     SequencedMap<String, String> produceDeps = new LinkedHashMap<>();
                     produceDeps.put(MultiProjectModule.IDENTIFIER_PATH + name + "/" + SOURCES, SOURCES);
@@ -345,6 +349,11 @@ public class ModularProject implements BuildExecutorModule {
                 SequencedProperties properties = new SequencedProperties();
                 versions.forEach(properties::setProperty);
                 properties.store(context.next().resolve(BuildStep.VERSIONS));
+            }
+            if (!info.signatures().isEmpty()) {
+                SequencedProperties properties = new SequencedProperties();
+                info.signatures().forEach(properties::setProperty);
+                properties.store(context.next().resolve(BuildStep.SIGNATURES));
             }
             SequencedMap<String, String> declared = new LinkedHashMap<>(info.boms());
             for (Map.Entry<String, SequencedMap<String, String>> variant : info.bomVariants().entrySet()) {

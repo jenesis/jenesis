@@ -55,6 +55,7 @@ public class ModuleInfoParser {
             SequencedMap<String, String> versions = new LinkedHashMap<>();
             SequencedMap<String, SequencedMap<String, String>> variants = new LinkedHashMap<>();
             SequencedMap<String, String> boms = new LinkedHashMap<>();
+            SequencedMap<String, String> signatures = new TreeMap<>();
             SequencedMap<String, SequencedMap<String, String>> bomVariants = new LinkedHashMap<>();
             SequencedMap<String, String> plugins = new LinkedHashMap<>();
             SequencedMap<String, String> attachments = new LinkedHashMap<>();
@@ -353,6 +354,30 @@ public class ModuleInfoParser {
                                             + "': expected no value, a module name, or 'abstract'");
                                 }
                             }
+                            case "jenesis.signature" -> {
+                                String declaration = content.replaceAll("\\s+", " ").trim();
+                                int split = declaration.indexOf(' ');
+                                if (split < 1) {
+                                    throw new IllegalArgumentException("Malformed @jenesis.signature declaration '"
+                                            + declaration
+                                            + "': expected <algorithm>/<fingerprint> <token>...");
+                                }
+                                StringJoiner tokens = new StringJoiner(" ");
+                                for (String token : declaration.substring(split + 1).split(" ")) {
+                                    if (!token.endsWith("/*")) {
+                                        tokens.add(expand("jenesis.signature", token));
+                                    } else {
+                                        String base = token.substring(0, token.length() - 2);
+                                        tokens.add(base.indexOf('/') < 0
+                                                ? group + "/maven/" + base + "/*"
+                                                : base + "/*");
+                                    }
+                                }
+                                String fingerprint = declaration.substring(0, split);
+                                String existing = signatures.get(fingerprint);
+                                signatures.put(fingerprint,
+                                        existing == null ? tokens.toString() : existing + " " + tokens);
+                            }
                             case "jenesis.main" -> {
                                 if (!content.isEmpty()) {
                                     main = content;
@@ -379,6 +404,7 @@ public class ModuleInfoParser {
                     versions,
                     variants,
                     boms,
+                    signatures,
                     bomVariants);
         }
         throw new IllegalArgumentException("Expected module-info.java to contain module information");

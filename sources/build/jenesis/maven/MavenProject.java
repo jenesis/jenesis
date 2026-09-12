@@ -23,6 +23,7 @@ import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Javac;
+import build.jenesis.step.Signatures;
 
 import static build.jenesis.BuildStep.IDENTITY;
 import static build.jenesis.project.MultiProjectModule.ARTIFACTS;
@@ -148,6 +149,9 @@ public class MavenProject implements BuildExecutorModule {
                         depExec.addStep(ARTIFACTS,
                                 new Dependencies(mergedRepositories, resolvers).pinning(pinning),
                                 artifactInputs);
+                        depExec.addStep(MultiProjectModule.SIGNATURES,
+                                new Signatures(mergedRepositories),
+                                new LinkedHashSet<>(List.of(PREPARE, ARTIFACTS)));
                     }, dependencyDeps);
                     SequencedMap<String, String> produceDeps = new LinkedHashMap<>();
                     produceDeps.put(MultiProjectModule.IDENTIFIER_PATH + name + "/" + SOURCES, SOURCES);

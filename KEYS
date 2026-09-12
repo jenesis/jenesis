@@ -5,8 +5,8 @@ Check a downloaded artifact:
     gpg --import KEYS
     gpg --verify build.jenesis-<version>.jar.asc build.jenesis-<version>.jar
 
-Declare the key to a Jenesis build, so `pin` verifies it and every later build
-enforces that verdict through the checksum it writes:
+Declare the key to a Jenesis build, which then checks every artifact it downloads
+under this coordinate against it:
 
     @jenesis.signature OpenPGP/B4AC8CDC141AF0AE468D16921DA784CCB5C46DD5 build.jenesis/*
 
