@@ -1125,7 +1125,44 @@ public class ModuleInfoParserTest {
         ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
         assertThat(info.signatures())
                 .containsEntry("OpenPGP/B4D5", "main/maven/org.example/lib main/module/some.module")
-                .containsEntry("OpenPGP/FEED", "tool/maven/org.example/other main/maven/org.example/*");
+                .containsEntry("OpenPGP/FEED", "main/maven/org.example/* tool/maven/org.example/other");
+    }
+
+    @Test
+    public void signature_tag_declares_one_coordinate_once_however_often_it_is_repeated() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.signature OpenPGP/B4D5 org.example/lib
+                 * @jenesis.signature OpenPGP/B4D5 org.example/lib org.example/other
+                 * @jenesis.signature OpenPGP/B4D5 org.example/*
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.signatures())
+                .as("declaring a key twice adds nothing the first line did not already say")
+                .containsEntry("OpenPGP/B4D5",
+                        "main/maven/org.example/* main/maven/org.example/lib main/maven/org.example/other");
+    }
+
+    @Test
+    public void signature_tag_keeps_every_key_declared_for_one_coordinate() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.signature OpenPGP/B4D5 org.example/lib
+                 * @jenesis.signature OpenPGP/CAFE org.example/lib
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.signatures())
+                .as("two keys for one coordinate is a rotation, not a contradiction")
+                .containsEntry("OpenPGP/B4D5", "main/maven/org.example/lib")
+                .containsEntry("OpenPGP/CAFE", "main/maven/org.example/lib");
     }
 
     @Test

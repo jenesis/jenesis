@@ -381,7 +381,12 @@ public class ModuleInfoParser {
                                             + declaration
                                             + "': expected <algorithm>/<fingerprint> <token>...");
                                 }
-                                StringJoiner tokens = new StringJoiner(" ");
+                                String fingerprint = declaration.substring(0, split);
+                                String existing = signatures.get(fingerprint);
+                                SequencedSet<String> tokens = new TreeSet<>();
+                                if (existing != null && !existing.isEmpty()) {
+                                    tokens.addAll(List.of(existing.split(" ")));
+                                }
                                 for (String token : declaration.substring(split + 1).split(" ")) {
                                     if (!token.endsWith("/*")) {
                                         tokens.add(expand("jenesis.signature", token));
@@ -392,10 +397,7 @@ public class ModuleInfoParser {
                                                 : base + "/*");
                                     }
                                 }
-                                String fingerprint = declaration.substring(0, split);
-                                String existing = signatures.get(fingerprint);
-                                signatures.put(fingerprint,
-                                        existing == null ? tokens.toString() : existing + " " + tokens);
+                                signatures.put(fingerprint, String.join(" ", tokens));
                             }
                             case "jenesis.main" -> {
                                 if (!content.isEmpty()) {
