@@ -171,7 +171,9 @@ a repository which re-serialises POMs invalidates their signatures, so resolve f
 that serves the published bytes. The demo signs both the jar and the POM, so it forks gpg
 twice for the one coordinate.
 
-Verification forks `gpg`, which must be installed and on the `PATH`. That is deliberate: a
+When verification is switched on - and only then - it forks `gpg`, which must then be
+installed and on the `PATH`. A build that has not enabled it needs none of this. Forking
+rather than linking is deliberate: a
 Java OpenPGP library would have to be resolved from a repository - the very thing being
 verified - and a verifier you downloaded on trust verifies nothing. It is also why a
 hardened machine for writing pins is one where the JDK and gpg are already present and
@@ -236,7 +238,10 @@ demo ships it un-run, so the supply-chain check above still has something to cat
 
 That healing power is exactly why the operation is dangerous in the wrong hands: it
 re-blesses whatever the repository currently serves, so a *swapped* artifact would be
-written in as an accepted pin just the same. This is the one build a pin cannot protect:
+written in as an accepted pin just the same. Note that `ignore` on its own verifies
+nothing - `jenesis.dependency.signature` is `none` until you set it, and declarations alone
+never switch it on, so the refresh needs both flags. This is the one build a pin cannot
+protect:
 every other build checks the bytes against a pin your project already reviewed, but the run
 that *writes* the pin has nothing to check against, so whatever arrives becomes the
 definition of correct. A signature is what still has something to say there, which is why
