@@ -1,7 +1,11 @@
 package build.jenesis.module;
 
 import module java.base;
+import module jdk.compiler;
 import build.jenesis.BuildStep;
+import javax.tools.JavaFileObject;
+import javax.tools.SimpleJavaFileObject;
+import javax.tools.ToolProvider;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
@@ -11,10 +15,6 @@ import build.jenesis.step.Inventory;
 
 public class PinModuleInfo implements BuildStep {
 
-    private static final Pattern MODULE_DECLARATION = Pattern.compile("(?m)^(open\\s+)?module\\s+");
-    private static final Pattern JAVADOC_END = Pattern.compile("\\*/\\s*$");
-    private static final Pattern PIN_TAG = Pattern.compile("^\\s*(?:///|\\*)\\s*@jenesis\\.pin\\s+(\\S+)(\\s+.*)?$");
-    private static final Pattern BOM_TAG = Pattern.compile("^\\s*(?:///|\\*)\\s*@jenesis\\.bom\\s+(\\S+)(\\s+.*)?$");
 
     private final String prefix;
     private final String path;
@@ -140,6 +140,79 @@ public class PinModuleInfo implements BuildStep {
         return dependency.checksum().isEmpty() ? null : dependency.checksum();
     }
 
+    private record Tag(String name, String token, String rest, int line) {
+    }
+
+    private record Comment(int start, int end, String prefix, List<Tag> tags) {
+    }
+
+    private record Located(int moduleStart, Comment comment) {
+    }
+
+    private static Located locate(Path file, String text) throws IOException {
+        JavacTask javac = (JavacTask) ToolProvider.getSystemJavaCompiler().getTask(
+                new PrintWriter(Writer.nullWriter()),
+                ToolProvider.getSystemJavaCompiler().getStandardFileManager(null, null, null),
+                null,
+                null,
+                null,
+                List.of(new SimpleJavaFileObject(file.toUri(), JavaFileObject.Kind.SOURCE) {
+                    @Override
+                    public CharSequence getCharContent(boolean ignoreEncodingErrors) {
+                        return text;
+                    }
+                }));
+        DocTrees docTrees = DocTrees.instance(javac);
+        DocSourcePositions positions = docTrees.getSourcePositions();
+        for (CompilationUnitTree unit : javac.parse()) {
+            ModuleTree module = unit.getModule();
+            if (module == null) {
+                continue;
+            }
+            int moduleStart = (int) positions.getStartPosition(unit, module);
+            moduleStart = text.lastIndexOf('\n', Math.max(moduleStart - 1, 0)) + 1;
+            DocCommentTree doc = docTrees.getDocCommentTree(TreePath.getPath(unit, module));
+            if (doc == null) {
+                return new Located(moduleStart, null);
+            }
+            int contentStart = (int) positions.getStartPosition(unit, doc, doc);
+            int contentEnd = (int) positions.getEndPosition(unit, doc, doc);
+            if (contentStart < 0 || contentEnd < contentStart) {
+                return new Located(moduleStart, null);
+            }
+            int start = text.lastIndexOf('\n', contentStart - 1) + 1;
+            int end = text.indexOf('\n', Math.max(contentEnd - 1, start));
+            if (end < 0) {
+                end = text.length();
+            }
+            List<Tag> tags = new ArrayList<>();
+            for (DocTree tag : doc.getBlockTags()) {
+                if (!(tag instanceof UnknownBlockTagTree unknown)) {
+                    continue;
+                }
+                int tagStart = (int) positions.getStartPosition(unit, doc, tag);
+                if (tagStart < start || tagStart > end) {
+                    continue;
+                }
+                int lineEnd = text.indexOf('\n', tagStart);
+                if (lineEnd < 0 || lineEnd > end) {
+                    lineEnd = end;
+                }
+                String content = text.substring(tagStart, lineEnd).trim();
+                content = content.substring(Math.min(content.length(),
+                        unknown.getTagName().length() + 1)).trim();
+                int space = content.indexOf(' ');
+                int line = (int) text.substring(start, tagStart).chars().filter(c -> c == '\n').count();
+                tags.add(new Tag(unknown.getTagName(),
+                        space < 0 ? content : content.substring(0, space),
+                        space < 0 ? "" : content.substring(space + 1).trim(),
+                        line));
+            }
+            return new Located(moduleStart, new Comment(start, end, text.substring(start, contentStart), tags));
+        }
+        return null;
+    }
+
     private static void updateModuleInfo(Path file,
                                          SequencedMap<String, String> entries,
                                          Set<String> covered,
@@ -147,15 +220,32 @@ public class PinModuleInfo implements BuildStep {
                                          boolean flatten,
                                          Platform platform) throws IOException {
         String existing = Files.readString(file);
-        Matcher moduleDeclarationMatcher = MODULE_DECLARATION.matcher(existing);
-        if (!moduleDeclarationMatcher.find()) {
+        Located located = locate(file, existing);
+        if (located == null) {
             throw new IllegalStateException("No module declaration found in " + file);
         }
-        int moduleStart = moduleDeclarationMatcher.start();
-        String prelude = existing.substring(0, moduleStart);
-        String body = existing.substring(moduleStart);
-        String updatedPrelude = updateJavadoc(prelude, entries, covered, references, flatten, platform);
-        String updated = updatedPrelude + body;
+        Comment comment = located.comment();
+        String updated;
+        if (comment == null) {
+            if (entries.isEmpty()) {
+                return;
+            }
+            updated = existing.substring(0, located.moduleStart())
+                    + renderJavadoc(entries)
+                    + "\n"
+                    + existing.substring(located.moduleStart());
+        } else {
+            updated = existing.substring(0, comment.start())
+                    + rewriteJavadoc(existing.substring(comment.start(), comment.end()),
+                            comment.prefix(),
+                            comment.tags(),
+                            entries,
+                            covered,
+                            references,
+                            flatten,
+                            platform)
+                    + existing.substring(comment.end());
+        }
         if (!updated.equals(existing)) {
             Files.writeString(file, updated);
         }
@@ -218,86 +308,46 @@ public class PinModuleInfo implements BuildStep {
         return internal;
     }
 
-    private static String updateJavadoc(String prelude,
-                                        SequencedMap<String, String> entries,
-                                        Set<String> covered,
-                                        SequencedMap<String, String> references,
-                                        boolean flatten,
-                                        Platform platform) {
-        int javadocEnd = -1;
-        int javadocStart = -1;
-        Matcher javadocEndMatcher = JAVADOC_END.matcher(prelude);
-        while (javadocEndMatcher.find()) {
-            javadocEnd = javadocEndMatcher.end();
-        }
-        if (javadocEnd >= 0) {
-            javadocStart = prelude.lastIndexOf("/**", javadocEnd);
-        }
-        String prefix = " * ";
-        if (javadocStart < 0 || javadocEnd < 0) {
-            int scan = prelude.length();
-            while (scan > 0 && Character.isWhitespace(prelude.charAt(scan - 1))) {
-                scan--;
-            }
-            int markdownEnd = scan, markdownStart = -1;
-            while (scan > 0) {
-                int lineStart = prelude.lastIndexOf('\n', scan - 1) + 1;
-                if (!prelude.substring(lineStart, scan).stripLeading().startsWith("///")) {
-                    break;
-                }
-                markdownStart = lineStart;
-                if (lineStart == 0) {
-                    break;
-                }
-                scan = lineStart - 1;
-            }
-            if (markdownStart < 0) {
-                if (entries.isEmpty()) {
-                    return prelude;
-                }
-                return prelude + renderJavadoc(entries) + "\n";
-            }
-            javadocStart = markdownStart;
-            javadocEnd = markdownEnd;
-            prefix = "/// ";
-        }
-        String before = prelude.substring(0, javadocStart);
-        String javadoc = prelude.substring(javadocStart, javadocEnd);
-        String after = prelude.substring(javadocEnd);
-        String rewritten = rewriteJavadoc(javadoc, prefix, entries, covered, references, flatten, platform);
-        return before + rewritten + after;
-    }
-
     private record PinLine(int index, String token, String guard) {
     }
 
     private static String rewriteJavadoc(String javadoc,
                                          String prefix,
+                                         List<Tag> located,
                                          SequencedMap<String, String> entries,
                                          Set<String> covered,
                                          SequencedMap<String, String> references,
                                          boolean flatten,
                                          Platform platform) {
         List<String> lines = new ArrayList<>(List.of(javadoc.split("\\n", -1)));
-        rewriteBoms(lines, prefix, references, flatten, platform);
-        SequencedMap<String, List<PinLine>> guarded = new LinkedHashMap<>();
-        for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
-            Matcher matcher = PIN_TAG.matcher(lines.get(lineIndex));
-            if (matcher.matches() && matcher.group(2) != null && matcher.group(2).trim().endsWith("]")) {
-                guarded.computeIfAbsent(expand(matcher.group(1)), _ -> new ArrayList<>());
-            }
-        }
-        for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
-            Matcher matcher = PIN_TAG.matcher(lines.get(lineIndex));
-            if (!matcher.matches()) {
+        SequencedMap<Integer, Tag> pinTags = new LinkedHashMap<>(), bomTags = new LinkedHashMap<>();
+        for (Tag tag : located) {
+            if (tag.line() >= lines.size()) {
                 continue;
             }
-            String key = expand(matcher.group(1));
+            switch (tag.name()) {
+                case "jenesis.pin" -> pinTags.put(tag.line(), tag);
+                case "jenesis.bom" -> bomTags.put(tag.line(), tag);
+                default -> {
+                }
+            }
+        }
+        rewriteBoms(lines, prefix, bomTags, references, flatten, platform);
+        SequencedMap<String, List<PinLine>> guarded = new LinkedHashMap<>();
+        for (Tag tag : pinTags.values()) {
+            if (tag.rest().endsWith("]")) {
+                guarded.computeIfAbsent(expand(tag.token()), _ -> new ArrayList<>());
+            }
+        }
+        for (Map.Entry<Integer, Tag> entry : pinTags.entrySet()) {
+            int lineIndex = entry.getKey();
+            Tag tag = entry.getValue();
+            String key = expand(tag.token());
             List<PinLine> pins = guarded.get(key);
             if (pins == null) {
                 continue;
             }
-            String rest = matcher.group(2) == null ? "" : matcher.group(2).trim();
+            String rest = tag.rest();
             String guard = null;
             if (rest.endsWith("]")) {
                 int bracket = rest.lastIndexOf('[');
@@ -305,7 +355,7 @@ public class PinModuleInfo implements BuildStep {
                     guard = rest.substring(bracket + 1, rest.length() - 1);
                 }
             }
-            pins.add(new PinLine(lineIndex, matcher.group(1), guard));
+            pins.add(new PinLine(lineIndex, tag.token(), guard));
         }
         SequencedMap<String, String> expanded = new LinkedHashMap<>();
         entries.forEach((key, value) -> expanded.put(expand(key), key + " " + value));
@@ -339,7 +389,7 @@ public class PinModuleInfo implements BuildStep {
             }
             PinLine winner = matched != null ? matched : fallback;
             if (winner != null) {
-                lines.set(winner.index(), " * @jenesis.pin "
+                lines.set(winner.index(), prefix + "@jenesis.pin "
                         + resolved
                         + (winner.guard() == null ? "" : " [" + winner.guard() + "]"));
             }
@@ -351,33 +401,25 @@ public class PinModuleInfo implements BuildStep {
         regenerated.addAll(covered);
         SequencedMap<String, String> merged = new TreeMap<>();
         int insertAt = -1;
-        Iterator<String> it = lines.iterator();
-        int index = 0;
-        while (it.hasNext()) {
-            String line = it.next();
-            Matcher matcher = PIN_TAG.matcher(line);
-            if (matcher.matches() && !guarded.containsKey(expand(matcher.group(1)))) {
+        List<String> kept = new ArrayList<>();
+        for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
+            Tag tag = pinTags.get(lineIndex);
+            if (tag != null && !guarded.containsKey(expand(tag.token()))) {
                 if (insertAt < 0) {
-                    insertAt = index;
+                    insertAt = kept.size();
                 }
-                if (!regenerated.contains(expand(matcher.group(1)))) {
-                    merged.putIfAbsent(matcher.group(1), matcher.group(2) == null ? "" : matcher.group(2).trim());
+                if (!regenerated.contains(expand(tag.token()))) {
+                    merged.putIfAbsent(tag.token(), tag.rest());
                 }
-                it.remove();
-            } else {
-                index++;
+                continue;
+            }
+            if (lines.get(lineIndex) != null) {
+                kept.add(lines.get(lineIndex));
             }
         }
+        lines = kept;
         if (insertAt < 0) {
-            for (int lineIndex = lines.size() - 1; lineIndex >= 0; lineIndex--) {
-                if (lines.get(lineIndex).contains("*/")) {
-                    insertAt = lineIndex;
-                    break;
-                }
-            }
-            if (insertAt < 0) {
-                insertAt = prefix.startsWith("///") ? lines.size() : Math.max(1, lines.size() - 1);
-            }
+            insertAt = lines.size();
         }
         for (Map.Entry<String, String> entry : entries.entrySet()) {
             if (guarded.containsKey(expand(entry.getKey()))) {
@@ -395,41 +437,33 @@ public class PinModuleInfo implements BuildStep {
 
     private static void rewriteBoms(List<String> lines,
                                     String prefix,
+                                    SequencedMap<Integer, Tag> bomTags,
                                     SequencedMap<String, String> references,
                                     boolean flatten,
                                     Platform platform) {
         if (flatten) {
-            Iterator<String> it = lines.iterator();
-            while (it.hasNext()) {
-                String line = it.next();
-                Matcher matcher = BOM_TAG.matcher(line);
-                if (!matcher.matches()) {
-                    continue;
-                }
-                String rest = matcher.group(2) == null ? "" : matcher.group(2).trim();
+            for (Map.Entry<Integer, Tag> entry : bomTags.entrySet()) {
+                String rest = entry.getValue().rest();
                 if (rest.endsWith("]")) {
                     int bracket = rest.lastIndexOf('[');
                     if (bracket > 0 && !rest.substring(0, bracket).trim().isEmpty()) {
                         throw new IllegalStateException("Cannot flatten platform-guarded BOM declaration: "
-                                + line.trim());
+                                + lines.get(entry.getKey()).trim());
                     }
                 }
-                it.remove();
+                lines.set(entry.getKey(), null);
             }
             return;
         }
         SequencedMap<String, List<PinLine>> declarations = new LinkedHashMap<>();
-        for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
-            Matcher matcher = BOM_TAG.matcher(lines.get(lineIndex));
-            if (!matcher.matches()) {
-                continue;
-            }
-            String token = matcher.group(1);
+        for (Map.Entry<Integer, Tag> entry : bomTags.entrySet()) {
+            int lineIndex = entry.getKey();
+            String token = entry.getValue().token();
             String last = token.substring(token.lastIndexOf('/') + 1);
             if (last.startsWith("pin-") && last.endsWith(".properties")) {
                 continue;
             }
-            String rest = matcher.group(2) == null ? "" : matcher.group(2).trim();
+            String rest = entry.getValue().rest();
             String guard = null;
             if (rest.endsWith("]")) {
                 int bracket = rest.lastIndexOf('[');

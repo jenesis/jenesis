@@ -873,4 +873,113 @@ public class PinModuleInfoTest {
                 .contains(" * @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe")
                 .doesNotContain("///");
     }
+
+    @Test
+    public void writes_a_pin_when_there_is_no_documentation_comment() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        String result = run(file);
+        assertThat(result)
+                .as("a file with no comment gets a traditional one, since there is no form to follow")
+                .contains("/**")
+                .contains(" * @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe")
+                .contains("*/");
+        assertThat(result.indexOf("/**"))
+                .as("the comment is written above the declaration it documents")
+                .isLessThan(result.indexOf("module foo"));
+    }
+
+    @Test
+    public void writes_a_pin_above_annotations_when_there_is_no_documentation_comment() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                import java.lang.Deprecated;
+
+                @Deprecated
+                open module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        String result = run(file);
+        assertThat(result.indexOf("/**"))
+                .as("the comment documents the declaration, so it precedes its annotations")
+                .isGreaterThan(result.indexOf("import"))
+                .isLessThan(result.indexOf("@Deprecated"));
+        assertThat(result).contains(" * @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe");
+    }
+
+    @Test
+    public void writes_a_pin_into_a_markdown_comment_that_has_no_tags_yet() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /// A module documented in Markdown, with prose only.
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        String result = run(file);
+        assertThat(result)
+                .as("the form is taken from the comment, not from the tags it happens to carry")
+                .contains("/// @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe")
+                .doesNotContain("/**");
+        assertThat(result).contains("/// A module documented in Markdown, with prose only.");
+    }
+
+    @Test
+    public void refreshes_a_guarded_pin_in_a_traditional_comment() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * A module documented in HTML.
+                 *
+                 * @jenesis.pin org.example/lib 0.9 SHA-256/0000 [linux]
+                 */
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        String result = run(file, Platform.of("linux"));
+        assertThat(result)
+                .as("the control for the Markdown case: a guard survives a refresh")
+                .contains(" * @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe [linux]");
+    }
+
+    @Test
+    public void refreshes_a_guarded_pin_in_a_markdown_comment() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /// A module documented in Markdown.
+                ///
+                /// @jenesis.pin org.example/lib 0.9 SHA-256/0000 [linux]
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        String result = run(file, Platform.of("linux"));
+        assertThat(result)
+                .as("a guarded line keeps its guard and its form")
+                .contains("/// @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe [linux]");
+    }
+
+    @Test
+    public void flattens_a_bom_declaration_in_a_markdown_comment() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /// A module documented in Markdown.
+                ///
+                /// @jenesis.bom org.acme/platform-bom 1.0
+                module foo {
+                }
+                """);
+        writeBomEntries(Map.of("main/maven/org.example/lib", "1.0"));
+        String result = run(file, step -> step.flatten(true));
+        assertThat(result)
+                .as("flatten removes the declaration whichever form carried it")
+                .doesNotContain("@jenesis.bom");
+        assertThat(result).contains("/// A module documented in Markdown.");
+    }
 }
