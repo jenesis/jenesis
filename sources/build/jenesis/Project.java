@@ -451,6 +451,11 @@ public record Project(
                       %{name}-Djenesis.print.fetch%{reset}     Name each artifact as it is fetched from a repository -
                                                 what a long, quiet resolve is busy with
                       %{name}-Djenesis.print.cache%{reset}     Print each step served from or written to the cache
+                      %{name}-Djenesis.print.signatures%{reset}
+                                                Name each dependency whose signature was verified with
+                                                the key that signed it, and each one no
+                                                @jenesis.signature line covers - what to declare before
+                                                moving to strict
                       %{name}-Djenesis.print.checksum%{reset}  Print each step's input and output checksums, to
                                                 see what made a step re-run
                       %{name}-Djenesis.print.progress=false%{reset}
@@ -1636,6 +1641,7 @@ public record Project(
                 print.checksum|false|Each step's input and output checksums
                 print.fetch|false|Each artifact downloaded from a repository
                 print.cache|false|Each step served from or written to the build cache
+                print.signatures|false|Each verified dependency with its signer, and each one no declaration covers
                 print.docker|true|The image notice when a build or run is containerized
                 print.jreleaser|true|The JReleaser command line when a release runs
                 dependency.pin||strict|versions|ignore; unset keeps existing pins and tolerates missing ones

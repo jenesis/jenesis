@@ -14,6 +14,7 @@ import build.jenesis.maven.MavenRepository;
 import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.Signatures;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -109,10 +110,51 @@ public class SignaturesTest {
                 .join();
     }
 
+    private String printed(Signatures signatures) throws IOException {
+        PrintStream out = System.out;
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(captured, true, StandardCharsets.UTF_8));
+        try {
+            run(signatures);
+        } finally {
+            System.setOut(out);
+        }
+        return captured.toString(StandardCharsets.UTF_8);
+    }
+
     private Signatures step(Path signature, String... status) {
         return new Signatures(Map.of("maven", publishing(signature)))
                 .verification(Verification.DECLARED)
                 .factory(reporting(status));
+    }
+
+    @Test
+    public void names_each_verified_coordinate_and_its_signer_when_asked() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThat(printed(step(signature("lib"), validated(PRIMARY)).printing(true)))
+                .as("a verified coordinate is named with the key that signed it")
+                .contains("[VERIFIED]")
+                .contains("main/maven/org.example/lib 1.0")
+                .contains("OpenPGP/" + PRIMARY);
+    }
+
+    @Test
+    public void names_each_coordinate_no_declaration_covers_when_asked() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        assertThat(printed(step(signature("lib"), validated(PRIMARY)).printing(true)))
+                .as("what is missing is what a move to strict would have to declare")
+                .contains("[UNDECLARED]")
+                .contains("main/maven/org.example/lib 1.0");
+    }
+
+    @Test
+    public void prints_nothing_unless_asked() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThat(printed(step(signature("lib"), validated(PRIMARY))))
+                .as("a quiet step stays quiet")
+                .isEmpty();
     }
 
     @Test
