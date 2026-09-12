@@ -49,6 +49,7 @@ public class AttachModuleRunTest {
         assertThat(marker).as("premain wrote its marker through the argument with a space").hasContent("attached");
         SequencedProperties index = SequencedProperties.ofFiles(root.resolve("test")
                 .resolve("dependencies")
+                .resolve("resolve")
                 .resolve("output")
                 .resolve(BuildStep.DEPENDENCIES));
         String agent = index.getProperty("main/agent/probes/probe/probe/1");
@@ -88,6 +89,7 @@ public class AttachModuleRunTest {
         assertThat(marker).hasContent("attached");
         SequencedProperties index = SequencedProperties.ofFiles(root.resolve("test")
                 .resolve("dependencies")
+                .resolve("resolve")
                 .resolve("output")
                 .resolve(BuildStep.DEPENDENCIES));
         String agent = index.getProperty("main/agent/probes/probe/probe/1");
