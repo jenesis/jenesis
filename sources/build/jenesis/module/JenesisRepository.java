@@ -54,9 +54,23 @@ public interface JenesisRepository extends Repository {
             return this;
         }
         Repository cached = Repository.super.cached(folder);
-        return (executor, module, classifier, version, type) -> cached.fetch(
-                executor,
-                coordinate(module, classifier, version, type));
+        JenesisRepository origin = this;
+        return new JenesisRepository() {
+
+            @Override
+            public Optional<RepositoryItem> fetch(Executor executor,
+                                                  String module,
+                                                  String classifier,
+                                                  String version,
+                                                  String type) throws IOException {
+                return cached.fetch(executor, coordinate(module, classifier, version, type));
+            }
+
+            @Override
+            public Optional<RepositoryItem> signature(Executor executor, String coordinate) throws IOException {
+                return cached.signature(executor, coordinate);
+            }
+        };
     }
 
     @Override

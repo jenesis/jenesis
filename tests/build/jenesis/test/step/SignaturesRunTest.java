@@ -2,19 +2,20 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SequencedProperties;
 import build.jenesis.Verification;
 import build.jenesis.maven.MavenRepository;
-import build.jenesis.step.Inventory;
 import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.Signatures;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @EnabledIf("gpgAvailable")
@@ -53,12 +54,12 @@ public class SignaturesRunTest {
         jar = Files.writeString(input.resolve("lib.jar"), "artifact bytes\n");
         detached = root.resolve("lib.jar.asc");
         gpg("--detach-sign", "--armor", "--output", detached.toString(), jar.toString());
-        SequencedProperties inventory = new SequencedProperties();
-        inventory.setProperty("module.path", "");
-        inventory.setProperty("module.dependency.0", "maven/org.example/lib/1.0 lib.jar");
-        inventory.setProperty("module.dependency.0.scope", "compile");
-        inventory.setProperty("module.dependency.0.group", "main");
-        inventory.store(input.resolve(Inventory.INVENTORY));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/compile/maven/org.example/lib/1.0", "lib.jar");
+        index.store(input.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties declarations = new SequencedProperties();
+        declarations.setProperty("OpenPGP/" + fingerprint, "main/maven/org.example/lib");
+        declarations.store(input.resolve(BuildStep.SIGNATURES));
     }
 
     private void gpg(String... arguments) throws Exception {
@@ -90,34 +91,32 @@ public class SignaturesRunTest {
         throw new IllegalStateException("No fingerprint in:\n" + output);
     }
 
-    private SequencedProperties run(Path signature, Verification verification) throws IOException {
-        new Signatures(Map.of("maven", (MavenRepository) (_, _, _, _, type, _, checksum) ->
-                Optional.ofNullable("jar".equals(type) && "asc".equals(checksum) && signature != null
-                        ? RepositoryItem.ofFile(signature)
-                        : null)), "")
-                .verification(verification)
-                .factory(ProcessHandler.OfProcess.of(List.of("gpg", "--homedir", home.toString())))
+    private void run(Path keyring) throws IOException {
+        Map<String, Repository> repositories = Map.of("maven", (MavenRepository) (_, _, _, _, type, _, checksum) ->
+                Optional.ofNullable("jar".equals(type) && "asc".equals(checksum)
+                        ? RepositoryItem.ofFile(detached)
+                        : null));
+        new Signatures(repositories)
+                .verification(Verification.DECLARED)
+                .factory(ProcessHandler.OfProcess.of(List.of("gpg", "--homedir", keyring.toString())))
                 .apply(Runnable::run,
                         new BuildStepContext(previous, next, supplement),
                         new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
                                 input,
-                                Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
+                                Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
                 .toCompletableFuture()
                 .join();
-        Path file = next.resolve(Signatures.SIGNATURES);
-        return Files.isRegularFile(file) ? SequencedProperties.ofFiles(file) : new SequencedProperties();
     }
 
     @Test
-    public void records_the_fingerprint_gpg_reports_for_a_genuine_signature() throws IOException {
-        assertThat(run(detached, Verification.UNPINNED).getProperty("main/maven/org.example/lib"))
-                .isEqualTo("OpenPGP/" + fingerprint);
+    public void accepts_the_fingerprint_gpg_reports_for_a_genuine_signature() {
+        assertThatCode(() -> run(home)).doesNotThrowAnyException();
     }
 
     @Test
     public void rejects_an_artifact_whose_bytes_changed_after_signing() throws Exception {
         Files.writeString(jar, "tampered bytes\n");
-        assertThatThrownBy(() -> run(detached, Verification.UNPINNED))
+        assertThatThrownBy(() -> run(home))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("does not match the file");
     }
@@ -126,19 +125,6 @@ public class SignaturesRunTest {
     public void rejects_a_signature_from_a_key_gpg_does_not_hold() throws Exception {
         Path stranger = Files.createDirectory(root.resolve("stranger"));
         Files.setPosixFilePermissions(stranger, PosixFilePermissions.fromString("rwx------"));
-        assertThatThrownBy(() -> new Signatures(Map.of("maven", (MavenRepository) (_, _, _, _, type, _, checksum) ->
-                Optional.ofNullable("jar".equals(type) && "asc".equals(checksum)
-                        ? RepositoryItem.ofFile(detached)
-                        : null)), "")
-                .verification(Verification.UNPINNED)
-                .factory(ProcessHandler.OfProcess.of(List.of("gpg", "--homedir", stranger.toString())))
-                .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
-                        new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
-                                input,
-                                Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
-                .toCompletableFuture()
-                .join())
-                .hasMessageContaining("is not available");
+        assertThatThrownBy(() -> run(stranger)).hasMessageContaining("is not available");
     }
 }

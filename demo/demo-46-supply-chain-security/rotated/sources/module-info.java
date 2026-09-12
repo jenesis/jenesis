@@ -1,7 +1,7 @@
 /**
- * A modular project declaring a key that did not sign its dependency. The signature
- * on the artifact is perfectly valid, so only the comparison against the declaration
- * below catches the substitution.
+ * A modular project declaring a key that did not sign its dependency. The signature on the
+ * artifact is perfectly valid, so only the comparison against the declaration below catches
+ * the substitution.
  *
  * @jenesis.release 25
  * @jenesis.alias org.example.lib org.example/lib

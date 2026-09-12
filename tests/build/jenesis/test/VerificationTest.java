@@ -24,8 +24,8 @@ public class VerificationTest {
 
     @Test
     public void from_property_parses_case_insensitively() {
-        System.setProperty("jenesis.dependency.signature", "unpinned");
-        assertThat(Verification.fromProperty()).isEqualTo(Verification.UNPINNED);
+        System.setProperty("jenesis.dependency.signature", "declared");
+        assertThat(Verification.fromProperty()).isEqualTo(Verification.DECLARED);
         System.setProperty("jenesis.dependency.signature", "STRICT");
         assertThat(Verification.fromProperty()).isEqualTo(Verification.STRICT);
     }

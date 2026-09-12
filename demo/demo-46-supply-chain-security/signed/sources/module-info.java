@@ -1,7 +1,7 @@
 /**
- * A modular project whose dependency carries no signature declaration yet. Running
- * {@code pin} verifies the detached signature published beside the artifact and
- * records the key it found as a {@code @jenesis.signature} tag below, for review.
+ * A modular project whose dependency is signed but for which no key is declared. Under
+ * {@code declared} it builds untouched, under {@code strict} it is rejected, and once the
+ * demo writes the signer's fingerprint in below, {@code strict} accepts it.
  *
  * @jenesis.release 25
  * @jenesis.alias org.example.lib org.example/lib

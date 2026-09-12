@@ -51,11 +51,15 @@ public interface MavenRepository extends Repository {
                                                   String type,
                                                   String classifier,
                                                   String checksum) throws IOException {
+                String coordinate = new MavenDependencyKey(groupId, artifactId, type, classifier)
+                        .coordinate(null, version);
+                if ("asc".equals(checksum)) {
+                    return cached.signature(executor, coordinate);
+                }
                 if (checksum != null) {
                     return MavenRepository.this.fetch(executor, groupId, artifactId, version, type, classifier, checksum);
                 }
-                return cached.fetch(executor,
-                        new MavenDependencyKey(groupId, artifactId, type, classifier).coordinate(null, version));
+                return cached.fetch(executor, coordinate);
             }
 
             @Override

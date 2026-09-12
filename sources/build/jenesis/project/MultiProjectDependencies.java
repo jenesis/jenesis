@@ -22,6 +22,7 @@ public class MultiProjectDependencies implements BuildStep {
                 Path.of(VERSIONS),
                 Path.of(ALIASES),
                 Path.of(BOMS),
+                Path.of(SIGNATURES),
                 Path.of(EXCLUSIONS),
                 Path.of(OVERRIDES),
                 Path.of(IDENTITY),
@@ -36,7 +37,7 @@ public class MultiProjectDependencies implements BuildStep {
         SequencedMap<String, Path> coordinates = new LinkedHashMap<>();
         SequencedMap<String, String> dependencies = new LinkedHashMap<>();
         SequencedMap<String, SequencedMap<String, String>> inherited = new LinkedHashMap<>();
-        for (String name : List.of(VERSIONS, ALIASES, BOMS, EXCLUSIONS, OVERRIDES)) {
+        for (String name : List.of(VERSIONS, ALIASES, BOMS, SIGNATURES, EXCLUSIONS, OVERRIDES)) {
             inherited.put(name, new LinkedHashMap<>());
         }
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
@@ -51,7 +52,16 @@ public class MultiProjectDependencies implements BuildStep {
                 for (Map.Entry<String, SequencedMap<String, String>> merged : inherited.entrySet()) {
                     Path file = entry.getValue().folder().resolve(merged.getKey());
                     if (Files.exists(file)) {
-                        SequencedProperties.ofFiles(file).forEachProperty(merged.getValue()::putIfAbsent);
+                        if (merged.getKey().equals(SIGNATURES)) {
+                            SequencedProperties.ofFiles(file).forEachProperty((key, value) -> merged.getValue()
+                                    .merge(key, value, (first, second) -> Stream
+                                            .concat(Stream.of(first.split(" ")), Stream.of(second.split(" ")))
+                                            .distinct()
+                                            .sorted()
+                                            .collect(Collectors.joining(" "))));
+                        } else {
+                            SequencedProperties.ofFiles(file).forEachProperty(merged.getValue()::putIfAbsent);
+                        }
                     }
                 }
             } else {

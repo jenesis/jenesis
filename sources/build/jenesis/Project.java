@@ -32,7 +32,6 @@ import build.jenesis.step.Dependencies;
 import build.jenesis.step.ImageStaging;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.ReportStaging;
-import build.jenesis.step.Signatures;
 import build.jenesis.step.Tree;
 
 public record Project(
@@ -42,7 +41,6 @@ public record Project(
         SequencedSet<Path> metadata,
         SequencedSet<Path> configuration,
         SequencedSet<Path> boms,
-        SequencedSet<Path> signatures,
         SequencedSet<Path> profiles,
         BuildExecutorCache cache,
         HashDigestFunction hashFunction,
@@ -167,9 +165,7 @@ public record Project(
             String prefix = BUILD + "/maven/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
             executor.addModule(PIN, new PinModule(project.root(),
                     "pom.xml",
-                    (path, file) -> new PinPom("maven", path, List.of(file), project.hashFunction()),
-                    project,
-                    PinPom::declaredSignatures), BUILD);
+                    (path, file) -> new PinPom("maven", path, List.of(file), project.hashFunction())), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", new Tree(), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
@@ -235,9 +231,7 @@ public record Project(
                     "modular", new JenesisModuleRepositoryExport(), BuildExecutorModule.PREVIOUS + STAGE + "/modular"), STAGE);
             String prefix = BUILD + "/modules/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
             executor.addModule(PIN, new PinModule(project.root(), "module-info.java",
-                    (path, file) -> new PinModuleInfo("module", path, List.of(file), project.hashFunction()),
-                    project,
-                    PinModuleInfo::declaredSignatures), BUILD);
+                    (path, file) -> new PinModuleInfo("module", path, List.of(file), project.hashFunction())), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", new Tree(), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
@@ -314,9 +308,7 @@ public record Project(
             executor.addModule(PIN,
                     new PinModule(project.root(),
                             "module-info.java",
-                            (path, file) -> new PinModuleInfo("module", path, List.of(file), project.hashFunction()),
-                            project,
-                            PinModuleInfo::declaredSignatures),
+                            (path, file) -> new PinModuleInfo("module", path, List.of(file), project.hashFunction())),
                     BUILD);
             executor.addStep(DEPENDENCIES, new Tree(), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
@@ -592,6 +584,8 @@ public record Project(
                       versions.properties   <group>/<repository>/<coordinate> -> <version>[ <algo>/<hex>]
                       boms.properties       bom/<...> -> [<version>[ <algo>/<hex>]] references and
                                             entry/<...> -> expanded entries; merged below versions
+                      signatures.properties <algo>/<hex> -> space-separated coordinate tokens, each
+                                            optionally ending in /* for a whole groupId
                       exclusions.properties <group>/<scope>/<repository>/<coordinate> -> comma-separated
                                             <groupId>/<artifactId>
                       inventory.properties  what staging reads: artifacts, sources, documentation,
@@ -620,29 +614,25 @@ public record Project(
                           no tests, runs none, is never staged.
                       @jenesis.pin <token> <ver> [<algo>/<hex>] [<guard>]
                           Pin a version and optionally a content checksum.
-                      @jenesis.signature <algo>/<hex> <token>... | signature-<name>.properties
-                          Record the key that signed these coordinates' artifacts - the fingerprint
-                          first, because one key normally signs many. A Maven token may end in /* to
-                          cover every artifact of one groupId; `pin` never writes such a line itself,
-                          since widening trust over a whole group is a decision to make by hand.
-                          Written by `pin`, which verifies the detached signature published beside
-                          each artifact with a local gpg and fails when the signer is not among the
-                          keys declared for that coordinate; accept a key rotation by adding the new
-                          fingerprint, not by deleting the old one. Carries no version: one line
-                          covers every release those keys sign. A build reads nothing here, so
-                          consumers need no gpg - the pins already carry the result forward. A lone
-                          signature-<name>.properties token instead reads `<algo>/<hex>=<token>...`
-                          lines from a local file in jenesis.project.signatures, so one vetted list
-                          serves many modules; `pin` keeps the reference and never expands it, and a
-                          list is never resolved from a repository, since one that had to be
-                          downloaded would itself need verifying. Scope is
-                          set by jenesis.dependency.signature, which defaults to none: unpinned checks
-                          only coordinates that arrive without a pin checksum, all checks every one, and
-                          strict additionally rejects an artifact that publishes no signature. A coordinate's POM is verified
-                          with the artifact and must carry the same signer, which closes the gap that
-                          POMs are read but never pinned. The verifier is an ordinary forked
-                          tool, so process-gpg.properties adds arguments to it and jenesis.print.gpg
-                          shows each invocation.
+                      @jenesis.signature <algo>/<hex> <token>...
+                          Declare the OpenPGP key that signs these coordinates' artifacts - the
+                          fingerprint first, because one key normally signs many. A Maven token may
+                          end in /* to cover every artifact of one groupId. Carries no version: one
+                          line covers every release that key signs, so it stays put across version
+                          bumps. Nothing writes these lines: a key is checked against the upstream
+                          project's published KEYS and added by hand, and a genuine key rotation is
+                          accepted by adding the new fingerprint rather than deleting the old one.
+                          Verification runs during dependency resolution, right after an artifact is
+                          downloaded, and only when jenesis.dependency.signature asks for it:
+                          declared verifies every coordinate a line covers, strict additionally
+                          rejects one that no line covers or that publishes no signature, and the
+                          default none verifies nothing, so a consumer who trusts the pins needs no
+                          gpg at all. A coordinate's POM is verified with its artifact and must carry
+                          the same signer, which closes the gap that POMs are read but never pinned.
+                          Key material comes from the local gpg keyring and is never fetched; an
+                          unknown key is reported rather than retrieved. The verifier is an ordinary
+                          forked tool, so jenesis.print.gpg shows each invocation and
+                          jenesis.signature.command names a different binary.
                       @jenesis.alias <module> <groupId>/<artifactId>[/<type>[/<classifier>]]
                           Require a Maven artifact under a stable module name, so a non-modular jar
                           needs no derived automatic name. Carries no version: a pin or BOM entry
@@ -775,9 +765,9 @@ public record Project(
                     coverage with -Djenesis.dependency.pin=strict; refresh with
                     -Djenesis.dependency.pin=ignore and the `pin` selector. A checksum says the bytes
                     did not change since they were vetted, not who produced them; @jenesis.signature
-                    records the OpenPGP key that signed a coordinate, and `pin` verifies the detached
-                    signature with a local gpg before writing a checksum, so a later build enforces
-                    that verdict with no gpg at all.
+                    declares the OpenPGP key that signs a coordinate, and -Djenesis.dependency.signature
+                    checks the detached signature with a local gpg as each artifact is downloaded, so
+                    the run that establishes a pin is the run that proves who produced it.
 
                     ## 13. Copy a demo: they are the recipe book
 
@@ -826,20 +816,8 @@ public record Project(
         }
     }
 
-    @FunctionalInterface
-    private interface Declarations {
-
-        SequencedMap<String, SequencedSet<String>> apply(Path file, SequencedSet<Path> locations)
-                throws IOException;
-    }
-
-    private record PinModule(Path root,
-                             String fileName,
-                             BiFunction<String, Path, BuildStep> stepFactory,
-                             Project project,
-                             Declarations declarations) implements BuildExecutorModule {
-
-        private static final String SIGNATURES = "signatures";
+    private record PinModule(Path root, String fileName, BiFunction<String, Path, BuildStep> stepFactory)
+            implements BuildExecutorModule {
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
@@ -856,40 +834,16 @@ public record Project(
                     }
                 }
             }
-            Verification verification = Verification.fromProperty();
-            Map<String, Repository> repositories = null;
             for (String path : paths) {
                 Path file = root.resolve(path).resolve(fileName);
                 if (!Files.isRegularFile(file)) {
                     continue;
                 }
-                SequencedMap<String, SequencedSet<String>> declared = verification == Verification.NONE
-                        ? new LinkedHashMap<>()
-                        : declarations.apply(file, project.signatures());
-                SequencedSet<String> predecessors = new LinkedHashSet<>(inherited.sequencedKeySet());
-                if (verification != Verification.NONE) {
-                    if (repositories == null) {
-                        repositories = pinRepositories(project);
-                    }
-                    String name = SIGNATURES + "-" + BuildExecutorModule.encode(path);
-                    buildExecutor.addStep(name,
-                            new Signatures(repositories, path).verification(verification).declared(declared),
-                            new LinkedHashSet<>(inherited.sequencedKeySet()));
-                    predecessors.add(name);
-                }
                 buildExecutor.addStep("module-" + BuildExecutorModule.encode(path),
                         stepFactory.apply(path, file),
-                        predecessors);
+                        new LinkedHashSet<>(inherited.sequencedKeySet()));
             }
         }
-    }
-
-    private static Map<String, Repository> pinRepositories(Project project) throws IOException {
-        Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
-        repositories.putIfAbsent("maven",
-                MavenDefaultRepository.of()
-                        .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
-        return Collections.unmodifiableMap(repositories);
     }
 
     private record PomAwareAssembler(MultiProjectAssembler<? super ProjectModuleDescriptor> base,
@@ -988,14 +942,6 @@ public record Project(
             resolvedBoms = new LinkedHashSet<>();
             locations(bomsOverride, resolvedRoot, resolvedConfiguration, new HashSet<>(), resolvedBoms);
         }
-        String signaturesOverride = System.getProperty("jenesis.project.signatures");
-        SequencedSet<Path> resolvedSignatures;
-        if (signaturesOverride == null) {
-            resolvedSignatures = resolvedConfiguration;
-        } else {
-            resolvedSignatures = new LinkedHashSet<>();
-            locations(signaturesOverride, resolvedRoot, resolvedConfiguration, new HashSet<>(), resolvedSignatures);
-        }
         SequencedSet<Path> resolvedProfiles = Collections.emptyNavigableSet();
         Path resolvedTarget = Path.of("target");
         String targetOverride = System.getProperty("jenesis.project.target");
@@ -1040,7 +986,6 @@ public record Project(
                 resolvedMetadata,
                 resolvedConfiguration,
                 resolvedBoms,
-                resolvedSignatures,
                 resolvedProfiles,
                 resolvedCache,
                 new HashDigestFunction(System.getProperty("jenesis.project.digest", "SHA-256")),
@@ -1095,7 +1040,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1119,31 +1063,6 @@ public record Project(
                 metadata,
                 new LinkedHashSet<>(List.of(configuration)),
                 boms,
-                signatures,
-                profiles,
-                cache,
-                hashFunction,
-                layout,
-                tests,
-                sources,
-                documentation,
-                pinning,
-                version,
-                defaultTarget,
-                assembler,
-                configurator,
-                repositories,
-                resolvers);
-    }
-
-    public Project signatures(Path... signatures) {
-        return new Project(root,
-                target,
-                artifacts,
-                metadata,
-                configuration,
-                boms,
-                new LinkedHashSet<>(List.of(signatures)),
                 profiles,
                 cache,
                 hashFunction,
@@ -1167,7 +1086,6 @@ public record Project(
                 metadata,
                 configuration,
                 new LinkedHashSet<>(List.of(boms)),
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1191,7 +1109,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 new LinkedHashSet<>(List.of(profiles)),
                 cache,
                 hashFunction,
@@ -1215,7 +1132,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1239,7 +1155,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1263,7 +1178,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1287,7 +1201,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1311,7 +1224,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1335,7 +1247,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1359,7 +1270,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1383,7 +1293,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1407,7 +1316,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1431,7 +1339,6 @@ public record Project(
                 new LinkedHashSet<>(List.of(metadata)),
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1455,7 +1362,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1479,7 +1385,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1503,7 +1408,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1527,7 +1431,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1551,7 +1454,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1575,7 +1477,6 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
-                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1632,12 +1533,11 @@ public record Project(
                 project.documentation|false|Assemble a javadoc jar for every module
                 project.version||Version stamped onto every produced artifact
                 project.digest|SHA-256|Algorithm for pin and dependency checksums
-                dependency.signature|none|Signature scope `pin` verifies: none|unpinned|all|strict
-                signature.command|gpg|Binary `pin` forks to verify detached OpenPGP signatures; process-gpg.properties adds arguments
+                dependency.signature|none|Signatures verified after download: none|declared|strict
+                signature.command|gpg|Binary forked to verify detached OpenPGP signatures
                 project.metadata||Path-separated extra metadata files
                 project.configuration|build.jenesis|Path-separated folders searched for tool configuration files; @ splices the default
                 project.boms||Path-separated locations of local pin-<name>.properties; default: the configuration folders
-                project.signatures||Path-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
                 project.docker|false|Run the whole build inside a container

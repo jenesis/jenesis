@@ -23,7 +23,7 @@ public class Demo {
 
         // A checksum only proves the bytes did not change since they were vetted.
         // The rest of this demo is about who produced them in the first place, which
-        // no hash can answer, and which @jenesis.signature records.
+        // no hash can answer, and which @jenesis.signature declares.
         if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
             System.out.println("[skipped] the gpg Git for Windows ships reads --homedir as an MSYS path,"
                     + " so this half needs a POSIX shell");
@@ -38,38 +38,40 @@ public class Demo {
         Path home = generatedKey(work);
         String fingerprint = signed(home, jar);
 
-        // 3. Nothing is declared for this coordinate yet, so pin verifies the detached
-        // signature and records the key it found, for review in the diff.
+        // 3. The declared scope verifies exactly the coordinates a declaration covers.
+        // This project declares none, so nothing is verified and the build is untouched.
+        expectSignature("signed: an undeclared coordinate is left alone under declared",
+                true, home, "declared", "signed");
+
+        // 4. Under strict, that same silence is the failure: an external coordinate no
+        // line vouches for is refused rather than resolved on trust.
+        expectSignature("signed: an undeclared coordinate under strict verification",
+                false, home, "strict", "signed");
+
+        // 5. With the signer declared, strict accepts it. The key arrives in the diff
+        // the way a pin does, for review against the project's published KEYS; here it
+        // is written in from the throwaway key generated above.
         Path declaration = Path.of("signed", "sources", "module-info.java");
         String before = Files.readString(declaration);
         try {
-            expectSignature("signed: pin records the key that signed an undeclared coordinate",
-                    true, home, "all", "signed");
-            if (!Files.readString(declaration).contains("OpenPGP/" + fingerprint)) {
-                throw new AssertionError("pin did not record OpenPGP/" + fingerprint + " in " + declaration);
-            }
+            Files.writeString(declaration, before.replace(" */",
+                    " * @jenesis.signature OpenPGP/" + fingerprint + " org.example/*\n */"));
+            expectSignature("signed: the artifact and its POM both verify against the declared key",
+                    true, home, "strict", "signed");
         } finally {
             Files.writeString(declaration, before);
         }
 
-        // 4. This project declares a different key. The signature itself is
-        // perfectly valid, so only the comparison against the declaration catches
-        // it - which is the whole point of recording the signer.
+        // 6. This project declares a different key. The signature itself is perfectly
+        // valid, so only the comparison against the declaration catches it - which is
+        // the whole point of naming the key rather than only hashing the bytes.
         expectSignature("rotated: the declared key is not the one that signed the artifact",
-                false, home, "all", "rotated");
+                false, home, "declared", "rotated");
 
-        // 5. The unpinned scope verifies only what pin is about to write fresh. This
-        // coordinate already carries a pin checksum, so nothing is re-verified and
-        // even the contradicting declaration is left alone: signatures are an
-        // update-time check, and the pin carries the earlier verdict forward.
-        expectSignature("rotated: an already-pinned coordinate is not re-verified under unpinned",
-                true, home, "unpinned", "rotated");
-
-        // 6. The same rejection, with the key taken from a local list instead of an
-        // inline declaration. A list is only ever read from disk - one fetched from a
-        // repository would itself need verifying, which is the problem being solved.
-        expectSignature("vendored: a local key list is consulted like an inline declaration",
-                false, home, "all", "vendored");
+        // 7. Verification is opt-in. Without the property the contradiction is never
+        // looked for: an ordinary build enforces the pin and needs no gpg at all.
+        expectSignature("rotated: the same contradiction is never looked for by default",
+                true, home, null, "rotated");
 
         System.out.println();
         System.out.println("Pinning blocked the unverified and the tampered dependency,");
@@ -152,16 +154,16 @@ public class Demo {
     private static void expectSignature(String description,
                                         boolean success,
                                         Path home,
-                                        String scope,
+                                        String verification,
                                         String project) throws Exception {
         Path artifacts = Files.createDirectories(Path.of("target", "artifacts").toAbsolutePath());
         List<String> command = new ArrayList<>(List.of(System.getProperty("java.home") + "/bin/java",
                 "-Djenesis.maven.uri=" + Path.of("target", "repository").toAbsolutePath().toUri(),
                 "-Djenesis.maven.local=" + artifacts));
-        if (scope != null) {
-            command.add("-Djenesis.dependency.signature=" + scope);
+        if (verification != null) {
+            command.add("-Djenesis.dependency.signature=" + verification);
         }
-        command.addAll(List.of("build/jenesis/Make.java", "pin"));
+        command.addAll(List.of("build/jenesis/Make.java", "build"));
         String failure = run(Path.of(project), command, home);
         if ((failure == null) != success) {
             throw new AssertionError("Expected "
