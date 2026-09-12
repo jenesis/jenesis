@@ -63,13 +63,11 @@ public class ModularJarResolverTest {
     }
 
     @Test
-    public void a_selected_negotiator_changes_the_dependencies_step_hash() throws IOException {
-        BuildStepHashFunction hashFunction = BuildStepHashFunction.ofSerializationDigest("SHA-256");
-        assertThat(hashFunction.hash(new Dependencies(Map.of(), Map.of(
-                "module", new ModularJarResolver(false, null, ModuleVersionNegotiator.ignore()))).resolution()))
-                .as("a resolution decided differently must not be served from the cache")
-                .isNotEqualTo(hashFunction.hash(new Dependencies(Map.of(), Map.of(
-                        "module", new ModularJarResolver(false))).resolution()));
+    public void a_selected_negotiator_changes_what_the_resolution_is_keyed_by() throws IOException {
+        assertThat(serialize(new ModularJarResolver(false, null, ModuleVersionNegotiator.ignore())))
+                .as("the resolver travels in the step's serialized form, which is its cache key,"
+                        + " so a resolution decided differently cannot be served from the cache")
+                .isNotEqualTo(serialize(new ModularJarResolver(false)));
     }
 
     private static byte[] serialize(Object value) throws IOException {

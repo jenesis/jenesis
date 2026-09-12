@@ -2,7 +2,12 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.BuildExecutor;
+import build.jenesis.BuildExecutorCache;
+import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
+import build.jenesis.BuildStepHashFunction;
+import build.jenesis.HashDigestFunction;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
@@ -20,18 +25,38 @@ import build.jenesis.step.Dependencies;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class DependenciesResolutionTest {
+public class DependenciesResolutionTest implements Serializable {
 
     @TempDir
     private Path root, artifacts;
-    private Path previous, next, supplement, dependencies;
+    private Path next, dependencies, build;
 
     @BeforeEach
     public void setUp() throws Exception {
-        previous = root.resolve("previous");
-        next = Files.createDirectory(root.resolve("next"));
-        supplement = Files.createDirectory(root.resolve("supplement"));
         dependencies = Files.createDirectory(root.resolve("dependencies"));
+        build = Files.createDirectory(root.resolve("build"));
+    }
+
+    private Path execute(Dependencies module) throws IOException {
+        return execute(module, null);
+    }
+
+    private Path execute(Dependencies module, Path spdx) throws IOException {
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+        executor.addSource("dependencies", dependencies);
+        SequencedSet<String> inputs = new LinkedHashSet<>();
+        inputs.add("dependencies");
+        if (spdx != null) {
+            executor.addSource("licenses", spdx);
+            inputs.add("licenses");
+        }
+        executor.addModule("resolved", module, inputs);
+        next = executor.execute().get("resolved");
+        return next;
     }
 
     private Repository files(Map<String, String> contents) {
@@ -71,22 +96,14 @@ public class DependenciesResolutionTest {
         properties.setProperty("main/compile/foo/qux", "");
         properties.setProperty("main/compile/foo/baz", "");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+        execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> {
                         resolved.put(prefix + "/" +descriptor, "");
                         resolved.put(prefix + "/transitive/" + descriptor, "");
                     });
                     return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-                })).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(
-                                Path.of(BuildStep.REQUIRES),
-                                Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                })));
         SequencedProperties dependencies = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(dependencies.stringPropertyNames()).containsExactlyInAnyOrder("main/compile/foo/qux",
                 "main/compile/foo/transitive/qux",
@@ -103,19 +120,11 @@ public class DependenciesResolutionTest {
         properties.setProperty("main/compile/foo/qux", "");
         properties.setProperty("tool/runtime/foo/baz", "");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+        execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
                     return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-                })).group("tool").resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(
-                                Path.of(BuildStep.REQUIRES),
-                                Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                })).group("tool"));
         assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
                 .as("a tool reads the module's requirements for its pins, but resolves only what it declares")
                 .containsExactly("tool/runtime/foo/baz");
@@ -130,19 +139,11 @@ public class DependenciesResolutionTest {
         SequencedProperties aliases = new SequencedProperties();
         aliases.setProperty("main/foo/toolkit.lib", "org.example/plain-lib");
         aliases.store(dependencies.resolve(BuildStep.ALIASES));
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+        execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
                     return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-                })).group("tool").resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(
-                                Path.of(BuildStep.REQUIRES),
-                                Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                })).group("tool"));
         assertThat(next.resolve(Dependencies.ALIASED))
                 .as("the module renames its own jars; a tool step is not the place that fails over it")
                 .doesNotExist();
@@ -158,21 +159,12 @@ public class DependenciesResolutionTest {
         exclusions.setProperty("main/compile/foo/qux", "org.example/wrong,commons-logging/commons-logging");
         exclusions.store(dependencies.resolve(BuildStep.EXCLUSIONS));
         SequencedMap<String, SequencedSet<String>> received = new LinkedHashMap<>();
-        new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+        execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
                     received.putAll(descriptors);
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
                     return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-                })).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(
-                                Path.of(BuildStep.REQUIRES),
-                                Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.EXCLUSIONS),
-                                Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+                })));
 
         assertThat(received)
                 .as("what an exclusion means is the resolver's business; the step only delivers it intact")
@@ -188,19 +180,11 @@ public class DependenciesResolutionTest {
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
         Repository streaming = (_, coordinate) -> Optional.of(
                 () -> new ByteArrayInputStream(coordinate.getBytes(StandardCharsets.UTF_8)));
-        BuildStepResult result = new Dependencies(Map.of("foo", streaming), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+        execute(new Dependencies(Map.of("foo", streaming), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
                     return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-                })).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(
-                                Path.of(BuildStep.REQUIRES),
-                                Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                })));
         assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
                 .containsExactly("main/compile/foo/qux");
     }
@@ -210,7 +194,7 @@ public class DependenciesResolutionTest {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/qux", "");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())),
+        execute(new Dependencies(Map.of("foo", files(Map.of())),
                 Map.of("foo", (executor, prefix, repositories, descriptors, bom, scope) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
@@ -221,14 +205,7 @@ public class DependenciesResolutionTest {
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
                             vertices);
-                })).resolution()
-                .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
-                        new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                                dependencies,
-                                Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED))))))
-                .toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                })));
         SequencedProperties licenses = SequencedProperties.ofFiles(next.resolve("licenses.properties"));
         assertThat(licenses.getProperty("foo/qux#0#name"))
                 .as("the declared name is captured verbatim")
@@ -250,7 +227,7 @@ public class DependenciesResolutionTest {
         Path licenses = Files.createDirectory(root.resolve("license-config"));
         Files.writeString(licenses.resolve(Dependencies.SPDX),
                 "alias/acme-license=Acme-1.0\ncategory/Acme-1.0=permissive\n");
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())),
+        execute(new Dependencies(Map.of("foo", files(Map.of())),
                 Map.of("foo", (executor, prefix, repositories, descriptors, bom, scope) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
@@ -261,15 +238,7 @@ public class DependenciesResolutionTest {
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
                             vertices);
-                })).resolution()
-                .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
-                        new LinkedHashMap<>(Map.of(
-                                "dependencies", new BuildStepArgument(dependencies,
-                                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED))),
-                                "licenses", new BuildStepArgument(licenses, Map.of()))))
-                .toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                })), licenses);
         SequencedProperties sidecar = SequencedProperties.ofFiles(next.resolve("licenses.properties"));
         assertThat(sidecar.getProperty("foo/qux#0#id"))
                 .as("a supplied license-aliases.properties file extends the built-in alias table")
@@ -286,7 +255,7 @@ public class DependenciesResolutionTest {
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
         Path licenses = Files.createDirectory(root.resolve("license-config"));
         Files.writeString(licenses.resolve(Dependencies.SPDX), "category/Apache-2.0=\n");
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())),
+        execute(new Dependencies(Map.of("foo", files(Map.of())),
                 Map.of("foo", (executor, prefix, repositories, descriptors, bom, scope) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
@@ -297,15 +266,7 @@ public class DependenciesResolutionTest {
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
                             vertices);
-                })).resolution()
-                .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
-                        new LinkedHashMap<>(Map.of(
-                                "dependencies", new BuildStepArgument(dependencies,
-                                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED))),
-                                "licenses", new BuildStepArgument(licenses, Map.of()))))
-                .toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                })), licenses);
         SequencedProperties sidecar = SequencedProperties.ofFiles(next.resolve("licenses.properties"));
         assertThat(sidecar.getProperty("foo/qux#0#id")).isEqualTo("Apache-2.0");
         assertThat(sidecar.getProperty("foo/qux#0#category"))
@@ -320,7 +281,7 @@ public class DependenciesResolutionTest {
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
         Path licenses = Files.createDirectory(root.resolve("license-config"));
         Files.writeString(licenses.resolve(Dependencies.SPDX), "bogus/apache=Apache-2.0\n");
-        BuildStep step = new Dependencies(Map.of("foo", files(Map.of())),
+        Dependencies step = new Dependencies(Map.of("foo", files(Map.of())),
                 Map.of("foo", (executor, prefix, repositories, descriptors, bom, scope) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
@@ -328,16 +289,11 @@ public class DependenciesResolutionTest {
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
                             new LinkedHashMap<>());
-                })).resolution();
-        assertThatThrownBy(() -> step.apply(Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of(
-                        "dependencies", new BuildStepArgument(dependencies,
-                                Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED))),
-                        "licenses", new BuildStepArgument(licenses, Map.of())))))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Expected key to be prefixed")
-                .hasMessageContaining("bogus/apache");
+                }));
+        assertThatThrownBy(() -> execute(step, licenses))
+                .hasStackTraceContaining(IllegalArgumentException.class.getName())
+                .hasStackTraceContaining("Expected key to be prefixed")
+                .hasStackTraceContaining("bogus/apache");
     }
 
     @Test
@@ -345,7 +301,7 @@ public class DependenciesResolutionTest {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/qux", "");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())),
+        execute(new Dependencies(Map.of("foo", files(Map.of())),
                 Map.of("foo", (executor, prefix, repositories, descriptors, bom, scope) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
@@ -355,14 +311,7 @@ public class DependenciesResolutionTest {
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(new Resolver.Edge(null, "foo/qux/1", "1", "compile", true)),
                             vertices);
-                })).resolution()
-                .apply(Runnable::run,
-                        new BuildStepContext(previous, next, supplement),
-                        new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                                dependencies,
-                                Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED))))))
-                .toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                })));
         SequencedProperties graph = SequencedProperties.ofFiles(next.resolve("graph.properties"));
         assertThat(graph.getProperty("edge/0")).isEqualTo("main\tcompile\tfoo\ttrue\tcompile\t1\t\tfoo/qux/1");
         assertThat(graph.getProperty("vertex/main/compile/foo/qux")).isEqualTo("1\tqux.module\tfalse\tfalse");
@@ -373,19 +322,11 @@ public class DependenciesResolutionTest {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("kotlinc/plugin/maven/org.jetbrains/something", "");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
-        BuildStepResult result = new Dependencies(Map.of("maven", files(Map.of())), Map.of("maven", (executor, prefix, repositories, descriptors, _, _) -> {
+        execute(new Dependencies(Map.of("maven", files(Map.of())), Map.of("maven", (executor, prefix, repositories, descriptors, _, _) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
                     return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-                })).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(
-                                Path.of(BuildStep.REQUIRES),
-                                Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                })));
         SequencedProperties resolved = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(resolved.stringPropertyNames()).containsExactly("kotlinc/plugin/maven/org.jetbrains/something");
     }
@@ -396,22 +337,14 @@ public class DependenciesResolutionTest {
         properties.setProperty("main/compile/foo/qux", "bar");
         properties.setProperty("main/compile/foo/baz", "");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+        execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> {
                 resolved.put(prefix + "/" + descriptor, "");
                 resolved.put(prefix + "/transitive/" + descriptor, "");
             });
             return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-        })).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(
-                                Path.of(BuildStep.REQUIRES),
-                                Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+        })));
         SequencedProperties dependencies = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(dependencies.stringPropertyNames()).containsExactlyInAnyOrder("main/compile/foo/qux",
                 "main/compile/foo/transitive/qux",
@@ -429,22 +362,14 @@ public class DependenciesResolutionTest {
         properties.setProperty("main/compile/foo/qux", "bar");
         properties.setProperty("main/compile/foo/baz", "");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+        execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> {
                 resolved.put(prefix + "/" + descriptor, checksum(descriptor));
                 resolved.put(prefix + "/" + "transitive/" + descriptor, checksum("transitive/" + descriptor));
             });
             return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-        })).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(
-                                Path.of(BuildStep.REQUIRES),
-                                Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+        })));
         SequencedProperties dependencies = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(dependencies.stringPropertyNames()).containsExactlyInAnyOrder("main/compile/foo/qux",
                 "main/compile/foo/transitive/qux",
@@ -465,24 +390,14 @@ public class DependenciesResolutionTest {
         SequencedProperties versions = new SequencedProperties();
         versions.setProperty("main/foo/lib", "1.0");
         versions.store(dependencies.resolve(BuildStep.VERSIONS));
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, bom, _) -> {
+        execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, bom, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> {
                 String version = bom.getOrDefault(descriptor, "FLOAT");
                 resolved.put(prefix + "/" + descriptor + "/" + version, "");
             });
             return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-        })).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(
-                                Path.of(BuildStep.REQUIRES),
-                                Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.VERSIONS),
-                                Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+        })));
         SequencedProperties dependencies = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(dependencies.stringPropertyNames())
                 .containsExactlyInAnyOrder("main/compile/foo/lib/1.0", "main/runtime/foo/lib/1.0");
@@ -497,24 +412,14 @@ public class DependenciesResolutionTest {
         SequencedProperties versions = new SequencedProperties();
         versions.setProperty("custom/foo/lib", "1.0");
         versions.store(dependencies.resolve(BuildStep.VERSIONS));
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, bom, _) -> {
+        execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, bom, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> {
                 String version = bom.getOrDefault(descriptor, "FLOAT");
                 resolved.put(prefix + "/" + descriptor + "/" + version, "");
             });
             return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-        })).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(
-                                Path.of(BuildStep.REQUIRES),
-                                Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.VERSIONS),
-                                Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+        })));
         SequencedProperties dependencies = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(dependencies.stringPropertyNames())
                 .containsExactlyInAnyOrder("custom/compile/foo/lib/1.0", "custom/extra/foo/lib/1.0");
@@ -530,24 +435,14 @@ public class DependenciesResolutionTest {
         SequencedProperties versions = new SequencedProperties();
         versions.setProperty("main/foo/lib", "1.0");
         versions.store(dependencies.resolve(BuildStep.VERSIONS));
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, bom, _) -> {
+        execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, bom, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> {
                 String version = bom.getOrDefault(descriptor, "FLOAT");
                 resolved.put(prefix + "/" + descriptor + "/" + version, "");
             });
             return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-        })).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(
-                                Path.of(BuildStep.REQUIRES),
-                                Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.VERSIONS),
-                                Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+        })));
         SequencedProperties dependencies = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(dependencies.stringPropertyNames())
                 .containsExactlyInAnyOrder("main/compile/foo/lib/1.0", "main/extra/foo/lib/1.0", "other/extra/foo/lib/FLOAT");
@@ -558,19 +453,12 @@ public class DependenciesResolutionTest {
         SequencedProperties versions = new SequencedProperties();
         versions.setProperty("bar", "1.0");
         versions.store(dependencies.resolve(BuildStep.VERSIONS));
-        BuildStep resolve = new Dependencies(Map.of("foo", Repository.empty()),
-                Map.of("foo", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>()))).resolution();
-        assertThatThrownBy(() -> resolve.apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(
-                                Path.of(BuildStep.VERSIONS),
-                                Checksum.of(ChecksumStatus.ADDED)))))))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("bar")
-                .hasMessageContaining("<group>/<repository>/<coordinate>");
+        Dependencies resolve = new Dependencies(Map.of("foo", Repository.empty()),
+                Map.of("foo", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())));
+        assertThatThrownBy(() -> execute(resolve))
+                .hasStackTraceContaining(IllegalArgumentException.class.getName())
+                .hasStackTraceContaining("bar")
+                .hasStackTraceContaining("<group>/<repository>/<coordinate>");
     }
 
     @Test
@@ -578,17 +466,12 @@ public class DependenciesResolutionTest {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/bar", "");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
-        BuildStep resolve = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+        Dependencies resolve = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, checksum("other")));
             return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-        })).resolution();
-        assertThatThrownBy(() -> resolve.apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join())
+        }));
+        assertThatThrownBy(() -> execute(resolve))
                 .hasStackTraceContaining("Mismatched digest for bar");
     }
 
@@ -603,27 +486,18 @@ public class DependenciesResolutionTest {
                     produced.get().getBytes(StandardCharsets.UTF_8));
             return Optional.of(RepositoryItem.ofFile(file, true));
         };
-        BuildStep resolve = new Dependencies(Map.of("foo", internal), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+        Dependencies resolve = new Dependencies(Map.of("foo", internal), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
             return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-        })).pinning(Pinning.STRICT).resolution();
-        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>(Map.of("dependencies",
-                new BuildStepArgument(dependencies, Map.of(
-                        Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED)))));
-        resolve.apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
-                .toCompletableFuture()
-                .join();
+        })).pinning(Pinning.STRICT);
+        execute(resolve);
 
         produced.set("second");
-        Path second = Files.createDirectory(root.resolve("second"));
-        BuildStepResult result = resolve.apply(Runnable::run,
-                        new BuildStepContext(next, second, supplement),
-                        arguments)
-                .toCompletableFuture()
-                .join();
+        properties.setProperty("main/compile/foo/baz", "");
+        properties.store(dependencies.resolve(BuildStep.REQUIRES));
+        Path second = execute(resolve);
 
-        assertThat(result.next()).isTrue();
         String entry = SequencedProperties.ofFiles(second.resolve(BuildStep.DEPENDENCIES))
                 .getProperty("main/compile/foo/bar");
         assertThat(second.resolve(entry))
@@ -636,20 +510,15 @@ public class DependenciesResolutionTest {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/bar", "");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
-        BuildStep resolve = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+        Dependencies resolve = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
             return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-        })).pinning(Pinning.STRICT).resolution();
-        assertThatThrownBy(() -> resolve.apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join())
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("No checksum pinned for foo/bar")
-                .hasMessageContaining("strict pinning");
+        })).pinning(Pinning.STRICT);
+        assertThatThrownBy(() -> execute(resolve))
+                .hasStackTraceContaining(IllegalStateException.class.getName())
+                .hasStackTraceContaining("No checksum pinned for foo/bar")
+                .hasStackTraceContaining("strict pinning");
     }
 
     @Test
@@ -657,17 +526,11 @@ public class DependenciesResolutionTest {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/bar", "");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+        execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
             return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-        })).pinning(Pinning.IGNORE).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+        })).pinning(Pinning.IGNORE));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.getProperty("main/compile/foo/bar")).isEqualTo("resolved/bar.jar");
         assertThat(next.resolve("resolved/bar.jar")).content().isEqualTo("bar");
@@ -684,19 +547,12 @@ public class DependenciesResolutionTest {
         versions.setProperty("main/foo/transitive", ":mac:3.0 SHA-256/cccc");
         versions.store(dependencies.resolve(BuildStep.VERSIONS));
         SequencedMap<String, String> received = new LinkedHashMap<>();
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, pins, _) -> {
+        execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, pins, _) -> {
             received.putAll(pins);
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
             return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-        })).pinning(Pinning.IGNORE).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.VERSIONS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+        })).pinning(Pinning.IGNORE));
         assertThat(received).containsOnly(Map.entry("bar", ":win:1.0"), Map.entry("transitive", ":mac"));
     }
 
@@ -711,19 +567,12 @@ public class DependenciesResolutionTest {
         versions.setProperty("main/foo/other", "1.5 SHA-256/bbbb");
         versions.store(dependencies.resolve(BuildStep.VERSIONS));
         SequencedMap<String, String> received = new LinkedHashMap<>();
-        BuildStepResult result = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, pins, _) -> {
+        execute(new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, pins, _) -> {
             received.putAll(pins);
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
             return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-        })).pinning(Pinning.IGNORE).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.VERSIONS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+        })).pinning(Pinning.IGNORE));
         assertThat(received).containsOnly(Map.entry("bar", "1.0"));
     }
 
@@ -733,17 +582,12 @@ public class DependenciesResolutionTest {
         properties.setProperty("main/compile/foo/bar", "SHA-256/aaaa");
         properties.setProperty("main/runtime/foo/bar", "SHA-256/bbbb");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
-        BuildStep resolve = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
+        Dependencies resolve = new Dependencies(Map.of("foo", files(Map.of())), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
             descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
             return new Resolver.Resolution(Resolver.materializeAll(executor, repositories, prefix, resolved), List.of(), new LinkedHashMap<>());
-        })).resolution();
-        assertThatThrownBy(() -> resolve.apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join())
+        }));
+        assertThatThrownBy(() -> execute(resolve))
                 .hasStackTraceContaining("Conflicting checksums pinned for foo/bar");
     }
 
@@ -775,17 +619,9 @@ public class DependenciesResolutionTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/module/acme.platform", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = new Dependencies(
+        execute(new Dependencies(
                 Map.of("module", files(Map.of("acme.platform/1.0:properties", "bar = 1.0\nqux = 2.0\n"))),
-                Map.of("module", versioning())).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.VERSIONS), Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                Map.of("module", versioning())));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).containsExactlyInAnyOrder(
                 "main/compile/module/bar/9.9",
@@ -801,16 +637,9 @@ public class DependenciesResolutionTest {
         boms.setProperty("bom/main/module/acme.platform", "1.0");
         boms.setProperty("entry/main/module/extra", "3.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = new Dependencies(
+        execute(new Dependencies(
                 Map.of("module", files(Map.of("acme.platform/1.0:properties", "qux = 2.0\n"))),
-                Map.of("module", versioning())).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                Map.of("module", versioning())));
         SequencedProperties resolved = SequencedProperties.ofFiles(next.resolve(BuildStep.BOMS));
         assertThat(resolved.stringPropertyNames()).containsExactlyInAnyOrder(
                 "bom/main/module/acme.platform/1.0",
@@ -830,16 +659,9 @@ public class DependenciesResolutionTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/module/acme.platform", "");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = new Dependencies(
+        execute(new Dependencies(
                 Map.of("module", files(Map.of("acme.platform:properties", "qux = 2.0\n"))),
-                Map.of("module", versioning())).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                Map.of("module", versioning())));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).containsExactly("main/compile/module/qux/2.0");
     }
@@ -853,18 +675,11 @@ public class DependenciesResolutionTest {
         boms.setProperty("bom/main/module/first", "1.0");
         boms.setProperty("bom/main/module/second", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = new Dependencies(
+        execute(new Dependencies(
                 Map.of("module", files(Map.of(
                         "first/1.0:properties", "qux = 1.0\n",
                         "second/1.0:properties", "qux = 2.0\n"))),
-                Map.of("module", versioning())).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                Map.of("module", versioning())));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).containsExactly("main/compile/module/qux/2.0");
     }
@@ -877,16 +692,9 @@ public class DependenciesResolutionTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("entry/main/module/qux", "3.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = new Dependencies(
+        execute(new Dependencies(
                 Map.of("module", files(Map.of())),
-                Map.of("module", versioning())).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                Map.of("module", versioning())));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).containsExactly("main/compile/module/qux/3.0");
     }
@@ -896,15 +704,10 @@ public class DependenciesResolutionTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/module/acme.platform", "1.0 " + checksum("other"));
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStep resolve = new Dependencies(
+        Dependencies resolve = new Dependencies(
                 Map.of("module", files(Map.of("acme.platform/1.0:properties", "qux = 2.0\n"))),
-                Map.of("module", versioning())).resolution();
-        assertThatThrownBy(() -> resolve.apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join())
+                Map.of("module", versioning()));
+        assertThatThrownBy(() -> execute(resolve))
                 .hasStackTraceContaining("Failed to fetch BOM main/module/acme.platform")
                 .hasStackTraceContaining("Mismatched digest");
     }
@@ -917,16 +720,9 @@ public class DependenciesResolutionTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/module/acme.platform", "1.0 " + checksum("other"));
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = new Dependencies(
+        execute(new Dependencies(
                 Map.of("module", files(Map.of("acme.platform/1.0:properties", "qux = 2.0\n"))),
-                Map.of("module", versioning())).pinning(Pinning.VERSIONS).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                Map.of("module", versioning())).pinning(Pinning.VERSIONS));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).containsExactly("main/compile/module/qux/2.0");
     }
@@ -936,18 +732,13 @@ public class DependenciesResolutionTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/module/acme.platform", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStep resolve = new Dependencies(
+        Dependencies resolve = new Dependencies(
                 Map.of("module", files(Map.of("acme.platform/1.0:properties", "qux = 2.0\n"))),
-                Map.of("module", versioning())).pinning(Pinning.STRICT).resolution();
-        assertThatThrownBy(() -> resolve.apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join())
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("No checksum pinned for BOM main/module/acme.platform")
-                .hasMessageContaining("strict pinning");
+                Map.of("module", versioning())).pinning(Pinning.STRICT);
+        assertThatThrownBy(() -> execute(resolve))
+                .hasStackTraceContaining(IllegalStateException.class.getName())
+                .hasStackTraceContaining("No checksum pinned for BOM main/module/acme.platform")
+                .hasStackTraceContaining("strict pinning");
     }
 
     @Test
@@ -959,16 +750,9 @@ public class DependenciesResolutionTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/module/acme.platform", "1.0 " + checksum(content));
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = new Dependencies(
+        execute(new Dependencies(
                 Map.of("module", files(Map.of("acme.platform/1.0:properties", content))),
-                Map.of("module", versioning())).pinning(Pinning.STRICT).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                Map.of("module", versioning())).pinning(Pinning.STRICT));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.getProperty("main/compile/module/bar/1.0")).endsWith(" " + checksum("bar/1.0"));
     }
@@ -982,7 +766,7 @@ public class DependenciesResolutionTest {
         boms.setProperty("bom/main/module/acme.platform", "1.0 " + checksum("other"));
         boms.store(dependencies.resolve(BuildStep.BOMS));
         SequencedMap<String, String> received = new LinkedHashMap<>();
-        BuildStepResult result = new Dependencies(
+        execute(new Dependencies(
                 Map.of("module", files(Map.of("acme.platform/1.0:properties", "bar = 1.0 SHA-256/aaaa\n"))),
                 Map.of("module", (executor, prefix, repositories, descriptors, pins, _) -> {
                     received.putAll(pins);
@@ -992,14 +776,7 @@ public class DependenciesResolutionTest {
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
                             new LinkedHashMap<>());
-                })).pinning(Pinning.IGNORE).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                })).pinning(Pinning.IGNORE));
         assertThat(received).containsOnly(Map.entry("bar", "1.0"));
     }
 
@@ -1008,17 +785,12 @@ public class DependenciesResolutionTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/nope/acme.platform", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStep resolve = new Dependencies(
+        Dependencies resolve = new Dependencies(
                 Map.of("module", files(Map.of())),
-                Map.of("module", versioning())).resolution();
-        assertThatThrownBy(() -> resolve.apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join())
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Unknown repository for BOM: main/nope/acme.platform");
+                Map.of("module", versioning()));
+        assertThatThrownBy(() -> execute(resolve))
+                .hasStackTraceContaining(IllegalArgumentException.class.getName())
+                .hasStackTraceContaining("Unknown repository for BOM: main/nope/acme.platform");
     }
 
     @Test
@@ -1026,15 +798,10 @@ public class DependenciesResolutionTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/module/acme.platform", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStep resolve = new Dependencies(
+        Dependencies resolve = new Dependencies(
                 Map.of("module", (_, _) -> Optional.empty()),
-                Map.of("module", versioning())).resolution();
-        assertThatThrownBy(() -> resolve.apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join())
+                Map.of("module", versioning()));
+        assertThatThrownBy(() -> execute(resolve))
                 .hasStackTraceContaining("Failed to fetch BOM main/module/acme.platform")
                 .hasStackTraceContaining("Unresolved");
     }
@@ -1070,16 +837,9 @@ public class DependenciesResolutionTest {
                 return new LinkedHashSet<>(List.of("maven"));
             }
         };
-        BuildStepResult result = new Dependencies(
+        execute(new Dependencies(
                 Map.of("module", files(Map.of("acme.platform/1.0:properties", "org.slf4j/slf4j-api = 2.0.17\n"))),
-                Map.of("module", resolver)).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(
-                        dependencies,
-                        Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
-                                Path.of(BuildStep.BOMS), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
-        assertThat(result.next()).isTrue();
+                Map.of("module", resolver)));
         assertThat(received).containsEntry("org.slf4j/slf4j-api", "2.0.17");
     }
 }

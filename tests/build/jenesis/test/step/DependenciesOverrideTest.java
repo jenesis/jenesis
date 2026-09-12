@@ -2,7 +2,12 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.BuildExecutor;
+import build.jenesis.BuildExecutorCache;
+import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
+import build.jenesis.BuildStepHashFunction;
+import build.jenesis.HashDigestFunction;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
@@ -27,14 +32,12 @@ public class DependenciesOverrideTest {
     @TempDir
     private Path root, mavenRepoFolder, work;
     private final SequencedMap<String, String> discovered = new LinkedHashMap<>();
-    private Path previous, next, supplement, dependencies;
+    private Path next, dependencies, build;
 
     @BeforeEach
     public void setUp() throws IOException {
-        previous = root.resolve("previous");
-        next = Files.createDirectory(root.resolve("next"));
-        supplement = Files.createDirectory(root.resolve("supplement"));
         dependencies = Files.createDirectory(root.resolve("dependencies"));
+        build = Files.createDirectory(root.resolve("build"));
     }
 
     @Test
@@ -42,9 +45,8 @@ public class DependenciesOverrideTest {
         modularLib("carrier-lib", "1.0", "lib.carrier", "shaded.api");
         module("lib.carrier", "org.example/carrier-lib");
 
-        BuildStepResult result = resolve(Map.of("lib.shaded", "lib.carrier"), "lib.carrier", "lib.shaded");
+        resolve(Map.of("lib.shaded", "lib.carrier"), "lib.carrier", "lib.shaded");
 
-        assertThat(result.next()).isTrue();
         Path placed = next.resolve(Dependencies.RESOLVED + "lib.shaded.jar");
         assertThat(placed).exists();
         ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(placed);
@@ -85,26 +87,22 @@ public class DependenciesOverrideTest {
         module("lib.carrier", "org.example/carrier-lib");
 
         assertThatThrownBy(() -> resolve(Map.of("lib.shaded", "lib.absent"), "lib.carrier"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Module override lib.shaded declared by"
+                .hasStackTraceContaining(IllegalArgumentException.class.getName())
+                .hasStackTraceContaining("Module override lib.shaded declared by"
                         + " a local @jenesis.override declaration names lib.absent"
                         + " which no resolved dependency carries - require the carrier or drop the override");
     }
 
     @Test
     public void rejects_an_override_where_modules_do_not_resolve_to_coordinates() throws IOException {
-        assertThatThrownBy(() -> new Dependencies(
+        declare(Map.of("lib.shaded", "lib.carrier"), "lib.carrier");
+        assertThatThrownBy(() -> execute(new Dependencies(
                 Map.of("module", discovery()),
-                Map.of("module", new ModularJarResolver(false))).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                arguments(Map.of("lib.shaded", "lib.carrier"), "lib.carrier"))
-                .toCompletableFuture()
-                .join())
+                Map.of("module", new ModularJarResolver(false)))))
                 .as("only a layout that maps module names onto Maven coordinates can drop the shaded artifact")
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Cannot override [lib.shaded]")
-                .hasMessageContaining("jenesis.project.layout=modular_to_maven");
+                .hasStackTraceContaining(IllegalArgumentException.class.getName())
+                .hasStackTraceContaining("Cannot override [lib.shaded]")
+                .hasStackTraceContaining("jenesis.project.layout=modular_to_maven");
     }
 
     private void modularLib(String artifactId, String version, String module, String name) throws IOException {
@@ -171,8 +169,7 @@ public class DependenciesOverrideTest {
                         body.getBytes(StandardCharsets.UTF_8)));
     }
 
-    private SequencedMap<String, BuildStepArgument> arguments(Map<String, String> overrides, String... modules)
-            throws IOException {
+    private void declare(Map<String, String> overrides, String... modules) throws IOException {
         SequencedProperties requires = new SequencedProperties();
         for (String module : modules) {
             requires.setProperty("main/compile/module/" + module, "");
@@ -181,24 +178,29 @@ public class DependenciesOverrideTest {
         SequencedProperties declared = new SequencedProperties();
         overrides.forEach((module, carriers) -> declared.setProperty("main/module/" + module, carriers));
         declared.store(dependencies.resolve(BuildStep.OVERRIDES));
-        return new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(dependencies, new LinkedHashMap<>(
-                Map.of(Path.of(BuildStep.REQUIRES), Checksum.of(ChecksumStatus.ADDED),
-                        Path.of(BuildStep.OVERRIDES), Checksum.of(ChecksumStatus.ADDED))))));
     }
 
-    private BuildStepResult resolve(Map<String, String> overrides, String... modules) throws IOException {
+    private Path execute(Dependencies module) throws IOException {
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+        executor.addSource("dependencies", dependencies);
+        executor.addModule("resolved", module, "dependencies");
+        next = executor.execute().get("resolved");
+        return next;
+    }
+
+    private Path resolve(Map<String, String> overrides, String... modules) throws IOException {
         MavenDefaultRepository maven = new MavenDefaultRepository(
                 mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {
         });
-        return new Dependencies(
+        declare(overrides, modules);
+        return execute(new Dependencies(
                 Map.of("maven", maven, "module", discovery()),
                 Map.of("module", new MavenModuleResolver("maven",
                         new MavenPomResolver(MavenDefaultVersionNegotiator.maven()),
-                        discovery()))).resolution().apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                arguments(overrides, modules))
-                .toCompletableFuture()
-                .join();
+                        discovery()))));
     }
 }
