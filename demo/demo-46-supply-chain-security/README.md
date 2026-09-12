@@ -171,8 +171,12 @@ a repository which re-serialises POMs invalidates their signatures, so resolve f
 that serves the published bytes. The demo signs both the jar and the POM, so it forks gpg
 twice for the one coordinate.
 
-Verification is an ordinary forked tool: `jenesis.print.gpg` shows each invocation and
-`jenesis.signature.command` names a different binary. A broken invocation fails loudly
+Verification forks `gpg`, which must be installed and on the `PATH`. That is deliberate: a
+Java OpenPGP library would have to be resolved from a repository - the very thing being
+verified - and a verifier you downloaded on trust verifies nothing. It is also why a
+hardened machine for writing pins is one where the JDK and gpg are already present and
+vetted, rather than one that fetches them on the way. `jenesis.print.gpg` shows each
+invocation and `jenesis.signature.command` names a different binary. A broken invocation fails loudly
 with the command to reproduce, rather than passing for "no signature found".
 
 Where the keys come from
