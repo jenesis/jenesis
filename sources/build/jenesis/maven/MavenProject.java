@@ -311,7 +311,24 @@ public class MavenProject implements BuildExecutorModule {
                                     }
                                     attachments.setProperty(seeded, arguments);
                                 }
+                                String declared = properties.getProperty("plugins", "");
+                                for (String entry : declared.isEmpty() ? new String[0] : declared.split("\t")) {
+                                    int split = entry.indexOf('=');
+                                    requires.setProperty(entry.substring(split + 1)
+                                            + "/plugin/"
+                                            + entry.substring(0, split), "");
+                                }
                                 requires.store(context.next().resolve(BuildStep.REQUIRES));
+                                String keys = properties.getProperty("signatures", "");
+                                if (!keys.isEmpty()) {
+                                    SequencedProperties signatures = new SequencedProperties();
+                                    for (String entry : keys.split("\t")) {
+                                        int split = entry.indexOf('=');
+                                        signatures.setProperty(entry.substring(0, split),
+                                                entry.substring(split + 1));
+                                    }
+                                    signatures.store(context.next().resolve(BuildStep.SIGNATURES));
+                                }
                                 if (!attachments.isEmpty()) {
                                     attachments.store(context.next().resolve(BuildStep.ATTACHMENTS));
                                 }
@@ -697,6 +714,16 @@ public class MavenProject implements BuildExecutorModule {
             }
             if (!attachments.isEmpty()) {
                 properties.setProperty("attachments", attachments);
+            }
+            if (value.plugins() != null && !value.plugins().isEmpty()) {
+                properties.setProperty("plugins", value.plugins().entrySet().stream()
+                        .map(plugin -> plugin.getKey() + "=" + plugin.getValue())
+                        .collect(Collectors.joining("\t")));
+            }
+            if (value.signatures() != null && !value.signatures().isEmpty()) {
+                properties.setProperty("signatures", value.signatures().entrySet().stream()
+                        .map(signature -> signature.getKey() + "=" + signature.getValue())
+                        .collect(Collectors.joining("\t")));
             }
             properties.setProperty("checksums",
                     value.dependencies() == null ? "" : value.dependencies().entrySet().stream()

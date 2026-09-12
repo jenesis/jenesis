@@ -3697,6 +3697,93 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_reads_plugin_comment_block() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.plugin
+                    some.processor
+                    maven/org.example/processor/1.0
+                    kotlinc org.jetbrains.kotlin/kotlin-serialization
+                    -->
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("")).plugins())
+                .as("a leading compiler names the group the plugin is resolved in, and plugin is the default")
+                .containsExactly(
+                        Map.entry("module/some.processor", "plugin"),
+                        Map.entry("maven/org.example/processor/1.0", "plugin"),
+                        Map.entry("org.jetbrains.kotlin/kotlin-serialization", "kotlinc"));
+    }
+
+    @Test
+    public void local_pom_reads_signature_comment_block() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.signature
+                    OpenPGP/B4D5 org.example/lib some.module
+                    OpenPGP/FEED tool/maven/org.example/other org.example/*
+                    -->
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("")).signatures())
+                .as("the tokens expand exactly as the module-info tag expands them")
+                .containsEntry("OpenPGP/B4D5", "main/maven/org.example/lib main/module/some.module")
+                .containsEntry("OpenPGP/FEED", "main/maven/org.example/* tool/maven/org.example/other");
+    }
+
+    @Test
+    public void signature_block_joins_repeated_declarations_of_one_key() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.signature
+                    OpenPGP/B4D5 org.example/lib
+                    OpenPGP/B4D5 org.example/lib org.example/other
+                    -->
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("")).signatures())
+                .as("declaring a key twice adds nothing the first line did not already say")
+                .containsEntry("OpenPGP/B4D5", "main/maven/org.example/lib main/maven/org.example/other");
+    }
+
+    @Test
+    public void signature_block_rejects_a_declaration_that_names_no_coordinate() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.signature
+                    OpenPGP/B4D5
+                    -->
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expected <algorithm>/<fingerprint> <token>...");
+    }
+
+    @Test
     public void local_pom_reads_attach_comment_block() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

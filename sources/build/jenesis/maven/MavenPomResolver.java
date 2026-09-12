@@ -607,6 +607,8 @@ public class MavenPomResolver implements MavenResolver {
                     managedDependencies,
                     pom.qualifiedDependencies(),
                     pom.attachments(),
+                    pom.plugins(),
+                    pom.signatures(),
                     property(pom.properties().get("mainClass"), pom.properties())));
         }
         return results;
@@ -779,6 +781,12 @@ public class MavenPomResolver implements MavenResolver {
                         extended
                                 ? toAttachments(document.getDocumentElement())
                                 : Collections.emptyNavigableMap(),
+                        extended
+                                ? toPlugins(document.getDocumentElement())
+                                : Collections.emptyNavigableMap(),
+                        extended
+                                ? toSignatures(document.getDocumentElement())
+                                : Collections.emptyNavigableMap(),
                         ownLicenses.isEmpty() ? parentLicenses : ownLicenses);
             }
             default -> throw new IllegalArgumentException("Unknown namespace: " + namespace);
@@ -816,6 +824,8 @@ public class MavenPomResolver implements MavenResolver {
                             null,
                             Map.of(),
                             Map.of(),
+                            Collections.emptyNavigableMap(),
+                            Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
@@ -1108,6 +1118,86 @@ public class MavenPomResolver implements MavenResolver {
         return entries;
     }
 
+    private static SequencedMap<String, String> toSignatures(Node node) {
+        SequencedMap<String, String> entries = new TreeMap<>();
+        toChildren(node)
+                .filter(child -> child.getNodeType() == Node.COMMENT_NODE)
+                .map(Node::getNodeValue)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(text -> text.startsWith("jenesis.signature"))
+                .forEach(text -> {
+                    for (String line : text.substring("jenesis.signature".length())
+                            .replace("&#45;", "-")
+                            .split("\n")) {
+                        String declaration = line.trim().replaceAll("\\s+", " ");
+                        if (declaration.isEmpty()) {
+                            continue;
+                        }
+                        int split = declaration.indexOf(' ');
+                        if (split < 1) {
+                            throw new IllegalArgumentException("Malformed jenesis.signature declaration '"
+                                    + declaration
+                                    + "': expected <algorithm>/<fingerprint> <token>...");
+                        }
+                        String fingerprint = declaration.substring(0, split);
+                        String existing = entries.get(fingerprint);
+                        SequencedSet<String> tokens = new TreeSet<>();
+                        if (existing != null && !existing.isEmpty()) {
+                            tokens.addAll(List.of(existing.split(" ")));
+                        }
+                        for (String token : declaration.substring(split + 1).split(" ")) {
+                            boolean wildcard = token.endsWith("/*");
+                            String base = wildcard ? token.substring(0, token.length() - 2) : token;
+                            int first = base.indexOf('/');
+                            String expanded;
+                            if (first < 0) {
+                                expanded = wildcard ? "main/maven/" + base : "main/module/" + base;
+                            } else if (base.indexOf('/', first + 1) < 0) {
+                                expanded = "main/maven/" + base;
+                            } else {
+                                expanded = base;
+                            }
+                            tokens.add(wildcard ? expanded + "/*" : expanded);
+                        }
+                        entries.put(fingerprint, String.join(" ", tokens));
+                    }
+                });
+        return entries;
+    }
+
+    private static SequencedMap<String, String> toPlugins(Node node) {
+        SequencedMap<String, String> entries = new LinkedHashMap<>();
+        toChildren(node)
+                .filter(child -> child.getNodeType() == Node.COMMENT_NODE)
+                .map(Node::getNodeValue)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(text -> text.startsWith("jenesis.plugin"))
+                .forEach(text -> {
+                    for (String line : text.substring("jenesis.plugin".length()).replace("&#45;", "-").split("\n")) {
+                        String trimmed = line.trim().replaceAll("\\s+", " ");
+                        if (trimmed.isEmpty()) {
+                            continue;
+                        }
+                        int space = trimmed.indexOf(' ');
+                        String group, token;
+                        if (space > 0 && trimmed.substring(0, space).indexOf('/') < 0) {
+                            group = trimmed.substring(0, space).trim();
+                            token = trimmed.substring(space + 1).trim();
+                        } else {
+                            group = "plugin";
+                            token = trimmed;
+                        }
+                        if (token.isEmpty()) {
+                            continue;
+                        }
+                        entries.put(token.indexOf('/') < 0 ? "module/" + token : token, group);
+                    }
+                });
+        return entries;
+    }
+
     private static SequencedMap<String, String> toAttachments(Node node) {
         SequencedMap<String, String> entries = new LinkedHashMap<>();
         toChildren(node)
@@ -1303,6 +1393,8 @@ public class MavenPomResolver implements MavenResolver {
                                  SequencedMap<DependencyKey, DependencyValue> dependencies,
                                  SequencedMap<String, String> qualifiedDependencies,
                                  SequencedMap<String, String> attachments,
+                                 SequencedMap<String, String> plugins,
+                                 SequencedMap<String, String> signatures,
                                  List<License> licenses) {
     }
 

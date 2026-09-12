@@ -11,6 +11,12 @@
     <name>Jenesis</name>
     <description>A build tool for Java projects, written and configured in Java itself.</description>
 
+    <!--jenesis.signature
+    OpenPGP/B4AC8CDC141AF0AE468D16921DA784CCB5C46DD5 net.bytebuddy/*
+    OpenPGP/BE685132AFD2740D9095F9040CC0B712FEE75827 org.assertj/*
+    OpenPGP/FF6E2C001948C5F2F38B0CC385911F425EC61B51 org.apiguardian/* org.junit.jupiter/* org.junit.platform/* org.opentest4j/*
+    -->
+
     <build>
         <sourceDirectory>sources</sourceDirectory>
         <testSourceDirectory>tests</testSourceDirectory>

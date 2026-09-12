@@ -101,32 +101,55 @@ public class Signatures extends ProcessBuildStep {
         }
         List<String> prefix = new ArrayList<>(prepended(properties(arguments)));
         prefix.addAll(VERIFY);
-        SequencedSet<String> visited = new LinkedHashSet<>();
-        List<String> violations = new ArrayList<>();
+        SequencedMap<String, SequencedMap<String, String>> candidates = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : resolved.entrySet()) {
             String key = entry.getKey();
             int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
-            if (second < 0 || internal.contains(key)) {
+            if (second < 0) {
                 continue;
             }
             String rest = key.substring(second + 1);
+            if (internal.contains(rest)) {
+                continue;
+            }
             int last = rest.lastIndexOf('/');
             if (last <= 0 || last == rest.indexOf('/')) {
                 continue;
             }
-            String coordinate = rest.substring(0, last), version = rest.substring(last + 1);
-            String token = key.substring(0, first) + "/" + coordinate;
-            if (!visited.add(token)) {
-                continue;
-            }
+            candidates.computeIfAbsent(entry.getValue(), _ -> new LinkedHashMap<>())
+                    .putIfAbsent(key.substring(0, first) + "/" + rest.substring(0, last),
+                            rest.substring(last + 1));
+        }
+        List<String> violations = new ArrayList<>();
+        for (Map.Entry<String, SequencedMap<String, String>> candidate : candidates.entrySet()) {
             SequencedSet<String> accepted = new LinkedHashSet<>();
-            for (Map.Entry<String, SequencedSet<String>> declaration : declared.entrySet()) {
-                if (declaration.getValue().stream().anyMatch(value -> value.equals(token)
-                        || value.endsWith("/*")
-                        && token.startsWith(value.substring(0, value.length() - 1)))) {
-                    accepted.add(declaration.getKey());
+            String token = candidate.getValue().firstEntry().getKey();
+            String version = candidate.getValue().firstEntry().getValue();
+            for (Map.Entry<String, String> spelling : candidate.getValue().entrySet()) {
+                SequencedSet<String> covering = new LinkedHashSet<>();
+                for (Map.Entry<String, SequencedSet<String>> declaration : declared.entrySet()) {
+                    if (declaration.getValue().stream().anyMatch(value -> value.equals(spelling.getKey())
+                            || value.endsWith("/*")
+                            && spelling.getKey().startsWith(value.substring(0, value.length() - 1)))) {
+                        covering.add(declaration.getKey());
+                    }
+                }
+                if (!covering.isEmpty() && accepted.isEmpty()) {
+                    token = spelling.getKey();
+                    version = spelling.getValue();
+                }
+                accepted.addAll(covering);
+            }
+            String key = null;
+            for (Map.Entry<String, String> resolvedEntry : resolved.entrySet()) {
+                if (resolvedEntry.getValue().equals(candidate.getKey())) {
+                    key = resolvedEntry.getKey();
+                    break;
                 }
             }
+            int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
+            String rest = token.substring(token.indexOf('/') + 1) + "/" + version;
+            String coordinate = rest.substring(0, rest.lastIndexOf('/'));
             if (accepted.isEmpty()) {
                 if (verification == Verification.STRICT) {
                     violations.add(token + " " + version + ": no @jenesis.signature line declares a key for it");
@@ -147,7 +170,7 @@ public class Signatures extends ProcessBuildStep {
                 violations.add(token + " " + version + ": a key is declared for it but no signature is published");
                 continue;
             }
-            Status status = verify(executor, context, prefix, Path.of(entry.getValue()), signature);
+            Status status = verify(executor, context, prefix, Path.of(candidate.getKey()), signature);
             if (status.failure() != null) {
                 violations.add(token + " " + version + ": " + status.failure());
                 continue;
