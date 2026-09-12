@@ -147,7 +147,7 @@ public class InternalModule implements BuildExecutorModule {
         buildExecutor.addStep(REQUIRES,
                 new ParseModuleInfo(group, prefix, additionalDependencies, new Platform()),
                 Stream.concat(Stream.of(SOURCE), inherited.sequencedKeySet().stream()));
-        buildExecutor.addStep(DEPENDENCIES,
+        buildExecutor.addModule(DEPENDENCIES,
                 new Dependencies(repositories, resolvers).pinning(pinning),
                 REQUIRES);
         buildExecutor.addModule(JAVA,
