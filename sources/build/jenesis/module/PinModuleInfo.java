@@ -7,7 +7,6 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
-import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
 
 public class PinModuleInfo implements BuildStep {
@@ -165,13 +164,6 @@ public class PinModuleInfo implements BuildStep {
     static SequencedMap<String, String> collectEntries(SequencedMap<String, Inventory.Dependency> closure,
                                                        Set<String> internal,
                                                        HashDigestFunction hashFunction) throws IOException {
-        Set<Path> hashedElsewhere = new HashSet<>();
-        for (Map.Entry<String, Inventory.Dependency> dependency : closure.entrySet()) {
-            String coordinate = dependency.getKey().substring(dependency.getValue().group().length() + 1);
-            if (!coordinate.startsWith("module/") && dependency.getValue().jar() != null) {
-                hashedElsewhere.add(dependency.getValue().jar());
-            }
-        }
         SequencedMap<String, String> entries = new TreeMap<>();
         for (Map.Entry<String, Inventory.Dependency> dependency : closure.entrySet()) {
             String group = dependency.getValue().group();
@@ -186,7 +178,6 @@ public class PinModuleInfo implements BuildStep {
             }
             String coordinate = key.substring(0, lastSlash);
             String version = key.substring(lastSlash + 1);
-            boolean moduleRoot = group.equals("main") && coordinate.startsWith("module/");
             String mavenCoordinate = group.equals("main") && coordinate.startsWith("maven/")
                     ? coordinate.substring("maven/".length())
                     : null;
@@ -194,9 +185,6 @@ public class PinModuleInfo implements BuildStep {
                     && mavenCoordinate.indexOf('/') > 0
                     && mavenCoordinate.indexOf('/') == mavenCoordinate.lastIndexOf('/');
             String checksum = hashFunction == null
-                    || (moduleRoot
-                    && dependency.getValue().jar() != null
-                    && hashedElsewhere.contains(dependency.getValue().jar()))
                     ? null
                     : computeChecksum(dependency.getValue(), hashFunction);
             String value = checksum == null ? version : version + " " + checksum;

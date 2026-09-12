@@ -7,7 +7,6 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
-import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
 
 public class PinPom implements BuildStep {
@@ -128,6 +127,14 @@ public class PinPom implements BuildStep {
         }
     }
 
+    private static String expand(String token) {
+        int first = token.indexOf('/');
+        if (first < 0) {
+            return "main/module/" + token;
+        }
+        return token.indexOf('/', first + 1) < 0 ? "main/maven/" + token : token;
+    }
+
     static SequencedMap<String, String> collectEntries(SequencedMap<String, Inventory.Dependency> closure,
                                                        Set<String> internal,
                                                        HashDigestFunction hashFunction) throws IOException {
@@ -227,14 +234,6 @@ public class PinPom implements BuildStep {
             }
         }
         return preserved;
-    }
-
-    private static String expand(String token) {
-        int first = token.indexOf('/');
-        if (first < 0) {
-            return "main/module/" + token;
-        }
-        return token.indexOf('/', first + 1) < 0 ? "main/maven/" + token : token;
     }
 
     private static String renderRequires(SequencedMap<String, String> qualified, List<String> preserved, String indent) {

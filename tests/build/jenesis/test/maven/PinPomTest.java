@@ -13,6 +13,7 @@ import build.jenesis.maven.PinPom;
 import build.jenesis.step.Inventory;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class PinPomTest {
 

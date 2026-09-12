@@ -729,6 +729,7 @@ public class MavenProjectTest {
                                     "../dependencies/artifacts",
                                     "../../module-foo/dependencies/prepare",
                                     "../../module-foo/dependencies/artifacts",
+                                    "../../module-foo/dependencies/signatures",
                                     "../../module-foo/produce/java/classes",
                                     "../../module-foo/produce/java/artifacts",
                                     "../../module-foo/assign",

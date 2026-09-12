@@ -17,6 +17,7 @@ public interface BuildStep extends Serializable {
             VERSIONS = "versions.properties",
             ALIASES = "aliases.properties",
             BOMS = "boms.properties",
+            SIGNATURES = "signatures.properties",
             MODULE = "module.properties",
             METADATA = "metadata.properties",
             EXCLUSIONS = "exclusions.properties",
