@@ -47,9 +47,11 @@ public class ModularProject implements BuildExecutorModule {
     private final boolean modular;
     private final Platform platform;
     private final SequencedSet<Path> boms;
+    private final SequencedSet<Path> signatures;
 
     public ModularProject(String prefix, Path root) {
-        this("main", prefix, root, _ -> true, true, new Platform(), Collections.emptyNavigableSet());
+        this("main", prefix, root, _ -> true, true, new Platform(),
+                Collections.emptyNavigableSet(), Collections.emptyNavigableSet());
     }
 
     private ModularProject(String group,
@@ -58,7 +60,8 @@ public class ModularProject implements BuildExecutorModule {
                            Predicate<Path> filter,
                            boolean modular,
                            Platform platform,
-                           SequencedSet<Path> boms) {
+                           SequencedSet<Path> boms,
+                           SequencedSet<Path> signatures) {
         this.group = group;
         this.prefix = prefix;
         this.root = root;
@@ -66,26 +69,31 @@ public class ModularProject implements BuildExecutorModule {
         this.modular = modular;
         this.platform = platform;
         this.boms = boms;
+        this.signatures = signatures;
     }
 
     public ModularProject group(String group) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures);
     }
 
     public ModularProject filter(Predicate<Path> filter) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures);
     }
 
     public ModularProject modular(boolean modular) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures);
     }
 
     public ModularProject platform(Platform platform) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures);
     }
 
     public ModularProject boms(SequencedSet<Path> boms) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures);
+    }
+
+    public ModularProject signatures(SequencedSet<Path> signatures) {
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures);
     }
 
     public static BuildExecutorModule make(Path root, MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
@@ -97,6 +105,7 @@ public class ModularProject implements BuildExecutorModule {
                 Map.of("module", new ModularJarResolver(false)),
                 null,
                 true,
+                Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
                 assembler);
@@ -112,8 +121,10 @@ public class ModularProject implements BuildExecutorModule {
                                            boolean modular,
                                            SequencedSet<Path> spdx,
                                            SequencedSet<Path> boms,
+                                           SequencedSet<Path> signatures,
                                            MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
-        return new MultiProjectModule(new ModularProject(prefix, root).group(group).filter(filter).modular(modular).boms(boms),
+        return new MultiProjectModule(new ModularProject(prefix, root)
+                .group(group).filter(filter).modular(modular).boms(boms).signatures(signatures),
                 identity -> Optional.of(identity.substring(0, identity.indexOf('/'))),
                 _ -> (name, dependencies, arguments) -> {
                     Path location = MultiProjectModule.location(root, arguments);
@@ -351,8 +362,61 @@ public class ModularProject implements BuildExecutorModule {
                 properties.store(context.next().resolve(BuildStep.VERSIONS));
             }
             if (!info.signatures().isEmpty()) {
+                SequencedMap<String, SequencedSet<String>> declaredKeys = new TreeMap<>();
+                for (Map.Entry<String, String> entry : info.signatures().entrySet()) {
+                    int slash = entry.getKey().indexOf('/');
+                    String name = entry.getKey().substring(slash + 1);
+                    if (!entry.getValue().isEmpty()
+                            || name.indexOf('/') >= 0
+                            || !name.startsWith("signature-")
+                            || !name.endsWith(".properties")) {
+                        declaredKeys.computeIfAbsent(entry.getKey(), _ -> new TreeSet<>())
+                                .addAll(List.of(entry.getValue().split(" ")));
+                        continue;
+                    }
+                    Path file = null;
+                    for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
+                        if (argument.getValue().removed()) {
+                            continue;
+                        }
+                        if (argument.getKey().startsWith("signatures-")) {
+                            Path candidate = argument.getValue().folder().resolve(name);
+                            if (Files.isRegularFile(candidate)) {
+                                file = candidate;
+                                break;
+                            }
+                        }
+                    }
+                    if (file == null) {
+                        throw new IllegalStateException("No " + name + " found in any location of"
+                                + " jenesis.project.signatures; a key list is only ever read from disk");
+                    }
+                    String qualifier = entry.getKey().substring(0, slash);
+                    SequencedProperties listed = SequencedProperties.ofFiles(file);
+                    for (String fingerprint : listed.stringPropertyNames()) {
+                        SequencedSet<String> tokens = declaredKeys.computeIfAbsent(fingerprint, _ -> new TreeSet<>());
+                        for (String token : listed.getProperty(fingerprint).trim().split("\\s+")) {
+                            if (token.isEmpty()) {
+                                continue;
+                            }
+                            boolean wildcard = token.endsWith("/*");
+                            String base = wildcard ? token.substring(0, token.length() - 2) : token;
+                            int first = base.indexOf('/');
+                            String expanded;
+                            if (first < 0) {
+                                expanded = qualifier + (wildcard ? "/maven/" : "/module/") + base;
+                            } else if (base.indexOf('/', first + 1) < 0) {
+                                expanded = qualifier + "/maven/" + base;
+                            } else {
+                                expanded = base;
+                            }
+                            tokens.add(wildcard ? expanded + "/*" : expanded);
+                        }
+                    }
+                }
                 SequencedProperties properties = new SequencedProperties();
-                info.signatures().forEach(properties::setProperty);
+                declaredKeys.forEach((fingerprint, tokens) ->
+                        properties.setProperty(fingerprint, String.join(" ", tokens)));
                 properties.store(context.next().resolve(BuildStep.SIGNATURES));
             }
             SequencedMap<String, String> declared = new LinkedHashMap<>(info.boms());
@@ -492,6 +556,21 @@ public class ModularProject implements BuildExecutorModule {
                         .forEach(file -> bomFiles.putIfAbsent(file.getFileName().toString(), file));
             }
         }
+        SequencedMap<String, Path> signatureFiles = new LinkedHashMap<>();
+        for (Path folder : signatures) {
+            if (!Files.isDirectory(folder)) {
+                continue;
+            }
+            try (Stream<Path> files = Files.list(folder)) {
+                files.filter(Files::isRegularFile)
+                        .filter(file -> {
+                            String name = file.getFileName().toString();
+                            return name.startsWith("signature-") && name.endsWith(".properties");
+                        })
+                        .sorted()
+                        .forEach(file -> signatureFiles.putIfAbsent(file.getFileName().toString(), file));
+            }
+        }
         for (Path file : moduleInfos) {
             Path parent = file.getParent(), location = root.relativize(parent);
             if (filter.test(location)) {
@@ -504,6 +583,11 @@ public class ModularProject implements BuildExecutorModule {
                     for (Path bom : bomFiles.values()) {
                         String source = "boms-" + index++;
                         module.addSource(source, new Bind(Map.of(Path.of(""), bom.getFileName())), bom);
+                        manifestDeps.add(source);
+                    }
+                    for (Path signature : signatureFiles.values()) {
+                        String source = "signatures-" + index++;
+                        module.addSource(source, new Bind(Map.of(Path.of(""), signature.getFileName())), signature);
                         manifestDeps.add(source);
                     }
                     manifestDeps.addAll(modInherited.sequencedKeySet());

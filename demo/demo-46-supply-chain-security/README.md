@@ -25,14 +25,15 @@ Run it
     [blocked] signed: an undeclared coordinate under strict verification
     [ok]      signed: the artifact and its POM both verify against the declared key
     [blocked] rotated: the declared key is not the one that signed the artifact
+    [blocked] vendored: a local key list is consulted like an inline declaration
     [ok]      rotated: the same contradiction is never looked for by default
 
 The signature half is self-contained and reaches no network, and **nothing binary is
 committed**: `Demo.java` builds a byte-reproducible jar, generates a throwaway key in a
 gpg home under `target/`, signs both the jar and its POM with it, and publishes all four
-files to a `file:` Maven repository - then builds two standalone projects against it. If
+files to a `file:` Maven repository - then builds three standalone projects against it. If
 gpg is not installed the run prints `[skipped]` and stops after the pinning half, because
-there is nothing the remaining five cases could verify.
+there is nothing the remaining six cases could verify.
 
 Pinning: whether, and which bytes
 ---------------------------------
@@ -76,6 +77,24 @@ equivalent form: a Maven project states its BOM imports in `<dependencyManagemen
 has no place for a key, so the signature half of this demo is modular while the pinning
 half is Maven.
 
+One vetted list can serve many modules. A declaration naming a lone
+`signature-<name>.properties` reads its keys from a local file instead, the shape
+`@jenesis.bom` already uses for a local `pin-<name>.properties`:
+
+    @jenesis.signature signature-vendor.properties
+
+```properties
+# build.jenesis/signature-vendor.properties
+OpenPGP/FF6E2C001948C5F2F38B0CC385911F425EC61B51 = org.apiguardian/* org.junit.jupiter/*
+OpenPGP/BE685132AFD2740D9095F9040CC0B712FEE75827 = org.assertj/*
+```
+
+The fingerprint is the properties key rather than the coordinate, so one coordinate can
+sit under two keys through a rotation. The file is found in `jenesis.project.signatures`,
+which defaults to the configuration folders. A list is **only ever read from disk**: there
+is no form that resolves one from a repository, because a list you had to download would
+itself need verifying, which is the problem the mechanism exists to solve.
+
 The line carries **no version**: one key signs every release it signs, so the declaration
 stays put across version bumps. That is the whole economy of this approach - vetting a key
 once covers every future release from that key, where a hash covers exactly one file and
@@ -105,8 +124,8 @@ whatever the repository currently serves - look safer than it is. Run that opera
 `-Djenesis.dependency.signature=strict` and the bytes it is about to bless are the ones
 their author released.
 
-The two projects
-----------------
+The three projects
+------------------
 
 - **`signed`** declares **nothing** for the coordinate. Under `declared` it builds
   untouched: that mode verifies what is declared and claims nothing about the rest. Under
@@ -117,6 +136,9 @@ The two projects
   perfectly valid - gpg is happy with it - so **only** the comparison against the
   declaration catches the substitution. That is precisely what naming the key buys you,
   and what a checksum alone cannot see.
+- **`vendored`** makes the same mistake through a local key list rather than an inline
+  line, and is blocked identically. The list is the only difference: where the trust is
+  written down, not how much of it is checked.
 
 The failure names both keys and the fix:
 
@@ -169,12 +191,13 @@ Layout
 
     demo-46-supply-chain-security
     |-- build/jenesis            symlink to ../../../sources/build/jenesis
-    |-- build/Demo.java          builds and signs the fixture, asserts all eight outcomes
+    |-- build/Demo.java          builds and signs the fixture, asserts all nine outcomes
     |-- pom.xml                  aggregator over the two pinning modules
     |-- unpinned/pom.xml         commons-lang3 with a version but no checksum
     |-- tampered/pom.xml         commons-lang3 pinned to a deliberately wrong SHA-256
     |-- signed/                  standalone modular project declaring no key
-    `-- rotated/                 standalone modular project declaring the wrong key
+    |-- rotated/                 standalone modular project declaring the wrong key
+    `-- vendored/                the same wrong key, taken from a local key list
 
 The jar, its POM, both signatures, the key and the `file:` repository are all built under
 `target/` at run time, so nothing binary is committed.

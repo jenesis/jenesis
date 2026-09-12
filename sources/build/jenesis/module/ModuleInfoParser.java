@@ -357,6 +357,25 @@ public class ModuleInfoParser {
                             case "jenesis.signature" -> {
                                 String declaration = content.replaceAll("\\s+", " ").trim();
                                 int split = declaration.indexOf(' ');
+                                if (split < 0) {
+                                    String last = declaration.substring(declaration.lastIndexOf('/') + 1);
+                                    if (!last.startsWith("signature-") || !last.endsWith(".properties")) {
+                                        throw new IllegalArgumentException("Malformed @jenesis.signature declaration '"
+                                                + declaration
+                                                + "': expected <algorithm>/<fingerprint> <token>... or"
+                                                + " [<group>/]signature-<name>.properties; a list that had to be"
+                                                + " downloaded would itself need verifying");
+                                    }
+                                    int first = declaration.indexOf('/');
+                                    String qualifier = first < 0 ? group : declaration.substring(0, first);
+                                    if (qualifier.isEmpty() || first != declaration.lastIndexOf('/')) {
+                                        throw new IllegalArgumentException("Malformed @jenesis.signature token '"
+                                                + declaration
+                                                + "': expected [<group>/]signature-<name>.properties");
+                                    }
+                                    signatures.putIfAbsent(qualifier + "/" + last, "");
+                                    continue;
+                                }
                                 if (split < 1) {
                                     throw new IllegalArgumentException("Malformed @jenesis.signature declaration '"
                                             + declaration

@@ -972,17 +972,21 @@ coordinate's artifacts: the fingerprint first, then the coordinates it covers,
 because one key normally signs many, and a Maven token may end in `/*` to cover a
 whole groupId. Nothing writes those lines - a fingerprint is checked against the
 upstream project's published KEYS and added by hand, as `@jenesis.bom` entries are.
-Verification happens right after download, as its own step inside the `Dependencies`
-module, and `jenesis.dependency.signature` decides how much of it happens: `declared`
-checks every coordinate a line covers, `strict` additionally refuses one no line
-covers, and the default `none` checks nothing. A **`signed`** project declares no key
+A declaration naming a lone `signature-<name>.properties` reads its keys from a local
+file instead, the shape `@jenesis.bom` already uses for a local pin file, so one vetted
+list serves many modules; a list is only ever read from disk. Verification happens right
+after download, as its own step inside the `Dependencies` module, and
+`jenesis.dependency.signature` decides how much of it happens: `declared` checks every
+coordinate a line covers, `strict` additionally refuses one no line covers, and the
+default `none` checks nothing. A **`signed`** project declares no key
 and so passes `declared` and fails `strict`, until the demo writes the real
 fingerprint in; a **`rotated`** one declares another key and is blocked, even though
 its signature is perfectly valid - only the comparison against the declaration can
-see that. That half is self-contained and commits nothing binary: the demo builds a
-byte-reproducible jar, generates a throwaway key, signs the jar and its POM, and
-publishes all four files to a `file:` repository under `target/`, so nothing reaches
-the network.
+see that; a **`vendored`** one makes the same mistake through a local key list and is
+blocked identically. That half is self-contained and commits nothing binary: the demo
+builds a byte-reproducible jar, generates a throwaway key, signs the jar and its POM,
+and publishes all four files to a `file:` repository under `target/`, so nothing
+reaches the network.
 
 The new ideas are **strict pinning vs. checksum verification** - the former decides
 *whether* an unverified dependency may be used at all, the latter proves a pinned
