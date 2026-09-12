@@ -650,10 +650,11 @@ public record Project(
                           lines from a local file in jenesis.project.signatures, the way
                           @jenesis.bom names a local pin-<name>.properties, so one vetted list
                           serves many modules; a list is never resolved from a repository, since one
-                          that had to be downloaded would itself need verifying. Verification forks
-                          gpg, which must be installed and on the PATH: a Java implementation would
-                          have to be resolved from the repository being verified, and a verifier
-                          downloaded on trust verifies nothing. The verifier is an ordinary forked
+                          that had to be downloaded would itself need verifying. A declaration never
+                          switches verification on by itself, and when it is switched on it forks
+                          gpg, which must then be installed and on the PATH: a Java implementation
+                          would have to be resolved from the repository being verified, and a
+                          verifier downloaded on trust verifies nothing. The verifier is an ordinary forked
                           tool, so jenesis.print.gpg shows each invocation, jenesis.print.signatures
                           names what was covered, and jenesis.signature.command names a different
                           binary.
