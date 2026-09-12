@@ -757,11 +757,11 @@ public class MavenModuleResolverTest {
         versions.setProperty("main/maven/org.transitive/lib", "2.0 " + libs.get("2.0"));
         versions.store(folder.resolve(BuildStep.VERSIONS));
 
-        new Dependencies.Resolve(
+        new Dependencies(
                 Map.of("module", discovery,
                         "maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
                 Map.of("module", new MavenModuleResolver("maven", mavenPomResolver, discovery)))
-                .pinning(pinning)
+                .pinning(pinning).resolution()
                 .apply(Runnable::run,
                         new BuildStepContext(workspace.resolve("previous"), next, supplement),
                         new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(folder, Map.of(

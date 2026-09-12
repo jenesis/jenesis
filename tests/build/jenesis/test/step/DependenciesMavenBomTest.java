@@ -75,7 +75,7 @@ public class DependenciesMavenBomTest {
         };
     }
 
-    private BuildStepResult apply(Dependencies.Resolve resolve) throws IOException {
+    private BuildStepResult apply(BuildStep resolve) throws IOException {
         return resolve.apply(
                         Runnable::run,
                         new BuildStepContext(previous, next, supplement),
@@ -95,7 +95,7 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies.Resolve(
+        BuildStepResult result = apply(new Dependencies(
                 Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", """
                         <project xmlns="http://maven.apache.org/POM/4.0.0">
                             <modelVersion>4.0.0</modelVersion>
@@ -110,7 +110,7 @@ public class DependenciesMavenBomTest {
                             </dependencyManagement>
                         </project>
                         """))),
-                Map.of("maven", new MavenPomResolver())));
+                Map.of("maven", new MavenPomResolver())).resolution());
         assertThat(result.next()).isTrue();
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).contains("main/compile/maven/org.acme/lib/2.0");
@@ -128,13 +128,13 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies.Resolve(
+        BuildStepResult result = apply(new Dependencies(
                 Map.of("maven", maven(Map.of("org.acme/tool/pom/1.0", """
                         <project xmlns="http://maven.apache.org/POM/4.0.0">
                             <modelVersion>4.0.0</modelVersion>
                         </project>
                         """))),
-                Map.of("maven", new MavenPomResolver())).group("tool"));
+                Map.of("maven", new MavenPomResolver())).group("tool").resolution());
         assertThat(result.next()).isTrue();
         assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
                 .as("a tool never fetches the bill of materials that manages the module's own closure")
@@ -152,7 +152,7 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies.Resolve(
+        BuildStepResult result = apply(new Dependencies(
                 Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", """
                         <project xmlns="http://maven.apache.org/POM/4.0.0">
                             <modelVersion>4.0.0</modelVersion>
@@ -167,7 +167,7 @@ public class DependenciesMavenBomTest {
                             </dependencyManagement>
                         </project>
                         """))),
-                Map.of("maven", new MavenPomResolver())));
+                Map.of("maven", new MavenPomResolver())).resolution());
         assertThat(result.next()).isTrue();
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).contains("main/compile/maven/org.acme/lib/3.0");
@@ -178,13 +178,13 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies.Resolve(
+        BuildStepResult result = apply(new Dependencies(
                 Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", """
                         <project xmlns="http://maven.apache.org/POM/4.0.0">
                             <modelVersion>4.0.0</modelVersion>
                         </project>
                         """))),
-                Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT));
+                Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT).resolution());
         assertThat(result.next()).isTrue();
     }
 
@@ -196,7 +196,7 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies.Resolve(
+        BuildStepResult result = apply(new Dependencies(
                 Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", """
                         <project xmlns="http://maven.apache.org/POM/4.0.0">
                             <modelVersion>4.0.0</modelVersion>
@@ -211,7 +211,7 @@ public class DependenciesMavenBomTest {
                             </dependencyManagement>
                         </project>
                         """))),
-                Map.of("maven", new MavenPomResolver())));
+                Map.of("maven", new MavenPomResolver())).resolution());
         assertThat(result.next()).isTrue();
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.getProperty("main/compile/maven/org.acme/lib/2.0")).doesNotContain("SHA");
@@ -226,7 +226,7 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies.Resolve(
+        BuildStepResult result = apply(new Dependencies(
                 Map.of("maven", maven(Map.of(
                         "org.acme/platform-bom/pom/1.0", """
                                 <project xmlns="http://maven.apache.org/POM/4.0.0">
@@ -268,7 +268,7 @@ public class DependenciesMavenBomTest {
                                     </dependencyManagement>
                                 </project>
                                 """))),
-                Map.of("maven", new MavenPomResolver())));
+                Map.of("maven", new MavenPomResolver())).resolution());
         assertThat(result.next()).isTrue();
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).contains(
@@ -285,7 +285,7 @@ public class DependenciesMavenBomTest {
         boms.setProperty("entry/main/maven/org.acme/lib", "1.0 SHA-256/aaaa");
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies.Resolve(
+        BuildStepResult result = apply(new Dependencies(
                 Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", """
                         <project xmlns="http://maven.apache.org/POM/4.0.0">
                             <modelVersion>4.0.0</modelVersion>
@@ -300,7 +300,7 @@ public class DependenciesMavenBomTest {
                             </dependencyManagement>
                         </project>
                         """))),
-                Map.of("maven", new MavenPomResolver())));
+                Map.of("maven", new MavenPomResolver())).resolution());
         assertThat(result.next()).isTrue();
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).contains("main/compile/maven/org.acme/lib/2.0");
@@ -316,7 +316,7 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies.Resolve(
+        BuildStepResult result = apply(new Dependencies(
                 Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", """
                                 <project xmlns="http://maven.apache.org/POM/4.0.0">
                                     <modelVersion>4.0.0</modelVersion>
@@ -332,7 +332,7 @@ public class DependenciesMavenBomTest {
                                 </project>
                                 """),
                         "<metadata><versioning><release>1.0</release></versioning></metadata>")),
-                Map.of("maven", new MavenPomResolver())));
+                Map.of("maven", new MavenPomResolver())).resolution());
         assertThat(result.next()).isTrue();
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).contains("main/compile/maven/org.acme/lib/2.0");
@@ -354,7 +354,7 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies.Resolve(
+        BuildStepResult result = apply(new Dependencies(
                 Map.of("maven", maven(Map.of(
                                 "org.acme/platform-bom/pom/1.0", """
                                         <project xmlns="http://maven.apache.org/POM/4.0.0">
@@ -385,7 +385,7 @@ public class DependenciesMavenBomTest {
                                         </project>
                                         """),
                         "<metadata><versioning><release>2.0</release></versioning></metadata>")),
-                Map.of("maven", new MavenPomResolver())).pinning(Pinning.IGNORE));
+                Map.of("maven", new MavenPomResolver())).pinning(Pinning.IGNORE).resolution());
         assertThat(result.next()).isTrue();
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).contains("main/compile/maven/org.acme/lib/2.5");

@@ -35,10 +35,10 @@ public class DependenciesExecutionTest {
         dependencies.setProperty("main/compile/foo/bar", "");
         dependencies.store(input.resolve(BuildStep.REQUIRES));
         buildExecutor.addSource("input", input);
-        buildExecutor.addStep("output", new Dependencies.Resolve(
+        buildExecutor.addStep("output", new Dependencies(
                 Map.of("foo", (_, coordinate) -> Optional.of(() -> new ByteArrayInputStream(
                         coordinate.getBytes(StandardCharsets.UTF_8)))),
-                Map.of("foo", Resolver.identity())), "input");
+                Map.of("foo", Resolver.identity())).resolution(), "input");
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps).containsKey("output");
         SequencedProperties resolved = SequencedProperties.ofFiles(steps.get("output").resolve(BuildStep.DEPENDENCIES));

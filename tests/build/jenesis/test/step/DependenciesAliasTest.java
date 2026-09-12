@@ -392,10 +392,10 @@ public class DependenciesAliasTest {
             declared.store(dependencies.resolve(BuildStep.ALIASES));
             changed.put(Path.of(BuildStep.ALIASES), Checksum.of(ChecksumStatus.ADDED));
         }
-        return new Dependencies.Resolve(
+        return new Dependencies(
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {
                 })),
-                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))).apply(
+                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))).resolution().apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("dependencies", new BuildStepArgument(dependencies, changed))))

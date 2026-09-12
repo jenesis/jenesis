@@ -93,9 +93,9 @@ public class DependenciesOverrideTest {
 
     @Test
     public void rejects_an_override_where_modules_do_not_resolve_to_coordinates() throws IOException {
-        assertThatThrownBy(() -> new Dependencies.Resolve(
+        assertThatThrownBy(() -> new Dependencies(
                 Map.of("module", discovery()),
-                Map.of("module", new ModularJarResolver(false))).apply(
+                Map.of("module", new ModularJarResolver(false))).resolution().apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 arguments(Map.of("lib.shaded", "lib.carrier"), "lib.carrier"))
@@ -190,11 +190,11 @@ public class DependenciesOverrideTest {
         MavenDefaultRepository maven = new MavenDefaultRepository(
                 mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {
         });
-        return new Dependencies.Resolve(
+        return new Dependencies(
                 Map.of("maven", maven, "module", discovery()),
                 Map.of("module", new MavenModuleResolver("maven",
                         new MavenPomResolver(MavenDefaultVersionNegotiator.maven()),
-                        discovery()))).apply(
+                        discovery()))).resolution().apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 arguments(overrides, modules))
