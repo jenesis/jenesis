@@ -68,29 +68,27 @@ public class Dependencies implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        buildExecutor.addStep(RESOLVE,
-                new Resolve(repositories, resolvers, pinning, group),
-                inherited.sequencedKeySet());
+        buildExecutor.addStep(RESOLVE, resolution(), inherited.sequencedKeySet());
         SequencedSet<String> verified = new LinkedHashSet<>();
         verified.add(RESOLVE);
         verified.addAll(inherited.sequencedKeySet());
         buildExecutor.addStep(SIGNATURES, new Signatures(repositories), verified);
     }
 
+    public BuildStep resolution() {
+        return new Resolve(repositories, resolvers, pinning, group);
+    }
+
     @Override
     public Optional<String> resolve(String path) {
         return path.equals(RESOLVE) ? Optional.of("") : Optional.empty();
     }
-    public static class Resolve implements BuildStep {
+    private static class Resolve implements BuildStep {
 
         private final transient Map<String, Repository> repositories;
         private final Map<String, Resolver> resolvers;
         private final Pinning pinning;
         private final String group;
-
-        public Resolve(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-            this(repositories, resolvers, null, null);
-        }
 
         private Resolve(Map<String, Repository> repositories,
                         Map<String, Resolver> resolvers,
@@ -100,14 +98,6 @@ public class Dependencies implements BuildExecutorModule {
             this.resolvers = new LinkedHashMap<>(resolvers);
             this.pinning = pinning;
             this.group = group;
-        }
-
-        public Resolve pinning(Pinning pinning) {
-            return new Resolve(repositories, resolvers, pinning, group);
-        }
-
-        public Resolve group(String group) {
-            return new Resolve(repositories, resolvers, pinning, group);
         }
 
         @Override
