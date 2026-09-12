@@ -19,12 +19,14 @@ public record ModuleInfo(String coordinate,
                          SequencedMap<String, String> versions,
                          SequencedMap<String, SequencedMap<String, String>> variants,
                          SequencedMap<String, String> boms,
+                         SequencedMap<String, String> signatures,
                          SequencedMap<String, SequencedMap<String, String>> bomVariants) {
 
     public ModuleInfo(String coordinate, SequencedSet<String> requires, SequencedSet<String> runtimeRequires) {
         this(coordinate,
                 null, null, null, null, false, null,
                 requires, runtimeRequires,
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),

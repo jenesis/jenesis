@@ -1110,4 +1110,52 @@ public class ModuleInfoParserTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("expected <algorithm>/<hash>");
     }
+
+    @Test
+    public void signature_tag_expands_every_token_it_lists() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.signature OpenPGP/B4D5 org.example/lib some.module
+                 * @jenesis.signature OpenPGP/FEED tool/maven/org.example/other org.example/*
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.signatures())
+                .containsEntry("OpenPGP/B4D5", "main/maven/org.example/lib main/module/some.module")
+                .containsEntry("OpenPGP/FEED", "tool/maven/org.example/other main/maven/org.example/*");
+    }
+
+    @Test
+    public void signature_tag_joins_repeated_declarations_of_one_key() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.signature OpenPGP/B4D5 org.example/lib
+                 * @jenesis.signature OpenPGP/B4D5 org.example/other
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.signatures())
+                .containsEntry("OpenPGP/B4D5", "main/maven/org.example/lib main/maven/org.example/other");
+    }
+
+    @Test
+    public void signature_tag_rejects_a_declaration_that_names_no_coordinate() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.signature OpenPGP/B4D5
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expected <algorithm>/<fingerprint> <token>...");
+    }
 }

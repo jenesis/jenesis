@@ -7,6 +7,10 @@ public interface Repository {
 
     Optional<RepositoryItem> fetch(Executor executor, String coordinate) throws IOException;
 
+    default Optional<RepositoryItem> signature(Executor executor, String coordinate) throws IOException {
+        return Optional.empty();
+    }
+
     default Repository prepend(Repository repository) {
         return (executor, coordinate) -> {
             Optional<RepositoryItem> candidate = repository.fetch(executor, coordinate);
@@ -56,51 +60,70 @@ public interface Repository {
         }
         ConcurrentMap<String, Path> cache = new ConcurrentHashMap<>();
         Set<String> internal = ConcurrentHashMap.newKeySet();
-        return (executor, coordinate) -> {
-            try {
-                Path candidate = folder.resolve(BuildExecutorModule.encode(coordinate) + ".jar");
-                boolean preexisting = Files.exists(candidate);
-                Path target = cache.computeIfAbsent(coordinate, key -> {
-                    if (Files.exists(candidate)) {
-                        return candidate;
-                    }
-                    try {
-                        RepositoryItem item = fetch(executor, key).orElse(null);
-                        if (item == null) {
-                            return null;
+        Repository origin = this;
+        return new Repository() {
+
+            @Override
+            public Optional<RepositoryItem> fetch(Executor executor, String coordinate) throws IOException {
+                return locate(executor, coordinate, ".jar", false);
+            }
+
+            @Override
+            public Optional<RepositoryItem> signature(Executor executor, String coordinate) throws IOException {
+                return locate(executor, coordinate, ".asc", true);
+            }
+
+            private Optional<RepositoryItem> locate(Executor executor,
+                                                    String coordinate,
+                                                    String suffix,
+                                                    boolean detached) throws IOException {
+                try {
+                    Path candidate = folder.resolve(BuildExecutorModule.encode(coordinate) + suffix);
+                    boolean preexisting = Files.exists(candidate);
+                    Path target = cache.computeIfAbsent(coordinate + suffix, key -> {
+                        if (Files.exists(candidate)) {
+                            return candidate;
                         }
-                        Path file = item.file().orElse(null);
-                        if (file != null && (item.internal() || !snapshot && item.local())) {
-                            if (item.internal()) {
-                                internal.add(key);
+                        try {
+                            RepositoryItem item = (detached
+                                    ? origin.signature(executor, coordinate)
+                                    : origin.fetch(executor, coordinate)).orElse(null);
+                            if (item == null) {
+                                return null;
                             }
-                            return file;
-                        }
-                        if (file != null) {
-                            BuildStep.linkOrCopy(candidate, file);
-                        } else {
-                            Path temporary = Files.createTempFile(candidate.getParent(), "fetch", ".jar");
-                            try (InputStream inputStream = item.toInputStream()) {
-                                Files.copy(inputStream, temporary, StandardCopyOption.REPLACE_EXISTING);
-                            } catch (Throwable t) {
-                                Files.deleteIfExists(temporary);
-                                throw t;
+                            Path file = item.file().orElse(null);
+                            if (file != null && (item.internal() || !snapshot && item.local())) {
+                                if (item.internal()) {
+                                    internal.add(key);
+                                }
+                                return file;
                             }
-                            Files.move(temporary, candidate, StandardCopyOption.ATOMIC_MOVE);
+                            if (file != null) {
+                                BuildStep.linkOrCopy(candidate, file);
+                            } else {
+                                Path temporary = Files.createTempFile(candidate.getParent(), "fetch", suffix);
+                                try (InputStream inputStream = item.toInputStream()) {
+                                    Files.copy(inputStream, temporary, StandardCopyOption.REPLACE_EXISTING);
+                                } catch (Throwable t) {
+                                    Files.deleteIfExists(temporary);
+                                    throw t;
+                                }
+                                Files.move(temporary, candidate, StandardCopyOption.ATOMIC_MOVE);
+                            }
+                            return candidate;
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
                         }
-                        return candidate;
-                    } catch (IOException e) {
-                        throw new UncheckedIOException(e);
+                    });
+                    if (preexisting && target != null) {
+                        callback.accept(target);
                     }
-                });
-                if (preexisting && target != null) {
-                    callback.accept(target);
+                    return target == null
+                            ? Optional.empty()
+                            : Optional.of(RepositoryItem.ofFile(target, internal.contains(coordinate + suffix)));
+                } catch (UncheckedIOException e) {
+                    throw e.getCause();
                 }
-                return target == null
-                        ? Optional.empty()
-                        : Optional.of(RepositoryItem.ofFile(target, internal.contains(coordinate)));
-            } catch (UncheckedIOException e) {
-                throw e.getCause();
             }
         };
     }

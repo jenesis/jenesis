@@ -584,6 +584,8 @@ public record Project(
                       versions.properties   <group>/<repository>/<coordinate> -> <version>[ <algo>/<hex>]
                       boms.properties       bom/<...> -> [<version>[ <algo>/<hex>]] references and
                                             entry/<...> -> expanded entries; merged below versions
+                      signatures.properties <algo>/<hex> -> space-separated coordinate tokens, each
+                                            optionally ending in /* for a whole groupId
                       exclusions.properties <group>/<scope>/<repository>/<coordinate> -> comma-separated
                                             <groupId>/<artifactId>
                       inventory.properties  what staging reads: artifacts, sources, documentation,
@@ -612,6 +614,25 @@ public record Project(
                           no tests, runs none, is never staged.
                       @jenesis.pin <token> <ver> [<algo>/<hex>] [<guard>]
                           Pin a version and optionally a content checksum.
+                      @jenesis.signature <algo>/<hex> <token>...
+                          Declare the OpenPGP key that signs these coordinates' artifacts - the
+                          fingerprint first, because one key normally signs many. A Maven token may
+                          end in /* to cover every artifact of one groupId. Carries no version: one
+                          line covers every release that key signs, so it stays put across version
+                          bumps. Nothing writes these lines: a key is checked against the upstream
+                          project's published KEYS and added by hand, and a genuine key rotation is
+                          accepted by adding the new fingerprint rather than deleting the old one.
+                          Verification runs during dependency resolution, right after an artifact is
+                          downloaded, and only when jenesis.dependency.signature asks for it:
+                          declared verifies every coordinate a line covers, strict additionally
+                          rejects one that no line covers or that publishes no signature, and the
+                          default none verifies nothing, so a consumer who trusts the pins needs no
+                          gpg at all. A coordinate's POM is verified with its artifact and must carry
+                          the same signer, which closes the gap that POMs are read but never pinned.
+                          Key material comes from the local gpg keyring and is never fetched; an
+                          unknown key is reported rather than retrieved. The verifier is an ordinary
+                          forked tool, so jenesis.print.gpg shows each invocation and
+                          jenesis.signature.command names a different binary.
                       @jenesis.alias <module> <groupId>/<artifactId>[/<type>[/<classifier>]]
                           Require a Maven artifact under a stable module name, so a non-modular jar
                           needs no derived automatic name. Carries no version: a pin or BOM entry
@@ -742,11 +763,15 @@ public record Project(
                     and a <!--jenesis.pin ... --> comment) or module-info.java (@jenesis.pin tags),
                     idempotently, refreshing only the lines matching the local platform. Enforce
                     coverage with -Djenesis.dependency.pin=strict; refresh with
-                    -Djenesis.dependency.pin=ignore and the `pin` selector.
+                    -Djenesis.dependency.pin=ignore and the `pin` selector. A checksum says the bytes
+                    did not change since they were vetted, not who produced them; @jenesis.signature
+                    declares the OpenPGP key that signs a coordinate, and -Djenesis.dependency.signature
+                    checks the detached signature with a local gpg as each artifact is downloaded, so
+                    the run that establishes a pin is the run that proves who produced it.
 
                     ## 13. Copy a demo: they are the recipe book
 
-                    51 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    52 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -1508,6 +1533,8 @@ public record Project(
                 project.documentation|false|Assemble a javadoc jar for every module
                 project.version||Version stamped onto every produced artifact
                 project.digest|SHA-256|Algorithm for pin and dependency checksums
+                dependency.signature|none|Signatures verified after download: none|declared|strict
+                signature.command|gpg|Binary forked to verify detached OpenPGP signatures
                 project.metadata||Path-separated extra metadata files
                 project.configuration|build.jenesis|Path-separated folders searched for tool configuration files; @ splices the default
                 project.boms||Path-separated locations of local pin-<name>.properties; default: the configuration folders

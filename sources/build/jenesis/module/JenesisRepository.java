@@ -33,14 +33,44 @@ public interface JenesisRepository extends Repository {
     }
 
     @Override
+    default Optional<RepositoryItem> signature(Executor executor, String coordinate) throws IOException {
+        int colon = coordinate.lastIndexOf(':');
+        String type = colon < 0 ? "jar" : coordinate.substring(colon + 1);
+        String identifier = colon < 0 ? coordinate : coordinate.substring(0, colon);
+        int slash = identifier.indexOf('/');
+        String module = slash < 0 ? identifier : identifier.substring(0, slash);
+        String version = slash < 0 ? null : identifier.substring(slash + 1);
+        int dash = module.indexOf('-');
+        String classifier = dash < 0 ? null : module.substring(dash + 1);
+        if (dash >= 0) {
+            module = module.substring(0, dash);
+        }
+        return fetch(executor, module, classifier, version, type + ".asc");
+    }
+
+    @Override
     default JenesisRepository cached(Path folder) {
         if (folder == null) {
             return this;
         }
         Repository cached = Repository.super.cached(folder);
-        return (executor, module, classifier, version, type) -> cached.fetch(
-                executor,
-                coordinate(module, classifier, version, type));
+        JenesisRepository origin = this;
+        return new JenesisRepository() {
+
+            @Override
+            public Optional<RepositoryItem> fetch(Executor executor,
+                                                  String module,
+                                                  String classifier,
+                                                  String version,
+                                                  String type) throws IOException {
+                return cached.fetch(executor, coordinate(module, classifier, version, type));
+            }
+
+            @Override
+            public Optional<RepositoryItem> signature(Executor executor, String coordinate) throws IOException {
+                return cached.signature(executor, coordinate);
+            }
+        };
     }
 
     @Override
