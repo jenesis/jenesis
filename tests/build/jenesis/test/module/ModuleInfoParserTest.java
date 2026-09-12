@@ -67,7 +67,7 @@ public class ModuleInfoParserTest {
     public void jenesis_pin_keeps_range_as_version_when_platform_guarded() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
-                 * @jenesis.pin org.slf4j/slf4j-api [1.7,2.0] [windows]
+                 * @jenesis.pin org.slf4j/slf4j-api [1.7,2.0] (windows)
                  */
                 module foo {
                     requires org.slf4j;
@@ -975,8 +975,8 @@ public class ModuleInfoParserTest {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
                  * @jenesis.bom acme.platform 2.1.0
-                 * @jenesis.bom acme.platform 1.9.0 SHA256/cafebabe [legacy]
-                 * @jenesis.bom guarded.platform [legacy]
+                 * @jenesis.bom acme.platform 1.9.0 SHA256/cafebabe (legacy)
+                 * @jenesis.bom guarded.platform (legacy)
                  */
                 module foo {
                   requires bar;
@@ -1190,5 +1190,69 @@ public class ModuleInfoParserTest {
         assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("a list that had to be downloaded would itself need verifying");
+    }
+
+    @Test
+    public void guard_survives_the_javadoc_tool_in_a_markdown_comment() throws IOException {
+        Path sources = Files.createDirectories(folder.resolve("sources"));
+        Files.writeString(sources.resolve("module-info.java"), """
+                /// A module documented in Markdown.
+                ///
+                /// @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe (linux)
+                module demo.guarded {
+                }
+                """);
+        StringWriter error = new StringWriter();
+        int exitCode = ToolProvider.findFirst("javadoc").orElseThrow().run(new PrintWriter(Writer.nullWriter()),
+                new PrintWriter(error),
+                "-quiet",
+                "-tag", "jenesis.pin:a:Pinned dependencies:",
+                "-d", Files.createDirectories(folder.resolve("out")).toString(),
+                sources.resolve("module-info.java").toString());
+        assertThat(exitCode)
+                .as("a bracketed guard is a Markdown reference link, which javadoc rejects; "
+                        + "parentheses are why this passes: %s", error)
+                .isZero();
+        assertThat(error.toString()).doesNotContain("reference not found");
+    }
+
+    @Test
+    public void guard_is_parenthesised_in_both_documentation_comment_forms() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /// @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe (linux)
+                module foo {
+                }
+                """);
+        ModuleInfo markdown = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe (linux)
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo traditional = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(markdown.variants())
+                .as("the same declaration means the same thing in either form")
+                .isEqualTo(traditional.variants());
+        assertThat(markdown.variants().get("main/maven/org.example/lib"))
+                .containsEntry("linux", "1.0 SHA-256/cafebabe");
+    }
+
+    @Test
+    public void guard_rejects_the_bracket_form_it_replaced() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe [linux]
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.variants())
+                .as("brackets are no longer a guard, so nothing is silently guarded by one")
+                .isEmpty();
+        assertThat(info.versions())
+                .containsEntry("main/maven/org.example/lib", "1.0 SHA-256/cafebabe [linux]");
     }
 }

@@ -367,7 +367,7 @@ public class ModularProjectTest {
     public void selects_guarded_pin_matching_platform() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
-                 * @jenesis.pin bar :win:1.0 [windows]
+                 * @jenesis.pin bar :win:1.0 (windows)
                  * @jenesis.pin bar 1.0
                  */
                 module foo {
@@ -391,7 +391,7 @@ public class ModularProjectTest {
     public void guarded_pin_value_carries_checksum() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
-                 * @jenesis.pin bar :win:1.0 SHA-256/aaa [windows]
+                 * @jenesis.pin bar :win:1.0 SHA-256/aaa (windows)
                  * @jenesis.pin bar 1.0 SHA-256/bbb
                  */
                 module foo {
@@ -415,7 +415,7 @@ public class ModularProjectTest {
     public void falls_back_to_unguarded_pin_without_platform_match() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
-                 * @jenesis.pin bar :win:1.0 [windows]
+                 * @jenesis.pin bar :win:1.0 (windows)
                  * @jenesis.pin bar 1.0
                  */
                 module foo {
@@ -439,8 +439,8 @@ public class ModularProjectTest {
     public void more_specific_guard_wins_over_general_guard() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
-                 * @jenesis.pin bar :win:1.0 [windows]
-                 * @jenesis.pin bar :win-aarch64:1.0 [windows,aarch64]
+                 * @jenesis.pin bar :win:1.0 (windows)
+                 * @jenesis.pin bar :win-aarch64:1.0 (windows,aarch64)
                  */
                 module foo {
                   requires bar;
@@ -463,8 +463,8 @@ public class ModularProjectTest {
     public void ambiguous_guards_fail_the_build() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
-                 * @jenesis.pin bar :win:1.0 [windows]
-                 * @jenesis.pin bar :x64:1.0 [x86_64]
+                 * @jenesis.pin bar :win:1.0 (windows)
+                 * @jenesis.pin bar :x64:1.0 (x86_64)
                  */
                 module foo {
                   requires bar;
@@ -488,7 +488,7 @@ public class ModularProjectTest {
     public void unmatched_guard_without_fallback_yields_no_pin() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
-                 * @jenesis.pin bar :win:1.0 [windows]
+                 * @jenesis.pin bar :win:1.0 (windows)
                  */
                 module foo {
                   requires bar;
@@ -625,7 +625,7 @@ public class ModularProjectTest {
     public void selects_guarded_bom_matching_platform() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
-                 * @jenesis.bom acme.platform 2.0 [windows]
+                 * @jenesis.bom acme.platform 2.0 (windows)
                  * @jenesis.bom acme.platform 1.0
                  */
                 module foo {
@@ -649,7 +649,7 @@ public class ModularProjectTest {
     public void unmatched_guarded_bom_without_fallback_is_skipped() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
-                 * @jenesis.bom acme.platform 2.0 [windows]
+                 * @jenesis.bom acme.platform 2.0 (windows)
                  */
                 module foo {
                   requires bar;

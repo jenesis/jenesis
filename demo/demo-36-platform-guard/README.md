@@ -37,7 +37,7 @@ The guarded pins
 
     /**
      * @jenesis.pin mutiny.zero 1.1.1 SHA-256/2ba03737...
-     * @jenesis.pin mutiny.zero :jdk-flow:0.4.3 SHA-256/0556f076... [legacy]
+     * @jenesis.pin mutiny.zero :jdk-flow:0.4.3 SHA-256/0556f076... (legacy)
      */
     module demo.platform {
         requires mutiny.zero;
@@ -56,8 +56,8 @@ pinning rejects).
 
 A real OS-dependent project guards with platform tokens, one line per variant:
 
-    @jenesis.pin org.openjfx.javafx.base :win:21.0.3 SHA-256/... [windows]
-    @jenesis.pin org.openjfx.javafx.base :mac-aarch64:21.0.3 SHA-256/... [macos,aarch64]
+    @jenesis.pin org.openjfx.javafx.base :win:21.0.3 SHA-256/... (windows)
+    @jenesis.pin org.openjfx.javafx.base :mac-aarch64:21.0.3 SHA-256/... (macos,aarch64)
     @jenesis.pin org.openjfx.javafx.base :linux:21.0.3 SHA-256/...
 
 This demo deliberately guards with the neutral token `legacy` instead, so the

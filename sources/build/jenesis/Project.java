@@ -610,9 +610,11 @@ public record Project(
 
                     Token grammar, shared below: `<group>/<repo>/<coordinate>`, where a bare
                     `<module>` abbreviates `<group>/module/<module>` and `<groupId>/<artifactId>`
-                    abbreviates `<group>/maven/<groupId>/<artifactId>`. A trailing `[<token>,...]`
+                    abbreviates `<group>/maven/<groupId>/<artifactId>`. A trailing `(<token>,...)`
                     guard applies a line only on a matching platform, with an unguarded line for the
-                    same coordinate as fallback. alias, exclude and override are MODULAR_TO_MAVEN
+                    same coordinate as fallback. Parentheses rather than brackets, because a
+                    bracketed word is a link in a Markdown documentation comment and javadoc fails
+                    on one it cannot resolve. alias, exclude and override are MODULAR_TO_MAVEN
                     only.
 
                       @jenesis.release <V>   Java release target
@@ -620,7 +622,7 @@ public record Project(
                       @jenesis.test [<module>|abstract]
                           Test variant of <module>. `abstract` supplies infrastructure only: declares
                           no tests, runs none, is never staged.
-                      @jenesis.pin <token> <ver> [<algo>/<hex>] [<guard>]
+                      @jenesis.pin <token> <ver> [<algo>/<hex>] [(<guard>)]
                           Pin a version and optionally a content checksum.
                       @jenesis.signature <algo>/<hex> <token>... | [<group>/]signature-<name>.properties
                           Declare the OpenPGP key that signs these coordinates' artifacts - the
@@ -663,7 +665,7 @@ public record Project(
                           transitively and drops every resolved artifact declaring the overridden
                           module, so the packages appear once. Reaches consumers through the
                           Jenesis-Overrides manifest header. A carrier nothing declares is an error.
-                      @jenesis.bom <token> [<ver> [<algo>/<hex>]] [<guard>]
+                      @jenesis.bom <token> [<ver> [<algo>/<hex>]] [(<guard>)]
                           Import managed versions. A bare <module> names a BOM properties file in the
                           module repository, floating latest without a version; <groupId>/<artifactId>
                           names a Maven BOM whose <dependencyManagement> is imported with nested

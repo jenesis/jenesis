@@ -60,7 +60,7 @@ public interface Resolver extends Serializable {
         SequencedMap<String, String> entries = new LinkedHashMap<>();
         for (String key : properties.stringPropertyNames()) {
             String value = properties.getProperty(key).trim();
-            if (value.endsWith("]")) {
+            if (value.endsWith(")")) {
                 throw new IllegalArgumentException("Malformed BOM entry '"
                         + key
                         + "': platform guards are not supported in BOM files,"

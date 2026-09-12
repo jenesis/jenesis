@@ -178,8 +178,8 @@ public class PinPom implements BuildStep {
             String token = trimmed.substring(0, space);
             String value = trimmed.substring(space + 1).trim();
             String guard = null;
-            if (value.endsWith("]")) {
-                int bracket = value.lastIndexOf('[');
+            if (value.endsWith(")")) {
+                int bracket = value.lastIndexOf('(');
                 if (bracket > 0 && !value.substring(0, bracket).trim().isEmpty()) {
                     guard = value.substring(bracket + 1, value.length() - 1);
                     value = value.substring(0, bracket).trim();
@@ -230,7 +230,7 @@ public class PinPom implements BuildStep {
         List<String> preserved = new ArrayList<>();
         for (Pin pin : pins) {
             if (guarded.contains(expand(pin.token()))) {
-                preserved.add(pin.token() + " " + pin.value() + (pin.guard() == null ? "" : " [" + pin.guard() + "]"));
+                preserved.add(pin.token() + " " + pin.value() + (pin.guard() == null ? "" : " (" + pin.guard() + ")"));
             }
         }
         return preserved;

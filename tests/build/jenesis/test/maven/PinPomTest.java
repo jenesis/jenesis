@@ -127,7 +127,7 @@ public class PinPomTest {
                     <artifactId>artifact</artifactId>
                     <version>1</version>
                     <!--jenesis.pin
-                    kotlin/maven/org.jetbrains/something 1.0.0 SHA-256/aaa [windows]
+                    kotlin/maven/org.jetbrains/something 1.0.0 SHA-256/aaa (windows)
                     kotlin/maven/org.jetbrains/something 1.0.0 SHA-256/bbb
                     plugin/maven/org.example/other 0.9
                     -->
@@ -136,7 +136,7 @@ public class PinPomTest {
         writeResolved("kotlin", Map.of("maven/org.jetbrains/something", "1.2.3 SHA-256/fresh"));
         writeResolved("plugin", Map.of("maven/org.example/other", "4.5.6 SHA-256/cafebabe"));
         String result = run(pom, Platform.of("windows,x86_64"));
-        assertThat(result).contains("kotlin/maven/org.jetbrains/something 1.2.3 SHA-256/fresh [windows]");
+        assertThat(result).contains("kotlin/maven/org.jetbrains/something 1.2.3 SHA-256/fresh (windows)");
         assertThat(result).contains("kotlin/maven/org.jetbrains/something 1.0.0 SHA-256/bbb");
         assertThat(result).doesNotContain("SHA-256/aaa");
         assertThat(result).contains("plugin/maven/org.example/other 4.5.6 SHA-256/cafebabe");
@@ -154,14 +154,14 @@ public class PinPomTest {
                     <artifactId>artifact</artifactId>
                     <version>1</version>
                     <!--jenesis.pin
-                    org.foo/bar 1.0.0 SHA-256/aaa [legacy]
+                    org.foo/bar 1.0.0 SHA-256/aaa (legacy)
                     org.foo/bar 2.0.0 SHA-256/bbb
                     -->
                 </project>
                 """);
         writeResolved(Map.of("maven/org.foo/bar", "3.0.0 SHA-256/fresh"));
         String result = run(pom, Platform.of("linux,x86_64,legacy"));
-        assertThat(result).contains("org.foo/bar 3.0.0 SHA-256/fresh [legacy]");
+        assertThat(result).contains("org.foo/bar 3.0.0 SHA-256/fresh (legacy)");
         assertThat(result).contains("org.foo/bar 2.0.0 SHA-256/bbb");
         assertThat(result).doesNotContain("SHA-256/aaa");
         assertThat(result).as("the guarded short-form main pin is not migrated into dependencyManagement")
@@ -181,21 +181,21 @@ public class PinPomTest {
                     <artifactId>artifact</artifactId>
                     <version>1</version>
                     <!--jenesis.pin
-                    kotlin/maven/org.x/y 1.0 SHA-256/win [windows]
-                    kotlin/maven/org.x/y 2.0 SHA-256/leg [legacy]
+                    kotlin/maven/org.x/y 1.0 SHA-256/win (windows)
+                    kotlin/maven/org.x/y 2.0 SHA-256/leg (legacy)
                     kotlin/maven/org.x/y 3.0 SHA-256/fb
                     -->
                 </project>
                 """);
         writeResolved("kotlin", Map.of("maven/org.x/y", "9.9 SHA-256/fresh"));
         String result = run(pom, Platform.of("linux,x86_64,legacy"));
-        assertThat(result).as("the matched [legacy] line is refreshed")
-                .contains("kotlin/maven/org.x/y 9.9 SHA-256/fresh [legacy]");
-        assertThat(result).as("the non-matched [windows] line is retained verbatim")
-                .contains("kotlin/maven/org.x/y 1.0 SHA-256/win [windows]");
+        assertThat(result).as("the matched (legacy) line is refreshed")
+                .contains("kotlin/maven/org.x/y 9.9 SHA-256/fresh (legacy)");
+        assertThat(result).as("the non-matched (windows) line is retained verbatim")
+                .contains("kotlin/maven/org.x/y 1.0 SHA-256/win (windows)");
         assertThat(result).as("the fallback line is retained verbatim")
                 .contains("kotlin/maven/org.x/y 3.0 SHA-256/fb");
-        assertThat(result).as("the stale [legacy] value is gone").doesNotContain("SHA-256/leg");
+        assertThat(result).as("the stale (legacy) value is gone").doesNotContain("SHA-256/leg");
     }
 
     @Test
@@ -209,14 +209,14 @@ public class PinPomTest {
                     <artifactId>artifact</artifactId>
                     <version>1</version>
                     <!--jenesis.pin
-                    kotlin/maven/org.jetbrains/something 1.0.0 SHA-256/aaa [windows]
+                    kotlin/maven/org.jetbrains/something 1.0.0 SHA-256/aaa (windows)
                     kotlin/maven/org.jetbrains/something 1.0.0 SHA-256/bbb
                     -->
                 </project>
                 """);
         writeResolved("kotlin", Map.of("maven/org.jetbrains/something", "1.2.3 SHA-256/fresh"));
         String result = run(pom, Platform.of("linux,x86_64"));
-        assertThat(result).contains("kotlin/maven/org.jetbrains/something 1.0.0 SHA-256/aaa [windows]");
+        assertThat(result).contains("kotlin/maven/org.jetbrains/something 1.0.0 SHA-256/aaa (windows)");
         assertThat(result).contains("kotlin/maven/org.jetbrains/something 1.2.3 SHA-256/fresh");
         assertThat(result).doesNotContain("SHA-256/bbb");
     }
@@ -232,14 +232,14 @@ public class PinPomTest {
                     <artifactId>artifact</artifactId>
                     <version>1</version>
                     <!--jenesis.pin
-                    main/maven/io.smallrye.reactive/mutiny-zero 1.0.0 SHA-256/aaa [windows]
+                    main/maven/io.smallrye.reactive/mutiny-zero 1.0.0 SHA-256/aaa (windows)
                     main/maven/io.smallrye.reactive/mutiny-zero 0.9.0 SHA-256/bbb
                     -->
                 </project>
                 """);
         writeResolved(Map.of("maven/io.smallrye.reactive/mutiny-zero", "1.1.1 SHA-256/fresh"));
         String result = run(pom, Platform.of("linux,x86_64"));
-        assertThat(result).contains("main/maven/io.smallrye.reactive/mutiny-zero 1.0.0 SHA-256/aaa [windows]");
+        assertThat(result).contains("main/maven/io.smallrye.reactive/mutiny-zero 1.0.0 SHA-256/aaa (windows)");
         assertThat(result).contains("main/maven/io.smallrye.reactive/mutiny-zero 1.1.1 SHA-256/fresh");
         assertThat(result).doesNotContain("SHA-256/bbb");
         assertThat(result).doesNotContain("<dependencyManagement>");
@@ -256,13 +256,13 @@ public class PinPomTest {
                     <artifactId>artifact</artifactId>
                     <version>1</version>
                     <!--jenesis.pin
-                    kotlin/maven/org.jetbrains/something 1.0.0 [windows]
+                    kotlin/maven/org.jetbrains/something 1.0.0 (windows)
                     -->
                 </project>
                 """);
         writeResolved("plugin", Map.of("maven/org.example/other", "4.5.6"));
         String result = run(pom, Platform.of("linux,x86_64"));
-        assertThat(result).contains("kotlin/maven/org.jetbrains/something 1.0.0 [windows]");
+        assertThat(result).contains("kotlin/maven/org.jetbrains/something 1.0.0 (windows)");
         assertThat(result).contains("plugin/maven/org.example/other 4.5.6");
     }
 

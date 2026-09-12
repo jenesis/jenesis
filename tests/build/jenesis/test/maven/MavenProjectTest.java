@@ -933,7 +933,7 @@ public class MavenProjectTest {
                     <artifactId>artifact</artifactId>
                     <version>1</version>
                     <!--jenesis.pin
-                    launcher/maven/build.jenesis/build.jenesis.launcher 0.3.0 SHA-256/win [windows]
+                    launcher/maven/build.jenesis/build.jenesis.launcher 0.3.0 SHA-256/win (windows)
                     launcher/maven/build.jenesis/build.jenesis.launcher 0.2.0 SHA-256/abc
                     -->
                 </project>
@@ -962,7 +962,7 @@ public class MavenProjectTest {
                     <artifactId>artifact</artifactId>
                     <version>1</version>
                     <!--jenesis.pin
-                    launcher/maven/build.jenesis/build.jenesis.launcher 0.3.0 SHA-256/win [windows]
+                    launcher/maven/build.jenesis/build.jenesis.launcher 0.3.0 SHA-256/win (windows)
                     launcher/maven/build.jenesis/build.jenesis.launcher 0.2.0 SHA-256/abc
                     -->
                 </project>

@@ -91,7 +91,7 @@ public class DependenciesTest {
     @Test
     public void bom_entries_reject_platform_guards() {
         SequencedProperties properties = new SequencedProperties();
-        properties.setProperty("acme.core", "2.1.0 [linux]");
+        properties.setProperty("acme.core", "2.1.0 (linux)");
         assertThatThrownBy(() -> Dependencies.bomEntries(properties, "main"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("platform guards are not supported in BOM files");

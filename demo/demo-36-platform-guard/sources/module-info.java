@@ -13,7 +13,7 @@
  * @jenesis.release 25
  * @jenesis.main sample.Sample
  * @jenesis.pin mutiny.zero 1.1.1 SHA-256/2ba037374ea75e29921726d34a2ac426b88bd425a9e646802f905c117457a7a8
- * @jenesis.pin mutiny.zero :jdk-flow:0.4.3 SHA-256/0556f076191921250e5c9e21b9674d252bf2c4c515491e087fec93f383292b17 [legacy]
+ * @jenesis.pin mutiny.zero :jdk-flow:0.4.3 SHA-256/0556f076191921250e5c9e21b9674d252bf2c4c515491e087fec93f383292b17 (legacy)
  */
 module demo.platform {
     requires mutiny.zero;

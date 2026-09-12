@@ -64,7 +64,10 @@ public class Javadoc extends JdkProcessBuildStep {
                 "-tag", "jenesis.alias:a:Module aliases:",
                 "-tag", "jenesis.exclude:a:Excluded dependencies:",
                 "-tag", "jenesis.override:a:Overridden modules:",
-                "-tag", "jenesis.attach:a:Attached agents:"));
+                "-tag", "jenesis.attach:a:Attached agents:",
+                "-tag", "jenesis.bom:a:Imported bills of materials:",
+                "-tag", "jenesis.plugin:a:Compiler plugins:",
+                "-tag", "jenesis.signature:a:Signing keys:"));
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;

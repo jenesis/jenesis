@@ -1062,12 +1062,12 @@ public class MavenPomResolver implements MavenResolver {
                         String token = trimmed.substring(0, space).trim();
                         String value = trimmed.substring(space + 1).trim().replaceAll("\\s+", " ");
                         String guard = null;
-                        if (value.endsWith("]")) {
-                            int bracket = value.lastIndexOf('[');
+                        if (value.endsWith(")")) {
+                            int bracket = value.lastIndexOf('(');
                             if (bracket < 0) {
                                 throw new IllegalArgumentException("Malformed jenesis.pin guard '"
                                         + value
-                                        + "': expected <value> [<token>,<token>...]");
+                                        + "': expected <value> (<token>,<token>...)");
                             }
                             String guarded = value.substring(0, bracket).trim();
                             if (!guarded.isEmpty()) {

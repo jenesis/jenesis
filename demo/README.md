@@ -95,7 +95,7 @@ Quick index
 | 33 | [`module-classifier`](demo-33-module-classifier/README.md)   | Pin a classified variant of a module (`:jdk-flow:0.4.3`): the build fetches the classifier artifact, validated by checksum and asserted at runtime | `java build/jenesis/Execute.java`  |
 | 34 | [`module-alias`](demo-34-module-alias/README.md)             | Give a plain jar with no module identity (no `module-info`, no `Automatic-Module-Name`) a stable name with `@jenesis.alias`, so it can be `requires`d and `opens`d like any module - shown with args4j 2.33 - then a `modules.properties` rewrites the closure into explicit named modules with `jdeps`, so the alias becomes linkable into a `jlink` image | `java build/jenesis/Execute.java`  |
 | 35 | [`module-override`](demo-35-module-override/README.md)       | Require an API whose packages a dependency already ships: Tomcat Embed exports the `jakarta.servlet` and `jakarta.el` packages under its own module names, so a modular library that states `requires jakarta.servlet` in its descriptor - here the Jakarta Server Pages API - cannot share a module path with it. `@jenesis.override` places package-less modules of those names that read the carriers, and drops the artifacts that would carry the packages twice | `java build/jenesis/Execute.java`  |
-| 36 | [`platform-guard`](demo-36-platform-guard/README.md)         | Select a dependency variant per platform: guarded pin lines (`[windows]`) matched against the `-Djenesis.platform.<token>=true` flags, with an unguarded fallback | `java build/jenesis/Execute.java`  |
+| 36 | [`platform-guard`](demo-36-platform-guard/README.md)         | Select a dependency variant per platform: guarded pin lines (`(windows)`) matched against the `-Djenesis.platform.<token>=true` flags, with an unguarded fallback | `java build/jenesis/Execute.java`  |
 | 37 | [`platform-guard-pom`](demo-37-platform-guard-pom/README.md)  | The same guards in a `pom.xml`'s `<!--jenesis.pin-->` block: switch a transitive's pinned version per platform, each variant checksummed | `java build/jenesis/Execute.java`  |
 | 38 | [`custom-assembler`](demo-38-custom-assembler/README.md)     | Wrap the assembler to preprocess sources before the regular flow      | `java build/Demo.java`             |
 | 39 | [`custom-jmod`](demo-39-custom-jmod/README.md)               | Wrap the assembler to pack extra content into a `.jmod`, `jlink` it into a runtime, and `jpackage` that into a runnable app | `java build/Demo.java`             |
@@ -684,7 +684,7 @@ The pin stays keyed by the bare module name - the classifier is part of the valu
 never the coordinate - so it applies wherever the module appears in the closure,
 and only one variant of a module name can be selected, mirroring the module path's
 own uniqueness rule. Per-machine selection composes on top as plain data: a pin
-line ending in a bracketed guard (`[windows]`, `[linux,aarch64]`) applies only when
+line ending in a parenthesised guard (`(windows)`, `(linux,aarch64)`) applies only when
 its tokens are all contained in the active platform - the detected OS and chipset
 plus any token a `-Djenesis.platform.<token>=true` flag adds - with the unguarded
 line as the fallback. Every variant stays committed in source, so the build remains
@@ -809,12 +809,12 @@ chipset (e.g. `linux,x86_64`) plus any token a `-Djenesis.platform.<token>=true`
 system property adds on top:
 
     @jenesis.pin mutiny.zero 1.1.1 SHA-256/2ba03737...
-    @jenesis.pin mutiny.zero :jdk-flow:0.4.3 SHA-256/0556f076... [legacy]
+    @jenesis.pin mutiny.zero :jdk-flow:0.4.3 SHA-256/0556f076... (legacy)
 
 A guard matches when all of its tokens are contained in the active set; the most
 specific match wins, the unguarded line is the fallback, and equally specific
 distinct matches fail the build. Tokens are free-form - a real project guards
-with `[windows]` or `[macos,aarch64]`, while this demo uses the neutral token
+with `(windows)` or `(macos,aarch64)`, while this demo uses the neutral token
 `legacy` so the differential selection is observable on any machine: the default
 build resolves `mutiny.zero` 1.1.1, and
 `java -Djenesis.platform.legacy=true build/jenesis/Execute.java` adds the `legacy`

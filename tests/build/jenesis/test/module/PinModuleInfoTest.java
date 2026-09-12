@@ -360,7 +360,7 @@ public class PinModuleInfoTest {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """
                 /**
-                 * @jenesis.pin bar :win:1.0 SHA-256/aaa [windows]
+                 * @jenesis.pin bar :win:1.0 SHA-256/aaa (windows)
                  * @jenesis.pin bar 1.0 SHA-256/bbb
                  * @jenesis.pin other 0.9
                  */
@@ -373,7 +373,7 @@ public class PinModuleInfoTest {
                 "module/bar", "2.0 SHA-256/cafebabe",
                 "module/other", "1.0 SHA-256/dadada")));
         String result = run(file, Platform.of("linux,x86_64"));
-        assertThat(result).contains("@jenesis.pin bar :win:1.0 SHA-256/aaa [windows]");
+        assertThat(result).contains("@jenesis.pin bar :win:1.0 SHA-256/aaa (windows)");
         assertThat(result).contains("@jenesis.pin bar 2.0 SHA-256/cafebabe");
         assertThat(result).doesNotContain("@jenesis.pin bar 1.0 SHA-256/bbb");
         assertThat(result).contains("@jenesis.pin other 1.0 SHA-256/dadada");
@@ -385,7 +385,7 @@ public class PinModuleInfoTest {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """
                 /**
-                 * @jenesis.pin bar :win:1.0 SHA-256/aaa [windows]
+                 * @jenesis.pin bar :win:1.0 SHA-256/aaa (windows)
                  * @jenesis.pin bar 1.0 SHA-256/bbb
                  */
                 module foo {
@@ -394,7 +394,7 @@ public class PinModuleInfoTest {
                 """);
         writeResolved(Map.of("module/bar-win", "1.1 SHA-256/fresh"));
         String result = run(file, Platform.of("windows,x86_64"));
-        assertThat(result).contains("@jenesis.pin bar :win:1.1 SHA-256/fresh [windows]");
+        assertThat(result).contains("@jenesis.pin bar :win:1.1 SHA-256/fresh (windows)");
         assertThat(result).contains("@jenesis.pin bar 1.0 SHA-256/bbb");
         assertThat(result).doesNotContain("SHA-256/aaa");
     }
@@ -404,8 +404,8 @@ public class PinModuleInfoTest {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """
                 /**
-                 * @jenesis.pin bar :win:1.0 SHA-256/win [windows]
-                 * @jenesis.pin bar :leg:2.0 SHA-256/leg [legacy]
+                 * @jenesis.pin bar :win:1.0 SHA-256/win (windows)
+                 * @jenesis.pin bar :leg:2.0 SHA-256/leg (legacy)
                  * @jenesis.pin bar 3.0 SHA-256/fb
                  */
                 module foo {
@@ -414,8 +414,8 @@ public class PinModuleInfoTest {
                 """);
         writeResolved(Map.of("module/bar-leg", "9.9 SHA-256/fresh"));
         String result = run(file, Platform.of("linux,x86_64,legacy"));
-        assertThat(result).contains("@jenesis.pin bar :leg:9.9 SHA-256/fresh [legacy]");
-        assertThat(result).contains("@jenesis.pin bar :win:1.0 SHA-256/win [windows]");
+        assertThat(result).contains("@jenesis.pin bar :leg:9.9 SHA-256/fresh (legacy)");
+        assertThat(result).contains("@jenesis.pin bar :win:1.0 SHA-256/win (windows)");
         assertThat(result).contains("@jenesis.pin bar 3.0 SHA-256/fb");
         assertThat(result).doesNotContain("SHA-256/leg ");
     }
@@ -425,7 +425,7 @@ public class PinModuleInfoTest {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """
                 /**
-                 * @jenesis.pin bar :win:1.0 [windows]
+                 * @jenesis.pin bar :win:1.0 (windows)
                  * @jenesis.pin bar 1.0
                  */
                 module foo {
@@ -434,7 +434,7 @@ public class PinModuleInfoTest {
                 """);
         writeResolved(Map.of("module/bar-win", "1.1"));
         String result = run(file, Platform.of("windows,x86_64"));
-        assertThat(result).contains("@jenesis.pin bar :win:1.1 [windows]");
+        assertThat(result).contains("@jenesis.pin bar :win:1.1 (windows)");
         assertThat(result).contains("@jenesis.pin bar 1.0\n");
         assertThat(result).doesNotContain("SHA-256");
     }
@@ -444,7 +444,7 @@ public class PinModuleInfoTest {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """
                 /**
-                 * @jenesis.pin bar :win:1.0 [windows]
+                 * @jenesis.pin bar :win:1.0 (windows)
                  * @jenesis.pin other 0.9
                  */
                 module foo {
@@ -454,7 +454,7 @@ public class PinModuleInfoTest {
                 """);
         writeResolved(Map.of("module/other", "1.0 SHA-256/dadada"));
         String result = run(file, Platform.of("linux,x86_64"));
-        assertThat(result).contains("@jenesis.pin bar :win:1.0 [windows]");
+        assertThat(result).contains("@jenesis.pin bar :win:1.0 (windows)");
         assertThat(result).contains("@jenesis.pin other 1.0 SHA-256/dadada");
         assertThat(result).doesNotContain("@jenesis.pin other 0.9");
     }
@@ -703,7 +703,7 @@ public class PinModuleInfoTest {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """
                 /**
-                 * @jenesis.bom acme.platform 2.0 SHA-256/aaaa [windows]
+                 * @jenesis.bom acme.platform 2.0 SHA-256/aaaa (windows)
                  * @jenesis.bom acme.platform 1.0
                  */
                 module foo {
@@ -712,7 +712,7 @@ public class PinModuleInfoTest {
                 """);
         Path bom = writeBomReference("main/module/acme.platform", "1.0", "bar = 1.0\n");
         String result = run(file);
-        assertThat(result).contains("@jenesis.bom acme.platform 2.0 SHA-256/aaaa [windows]");
+        assertThat(result).contains("@jenesis.bom acme.platform 2.0 SHA-256/aaaa (windows)");
         assertThat(result).contains("@jenesis.bom acme.platform 1.0 "
                 + new HashDigestFunction("SHA-256").encodedHash(bom));
     }
@@ -789,7 +789,7 @@ public class PinModuleInfoTest {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """
                 /**
-                 * @jenesis.bom acme.platform 1.0 [windows]
+                 * @jenesis.bom acme.platform 1.0 (windows)
                  */
                 module foo {
                   requires bar;
@@ -936,7 +936,7 @@ public class PinModuleInfoTest {
                 /**
                  * A module documented in HTML.
                  *
-                 * @jenesis.pin org.example/lib 0.9 SHA-256/0000 [linux]
+                 * @jenesis.pin org.example/lib 0.9 SHA-256/0000 (linux)
                  */
                 module foo {
                 }
@@ -945,7 +945,7 @@ public class PinModuleInfoTest {
         String result = run(file, Platform.of("linux"));
         assertThat(result)
                 .as("the control for the Markdown case: a guard survives a refresh")
-                .contains(" * @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe [linux]");
+                .contains(" * @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe (linux)");
     }
 
     @Test
@@ -954,7 +954,7 @@ public class PinModuleInfoTest {
         Files.writeString(file, """
                 /// A module documented in Markdown.
                 ///
-                /// @jenesis.pin org.example/lib 0.9 SHA-256/0000 [linux]
+                /// @jenesis.pin org.example/lib 0.9 SHA-256/0000 (linux)
                 module foo {
                 }
                 """);
@@ -962,7 +962,7 @@ public class PinModuleInfoTest {
         String result = run(file, Platform.of("linux"));
         assertThat(result)
                 .as("a guarded line keeps its guard and its form")
-                .contains("/// @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe [linux]");
+                .contains("/// @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe (linux)");
     }
 
     @Test
