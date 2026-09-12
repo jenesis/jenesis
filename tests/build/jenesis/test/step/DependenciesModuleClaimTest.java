@@ -112,7 +112,7 @@ public class DependenciesModuleClaimTest {
             requires.setProperty("main/compile/maven/" + coordinate, "");
         }
         requires.store(dependencies.resolve(BuildStep.REQUIRES));
-        return new Dependencies(
+        return new Dependencies.Resolve(
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {
                 })),
                 Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))).apply(

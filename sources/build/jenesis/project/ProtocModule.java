@@ -111,14 +111,14 @@ public class ProtocModule implements BuildExecutorModule {
         SequencedSet<String> resolveInputs = new LinkedHashSet<>();
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(DEPENDENCIES,
+        buildExecutor.addModule(DEPENDENCIES,
                 new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> generateInputs = new LinkedHashSet<>();
         generateInputs.add(DEPENDENCIES);
         for (String plugin : plugins.keySet()) {
             String step = DEPENDENCIES + "-" + plugin;
-            buildExecutor.addStep(step,
+            buildExecutor.addModule(step,
                     new Dependencies(repositories, resolvers).pinning(pinning).group(tool + "-" + plugin),
                     resolveInputs);
             generateInputs.add(step);

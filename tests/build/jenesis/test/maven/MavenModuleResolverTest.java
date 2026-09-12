@@ -757,7 +757,7 @@ public class MavenModuleResolverTest {
         versions.setProperty("main/maven/org.transitive/lib", "2.0 " + libs.get("2.0"));
         versions.store(folder.resolve(BuildStep.VERSIONS));
 
-        new Dependencies(
+        new Dependencies.Resolve(
                 Map.of("module", discovery,
                         "maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
                 Map.of("module", new MavenModuleResolver("maven", mavenPomResolver, discovery)))

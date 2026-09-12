@@ -61,7 +61,7 @@ public class JaCoCoModule implements BuildExecutorModule {
         SequencedSet<String> resolveInputs = new LinkedHashSet<>();
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(DEPENDENCIES,
+        buildExecutor.addModule(DEPENDENCIES,
                 new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> reportInputs = new LinkedHashSet<>();

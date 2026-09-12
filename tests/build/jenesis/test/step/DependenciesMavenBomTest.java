@@ -75,7 +75,7 @@ public class DependenciesMavenBomTest {
         };
     }
 
-    private BuildStepResult apply(Dependencies resolve) throws IOException {
+    private BuildStepResult apply(Dependencies.Resolve resolve) throws IOException {
         return resolve.apply(
                         Runnable::run,
                         new BuildStepContext(previous, next, supplement),
@@ -95,7 +95,7 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies(
+        BuildStepResult result = apply(new Dependencies.Resolve(
                 Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", """
                         <project xmlns="http://maven.apache.org/POM/4.0.0">
                             <modelVersion>4.0.0</modelVersion>
@@ -128,7 +128,7 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies(
+        BuildStepResult result = apply(new Dependencies.Resolve(
                 Map.of("maven", maven(Map.of("org.acme/tool/pom/1.0", """
                         <project xmlns="http://maven.apache.org/POM/4.0.0">
                             <modelVersion>4.0.0</modelVersion>
@@ -152,7 +152,7 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies(
+        BuildStepResult result = apply(new Dependencies.Resolve(
                 Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", """
                         <project xmlns="http://maven.apache.org/POM/4.0.0">
                             <modelVersion>4.0.0</modelVersion>
@@ -178,7 +178,7 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies(
+        BuildStepResult result = apply(new Dependencies.Resolve(
                 Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", """
                         <project xmlns="http://maven.apache.org/POM/4.0.0">
                             <modelVersion>4.0.0</modelVersion>
@@ -196,7 +196,7 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies(
+        BuildStepResult result = apply(new Dependencies.Resolve(
                 Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", """
                         <project xmlns="http://maven.apache.org/POM/4.0.0">
                             <modelVersion>4.0.0</modelVersion>
@@ -226,7 +226,7 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies(
+        BuildStepResult result = apply(new Dependencies.Resolve(
                 Map.of("maven", maven(Map.of(
                         "org.acme/platform-bom/pom/1.0", """
                                 <project xmlns="http://maven.apache.org/POM/4.0.0">
@@ -285,7 +285,7 @@ public class DependenciesMavenBomTest {
         boms.setProperty("entry/main/maven/org.acme/lib", "1.0 SHA-256/aaaa");
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies(
+        BuildStepResult result = apply(new Dependencies.Resolve(
                 Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", """
                         <project xmlns="http://maven.apache.org/POM/4.0.0">
                             <modelVersion>4.0.0</modelVersion>
@@ -316,7 +316,7 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies(
+        BuildStepResult result = apply(new Dependencies.Resolve(
                 Map.of("maven", maven(Map.of("org.acme/platform-bom/pom/1.0", """
                                 <project xmlns="http://maven.apache.org/POM/4.0.0">
                                     <modelVersion>4.0.0</modelVersion>
@@ -354,7 +354,7 @@ public class DependenciesMavenBomTest {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
-        BuildStepResult result = apply(new Dependencies(
+        BuildStepResult result = apply(new Dependencies.Resolve(
                 Map.of("maven", maven(Map.of(
                                 "org.acme/platform-bom/pom/1.0", """
                                         <project xmlns="http://maven.apache.org/POM/4.0.0">

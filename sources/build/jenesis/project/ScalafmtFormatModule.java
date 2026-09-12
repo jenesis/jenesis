@@ -81,7 +81,7 @@ public class ScalafmtFormatModule implements BuildExecutorModule {
         SequencedSet<String> resolveInputs = new LinkedHashSet<>();
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(DEPENDENCIES,
+        buildExecutor.addModule(DEPENDENCIES,
                 new Dependencies(repositories, resolvers).pinning(pinning).group(group),
                 resolveInputs);
         SequencedSet<String> formatInputs = new LinkedHashSet<>();

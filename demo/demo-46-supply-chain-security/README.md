@@ -255,9 +255,9 @@ where the resolved set should never drift from the one you reviewed.
 What a signature does not prove
 -------------------------------
 
-Verification covers a module's own dependency closure - what it compiles against and
-ships. A tool a build module resolves for itself, such as a linter, a formatter or the
-test launcher, is pinned like any other coordinate but is not yet signature-checked. A
-valid signature also proves only that the holder of a key asserted these bytes. It does not prove the artifact is benign, that it matches its published source, or
+Verification rides along with every resolution, because it is a step of the `Dependencies`
+module rather than something wired beside it: a module's own closure, and equally a linter,
+a formatter, an alternative compiler or the test launcher that a build module resolves for
+itself. A valid signature proves only that the holder of a key asserted these bytes. It does not prove the artifact is benign, that it matches its published source, or
 that the key was not stolen. It closes one specific gap: that the artifact you accepted is
 the one its author released.

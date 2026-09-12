@@ -477,7 +477,7 @@ public class TestModule implements BuildExecutorModule {
         SequencedSet<String> resolveInputs = new LinkedHashSet<>();
         resolveInputs.add(RESOLVED);
         resolveInputs.addAll(upstream);
-        buildExecutor.addStep(DEPENDENCIES,
+        buildExecutor.addModule(DEPENDENCIES,
                 new Dependencies(repositories, resolvers).pinning(pinning),
                 resolveInputs);
         String incrementalProperty = System.getProperty("jenesis.test.incremental");

@@ -114,7 +114,7 @@ public class ExternalModule implements BuildExecutorModule {
         buildExecutor.addStep(COORDINATE,
                 new WriteCoordinates(group, coordinates),
                 inherited.sequencedKeySet().stream());
-        buildExecutor.addStep(DEPENDENCIES,
+        buildExecutor.addModule(DEPENDENCIES,
                 new Dependencies(repositories, resolvers)
                         .pinning(pinning),
                 COORDINATE);

@@ -12,12 +12,14 @@ import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
+import build.jenesis.BuildExecutor;
+import build.jenesis.BuildExecutorModule;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 
 import static java.util.Objects.requireNonNull;
 
-public class Dependencies implements BuildStep {
+public class Dependencies implements BuildExecutorModule {
 
     public static final String SPDX = "spdx.properties";
     public static final String GRAPH = "graph.properties";
@@ -27,6 +29,8 @@ public class Dependencies implements BuildStep {
     public static final String RESOLVED = "resolved/";
     public static final String MODULAR = "modular.properties";
     public static final String MODULAR_PATH = "modular/";
+    public static final String RESOLVE = "resolve";
+    public static final String SIGNATURES = "signatures";
 
     private final transient Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
@@ -61,633 +65,680 @@ public class Dependencies implements BuildStep {
         return entries;
     }
 
+
     @Override
-    public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
-        return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
-                Path.of(REQUIRES),
-                Path.of(VERSIONS),
-                Path.of(ALIASES),
-                Path.of(BOMS),
-                Path.of(EXCLUSIONS),
-                Path.of(OVERRIDES),
-                Path.of(SPDX)));
+    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
+        buildExecutor.addStep(RESOLVE,
+                new Resolve(repositories, resolvers, pinning, group),
+                inherited.sequencedKeySet());
+        SequencedSet<String> verified = new LinkedHashSet<>();
+        verified.add(RESOLVE);
+        verified.addAll(inherited.sequencedKeySet());
+        buildExecutor.addStep(SIGNATURES, new Signatures(repositories), verified);
     }
 
     @Override
-    public CompletionStage<BuildStepResult> apply(Executor executor,
-                                                  BuildStepContext context,
-                                                  SequencedMap<String, BuildStepArgument> arguments)
-            throws IOException {
-        boolean pinned = pinning != Pinning.IGNORE;
-        Map<String, String> aliases = new LinkedHashMap<>(DEFAULT_ALIASES);
-        Map<String, String> categories = new LinkedHashMap<>(DEFAULT_CATEGORIES);
-        for (BuildStepArgument argument : arguments.values()) {
-            if (argument.removed()) {
-                continue;
-            }
-            Path file = argument.folder().resolve(SPDX);
-            if (Files.isRegularFile(file)) {
-                SequencedProperties properties = SequencedProperties.ofFiles(file);
-                for (String key : properties.stringPropertyNames()) {
-                    String value = properties.getProperty(key).trim();
-                    if (key.startsWith("alias/")) {
-                        String name = key.substring("alias/".length()).toLowerCase(Locale.ROOT).trim();
-                        if (value.isEmpty()) {
-                            aliases.remove(name);
-                        } else {
-                            aliases.put(name, value);
-                        }
-                    } else if (key.startsWith("category/")) {
-                        String identifier = key.substring("category/".length()).trim();
-                        if (value.isEmpty()) {
-                            categories.remove(identifier);
-                        } else {
-                            categories.put(identifier, value);
-                        }
-                    } else {
-                        throw new IllegalArgumentException("Expected key to be prefixed: " + key);
-                    }
-                }
-            }
+    public Optional<String> resolve(String path) {
+        return path.equals(RESOLVE) ? Optional.of("") : Optional.empty();
+    }
+    public static class Resolve implements BuildStep {
+
+        private final transient Map<String, Repository> repositories;
+        private final Map<String, Resolver> resolvers;
+        private final Pinning pinning;
+        private final String group;
+
+        public Resolve(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
+            this(repositories, resolvers, null, null);
         }
-        SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>> requires = new LinkedHashMap<>();
-        SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> versions = new LinkedHashMap<>();
-        SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> moduleAliases = new LinkedHashMap<>();
-        SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> moduleOverrides = new LinkedHashMap<>();
-        SequencedMap<String, String> bomTokens = new LinkedHashMap<>();
-        SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedSet<String>>>>> exclusions = new LinkedHashMap<>();
-        for (BuildStepArgument argument : arguments.values()) {
-            if (argument.removed()) {
-                continue;
-            }
-            Path requiresFile = argument.folder().resolve(REQUIRES);
-            if (Files.exists(requiresFile)) {
-                SequencedProperties properties = SequencedProperties.ofFiles(requiresFile);
-                for (String key : properties.stringPropertyNames()) {
-                    String[] parts = split(key);
-                    if (parts == null) {
-                        continue;
-                    }
-                    requires.computeIfAbsent(parts[0], _ -> new LinkedHashMap<>())
-                            .computeIfAbsent(parts[1], _ -> new LinkedHashMap<>())
-                            .computeIfAbsent(parts[2], _ -> new LinkedHashMap<>())
-                            .merge(parts[3], properties.getProperty(key), (left, right) -> left.isEmpty() ? right : left);
-                }
-            }
-            Path versionsFile = argument.folder().resolve(VERSIONS);
-            if (Files.exists(versionsFile)) {
-                SequencedProperties properties = SequencedProperties.ofFiles(versionsFile);
-                for (String key : properties.stringPropertyNames()) {
-                    int first = key.indexOf('/');
-                    int second = first < 1 ? -1 : key.indexOf('/', first + 1);
-                    if (first < 1 || second <= first || second == key.length() - 1) {
-                        throw new IllegalArgumentException("Malformed version pin '"
-                                + key
-                                + "' in "
-                                + versionsFile
-                                + ": expected <group>/<repository>/<coordinate>");
-                    }
-                    versions.computeIfAbsent(key.substring(0, first), _ -> new LinkedHashMap<>())
-                            .computeIfAbsent(key.substring(first + 1, second), _ -> new LinkedHashMap<>())
-                            .putIfAbsent(key.substring(second + 1), properties.getProperty(key));
-                }
-            }
-            Path aliasesFile = argument.folder().resolve(ALIASES);
-            if (Files.exists(aliasesFile)) {
-                SequencedProperties properties = SequencedProperties.ofFiles(aliasesFile);
-                for (String key : properties.stringPropertyNames()) {
-                    int first = key.indexOf('/');
-                    int second = first < 1 ? -1 : key.indexOf('/', first + 1);
-                    if (first < 1 || second <= first || second == key.length() - 1) {
-                        throw new IllegalArgumentException("Malformed module alias '"
-                                + key
-                                + "' in "
-                                + aliasesFile
-                                + ": expected <group>/<repository>/<module-name>");
-                    }
-                    moduleAliases.computeIfAbsent(key.substring(0, first), _ -> new LinkedHashMap<>())
-                            .computeIfAbsent(key.substring(first + 1, second), _ -> new LinkedHashMap<>())
-                            .putIfAbsent(key.substring(second + 1), properties.getProperty(key));
-                }
-            }
-            Path overridesFile = argument.folder().resolve(OVERRIDES);
-            if (Files.exists(overridesFile)) {
-                SequencedProperties properties = SequencedProperties.ofFiles(overridesFile);
-                for (String key : properties.stringPropertyNames()) {
-                    int first = key.indexOf('/');
-                    int second = first < 1 ? -1 : key.indexOf('/', first + 1);
-                    if (first < 1 || second <= first || second == key.length() - 1) {
-                        throw new IllegalArgumentException("Malformed module override '"
-                                + key
-                                + "' in "
-                                + overridesFile
-                                + ": expected <group>/<repository>/<module-name>");
-                    }
-                    moduleOverrides.computeIfAbsent(key.substring(0, first), _ -> new LinkedHashMap<>())
-                            .computeIfAbsent(key.substring(first + 1, second), _ -> new LinkedHashMap<>())
-                            .putIfAbsent(key.substring(second + 1), properties.getProperty(key));
-                }
-            }
-            Path bomsFile = argument.folder().resolve(BOMS);
-            if (Files.exists(bomsFile)) {
-                SequencedProperties properties = SequencedProperties.ofFiles(bomsFile);
-                for (String key : properties.stringPropertyNames()) {
-                    String reference = key.startsWith("bom/")
-                            ? key.substring(4)
-                            : key.startsWith("entry/") ? key.substring(6) : null;
-                    int first = reference == null ? -1 : reference.indexOf('/');
-                    int second = first < 1 ? -1 : reference.indexOf('/', first + 1);
-                    if (first < 1 || second <= first || second == reference.length() - 1) {
-                        throw new IllegalArgumentException("Malformed BOM reference '"
-                                + key
-                                + "' in "
-                                + bomsFile
-                                + ": expected bom/<group>/<repository>/<coordinate>"
-                                + " or entry/<group>/<repository>/<coordinate>");
-                    }
-                    bomTokens.putIfAbsent(key, properties.getProperty(key));
-                }
-            }
-            Path exclusionsFile = argument.folder().resolve(EXCLUSIONS);
-            if (Files.exists(exclusionsFile)) {
-                SequencedProperties properties = SequencedProperties.ofFiles(exclusionsFile);
-                for (String key : properties.stringPropertyNames()) {
-                    String[] parts = split(key);
-                    if (parts == null) {
-                        continue;
-                    }
-                    SequencedSet<String> excludes = new LinkedHashSet<>();
-                    String value = properties.getProperty(key);
-                    if (!value.isEmpty()) {
-                        excludes.addAll(Arrays.asList(value.split(",")));
-                    }
-                    exclusions.computeIfAbsent(parts[0], _ -> new LinkedHashMap<>())
-                            .computeIfAbsent(parts[1], _ -> new LinkedHashMap<>())
-                            .computeIfAbsent(parts[2], _ -> new LinkedHashMap<>())
-                            .put(parts[3], excludes);
-                }
-            }
+
+        private Resolve(Map<String, Repository> repositories,
+                        Map<String, Resolver> resolvers,
+                        Pinning pinning,
+                        String group) {
+            this.repositories = repositories;
+            this.resolvers = new LinkedHashMap<>(resolvers);
+            this.pinning = pinning;
+            this.group = group;
         }
-        if (group != null) {
-            requires.keySet().retainAll(Set.of(group));
-            moduleAliases.keySet().retainAll(Set.of(group));
-            moduleOverrides.keySet().retainAll(Set.of(group));
-            bomTokens.keySet().removeIf(token -> {
-                int first = token.indexOf('/'), second = token.indexOf('/', first + 1);
-                return second < 0 || !group.equals(token.substring(first + 1, second));
-            });
-            exclusions.keySet().retainAll(Set.of(group));
-            versions.keySet().retainAll(Set.of(group));
+
+        public Resolve pinning(Pinning pinning) {
+            return new Resolve(repositories, resolvers, pinning, group);
         }
-        Path libs = Files.createDirectories(context.next().resolve(RESOLVED));
-        SequencedMap<String, Path> previousArtifacts = new LinkedHashMap<>();
-        SequencedSet<String> previousInternal = new LinkedHashSet<>();
-        if (context.previous() != null) {
-            Path previousInternalFile = context.previous().resolve(INTERNAL);
-            if (Files.exists(previousInternalFile)) {
-                for (String dependency : SequencedProperties.ofFiles(previousInternalFile).stringPropertyNames()) {
-                    previousInternal.add(dependency.substring(dependency.indexOf('/') + 1));
-                }
-            }
-            Path previousIndex = context.previous().resolve(DEPENDENCIES);
-            if (Files.exists(previousIndex)) {
-                SequencedProperties.ofFiles(previousIndex).forEachProperty((key, value) -> {
-                    String[] parts = split(key);
-                    if (parts == null) {
-                        return;
-                    }
-                    int space = value.indexOf(' ');
-                    Path file = context.previous()
-                            .resolve(space < 0 ? value : value.substring(0, space))
-                            .normalize();
-                    if (Files.exists(file) && !previousInternal.contains(parts[3])) {
-                        previousArtifacts.putIfAbsent(parts[3], file);
-                    }
-                });
-            }
+
+        public Resolve group(String group) {
+            return new Resolve(repositories, resolvers, pinning, group);
         }
-        Map<String, Repository> wrapped = new LinkedHashMap<>();
-        repositories.forEach((name, repository) -> {
-            Repository effective = repository;
-            if (!previousArtifacts.isEmpty()) {
-                effective = effective.prepend((_, coordinate) -> Optional
-                        .ofNullable(previousArtifacts.get(coordinate))
-                        .map(RepositoryItem::ofFile));
-            }
-            wrapped.put(name, effective.materialized(libs));
-        });
-        SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> managed = new LinkedHashMap<>();
-        if (!bomTokens.isEmpty()) {
-            SequencedMap<String, String> merged = new LinkedHashMap<>();
-            SequencedMap<String, String> covering = new LinkedHashMap<>();
-            SequencedProperties resolvedBoms = new SequencedProperties();
-            for (Map.Entry<String, String> token : bomTokens.entrySet()) {
-                if (token.getKey().startsWith("entry/")) {
-                    String key = token.getKey().substring(6);
-                    merged.put(key, token.getValue());
-                    covering.put(key, token.getValue());
+
+        @Override
+        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+            return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
+                    Path.of(REQUIRES),
+                    Path.of(VERSIONS),
+                    Path.of(ALIASES),
+                    Path.of(BOMS),
+                    Path.of(EXCLUSIONS),
+                    Path.of(OVERRIDES),
+                    Path.of(SPDX)));
+        }
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            boolean pinned = pinning != Pinning.IGNORE;
+            Map<String, String> aliases = new LinkedHashMap<>(DEFAULT_ALIASES);
+            Map<String, String> categories = new LinkedHashMap<>(DEFAULT_CATEGORIES);
+            for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
                     continue;
                 }
-                String reference = token.getKey().substring(4);
-                int first = reference.indexOf('/');
-                int second = reference.indexOf('/', first + 1);
-                String group = reference.substring(0, first);
-                String repo = reference.substring(first + 1, second);
-                String coordinate = reference.substring(second + 1);
-                String value = token.getValue();
-                int space = value.indexOf(' ');
-                String version = space < 0 ? value : value.substring(0, space);
-                String checksum = space < 0 ? "" : value.substring(space + 1).trim();
-                if (wrapped.get(Resolver.base(repo)) == null) {
-                    throw new IllegalArgumentException("Unknown repository for BOM: " + reference);
-                }
-                boolean verify = pinning != Pinning.VERSIONS && pinning != Pinning.IGNORE;
-                Resolver.Bom bom;
-                try {
-                    bom = resolvers.getOrDefault(Resolver.base(repo), Resolver.identity()).bom(executor,
-                            repo,
-                            wrapped,
-                            coordinate,
-                            version,
-                            verify ? checksum : null,
-                            pinning == Pinning.IGNORE);
-                } catch (RuntimeException e) {
-                    throw new IllegalStateException("Failed to fetch BOM " + reference, e);
-                }
-                if (pinning == Pinning.STRICT && bom.verifiable() && checksum.isEmpty() && !bom.internal()) {
-                    throw new IllegalStateException("No checksum pinned for BOM "
-                            + reference
-                            + " (strict pinning is enabled)");
-                }
-                if (!version.isEmpty() && !bom.version().isEmpty()) {
-                    if (bom.verifiable()) {
-                        resolvedBoms.setProperty("bom/" + reference + "/" + bom.version(),
-                                context.next().toAbsolutePath().relativize(bom.file().toAbsolutePath())
-                                        .toString().replace(File.separatorChar, '/'));
-                    } else {
-                        resolvedBoms.setProperty("version/" + reference, bom.version());
-                    }
-                }
-                for (Map.Entry<String, String> entry : bom.entries().entrySet()) {
-                    String key = group + "/" + entry.getKey();
-                    merged.put(key, entry.getValue());
-                    if (bom.verifiable()) {
-                        covering.put(key, entry.getValue());
-                    } else {
-                        covering.remove(key);
+                Path file = argument.folder().resolve(SPDX);
+                if (Files.isRegularFile(file)) {
+                    SequencedProperties properties = SequencedProperties.ofFiles(file);
+                    for (String key : properties.stringPropertyNames()) {
+                        String value = properties.getProperty(key).trim();
+                        if (key.startsWith("alias/")) {
+                            String name = key.substring("alias/".length()).toLowerCase(Locale.ROOT).trim();
+                            if (value.isEmpty()) {
+                                aliases.remove(name);
+                            } else {
+                                aliases.put(name, value);
+                            }
+                        } else if (key.startsWith("category/")) {
+                            String identifier = key.substring("category/".length()).trim();
+                            if (value.isEmpty()) {
+                                categories.remove(identifier);
+                            } else {
+                                categories.put(identifier, value);
+                            }
+                        } else {
+                            throw new IllegalArgumentException("Expected key to be prefixed: " + key);
+                        }
                     }
                 }
             }
-            for (Map.Entry<String, String> entry : covering.entrySet()) {
-                resolvedBoms.setProperty("entry/" + entry.getKey(), entry.getValue());
-            }
-            for (Map.Entry<String, String> entry : merged.entrySet()) {
-                String key = entry.getKey();
-                int first = key.indexOf('/');
-                int second = key.indexOf('/', first + 1);
-                managed.computeIfAbsent(key.substring(0, first), _ -> new LinkedHashMap<>())
-                        .computeIfAbsent(key.substring(first + 1, second), _ -> new LinkedHashMap<>())
-                        .putIfAbsent(key.substring(second + 1), entry.getValue());
-            }
-            if (!resolvedBoms.isEmpty()) {
-                resolvedBoms.store(context.next().resolve(BOMS));
-            }
-        }
-        SequencedProperties resolved = new SequencedProperties();
-        SequencedMap<String, Resolver.Resolved> materialized = new LinkedHashMap<>();
-        SequencedMap<String, Alias> aliasTargets = new LinkedHashMap<>();
-        for (SequencedMap<String, SequencedMap<String, String>> byRepository : moduleAliases.values()) {
-            for (SequencedMap<String, String> byAlias : byRepository.values()) {
-                byAlias.forEach((alias, token) -> merge(aliasTargets, alias, token, LOCAL));
-            }
-        }
-        SequencedMap<String, Overridden> overrideTargets = new LinkedHashMap<>();
-        for (SequencedMap<String, SequencedMap<String, String>> byRepository : moduleOverrides.values()) {
-            for (SequencedMap<String, String> byModule : byRepository.values()) {
-                byModule.forEach((module, carriers) -> merge(overrideTargets,
-                        module,
-                        PathPlacement.overrides(module + "=" + carriers, "a local @jenesis.override declaration")
-                                .get(module),
-                        "a local @jenesis.override declaration"));
-            }
-        }
-        if (!overrideTargets.isEmpty()
-                && resolvers.values().stream().allMatch(resolver -> resolver.managedPrefixes().isEmpty())) {
-            throw new IllegalArgumentException("Cannot override "
-                    + overrideTargets.sequencedKeySet()
-                    + ": a module override needs a layout where module names resolve to Maven coordinates"
-                    + " - drop the declaration or build with jenesis.project.layout=modular_to_maven");
-        }
-        SequencedSet<String> aliasTokens = new LinkedHashSet<>();
-        for (Alias alias : aliasTargets.values()) {
-            aliasTokens.add(alias.token());
-        }
-        SequencedMap<String, String> modules = new LinkedHashMap<>();
-        SequencedMap<String, Boolean> explicit = new LinkedHashMap<>();
-        SequencedProperties graph = new SequencedProperties();
-        SequencedProperties licenses = new SequencedProperties();
-        int edge = 0;
-        for (Map.Entry<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>> groupEntry : requires.entrySet()) {
-            String group = groupEntry.getKey();
-            for (String scope : groupEntry.getValue().sequencedKeySet()) {
-                DependencyScope intent = scope.equals("compile") ? DependencyScope.COMPILE : DependencyScope.RUNTIME;
-                for (Map.Entry<String, SequencedMap<String, String>> repoEntry : groupEntry.getValue().get(scope).entrySet()) {
-                    String repo = repoEntry.getKey();
-                    Resolver resolver = requireNonNull(resolvers.get(Resolver.base(repo)), "Unknown resolver: " + Resolver.base(repo));
-                    SequencedMap<String, SequencedSet<String>> repoExclusions = exclusions
-                            .getOrDefault(group, Collections.emptyNavigableMap())
-                            .getOrDefault(scope, Collections.emptyNavigableMap())
-                            .getOrDefault(repo, Collections.emptyNavigableMap());
-                    SequencedMap<String, SequencedSet<String>> coordinates = new LinkedHashMap<>();
-                    SequencedMap<String, SequencedSet<String>> deferred = new LinkedHashMap<>();
-                    for (String coordinate : repoEntry.getValue().sequencedKeySet()) {
-                        if (overrideTargets.containsKey(coordinate)) {
+            SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>> requires = new LinkedHashMap<>();
+            SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> versions = new LinkedHashMap<>();
+            SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> moduleAliases = new LinkedHashMap<>();
+            SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> moduleOverrides = new LinkedHashMap<>();
+            SequencedMap<String, String> bomTokens = new LinkedHashMap<>();
+            SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedSet<String>>>>> exclusions = new LinkedHashMap<>();
+            for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
+                Path requiresFile = argument.folder().resolve(REQUIRES);
+                if (Files.exists(requiresFile)) {
+                    SequencedProperties properties = SequencedProperties.ofFiles(requiresFile);
+                    for (String key : properties.stringPropertyNames()) {
+                        String[] parts = split(key);
+                        if (parts == null) {
                             continue;
                         }
-                        SequencedSet<String> excludes = repoExclusions.getOrDefault(coordinate, Collections.emptyNavigableSet());
-                        if (aliasTokens.contains(coordinate)) {
-                            deferred.put(coordinate, excludes);
+                        requires.computeIfAbsent(parts[0], _ -> new LinkedHashMap<>())
+                                .computeIfAbsent(parts[1], _ -> new LinkedHashMap<>())
+                                .computeIfAbsent(parts[2], _ -> new LinkedHashMap<>())
+                                .merge(parts[3], properties.getProperty(key), (left, right) -> left.isEmpty() ? right : left);
+                    }
+                }
+                Path versionsFile = argument.folder().resolve(VERSIONS);
+                if (Files.exists(versionsFile)) {
+                    SequencedProperties properties = SequencedProperties.ofFiles(versionsFile);
+                    for (String key : properties.stringPropertyNames()) {
+                        int first = key.indexOf('/');
+                        int second = first < 1 ? -1 : key.indexOf('/', first + 1);
+                        if (first < 1 || second <= first || second == key.length() - 1) {
+                            throw new IllegalArgumentException("Malformed version pin '"
+                                    + key
+                                    + "' in "
+                                    + versionsFile
+                                    + ": expected <group>/<repository>/<coordinate>");
+                        }
+                        versions.computeIfAbsent(key.substring(0, first), _ -> new LinkedHashMap<>())
+                                .computeIfAbsent(key.substring(first + 1, second), _ -> new LinkedHashMap<>())
+                                .putIfAbsent(key.substring(second + 1), properties.getProperty(key));
+                    }
+                }
+                Path aliasesFile = argument.folder().resolve(ALIASES);
+                if (Files.exists(aliasesFile)) {
+                    SequencedProperties properties = SequencedProperties.ofFiles(aliasesFile);
+                    for (String key : properties.stringPropertyNames()) {
+                        int first = key.indexOf('/');
+                        int second = first < 1 ? -1 : key.indexOf('/', first + 1);
+                        if (first < 1 || second <= first || second == key.length() - 1) {
+                            throw new IllegalArgumentException("Malformed module alias '"
+                                    + key
+                                    + "' in "
+                                    + aliasesFile
+                                    + ": expected <group>/<repository>/<module-name>");
+                        }
+                        moduleAliases.computeIfAbsent(key.substring(0, first), _ -> new LinkedHashMap<>())
+                                .computeIfAbsent(key.substring(first + 1, second), _ -> new LinkedHashMap<>())
+                                .putIfAbsent(key.substring(second + 1), properties.getProperty(key));
+                    }
+                }
+                Path overridesFile = argument.folder().resolve(OVERRIDES);
+                if (Files.exists(overridesFile)) {
+                    SequencedProperties properties = SequencedProperties.ofFiles(overridesFile);
+                    for (String key : properties.stringPropertyNames()) {
+                        int first = key.indexOf('/');
+                        int second = first < 1 ? -1 : key.indexOf('/', first + 1);
+                        if (first < 1 || second <= first || second == key.length() - 1) {
+                            throw new IllegalArgumentException("Malformed module override '"
+                                    + key
+                                    + "' in "
+                                    + overridesFile
+                                    + ": expected <group>/<repository>/<module-name>");
+                        }
+                        moduleOverrides.computeIfAbsent(key.substring(0, first), _ -> new LinkedHashMap<>())
+                                .computeIfAbsent(key.substring(first + 1, second), _ -> new LinkedHashMap<>())
+                                .putIfAbsent(key.substring(second + 1), properties.getProperty(key));
+                    }
+                }
+                Path bomsFile = argument.folder().resolve(BOMS);
+                if (Files.exists(bomsFile)) {
+                    SequencedProperties properties = SequencedProperties.ofFiles(bomsFile);
+                    for (String key : properties.stringPropertyNames()) {
+                        String reference = key.startsWith("bom/")
+                                ? key.substring(4)
+                                : key.startsWith("entry/") ? key.substring(6) : null;
+                        int first = reference == null ? -1 : reference.indexOf('/');
+                        int second = first < 1 ? -1 : reference.indexOf('/', first + 1);
+                        if (first < 1 || second <= first || second == reference.length() - 1) {
+                            throw new IllegalArgumentException("Malformed BOM reference '"
+                                    + key
+                                    + "' in "
+                                    + bomsFile
+                                    + ": expected bom/<group>/<repository>/<coordinate>"
+                                    + " or entry/<group>/<repository>/<coordinate>");
+                        }
+                        bomTokens.putIfAbsent(key, properties.getProperty(key));
+                    }
+                }
+                Path exclusionsFile = argument.folder().resolve(EXCLUSIONS);
+                if (Files.exists(exclusionsFile)) {
+                    SequencedProperties properties = SequencedProperties.ofFiles(exclusionsFile);
+                    for (String key : properties.stringPropertyNames()) {
+                        String[] parts = split(key);
+                        if (parts == null) {
+                            continue;
+                        }
+                        SequencedSet<String> excludes = new LinkedHashSet<>();
+                        String value = properties.getProperty(key);
+                        if (!value.isEmpty()) {
+                            excludes.addAll(Arrays.asList(value.split(",")));
+                        }
+                        exclusions.computeIfAbsent(parts[0], _ -> new LinkedHashMap<>())
+                                .computeIfAbsent(parts[1], _ -> new LinkedHashMap<>())
+                                .computeIfAbsent(parts[2], _ -> new LinkedHashMap<>())
+                                .put(parts[3], excludes);
+                    }
+                }
+            }
+            if (group != null) {
+                requires.keySet().retainAll(Set.of(group));
+                moduleAliases.keySet().retainAll(Set.of(group));
+                moduleOverrides.keySet().retainAll(Set.of(group));
+                bomTokens.keySet().removeIf(token -> {
+                    int first = token.indexOf('/'), second = token.indexOf('/', first + 1);
+                    return second < 0 || !group.equals(token.substring(first + 1, second));
+                });
+                exclusions.keySet().retainAll(Set.of(group));
+                versions.keySet().retainAll(Set.of(group));
+            }
+            Path libs = Files.createDirectories(context.next().resolve(RESOLVED));
+            SequencedMap<String, Path> previousArtifacts = new LinkedHashMap<>();
+            SequencedSet<String> previousInternal = new LinkedHashSet<>();
+            if (context.previous() != null) {
+                Path previousInternalFile = context.previous().resolve(INTERNAL);
+                if (Files.exists(previousInternalFile)) {
+                    for (String dependency : SequencedProperties.ofFiles(previousInternalFile).stringPropertyNames()) {
+                        previousInternal.add(dependency.substring(dependency.indexOf('/') + 1));
+                    }
+                }
+                Path previousIndex = context.previous().resolve(DEPENDENCIES);
+                if (Files.exists(previousIndex)) {
+                    SequencedProperties.ofFiles(previousIndex).forEachProperty((key, value) -> {
+                        String[] parts = split(key);
+                        if (parts == null) {
+                            return;
+                        }
+                        int space = value.indexOf(' ');
+                        Path file = context.previous()
+                                .resolve(space < 0 ? value : value.substring(0, space))
+                                .normalize();
+                        if (Files.exists(file) && !previousInternal.contains(parts[3])) {
+                            previousArtifacts.putIfAbsent(parts[3], file);
+                        }
+                    });
+                }
+            }
+            Map<String, Repository> wrapped = new LinkedHashMap<>();
+            repositories.forEach((name, repository) -> {
+                Repository effective = repository;
+                if (!previousArtifacts.isEmpty()) {
+                    effective = effective.prepend((_, coordinate) -> Optional
+                            .ofNullable(previousArtifacts.get(coordinate))
+                            .map(RepositoryItem::ofFile));
+                }
+                wrapped.put(name, effective.materialized(libs));
+            });
+            SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> managed = new LinkedHashMap<>();
+            if (!bomTokens.isEmpty()) {
+                SequencedMap<String, String> merged = new LinkedHashMap<>();
+                SequencedMap<String, String> covering = new LinkedHashMap<>();
+                SequencedProperties resolvedBoms = new SequencedProperties();
+                for (Map.Entry<String, String> token : bomTokens.entrySet()) {
+                    if (token.getKey().startsWith("entry/")) {
+                        String key = token.getKey().substring(6);
+                        merged.put(key, token.getValue());
+                        covering.put(key, token.getValue());
+                        continue;
+                    }
+                    String reference = token.getKey().substring(4);
+                    int first = reference.indexOf('/');
+                    int second = reference.indexOf('/', first + 1);
+                    String group = reference.substring(0, first);
+                    String repo = reference.substring(first + 1, second);
+                    String coordinate = reference.substring(second + 1);
+                    String value = token.getValue();
+                    int space = value.indexOf(' ');
+                    String version = space < 0 ? value : value.substring(0, space);
+                    String checksum = space < 0 ? "" : value.substring(space + 1).trim();
+                    if (wrapped.get(Resolver.base(repo)) == null) {
+                        throw new IllegalArgumentException("Unknown repository for BOM: " + reference);
+                    }
+                    boolean verify = pinning != Pinning.VERSIONS && pinning != Pinning.IGNORE;
+                    Resolver.Bom bom;
+                    try {
+                        bom = resolvers.getOrDefault(Resolver.base(repo), Resolver.identity()).bom(executor,
+                                repo,
+                                wrapped,
+                                coordinate,
+                                version,
+                                verify ? checksum : null,
+                                pinning == Pinning.IGNORE);
+                    } catch (RuntimeException e) {
+                        throw new IllegalStateException("Failed to fetch BOM " + reference, e);
+                    }
+                    if (pinning == Pinning.STRICT && bom.verifiable() && checksum.isEmpty() && !bom.internal()) {
+                        throw new IllegalStateException("No checksum pinned for BOM "
+                                + reference
+                                + " (strict pinning is enabled)");
+                    }
+                    if (!version.isEmpty() && !bom.version().isEmpty()) {
+                        if (bom.verifiable()) {
+                            resolvedBoms.setProperty("bom/" + reference + "/" + bom.version(),
+                                    context.next().toAbsolutePath().relativize(bom.file().toAbsolutePath())
+                                            .toString().replace(File.separatorChar, '/'));
                         } else {
-                            coordinates.put(coordinate, excludes);
+                            resolvedBoms.setProperty("version/" + reference, bom.version());
                         }
                     }
-                    SequencedMap<String, SequencedMap<String, String>> groupVersions = versions
-                            .getOrDefault(group, Collections.emptyNavigableMap());
-                    SequencedMap<String, SequencedMap<String, String>> groupManaged = managed
-                            .getOrDefault(group, Collections.emptyNavigableMap());
-                    List<SequencedMap<String, String>> scoped = new ArrayList<>();
-                    List<SequencedMap<String, String>> scopedManaged = new ArrayList<>();
-                    scoped.add(groupVersions.getOrDefault(repo, Collections.emptyNavigableMap()));
-                    scopedManaged.add(groupManaged.getOrDefault(repo, Collections.emptyNavigableMap()));
-                    for (String managedPrefix : resolver.managedPrefixes()) {
-                        scoped.add(groupVersions.getOrDefault(managedPrefix, Collections.emptyNavigableMap()));
-                        scopedManaged.add(groupManaged.getOrDefault(managedPrefix, Collections.emptyNavigableMap()));
-                    }
-                    SequencedMap<String, String> bom = new LinkedHashMap<>();
-                    if (!pinned) {
-                        for (SequencedMap<String, String> entries : scopedManaged) {
-                            entries.forEach((coordinate, value) -> {
-                                int space = value.indexOf(' ');
-                                bom.putIfAbsent(coordinate, space < 0 ? value : value.substring(0, space));
-                            });
-                        }
-                    }
-                    for (SequencedMap<String, String> pins : scoped) {
-                        if (pinning == Pinning.VERSIONS) {
-                            pins.forEach((coordinate, value) -> {
-                                int space = value.indexOf(' ');
-                                bom.putIfAbsent(coordinate, space < 0 ? value : value.substring(0, space));
-                            });
-                        } else if (pinned) {
-                            pins.forEach(bom::putIfAbsent);
+                    for (Map.Entry<String, String> entry : bom.entries().entrySet()) {
+                        String key = group + "/" + entry.getKey();
+                        merged.put(key, entry.getValue());
+                        if (bom.verifiable()) {
+                            covering.put(key, entry.getValue());
                         } else {
-                            pins.forEach((coordinate, value) -> {
-                                int space = value.indexOf(' ');
-                                String qualified = space < 0 ? value : value.substring(0, space);
-                                if (coordinates.containsKey(coordinate)) {
-                                    bom.putIfAbsent(coordinate, qualified);
-                                } else if (qualified.startsWith(":")) {
-                                    int divider = qualified.indexOf(':', 1);
-                                    bom.putIfAbsent(coordinate, divider < 0
-                                            ? qualified
-                                            : qualified.substring(0, divider));
-                                }
-                            });
+                            covering.remove(key);
                         }
                     }
-                    if (pinned) {
-                        for (SequencedMap<String, String> entries : scopedManaged) {
-                            if (pinning == Pinning.VERSIONS) {
+                }
+                for (Map.Entry<String, String> entry : covering.entrySet()) {
+                    resolvedBoms.setProperty("entry/" + entry.getKey(), entry.getValue());
+                }
+                for (Map.Entry<String, String> entry : merged.entrySet()) {
+                    String key = entry.getKey();
+                    int first = key.indexOf('/');
+                    int second = key.indexOf('/', first + 1);
+                    managed.computeIfAbsent(key.substring(0, first), _ -> new LinkedHashMap<>())
+                            .computeIfAbsent(key.substring(first + 1, second), _ -> new LinkedHashMap<>())
+                            .putIfAbsent(key.substring(second + 1), entry.getValue());
+                }
+                if (!resolvedBoms.isEmpty()) {
+                    resolvedBoms.store(context.next().resolve(BOMS));
+                }
+            }
+            SequencedProperties resolved = new SequencedProperties();
+            SequencedMap<String, Resolver.Resolved> materialized = new LinkedHashMap<>();
+            SequencedMap<String, Alias> aliasTargets = new LinkedHashMap<>();
+            for (SequencedMap<String, SequencedMap<String, String>> byRepository : moduleAliases.values()) {
+                for (SequencedMap<String, String> byAlias : byRepository.values()) {
+                    byAlias.forEach((alias, token) -> merge(aliasTargets, alias, token, LOCAL));
+                }
+            }
+            SequencedMap<String, Overridden> overrideTargets = new LinkedHashMap<>();
+            for (SequencedMap<String, SequencedMap<String, String>> byRepository : moduleOverrides.values()) {
+                for (SequencedMap<String, String> byModule : byRepository.values()) {
+                    byModule.forEach((module, carriers) -> merge(overrideTargets,
+                            module,
+                            PathPlacement.overrides(module + "=" + carriers, "a local @jenesis.override declaration")
+                                    .get(module),
+                            "a local @jenesis.override declaration"));
+                }
+            }
+            if (!overrideTargets.isEmpty()
+                    && resolvers.values().stream().allMatch(resolver -> resolver.managedPrefixes().isEmpty())) {
+                throw new IllegalArgumentException("Cannot override "
+                        + overrideTargets.sequencedKeySet()
+                        + ": a module override needs a layout where module names resolve to Maven coordinates"
+                        + " - drop the declaration or build with jenesis.project.layout=modular_to_maven");
+            }
+            SequencedSet<String> aliasTokens = new LinkedHashSet<>();
+            for (Alias alias : aliasTargets.values()) {
+                aliasTokens.add(alias.token());
+            }
+            SequencedMap<String, String> modules = new LinkedHashMap<>();
+            SequencedMap<String, Boolean> explicit = new LinkedHashMap<>();
+            SequencedProperties graph = new SequencedProperties();
+            SequencedProperties licenses = new SequencedProperties();
+            int edge = 0;
+            for (Map.Entry<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>> groupEntry : requires.entrySet()) {
+                String group = groupEntry.getKey();
+                for (String scope : groupEntry.getValue().sequencedKeySet()) {
+                    DependencyScope intent = scope.equals("compile") ? DependencyScope.COMPILE : DependencyScope.RUNTIME;
+                    for (Map.Entry<String, SequencedMap<String, String>> repoEntry : groupEntry.getValue().get(scope).entrySet()) {
+                        String repo = repoEntry.getKey();
+                        Resolver resolver = requireNonNull(resolvers.get(Resolver.base(repo)), "Unknown resolver: " + Resolver.base(repo));
+                        SequencedMap<String, SequencedSet<String>> repoExclusions = exclusions
+                                .getOrDefault(group, Collections.emptyNavigableMap())
+                                .getOrDefault(scope, Collections.emptyNavigableMap())
+                                .getOrDefault(repo, Collections.emptyNavigableMap());
+                        SequencedMap<String, SequencedSet<String>> coordinates = new LinkedHashMap<>();
+                        SequencedMap<String, SequencedSet<String>> deferred = new LinkedHashMap<>();
+                        for (String coordinate : repoEntry.getValue().sequencedKeySet()) {
+                            if (overrideTargets.containsKey(coordinate)) {
+                                continue;
+                            }
+                            SequencedSet<String> excludes = repoExclusions.getOrDefault(coordinate, Collections.emptyNavigableSet());
+                            if (aliasTokens.contains(coordinate)) {
+                                deferred.put(coordinate, excludes);
+                            } else {
+                                coordinates.put(coordinate, excludes);
+                            }
+                        }
+                        SequencedMap<String, SequencedMap<String, String>> groupVersions = versions
+                                .getOrDefault(group, Collections.emptyNavigableMap());
+                        SequencedMap<String, SequencedMap<String, String>> groupManaged = managed
+                                .getOrDefault(group, Collections.emptyNavigableMap());
+                        List<SequencedMap<String, String>> scoped = new ArrayList<>();
+                        List<SequencedMap<String, String>> scopedManaged = new ArrayList<>();
+                        scoped.add(groupVersions.getOrDefault(repo, Collections.emptyNavigableMap()));
+                        scopedManaged.add(groupManaged.getOrDefault(repo, Collections.emptyNavigableMap()));
+                        for (String managedPrefix : resolver.managedPrefixes()) {
+                            scoped.add(groupVersions.getOrDefault(managedPrefix, Collections.emptyNavigableMap()));
+                            scopedManaged.add(groupManaged.getOrDefault(managedPrefix, Collections.emptyNavigableMap()));
+                        }
+                        SequencedMap<String, String> bom = new LinkedHashMap<>();
+                        if (!pinned) {
+                            for (SequencedMap<String, String> entries : scopedManaged) {
                                 entries.forEach((coordinate, value) -> {
                                     int space = value.indexOf(' ');
                                     bom.putIfAbsent(coordinate, space < 0 ? value : value.substring(0, space));
                                 });
+                            }
+                        }
+                        for (SequencedMap<String, String> pins : scoped) {
+                            if (pinning == Pinning.VERSIONS) {
+                                pins.forEach((coordinate, value) -> {
+                                    int space = value.indexOf(' ');
+                                    bom.putIfAbsent(coordinate, space < 0 ? value : value.substring(0, space));
+                                });
+                            } else if (pinned) {
+                                pins.forEach(bom::putIfAbsent);
                             } else {
-                                entries.forEach(bom::putIfAbsent);
+                                pins.forEach((coordinate, value) -> {
+                                    int space = value.indexOf(' ');
+                                    String qualified = space < 0 ? value : value.substring(0, space);
+                                    if (coordinates.containsKey(coordinate)) {
+                                        bom.putIfAbsent(coordinate, qualified);
+                                    } else if (qualified.startsWith(":")) {
+                                        int divider = qualified.indexOf(':', 1);
+                                        bom.putIfAbsent(coordinate, divider < 0
+                                                ? qualified
+                                                : qualified.substring(0, divider));
+                                    }
+                                });
                             }
                         }
-                    }
-                    Resolver.Resolution resolution = resolver.dependencies(executor,
-                            repo,
-                            wrapped,
-                            coordinates,
-                            bom,
-                            intent);
-                    if (!deferred.isEmpty()) {
-                        SequencedMap<String, SequencedSet<String>> absent = new LinkedHashMap<>();
-                        for (Map.Entry<String, SequencedSet<String>> entry : deferred.entrySet()) {
-                            if (!resolution.vertices().containsKey(repo + "/" + entry.getKey())) {
-                                absent.put(entry.getKey() + "/LATEST", entry.getValue());
+                        if (pinned) {
+                            for (SequencedMap<String, String> entries : scopedManaged) {
+                                if (pinning == Pinning.VERSIONS) {
+                                    entries.forEach((coordinate, value) -> {
+                                        int space = value.indexOf(' ');
+                                        bom.putIfAbsent(coordinate, space < 0 ? value : value.substring(0, space));
+                                    });
+                                } else {
+                                    entries.forEach(bom::putIfAbsent);
+                                }
                             }
                         }
-                        if (!absent.isEmpty()) {
-                            coordinates.putAll(absent);
-                            resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, intent);
-                        }
-                    }
-                    if (!overrideTargets.isEmpty() && !coordinates.isEmpty()) {
-                        SequencedSet<String> overridden = new LinkedHashSet<>();
-                        resolution.vertices().forEach((coordinate, node) -> {
-                            if (node.module() != null && overrideTargets.containsKey(node.module())) {
-                                overridden.add(artifactName(coordinate.substring(coordinate.indexOf('/') + 1)));
-                            }
-                        });
-                        if (!overridden.isEmpty()) {
-                            coordinates.replaceAll((_, excludes) -> {
-                                SequencedSet<String> merged = new LinkedHashSet<>(excludes);
-                                merged.addAll(overridden);
-                                return merged;
-                            });
-                            resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, intent);
-                        }
-                    }
-                    for (Map.Entry<String, Resolver.Resolved> entry : resolution.artifacts().entrySet()) {
-                        String coordinate = entry.getKey().substring(entry.getKey().indexOf('/') + 1);
-                        String declared = repoEntry.getValue().get(coordinate);
-                        String value = declared != null && !declared.isEmpty() ? declared : entry.getValue().checksum();
-                        String transitiveKey = group + "/" + scope + "/" + entry.getKey();
-                        resolved.setProperty(transitiveKey, value);
-                        materialized.putIfAbsent(transitiveKey, entry.getValue());
-                    }
-                    for (Resolver.Edge dependency : resolution.edges()) {
-                        graph.setProperty("edge/" + edge++, String.join("\t",
-                                group,
-                                scope,
+                        Resolver.Resolution resolution = resolver.dependencies(executor,
                                 repo,
-                                Boolean.toString(dependency.followed()),
-                                text(dependency.scope()),
-                                text(dependency.version()),
-                                text(dependency.parent()),
-                                dependency.coordinate()));
-                    }
-                    for (Map.Entry<String, Resolver.Vertex> entry : resolution.vertices().entrySet()) {
-                        Resolver.Vertex node = entry.getValue();
-                        graph.setProperty("vertex/" + group + "/" + scope + "/" + entry.getKey(), String.join("\t",
-                                text(node.resolvedVersion()),
-                                text(node.module()),
-                                Boolean.toString(node.automatic()),
-                                Boolean.toString(node.internal())));
-                        String versioned = node.resolvedVersion() == null
-                                ? entry.getKey()
-                                : entry.getKey() + "/" + node.resolvedVersion();
-                        explicit.putIfAbsent(versioned, node.module() != null && !node.automatic());
-                        if (node.module() != null) {
-                            modules.putIfAbsent(node.module(), versioned);
+                                wrapped,
+                                coordinates,
+                                bom,
+                                intent);
+                        if (!deferred.isEmpty()) {
+                            SequencedMap<String, SequencedSet<String>> absent = new LinkedHashMap<>();
+                            for (Map.Entry<String, SequencedSet<String>> entry : deferred.entrySet()) {
+                                if (!resolution.vertices().containsKey(repo + "/" + entry.getKey())) {
+                                    absent.put(entry.getKey() + "/LATEST", entry.getValue());
+                                }
+                            }
+                            if (!absent.isEmpty()) {
+                                coordinates.putAll(absent);
+                                resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, intent);
+                            }
                         }
-                        if (!node.licenses().isEmpty()) {
-                            String licenseKey = node.resolvedVersion() == null
+                        if (!overrideTargets.isEmpty() && !coordinates.isEmpty()) {
+                            SequencedSet<String> overridden = new LinkedHashSet<>();
+                            resolution.vertices().forEach((coordinate, node) -> {
+                                if (node.module() != null && overrideTargets.containsKey(node.module())) {
+                                    overridden.add(artifactName(coordinate.substring(coordinate.indexOf('/') + 1)));
+                                }
+                            });
+                            if (!overridden.isEmpty()) {
+                                coordinates.replaceAll((_, excludes) -> {
+                                    SequencedSet<String> merged = new LinkedHashSet<>(excludes);
+                                    merged.addAll(overridden);
+                                    return merged;
+                                });
+                                resolution = resolver.dependencies(executor, repo, wrapped, coordinates, bom, intent);
+                            }
+                        }
+                        for (Map.Entry<String, Resolver.Resolved> entry : resolution.artifacts().entrySet()) {
+                            String coordinate = entry.getKey().substring(entry.getKey().indexOf('/') + 1);
+                            String declared = repoEntry.getValue().get(coordinate);
+                            String value = declared != null && !declared.isEmpty() ? declared : entry.getValue().checksum();
+                            String transitiveKey = group + "/" + scope + "/" + entry.getKey();
+                            resolved.setProperty(transitiveKey, value);
+                            materialized.putIfAbsent(transitiveKey, entry.getValue());
+                        }
+                        for (Resolver.Edge dependency : resolution.edges()) {
+                            graph.setProperty("edge/" + edge++, String.join("\t",
+                                    group,
+                                    scope,
+                                    repo,
+                                    Boolean.toString(dependency.followed()),
+                                    text(dependency.scope()),
+                                    text(dependency.version()),
+                                    text(dependency.parent()),
+                                    dependency.coordinate()));
+                        }
+                        for (Map.Entry<String, Resolver.Vertex> entry : resolution.vertices().entrySet()) {
+                            Resolver.Vertex node = entry.getValue();
+                            graph.setProperty("vertex/" + group + "/" + scope + "/" + entry.getKey(), String.join("\t",
+                                    text(node.resolvedVersion()),
+                                    text(node.module()),
+                                    Boolean.toString(node.automatic()),
+                                    Boolean.toString(node.internal())));
+                            String versioned = node.resolvedVersion() == null
                                     ? entry.getKey()
                                     : entry.getKey() + "/" + node.resolvedVersion();
-                            for (int i = 0; i < node.licenses().size(); i++) {
-                                License license = node.licenses().get(i);
-                                String id = license.id();
-                                if (id == null && license.name() != null) {
-                                    id = aliases.get(license.name().toLowerCase(Locale.ROOT).trim());
-                                }
-                                String category = license.category();
-                                if (category == null && id != null) {
-                                    category = categories.get(id);
-                                }
-                                if (id != null) {
-                                    licenses.setProperty(licenseKey + "#" + i + "#id", id);
-                                }
-                                if (category != null) {
-                                    licenses.setProperty(licenseKey + "#" + i + "#category", category);
-                                }
-                                if (license.name() != null) {
-                                    licenses.setProperty(licenseKey + "#" + i + "#name", license.name());
-                                }
-                                if (license.url() != null) {
-                                    licenses.setProperty(licenseKey + "#" + i + "#url", license.url());
+                            explicit.putIfAbsent(versioned, node.module() != null && !node.automatic());
+                            if (node.module() != null) {
+                                modules.putIfAbsent(node.module(), versioned);
+                            }
+                            if (!node.licenses().isEmpty()) {
+                                String licenseKey = node.resolvedVersion() == null
+                                        ? entry.getKey()
+                                        : entry.getKey() + "/" + node.resolvedVersion();
+                                for (int i = 0; i < node.licenses().size(); i++) {
+                                    License license = node.licenses().get(i);
+                                    String id = license.id();
+                                    if (id == null && license.name() != null) {
+                                        id = aliases.get(license.name().toLowerCase(Locale.ROOT).trim());
+                                    }
+                                    String category = license.category();
+                                    if (category == null && id != null) {
+                                        category = categories.get(id);
+                                    }
+                                    if (id != null) {
+                                        licenses.setProperty(licenseKey + "#" + i + "#id", id);
+                                    }
+                                    if (category != null) {
+                                        licenses.setProperty(licenseKey + "#" + i + "#category", category);
+                                    }
+                                    if (license.name() != null) {
+                                        licenses.setProperty(licenseKey + "#" + i + "#name", license.name());
+                                    }
+                                    if (license.url() != null) {
+                                        licenses.setProperty(licenseKey + "#" + i + "#url", license.url());
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        }
-        SequencedMap<String, Path> placed = new LinkedHashMap<>();
-        SequencedMap<String, String> checksums = new LinkedHashMap<>();
-        SequencedMap<String, Boolean> internals = new LinkedHashMap<>();
-        for (Map.Entry<String, Resolver.Resolved> entry : materialized.entrySet()) {
-            String key = entry.getKey();
-            int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
-            if (first < 0 || second < 0) {
-                continue;
-            }
-            String dependency = key.substring(second + 1);
-            Resolver.Resolved artifact = entry.getValue();
-            String value = resolved.getProperty(key);
-            Path file = placed.get(dependency);
-            if (file == null) {
-                if (artifact.internal()) {
-                    file = libs.resolve(PathPlacement.fileName(
-                            dependency.substring(dependency.indexOf('/') + 1)));
-                    if (!Files.exists(file)) {
-                        BuildStep.linkOrCopy(file, artifact.file());
+            SequencedMap<String, Path> placed = new LinkedHashMap<>();
+            SequencedMap<String, String> checksums = new LinkedHashMap<>();
+            SequencedMap<String, Boolean> internals = new LinkedHashMap<>();
+            for (Map.Entry<String, Resolver.Resolved> entry : materialized.entrySet()) {
+                String key = entry.getKey();
+                int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
+                if (first < 0 || second < 0) {
+                    continue;
+                }
+                String dependency = key.substring(second + 1);
+                Resolver.Resolved artifact = entry.getValue();
+                String value = resolved.getProperty(key);
+                Path file = placed.get(dependency);
+                if (file == null) {
+                    if (artifact.internal()) {
+                        file = libs.resolve(PathPlacement.fileName(
+                                dependency.substring(dependency.indexOf('/') + 1)));
+                        if (!Files.exists(file)) {
+                            BuildStep.linkOrCopy(file, artifact.file());
+                        }
+                    } else {
+                        file = artifact.file();
                     }
-                } else {
-                    file = artifact.file();
+                    placed.put(dependency, file);
+                    internals.put(dependency, artifact.internal());
                 }
-                placed.put(dependency, file);
-                internals.put(dependency, artifact.internal());
+                checksums.merge(dependency, value, (left, right) -> {
+                    if (right.isEmpty()) {
+                        return left;
+                    }
+                    if (!left.isEmpty() && !left.equals(right)) {
+                        throw new IllegalStateException("Conflicting checksums pinned for " + dependency + ": " + left + " and " + right);
+                    }
+                    return left.isEmpty() ? right : left;
+                });
             }
-            checksums.merge(dependency, value, (left, right) -> {
-                if (right.isEmpty()) {
-                    return left;
-                }
-                if (!left.isEmpty() && !left.equals(right)) {
-                    throw new IllegalStateException("Conflicting checksums pinned for " + dependency + ": " + left + " and " + right);
-                }
-                return left.isEmpty() ? right : left;
-            });
-        }
-        SequencedMap<String, String> aliased = rename(placed, aliasTargets, modules, explicit, libs);
-        for (Map.Entry<String, Overridden> entry : overrideTargets.entrySet()) {
-            for (String carrier : entry.getValue().carriers()) {
-                if (!modules.containsKey(carrier)) {
-                    throw new IllegalArgumentException("Module override "
-                            + entry.getKey()
-                            + " declared by "
-                            + entry.getValue().origin()
-                            + " names "
-                            + carrier
-                            + " which no resolved dependency carries"
-                            + " - require the carrier or drop the override");
+            SequencedMap<String, String> aliased = rename(placed, aliasTargets, modules, explicit, libs);
+            for (Map.Entry<String, Overridden> entry : overrideTargets.entrySet()) {
+                for (String carrier : entry.getValue().carriers()) {
+                    if (!modules.containsKey(carrier)) {
+                        throw new IllegalArgumentException("Module override "
+                                + entry.getKey()
+                                + " declared by "
+                                + entry.getValue().origin()
+                                + " names "
+                                + carrier
+                                + " which no resolved dependency carries"
+                                + " - require the carrier or drop the override");
+                    }
                 }
             }
-        }
-        for (Map.Entry<String, SequencedMap<String, SequencedMap<String, String>>> byGroup : moduleOverrides.entrySet()) {
-            SequencedSet<String> scopes = requires
-                    .getOrDefault(byGroup.getKey(), Collections.emptyNavigableMap())
-                    .sequencedKeySet();
-            for (SequencedMap<String, String> byModule : byGroup.getValue().values()) {
-                for (String module : byModule.sequencedKeySet()) {
-                    Path file = libs.resolve(BuildExecutorModule.encode(module) + ".jar");
-                    if (!Files.exists(file)) {
-                        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(file))) {
-                            output.putNextEntry(new JarEntry("module-info.class"));
-                            output.write(carrying(module, overrideTargets.get(module).carriers()));
-                            output.closeEntry();
+            for (Map.Entry<String, SequencedMap<String, SequencedMap<String, String>>> byGroup : moduleOverrides.entrySet()) {
+                SequencedSet<String> scopes = requires
+                        .getOrDefault(byGroup.getKey(), Collections.emptyNavigableMap())
+                        .sequencedKeySet();
+                for (SequencedMap<String, String> byModule : byGroup.getValue().values()) {
+                    for (String module : byModule.sequencedKeySet()) {
+                        Path file = libs.resolve(BuildExecutorModule.encode(module) + ".jar");
+                        if (!Files.exists(file)) {
+                            try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(file))) {
+                                output.putNextEntry(new JarEntry("module-info.class"));
+                                output.write(carrying(module, overrideTargets.get(module).carriers()));
+                                output.closeEntry();
+                            }
+                        }
+                        placed.put("module/" + module, file);
+                        for (String scope : scopes) {
+                            String key = byGroup.getKey() + "/" + scope + "/module/" + module;
+                            materialized.put(key, new Resolver.Resolved(file, "", false));
+                            resolved.setProperty(key, "");
                         }
                     }
-                    placed.put("module/" + module, file);
-                    for (String scope : scopes) {
-                        String key = byGroup.getKey() + "/" + scope + "/module/" + module;
-                        materialized.put(key, new Resolver.Resolved(file, "", false));
-                        resolved.setProperty(key, "");
+                }
+            }
+            SequencedProperties index = new SequencedProperties();
+            for (Map.Entry<String, Resolver.Resolved> entry : materialized.entrySet()) {
+                String key = entry.getKey();
+                int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
+                if (first < 0 || second < 0) {
+                    continue;
+                }
+                String value = resolved.getProperty(key);
+                String relative = context.next()
+                        .relativize(placed.get(key.substring(second + 1)))
+                        .toString()
+                        .replace(File.separatorChar, '/');
+                index.setProperty(key, value.isEmpty() ? relative : relative + " " + value);
+            }
+            if (!aliased.isEmpty()) {
+                SequencedProperties properties = new SequencedProperties();
+                aliased.forEach(properties::setProperty);
+                properties.store(context.next().resolve(ALIASED));
+            }
+            SequencedProperties produced = new SequencedProperties();
+            internals.forEach((dependency, internal) -> {
+                if (internal) {
+                    produced.setProperty(dependency, "");
+                }
+            });
+            if (!produced.isEmpty()) {
+                produced.store(context.next().resolve(INTERNAL));
+            }
+            if (pinning == Pinning.STRICT) {
+                Set<Path> pinnedFiles = new HashSet<>();
+                for (Map.Entry<String, String> entry : checksums.entrySet()) {
+                    if (!entry.getValue().isEmpty()) {
+                        pinnedFiles.add(placed.get(entry.getKey()));
+                    }
+                }
+                for (Map.Entry<String, String> entry : checksums.entrySet()) {
+                    if (entry.getValue().isEmpty()
+                            && !internals.get(entry.getKey())
+                            && !pinnedFiles.contains(placed.get(entry.getKey()))) {
+                        throw new IllegalStateException("No checksum pinned for " + entry.getKey() + " (strict pinning is enabled)");
                     }
                 }
             }
+            index.store(context.next().resolve(DEPENDENCIES));
+            graph.store(context.next().resolve(GRAPH));
+            licenses.store(context.next().resolve(LICENSES));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
         }
-        SequencedProperties index = new SequencedProperties();
-        for (Map.Entry<String, Resolver.Resolved> entry : materialized.entrySet()) {
-            String key = entry.getKey();
-            int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
-            if (first < 0 || second < 0) {
-                continue;
-            }
-            String value = resolved.getProperty(key);
-            String relative = context.next()
-                    .relativize(placed.get(key.substring(second + 1)))
-                    .toString()
-                    .replace(File.separatorChar, '/');
-            index.setProperty(key, value.isEmpty() ? relative : relative + " " + value);
-        }
-        if (!aliased.isEmpty()) {
-            SequencedProperties properties = new SequencedProperties();
-            aliased.forEach(properties::setProperty);
-            properties.store(context.next().resolve(ALIASED));
-        }
-        SequencedProperties produced = new SequencedProperties();
-        internals.forEach((dependency, internal) -> {
-            if (internal) {
-                produced.setProperty(dependency, "");
-            }
-        });
-        if (!produced.isEmpty()) {
-            produced.store(context.next().resolve(INTERNAL));
-        }
-        if (pinning == Pinning.STRICT) {
-            Set<Path> pinnedFiles = new HashSet<>();
-            for (Map.Entry<String, String> entry : checksums.entrySet()) {
-                if (!entry.getValue().isEmpty()) {
-                    pinnedFiles.add(placed.get(entry.getKey()));
-                }
-            }
-            for (Map.Entry<String, String> entry : checksums.entrySet()) {
-                if (entry.getValue().isEmpty()
-                        && !internals.get(entry.getKey())
-                        && !pinnedFiles.contains(placed.get(entry.getKey()))) {
-                    throw new IllegalStateException("No checksum pinned for " + entry.getKey() + " (strict pinning is enabled)");
-                }
-            }
-        }
-        index.store(context.next().resolve(DEPENDENCIES));
-        graph.store(context.next().resolve(GRAPH));
-        licenses.store(context.next().resolve(LICENSES));
-        return CompletableFuture.completedStage(new BuildStepResult(true));
     }
+
 
     private static String text(String value) {
         return value == null ? "" : value;
