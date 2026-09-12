@@ -57,7 +57,7 @@ public class LauncherModuleTest {
                 "project");
         executor.execute("launcher/dependencies");
 
-        Path resolvedOutput = root.resolve("launcher").resolve("dependencies").resolve("output");
+        Path resolvedOutput = root.resolve("launcher").resolve("dependencies").resolve("resolve").resolve("output");
         SequencedProperties resolved = SequencedProperties.ofFiles(resolvedOutput.resolve(BuildStep.DEPENDENCIES));
         assertThat(resolved.stringPropertyNames())
                 .containsExactly("launcher/runtime/maven/build.jenesis/build.jenesis.launcher/RELEASE");

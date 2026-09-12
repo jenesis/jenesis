@@ -125,12 +125,14 @@ public class InferredCompilerChainModuleTest {
                 .resolve(InferredCompilerChainModule.COMPILE)
                 .resolve(InferredCompilerChainModule.KOTLINC)
                 .resolve("dependencies")
+                .resolve("resolve")
                 .resolve("output");
         Path scalaArtifacts = root
                 .resolve("chain")
                 .resolve(InferredCompilerChainModule.COMPILE)
                 .resolve(InferredCompilerChainModule.SCALAC)
                 .resolve("dependencies")
+                .resolve("resolve")
                 .resolve("output");
         URL[] urls = Stream.concat(
                         Stream.of(javaClasses.toUri().toURL(), kotlinClasses.toUri().toURL(), scalaClasses.toUri().toURL()),

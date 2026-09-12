@@ -49,7 +49,7 @@ public class CheckstyleModuleTest {
                 "project");
         executor.execute("checkstyle/dependencies");
 
-        Path resolvedOutput = root.resolve("checkstyle").resolve("dependencies").resolve("output");
+        Path resolvedOutput = root.resolve("checkstyle").resolve("dependencies").resolve("resolve").resolve("output");
         SequencedProperties resolved = SequencedProperties.ofFiles(resolvedOutput.resolve(BuildStep.DEPENDENCIES));
         assertThat(resolved.stringPropertyNames())
                 .as("the module's own closure is resolved by the module, not again by every tool")

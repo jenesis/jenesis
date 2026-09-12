@@ -58,6 +58,7 @@ public class ScalaCompilerModuleTest {
         Path artifacts = root
                 .resolve("scala")
                 .resolve("dependencies")
+                .resolve("resolve")
                 .resolve("output");
         URL[] runtimeUrls = collectJarUrls(artifacts).stream().toArray(URL[]::new);
         URL[] urls = Stream.concat(
@@ -244,6 +245,7 @@ public class ScalaCompilerModuleTest {
         Path artifacts = root
                 .resolve("scala")
                 .resolve("dependencies")
+                .resolve("resolve")
                 .resolve("output");
         List<String> names = listCoordinates(artifacts);
         assertThat(names).anyMatch(name -> name.contains("scala3-compiler_3"));

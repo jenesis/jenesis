@@ -61,6 +61,7 @@ public class KotlinCompilerModuleTest {
         Path artifacts = root
                 .resolve("kotlin")
                 .resolve("dependencies")
+                .resolve("resolve")
                 .resolve("output");
         URL[] runtimeUrls = collectJarUrls(artifacts).stream().toArray(URL[]::new);
         URL[] urls = Stream.concat(
@@ -247,6 +248,7 @@ public class KotlinCompilerModuleTest {
         Path artifacts = root
                 .resolve("kotlin")
                 .resolve("dependencies")
+                .resolve("resolve")
                 .resolve("output");
         List<String> names = listCoordinates(artifacts);
         assertThat(names).anyMatch(name -> name.contains("kotlin-compiler-embeddable"));
@@ -342,7 +344,7 @@ public class KotlinCompilerModuleTest {
                 "project");
         executor.execute("kotlin/dependencies");
 
-        Path resolvedOutput = root.resolve("kotlin").resolve("dependencies").resolve("output");
+        Path resolvedOutput = root.resolve("kotlin").resolve("dependencies").resolve("resolve").resolve("output");
         SequencedProperties requires = SequencedProperties.ofFiles(resolvedOutput.resolve(BuildStep.DEPENDENCIES));
         assertThat(requires.stringPropertyNames())
                 .containsExactly("custom/runtime/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable/RELEASE");

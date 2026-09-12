@@ -59,6 +59,7 @@ public class GroovyCompilerModuleTest {
         Path artifacts = root
                 .resolve("groovy")
                 .resolve("dependencies")
+                .resolve("resolve")
                 .resolve("output");
         URL[] runtimeUrls = collectJarUrls(artifacts).stream().toArray(URL[]::new);
         URL[] urls = Stream.concat(

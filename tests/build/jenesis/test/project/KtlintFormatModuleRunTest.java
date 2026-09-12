@@ -91,7 +91,7 @@ public class KtlintFormatModuleRunTest {
 
         newExecutor().execute();
 
-        Path resolved = root.resolve("ktlint-format").resolve("dependencies").resolve("output").resolve("resolved");
+        Path resolved = root.resolve("ktlint-format").resolve("dependencies").resolve("resolve").resolve("output").resolve("resolved");
         try (Stream<Path> jars = Files.list(resolved)) {
             assertThat(jars.map(jar -> jar.getFileName().toString()))
                     .as("the pinned ktlint version resolves")

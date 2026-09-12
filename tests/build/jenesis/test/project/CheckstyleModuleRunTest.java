@@ -100,7 +100,7 @@ public class CheckstyleModuleRunTest {
                 "project");
         executor.execute();
 
-        Path resolved = root.resolve("checkstyle").resolve("dependencies").resolve("output").resolve("resolved");
+        Path resolved = root.resolve("checkstyle").resolve("dependencies").resolve("resolve").resolve("output").resolve("resolved");
         try (Stream<Path> jars = Files.list(resolved)) {
             assertThat(jars.map(jar -> jar.getFileName().toString()))
                     .as("the pinned Checkstyle version is the one that resolves, not a floated RELEASE")
