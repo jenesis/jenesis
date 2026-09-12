@@ -41,6 +41,7 @@ public record Project(
         SequencedSet<Path> metadata,
         SequencedSet<Path> configuration,
         SequencedSet<Path> boms,
+        SequencedSet<Path> signatures,
         SequencedSet<Path> profiles,
         BuildExecutorCache cache,
         HashDigestFunction hashFunction,
@@ -204,6 +205,7 @@ public record Project(
                                 true,
                                 Layout.licenseFiles(project, Dependencies.SPDX),
                                 project.boms(),
+                project.signatures(),
                                 (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
                                         new ProjectModuleDescriptor(descriptor,
                                                 configurations(
@@ -279,6 +281,7 @@ public record Project(
                                 true,
                                 Layout.licenseFiles(project, Dependencies.SPDX),
                                 project.boms(),
+                project.signatures(),
                                 (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
                                         new ProjectModuleDescriptor(descriptor,
                                                 configurations(modularConfigurationFolder(descriptor.location()), project.configuration(), project.profiles()),
@@ -614,7 +617,7 @@ public record Project(
                           no tests, runs none, is never staged.
                       @jenesis.pin <token> <ver> [<algo>/<hex>] [<guard>]
                           Pin a version and optionally a content checksum.
-                      @jenesis.signature <algo>/<hex> <token>...
+                      @jenesis.signature <algo>/<hex> <token>... | [<group>/]signature-<name>.properties
                           Declare the OpenPGP key that signs these coordinates' artifacts - the
                           fingerprint first, because one key normally signs many. A Maven token may
                           end in /* to cover every artifact of one groupId. Carries no version: one
@@ -630,8 +633,13 @@ public record Project(
                           gpg at all. A coordinate's POM is verified with its artifact and must carry
                           the same signer, which closes the gap that POMs are read but never pinned.
                           Key material comes from the local gpg keyring and is never fetched; an
-                          unknown key is reported rather than retrieved. The verifier is an ordinary
-                          forked tool, so jenesis.print.gpg shows each invocation and
+                          unknown key is reported rather than retrieved. A lone
+                          signature-<name>.properties token instead reads `<algo>/<hex>=<token>...`
+                          lines from a local file in jenesis.project.signatures, the way
+                          @jenesis.bom names a local pin-<name>.properties, so one vetted list
+                          serves many modules; a list is never resolved from a repository, since one
+                          that had to be downloaded would itself need verifying. The verifier is an
+                          ordinary forked tool, so jenesis.print.gpg shows each invocation and
                           jenesis.signature.command names a different binary.
                       @jenesis.alias <module> <groupId>/<artifactId>[/<type>[/<classifier>]]
                           Require a Maven artifact under a stable module name, so a non-modular jar
@@ -942,6 +950,14 @@ public record Project(
             resolvedBoms = new LinkedHashSet<>();
             locations(bomsOverride, resolvedRoot, resolvedConfiguration, new HashSet<>(), resolvedBoms);
         }
+        String signaturesOverride = System.getProperty("jenesis.project.signatures");
+        SequencedSet<Path> resolvedSignatures;
+        if (signaturesOverride == null) {
+            resolvedSignatures = resolvedConfiguration;
+        } else {
+            resolvedSignatures = new LinkedHashSet<>();
+            locations(signaturesOverride, resolvedRoot, resolvedConfiguration, new HashSet<>(), resolvedSignatures);
+        }
         SequencedSet<Path> resolvedProfiles = Collections.emptyNavigableSet();
         Path resolvedTarget = Path.of("target");
         String targetOverride = System.getProperty("jenesis.project.target");
@@ -986,6 +1002,7 @@ public record Project(
                 resolvedMetadata,
                 resolvedConfiguration,
                 resolvedBoms,
+                resolvedSignatures,
                 resolvedProfiles,
                 resolvedCache,
                 new HashDigestFunction(System.getProperty("jenesis.project.digest", "SHA-256")),
@@ -1040,6 +1057,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1063,6 +1081,31 @@ public record Project(
                 metadata,
                 new LinkedHashSet<>(List.of(configuration)),
                 boms,
+                signatures,
+                profiles,
+                cache,
+                hashFunction,
+                layout,
+                tests,
+                sources,
+                documentation,
+                pinning,
+                version,
+                defaultTarget,
+                assembler,
+                configurator,
+                repositories,
+                resolvers);
+    }
+
+    public Project signatures(Path... signatures) {
+        return new Project(root,
+                target,
+                artifacts,
+                metadata,
+                configuration,
+                boms,
+                new LinkedHashSet<>(List.of(signatures)),
                 profiles,
                 cache,
                 hashFunction,
@@ -1086,6 +1129,7 @@ public record Project(
                 metadata,
                 configuration,
                 new LinkedHashSet<>(List.of(boms)),
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1109,6 +1153,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 new LinkedHashSet<>(List.of(profiles)),
                 cache,
                 hashFunction,
@@ -1132,6 +1177,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1155,6 +1201,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1178,6 +1225,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1201,6 +1249,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1224,6 +1273,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1247,6 +1297,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1270,6 +1321,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1293,6 +1345,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1316,6 +1369,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1339,6 +1393,7 @@ public record Project(
                 new LinkedHashSet<>(List.of(metadata)),
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1362,6 +1417,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1385,6 +1441,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1408,6 +1465,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1431,6 +1489,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1454,6 +1513,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1477,6 +1537,7 @@ public record Project(
                 metadata,
                 configuration,
                 boms,
+                signatures,
                 profiles,
                 cache,
                 hashFunction,
@@ -1538,6 +1599,7 @@ public record Project(
                 project.metadata||Path-separated extra metadata files
                 project.configuration|build.jenesis|Path-separated folders searched for tool configuration files; @ splices the default
                 project.boms||Path-separated locations of local pin-<name>.properties; default: the configuration folders
+                project.signatures||Path-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
                 project.docker|false|Run the whole build inside a container

@@ -1158,4 +1158,37 @@ public class ModuleInfoParserTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("expected <algorithm>/<fingerprint> <token>...");
     }
+
+    @Test
+    public void signature_tag_keeps_a_local_key_list_as_a_reference() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.signature signature-vendor.properties
+                 * @jenesis.signature tool/signature-plugins.properties
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.signatures())
+                .as("a list is resolved where the file is read, not where the tag is parsed")
+                .containsEntry("main/signature-vendor.properties", "")
+                .containsEntry("tool/signature-plugins.properties", "");
+    }
+
+    @Test
+    public void signature_tag_rejects_a_lone_token_that_is_not_a_local_list() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.signature org.example/vendor-keys
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("a list that had to be downloaded would itself need verifying");
+    }
 }

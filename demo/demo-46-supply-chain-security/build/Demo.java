@@ -68,7 +68,14 @@ public class Demo {
         expectSignature("rotated: the declared key is not the one that signed the artifact",
                 false, home, "declared", "rotated");
 
-        // 7. Verification is opt-in. Without the property the contradiction is never
+        // 7. The same rejection, with the key taken from a local list instead of an
+        // inline declaration - the shape @jenesis.bom uses for a local pin file. A list
+        // is only ever read from disk: one fetched from a repository would itself need
+        // verifying, which is the problem being solved.
+        expectSignature("vendored: a local key list is consulted like an inline declaration",
+                false, home, "declared", "vendored");
+
+        // 8. Verification is opt-in. Without the property the contradiction is never
         // looked for: an ordinary build enforces the pin and needs no gpg at all.
         expectSignature("rotated: the same contradiction is never looked for by default",
                 true, home, null, "rotated");

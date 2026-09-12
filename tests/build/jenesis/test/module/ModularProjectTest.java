@@ -747,6 +747,7 @@ public class ModularProjectTest {
                 true,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
+                Collections.emptyNavigableSet(),
                 (descriptor, _, _) -> {
                     switch (descriptor.name()) {
                         case "module-foo" -> {
