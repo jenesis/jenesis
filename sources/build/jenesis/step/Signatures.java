@@ -1,6 +1,7 @@
 package build.jenesis.step;
 
 import module java.base;
+import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
@@ -21,34 +22,51 @@ public class Signatures extends ProcessBuildStep {
     private final transient Map<String, Repository> repositories;
     private final Verification verification;
     private final String command;
+    private final transient boolean printing;
 
     public Signatures(Map<String, Repository> repositories) {
         this(repositories,
                 Verification.fromProperty(),
                 System.getProperty("jenesis.signature.command", "gpg"),
-                null);
+                null,
+                Boolean.getBoolean("jenesis.print.signatures"));
     }
 
     private Signatures(Map<String, Repository> repositories,
                        Verification verification,
                        String command,
-                       Function<List<String>, ? extends ProcessHandler> factory) {
+                       Function<List<String>, ? extends ProcessHandler> factory,
+                       boolean printing) {
         super("gpg", factory == null ? ProcessHandler.OfProcess.ofCommand(command) : factory);
         this.repositories = repositories;
         this.verification = verification;
         this.command = command;
+        this.printing = printing;
     }
 
     public Signatures verification(Verification verification) {
-        return new Signatures(repositories, verification, command, factory);
+        return new Signatures(repositories, verification, command, factory, printing);
     }
 
     public Signatures command(String command) {
-        return new Signatures(repositories, verification, command, factory);
+        return new Signatures(repositories, verification, command, factory, printing);
     }
 
     public Signatures factory(Function<List<String>, ? extends ProcessHandler> factory) {
-        return new Signatures(repositories, verification, command, factory);
+        return new Signatures(repositories, verification, command, factory, printing);
+    }
+
+    public Signatures printing(boolean printing) {
+        return new Signatures(repositories, verification, command, factory, printing);
+    }
+
+    private void print(String marker, String colour, String coordinate, String detail) {
+        System.out.printf("%s%-11s%s %s %s%n",
+                colour,
+                marker,
+                BuildExecutorCallback.RESET,
+                coordinate,
+                detail);
     }
 
     @Override
@@ -151,6 +169,12 @@ public class Signatures extends ProcessBuildStep {
             String rest = token.substring(token.indexOf('/') + 1) + "/" + version;
             String coordinate = rest.substring(0, rest.lastIndexOf('/'));
             if (accepted.isEmpty()) {
+                if (printing) {
+                    print("[UNDECLARED]",
+                            BuildExecutorCallback.YELLOW,
+                            token + " " + version,
+                            "no @jenesis.signature line covers it");
+                }
                 if (verification == Verification.STRICT) {
                     violations.add(token + " " + version + ": no @jenesis.signature line declares a key for it");
                 }
@@ -167,6 +191,12 @@ public class Signatures extends ProcessBuildStep {
             String relative = coordinate.substring(repositorySlash + 1) + "/" + version;
             Path signature = materialise(executor, context, repository, relative, true);
             if (signature == null) {
+                if (printing) {
+                    print("[UNSIGNED]",
+                            BuildExecutorCallback.YELLOW,
+                            token + " " + version,
+                            "a key is declared for it but no signature is published");
+                }
                 violations.add(token + " " + version + ": a key is declared for it but no signature is published");
                 continue;
             }
@@ -180,6 +210,9 @@ public class Signatures extends ProcessBuildStep {
                 continue;
             }
             String fingerprint = "OpenPGP/" + status.fingerprint().toUpperCase(Locale.ROOT);
+            if (printing && accepted.stream().anyMatch(fingerprint::equalsIgnoreCase)) {
+                print("[VERIFIED]", BuildExecutorCallback.GREEN, token + " " + version, fingerprint);
+            }
             if (accepted.stream().noneMatch(fingerprint::equalsIgnoreCase)) {
                 violations.add(token + " " + version + ": signed by " + fingerprint
                         + " but only " + String.join(", ", accepted)
