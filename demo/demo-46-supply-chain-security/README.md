@@ -112,6 +112,10 @@ step. `jenesis.dependency.signature` selects how much it checks, and defaults to
 | `declared` | every coordinate an `@jenesis.signature` line covers                     |
 | `strict`   | the same, and additionally rejects a coordinate no line covers, or whose artifact or POM publishes no signature |
 
+`-Djenesis.print.signatures` names each coordinate that was checked with the key that signed it, and each one
+no declaration covers - under `declared` that second list is exactly what `strict` would refuse, so it is how
+you find out what to declare before switching.
+
 Because it is a separate step, switching the property on does not re-download anything:
 the `artifacts` step's output is unchanged, and only `signatures` runs. The fetched `.asc`
 files are cached beside the jars they verify, like any other artifact.
@@ -228,7 +232,12 @@ demo ships it un-run, so the supply-chain check above still has something to cat
 
 That healing power is exactly why the operation is dangerous in the wrong hands: it
 re-blesses whatever the repository currently serves, so a *swapped* artifact would be
-written in as an accepted pin just the same. So because `ignore` bypasses checksum
+written in as an accepted pin just the same. This is the one build a pin cannot protect:
+every other build checks the bytes against a pin your project already reviewed, but the run
+that *writes* the pin has nothing to check against, so whatever arrives becomes the
+definition of correct. A signature is what still has something to say there, which is why
+the refresh is the run to pair with `-Djenesis.dependency.signature=strict` rather than
+hardening every ordinary build. So because `ignore` bypasses checksum
 verification while it resolves - it is the step that *establishes* trust rather than
 enforcing it - run it only on a **trusted machine** against a **trusted repository**, and
 pair it with `-Djenesis.dependency.signature=strict`, which is the one check that still
