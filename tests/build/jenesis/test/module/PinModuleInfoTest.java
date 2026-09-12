@@ -799,4 +799,78 @@ public class PinModuleInfoTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Cannot flatten platform-guarded BOM declaration");
     }
+
+    @Test
+    public void writes_a_pin_into_a_markdown_documentation_comment() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /// A module documented in Markdown.
+                ///
+                /// @jenesis.release 25
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        String result = run(file);
+        assertThat(result)
+                .as("a pin is written in the form the comment already uses")
+                .contains("/// @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe")
+                .doesNotContain("/**")
+                .doesNotContain(" * @jenesis.pin");
+        assertThat(result)
+                .as("the comment keeps the lines it already had")
+                .contains("/// A module documented in Markdown.")
+                .contains("/// @jenesis.release 25");
+    }
+
+    @Test
+    public void refreshes_a_pin_already_in_a_markdown_documentation_comment() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /// A module documented in Markdown.
+                ///
+                /// @jenesis.pin org.example/lib 0.9 SHA-256/0000
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        String result = run(file);
+        assertThat(result.split("@jenesis\\.pin", -1))
+                .as("the coordinate keeps exactly one pin line")
+                .hasSize(2);
+        assertThat(result).contains("/// @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe");
+    }
+
+    @Test
+    public void resolves_a_bom_reference_in_a_markdown_documentation_comment() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /// A module documented in Markdown.
+                ///
+                /// @jenesis.bom org.acme/platform-bom 1.0
+                module foo {
+                }
+                """);
+        writeBomVersion("main/maven/org.acme/platform-bom", "2.0");
+        String result = run(file);
+        assertThat(result).contains("/// @jenesis.bom org.acme/platform-bom 2.0");
+    }
+
+    @Test
+    public void leaves_a_traditional_comment_in_its_own_form() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * A module documented in HTML.
+                 */
+                module foo {
+                }
+                """);
+        writeResolved(Map.of("maven/org.example/lib", "1.0 SHA-256/cafebabe"));
+        String result = run(file);
+        assertThat(result)
+                .as("the form of the comment is the form the pin is written in")
+                .contains(" * @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe")
+                .doesNotContain("///");
+    }
 }

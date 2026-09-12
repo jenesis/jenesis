@@ -13,8 +13,8 @@ public class PinModuleInfo implements BuildStep {
 
     private static final Pattern MODULE_DECLARATION = Pattern.compile("(?m)^(open\\s+)?module\\s+");
     private static final Pattern JAVADOC_END = Pattern.compile("\\*/\\s*$");
-    private static final Pattern PIN_TAG = Pattern.compile("^\\s*\\*\\s*@jenesis\\.pin\\s+(\\S+)(\\s+.*)?$");
-    private static final Pattern BOM_TAG = Pattern.compile("^\\s*\\*\\s*@jenesis\\.bom\\s+(\\S+)(\\s+.*)?$");
+    private static final Pattern PIN_TAG = Pattern.compile("^\\s*(?:///|\\*)\\s*@jenesis\\.pin\\s+(\\S+)(\\s+.*)?$");
+    private static final Pattern BOM_TAG = Pattern.compile("^\\s*(?:///|\\*)\\s*@jenesis\\.bom\\s+(\\S+)(\\s+.*)?$");
 
     private final String prefix;
     private final String path;
@@ -233,16 +233,38 @@ public class PinModuleInfo implements BuildStep {
         if (javadocEnd >= 0) {
             javadocStart = prelude.lastIndexOf("/**", javadocEnd);
         }
+        String prefix = " * ";
         if (javadocStart < 0 || javadocEnd < 0) {
-            if (entries.isEmpty()) {
-                return prelude;
+            int scan = prelude.length();
+            while (scan > 0 && Character.isWhitespace(prelude.charAt(scan - 1))) {
+                scan--;
             }
-            return prelude + renderJavadoc(entries) + "\n";
+            int markdownEnd = scan, markdownStart = -1;
+            while (scan > 0) {
+                int lineStart = prelude.lastIndexOf('\n', scan - 1) + 1;
+                if (!prelude.substring(lineStart, scan).stripLeading().startsWith("///")) {
+                    break;
+                }
+                markdownStart = lineStart;
+                if (lineStart == 0) {
+                    break;
+                }
+                scan = lineStart - 1;
+            }
+            if (markdownStart < 0) {
+                if (entries.isEmpty()) {
+                    return prelude;
+                }
+                return prelude + renderJavadoc(entries) + "\n";
+            }
+            javadocStart = markdownStart;
+            javadocEnd = markdownEnd;
+            prefix = "/// ";
         }
         String before = prelude.substring(0, javadocStart);
         String javadoc = prelude.substring(javadocStart, javadocEnd);
         String after = prelude.substring(javadocEnd);
-        String rewritten = rewriteJavadoc(javadoc, entries, covered, references, flatten, platform);
+        String rewritten = rewriteJavadoc(javadoc, prefix, entries, covered, references, flatten, platform);
         return before + rewritten + after;
     }
 
@@ -250,13 +272,14 @@ public class PinModuleInfo implements BuildStep {
     }
 
     private static String rewriteJavadoc(String javadoc,
+                                         String prefix,
                                          SequencedMap<String, String> entries,
                                          Set<String> covered,
                                          SequencedMap<String, String> references,
                                          boolean flatten,
                                          Platform platform) {
         List<String> lines = new ArrayList<>(List.of(javadoc.split("\\n", -1)));
-        rewriteBoms(lines, references, flatten, platform);
+        rewriteBoms(lines, prefix, references, flatten, platform);
         SequencedMap<String, List<PinLine>> guarded = new LinkedHashMap<>();
         for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
             Matcher matcher = PIN_TAG.matcher(lines.get(lineIndex));
@@ -353,7 +376,7 @@ public class PinModuleInfo implements BuildStep {
                 }
             }
             if (insertAt < 0) {
-                insertAt = Math.max(1, lines.size() - 1);
+                insertAt = prefix.startsWith("///") ? lines.size() : Math.max(1, lines.size() - 1);
             }
         }
         for (Map.Entry<String, String> entry : entries.entrySet()) {
@@ -364,13 +387,14 @@ public class PinModuleInfo implements BuildStep {
         }
         List<String> tags = new ArrayList<>();
         for (Map.Entry<String, String> entry : merged.entrySet()) {
-            tags.add(" * @jenesis.pin " + entry.getKey() + " " + entry.getValue());
+            tags.add(prefix + "@jenesis.pin " + entry.getKey() + " " + entry.getValue());
         }
         lines.addAll(insertAt, tags);
         return String.join("\n", lines);
     }
 
     private static void rewriteBoms(List<String> lines,
+                                    String prefix,
                                     SequencedMap<String, String> references,
                                     boolean flatten,
                                     Platform platform) {
@@ -446,7 +470,7 @@ public class PinModuleInfo implements BuildStep {
             }
             PinLine winner = matched != null ? matched : fallback;
             if (winner != null) {
-                lines.set(winner.index(), " * @jenesis.bom "
+                lines.set(winner.index(), prefix + "@jenesis.bom "
                         + winner.token()
                         + " "
                         + resolved

@@ -603,6 +603,11 @@ public record Project(
 
                     ## 8. Configure a module with @jenesis tags on module-info.java
 
+                    Tags are read from the module's documentation comment in either form: the
+                    traditional /** ... */ and the Markdown /// of JEP 467. `pin` writes back in
+                    whichever form the comment already uses, and creates a /** ... */ when there is
+                    no comment at all.
+
                     Token grammar, shared below: `<group>/<repo>/<coordinate>`, where a bare
                     `<module>` abbreviates `<group>/module/<module>` and `<groupId>/<artifactId>`
                     abbreviates `<group>/maven/<groupId>/<artifactId>`. A trailing `[<token>,...]`
