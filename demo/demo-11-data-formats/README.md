@@ -94,9 +94,9 @@ pin - `protobuf/pom.xml` carries one line per platform, each guarded with the
 platform it is for so `pin` keeps the ones it cannot resolve itself:
 
     <!--jenesis.pin
-    protoc/maven/com.google.protobuf/protoc/exe/linux-x86_64  4.32.1 SHA-256/9a757b... [linux,x86_64]
-    protoc/maven/com.google.protobuf/protoc/exe/osx-aarch_64  4.32.1 SHA-256/e3b836... [macos,aarch64]
-    protoc-grpc-java/maven/io.grpc/protoc-gen-grpc-java/exe/linux-x86_64 1.83.1 SHA-256/db4044... [linux,x86_64]
+    protoc/maven/com.google.protobuf/protoc/exe/linux-x86_64  4.32.1 SHA-256/9a757b... (linux,x86_64)
+    protoc/maven/com.google.protobuf/protoc/exe/osx-aarch_64  4.32.1 SHA-256/e3b836... (macos,aarch64)
+    protoc-grpc-java/maven/io.grpc/protoc-gen-grpc-java/exe/linux-x86_64 1.83.1 SHA-256/db4044... (linux,x86_64)
     -->
 
 Pin `protoc` rather than floating it: `com.google.protobuf:protoc` still publishes

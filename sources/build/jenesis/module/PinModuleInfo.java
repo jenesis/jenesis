@@ -335,7 +335,7 @@ public class PinModuleInfo implements BuildStep {
         rewriteBoms(lines, prefix, bomTags, references, flatten, platform);
         SequencedMap<String, List<PinLine>> guarded = new LinkedHashMap<>();
         for (Tag tag : pinTags.values()) {
-            if (tag.rest().endsWith("]")) {
+            if (tag.rest().endsWith(")")) {
                 guarded.computeIfAbsent(expand(tag.token()), _ -> new ArrayList<>());
             }
         }
@@ -349,8 +349,8 @@ public class PinModuleInfo implements BuildStep {
             }
             String rest = tag.rest();
             String guard = null;
-            if (rest.endsWith("]")) {
-                int bracket = rest.lastIndexOf('[');
+            if (rest.endsWith(")")) {
+                int bracket = rest.lastIndexOf('(');
                 if (bracket > 0 && !rest.substring(0, bracket).trim().isEmpty()) {
                     guard = rest.substring(bracket + 1, rest.length() - 1);
                 }
@@ -391,7 +391,7 @@ public class PinModuleInfo implements BuildStep {
             if (winner != null) {
                 lines.set(winner.index(), prefix + "@jenesis.pin "
                         + resolved
-                        + (winner.guard() == null ? "" : " [" + winner.guard() + "]"));
+                        + (winner.guard() == null ? "" : " (" + winner.guard() + ")"));
             }
         }
         Set<String> regenerated = new HashSet<>();
@@ -444,8 +444,8 @@ public class PinModuleInfo implements BuildStep {
         if (flatten) {
             for (Map.Entry<Integer, Tag> entry : bomTags.entrySet()) {
                 String rest = entry.getValue().rest();
-                if (rest.endsWith("]")) {
-                    int bracket = rest.lastIndexOf('[');
+                if (rest.endsWith(")")) {
+                    int bracket = rest.lastIndexOf('(');
                     if (bracket > 0 && !rest.substring(0, bracket).trim().isEmpty()) {
                         throw new IllegalStateException("Cannot flatten platform-guarded BOM declaration: "
                                 + lines.get(entry.getKey()).trim());
@@ -465,8 +465,8 @@ public class PinModuleInfo implements BuildStep {
             }
             String rest = entry.getValue().rest();
             String guard = null;
-            if (rest.endsWith("]")) {
-                int bracket = rest.lastIndexOf('[');
+            if (rest.endsWith(")")) {
+                int bracket = rest.lastIndexOf('(');
                 if (bracket > 0 && !rest.substring(0, bracket).trim().isEmpty()) {
                     guard = rest.substring(bracket + 1, rest.length() - 1);
                 }

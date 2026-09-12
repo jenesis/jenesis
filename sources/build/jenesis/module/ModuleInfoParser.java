@@ -99,12 +99,12 @@ public class ModuleInfoParser {
                                 String token = pin.substring(0, split);
                                 String version = pin.substring(split + 1).trim();
                                 String guard = null;
-                                if (version.endsWith("]")) {
-                                    int bracket = version.lastIndexOf('[');
+                                if (version.endsWith(")")) {
+                                    int bracket = version.lastIndexOf('(');
                                     if (bracket < 0) {
                                         throw new IllegalArgumentException("Malformed @jenesis.pin guard '"
                                                 + version
-                                                + "': expected <value> [<token>,<token>...]");
+                                                + "': expected <value> (<token>,<token>...)");
                                     }
                                     String guarded = version.substring(0, bracket).trim();
                                     if (!guarded.isEmpty()) {
@@ -127,12 +127,12 @@ public class ModuleInfoParser {
                             case "jenesis.bom" -> {
                                 String bom = content.replaceAll("\\s+", " ").trim();
                                 String guard = null;
-                                if (bom.endsWith("]")) {
-                                    int bracket = bom.lastIndexOf('[');
+                                if (bom.endsWith(")")) {
+                                    int bracket = bom.lastIndexOf('(');
                                     if (bracket < 0) {
                                         throw new IllegalArgumentException("Malformed @jenesis.bom guard '"
                                                 + bom
-                                                + "': expected <value> [<token>,<token>...]");
+                                                + "': expected <value> (<token>,<token>...)");
                                     }
                                     String guarded = bom.substring(0, bracket).trim();
                                     if (!guarded.isEmpty()) {

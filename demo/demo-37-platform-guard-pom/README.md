@@ -39,7 +39,7 @@ The guarded pins
     </dependencies>
     <!--jenesis.pin
     main/maven/org.apache.commons/commons-lang3 3.14.0 SHA-256/7b96bf3e...
-    main/maven/org.apache.commons/commons-lang3 3.12.0 SHA-256/d919d904... [legacy]
+    main/maven/org.apache.commons/commons-lang3 3.12.0 SHA-256/d919d904... (legacy)
     -->
 
 The project declares `commons-text` and the guarded pins govern its
@@ -49,8 +49,8 @@ that applies at any depth of the closure, so the guard switches which
 The entry point tells the variants apart by a class that only exists since
 3.13 (`FluentBitSet`). The demo guards with the neutral token `legacy`, added
 with `-Djenesis.platform.legacy=true`, so the selection is observable on every
-machine; a real project guards with platform tokens (`[windows]`,
-`[macos,aarch64]`) that match the detected OS and chipset directly.
+machine; a real project guards with platform tokens (`(windows)`,
+`(macos,aarch64)`) that match the detected OS and chipset directly.
 
 Two Maven-specific boundaries are worth knowing. A **directly declared**
 version is identity-like in Maven and wins over the bill of materials, so a
