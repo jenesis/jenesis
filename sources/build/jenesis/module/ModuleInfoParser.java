@@ -10,6 +10,8 @@ import static java.util.Objects.requireNonNull;
 
 public class ModuleInfoParser {
 
+    private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.:+~@*/-]+");
+
     private final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
     private final String group;
 
@@ -116,6 +118,15 @@ public class ModuleInfoParser {
                                 if (token.isEmpty() || version.isEmpty()
                                         || token.startsWith("java.") || token.startsWith("jdk.")) {
                                     continue;
+                                }
+                                String[] words = version.split(" ");
+                                if (words.length > 2 || (words.length == 2 && words[1].indexOf('/') < 1)) {
+                                    throw new IllegalArgumentException("Malformed @jenesis.pin declaration '"
+                                            + token + " " + version
+                                            + "': expected <token> <version> [<algorithm>/<hash>] [(<platform>)]."
+                                            + " A tag owns every line below it until the next tag, so prose written"
+                                            + " under a pin becomes part of that pin; move it above the tag block."
+                                            + " A platform guard is written (token), not [token]");
                                 }
                                 String key = expand("jenesis.pin", token);
                                 if (guard == null) {
@@ -382,12 +393,32 @@ public class ModuleInfoParser {
                                             + "': expected <algorithm>/<fingerprint> <token>...");
                                 }
                                 String fingerprint = declaration.substring(0, split);
+                                int slash = fingerprint.indexOf('/');
+                                if (slash < 1 || slash != fingerprint.lastIndexOf('/')
+                                        || slash == fingerprint.length() - 1) {
+                                    throw new IllegalArgumentException("Malformed @jenesis.signature"
+                                            + " fingerprint '" + fingerprint
+                                            + "': expected <algorithm>/<fingerprint>."
+                                            + " A tag owns every line below it until the next tag, so prose"
+                                            + " written under a signature is read as part of it; move it above"
+                                            + " the tag block");
+                                }
                                 String existing = signatures.get(fingerprint);
                                 SequencedSet<String> tokens = new TreeSet<>();
                                 if (existing != null && !existing.isEmpty()) {
                                     tokens.addAll(List.of(existing.split(" ")));
                                 }
                                 for (String token : declaration.substring(split + 1).split(" ")) {
+                                    if (!COORDINATE.matcher(token).matches()) {
+                                        throw new IllegalArgumentException("Malformed @jenesis.signature token '"
+                                                + token
+                                                + "' for " + fingerprint
+                                                + ": expected <group>/<repo>/<coordinate>, <groupId>/<artifactId>"
+                                                + " or <module>, optionally ending in /*."
+                                                + " A tag owns every line below it until the next tag, so prose"
+                                                + " written under a signature becomes one of its tokens; move it"
+                                                + " above the tag block");
+                                    }
                                     if (!token.endsWith("/*")) {
                                         tokens.add(expand("jenesis.signature", token));
                                     } else {

@@ -1285,11 +1285,58 @@ public class ModuleInfoParserTest {
                 module foo {
                 }
                 """);
-        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
-        assertThat(info.variants())
-                .as("brackets are no longer a guard, so nothing is silently guarded by one")
-                .isEmpty();
-        assertThat(info.versions())
-                .containsEntry("main/maven/org.example/lib", "1.0 SHA-256/cafebabe [linux]");
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("the old spelling is refused outright rather than absorbed into the checksum")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expected <token> <version> [<algorithm>/<hash>] [(<platform>)]")
+                .hasMessageContaining("A platform guard is written (token), not [token]");
+    }
+
+    @Test
+    public void jenesis_pin_names_the_prose_that_a_tag_swallowed() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe
+                 * <p><b>Why</b> this dependency is here.
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("the message names the absorbed prose, not a checksum conflict further down the build")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("<p><b>Why</b> this dependency is here.")
+                .hasMessageContaining("move it above the tag block");
+    }
+
+    @Test
+    public void jenesis_pin_names_a_checksum_that_carries_no_algorithm() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.pin org.example/lib 1.0 cafebabe
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expected <token> <version> [<algorithm>/<hash>] [(<platform>)]");
+    }
+
+    @Test
+    public void jenesis_signature_names_the_prose_that_a_tag_swallowed() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.signature OpenPGP/B4D5 org.example/lib
+                 * <p>Vetted against the vendor's published KEYS.
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("prose below a signature arrives as a token and is named as such")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.signature token '<p>Vetted'")
+                .hasMessageContaining("move it above the tag block");
     }
 }
