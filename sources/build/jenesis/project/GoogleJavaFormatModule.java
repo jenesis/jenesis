@@ -31,7 +31,7 @@ public class GoogleJavaFormatModule implements BuildExecutorModule {
     private final transient BiConsumer<Boolean, String> printing;
 
     public GoogleJavaFormatModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "google-java-format", false, null);
+        this(repositories, resolvers, null, "google-java-format", false, ProcessBuildStep.printing("google-java-format"));
     }
 
     private GoogleJavaFormatModule(Map<String, Repository> repositories,
@@ -101,7 +101,7 @@ public class GoogleJavaFormatModule implements BuildExecutorModule {
     private static class Format extends FormatBuildStep {
 
         private Format(String group, boolean verify, BiConsumer<Boolean, String> printing) {
-            super(group, verify, printing == null ? ProcessBuildStep.printing(group) : printing);
+            super("google-java-format", group, verify, printing);
         }
 
         @Override

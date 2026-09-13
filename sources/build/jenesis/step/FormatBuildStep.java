@@ -14,12 +14,15 @@ public abstract class FormatBuildStep extends JdkProcessBuildStep {
     private final String tool;
     private final boolean verify;
 
-    protected FormatBuildStep(String tool, boolean verify) {
-        this(tool, verify, printing(tool));
+    protected FormatBuildStep(String command, String tool, boolean verify) {
+        this(command, tool, verify, printing(command));
     }
 
-    protected FormatBuildStep(String tool, boolean verify, BiConsumer<Boolean, String> printing) {
-        super(tool, ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
+    protected FormatBuildStep(String command,
+                              String tool,
+                              boolean verify,
+                              BiConsumer<Boolean, String> printing) {
+        super(command, ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
         this.tool = tool;
         this.verify = verify;
     }

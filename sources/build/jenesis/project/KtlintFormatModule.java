@@ -31,7 +31,7 @@ public class KtlintFormatModule implements BuildExecutorModule {
     private final transient BiConsumer<Boolean, String> printing;
 
     public KtlintFormatModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "ktlint-format", false, null);
+        this(repositories, resolvers, null, "ktlint-format", false, ProcessBuildStep.printing("ktlint-format"));
     }
 
     private KtlintFormatModule(Map<String, Repository> repositories,
@@ -105,7 +105,7 @@ public class KtlintFormatModule implements BuildExecutorModule {
     private static class Format extends FormatBuildStep {
 
         private Format(String group, boolean verify, BiConsumer<Boolean, String> printing) {
-            super(group, verify, printing == null ? ProcessBuildStep.printing(group) : printing);
+            super("ktlint-format", group, verify, printing);
         }
 
         @Override

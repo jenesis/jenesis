@@ -287,7 +287,7 @@ public class RepositoryTest {
         Repository repository = Repository.ofUris(Map.of("foo", bare),
                 (BiFunction<URI, String, Optional<URI>> & Serializable) (uri, _) -> Optional.of(uri),
                 new Repository.Retry(),
-                _ -> {});
+                null);
         Optional<RepositoryItem> item = repository.fetch(Runnable::run, "foo/9.9");
         assertThat(item).isPresent();
     }
@@ -298,7 +298,7 @@ public class RepositoryTest {
         Repository repository = Repository.ofUris(Map.of("foo", bare),
                 (BiFunction<URI, String, Optional<URI>> & Serializable) (_, _) -> Optional.empty(),
                 new Repository.Retry(),
-                _ -> {});
+                null);
         assertThat(repository.fetch(Runnable::run, "foo/9.9")).isEmpty();
     }
 

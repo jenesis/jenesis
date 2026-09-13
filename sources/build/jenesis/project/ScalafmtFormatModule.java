@@ -32,7 +32,8 @@ public class ScalafmtFormatModule implements BuildExecutorModule {
     private final transient BiConsumer<Boolean, String> printing;
 
     public ScalafmtFormatModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "scalafmt-format", ".scalafmt.conf", false, null);
+        this(repositories, resolvers, null, "scalafmt-format", ".scalafmt.conf", false,
+                ProcessBuildStep.printing("scalafmt-format"));
     }
 
     private ScalafmtFormatModule(Map<String, Repository> repositories,
@@ -114,7 +115,7 @@ public class ScalafmtFormatModule implements BuildExecutorModule {
         private final String configFile;
 
         private Format(String group, String configFile, boolean verify, BiConsumer<Boolean, String> printing) {
-            super(group, verify, printing == null ? ProcessBuildStep.printing(group) : printing);
+            super("scalafmt-format", group, verify, printing);
             this.configFile = configFile;
         }
 

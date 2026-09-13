@@ -34,7 +34,7 @@ public class MavenProjectTest {
         mavenRepository = new MavenDefaultRepository(repository.toUri(),
                 null,
                 Map.of(),
-                _ -> {});
+                null);
         mavenPomResolver = new MavenPomResolver(MavenDefaultVersionNegotiator.maven());
     }
 
