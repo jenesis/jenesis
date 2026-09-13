@@ -1096,8 +1096,7 @@ public class MavenPomResolver implements MavenResolver {
                                     + token + " " + value
                                     + "': expected <token> <version> [<algorithm>/<hash>] [(<platform>)]."
                                     + " Every line inside a jenesis.pin comment is a declaration of its own,"
-                                    + " so prose written among them becomes a pin; move it outside the comment."
-                                    + " A platform guard is written (token), not [token]");
+                                    + " so prose written among them becomes a pin; move it outside the comment");
                         }
                         String key;
                         int firstSlash = token.indexOf('/');

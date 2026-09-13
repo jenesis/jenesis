@@ -125,8 +125,7 @@ public class ModuleInfoParser {
                                             + token + " " + version
                                             + "': expected <token> <version> [<algorithm>/<hash>] [(<platform>)]."
                                             + " A tag owns every line below it until the next tag, so prose written"
-                                            + " under a pin becomes part of that pin; move it above the tag block."
-                                            + " A platform guard is written (token), not [token]");
+                                            + " under a pin becomes part of that pin; move it above the tag block");
                                 }
                                 String key = expand("jenesis.pin", token);
                                 if (guard == null) {

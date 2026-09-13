@@ -1277,7 +1277,7 @@ public class ModuleInfoParserTest {
     }
 
     @Test
-    public void guard_rejects_the_bracket_form_it_replaced() throws IOException {
+    public void jenesis_pin_rejects_a_value_that_is_not_a_guard() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
                  * @jenesis.pin org.example/lib 1.0 SHA-256/cafebabe [linux]
@@ -1286,10 +1286,9 @@ public class ModuleInfoParserTest {
                 }
                 """);
         assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
-                .as("the old spelling is refused outright rather than absorbed into the checksum")
+                .as("anything after the checksum that is not a guard is refused rather than absorbed")
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("expected <token> <version> [<algorithm>/<hash>] [(<platform>)]")
-                .hasMessageContaining("A platform guard is written (token), not [token]");
+                .hasMessageContaining("expected <token> <version> [<algorithm>/<hash>] [(<platform>)]");
     }
 
     @Test
