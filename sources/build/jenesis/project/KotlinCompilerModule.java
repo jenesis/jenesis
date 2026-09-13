@@ -37,10 +37,10 @@ public class KotlinCompilerModule implements BuildExecutorModule {
     private final String tool;
     private final String group;
     private final transient Function<List<String>, ? extends ProcessHandler> factory;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public KotlinCompilerModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, true, "kotlinc", "main", null, null);
+        this(repositories, resolvers, null, true, "kotlinc", "main", null, ProcessBuildStep.printing("kotlinc"));
     }
 
     private KotlinCompilerModule(Map<String, Repository> repositories,
@@ -50,7 +50,7 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                                  String tool,
                                  String group,
                                  Function<List<String>, ? extends ProcessHandler> factory,
-                                 Boolean printing) {
+                                 BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -81,7 +81,7 @@ public class KotlinCompilerModule implements BuildExecutorModule {
         return new KotlinCompilerModule(repositories, resolvers, pinning, includeResources, tool, group, factory, printing);
     }
 
-    public KotlinCompilerModule printing(boolean printing) {
+    public KotlinCompilerModule printing(BiConsumer<Boolean, String> printing) {
         return new KotlinCompilerModule(repositories, resolvers, pinning, includeResources, tool, group, factory, printing);
     }
 
@@ -159,12 +159,12 @@ public class KotlinCompilerModule implements BuildExecutorModule {
         private final String tool;
         private final String group;
 
-        private Compile(boolean includeResources, String tool, String group, Boolean printing) {
+        private Compile(boolean includeResources, String tool, String group, BiConsumer<Boolean, String> printing) {
             this(includeResources, tool, group, ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
         }
 
-        private Compile(boolean includeResources, String tool, String group, Function<List<String>, ? extends ProcessHandler> factory, Boolean printing) {
-            super("kotlinc", factory, printing == null ? ProcessBuildStep.printing("kotlinc") : printing);
+        private Compile(boolean includeResources, String tool, String group, Function<List<String>, ? extends ProcessHandler> factory, BiConsumer<Boolean, String> printing) {
+            super("kotlinc", factory, printing);
             this.includeResources = includeResources;
             this.tool = tool;
             this.group = group;

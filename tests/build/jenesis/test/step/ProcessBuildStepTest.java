@@ -31,7 +31,7 @@ public class ProcessBuildStepTest {
         Files.writeString(folder.resolve("process/test.properties"), "-Dshared=test\n-Dextra=test\n");
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
         AtomicReference<SequencedMap<String, SequencedMap<String, String>>> captured = new AtomicReference<>();
-        ProcessBuildStep step = new ProcessBuildStep("java", ProcessHandler.OfProcess.ofJavaHome("bin/java"), false) {
+        ProcessBuildStep step = new ProcessBuildStep("java", ProcessHandler.OfProcess.ofJavaHome("bin/java"), null) {
             @Override
             protected List<String> configurations() {
                 return List.of("java", "test");
@@ -61,7 +61,7 @@ public class ProcessBuildStepTest {
         Files.writeString(folder.resolve("process/protoc.properties"), "-Xmx=512m\n");
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
         AtomicReference<SequencedMap<String, SequencedMap<String, String>>> captured = new AtomicReference<>();
-        ProcessBuildStep step = new ProcessBuildStep("protoc", ProcessHandler.OfProcess.ofStaged(), false) {
+        ProcessBuildStep step = new ProcessBuildStep("protoc", ProcessHandler.OfProcess.ofStaged(), null) {
             @Override
             protected CompletionStage<List<String>> process(Executor executor,
                                                             BuildStepContext context,
@@ -99,10 +99,15 @@ public class ProcessBuildStepTest {
     }
 
     @Test
-    public void an_explicit_value_overrides_the_resolved_property() {
-        assertThat(new Probe(true).streams()).isTrue();
+    public void an_explicit_consumer_overrides_the_resolved_property() {
+        assertThat(new Probe((_, _) -> {
+        }).streams())
+                .as("a consumer supplied by the caller is what the lines are handed to")
+                .isTrue();
         System.setProperty("jenesis.print.process", "true");
-        assertThat(new Probe(false).streams()).isFalse();
+        assertThat(new Probe(null).streams())
+                .as("no consumer means the lines go nowhere, whatever the property says")
+                .isFalse();
     }
 
     @Test
@@ -196,11 +201,11 @@ public class ProcessBuildStepTest {
     private static final class Gated extends ProcessBuildStep {
 
         private Gated(ToolProvider provider) {
-            super("gated", ProcessHandler.OfTool.of(provider), false);
+            super("gated", ProcessHandler.OfTool.of(provider), null);
         }
 
         private Gated(ToolProvider provider, Semaphore permits) {
-            super("gated", ProcessHandler.OfTool.of(provider), false, permits);
+            super("gated", ProcessHandler.OfTool.of(provider), null, permits);
         }
 
         @Override
@@ -230,8 +235,8 @@ public class ProcessBuildStepTest {
             super("probe", arguments -> HANDLER);
         }
 
-        private Probe(boolean verbose) {
-            super("probe", arguments -> HANDLER, verbose);
+        private Probe(BiConsumer<Boolean, String> printing) {
+            super("probe", arguments -> HANDLER, printing);
         }
 
         private boolean streams() {

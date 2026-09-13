@@ -28,10 +28,10 @@ public class CodeNarcModule implements BuildExecutorModule {
     private final String tool;
     private final String configFile;
     private final boolean strict;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public CodeNarcModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "codenarc", "codenarc.xml", false, null);
+        this(repositories, resolvers, null, "codenarc", "codenarc.xml", false, ProcessBuildStep.printing("codenarc"));
     }
 
     private CodeNarcModule(Map<String, Repository> repositories,
@@ -40,7 +40,7 @@ public class CodeNarcModule implements BuildExecutorModule {
                            String tool,
                            String configFile,
                            boolean strict,
-                           Boolean printing) {
+                           BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -70,7 +70,7 @@ public class CodeNarcModule implements BuildExecutorModule {
         return new CodeNarcModule(repositories, resolvers, pinning, tool, configFile, strict, printing);
     }
 
-    public CodeNarcModule printing(boolean printing) {
+    public CodeNarcModule printing(BiConsumer<Boolean, String> printing) {
         return new CodeNarcModule(repositories, resolvers, pinning, tool, configFile, strict, printing);
     }
 
@@ -116,8 +116,8 @@ public class CodeNarcModule implements BuildExecutorModule {
         private final String configFile;
         private final boolean strict;
 
-        private Check(String tool, String configFile, boolean strict, Boolean printing) {
-            super("codenarc", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing == null ? ProcessBuildStep.printing("codenarc") : printing);
+        private Check(String tool, String configFile, boolean strict, BiConsumer<Boolean, String> printing) {
+            super("codenarc", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
             this.tool = tool;
             this.configFile = configFile;
             this.strict = strict;

@@ -13,7 +13,7 @@ public abstract class JdkProcessBuildStep extends ProcessBuildStep {
 
     protected JdkProcessBuildStep(String command,
                                   Function<List<String>, ? extends ProcessHandler> factory,
-                                  boolean verbose) {
-        super(command, factory, verbose);
+                                  BiConsumer<Boolean, String> printing) {
+        super(command, factory, printing);
     }
 }

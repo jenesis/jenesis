@@ -37,10 +37,10 @@ public class GroovyCompilerModule implements BuildExecutorModule {
     private final String tool;
     private final String group;
     private final transient Function<List<String>, ? extends ProcessHandler> factory;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public GroovyCompilerModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, true, "groovyc", "main", null, null);
+        this(repositories, resolvers, null, true, "groovyc", "main", null, ProcessBuildStep.printing("groovyc"));
     }
 
     private GroovyCompilerModule(Map<String, Repository> repositories,
@@ -50,7 +50,7 @@ public class GroovyCompilerModule implements BuildExecutorModule {
                                  String tool,
                                  String group,
                                  Function<List<String>, ? extends ProcessHandler> factory,
-                                 Boolean printing) {
+                                 BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -81,7 +81,7 @@ public class GroovyCompilerModule implements BuildExecutorModule {
         return new GroovyCompilerModule(repositories, resolvers, pinning, includeResources, tool, group, factory, printing);
     }
 
-    public GroovyCompilerModule printing(boolean printing) {
+    public GroovyCompilerModule printing(BiConsumer<Boolean, String> printing) {
         return new GroovyCompilerModule(repositories, resolvers, pinning, includeResources, tool, group, factory, printing);
     }
 
@@ -159,12 +159,12 @@ public class GroovyCompilerModule implements BuildExecutorModule {
         private final String tool;
         private final String group;
 
-        private Compile(boolean includeResources, String tool, String group, Boolean printing) {
+        private Compile(boolean includeResources, String tool, String group, BiConsumer<Boolean, String> printing) {
             this(includeResources, tool, group, ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
         }
 
-        private Compile(boolean includeResources, String tool, String group, Function<List<String>, ? extends ProcessHandler> factory, Boolean printing) {
-            super("groovyc", factory, printing == null ? ProcessBuildStep.printing("groovyc") : printing);
+        private Compile(boolean includeResources, String tool, String group, Function<List<String>, ? extends ProcessHandler> factory, BiConsumer<Boolean, String> printing) {
+            super("groovyc", factory, printing);
             this.includeResources = includeResources;
             this.tool = tool;
             this.group = group;

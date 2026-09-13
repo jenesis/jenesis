@@ -29,7 +29,7 @@ public class ScalafmtFormatModule implements BuildExecutorModule {
     private final String group;
     private final String configFile;
     private final boolean verify;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public ScalafmtFormatModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
         this(repositories, resolvers, null, "scalafmt-format", ".scalafmt.conf", false, null);
@@ -41,7 +41,7 @@ public class ScalafmtFormatModule implements BuildExecutorModule {
                                  String group,
                                  String configFile,
                                  boolean verify,
-                                 Boolean printing) {
+                                 BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -71,7 +71,7 @@ public class ScalafmtFormatModule implements BuildExecutorModule {
         return new ScalafmtFormatModule(repositories, resolvers, pinning, group, configFile, verify, printing);
     }
 
-    public ScalafmtFormatModule printing(boolean printing) {
+    public ScalafmtFormatModule printing(BiConsumer<Boolean, String> printing) {
         return new ScalafmtFormatModule(repositories, resolvers, pinning, group, configFile, verify, printing);
     }
 
@@ -113,7 +113,7 @@ public class ScalafmtFormatModule implements BuildExecutorModule {
 
         private final String configFile;
 
-        private Format(String group, String configFile, boolean verify, Boolean printing) {
+        private Format(String group, String configFile, boolean verify, BiConsumer<Boolean, String> printing) {
             super(group, verify, printing == null ? ProcessBuildStep.printing(group) : printing);
             this.configFile = configFile;
         }

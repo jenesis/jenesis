@@ -91,7 +91,9 @@ public class JReleaserModule implements BuildExecutorModule {
                     configuration,
                     System.getProperty("jenesis.jreleaser.command", "full-release"),
                     SequencedProperties.systemFlag("jenesis.jreleaser.dryRun", true),
-                    SequencedProperties.systemFlag("jenesis.print.jreleaser", true));
+                    SequencedProperties.systemFlag("jenesis.print.jreleaser", true)
+                            ? ProcessBuildStep.printing("jreleaser")
+                            : null);
         }
 
         private Execute(Function<List<String>, ? extends ProcessHandler> factory,
@@ -99,8 +101,8 @@ public class JReleaserModule implements BuildExecutorModule {
                         Path configuration,
                         String command,
                         boolean dryRun,
-                        boolean verbose) {
-            super("jreleaser", factory, verbose);
+                        BiConsumer<Boolean, String> printing) {
+            super("jreleaser", factory, printing);
             this.root = root;
             this.configuration = configuration;
             this.command = command;
