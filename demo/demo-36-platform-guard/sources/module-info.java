@@ -1,6 +1,6 @@
 /**
  * A modular Java sample that selects a dependency variant per platform. A
- * {@code @jenesis.pin} line may end with a bracketed guard that is matched
+ * {@code @jenesis.pin} line may end with a parenthesised guard that is matched
  * against the active platform: the detected operating system and chipset,
  * plus any token a {@code -Djenesis.platform.<token>=true} flag adds on top.
  * The most specific matching guard wins and the unguarded line is the

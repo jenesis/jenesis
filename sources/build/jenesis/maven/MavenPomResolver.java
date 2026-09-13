@@ -15,6 +15,7 @@ public class MavenPomResolver implements MavenResolver {
     private static final String NAMESPACE_4_0_0 = "http://maven.apache.org/POM/4.0.0";
     private static final Set<String> IMPLICITS = Set.of("groupId", "artifactId", "version", "packaging");
     private static final Pattern PROPERTY = Pattern.compile("(\\$\\{([^}]+)})");
+    private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.:+~@*/-]+");
     public static final String CHECKSUM_PREFIX = "Checksum/";
 
     private final Supplier<MavenVersionNegotiator> negotiatorSupplier;
@@ -1089,6 +1090,14 @@ public class MavenPomResolver implements MavenResolver {
                         if (value.isEmpty()) {
                             continue;
                         }
+                        String[] words = value.split(" ");
+                        if (words.length > 2 || (words.length == 2 && words[1].indexOf('/') < 1)) {
+                            throw new IllegalArgumentException("Malformed jenesis.pin declaration '"
+                                    + token + " " + value
+                                    + "': expected <token> <version> [<algorithm>/<hash>] [(<platform>)]."
+                                    + " Every line inside a jenesis.pin comment is a declaration of its own,"
+                                    + " so prose written among them becomes a pin; move it outside the comment");
+                        }
                         String key;
                         int firstSlash = token.indexOf('/');
                         int secondSlash = firstSlash < 0 ? -1 : token.indexOf('/', firstSlash + 1);
@@ -1141,12 +1150,32 @@ public class MavenPomResolver implements MavenResolver {
                                     + "': expected <algorithm>/<fingerprint> <token>...");
                         }
                         String fingerprint = declaration.substring(0, split);
+                        int slash = fingerprint.indexOf('/');
+                        if (slash < 1 || slash != fingerprint.lastIndexOf('/')
+                                || slash == fingerprint.length() - 1) {
+                            throw new IllegalArgumentException("Malformed jenesis.signature fingerprint '"
+                                    + fingerprint
+                                    + "': expected <algorithm>/<fingerprint>."
+                                    + " Every line inside a jenesis.signature comment is a declaration of its"
+                                    + " own, so prose written among them is read as one; move it outside the"
+                                    + " comment");
+                        }
                         String existing = entries.get(fingerprint);
                         SequencedSet<String> tokens = new TreeSet<>();
                         if (existing != null && !existing.isEmpty()) {
                             tokens.addAll(List.of(existing.split(" ")));
                         }
                         for (String token : declaration.substring(split + 1).split(" ")) {
+                            if (!COORDINATE.matcher(token).matches()) {
+                                throw new IllegalArgumentException("Malformed jenesis.signature token '"
+                                        + token
+                                        + "' for " + fingerprint
+                                        + ": expected <group>/<repo>/<coordinate>, <groupId>/<artifactId>"
+                                        + " or <module>, optionally ending in /*."
+                                        + " Every line inside a jenesis.signature comment is a declaration of"
+                                        + " its own, so prose written among them becomes a token; move it"
+                                        + " outside the comment");
+                            }
                             boolean wildcard = token.endsWith("/*");
                             String base = wildcard ? token.substring(0, token.length() - 2) : token;
                             int first = base.indexOf('/');
