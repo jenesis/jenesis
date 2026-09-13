@@ -181,7 +181,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                 + "/" + HexFormat.of().formatHex(fold(inputs)));
         String scheme = target.getScheme(), host = target.getHost();
         boolean loopback = "localhost".equals(host) || "127.0.0.1".equals(host) || "::1".equals(host);
-        if (!"https".equals(scheme) && !loopback && !Boolean.getBoolean("jenesis.cache.insecure")) {
+        if (!"https".equals(scheme) && !loopback && !SequencedProperties.systemFlag("jenesis.cache.insecure")) {
             throw new IllegalStateException("Refusing to send the cache key over insecure scheme '"
                     + scheme
                     + "': "

@@ -150,7 +150,7 @@ public class AttachModuleRunTest {
         executor.addSource("classes", classes);
         Map<String, Repository> repositories = Map.of(
                 "maven", MavenDefaultRepository.of(),
-                "probes", new MavenDefaultRepository(repository.toUri(), null, Map.of(), _ -> {}));
+                "probes", new MavenDefaultRepository(repository.toUri(), null, Map.of(), null));
         Map<String, Resolver> resolvers = Map.of(
                 "maven", new MavenPomResolver(),
                 "probes", new MavenPomResolver());

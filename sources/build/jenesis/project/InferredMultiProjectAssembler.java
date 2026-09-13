@@ -94,7 +94,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             .pinning(descriptor.pinning())),
                     Stream.of(descriptor.sources().stream(), descriptor.spdx().stream(), descriptor.manifests().stream())
                             .flatMap(Function.identity()));
-            Sbom sbom = Boolean.parseBoolean(System.getProperty("jenesis.sbom.cyclonedx", "true"))
+            Sbom sbom = SequencedProperties.systemFlag("jenesis.sbom.cyclonedx", true)
                     ? Sbom.configured(BuildStep.locate(descriptor.configuration(), "sbom.properties"))
                     : null;
             if (sbom != null) {

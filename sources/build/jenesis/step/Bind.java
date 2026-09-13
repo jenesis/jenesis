@@ -113,28 +113,32 @@ public class Bind implements BuildStep {
                         Files.createDirectories(target.getParent());
                     }
                     boolean filtered = extensions != null && Files.isDirectory(source);
-                    Files.walkFileTree(source, new SimpleFileVisitor<>() {
-                        @Override
-                        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                            if (!filtered) {
-                                Files.createDirectories(target.resolve(source.relativize(dir)));
-                            }
-                            return FileVisitResult.CONTINUE;
-                        }
+                    Files.walkFileTree(source, Set.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE,
+                            new SimpleFileVisitor<>() {
+                                @Override
+                                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+                                        throws IOException {
+                                    if (!filtered) {
+                                        Files.createDirectories(target.resolve(source.relativize(dir)));
+                                    }
+                                    return FileVisitResult.CONTINUE;
+                                }
 
-                        @Override
-                        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                            if (filtered && extensions.stream().noneMatch(file.getFileName().toString()::endsWith)) {
-                                return FileVisitResult.CONTINUE;
-                            }
-                            Path resolved = target.resolve(source.relativize(file));
-                            if (filtered) {
-                                Files.createDirectories(resolved.getParent());
-                            }
-                            BuildStep.linkOrCopy(resolved, file);
-                            return FileVisitResult.CONTINUE;
-                        }
-                    });
+                                @Override
+                                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                                        throws IOException {
+                                    if (filtered && extensions.stream()
+                                            .noneMatch(file.getFileName().toString()::endsWith)) {
+                                        return FileVisitResult.CONTINUE;
+                                    }
+                                    Path resolved = target.resolve(source.relativize(file));
+                                    if (filtered) {
+                                        Files.createDirectories(resolved.getParent());
+                                    }
+                                    BuildStep.linkOrCopy(resolved, file);
+                                    return FileVisitResult.CONTINUE;
+                                }
+                            });
                 }
             }
         }

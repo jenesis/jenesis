@@ -43,6 +43,26 @@ public class SequencedProperties extends Properties {
         return value == null ? defaultValue : value;
     }
 
+    public static boolean systemFlag(String key) {
+        return systemFlag(key, false);
+    }
+
+    public static boolean systemFlag(String key, boolean defaultValue) {
+        String value = System.getProperty(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        return switch (value.trim().toLowerCase(Locale.ROOT)) {
+            case "", "true" -> true;
+            case "false" -> false;
+            default -> throw new IllegalArgumentException("Malformed value for "
+                    + key
+                    + ": '"
+                    + value
+                    + "' (expected true, false, or the property named with no value at all)");
+        };
+    }
+
     public boolean flag(String key) {
         return flag(key, false);
     }

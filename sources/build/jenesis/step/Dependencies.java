@@ -3,6 +3,7 @@ package build.jenesis.step;
 import module java.base;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
+import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
@@ -36,27 +37,34 @@ public class Dependencies implements BuildExecutorModule {
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
     private final String group;
+    private final transient Consumer<String> printing;
 
     public Dependencies(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, null);
+        this(repositories, resolvers, null, null, SequencedProperties.systemFlag("jenesis.print.aliases") ? System.out::println : null);
     }
 
     private Dependencies(Map<String, Repository> repositories,
                          Map<String, Resolver> resolvers,
                          Pinning pinning,
-                         String group) {
+                         String group,
+                         Consumer<String> printing) {
         this.repositories = repositories;
         this.resolvers = new LinkedHashMap<>(resolvers);
         this.pinning = pinning;
         this.group = group;
+        this.printing = printing;
     }
 
     public Dependencies pinning(Pinning pinning) {
-        return new Dependencies(repositories, resolvers, pinning, group);
+        return new Dependencies(repositories, resolvers, pinning, group, printing);
     }
 
     public Dependencies group(String group) {
-        return new Dependencies(repositories, resolvers, pinning, group);
+        return new Dependencies(repositories, resolvers, pinning, group, printing);
+    }
+
+    public Dependencies printing(Consumer<String> printing) {
+        return new Dependencies(repositories, resolvers, pinning, group, printing);
     }
 
     public static SequencedMap<String, String> bomEntries(SequencedProperties properties, String group) {
@@ -69,7 +77,7 @@ public class Dependencies implements BuildExecutorModule {
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
         buildExecutor.addStep(RESOLVE,
-                new Resolve(repositories, resolvers, pinning, group),
+                new Resolve(repositories, resolvers, pinning, group, printing),
                 inherited.sequencedKeySet());
         SequencedSet<String> verified = new LinkedHashSet<>();
         verified.add(RESOLVE);
@@ -87,15 +95,18 @@ public class Dependencies implements BuildExecutorModule {
         private final Map<String, Resolver> resolvers;
         private final Pinning pinning;
         private final String group;
+        private final transient Consumer<String> printing;
 
         private Resolve(Map<String, Repository> repositories,
                         Map<String, Resolver> resolvers,
                         Pinning pinning,
-                        String group) {
+                        String group,
+                        Consumer<String> printing) {
             this.repositories = repositories;
             this.resolvers = new LinkedHashMap<>(resolvers);
             this.pinning = pinning;
             this.group = group;
+            this.printing = printing;
         }
 
         @Override
@@ -107,7 +118,10 @@ public class Dependencies implements BuildExecutorModule {
                     Path.of(BOMS),
                     Path.of(EXCLUSIONS),
                     Path.of(OVERRIDES),
-                    Path.of(SPDX)));
+                    Path.of(SPDX),
+                    Path.of(DEPENDENCIES),
+                    Path.of(MODULAR),
+                    Path.of(RESOLVED)));
         }
 
         @Override
@@ -321,6 +335,18 @@ public class Dependencies implements BuildExecutorModule {
                 for (Map.Entry<String, String> token : bomTokens.entrySet()) {
                     if (token.getKey().startsWith("entry/")) {
                         String key = token.getKey().substring(6);
+                        int groupSlash = key.indexOf('/');
+                        int repositorySlash = key.indexOf('/', groupSlash + 1);
+                        String repository = key.substring(groupSlash + 1, repositorySlash);
+                        if (wrapped.get(Resolver.base(repository)) == null) {
+                            throw new IllegalArgumentException("Unknown repository '"
+                                    + repository
+                                    + "' for bill of materials entry '"
+                                    + key.substring(repositorySlash + 1)
+                                    + "': a coordinate carrying a type or a classifier names its"
+                                    + " repository first, as maven/<groupId>/<artifactId>/<type>/<classifier>,"
+                                    + " because a bare <groupId>/<artifactId> reads the first segment as one");
+                        }
                         merged.put(key, token.getValue());
                         covering.put(key, token.getValue());
                         continue;
@@ -639,7 +665,7 @@ public class Dependencies implements BuildExecutorModule {
                     return left.isEmpty() ? right : left;
                 });
             }
-            SequencedMap<String, String> aliased = rename(placed, aliasTargets, modules, explicit, libs);
+            SequencedMap<String, String> aliased = rename(placed, aliasTargets, modules, explicit, libs, printing);
             for (Map.Entry<String, Overridden> entry : overrideTargets.entrySet()) {
                 for (String carrier : entry.getValue().carriers()) {
                     if (!modules.containsKey(carrier)) {
@@ -716,7 +742,10 @@ public class Dependencies implements BuildExecutorModule {
                     if (entry.getValue().isEmpty()
                             && !internals.get(entry.getKey())
                             && !pinnedFiles.contains(placed.get(entry.getKey()))) {
-                        throw new IllegalStateException("No checksum pinned for " + entry.getKey() + " (strict pinning is enabled)");
+                        throw new IllegalStateException("No checksum pinned for "
+                                + entry.getKey()
+                                + " (strict pinning is enabled)"
+                                + managing(managed, entry.getKey()));
                     }
                 }
             }
@@ -796,7 +825,8 @@ public class Dependencies implements BuildExecutorModule {
                                                        SequencedMap<String, Alias> declared,
                                                        SequencedMap<String, String> modules,
                                                        SequencedMap<String, Boolean> explicit,
-                                                       Path libs) throws IOException {
+                                                       Path libs,
+                                                       Consumer<String> printing) throws IOException {
         SequencedMap<String, String> coordinates = new LinkedHashMap<>();
         for (String dependency : placed.sequencedKeySet()) {
             int first = dependency.indexOf('/'), last = dependency.lastIndexOf('/');
@@ -829,6 +859,20 @@ public class Dependencies implements BuildExecutorModule {
                         : " - stop excluding the target"));
             }
             String module = modules.get(alias);
+            ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(placed.get(coordinate));
+            if (descriptor != null && descriptor.name().equals(alias)) {
+                if (printing != null) {
+                    printing.accept("%s%-11s%s %s already declares %s, so the alias declared by %s"
+                                    .formatted(BuildExecutorCallback.YELLOW,
+                                            "[ALIAS]",
+                                            BuildExecutorCallback.RESET,
+                                            coordinate,
+                                            alias,
+                                            entry.getValue().origin())
+                            + " says nothing the jar does not");
+                }
+                continue;
+            }
             if (module != null) {
                 throw new IllegalArgumentException("Module alias "
                         + alias
@@ -838,7 +882,6 @@ public class Dependencies implements BuildExecutorModule {
                         + module
                         + " - require it directly");
             }
-            ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(placed.get(coordinate));
             if (descriptor != null) {
                 throw new IllegalArgumentException("Target of module alias "
                         + alias
@@ -933,6 +976,34 @@ public class Dependencies implements BuildExecutorModule {
     }
 
     private record Claim(String dependency, Path file) {
+    }
+
+    private static String managing(
+            SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> managed,
+            String key) {
+        int lastSlash = key.lastIndexOf('/');
+        if (lastSlash < 1) {
+            return "";
+        }
+        String coordinate = key.substring(0, lastSlash), version = key.substring(lastSlash + 1);
+        for (SequencedMap<String, SequencedMap<String, String>> byRepository : managed.values()) {
+            for (Map.Entry<String, SequencedMap<String, String>> repository : byRepository.entrySet()) {
+                for (Map.Entry<String, String> entry : repository.getValue().entrySet()) {
+                    if (!coordinate.equals(repository.getKey() + "/" + entry.getKey())) {
+                        continue;
+                    }
+                    String value = entry.getValue();
+                    int space = value.indexOf(' ');
+                    if (!version.equals(space < 0 ? value : value.substring(0, space))) {
+                        continue;
+                    }
+                    return ". A bill of materials manages it at this version and records no checksum,"
+                            + " so no pin covers what it resolves to: record the checksum beside the"
+                            + " version in the bill of materials, or stop managing the coordinate there";
+                }
+            }
+        }
+        return "";
     }
 
     private static Path index(Path folder) {

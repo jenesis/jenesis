@@ -22,21 +22,21 @@ public class Signatures extends ProcessBuildStep {
     private final transient Map<String, Repository> repositories;
     private final Verification verification;
     private final String command;
-    private final transient boolean printing;
+    private final transient Consumer<String> printing;
 
     public Signatures(Map<String, Repository> repositories) {
         this(repositories,
                 Verification.fromProperty(),
                 System.getProperty("jenesis.signature.command", "gpg"),
                 null,
-                Boolean.getBoolean("jenesis.print.signatures"));
+                SequencedProperties.systemFlag("jenesis.print.signatures") ? System.out::println : null);
     }
 
     private Signatures(Map<String, Repository> repositories,
                        Verification verification,
                        String command,
                        Function<List<String>, ? extends ProcessHandler> factory,
-                       boolean printing) {
+                       Consumer<String> printing) {
         super("gpg", factory == null ? ProcessHandler.OfProcess.ofCommand(command) : factory);
         this.repositories = repositories;
         this.verification = verification;
@@ -56,17 +56,20 @@ public class Signatures extends ProcessBuildStep {
         return new Signatures(repositories, verification, command, factory, printing);
     }
 
-    public Signatures printing(boolean printing) {
+    public Signatures printing(Consumer<String> printing) {
         return new Signatures(repositories, verification, command, factory, printing);
     }
 
     private void print(String marker, String colour, String coordinate, String detail) {
-        System.out.printf("%s%-11s%s %s %s%n",
+        if (printing == null) {
+            return;
+        }
+        printing.accept("%s%-11s%s %s %s".formatted(
                 colour,
                 marker,
                 BuildExecutorCallback.RESET,
                 coordinate,
-                detail);
+                detail));
     }
 
     @Override
@@ -169,7 +172,7 @@ public class Signatures extends ProcessBuildStep {
             String rest = token.substring(token.indexOf('/') + 1) + "/" + version;
             String coordinate = rest.substring(0, rest.lastIndexOf('/'));
             if (accepted.isEmpty()) {
-                if (printing) {
+                if (printing != null) {
                     print("[UNDECLARED]",
                             BuildExecutorCallback.YELLOW,
                             token + " " + version,
@@ -191,7 +194,7 @@ public class Signatures extends ProcessBuildStep {
             String relative = coordinate.substring(repositorySlash + 1) + "/" + version;
             Path signature = materialise(executor, context, repository, relative, true);
             if (signature == null) {
-                if (printing) {
+                if (printing != null) {
                     print("[UNSIGNED]",
                             BuildExecutorCallback.YELLOW,
                             token + " " + version,
@@ -210,7 +213,7 @@ public class Signatures extends ProcessBuildStep {
                 continue;
             }
             String fingerprint = "OpenPGP/" + status.fingerprint().toUpperCase(Locale.ROOT);
-            if (printing && accepted.stream().anyMatch(fingerprint::equalsIgnoreCase)) {
+            if (printing != null && accepted.stream().anyMatch(fingerprint::equalsIgnoreCase)) {
                 print("[VERIFIED]", BuildExecutorCallback.GREEN, token + " " + version, fingerprint);
             }
             if (accepted.stream().noneMatch(fingerprint::equalsIgnoreCase)) {

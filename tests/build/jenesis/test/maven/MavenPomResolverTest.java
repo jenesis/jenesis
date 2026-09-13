@@ -33,7 +33,7 @@ public class MavenPomResolverTest {
 
     @BeforeEach
     public void setUp() throws Exception {
-        mavenRepository = new MavenDefaultRepository(repository.toUri(), repository, Map.of(), _ -> {});
+        mavenRepository = new MavenDefaultRepository(repository.toUri(), repository, Map.of(), null);
         mavenPomResolver = new MavenPomResolver(MavenDefaultVersionNegotiator.maven());
     }
 
@@ -70,7 +70,7 @@ public class MavenPomResolverTest {
         assertThatThrownBy(MavenPomResolver::new)
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Unknown jenesis.resolver.maven 'nonsense',"
-                        + " expected one of: maven, latest, release, closest");
+                        + " expected one of: maven, latest, release, stable, closest");
     }
 
     @Test

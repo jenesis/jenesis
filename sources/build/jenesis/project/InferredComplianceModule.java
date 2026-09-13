@@ -34,7 +34,7 @@ public class InferredComplianceModule implements BuildExecutorModule {
     }
 
     private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
-        return Boolean.parseBoolean(System.getProperty(property, "true")) ? module -> module : null;
+        return SequencedProperties.systemFlag(property, true) ? module -> module : null;
     }
 
     public InferredComplianceModule license(Function<BuildExecutorModule, BuildExecutorModule> license) {

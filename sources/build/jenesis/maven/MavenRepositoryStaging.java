@@ -17,7 +17,7 @@ public class MavenRepositoryStaging implements BuildStep {
     private final boolean includeTests;
 
     public MavenRepositoryStaging() {
-        this(Boolean.getBoolean("jenesis.stage.tests"));
+        this(SequencedProperties.systemFlag("jenesis.stage.tests"));
     }
 
     public MavenRepositoryStaging(boolean includeTests) {

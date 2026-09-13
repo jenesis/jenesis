@@ -269,7 +269,7 @@ public class JpxTest {
     @Test
     public void installs_without_local_maven_repository() throws IOException, InterruptedException {
         addMavenTool();
-        Repository streaming = new MavenDefaultRepository(mavenRepoFolder.toUri(), null, Map.of(), _ -> {});
+        Repository streaming = new MavenDefaultRepository(mavenRepoFolder.toUri(), null, Map.of(), null);
         Jpx jpx = new Jpx(storage,
                 Map.of("maven", streaming),
                 Map.of("maven", new MavenPomResolver()),
@@ -435,7 +435,7 @@ public class JpxTest {
     public void skips_materialization_when_installation_appears_during_resolution() throws IOException {
         addMavenTool();
         Path folder = storage.resolve("maven").resolve("org.example--tool-main@1.0");
-        Repository mavenRepository = new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {});
+        Repository mavenRepository = new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null);
         Resolver delegate = new MavenPomResolver();
         Resolver racing = (executor, prefix, repositories, coordinates, versions, scope) -> {
             Files.createDirectories(folder);
@@ -795,7 +795,7 @@ public class JpxTest {
 
     private Jpx jpx(PathPlacement placement) {
         MavenPomResolver maven = new MavenPomResolver();
-        Repository mavenRepository = new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {});
+        Repository mavenRepository = new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null);
         Repository jenesisRepository = new JenesisModuleRepository(jenesisRepoFolder.toUri());
         return new Jpx(storage,
                 Map.of("maven", mavenRepository, "module", jenesisRepository),

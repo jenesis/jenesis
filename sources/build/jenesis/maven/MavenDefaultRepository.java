@@ -5,6 +5,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
+import build.jenesis.SequencedProperties;
 
 public class MavenDefaultRepository implements MavenRepository {
 
@@ -29,7 +30,7 @@ public class MavenDefaultRepository implements MavenRepository {
             }
         }
         String token = System.getProperty("jenesis.maven.token", System.getenv("MAVEN_REPOSITORY_TOKEN"));
-        boolean verbose = Boolean.getBoolean("jenesis.print.fetch");
+        boolean verbose = SequencedProperties.systemFlag("jenesis.print.fetch");
         String property = System.getProperty("jenesis.maven.uri");
         String environment = System.getenv("MAVEN_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();
@@ -107,8 +108,7 @@ public class MavenDefaultRepository implements MavenRepository {
                                 BuildExecutorCallback.YELLOW,
                                 "[FETCHED]",
                                 BuildExecutorCallback.RESET,
-                                uri.resolve(path)) : _ -> {
-                        },
+                                uri.resolve(path)) : null,
                         token);
             }
             List<String> groups = new ArrayList<>();
@@ -164,6 +164,16 @@ public class MavenDefaultRepository implements MavenRepository {
 
     public MavenDefaultRepository retry(Repository.Retry retry) {
         return new MavenDefaultRepository(repository, local, validations, callback, token, retry);
+    }
+
+    public MavenDefaultRepository printing(boolean printing) {
+        return new MavenDefaultRepository(repository, local, validations, printing
+                ? path -> System.out.printf("%s%-11s%s %s%n",
+                        BuildExecutorCallback.YELLOW,
+                        "[FETCHED]",
+                        BuildExecutorCallback.RESET,
+                        repository.resolve(path))
+                : null, token, retry);
     }
 
     @SuppressWarnings("unchecked")
@@ -233,7 +243,9 @@ public class MavenDefaultRepository implements MavenRepository {
                 + "/" + version
                 + "/" + artifactId + "-" + version + (classifier == null ? "" : "-" + classifier)
                 + "." + type + (checksum == null ? "" : ("." + checksum));
-        callback.accept(path);
+        if (callback != null) {
+            callback.accept(path);
+        }
         return fetch(repository, path, checksum == null).materialize();
     }
 
@@ -245,7 +257,9 @@ public class MavenDefaultRepository implements MavenRepository {
         String path = groupId.replace('.', '/')
                 + "/" + artifactId
                 + "/maven-metadata.xml" + (checksum == null ? "" : "." + checksum);
-        callback.accept(path);
+        if (callback != null) {
+            callback.accept(path);
+        }
         return fetch(repository, path, checksum == null).materialize();
     }
 

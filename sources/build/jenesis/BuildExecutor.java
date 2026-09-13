@@ -28,9 +28,9 @@ public interface BuildExecutor {
             }
             this(Duration.parse(System.getProperty("jenesis.executor.timeout", Duration.ZERO.toString())),
                     System.getProperty("jenesis.executor.digest", "MD5"),
-                    Boolean.getBoolean("jenesis.print.checksum"),
-                    Boolean.getBoolean("jenesis.executor.rebuild"),
-                    Boolean.getBoolean("jenesis.executor.aggregate"),
+                    SequencedProperties.systemFlag("jenesis.print.checksum"),
+                    SequencedProperties.systemFlag("jenesis.executor.rebuild"),
+                    SequencedProperties.systemFlag("jenesis.executor.aggregate"),
                     Integer.getInteger("jenesis.executor.concurrency", 0),
                     cache);
         }
@@ -68,8 +68,8 @@ public interface BuildExecutor {
                     timeout,
                     new HashDigestFunction(digest),
                     BuildStepHashFunction.ofSerializationDigest(digest),
-                    Boolean.parseBoolean(System.getProperty("jenesis.print.progress", "true"))
-                            ? BuildExecutorCallback.printing(System.out, verbose, Boolean.getBoolean("jenesis.print.cache"), target)
+                    SequencedProperties.systemFlag("jenesis.print.progress", true)
+                            ? BuildExecutorCallback.printing(System.out, verbose, SequencedProperties.systemFlag("jenesis.print.cache"), target)
                             : BuildExecutorCallback.nop(),
                     cache == null ? BuildExecutorCache.nop() : cache,
                     rebuild,

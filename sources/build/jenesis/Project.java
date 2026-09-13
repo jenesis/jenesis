@@ -602,6 +602,9 @@ public record Project(
                                             <groupId>/<artifactId>
                       inventory.properties  what staging reads: artifacts, sources, documentation,
                                             pom, runtime, prefixed
+                      divergence.properties written by pin/divergence: <group>/<repository>/<coordinate>
+                                            -> the versions it is pinned at and the modules holding
+                                            each, for every coordinate pinned at more than one
 
                     ## 7. Bump serialVersionUID after editing a build step
 
@@ -667,11 +670,20 @@ public record Project(
                           needs no derived automatic name. Carries no version: a pin or BOM entry
                           states it and is the place for a checksum; failing that the version the
                           closure already resolves is kept, and only a coordinate nothing else pulls
-                          in is negotiated as LATEST.
+                          in is negotiated as LATEST. It also names the artifact a `requires` takes,
+                          replacing the module index lookup, which is the way to pin down a name
+                          several artifacts declare: alias org.bouncycastle.pg to bcpg-jdk18on and
+                          neither the -debug nor the -lts build can land instead. Aliasing a name the
+                          target already declares is allowed and does exactly that, so an alias need
+                          not be dropped when its target grows a module name.
                       @jenesis.exclude <module> <groupId>/<artifactId>...
                           Drop transitive dependencies of <module>, each with the subtree it pulled
                           in, from the compile path, runtime path and generated pom alike. Repeated
                           lines add up. Excluding from a module that is not required is an error.
+                          It is scoped to the path through <module>, as in Maven, so a coordinate
+                          reached by two paths needs an exclusion on each. A sibling project module
+                          is one such path: its generated pom is flat, so a consumer meets that
+                          closure again through the sibling and excludes it there as well.
                       @jenesis.override <module> <carrier>...
                           Replace a module with the modules already carrying its packages, for a
                           dependency that shades another module (Tomcat Embed shades the Servlet
@@ -687,6 +699,12 @@ public record Project(
                           not stable across repositories; [<group>/]pin-<name>.properties reads a
                           local file from jenesis.project.boms. Local @jenesis.pin lines override BOM
                           entries, and the last declared BOM wins a conflict.
+                          A key in that file is <module>, <groupId>/<artifactId>, or a full
+                          <repository>/<coordinate>, which is the form a type or a classifier needs:
+                          maven/io.netty/netty-transport-native-epoll/jar/linux-x86_64, because
+                          without the repository the groupId is read as one. An entry manages a
+                          version wherever a closure reaches that coordinate, including modules that
+                          never name it, so give every entry the checksum its version resolves to.
                       @jenesis.attach <token> [<arguments...>]
                           Attach a library as a -javaagent to this module's Execute run and its test
                           runs. The token carries no version: it comes from a declared dependency, a
@@ -791,7 +809,10 @@ public record Project(
                     checksums back into pom.xml (<dependencyManagement> with <!--Checksum/<algo>/<hex>-->
                     and a <!--jenesis.pin ... --> comment) or module-info.java (@jenesis.pin tags),
                     idempotently, refreshing only the lines matching the local platform. It covers the
-                    whole project; to pin one module, name its step rather than adding +<module>. Enforce
+                    whole project; to pin one module, name its step rather than adding +<module>. Each
+                    module resolves alone, so nothing makes them agree: pin/divergence reports every
+                    coordinate the tree pins at more than one version, which is the signal that a
+                    shared version table is overdue. Enforce
                     coverage with -Djenesis.dependency.pin=strict; refresh with
                     -Djenesis.dependency.pin=ignore and the `pin` selector. A checksum says the bytes
                     did not change since they were vetted, not who produced them; @jenesis.signature
@@ -873,6 +894,57 @@ public record Project(
                         stepFactory.apply(path, file),
                         new LinkedHashSet<>(inherited.sequencedKeySet()));
             }
+            buildExecutor.addStep("divergence",
+                    new Divergence(paths),
+                    new LinkedHashSet<>(inherited.sequencedKeySet()));
+        }
+    }
+
+    private record Divergence(SequencedSet<String> paths, Consumer<String> printing) implements BuildStep {
+
+        private Divergence(SequencedSet<String> paths) {
+            this(paths, SequencedProperties.systemFlag("jenesis.print.divergence") ? System.out::println : null);
+        }
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            SequencedMap<String, SequencedMap<String, SequencedSet<String>>> versions = new TreeMap<>();
+            for (String path : paths) {
+                for (Map.Entry<String, Inventory.Dependency> entry
+                        : Inventory.closure(arguments.values(), path).entrySet()) {
+                    String key = entry.getKey();
+                    int lastSlash = key.lastIndexOf('/');
+                    if (lastSlash <= 0 || lastSlash == key.indexOf('/')) {
+                        continue;
+                    }
+                    versions.computeIfAbsent(key.substring(0, lastSlash), _ -> new TreeMap<>())
+                            .computeIfAbsent(key.substring(lastSlash + 1), _ -> new TreeSet<>())
+                            .add(path.isEmpty() ? "." : path);
+                }
+            }
+            SequencedProperties diverged = new SequencedProperties();
+            versions.forEach((coordinate, byVersion) -> {
+                if (byVersion.size() < 2) {
+                    return;
+                }
+                List<String> rendered = new ArrayList<>();
+                byVersion.forEach((version, modules) -> rendered.add(version + " (" + String.join(" ", modules) + ")"));
+                diverged.setProperty(coordinate, String.join(", ", rendered));
+                if (printing == null) {
+                    return;
+                }
+                printing.accept("%s%-11s%s %s is pinned at %s".formatted(
+                        BuildExecutorCallback.YELLOW,
+                        "[DIVERGED]",
+                        BuildExecutorCallback.RESET,
+                        coordinate,
+                        String.join(", ", rendered)));
+            });
+            diverged.store(context.next().resolve("divergence.properties"));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }
 
@@ -1013,7 +1085,7 @@ public record Project(
         String metadataOverride = System.getProperty("jenesis.project.metadata");
         SequencedSet<Path> resolvedMetadata = metadataOverride == null
                 ? Collections.emptyNavigableSet()
-                : Arrays.stream(metadataOverride.split(Pattern.quote(File.pathSeparator)))
+                : Arrays.stream(metadataOverride.split(","))
                 .map(String::trim)
                 .filter(value -> !value.isEmpty())
                 .map(Path::of)
@@ -1030,8 +1102,8 @@ public record Project(
                 new HashDigestFunction(System.getProperty("jenesis.project.digest", "SHA-256")),
                 resolvedLayout,
                 true,
-                Boolean.getBoolean("jenesis.project.sources"),
-                Boolean.getBoolean("jenesis.project.documentation"),
+                SequencedProperties.systemFlag("jenesis.project.sources"),
+                SequencedProperties.systemFlag("jenesis.project.documentation"),
                 Pinning.fromProperty(),
                 System.getProperty("jenesis.project.version"),
                 Collections.unmodifiableSequencedSet(new LinkedHashSet<>(List.of(BUILD))),
@@ -1046,7 +1118,7 @@ public record Project(
                                   SequencedSet<Path> defaults,
                                   Set<String> visited,
                                   SequencedSet<Path> target) {
-        for (String entry : text.split(Pattern.quote(File.pathSeparator))) {
+        for (String entry : text.split(",")) {
             String candidate = entry.trim();
             if (candidate.isEmpty()) {
                 continue;
@@ -1618,10 +1690,10 @@ public record Project(
                 project.digest|SHA-256|Algorithm for pin and dependency checksums
                 dependency.signature|none|Signatures verified after download: none|declared|strict
                 signature.command|gpg|Binary forked to verify detached OpenPGP signatures
-                project.metadata||Path-separated extra metadata files
-                project.configuration|build.jenesis|Path-separated folders searched for tool configuration files; @ splices the default
-                project.boms||Path-separated locations of local pin-<name>.properties; default: the configuration folders
-                project.signatures||Path-separated locations of local signature-<name>.properties; default: the configuration folders
+                project.metadata||Comma-separated extra metadata files
+                project.configuration|build.jenesis|Comma-separated folders searched for tool configuration files; @ splices the default
+                project.boms||Comma-separated locations of local pin-<name>.properties; default: the configuration folders
+                project.signatures||Comma-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
                 project.docker|false|Run the whole build inside a container
@@ -1652,10 +1724,13 @@ public record Project(
                 print.fetch|false|Each artifact downloaded from a repository
                 print.cache|false|Each step served from or written to the build cache
                 print.signatures|false|Each verified dependency with its signer, and each one no declaration covers
+                print.pins|false|Each pin a refresh kept that no closure resolves, so it carries no checksum
+                print.divergence|false|Each coordinate the project pins at more than one version
+                print.aliases|false|Each module alias whose target already declares that name
                 print.docker|true|The image notice when a build or run is containerized
                 print.jreleaser|true|The JReleaser command line when a release runs
                 dependency.pin||strict|versions|ignore; unset keeps existing pins and tolerates missing ones
-                resolver.maven|maven|maven|closest|latest|release: which version a Maven coordinate resolves to
+                resolver.maven|maven|maven|closest|latest|release|stable: which version a Maven coordinate resolves to; stable skips pre-release qualifiers
                 resolver.module|first|first|ignore|fail: what to do with the versions a module-info records
                 pin.checksum|true|Record content checksums in the pins that the pin selector writes
                 pin.bom|keep|keep|flatten: whether pinning keeps BOM references or resolves them away
@@ -1677,7 +1752,7 @@ public record Project(
                 cache.connect|PT1S|Connect timeout for a cache server
                 cache.read|PT10S|Read timeout for a cache server
                 cache.insecure|false|Permit the cache key over plaintext http off loopback
-                test.skip||Skip executing tests; presence alone switches it on
+                test.skip|false|Skip executing tests, still resolving what running them needs
                 test.engine||junit-platform|junit4|testng; unset detects it from the resolved dependencies
                 test.filter||Comma-separated <classRegex>[#<method>] entries restricting which tests run
                 test.tag||Comma-separated tag expressions; only tests carrying one of them run
@@ -1748,11 +1823,11 @@ public record Project(
             properties.forEach((name, value) -> System.out.println(name + "=" + value));
             return Collections.emptyNavigableMap();
         }
-        if (Boolean.getBoolean("jenesis.project.watch")) {
+        if (SequencedProperties.systemFlag("jenesis.project.watch")) {
             watch(selectors);
             return Collections.emptyNavigableMap();
         }
-        if (Boolean.getBoolean("jenesis.project.docker")) {
+        if (SequencedProperties.systemFlag("jenesis.project.docker")) {
             SortedMap<String, String> properties = new TreeMap<>();
             for (String name : System.getProperties().stringPropertyNames()) {
                 if (name.startsWith("jenesis.") && !name.startsWith("jenesis.project.docker")) {
@@ -1826,7 +1901,7 @@ public record Project(
                 docker = docker.mount(jenesisLocal, jenesisLocal.toString(), true);
                 docker = docker.env("JENESIS_REPOSITORY_LOCAL", jenesisLocal.toString());
             }
-            if (Boolean.parseBoolean(System.getProperty("jenesis.print.docker", "true"))) {
+            if (SequencedProperties.systemFlag("jenesis.print.docker", true)) {
                 System.out.println("Launching build within Docker image: " + docker.image());
             }
             int code = docker.execute("build/jenesis/Project.java", properties, selectors);

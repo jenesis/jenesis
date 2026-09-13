@@ -25,7 +25,7 @@ public class Tree implements BuildStep {
             case "compact" -> true;
             default -> throw new IllegalArgumentException(
                     "Unknown jenesis.tree.format '" + format + "', expected 'full' or 'compact'");
-        }, Boolean.parseBoolean(System.getProperty("jenesis.tree.tests", "true")));
+        }, SequencedProperties.systemFlag("jenesis.tree.tests", true));
     }
 
     private Tree(PrintStream out, boolean compact, boolean tests) {

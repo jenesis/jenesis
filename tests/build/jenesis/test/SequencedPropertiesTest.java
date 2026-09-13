@@ -5,6 +5,7 @@ import module org.junit.jupiter.api;
 import build.jenesis.SequencedProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class SequencedPropertiesTest {
 
@@ -99,5 +100,61 @@ public class SequencedPropertiesTest {
         StringWriter writer = new StringWriter();
         original.store(writer, "header");
         assertThat(writer.toString()).isEqualTo("k1=v1\n");
+    }
+
+    @Test
+    public void a_system_flag_is_the_default_when_it_is_not_set() {
+        System.clearProperty("jenesis.test.sample.flag");
+        assertThat(SequencedProperties.systemFlag("jenesis.test.sample.flag")).isFalse();
+        assertThat(SequencedProperties.systemFlag("jenesis.test.sample.flag", true)).isTrue();
+    }
+
+    @Test
+    public void a_system_flag_named_with_no_value_is_true() {
+        System.setProperty("jenesis.test.sample.flag", "");
+        try {
+            assertThat(SequencedProperties.systemFlag("jenesis.test.sample.flag"))
+                    .as("naming a flag on the command line and nothing else is how it is switched on")
+                    .isTrue();
+        } finally {
+            System.clearProperty("jenesis.test.sample.flag");
+        }
+    }
+
+    @Test
+    public void a_system_flag_set_to_false_is_false() {
+        System.setProperty("jenesis.test.sample.flag", "false");
+        try {
+            assertThat(SequencedProperties.systemFlag("jenesis.test.sample.flag"))
+                    .as("=false once switched a presence-read flag on, which is the whole reason"
+                            + " every boolean is read the same way now")
+                    .isFalse();
+            assertThat(SequencedProperties.systemFlag("jenesis.test.sample.flag", true)).isFalse();
+        } finally {
+            System.clearProperty("jenesis.test.sample.flag");
+        }
+    }
+
+    @Test
+    public void a_system_flag_set_to_anything_else_is_refused() {
+        System.setProperty("jenesis.test.sample.flag", "yes");
+        try {
+            assertThatThrownBy(() -> SequencedProperties.systemFlag("jenesis.test.sample.flag"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Malformed value for jenesis.test.sample.flag: 'yes'"
+                            + " (expected true, false, or the property named with no value at all)");
+        } finally {
+            System.clearProperty("jenesis.test.sample.flag");
+        }
+    }
+
+    @Test
+    public void a_system_flag_ignores_case_and_surrounding_space() {
+        System.setProperty("jenesis.test.sample.flag", " TRUE ");
+        try {
+            assertThat(SequencedProperties.systemFlag("jenesis.test.sample.flag")).isTrue();
+        } finally {
+            System.clearProperty("jenesis.test.sample.flag");
+        }
     }
 }

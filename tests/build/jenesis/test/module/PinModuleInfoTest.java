@@ -481,6 +481,30 @@ public class PinModuleInfoTest {
     }
 
     @Test
+    public void reports_a_preserved_pin_that_carries_no_checksum() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.pin org.junit.jupiter.api 6.1.0
+                 * @jenesis.pin org.opentest4j 1.3.0 SHA-256/cafebabe
+                 * @jenesis.pin bar 0.9
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        writeResolved(Map.of("module/bar", "1.0 SHA-256/cafebabe"));
+        StringBuilder captured = new StringBuilder();
+        String result = run(file, pin -> pin.printing(line -> captured.append(line).append('\n')));
+        assertInsideJavadoc(result, "@jenesis.pin org.junit.jupiter.api 6.1.0");
+        assertThat(captured.toString())
+                .as("strict mode accepts a bare line for a coordinate it never resolves, so nothing"
+                        + " else would ever mention it, and jenesis.print.pins is what asks")
+                .contains("org.junit.jupiter.api 6.1.0")
+                .doesNotContain("org.opentest4j");
+    }
+
+    @Test
     public void preserved_manual_pin_survives_a_second_run() throws IOException {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """

@@ -8,6 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.step.Bind;
+import build.jenesis.SequencedProperties;
 
 public class InferredSourceFormattingModule implements BuildExecutorModule {
 
@@ -28,7 +29,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                                           Map<String, Repository> repositories,
                                           Map<String, Resolver> resolvers) {
         this(configuration, repositories, resolvers, null,
-                !Boolean.getBoolean("jenesis.format.rewrite"),
+                !SequencedProperties.systemFlag("jenesis.format.rewrite"),
                 enabledBy("jenesis.format.java"),
                 enabledBy("jenesis.format.ktlint"),
                 enabledBy("jenesis.format.scalafmt"));
@@ -53,7 +54,7 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     }
 
     private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
-        return Boolean.parseBoolean(System.getProperty(property, "true")) ? module -> module : null;
+        return SequencedProperties.systemFlag(property, true) ? module -> module : null;
     }
 
     public InferredSourceFormattingModule pinning(Pinning pinning) {
