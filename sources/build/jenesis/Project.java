@@ -1682,7 +1682,7 @@ public record Project(
                 cache.connect|PT1S|Connect timeout for a cache server
                 cache.read|PT10S|Read timeout for a cache server
                 cache.insecure|false|Permit the cache key over plaintext http off loopback
-                test.skip||Skip executing tests; presence alone switches it on
+                test.skip||Skip executing tests, still resolving what running them needs; presence switches it on
                 test.engine||junit-platform|junit4|testng; unset detects it from the resolved dependencies
                 test.filter||Comma-separated <classRegex>[#<method>] entries restricting which tests run
                 test.tag||Comma-separated tag expressions; only tests carrying one of them run

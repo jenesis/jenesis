@@ -40,6 +40,7 @@ public class TestModule implements BuildExecutorModule {
     private final String group;
     private final List<ObservabilityEngine> observers;
     private final Boolean printing;
+    private final boolean skip;
 
     public TestModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
         List<Pattern> patterns = Stream.of(
@@ -74,7 +75,8 @@ public class TestModule implements BuildExecutorModule {
                 Boolean.getBoolean("jenesis.test.reporting"),
                 "main",
                 List.of(),
-                null);
+                null,
+                System.getProperty("jenesis.test.skip") != null);
     }
 
     private TestModule(TestEngine engine,
@@ -94,7 +96,9 @@ public class TestModule implements BuildExecutorModule {
                        boolean reporting,
                        String group,
                        List<ObservabilityEngine> observers,
-                       Boolean printing) {
+                       Boolean printing,
+                       boolean skip) {
+        this.skip = skip;
         this.engine = engine;
         this.isTest = isTest;
         this.factory = factory;
@@ -133,7 +137,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
     }
 
     public <P extends Predicate<String> & Serializable> TestModule isTest(P isTest) {
@@ -154,7 +159,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
     }
 
     public TestModule factory(Function<List<String>, ProcessHandler.OfProcess> factory) {
@@ -175,7 +181,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
     }
 
     public TestModule filter(String filter) {
@@ -196,7 +203,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
     }
 
     public TestModule jarsOnly(boolean jarsOnly) {
@@ -217,7 +225,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
     }
 
     public TestModule requireEngine(boolean requireEngine) {
@@ -238,7 +247,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
     }
 
     public TestModule pinning(Pinning pinning) {
@@ -259,7 +269,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
     }
 
     public TestModule pathPlacement(PathPlacement pathPlacement) {
@@ -280,7 +291,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
     }
 
     public TestModule moduleName(String moduleName) {
@@ -301,7 +313,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
     }
 
     public TestModule tag(String tag) {
@@ -322,7 +335,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
     }
 
     public TestModule force(boolean force) {
@@ -343,7 +357,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
     }
 
     public TestModule group(String group) {
@@ -364,7 +379,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
     }
 
     public TestModule parallel(boolean parallel) {
@@ -385,7 +401,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
     }
 
     public TestModule reporting(boolean reporting) {
@@ -406,7 +423,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
     }
 
     public TestModule observe(ObservabilityEngine... observers) {
@@ -431,7 +449,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
     }
 
     public TestModule printing(boolean printing) {
@@ -452,19 +471,39 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing);
+                printing,
+                skip);
+    }
+
+    public TestModule skip(boolean skip) {
+        return new TestModule(engine,
+                isTest,
+                factory,
+                repositories,
+                resolvers,
+                jarsOnly,
+                requireEngine,
+                pinning,
+                pathPlacement,
+                moduleName,
+                filter,
+                tag,
+                force,
+                parallel,
+                reporting,
+                group,
+                observers,
+                printing,
+                skip);
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-        if (System.getProperty("jenesis.test.skip") != null) {
-            return;
-        }
         TestEngine resolved = engine;
         if (resolved == null) {
             resolved = TestEngine.of(() -> inherited.values().stream().iterator()).orElse(null);
             if (resolved == null) {
-                if (requireEngine) {
+                if (requireEngine && !skip) {
                     throw new IllegalStateException(
                             "No test engine could be resolved from inherited dependencies: "
                                     + inherited.sequencedKeySet());
@@ -480,6 +519,9 @@ public class TestModule implements BuildExecutorModule {
         buildExecutor.addModule(DEPENDENCIES,
                 new Dependencies(repositories, resolvers).pinning(pinning),
                 resolveInputs);
+        if (skip) {
+            return;
+        }
         String incrementalProperty = System.getProperty("jenesis.test.incremental");
         buildExecutor.addStep(EXECUTED, new Run(
                         factory,
