@@ -207,6 +207,55 @@ public class DependenciesMavenBomTest {
     }
 
     @Test
+    public void a_classified_coordinate_in_a_bill_of_materials_names_its_repository() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.acme/lib", "");
+        requires.store(dependencies.resolve(BuildStep.REQUIRES));
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("main/maven/org.acme/lib", "1.0");
+        versions.store(dependencies.resolve(BuildStep.VERSIONS));
+        SequencedProperties boms = new SequencedProperties();
+        boms.setProperty("entry/main/maven/io.netty/netty-transport-native-epoll/jar/linux-x86_64", "4.2.18");
+        boms.store(dependencies.resolve(BuildStep.BOMS));
+        apply(new Dependencies(
+                Map.of("maven", maven(Map.of("org.acme/lib/pom/1.0", """
+                        <project xmlns="http://maven.apache.org/POM/4.0.0">
+                            <modelVersion>4.0.0</modelVersion>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>io.netty</groupId>
+                                    <artifactId>netty-transport-native-epoll</artifactId>
+                                    <version>4.2.10</version>
+                                    <classifier>linux-x86_64</classifier>
+                                </dependency>
+                            </dependencies>
+                        </project>
+                        """))),
+                Map.of("maven", new MavenPomResolver())));
+        SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
+        assertThat(index.stringPropertyNames())
+                .as("written in full, a classified coordinate manages a version like any other")
+                .contains("main/compile/maven/io.netty/netty-transport-native-epoll/jar/linux-x86_64/4.2.18");
+    }
+
+    @Test
+    public void a_bill_of_materials_entry_naming_no_repository_is_rejected() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.acme/lib", "");
+        requires.store(dependencies.resolve(BuildStep.REQUIRES));
+        SequencedProperties boms = new SequencedProperties();
+        boms.setProperty("entry/main/io.netty/netty-transport-native-epoll/jar/linux-x86_64", "4.2.18");
+        boms.store(dependencies.resolve(BuildStep.BOMS));
+        assertThatThrownBy(() -> apply(new Dependencies(
+                Map.of("maven", maven(Map.of())),
+                Map.of("maven", new MavenPomResolver()))))
+                .as("dropping the repository turns the groupId into one, and the entry then manages"
+                        + " a coordinate nothing resolves rather than the one that was meant")
+                .hasStackTraceContaining("Unknown repository 'io.netty'")
+                .hasStackTraceContaining("maven/<groupId>/<artifactId>/<type>/<classifier>");
+    }
+
+    @Test
     public void strict_pinning_accepts_hashless_maven_bom_reference() throws IOException {
         SequencedProperties boms = new SequencedProperties();
         boms.setProperty("bom/main/maven/org.acme/platform-bom", "1.0");

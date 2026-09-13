@@ -699,6 +699,12 @@ public record Project(
                           not stable across repositories; [<group>/]pin-<name>.properties reads a
                           local file from jenesis.project.boms. Local @jenesis.pin lines override BOM
                           entries, and the last declared BOM wins a conflict.
+                          A key in that file is <module>, <groupId>/<artifactId>, or a full
+                          <repository>/<coordinate>, which is the form a type or a classifier needs:
+                          maven/io.netty/netty-transport-native-epoll/jar/linux-x86_64, because
+                          without the repository the groupId is read as one. An entry manages a
+                          version wherever a closure reaches that coordinate, including modules that
+                          never name it, so give every entry the checksum its version resolves to.
                       @jenesis.attach <token> [<arguments...>]
                           Attach a library as a -javaagent to this module's Execute run and its test
                           runs. The token carries no version: it comes from a declared dependency, a

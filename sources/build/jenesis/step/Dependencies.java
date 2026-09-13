@@ -324,6 +324,18 @@ public class Dependencies implements BuildExecutorModule {
                 for (Map.Entry<String, String> token : bomTokens.entrySet()) {
                     if (token.getKey().startsWith("entry/")) {
                         String key = token.getKey().substring(6);
+                        int groupSlash = key.indexOf('/');
+                        int repositorySlash = key.indexOf('/', groupSlash + 1);
+                        String repository = key.substring(groupSlash + 1, repositorySlash);
+                        if (wrapped.get(Resolver.base(repository)) == null) {
+                            throw new IllegalArgumentException("Unknown repository '"
+                                    + repository
+                                    + "' for bill of materials entry '"
+                                    + key.substring(repositorySlash + 1)
+                                    + "': a coordinate carrying a type or a classifier names its"
+                                    + " repository first, as maven/<groupId>/<artifactId>/<type>/<classifier>,"
+                                    + " because a bare <groupId>/<artifactId> reads the first segment as one");
+                        }
                         merged.put(key, token.getValue());
                         covering.put(key, token.getValue());
                         continue;
