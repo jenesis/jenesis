@@ -6,6 +6,7 @@ import build.jenesis.BuildStep;
 import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
 import javax.tools.ToolProvider;
+import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
@@ -117,7 +118,16 @@ public class PinModuleInfo implements BuildStep {
             }
         }
         for (Path file : moduleInfoFiles) {
-            updateModuleInfo(file, entries, covered, references, flatten, platform);
+            SequencedSet<String> carried = new TreeSet<>();
+            updateModuleInfo(file, entries, covered, references, flatten, platform, carried);
+            if (!carried.isEmpty()) {
+                System.out.printf("%s%-11s%s %s%n",
+                        BuildExecutorCallback.YELLOW,
+                        "[UNPINNED]",
+                        BuildExecutorCallback.RESET,
+                        file + ": kept without a checksum, resolved by no closure: "
+                                + String.join(", ", carried));
+            }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
@@ -218,7 +228,8 @@ public class PinModuleInfo implements BuildStep {
                                          Set<String> covered,
                                          SequencedMap<String, String> references,
                                          boolean flatten,
-                                         Platform platform) throws IOException {
+                                         Platform platform,
+                                         SequencedSet<String> carried) throws IOException {
         String existing = Files.readString(file);
         Located located = locate(file, existing);
         if (located == null) {
@@ -243,7 +254,8 @@ public class PinModuleInfo implements BuildStep {
                             covered,
                             references,
                             flatten,
-                            platform)
+                            platform,
+                            carried)
                     + existing.substring(comment.end());
         }
         if (!updated.equals(existing)) {
@@ -318,7 +330,8 @@ public class PinModuleInfo implements BuildStep {
                                          Set<String> covered,
                                          SequencedMap<String, String> references,
                                          boolean flatten,
-                                         Platform platform) {
+                                         Platform platform,
+                                         SequencedSet<String> carried) {
         List<String> lines = new ArrayList<>(List.of(javadoc.split("\\n", -1)));
         SequencedMap<Integer, Tag> pinTags = new LinkedHashMap<>(), bomTags = new LinkedHashMap<>();
         for (Tag tag : located) {
@@ -410,6 +423,9 @@ public class PinModuleInfo implements BuildStep {
                 }
                 if (!regenerated.contains(expand(tag.token()))) {
                     merged.putIfAbsent(tag.token(), tag.rest());
+                    if (!tag.rest().contains("/")) {
+                        carried.add(tag.token() + " " + tag.rest());
+                    }
                 }
                 continue;
             }
