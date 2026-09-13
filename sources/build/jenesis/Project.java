@@ -1928,6 +1928,7 @@ public record Project(
                 executor.concurrency|0|Run at most this many build steps at once; 0 is unbounded
                 executor.timeout|PT0S|ISO-8601 timeout per step; PT0S is no timeout
                 executor.digest|MD5|Algorithm behind the content and step hashes that drive the cache
+                executor.engine|(the engine's own bytes)|Identity the step keys are salted with, so a different build tool cannot reuse the previous one's cached outputs
                 executor.rebuild|false|Wipe target/ before building; prefer letting the cache decide
                 executor.aggregate|false|Collect independent step failures into one report
                 process.concurrency|0|Run at most this many JDK tool runs at once; 0 is unbounded
