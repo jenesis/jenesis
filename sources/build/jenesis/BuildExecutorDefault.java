@@ -69,7 +69,8 @@ class BuildExecutorDefault implements BuildExecutor {
         return (identity, executor, _, selectors) -> {
             if (!selectors.isEmpty()) {
                 selectors.stream().filter(selector -> !selector.lenient()).findFirst().ifPresent(selector -> {
-                    throw new IllegalArgumentException("Unknown selector: " + selector.path());
+                    throw new IllegalArgumentException("Unknown selector: " + selector.path()
+                            + " - " + identity + " is a source, which holds no steps to select");
                 });
                 return CompletableFuture.completedStage(Map.of(identity, Map.of()));
             }
@@ -112,7 +113,8 @@ class BuildExecutorDefault implements BuildExecutor {
             try {
                 if (!selectors.isEmpty()) {
                     selectors.stream().filter(selector -> !selector.lenient()).findFirst().ifPresent(selector -> {
-                        throw new IllegalArgumentException("Unknown selector: " + selector.path());
+                        throw new IllegalArgumentException("Unknown selector: " + selector.path()
+                                + " - " + identity + " is a step, which holds no steps to select");
                     });
                     return CompletableFuture.completedStage(Map.of(identity, Map.of()));
                 }
@@ -523,7 +525,10 @@ class BuildExecutorDefault implements BuildExecutor {
                     }
                 } else if (!registrations.containsKey(first)) {
                     if (!selector.lenient()) {
-                        throw new IllegalArgumentException("Unknown selector: " + selector.path());
+                        throw new IllegalArgumentException("Unknown selector: " + selector.path()
+                                + " - " + (registrations.isEmpty()
+                                ? "nothing is registered here"
+                                : "expected one of " + registrations.sequencedKeySet()));
                     }
                 } else {
                     scheduled.add(first);

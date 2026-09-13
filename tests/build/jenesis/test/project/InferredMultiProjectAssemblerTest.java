@@ -105,7 +105,7 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("path=\n", false, false, false);
         assertThatThrownBy(() -> fixture.execute("sub/jpackage"))
                 .rootCause()
-                .hasMessage("Unknown selector: jpackage");
+                .hasMessageStartingWith("Unknown selector: jpackage - ");
     }
 
     @Test
@@ -190,7 +190,7 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("path=\n", false, false, false);
         assertThatThrownBy(() -> fixture.execute("sub/jmod"))
                 .rootCause()
-                .hasMessage("Unknown selector: jmod");
+                .hasMessageStartingWith("Unknown selector: jmod - ");
     }
 
     @Test
@@ -198,7 +198,7 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("path=\n", false, false, false);
         assertThatThrownBy(() -> fixture.execute("sub/jlink"))
                 .rootCause()
-                .hasMessage("Unknown selector: jlink");
+                .hasMessageStartingWith("Unknown selector: jlink - ");
     }
 
     @Test
@@ -206,7 +206,7 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("path=\n", false, false, false);
         assertThatThrownBy(() -> fixture.execute("sub/native-image"))
                 .rootCause()
-                .hasMessage("Unknown selector: native-image");
+                .hasMessageStartingWith("Unknown selector: native-image - ");
     }
 
     @Test
@@ -231,7 +231,7 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("path=\n", false, false, false);
         assertThatThrownBy(() -> fixture.execute("sub/sources/archive"))
                 .rootCause()
-                .hasMessage("Unknown selector: sources/archive");
+                .hasMessageStartingWith("Unknown selector: sources/archive - ");
     }
 
     @Test
@@ -251,7 +251,7 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("path=\n", false, false, false);
         assertThatThrownBy(() -> fixture.execute("sub/documentation/archive"))
                 .rootCause()
-                .hasMessage("Unknown selector: documentation/archive");
+                .hasMessageStartingWith("Unknown selector: documentation/archive - ");
     }
 
     @Test
@@ -270,7 +270,7 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("path=\n", false, false, false);
         assertThatThrownBy(() -> fixture.execute("sub/test/resolved"))
                 .rootCause()
-                .hasMessage("Unknown selector: test/resolved");
+                .hasMessageStartingWith("Unknown selector: test/resolved - ");
     }
 
     @Test
@@ -278,7 +278,7 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("path=\ntest=\nabstract=true\n", true, false, false);
         assertThatThrownBy(() -> fixture.execute("sub/observed/test/resolved"))
                 .rootCause()
-                .hasMessage("Unknown selector: observed/test/resolved");
+                .hasMessageStartingWith("Unknown selector: observed/test/resolved - ");
     }
 
     @Test

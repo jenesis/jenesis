@@ -1523,7 +1523,22 @@ public class BuildExecutorTest implements Serializable {
         });
         assertThatThrownBy(() -> buildExecutor.execute(Runnable::run, "nonexistent").toCompletableFuture().join())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Unknown selector: nonexistent");
+                .hasMessageStartingWith("Unknown selector: nonexistent - ");
+    }
+
+    @Test
+    public void an_unknown_selector_names_what_it_could_have_matched() {
+        buildExecutor.addStep("step1", (_, _, _) -> {
+            throw new AssertionError();
+        });
+        buildExecutor.addStep("step2", (_, _, _) -> {
+            throw new AssertionError();
+        });
+        assertThatThrownBy(() -> buildExecutor.execute(Runnable::run, "step").toCompletableFuture().join())
+                .as("a selector that runs a module's preliminaries before it fails is expensive to get"
+                        + " wrong twice, so the failure carries what would have matched")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Unknown selector: step - expected one of [step1, step2]");
     }
 
     @Test
@@ -1605,7 +1620,7 @@ public class BuildExecutorTest implements Serializable {
                 .hasMessage("Failed to execute module")
                 .cause()
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Unknown selector: nonexistent");
+                .hasMessageStartingWith("Unknown selector: nonexistent - ");
     }
 
     @Test
@@ -1784,7 +1799,7 @@ public class BuildExecutorTest implements Serializable {
         assertThatThrownBy(() -> buildExecutor.execute(Runnable::run, ":::/step")
                 .toCompletableFuture().join())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Unknown selector: :::/step");
+                .hasMessageStartingWith("Unknown selector: :::/step - ");
     }
 
     @Test
@@ -1798,7 +1813,7 @@ public class BuildExecutorTest implements Serializable {
                 .hasMessage("Failed to execute step1")
                 .cause()
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Unknown selector: extra");
+                .hasMessageStartingWith("Unknown selector: extra - ");
     }
 
     @Test
