@@ -1018,7 +1018,7 @@ public record Project(
         String metadataOverride = System.getProperty("jenesis.project.metadata");
         SequencedSet<Path> resolvedMetadata = metadataOverride == null
                 ? Collections.emptyNavigableSet()
-                : Arrays.stream(metadataOverride.split(Pattern.quote(File.pathSeparator)))
+                : Arrays.stream(metadataOverride.split(","))
                 .map(String::trim)
                 .filter(value -> !value.isEmpty())
                 .map(Path::of)
@@ -1051,7 +1051,7 @@ public record Project(
                                   SequencedSet<Path> defaults,
                                   Set<String> visited,
                                   SequencedSet<Path> target) {
-        for (String entry : text.split(Pattern.quote(File.pathSeparator))) {
+        for (String entry : text.split(",")) {
             String candidate = entry.trim();
             if (candidate.isEmpty()) {
                 continue;
@@ -1623,10 +1623,10 @@ public record Project(
                 project.digest|SHA-256|Algorithm for pin and dependency checksums
                 dependency.signature|none|Signatures verified after download: none|declared|strict
                 signature.command|gpg|Binary forked to verify detached OpenPGP signatures
-                project.metadata||Path-separated extra metadata files
-                project.configuration|build.jenesis|Path-separated folders searched for tool configuration files; @ splices the default
-                project.boms||Path-separated locations of local pin-<name>.properties; default: the configuration folders
-                project.signatures||Path-separated locations of local signature-<name>.properties; default: the configuration folders
+                project.metadata||Comma-separated extra metadata files
+                project.configuration|build.jenesis|Comma-separated folders searched for tool configuration files; @ splices the default
+                project.boms||Comma-separated locations of local pin-<name>.properties; default: the configuration folders
+                project.signatures||Comma-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
                 project.docker|false|Run the whole build inside a container
