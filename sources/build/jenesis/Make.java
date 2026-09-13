@@ -22,8 +22,24 @@ public final class Make {
         classes = location == null || location.isBlank()
                 ? root.resolve(".jenesis").resolve("classes")
                 : root.resolve(location).normalize();
-        daemon = SequencedProperties.systemFlag("jenesis.make.daemon", false);
-        compile = SequencedProperties.systemFlag("jenesis.make.compile", true);
+        daemon = flag("jenesis.make.daemon", false);
+        compile = flag("jenesis.make.compile", true);
+    }
+
+    private static boolean flag(String key, boolean defaultValue) {
+        String value = System.getProperty(key);
+        if (value == null) {
+            return defaultValue;
+        }
+        return switch (value.trim().toLowerCase(Locale.ROOT)) {
+            case "", "true" -> true;
+            case "false" -> false;
+            default -> throw new IllegalArgumentException("Malformed value for "
+                    + key
+                    + ": '"
+                    + value
+                    + "' (expected true, false, or the property named with no value at all)");
+        };
     }
 
     private Make(String mainClass, Path root, Path classes, boolean daemon, boolean compile) {
