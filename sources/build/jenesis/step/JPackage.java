@@ -14,17 +14,17 @@ public class JPackage extends JdkProcessBuildStep {
     private final String group;
 
     public JPackage(ProcessHandler.Factory factory) {
-        this(factory, null);
-    }
-
-    public JPackage(ProcessHandler.Factory factory, String type) {
-        this(factory.apply("jpackage", "bin/jpackage"), type, "main", printing("jpackage"));
+        this(factory.apply("jpackage", "bin/jpackage"), null, "main", printing("jpackage"));
     }
 
     private JPackage(Function<List<String>, ? extends ProcessHandler> factory, String type, String group, BiConsumer<Boolean, String> printing) {
         super("jpackage", factory, printing);
         this.type = type;
         this.group = group;
+    }
+
+    public JPackage type(String type) {
+        return new JPackage(factory, type, group, printing);
     }
 
     public JPackage group(String group) {
