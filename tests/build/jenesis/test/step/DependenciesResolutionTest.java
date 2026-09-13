@@ -842,4 +842,49 @@ public class DependenciesResolutionTest implements Serializable {
                 Map.of("module", resolver)));
         assertThat(received).containsEntry("org.slf4j/slf4j-api", "2.0.17");
     }
+
+    @Test
+    public void resolves_again_when_an_upstream_resolution_changed() throws IOException {
+        Files.writeString(dependencies.resolve(BuildStep.REQUIRES), "main/compile/module/org.example/lib=\n");
+        Path upstream = Files.createDirectory(root.resolve("upstream"));
+        Files.writeString(upstream.resolve(BuildStep.DEPENDENCIES),
+                "main/compile/module/org.example/other/1.0=resolved/other.jar\n");
+        Dependencies module = new Dependencies(
+                Map.of("module", files(Map.of())),
+                Map.of("module", Resolver.identity()));
+
+        assertThat(executed(module, upstream))
+                .as("the first run has nothing to reuse")
+                .contains("resolved/resolve");
+        assertThat(executed(module, upstream))
+                .as("nothing changed, so nothing runs")
+                .doesNotContain("resolved/resolve");
+
+        Files.writeString(upstream.resolve(BuildStep.DEPENDENCIES),
+                "main/compile/module/org.example/other/2.0=resolved/other.jar\n");
+
+        assertThat(executed(module, upstream))
+                .as("a sibling's closure is what this resolution resolves through, so a change to it"
+                        + " has to invalidate this one rather than leaving a stale graph behind")
+                .contains("resolved/resolve");
+    }
+
+    private SequencedSet<String> executed(Dependencies module, Path upstream) throws IOException {
+        SequencedSet<String> ran = new LinkedHashSet<>();
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                (identity, _) -> (step, _) -> {
+                    if (identity != null && Boolean.TRUE.equals(step)) {
+                        ran.add(identity);
+                    }
+                },
+                BuildExecutorCache.nop(), false, false, 0);
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("upstream", upstream);
+        executor.addModule("resolved", module, "dependencies", "upstream");
+        executor.execute();
+        return ran;
+    }
 }

@@ -107,7 +107,10 @@ public class Dependencies implements BuildExecutorModule {
                     Path.of(BOMS),
                     Path.of(EXCLUSIONS),
                     Path.of(OVERRIDES),
-                    Path.of(SPDX)));
+                    Path.of(SPDX),
+                    Path.of(DEPENDENCIES),
+                    Path.of(MODULAR),
+                    Path.of(RESOLVED)));
         }
 
         @Override
