@@ -602,6 +602,9 @@ public record Project(
                                             <groupId>/<artifactId>
                       inventory.properties  what staging reads: artifacts, sources, documentation,
                                             pom, runtime, prefixed
+                      divergence.properties written by pin/divergence: <group>/<repository>/<coordinate>
+                                            -> the versions it is pinned at and the modules holding
+                                            each, for every coordinate pinned at more than one
 
                     ## 7. Bump serialVersionUID after editing a build step
 
@@ -796,7 +799,10 @@ public record Project(
                     checksums back into pom.xml (<dependencyManagement> with <!--Checksum/<algo>/<hex>-->
                     and a <!--jenesis.pin ... --> comment) or module-info.java (@jenesis.pin tags),
                     idempotently, refreshing only the lines matching the local platform. It covers the
-                    whole project; to pin one module, name its step rather than adding +<module>. Enforce
+                    whole project; to pin one module, name its step rather than adding +<module>. Each
+                    module resolves alone, so nothing makes them agree: pin/divergence reports every
+                    coordinate the tree pins at more than one version, which is the signal that a
+                    shared version table is overdue. Enforce
                     coverage with -Djenesis.dependency.pin=strict; refresh with
                     -Djenesis.dependency.pin=ignore and the `pin` selector. A checksum says the bytes
                     did not change since they were vetted, not who produced them; @jenesis.signature
@@ -878,6 +884,50 @@ public record Project(
                         stepFactory.apply(path, file),
                         new LinkedHashSet<>(inherited.sequencedKeySet()));
             }
+            buildExecutor.addStep("divergence",
+                    new Divergence(paths),
+                    new LinkedHashSet<>(inherited.sequencedKeySet()));
+        }
+    }
+
+    private record Divergence(SequencedSet<String> paths) implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            SequencedMap<String, SequencedMap<String, SequencedSet<String>>> versions = new TreeMap<>();
+            for (String path : paths) {
+                for (Map.Entry<String, Inventory.Dependency> entry
+                        : Inventory.closure(arguments.values(), path).entrySet()) {
+                    String key = entry.getKey();
+                    int lastSlash = key.lastIndexOf('/');
+                    if (lastSlash <= 0 || lastSlash == key.indexOf('/')) {
+                        continue;
+                    }
+                    versions.computeIfAbsent(key.substring(0, lastSlash), _ -> new TreeMap<>())
+                            .computeIfAbsent(key.substring(lastSlash + 1), _ -> new TreeSet<>())
+                            .add(path.isEmpty() ? "." : path);
+                }
+            }
+            SequencedProperties diverged = new SequencedProperties();
+            versions.forEach((coordinate, byVersion) -> {
+                if (byVersion.size() < 2) {
+                    return;
+                }
+                List<String> rendered = new ArrayList<>();
+                byVersion.forEach((version, modules) -> rendered.add(version + " (" + String.join(" ", modules) + ")"));
+                diverged.setProperty(coordinate, String.join(", ", rendered));
+                System.out.printf("%s%-11s%s %s is pinned at %s%n",
+                        BuildExecutorCallback.YELLOW,
+                        "[DIVERGED]",
+                        BuildExecutorCallback.RESET,
+                        coordinate,
+                        String.join(", ", rendered));
+            });
+            diverged.store(context.next().resolve("divergence.properties"));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }
 
