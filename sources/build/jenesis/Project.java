@@ -435,9 +435,10 @@ public record Project(
                       %{name}help%{reset}          Print this message
                       %{name}skill%{reset}         Print the briefing for a coding agent
 
-                      %{name}+<module>%{reset} narrows the build to one module and %{name}+<module>/<step>%{reset} to a
-                      single step inside it; %{name}:%{reset} matches one path segment and %{name}::%{reset} any depth,
-                      as in %{name}::/test%{reset}.
+                      %{name}+<module>%{reset} narrows %{name}build%{reset} to one module, not %{name}stage%{reset}, %{name}export%{reset} or
+                      %{name}pin%{reset}, and %{name}+<module>/<step>%{reset} narrows it to a single step inside that
+                      module; %{name}:%{reset} matches one path segment and %{name}::%{reset} any depth, as in
+                      %{name}::/test%{reset}.
 
                     %{header}Watching what a step does:%{reset}
                       A step prints its name and its timing, and nothing of the tool underneath.
@@ -568,6 +569,11 @@ public record Project(
                                         <module> is the source folder holding its pom.xml or
                                         module-info.java; nested, foo/bar is written +foo+bar.
                       +<module>/<step>  one step in it, e.g. +foo+bar/compile/dependencies/resolved
+                      pin/module-<path> one module's pins. `pin` is an entry point of its own and
+                                        always rewrites every module, so `pin +foo` runs both and
+                                        narrows nothing. <path> is the module's source folder,
+                                        URL-encoded because selectors split on /: foo/bar is
+                                        pin/module-foo%2Fbar.
                       :                 one path segment, e.g. build/:/java
                       ::                any depth, e.g. ::/test. Lenient: a typo matches nothing
                                         silently, so confirm a selector ran what you meant.
@@ -784,7 +790,8 @@ public record Project(
                     to pin whenever you add or change one. `pin` records resolved versions and
                     checksums back into pom.xml (<dependencyManagement> with <!--Checksum/<algo>/<hex>-->
                     and a <!--jenesis.pin ... --> comment) or module-info.java (@jenesis.pin tags),
-                    idempotently, refreshing only the lines matching the local platform. Enforce
+                    idempotently, refreshing only the lines matching the local platform. It covers the
+                    whole project; to pin one module, name its step rather than adding +<module>. Enforce
                     coverage with -Djenesis.dependency.pin=strict; refresh with
                     -Djenesis.dependency.pin=ignore and the `pin` selector. A checksum says the bytes
                     did not change since they were vetted, not who produced them; @jenesis.signature
