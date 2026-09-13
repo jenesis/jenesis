@@ -24,9 +24,11 @@ public class PinModuleInfo implements BuildStep {
     private final Platform platform;
     private final boolean checksum;
     private final boolean flatten;
+    private final transient boolean printing;
 
     public PinModuleInfo(String prefix, String path, List<Path> moduleInfoFiles, HashDigestFunction hashFunction) {
-        this(prefix, path, moduleInfoFiles, hashFunction, new Platform(), checksumFromProperty(), flattenFromProperty());
+        this(prefix, path, moduleInfoFiles, hashFunction, new Platform(), checksumFromProperty(), flattenFromProperty(),
+                Boolean.getBoolean("jenesis.print.pins"));
     }
 
     private PinModuleInfo(String prefix,
@@ -35,7 +37,8 @@ public class PinModuleInfo implements BuildStep {
                           HashDigestFunction hashFunction,
                           Platform platform,
                           boolean checksum,
-                          boolean flatten) {
+                          boolean flatten,
+                          boolean printing) {
         this.prefix = prefix;
         this.path = path;
         this.moduleInfoFiles = List.copyOf(moduleInfoFiles);
@@ -43,18 +46,23 @@ public class PinModuleInfo implements BuildStep {
         this.platform = platform;
         this.checksum = checksum;
         this.flatten = flatten;
+        this.printing = printing;
     }
 
     public PinModuleInfo platform(Platform platform) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, printing);
     }
 
     public PinModuleInfo checksum(boolean checksum) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, printing);
     }
 
     public PinModuleInfo flatten(boolean flatten) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, printing);
+    }
+
+    public PinModuleInfo printing(boolean printing) {
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, printing);
     }
 
     private static boolean checksumFromProperty() {
@@ -120,7 +128,7 @@ public class PinModuleInfo implements BuildStep {
         for (Path file : moduleInfoFiles) {
             SequencedSet<String> carried = new TreeSet<>();
             updateModuleInfo(file, entries, covered, references, flatten, platform, carried);
-            if (!carried.isEmpty()) {
+            if (printing && !carried.isEmpty()) {
                 System.out.printf("%s%-11s%s %s%n",
                         BuildExecutorCallback.YELLOW,
                         "[UNPINNED]",

@@ -900,7 +900,11 @@ public record Project(
         }
     }
 
-    private record Divergence(SequencedSet<String> paths) implements BuildStep {
+    private record Divergence(SequencedSet<String> paths, boolean printing) implements BuildStep {
+
+        private Divergence(SequencedSet<String> paths) {
+            this(paths, Boolean.getBoolean("jenesis.print.divergence"));
+        }
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
@@ -929,6 +933,9 @@ public record Project(
                 List<String> rendered = new ArrayList<>();
                 byVersion.forEach((version, modules) -> rendered.add(version + " (" + String.join(" ", modules) + ")"));
                 diverged.setProperty(coordinate, String.join(", ", rendered));
+                if (!printing) {
+                    return;
+                }
                 System.out.printf("%s%-11s%s %s is pinned at %s%n",
                         BuildExecutorCallback.YELLOW,
                         "[DIVERGED]",
@@ -1717,6 +1724,9 @@ public record Project(
                 print.fetch|false|Each artifact downloaded from a repository
                 print.cache|false|Each step served from or written to the build cache
                 print.signatures|false|Each verified dependency with its signer, and each one no declaration covers
+                print.pins|false|Each pin a refresh kept that no closure resolves, so it carries no checksum
+                print.divergence|false|Each coordinate the project pins at more than one version
+                print.aliases|false|Each module alias whose target already declares that name
                 print.docker|true|The image notice when a build or run is containerized
                 print.jreleaser|true|The JReleaser command line when a release runs
                 dependency.pin||strict|versions|ignore; unset keeps existing pins and tolerates missing ones

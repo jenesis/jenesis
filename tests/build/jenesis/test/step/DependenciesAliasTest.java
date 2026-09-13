@@ -203,6 +203,29 @@ public class DependenciesAliasTest {
     }
 
     @Test
+    public void a_confirming_alias_is_reported_when_asked_for() throws IOException {
+        addPom("org.example", "amn-lib", "1.0", List.of());
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        manifest.getMainAttributes().putValue("Automatic-Module-Name", "toolkit.amn");
+        addJar("org/example/amn-lib/1.0/amn-lib-1.0.jar", manifest, Map.of(
+                "amnlib/Amn.class", new byte[]{1, 2, 3}));
+        printing = true;
+        PrintStream out = System.out;
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(captured, true, StandardCharsets.UTF_8));
+        try {
+            resolve(Map.of("toolkit.amn", "org.example/amn-lib"), "org.example/amn-lib/1.0");
+        } finally {
+            System.setOut(out);
+        }
+        assertThat(captured.toString(StandardCharsets.UTF_8))
+                .as("an alias kept after its target grew the name is legal and pointless, and only a"
+                        + " report distinguishes the two")
+                .contains("maven/org.example/amn-lib/1.0 already declares toolkit.amn");
+    }
+
+    @Test
     public void an_alias_naming_what_a_named_target_declares_is_a_confirmation() throws IOException {
         Path classes = compile("named", "module-info.java", """
                 module toolkit.named {
@@ -404,6 +427,8 @@ public class DependenciesAliasTest {
                 """.formatted(version));
     }
 
+    private boolean printing;
+
     private Path resolve(Map<String, String> aliases, String... coordinates) throws IOException {
         SequencedProperties requires = new SequencedProperties();
         for (String coordinate : coordinates) {
@@ -424,7 +449,8 @@ public class DependenciesAliasTest {
         executor.addModule("resolved", new Dependencies(
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {
                 })),
-                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))), "dependencies");
+                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven())))
+                .printing(printing), "dependencies");
         next = executor.execute().get("resolved");
         return next;
     }

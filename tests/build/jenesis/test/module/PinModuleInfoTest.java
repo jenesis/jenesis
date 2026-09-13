@@ -499,14 +499,14 @@ public class PinModuleInfoTest {
         String result;
         System.setOut(new PrintStream(captured, true, StandardCharsets.UTF_8));
         try {
-            result = run(file);
+            result = run(file, pin -> pin.printing(true));
         } finally {
             System.setOut(out);
         }
         assertInsideJavadoc(result, "@jenesis.pin org.junit.jupiter.api 6.1.0");
         assertThat(captured.toString(StandardCharsets.UTF_8))
                 .as("strict mode accepts a bare line for a coordinate it never resolves, so nothing"
-                        + " else would ever mention it")
+                        + " else would ever mention it, and jenesis.print.pins is what asks")
                 .contains("org.junit.jupiter.api 6.1.0")
                 .doesNotContain("org.opentest4j");
     }

@@ -3,6 +3,7 @@ package build.jenesis.step;
 import module java.base;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
+import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
@@ -36,27 +37,34 @@ public class Dependencies implements BuildExecutorModule {
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
     private final String group;
+    private final transient boolean printing;
 
     public Dependencies(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, null);
+        this(repositories, resolvers, null, null, Boolean.getBoolean("jenesis.print.aliases"));
     }
 
     private Dependencies(Map<String, Repository> repositories,
                          Map<String, Resolver> resolvers,
                          Pinning pinning,
-                         String group) {
+                         String group,
+                         boolean printing) {
         this.repositories = repositories;
         this.resolvers = new LinkedHashMap<>(resolvers);
         this.pinning = pinning;
         this.group = group;
+        this.printing = printing;
     }
 
     public Dependencies pinning(Pinning pinning) {
-        return new Dependencies(repositories, resolvers, pinning, group);
+        return new Dependencies(repositories, resolvers, pinning, group, printing);
     }
 
     public Dependencies group(String group) {
-        return new Dependencies(repositories, resolvers, pinning, group);
+        return new Dependencies(repositories, resolvers, pinning, group, printing);
+    }
+
+    public Dependencies printing(boolean printing) {
+        return new Dependencies(repositories, resolvers, pinning, group, printing);
     }
 
     public static SequencedMap<String, String> bomEntries(SequencedProperties properties, String group) {
@@ -69,7 +77,7 @@ public class Dependencies implements BuildExecutorModule {
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
         buildExecutor.addStep(RESOLVE,
-                new Resolve(repositories, resolvers, pinning, group),
+                new Resolve(repositories, resolvers, pinning, group, printing),
                 inherited.sequencedKeySet());
         SequencedSet<String> verified = new LinkedHashSet<>();
         verified.add(RESOLVE);
@@ -87,15 +95,18 @@ public class Dependencies implements BuildExecutorModule {
         private final Map<String, Resolver> resolvers;
         private final Pinning pinning;
         private final String group;
+        private final transient boolean printing;
 
         private Resolve(Map<String, Repository> repositories,
                         Map<String, Resolver> resolvers,
                         Pinning pinning,
-                        String group) {
+                        String group,
+                        boolean printing) {
             this.repositories = repositories;
             this.resolvers = new LinkedHashMap<>(resolvers);
             this.pinning = pinning;
             this.group = group;
+            this.printing = printing;
         }
 
         @Override
@@ -654,7 +665,7 @@ public class Dependencies implements BuildExecutorModule {
                     return left.isEmpty() ? right : left;
                 });
             }
-            SequencedMap<String, String> aliased = rename(placed, aliasTargets, modules, explicit, libs);
+            SequencedMap<String, String> aliased = rename(placed, aliasTargets, modules, explicit, libs, printing);
             for (Map.Entry<String, Overridden> entry : overrideTargets.entrySet()) {
                 for (String carrier : entry.getValue().carriers()) {
                     if (!modules.containsKey(carrier)) {
@@ -814,7 +825,8 @@ public class Dependencies implements BuildExecutorModule {
                                                        SequencedMap<String, Alias> declared,
                                                        SequencedMap<String, String> modules,
                                                        SequencedMap<String, Boolean> explicit,
-                                                       Path libs) throws IOException {
+                                                       Path libs,
+                                                       boolean printing) throws IOException {
         SequencedMap<String, String> coordinates = new LinkedHashMap<>();
         for (String dependency : placed.sequencedKeySet()) {
             int first = dependency.indexOf('/'), last = dependency.lastIndexOf('/');
@@ -849,6 +861,16 @@ public class Dependencies implements BuildExecutorModule {
             String module = modules.get(alias);
             ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(placed.get(coordinate));
             if (descriptor != null && descriptor.name().equals(alias)) {
+                if (printing) {
+                    System.out.printf("%s%-11s%s %s already declares %s, so the alias declared by %s"
+                                    + " says nothing the jar does not%n",
+                            BuildExecutorCallback.YELLOW,
+                            "[ALIAS]",
+                            BuildExecutorCallback.RESET,
+                            coordinate,
+                            alias,
+                            entry.getValue().origin());
+                }
                 continue;
             }
             if (module != null) {
