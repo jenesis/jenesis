@@ -52,7 +52,7 @@ public class Tree implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        DependencyTreeReport report = new DependencyTreeReport(out, compact);
+        DependencyTreeReport report = new DependencyTreeReport(out).compact(compact);
         SequencedMap<String, Resolver.Vertex> aggregated = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {

@@ -18,8 +18,8 @@ public class DownloadModuleUrisTest {
         Path source = Files.writeString(root.resolve("modules.properties"),
                 "foo=https://example.test/foo.jar\nbar=https://example.test/bar.jar\n");
         URI location = source.toUri();
-        DownloadModuleUris step = new DownloadModuleUris("module",
-                (Supplier<List<URI>> & Serializable) () -> List.of(location));
+        DownloadModuleUris step = new DownloadModuleUris("module")
+                .locations((Supplier<List<URI>> & Serializable) () -> List.of(location));
 
         step.apply(Runnable::run,
                         new BuildStepContext(root.resolve("previous"), next, root.resolve("supplement")),
