@@ -87,7 +87,7 @@ public class TestModuleTest {
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
-                                _ -> {})),
+                                null)),
                         Map.of("maven", new MavenPomResolver()))
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
                 "dependencies", "classes");
@@ -112,7 +112,7 @@ public class TestModuleTest {
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
-                                _ -> {})),
+                                null)),
                         Map.of("maven", new MavenPomResolver()))
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false).pathPlacement(PathPlacement.CLASS_PATH),
                 "dependencies", "classes");
@@ -162,7 +162,7 @@ public class TestModuleTest {
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
-                                _ -> {})),
+                                null)),
                         Map.of("maven", new MavenPomResolver()))
                         .engine(new JUnit4())
                         .isTest(candidate -> candidate.endsWith("JUnit4TestSample")).jarsOnly(false).pathPlacement(PathPlacement.CLASS_PATH),
@@ -221,7 +221,7 @@ public class TestModuleTest {
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
-                                _ -> {})),
+                                null)),
                         Map.of("maven", new MavenPomResolver()))
                         .engine(new TestNG())
                         .isTest(candidate -> candidate.endsWith("TestNGTestSample")).jarsOnly(false).pathPlacement(PathPlacement.CLASS_PATH),
@@ -243,7 +243,7 @@ public class TestModuleTest {
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
-                                _ -> {})),
+                                null)),
                         Map.of("maven", new MavenPomResolver()))
                         .engine(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
@@ -269,7 +269,7 @@ public class TestModuleTest {
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
-                                _ -> {})),
+                                null)),
                         Map.of("maven", new MavenPomResolver()))
                         .engine(new JUnitPlatform()).jarsOnly(false),
                 "dependencies", "classes");
@@ -290,7 +290,7 @@ public class TestModuleTest {
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
-                                _ -> {})),
+                                null)),
                         Map.of("maven", new MavenPomResolver()))
                         .engine(new JUnitPlatform())
                         .isTest((Predicate<String> & Serializable) _ -> false)
@@ -323,7 +323,7 @@ public class TestModuleTest {
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
-                                _ -> {})),
+                                null)),
                         Map.of("maven", new MavenPomResolver()))
                         .engine(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
@@ -347,7 +347,7 @@ public class TestModuleTest {
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
-                                _ -> {})),
+                                null)),
                         Map.of("maven", new MavenPomResolver()))
                         .engine(new JUnitPlatform())
                         .isTest((Predicate<String> & Serializable) _ -> false)
@@ -371,7 +371,7 @@ public class TestModuleTest {
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
-                                _ -> {})),
+                                null)),
                         Map.of("maven", new MavenPomResolver()))
                         .engine(new JUnitPlatform())
                         .isTest((Predicate<String> & Serializable) _ -> false)
@@ -435,7 +435,7 @@ public class TestModuleTest {
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
-                                _ -> {})),
+                                null)),
                         Map.of("maven", new MavenPomResolver()))
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false)
@@ -800,7 +800,7 @@ public class TestModuleTest {
                         URI.create("https://repo1.maven.org/maven2/"),
                         null,
                         Map.of(),
-                        _ -> {})),
+                        null)),
                 Map.of("maven", new MavenPomResolver()))
                 .isTest(candidate -> candidate.endsWith("TestSample"))
                 .jarsOnly(false)

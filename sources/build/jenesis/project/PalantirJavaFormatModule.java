@@ -31,7 +31,7 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
     private final transient BiConsumer<Boolean, String> printing;
 
     public PalantirJavaFormatModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "palantir-java-format", false, null);
+        this(repositories, resolvers, null, "palantir-java-format", false, ProcessBuildStep.printing("palantir-java-format"));
     }
 
     private PalantirJavaFormatModule(Map<String, Repository> repositories,
@@ -101,7 +101,7 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
     private static class Format extends FormatBuildStep {
 
         private Format(String group, boolean verify, BiConsumer<Boolean, String> printing) {
-            super(group, verify, printing == null ? ProcessBuildStep.printing(group) : printing);
+            super("palantir-java-format", group, verify, printing);
         }
 
         @Override

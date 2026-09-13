@@ -214,7 +214,7 @@ public class JavaToolchainModuleTest {
                         URI.create("https://repo1.maven.org/maven2/"),
                         null,
                         Map.of(),
-                        _ -> {})),
+                        null)),
                 Map.of("maven", new MavenPomResolver())), "output", "input");
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps).containsKeys("output/classes", "output/artifacts", "output-test/executed");
