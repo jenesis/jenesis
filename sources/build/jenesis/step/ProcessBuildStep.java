@@ -29,6 +29,7 @@ public abstract class ProcessBuildStep implements BuildStep {
     protected final transient Function<List<String>, ? extends ProcessHandler> factory;
     private final String command;
     protected final transient boolean verbose;
+    protected final transient boolean announcing;
     private final transient Semaphore permits;
 
     protected ProcessBuildStep(String command, Function<List<String>, ? extends ProcessHandler> factory) {
@@ -54,6 +55,7 @@ public abstract class ProcessBuildStep implements BuildStep {
         this.command = command;
         this.factory = factory;
         this.verbose = verbose;
+        this.announcing = SequencedProperties.systemFlag("jenesis.print.command");
         this.permits = permits;
     }
 
@@ -171,7 +173,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                 ProcessHandler handler = factory.apply(commands);
                 Files.writeString(context.supplement().resolve("command"), String.join(" ", handler.commands()));
                 ProcessHandler.Tee tee = tee(executor, handler);
-                if (SequencedProperties.systemFlag("jenesis.print.command")) {
+                if (announcing) {
                     System.out.printf("%s%-11s%s %s%n",
                         BuildExecutorCallback.YELLOW,
                         "[EXECUTED]",

@@ -46,8 +46,7 @@ public interface Repository {
                 BuildExecutorCallback.YELLOW,
                 "[FETCHED]",
                 BuildExecutorCallback.RESET,
-                target.toAbsolutePath().toUri()) : _ -> {
-        });
+                target.toAbsolutePath().toUri()) : null);
     }
 
     default Repository cached(Path folder, Consumer<Path> callback) {
@@ -116,7 +115,9 @@ public interface Repository {
                         }
                     });
                     if (preexisting && target != null) {
-                        callback.accept(target);
+                        if (callback != null) {
+                            callback.accept(target);
+                        }
                     }
                     return target == null
                             ? Optional.empty()
@@ -278,8 +279,7 @@ public interface Repository {
                 BuildExecutorCallback.YELLOW,
                 "[FETCHED]",
                 BuildExecutorCallback.RESET,
-                uri) : _ -> {
-        });
+                uri) : null);
     }
 
     static <F extends BiFunction<URI, String, Optional<URI>> & Serializable> Repository ofUris(
@@ -302,7 +302,9 @@ public interface Repository {
                 return Optional.empty();
             }
             URI uri = candidate;
-            callback.accept(uri);
+            if (callback != null) {
+                callback.accept(uri);
+            }
             if (Objects.equals("file", uri.getScheme())) {
                 return Optional.of(RepositoryItem.ofFile(Path.of(uri), true));
             } else {
