@@ -667,7 +667,12 @@ public record Project(
                           needs no derived automatic name. Carries no version: a pin or BOM entry
                           states it and is the place for a checksum; failing that the version the
                           closure already resolves is kept, and only a coordinate nothing else pulls
-                          in is negotiated as LATEST.
+                          in is negotiated as LATEST. It also names the artifact a `requires` takes,
+                          replacing the module index lookup, which is the way to pin down a name
+                          several artifacts declare: alias org.bouncycastle.pg to bcpg-jdk18on and
+                          neither the -debug nor the -lts build can land instead. Aliasing a name the
+                          target already declares is allowed and does exactly that, so an alias need
+                          not be dropped when its target grows a module name.
                       @jenesis.exclude <module> <groupId>/<artifactId>...
                           Drop transitive dependencies of <module>, each with the subtree it pulled
                           in, from the compile path, runtime path and generated pom alike. Repeated

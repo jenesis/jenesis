@@ -829,6 +829,10 @@ public class Dependencies implements BuildExecutorModule {
                         : " - stop excluding the target"));
             }
             String module = modules.get(alias);
+            ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(placed.get(coordinate));
+            if (descriptor != null && descriptor.name().equals(alias)) {
+                continue;
+            }
             if (module != null) {
                 throw new IllegalArgumentException("Module alias "
                         + alias
@@ -838,7 +842,6 @@ public class Dependencies implements BuildExecutorModule {
                         + module
                         + " - require it directly");
             }
-            ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(placed.get(coordinate));
             if (descriptor != null) {
                 throw new IllegalArgumentException("Target of module alias "
                         + alias

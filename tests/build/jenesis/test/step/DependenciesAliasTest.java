@@ -18,6 +18,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class DependenciesAliasTest {
@@ -183,6 +184,37 @@ public class DependenciesAliasTest {
                 "org.example/named-lib/1.0"))
                 .hasStackTraceContaining(IllegalArgumentException.class.getName())
                 .hasStackTraceContaining("Target of module alias toolkit.named is already the named module lib.named");
+    }
+
+    @Test
+    public void an_alias_naming_what_its_own_target_declares_is_a_confirmation() throws IOException {
+        addPom("org.example", "amn-lib", "1.0", List.of());
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        manifest.getMainAttributes().putValue("Automatic-Module-Name", "toolkit.amn");
+        addJar("org/example/amn-lib/1.0/amn-lib-1.0.jar", manifest, Map.of(
+                "amnlib/Amn.class", new byte[]{1, 2, 3}));
+
+        assertThatCode(() -> resolve(Map.of("toolkit.amn", "org.example/amn-lib"),
+                "org.example/amn-lib/1.0"))
+                .as("a target that grew the very name the alias gives it says the same thing twice,"
+                        + " and the alias is what routes the requirement past the module index")
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    public void an_alias_naming_what_a_named_target_declares_is_a_confirmation() throws IOException {
+        Path classes = compile("named", "module-info.java", """
+                module toolkit.named {
+                }
+                """);
+        addPom("org.example", "named-lib", "1.0", List.of());
+        jarOf(Files.createDirectories(mavenRepoFolder.resolve("org/example/named-lib/1.0"))
+                .resolve("named-lib-1.0.jar"), classes, null);
+
+        assertThatCode(() -> resolve(Map.of("toolkit.named", "org.example/named-lib"),
+                "org.example/named-lib/1.0"))
+                .doesNotThrowAnyException();
     }
 
     @Test
