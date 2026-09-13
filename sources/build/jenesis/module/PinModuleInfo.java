@@ -25,11 +25,11 @@ public class PinModuleInfo implements BuildStep {
     private final Platform platform;
     private final boolean checksum;
     private final boolean flatten;
-    private final transient boolean printing;
+    private final transient Consumer<String> printing;
 
     public PinModuleInfo(String prefix, String path, List<Path> moduleInfoFiles, HashDigestFunction hashFunction) {
         this(prefix, path, moduleInfoFiles, hashFunction, new Platform(), checksumFromProperty(), flattenFromProperty(),
-                SequencedProperties.systemFlag("jenesis.print.pins"));
+                SequencedProperties.systemFlag("jenesis.print.pins") ? System.out::println : null);
     }
 
     private PinModuleInfo(String prefix,
@@ -39,7 +39,7 @@ public class PinModuleInfo implements BuildStep {
                           Platform platform,
                           boolean checksum,
                           boolean flatten,
-                          boolean printing) {
+                          Consumer<String> printing) {
         this.prefix = prefix;
         this.path = path;
         this.moduleInfoFiles = List.copyOf(moduleInfoFiles);
@@ -62,7 +62,7 @@ public class PinModuleInfo implements BuildStep {
         return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, printing);
     }
 
-    public PinModuleInfo printing(boolean printing) {
+    public PinModuleInfo printing(Consumer<String> printing) {
         return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, printing);
     }
 
@@ -129,13 +129,13 @@ public class PinModuleInfo implements BuildStep {
         for (Path file : moduleInfoFiles) {
             SequencedSet<String> carried = new TreeSet<>();
             updateModuleInfo(file, entries, covered, references, flatten, platform, carried);
-            if (printing && !carried.isEmpty()) {
-                System.out.printf("%s%-11s%s %s%n",
+            if (printing != null && !carried.isEmpty()) {
+                printing.accept("%s%-11s%s %s".formatted(
                         BuildExecutorCallback.YELLOW,
                         "[UNPINNED]",
                         BuildExecutorCallback.RESET,
                         file + ": kept without a checksum, resolved by no closure: "
-                                + String.join(", ", carried));
+                                + String.join(", ", carried)));
             }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));

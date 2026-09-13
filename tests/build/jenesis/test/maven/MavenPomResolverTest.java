@@ -33,7 +33,7 @@ public class MavenPomResolverTest {
 
     @BeforeEach
     public void setUp() throws Exception {
-        mavenRepository = new MavenDefaultRepository(repository.toUri(), repository, Map.of(), _ -> {});
+        mavenRepository = new MavenDefaultRepository(repository.toUri(), repository, Map.of(), null);
         mavenPomResolver = new MavenPomResolver(MavenDefaultVersionNegotiator.maven());
     }
 

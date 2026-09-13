@@ -52,7 +52,7 @@ public class MavenDefaultRepositoryTest {
                 .resolve("artifact-1.jar"), "remote-content");
         Repository emptyOverlay = (_, _) -> Optional.empty();
         Path cache = Files.createDirectory(result.resolve("cache"));
-        MavenRepository merged = new MavenDefaultRepository(repository.toUri(), null, Map.of(), _ -> {})
+        MavenRepository merged = new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)
                 .cached(cache)
                 .prepend(emptyOverlay);
 
@@ -72,7 +72,7 @@ public class MavenDefaultRepositoryTest {
                 .createDirectories(repository.resolve("group/artifact/1"))
                 .resolve("artifact-1.jar"), "foo");
         Path dependency = result.resolve("dependency.jar");
-        try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(), null, Map.of(), _ -> {}).fetch(Runnable::run,
+        try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(), null, Map.of(), null).fetch(Runnable::run,
                 "group",
                 "artifact",
                 "1",
@@ -90,7 +90,7 @@ public class MavenDefaultRepositoryTest {
                 .createDirectories(repository.resolve("group/artifact/1"))
                 .resolve("artifact-1.jar"), "foo");
         Path dependency = result.resolve("dependency.jar");
-        try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(), local, Map.of(), _ -> {}).fetch(Runnable::run,
+        try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(), local, Map.of(), null).fetch(Runnable::run,
                 "group",
                 "artifact",
                 "1",
@@ -112,7 +112,7 @@ public class MavenDefaultRepositoryTest {
         try {
             Assumptions.assumeFalse(Files.isWritable(local), "read-only enforcement requires a non-root user");
             Path dependency = result.resolve("dependency.jar");
-            try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(), local, Map.of(), _ -> {})
+            try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(), local, Map.of(), null)
                     .fetch(Runnable::run, "group", "artifact", "1", "jar", null, null).orElseThrow().toInputStream()) {
                 Files.copy(inputStream, dependency);
             }
@@ -138,7 +138,7 @@ public class MavenDefaultRepositoryTest {
         Path dependency = result.resolve("dependency.jar");
         try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(),
                 local,
-                Map.of("MD5", repository.toUri()), _ -> {}).fetch(Runnable::run,
+                Map.of("MD5", repository.toUri()), null).fetch(Runnable::run,
                 "group",
                 "artifact",
                 "1",
@@ -165,7 +165,7 @@ public class MavenDefaultRepositoryTest {
         }
         MavenRepository repository = new MavenDefaultRepository(this.repository.toUri(),
                 local,
-                Map.of("MD5", this.repository.toUri()), _ -> {});
+                Map.of("MD5", this.repository.toUri()), null);
         assertThatThrownBy(() -> repository.fetch(Runnable::run,
                 "group",
                 "artifact",
@@ -192,7 +192,7 @@ public class MavenDefaultRepositoryTest {
         Path dependency = result.resolve("dependency.jar");
         try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(),
                 local,
-                Map.of("MD5", repository.toUri()), _ -> {}).fetch(Runnable::run,
+                Map.of("MD5", repository.toUri()), null).fetch(Runnable::run,
                 "group",
                 "artifact",
                 "1",
@@ -221,7 +221,7 @@ public class MavenDefaultRepositoryTest {
         Path dependency = result.resolve("dependency.jar");
         try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(),
                 local,
-                Map.of("MD5", repository.toUri()), _ -> {}).fetch(Runnable::run,
+                Map.of("MD5", repository.toUri()), null).fetch(Runnable::run,
                 "group",
                 "artifact",
                 "1",
@@ -248,7 +248,7 @@ public class MavenDefaultRepositoryTest {
         }
         MavenRepository repository = new MavenDefaultRepository(this.repository.toUri(),
                 local,
-                Map.of("MD5", this.repository.toUri()), _ -> {});
+                Map.of("MD5", this.repository.toUri()), null);
         assertThat(repository.fetch(Runnable::run,
                 "group",
                 "artifact",
@@ -275,7 +275,7 @@ public class MavenDefaultRepositoryTest {
         }
         try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(),
                 null,
-                Map.of("MD5", repository.toUri()), _ -> {}).fetch(Runnable::run,
+                Map.of("MD5", repository.toUri()), null).fetch(Runnable::run,
                 "group",
                 "artifact",
                 "1",
@@ -348,7 +348,7 @@ public class MavenDefaultRepositoryTest {
 
     @Test
     public void rejects_coordinate_escaping_local_root() {
-        MavenRepository repository = new MavenDefaultRepository(this.repository.toUri(), local, Map.of(), _ -> {});
+        MavenRepository repository = new MavenDefaultRepository(this.repository.toUri(), local, Map.of(), null);
         assertThatThrownBy(() -> repository.fetch(Runnable::run,
                 "..",
                 "artifact",
@@ -367,7 +367,7 @@ public class MavenDefaultRepositoryTest {
                 .resolve("artifact-1.jar"), "foo");
         MavenRepository repository = new MavenDefaultRepository(this.repository.toUri(),
                 local,
-                Map.of("MD5", this.repository.toUri()), _ -> {});
+                Map.of("MD5", this.repository.toUri()), null);
         Path dependency = result.resolve("dependency.jar");
         try (InputStream inputStream = repository.fetch(Runnable::run,
                 "group",
@@ -389,7 +389,7 @@ public class MavenDefaultRepositoryTest {
                 .resolve("artifact-1.jar"), "foo");
         MavenRepository repository = new MavenDefaultRepository(this.repository.toUri(),
                 local,
-                Map.of("MD5", this.repository.toUri()), _ -> {});
+                Map.of("MD5", this.repository.toUri()), null);
         Path dependency = result.resolve("dependency.jar");
         try (InputStream inputStream = repository.fetch(Runnable::run,
                 "group",
@@ -412,7 +412,7 @@ public class MavenDefaultRepositoryTest {
                 HexFormat.of().formatHex(new byte[20]));
         MavenRepository repository = new MavenDefaultRepository(this.repository.toUri(),
                 local,
-                Map.of("SHA1", this.repository.toUri()), _ -> {});
+                Map.of("SHA1", this.repository.toUri()), null);
         assertThatThrownBy(() -> repository.fetch(Runnable::run,
                 "group",
                 "artifact",
@@ -441,7 +441,7 @@ public class MavenDefaultRepositoryTest {
         Path dependency = result.resolve("dependency.jar");
         try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(),
                 local,
-                validations, _ -> {}).fetch(Runnable::run,
+                validations, null).fetch(Runnable::run,
                 "group",
                 "artifact",
                 "1",
@@ -471,7 +471,7 @@ public class MavenDefaultRepositoryTest {
         Path dependency = result.resolve("dependency.jar");
         try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(),
                 local,
-                validations, _ -> {}).fetch(Runnable::run,
+                validations, null).fetch(Runnable::run,
                 "group",
                 "artifact",
                 "1",
@@ -506,7 +506,7 @@ public class MavenDefaultRepositoryTest {
         Path dependency = result.resolve("dependency.jar");
         try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(),
                 local,
-                validations, _ -> {}).fetch(Runnable::run,
+                validations, null).fetch(Runnable::run,
                 "group",
                 "artifact",
                 "1",
@@ -527,7 +527,7 @@ public class MavenDefaultRepositoryTest {
                 .createDirectories(repository.resolve("group/artifact"))
                 .resolve("maven-metadata.xml"), "foo");
         Path dependency = result.resolve("dependency.jar");
-        try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(), null, Map.of(), _ -> {}).fetchMetadata(Runnable::run,
+        try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(), null, Map.of(), null).fetchMetadata(Runnable::run,
                 "group",
                 "artifact",
                 null).orElseThrow().toInputStream()) {
@@ -783,10 +783,10 @@ public class MavenDefaultRepositoryTest {
         Files.writeString(Files
                 .createDirectories(repository.resolve("group/artifact"))
                 .resolve("maven-metadata.xml"), "meta");
-        assertThat(new MavenDefaultRepository(repository.toUri(), null, Map.of(), _ -> {})
+        assertThat(new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)
                 .filter(groupId -> groupId.equals("other"))
                 .fetchMetadata(Runnable::run, "group", "artifact", null)).isEmpty();
-        try (InputStream stream = new MavenDefaultRepository(repository.toUri(), null, Map.of(), _ -> {})
+        try (InputStream stream = new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)
                 .filter(groupId -> groupId.equals("group"))
                 .fetchMetadata(Runnable::run, "group", "artifact", null).orElseThrow().toInputStream()) {
             assertThat(new String(stream.readAllBytes())).isEqualTo("meta");

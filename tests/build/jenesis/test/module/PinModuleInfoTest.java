@@ -494,17 +494,10 @@ public class PinModuleInfoTest {
                 }
                 """);
         writeResolved(Map.of("module/bar", "1.0 SHA-256/cafebabe"));
-        PrintStream out = System.out;
-        ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        String result;
-        System.setOut(new PrintStream(captured, true, StandardCharsets.UTF_8));
-        try {
-            result = run(file, pin -> pin.printing(true));
-        } finally {
-            System.setOut(out);
-        }
+        StringBuilder captured = new StringBuilder();
+        String result = run(file, pin -> pin.printing(line -> captured.append(line).append('\n')));
         assertInsideJavadoc(result, "@jenesis.pin org.junit.jupiter.api 6.1.0");
-        assertThat(captured.toString(StandardCharsets.UTF_8))
+        assertThat(captured.toString())
                 .as("strict mode accepts a bare line for a coordinate it never resolves, so nothing"
                         + " else would ever mention it, and jenesis.print.pins is what asks")
                 .contains("org.junit.jupiter.api 6.1.0")

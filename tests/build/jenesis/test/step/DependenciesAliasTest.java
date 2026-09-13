@@ -210,16 +210,10 @@ public class DependenciesAliasTest {
         manifest.getMainAttributes().putValue("Automatic-Module-Name", "toolkit.amn");
         addJar("org/example/amn-lib/1.0/amn-lib-1.0.jar", manifest, Map.of(
                 "amnlib/Amn.class", new byte[]{1, 2, 3}));
-        printing = true;
-        PrintStream out = System.out;
-        ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        System.setOut(new PrintStream(captured, true, StandardCharsets.UTF_8));
-        try {
-            resolve(Map.of("toolkit.amn", "org.example/amn-lib"), "org.example/amn-lib/1.0");
-        } finally {
-            System.setOut(out);
-        }
-        assertThat(captured.toString(StandardCharsets.UTF_8))
+        StringBuilder captured = new StringBuilder();
+        printing = line -> captured.append(line).append('\n');
+        resolve(Map.of("toolkit.amn", "org.example/amn-lib"), "org.example/amn-lib/1.0");
+        assertThat(captured.toString())
                 .as("an alias kept after its target grew the name is legal and pointless, and only a"
                         + " report distinguishes the two")
                 .contains("maven/org.example/amn-lib/1.0 already declares toolkit.amn");
@@ -427,7 +421,7 @@ public class DependenciesAliasTest {
                 """.formatted(version));
     }
 
-    private boolean printing;
+    private Consumer<String> printing;
 
     private Path resolve(Map<String, String> aliases, String... coordinates) throws IOException {
         SequencedProperties requires = new SequencedProperties();
@@ -447,8 +441,7 @@ public class DependenciesAliasTest {
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addSource("dependencies", dependencies);
         executor.addModule("resolved", new Dependencies(
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {
-                })),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven())))
                 .printing(printing), "dependencies");
         next = executor.execute().get("resolved");

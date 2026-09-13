@@ -37,17 +37,17 @@ public class Dependencies implements BuildExecutorModule {
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
     private final String group;
-    private final transient boolean printing;
+    private final transient Consumer<String> printing;
 
     public Dependencies(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, null, SequencedProperties.systemFlag("jenesis.print.aliases"));
+        this(repositories, resolvers, null, null, SequencedProperties.systemFlag("jenesis.print.aliases") ? System.out::println : null);
     }
 
     private Dependencies(Map<String, Repository> repositories,
                          Map<String, Resolver> resolvers,
                          Pinning pinning,
                          String group,
-                         boolean printing) {
+                         Consumer<String> printing) {
         this.repositories = repositories;
         this.resolvers = new LinkedHashMap<>(resolvers);
         this.pinning = pinning;
@@ -63,7 +63,7 @@ public class Dependencies implements BuildExecutorModule {
         return new Dependencies(repositories, resolvers, pinning, group, printing);
     }
 
-    public Dependencies printing(boolean printing) {
+    public Dependencies printing(Consumer<String> printing) {
         return new Dependencies(repositories, resolvers, pinning, group, printing);
     }
 
@@ -95,13 +95,13 @@ public class Dependencies implements BuildExecutorModule {
         private final Map<String, Resolver> resolvers;
         private final Pinning pinning;
         private final String group;
-        private final transient boolean printing;
+        private final transient Consumer<String> printing;
 
         private Resolve(Map<String, Repository> repositories,
                         Map<String, Resolver> resolvers,
                         Pinning pinning,
                         String group,
-                        boolean printing) {
+                        Consumer<String> printing) {
             this.repositories = repositories;
             this.resolvers = new LinkedHashMap<>(resolvers);
             this.pinning = pinning;
@@ -826,7 +826,7 @@ public class Dependencies implements BuildExecutorModule {
                                                        SequencedMap<String, String> modules,
                                                        SequencedMap<String, Boolean> explicit,
                                                        Path libs,
-                                                       boolean printing) throws IOException {
+                                                       Consumer<String> printing) throws IOException {
         SequencedMap<String, String> coordinates = new LinkedHashMap<>();
         for (String dependency : placed.sequencedKeySet()) {
             int first = dependency.indexOf('/'), last = dependency.lastIndexOf('/');
@@ -861,15 +861,15 @@ public class Dependencies implements BuildExecutorModule {
             String module = modules.get(alias);
             ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(placed.get(coordinate));
             if (descriptor != null && descriptor.name().equals(alias)) {
-                if (printing) {
-                    System.out.printf("%s%-11s%s %s already declares %s, so the alias declared by %s"
-                                    + " says nothing the jar does not%n",
-                            BuildExecutorCallback.YELLOW,
-                            "[ALIAS]",
-                            BuildExecutorCallback.RESET,
-                            coordinate,
-                            alias,
-                            entry.getValue().origin());
+                if (printing != null) {
+                    printing.accept("%s%-11s%s %s already declares %s, so the alias declared by %s"
+                                    .formatted(BuildExecutorCallback.YELLOW,
+                                            "[ALIAS]",
+                                            BuildExecutorCallback.RESET,
+                                            coordinate,
+                                            alias,
+                                            entry.getValue().origin())
+                            + " says nothing the jar does not");
                 }
                 continue;
             }

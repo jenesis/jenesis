@@ -57,7 +57,7 @@ public class MavenModuleResolverTest {
         SequencedMap<String, Resolver.Resolved> resolved = new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
@@ -80,7 +80,7 @@ public class MavenModuleResolverTest {
         assertThatThrownBy(() -> new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE))
@@ -102,7 +102,7 @@ public class MavenModuleResolverTest {
         SequencedMap<String, Resolver.Resolved> resolved = new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
@@ -124,7 +124,7 @@ public class MavenModuleResolverTest {
         SequencedMap<String, Resolver.Resolved> resolved = new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("foo.bar", "9.9")),
                 DependencyScope.COMPILE).artifacts();
@@ -146,7 +146,7 @@ public class MavenModuleResolverTest {
         SequencedMap<String, Resolver.Resolved> resolved = new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("foo.bar", "1.0 " + checksum)),
                 DependencyScope.COMPILE).artifacts();
@@ -182,7 +182,7 @@ public class MavenModuleResolverTest {
         SequencedMap<String, Resolver.Resolved> resolved = new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
@@ -207,7 +207,7 @@ public class MavenModuleResolverTest {
         new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE);
@@ -222,7 +222,7 @@ public class MavenModuleResolverTest {
         assertThatThrownBy(() -> new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE))
@@ -271,7 +271,7 @@ public class MavenModuleResolverTest {
         SequencedMap<String, Resolver.Resolved> resolved = new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", new LinkedHashSet<>(List.of("org.transitive/lib")))),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
@@ -320,7 +320,7 @@ public class MavenModuleResolverTest {
         SequencedMap<String, Resolver.Resolved> resolved = new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar",
                         new LinkedHashSet<>(List.of("org.transitive/first", "org.transitive/third")))),
                 new LinkedHashMap<>(),
@@ -345,7 +345,7 @@ public class MavenModuleResolverTest {
         assertThatThrownBy(() -> new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", new LinkedHashSet<>(List.of("org.transitive")))),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE))
@@ -403,7 +403,7 @@ public class MavenModuleResolverTest {
         SequencedMap<String, Resolver.Resolved> resolved = new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE).artifacts();
@@ -464,7 +464,7 @@ public class MavenModuleResolverTest {
         SequencedMap<String, Resolver.Resolved> resolved = new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("lib.module", "2.0")),
                 DependencyScope.COMPILE).artifacts();
@@ -769,7 +769,7 @@ public class MavenModuleResolverTest {
         executor.addSource("dependencies", folder);
         executor.addModule("resolved", new Dependencies(
                 Map.of("module", discovery,
-                        "maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                        "maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 Map.of("module", new MavenModuleResolver("maven", mavenPomResolver, discovery)))
                 .pinning(pinning), "dependencies");
         Path next = executor.execute().get("resolved");
@@ -841,7 +841,7 @@ public class MavenModuleResolverTest {
         return new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {})),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(pins),
                 DependencyScope.COMPILE).artifacts();

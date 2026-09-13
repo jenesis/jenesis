@@ -277,7 +277,7 @@ public class RepositoryTest {
     @Test
     public void ofUris_without_version_resolver_does_not_attempt_fallback() throws IOException {
         URI bare = URI.create("https://example.test/other/foo.jar");
-        Repository repository = Repository.ofUris(Map.of("foo", bare), null, new Repository.Retry(), _ -> {});
+        Repository repository = Repository.ofUris(Map.of("foo", bare), null, new Repository.Retry(), null);
         assertThat(repository.fetch(Runnable::run, "foo/9.9")).isEmpty();
     }
 

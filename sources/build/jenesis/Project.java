@@ -900,10 +900,10 @@ public record Project(
         }
     }
 
-    private record Divergence(SequencedSet<String> paths, boolean printing) implements BuildStep {
+    private record Divergence(SequencedSet<String> paths, Consumer<String> printing) implements BuildStep {
 
         private Divergence(SequencedSet<String> paths) {
-            this(paths, SequencedProperties.systemFlag("jenesis.print.divergence"));
+            this(paths, SequencedProperties.systemFlag("jenesis.print.divergence") ? System.out::println : null);
         }
 
         @Override
@@ -933,15 +933,15 @@ public record Project(
                 List<String> rendered = new ArrayList<>();
                 byVersion.forEach((version, modules) -> rendered.add(version + " (" + String.join(" ", modules) + ")"));
                 diverged.setProperty(coordinate, String.join(", ", rendered));
-                if (!printing) {
+                if (printing == null) {
                     return;
                 }
-                System.out.printf("%s%-11s%s %s is pinned at %s%n",
+                printing.accept("%s%-11s%s %s is pinned at %s".formatted(
                         BuildExecutorCallback.YELLOW,
                         "[DIVERGED]",
                         BuildExecutorCallback.RESET,
                         coordinate,
-                        String.join(", ", rendered));
+                        String.join(", ", rendered)));
             });
             diverged.store(context.next().resolve("divergence.properties"));
             return CompletableFuture.completedStage(new BuildStepResult(true));
