@@ -13,6 +13,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
 import build.jenesis.step.Inventory;
+import build.jenesis.SequencedProperties;
 
 public class PinModuleInfo implements BuildStep {
 
@@ -28,7 +29,7 @@ public class PinModuleInfo implements BuildStep {
 
     public PinModuleInfo(String prefix, String path, List<Path> moduleInfoFiles, HashDigestFunction hashFunction) {
         this(prefix, path, moduleInfoFiles, hashFunction, new Platform(), checksumFromProperty(), flattenFromProperty(),
-                Boolean.getBoolean("jenesis.print.pins"));
+                SequencedProperties.systemFlag("jenesis.print.pins"));
     }
 
     private PinModuleInfo(String prefix,

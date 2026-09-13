@@ -360,7 +360,7 @@ public class OsvDownload implements BuildStep {
 
     private static void requireSecure(URI uri) {
         String scheme = uri.getScheme();
-        if (scheme != null && !scheme.equals("https") && !Boolean.getBoolean("jenesis.repository.insecure")) {
+        if (scheme != null && !scheme.equals("https") && !SequencedProperties.systemFlag("jenesis.repository.insecure")) {
             throw new IllegalStateException("Refusing to query OSV over insecure scheme '"
                     + scheme
                     + "': "

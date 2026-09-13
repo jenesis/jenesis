@@ -41,7 +41,7 @@ public interface Repository {
         if (folder == null) {
             return this;
         }
-        boolean verbose = Boolean.getBoolean("jenesis.print.fetch");
+        boolean verbose = SequencedProperties.systemFlag("jenesis.print.fetch");
         return cached(folder, snapshot, verbose ? target -> System.out.printf("%s%-11s%s %s%n",
                 BuildExecutorCallback.YELLOW,
                 "[FETCHED]",
@@ -137,7 +137,7 @@ public interface Repository {
     }
 
     static InputStream open(URI uri, String token, Retry retry) throws IOException {
-        boolean insecure = Boolean.getBoolean("jenesis.repository.insecure");
+        boolean insecure = SequencedProperties.systemFlag("jenesis.repository.insecure");
         int connectTimeout = Integer.getInteger("jenesis.repository.connect.timeout", 10_000);
         int readTimeout = Integer.getInteger("jenesis.repository.read.timeout", 30_000);
         attempts:
@@ -273,7 +273,7 @@ public interface Repository {
     static <F extends BiFunction<URI, String, Optional<URI>> & Serializable> Repository ofUris(
             Map<String, URI> uris,
             F versionResolver) {
-        boolean verbose = Boolean.getBoolean("jenesis.print.fetch");
+        boolean verbose = SequencedProperties.systemFlag("jenesis.print.fetch");
         return ofUris(uris, versionResolver, new Retry(0, Duration.ZERO), verbose ? uri -> System.out.printf("%s%-11s%s %s%n",
                 BuildExecutorCallback.YELLOW,
                 "[FETCHED]",

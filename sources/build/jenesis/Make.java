@@ -22,8 +22,8 @@ public final class Make {
         classes = location == null || location.isBlank()
                 ? root.resolve(".jenesis").resolve("classes")
                 : root.resolve(location).normalize();
-        daemon = Boolean.parseBoolean(System.getProperty("jenesis.make.daemon", "false"));
-        compile = Boolean.parseBoolean(System.getProperty("jenesis.make.compile", "true"));
+        daemon = SequencedProperties.systemFlag("jenesis.make.daemon", false);
+        compile = SequencedProperties.systemFlag("jenesis.make.compile", true);
     }
 
     private Make(String mainClass, Path root, Path classes, boolean daemon, boolean compile) {

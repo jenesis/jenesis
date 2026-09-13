@@ -29,7 +29,7 @@ public class Signatures extends ProcessBuildStep {
                 Verification.fromProperty(),
                 System.getProperty("jenesis.signature.command", "gpg"),
                 null,
-                Boolean.getBoolean("jenesis.print.signatures"));
+                SequencedProperties.systemFlag("jenesis.print.signatures"));
     }
 
     private Signatures(Map<String, Repository> repositories,

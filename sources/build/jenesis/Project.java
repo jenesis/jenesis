@@ -903,7 +903,7 @@ public record Project(
     private record Divergence(SequencedSet<String> paths, boolean printing) implements BuildStep {
 
         private Divergence(SequencedSet<String> paths) {
-            this(paths, Boolean.getBoolean("jenesis.print.divergence"));
+            this(paths, SequencedProperties.systemFlag("jenesis.print.divergence"));
         }
 
         @Override
@@ -1102,8 +1102,8 @@ public record Project(
                 new HashDigestFunction(System.getProperty("jenesis.project.digest", "SHA-256")),
                 resolvedLayout,
                 true,
-                Boolean.getBoolean("jenesis.project.sources"),
-                Boolean.getBoolean("jenesis.project.documentation"),
+                SequencedProperties.systemFlag("jenesis.project.sources"),
+                SequencedProperties.systemFlag("jenesis.project.documentation"),
                 Pinning.fromProperty(),
                 System.getProperty("jenesis.project.version"),
                 Collections.unmodifiableSequencedSet(new LinkedHashSet<>(List.of(BUILD))),
@@ -1752,7 +1752,7 @@ public record Project(
                 cache.connect|PT1S|Connect timeout for a cache server
                 cache.read|PT10S|Read timeout for a cache server
                 cache.insecure|false|Permit the cache key over plaintext http off loopback
-                test.skip||Skip executing tests, still resolving what running them needs; presence switches it on
+                test.skip|false|Skip executing tests, still resolving what running them needs
                 test.engine||junit-platform|junit4|testng; unset detects it from the resolved dependencies
                 test.filter||Comma-separated <classRegex>[#<method>] entries restricting which tests run
                 test.tag||Comma-separated tag expressions; only tests carrying one of them run
@@ -1823,11 +1823,11 @@ public record Project(
             properties.forEach((name, value) -> System.out.println(name + "=" + value));
             return Collections.emptyNavigableMap();
         }
-        if (Boolean.getBoolean("jenesis.project.watch")) {
+        if (SequencedProperties.systemFlag("jenesis.project.watch")) {
             watch(selectors);
             return Collections.emptyNavigableMap();
         }
-        if (Boolean.getBoolean("jenesis.project.docker")) {
+        if (SequencedProperties.systemFlag("jenesis.project.docker")) {
             SortedMap<String, String> properties = new TreeMap<>();
             for (String name : System.getProperties().stringPropertyNames()) {
                 if (name.startsWith("jenesis.") && !name.startsWith("jenesis.project.docker")) {
@@ -1901,7 +1901,7 @@ public record Project(
                 docker = docker.mount(jenesisLocal, jenesisLocal.toString(), true);
                 docker = docker.env("JENESIS_REPOSITORY_LOCAL", jenesisLocal.toString());
             }
-            if (Boolean.parseBoolean(System.getProperty("jenesis.print.docker", "true"))) {
+            if (SequencedProperties.systemFlag("jenesis.print.docker", true)) {
                 System.out.println("Launching build within Docker image: " + docker.image());
             }
             int code = docker.execute("build/jenesis/Project.java", properties, selectors);

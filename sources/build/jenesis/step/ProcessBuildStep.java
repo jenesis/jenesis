@@ -70,10 +70,8 @@ public abstract class ProcessBuildStep implements BuildStep {
     }
 
     protected static boolean printing(String command) {
-        String specific = System.getProperty("jenesis.print." + command);
-        return specific == null
-                ? Boolean.getBoolean("jenesis.print.process")
-                : Boolean.parseBoolean(specific);
+        return SequencedProperties.systemFlag("jenesis.print." + command,
+                SequencedProperties.systemFlag("jenesis.print.process"));
     }
 
     protected List<String> configurations() {
@@ -173,7 +171,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                 ProcessHandler handler = factory.apply(commands);
                 Files.writeString(context.supplement().resolve("command"), String.join(" ", handler.commands()));
                 ProcessHandler.Tee tee = tee(executor, handler);
-                if (Boolean.getBoolean("jenesis.print.command")) {
+                if (SequencedProperties.systemFlag("jenesis.print.command")) {
                     System.out.printf("%s%-11s%s %s%n",
                         BuildExecutorCallback.YELLOW,
                         "[EXECUTED]",

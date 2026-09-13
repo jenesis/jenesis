@@ -40,7 +40,7 @@ public class Dependencies implements BuildExecutorModule {
     private final transient boolean printing;
 
     public Dependencies(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, null, Boolean.getBoolean("jenesis.print.aliases"));
+        this(repositories, resolvers, null, null, SequencedProperties.systemFlag("jenesis.print.aliases"));
     }
 
     private Dependencies(Map<String, Repository> repositories,

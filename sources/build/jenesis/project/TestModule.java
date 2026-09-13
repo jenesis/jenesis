@@ -70,13 +70,13 @@ public class TestModule implements BuildExecutorModule {
                 null,
                 System.getProperty("jenesis.test.filter"),
                 System.getProperty("jenesis.test.tag"),
-                Boolean.getBoolean("jenesis.test.force"),
-                Boolean.getBoolean("jenesis.test.parallel"),
-                Boolean.getBoolean("jenesis.test.reporting"),
+                SequencedProperties.systemFlag("jenesis.test.force"),
+                SequencedProperties.systemFlag("jenesis.test.parallel"),
+                SequencedProperties.systemFlag("jenesis.test.reporting"),
                 "main",
                 List.of(),
                 null,
-                System.getProperty("jenesis.test.skip") != null);
+                SequencedProperties.systemFlag("jenesis.test.skip"));
     }
 
     private TestModule(TestEngine engine,

@@ -3,6 +3,7 @@ package build.jenesis.daemon;
 import module java.base;
 import build.jenesis.Make;
 import build.jenesis.Project;
+import build.jenesis.SequencedProperties;
 
 public final class DaemonServer {
 
@@ -195,7 +196,7 @@ public final class DaemonServer {
             System.setOut(new PrintStream(new Frames(out, 1), true));
             System.setErr(new PrintStream(new Frames(out, 2), true));
             try {
-                if (System.getProperty("jenesis.project.docker") != null) {
+                if (SequencedProperties.systemFlag("jenesis.project.docker")) {
                     throw new IllegalStateException("A dockerized build cannot run in the daemon, because it replaces"
                             + " the running process - unset jenesis.project.docker or run build/jenesis/Make.java");
                 }

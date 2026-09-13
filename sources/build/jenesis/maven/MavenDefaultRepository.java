@@ -5,6 +5,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
+import build.jenesis.SequencedProperties;
 
 public class MavenDefaultRepository implements MavenRepository {
 
@@ -29,7 +30,7 @@ public class MavenDefaultRepository implements MavenRepository {
             }
         }
         String token = System.getProperty("jenesis.maven.token", System.getenv("MAVEN_REPOSITORY_TOKEN"));
-        boolean verbose = Boolean.getBoolean("jenesis.print.fetch");
+        boolean verbose = SequencedProperties.systemFlag("jenesis.print.fetch");
         String property = System.getProperty("jenesis.maven.uri");
         String environment = System.getenv("MAVEN_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();
