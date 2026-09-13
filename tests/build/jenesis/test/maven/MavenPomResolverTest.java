@@ -70,7 +70,7 @@ public class MavenPomResolverTest {
         assertThatThrownBy(MavenPomResolver::new)
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Unknown jenesis.resolver.maven 'nonsense',"
-                        + " expected one of: maven, latest, release, closest");
+                        + " expected one of: maven, latest, release, stable, closest");
     }
 
     @Test

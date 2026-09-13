@@ -1660,7 +1660,7 @@ public record Project(
                 print.docker|true|The image notice when a build or run is containerized
                 print.jreleaser|true|The JReleaser command line when a release runs
                 dependency.pin||strict|versions|ignore; unset keeps existing pins and tolerates missing ones
-                resolver.maven|maven|maven|closest|latest|release: which version a Maven coordinate resolves to
+                resolver.maven|maven|maven|closest|latest|release|stable: which version a Maven coordinate resolves to; stable skips pre-release qualifiers
                 resolver.module|first|first|ignore|fail: what to do with the versions a module-info records
                 pin.checksum|true|Record content checksums in the pins that the pin selector writes
                 pin.bom|keep|keep|flatten: whether pinning keeps BOM references or resolves them away

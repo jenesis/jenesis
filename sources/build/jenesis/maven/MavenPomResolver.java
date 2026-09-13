@@ -27,10 +27,11 @@ public class MavenPomResolver implements MavenResolver {
             case "maven" -> MavenDefaultVersionNegotiator.maven();
             case "latest" -> MavenDefaultVersionNegotiator.latest();
             case "release" -> MavenDefaultVersionNegotiator.release();
+            case "stable" -> MavenDefaultVersionNegotiator.stable();
             case "closest" -> MavenDefaultVersionNegotiator.closest();
             default -> throw new IllegalArgumentException("Unknown jenesis.resolver.maven '"
                     + property
-                    + "', expected one of: maven, latest, release, closest");
+                    + "', expected one of: maven, latest, release, stable, closest");
         };
     }
 

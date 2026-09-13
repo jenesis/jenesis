@@ -92,6 +92,22 @@ public class MavenDefaultVersionNegotiator implements MavenVersionNegotiator {
     }
 
     @SuppressWarnings("unchecked")
+    public static <S extends Supplier<MavenVersionNegotiator> & Serializable> S stable() {
+        return (S) (Supplier<MavenVersionNegotiator> & Serializable) () -> new MavenDefaultVersionNegotiator(toDocumentBuilderFactory()) {
+            @Override
+            public String resolve(Executor executor,
+                                  MavenRepository repository,
+                                  String groupId,
+                                  String artifactId,
+                                  String type,
+                                  String classifier,
+                                  String version) throws IOException {
+                return toStable(toMetadata(executor, repository, groupId, artifactId), groupId, artifactId);
+            }
+        };
+    }
+
+    @SuppressWarnings("unchecked")
     public static <S extends Supplier<MavenVersionNegotiator> & Serializable> S closest() {
         return (S) (Supplier<MavenVersionNegotiator> & Serializable) () -> new MavenDefaultVersionNegotiator(toDocumentBuilderFactory());
     }
@@ -107,6 +123,7 @@ public class MavenDefaultVersionNegotiator implements MavenVersionNegotiator {
         return switch (version) {
             case "RELEASE" -> toMetadata(executor, repository, groupId, artifactId).release();
             case "LATEST" -> toMetadata(executor, repository, groupId, artifactId).latest();
+            case "STABLE" -> toStable(toMetadata(executor, repository, groupId, artifactId), groupId, artifactId);
             case String range when isRange(range) -> {
                 List<Restriction> restrictions = parseRanges(range);
                 yield toMetadata(executor, repository, groupId, artifactId).versions().stream()
@@ -241,11 +258,36 @@ public class MavenDefaultVersionNegotiator implements MavenVersionNegotiator {
         return compareItems(parseVersion(left), parseVersion(right));
     }
 
+    public static boolean isStable(String version) {
+        return isStable(new ListItem(parseVersion(version)));
+    }
+
+    private static boolean isStable(Item item) {
+        return switch (item) {
+            case IntegerItem _ -> true;
+            case StringItem stringItem -> !PRERELEASE.contains(stringItem.value())
+                    && comparableQualifier(stringItem.value()).compareTo(RELEASE_INDEX) >= 0;
+            case ListItem listItem -> listItem.items().stream()
+                    .allMatch(MavenDefaultVersionNegotiator::isStable);
+        };
+    }
+
+    private static String toStable(Metadata metadata, String groupId, String artifactId) {
+        return metadata.versions().stream()
+                .filter(MavenDefaultVersionNegotiator::isStable)
+                .max(MavenDefaultVersionNegotiator::compareVersions)
+                .orElseThrow(() -> new IllegalStateException("No stable version of "
+                        + groupId + ":" + artifactId
+                        + " among " + metadata.versions()
+                        + ": every published version carries a pre-release qualifier"));
+    }
+
     private static final List<String> QUALIFIERS = List.of(
             "alpha", "beta", "milestone", "rc", "snapshot", "", "sp");
     private static final String RELEASE_INDEX = String.valueOf(QUALIFIERS.indexOf(""));
     private static final Map<String, String> ALIASES = Map.of(
             "ga", "", "final", "", "release", "", "cr", "rc");
+    private static final Set<String> PRERELEASE = Set.of("ea", "preview");
 
     private static String comparableQualifier(String value) {
         int index = QUALIFIERS.indexOf(value);

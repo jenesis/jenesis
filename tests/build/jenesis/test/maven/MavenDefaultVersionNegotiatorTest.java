@@ -262,6 +262,59 @@ public class MavenDefaultVersionNegotiatorTest {
         return MavenDefaultVersionNegotiator.closest().get();
     }
 
+    private static MavenVersionNegotiator stable() {
+        return MavenDefaultVersionNegotiator.stable().get();
+    }
+
+    @Test
+    public void stable_skips_the_milestone_that_metadata_calls_latest() throws IOException {
+        String resolved = stable().resolve(Runnable::run,
+                metadata("<metadata><versioning>"
+                        + "<latest>6.2.0-M2</latest><release>6.2.0-M2</release>"
+                        + "<versions><version>6.1.0</version><version>6.2.0-M2</version></versions>"
+                        + "</versioning></metadata>"),
+                "group",
+                "artifact",
+                null,
+                null,
+                "1.0");
+        assertThat(resolved)
+                .as("upstreams point <latest> and <release> at milestones, so neither answers"
+                        + " what the newest version fit to depend on is")
+                .isEqualTo("6.1.0");
+    }
+
+    @Test
+    public void stable_rejects_every_pre_release_qualifier() {
+        assertThat(List.of("1.0-alpha-1", "1.0-beta-2", "1.0-milestone-1", "6.2.0-M2",
+                        "1.0-rc1", "1.0-CR1", "1.0-SNAPSHOT", "25-ea", "2.0.0-preview"))
+                .allSatisfy(version -> assertThat(MavenDefaultVersionNegotiator.isStable(version))
+                        .as(version)
+                        .isFalse());
+    }
+
+    @Test
+    public void stable_keeps_a_release_and_a_service_pack() {
+        assertThat(List.of("1.0", "21.0.3", "7.0.0.Final", "1.0-sp1", "3.27.0"))
+                .allSatisfy(version -> assertThat(MavenDefaultVersionNegotiator.isStable(version))
+                        .as(version)
+                        .isTrue());
+    }
+
+    @Test
+    public void stable_names_the_artifact_when_every_version_is_a_pre_release() {
+        assertThatThrownBy(() -> stable().resolve(Runnable::run,
+                versions("1.0-M1", "1.0-M2"),
+                "group",
+                "artifact",
+                null,
+                null,
+                "1.0"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No stable version of group:artifact")
+                .hasMessageContaining("every published version carries a pre-release qualifier");
+    }
+
     private static MavenRepository versions(String... versions) {
         StringBuilder xml = new StringBuilder("<metadata><versioning><versions>");
         for (String version : versions) {
