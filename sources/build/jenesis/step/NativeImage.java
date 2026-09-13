@@ -28,18 +28,18 @@ public class NativeImage extends JdkProcessBuildStep {
     private NativeImage(PathPlacement pathPlacement,
                         Function<List<String>, ? extends ProcessHandler> factory,
                         String group,
-                        boolean verbose) {
-        super("native-image", factory, verbose);
+                        BiConsumer<Boolean, String> printing) {
+        super("native-image", factory, printing);
         this.pathPlacement = pathPlacement;
         this.group = group;
     }
 
     public NativeImage group(String group) {
-        return new NativeImage(pathPlacement, factory, group, verbose);
+        return new NativeImage(pathPlacement, factory, group, printing);
     }
 
-    public NativeImage verbose(boolean verbose) {
-        return new NativeImage(pathPlacement, factory, group, verbose);
+    public NativeImage verbose(BiConsumer<Boolean, String> printing) {
+        return new NativeImage(pathPlacement, factory, group, printing);
     }
 
     @Override

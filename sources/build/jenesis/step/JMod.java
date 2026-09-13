@@ -14,12 +14,12 @@ public class JMod extends JdkProcessBuildStep {
         this(factory.apply("jmod", "bin/jmod"), printing("jmod"));
     }
 
-    private JMod(Function<List<String>, ? extends ProcessHandler> factory, boolean verbose) {
-        super("jmod", factory, verbose);
+    private JMod(Function<List<String>, ? extends ProcessHandler> factory, BiConsumer<Boolean, String> printing) {
+        super("jmod", factory, printing);
     }
 
-    public JMod verbose(boolean verbose) {
-        return new JMod(factory, verbose);
+    public JMod verbose(BiConsumer<Boolean, String> printing) {
+        return new JMod(factory, printing);
     }
 
     @Override

@@ -27,10 +27,10 @@ public class PiTestModule implements BuildExecutorModule {
     private final String tool;
     private final String group;
     private final SequencedProperties config;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public PiTestModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "pitest", "main", new SequencedProperties(), null);
+        this(repositories, resolvers, null, "pitest", "main", new SequencedProperties(), ProcessBuildStep.printing("pitest"));
     }
 
     private PiTestModule(Map<String, Repository> repositories,
@@ -39,7 +39,7 @@ public class PiTestModule implements BuildExecutorModule {
                          String tool,
                          String group,
                          SequencedProperties config,
-                         Boolean printing) {
+                         BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -65,7 +65,7 @@ public class PiTestModule implements BuildExecutorModule {
         return new PiTestModule(repositories, resolvers, pinning, tool, group, config, printing);
     }
 
-    public PiTestModule printing(boolean printing) {
+    public PiTestModule printing(BiConsumer<Boolean, String> printing) {
         return new PiTestModule(repositories, resolvers, pinning, tool, group, config, printing);
     }
 
@@ -136,8 +136,8 @@ public class PiTestModule implements BuildExecutorModule {
         private final String group;
         private final SequencedProperties config;
 
-        private Mutate(String tool, String group, SequencedProperties config, Boolean printing) {
-            super("pitest", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing == null ? ProcessBuildStep.printing("pitest") : printing);
+        private Mutate(String tool, String group, SequencedProperties config, BiConsumer<Boolean, String> printing) {
+            super("pitest", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
             this.tool = tool;
             this.group = group;
             this.config = config;

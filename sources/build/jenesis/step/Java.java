@@ -25,8 +25,8 @@ public abstract class Java extends JdkProcessBuildStep {
                    PathPlacement pathPlacement,
                    boolean jarsOnly,
                    String group,
-                   boolean verbose) {
-        super("java", factory, verbose);
+                   BiConsumer<Boolean, String> printing) {
+        super("java", factory, printing);
         this.pathPlacement = pathPlacement;
         this.jarsOnly = jarsOnly;
         this.group = group;
@@ -86,7 +86,7 @@ public abstract class Java extends JdkProcessBuildStep {
 
     public Java group(String group) {
         Java self = this;
-        return new Java(factory, pathPlacement, jarsOnly, group, verbose) {
+        return new Java(factory, pathPlacement, jarsOnly, group, printing) {
             @Override
             protected CompletionStage<List<String>> commands(Executor executor,
                                                              BuildStepContext context,
@@ -97,9 +97,9 @@ public abstract class Java extends JdkProcessBuildStep {
         };
     }
 
-    public Java verbose(boolean verbose) {
+    public Java verbose(BiConsumer<Boolean, String> printing) {
         Java self = this;
-        return new Java(factory, pathPlacement, jarsOnly, group, verbose) {
+        return new Java(factory, pathPlacement, jarsOnly, group, printing) {
             @Override
             protected CompletionStage<List<String>> commands(Executor executor,
                                                              BuildStepContext context,

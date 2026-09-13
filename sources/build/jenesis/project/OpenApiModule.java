@@ -36,10 +36,10 @@ public class OpenApiModule implements BuildExecutorModule {
     private final String packageName;
     private final String sourceFolder;
     private final List<String> arguments;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public OpenApiModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "openapi", "java", null, "src/main/java", List.of(), null);
+        this(repositories, resolvers, null, "openapi", "java", null, "src/main/java", List.of(), ProcessBuildStep.printing("openapi"));
     }
 
     private OpenApiModule(Map<String, Repository> repositories,
@@ -50,7 +50,7 @@ public class OpenApiModule implements BuildExecutorModule {
                           String packageName,
                           String sourceFolder,
                           List<String> arguments,
-                          Boolean printing) {
+                          BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -86,7 +86,7 @@ public class OpenApiModule implements BuildExecutorModule {
         return new OpenApiModule(repositories, resolvers, pinning, tool, generator, packageName, sourceFolder, arguments, printing);
     }
 
-    public OpenApiModule printing(boolean printing) {
+    public OpenApiModule printing(BiConsumer<Boolean, String> printing) {
         return new OpenApiModule(repositories, resolvers, pinning, tool, generator, packageName, sourceFolder, arguments, printing);
     }
 
@@ -143,8 +143,8 @@ public class OpenApiModule implements BuildExecutorModule {
                          String generator,
                          String packageName,
                          List<String> arguments,
-                         Boolean printing) {
-            super("openapi", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing == null ? ProcessBuildStep.printing("openapi") : printing);
+                         BiConsumer<Boolean, String> printing) {
+            super("openapi", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
             this.tool = tool;
             this.generator = generator;
             this.packageName = packageName;

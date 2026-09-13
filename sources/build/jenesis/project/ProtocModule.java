@@ -33,10 +33,10 @@ public class ProtocModule implements BuildExecutorModule {
     private final String classifier;
     private final SequencedMap<String, String> plugins;
     private final List<String> arguments;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public ProtocModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "protoc", classifier(), new LinkedHashMap<>(), List.of(), null);
+        this(repositories, resolvers, null, "protoc", classifier(), new LinkedHashMap<>(), List.of(), ProcessBuildStep.printing("protoc"));
     }
 
     private ProtocModule(Map<String, Repository> repositories,
@@ -46,7 +46,7 @@ public class ProtocModule implements BuildExecutorModule {
                          String classifier,
                          SequencedMap<String, String> plugins,
                          List<String> arguments,
-                         Boolean printing) {
+                         BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -101,7 +101,7 @@ public class ProtocModule implements BuildExecutorModule {
         return new ProtocModule(repositories, resolvers, pinning, tool, classifier, plugins, arguments, printing);
     }
 
-    public ProtocModule printing(boolean printing) {
+    public ProtocModule printing(BiConsumer<Boolean, String> printing) {
         return new ProtocModule(repositories, resolvers, pinning, tool, classifier, plugins, arguments, printing);
     }
 
@@ -163,8 +163,8 @@ public class ProtocModule implements BuildExecutorModule {
         private final List<String> plugins;
         private final List<String> arguments;
 
-        private Generate(String tool, List<String> plugins, List<String> arguments, Boolean printing) {
-            super("protoc", ProcessHandler.OfProcess.ofStaged(), printing == null ? ProcessBuildStep.printing("protoc") : printing);
+        private Generate(String tool, List<String> plugins, List<String> arguments, BiConsumer<Boolean, String> printing) {
+            super("protoc", ProcessHandler.OfProcess.ofStaged(), printing);
             this.tool = tool;
             this.plugins = plugins;
             this.arguments = arguments;

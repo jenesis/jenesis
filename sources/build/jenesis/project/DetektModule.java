@@ -31,10 +31,10 @@ public class DetektModule implements BuildExecutorModule {
     private final String tool;
     private final String configFile;
     private final boolean strict;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public DetektModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "detekt", "detekt.yml", false, null);
+        this(repositories, resolvers, null, "detekt", "detekt.yml", false, ProcessBuildStep.printing("detekt"));
     }
 
     private DetektModule(Map<String, Repository> repositories,
@@ -43,7 +43,7 @@ public class DetektModule implements BuildExecutorModule {
                          String tool,
                          String configFile,
                          boolean strict,
-                         Boolean printing) {
+                         BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -73,7 +73,7 @@ public class DetektModule implements BuildExecutorModule {
         return new DetektModule(repositories, resolvers, pinning, tool, configFile, strict, printing);
     }
 
-    public DetektModule printing(boolean printing) {
+    public DetektModule printing(BiConsumer<Boolean, String> printing) {
         return new DetektModule(repositories, resolvers, pinning, tool, configFile, strict, printing);
     }
 
@@ -117,8 +117,8 @@ public class DetektModule implements BuildExecutorModule {
         private final String configFile;
         private final boolean strict;
 
-        private Check(String tool, String configFile, boolean strict, Boolean printing) {
-            super("detekt", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing == null ? ProcessBuildStep.printing("detekt") : printing);
+        private Check(String tool, String configFile, boolean strict, BiConsumer<Boolean, String> printing) {
+            super("detekt", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
             this.tool = tool;
             this.configFile = configFile;
             this.strict = strict;

@@ -30,10 +30,10 @@ public class KtlintModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final String tool;
     private final boolean strict;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public KtlintModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "ktlint", false, null);
+        this(repositories, resolvers, null, "ktlint", false, ProcessBuildStep.printing("ktlint"));
     }
 
     private KtlintModule(Map<String, Repository> repositories,
@@ -41,7 +41,7 @@ public class KtlintModule implements BuildExecutorModule {
                          Pinning pinning,
                          String tool,
                          boolean strict,
-                         Boolean printing) {
+                         BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -66,7 +66,7 @@ public class KtlintModule implements BuildExecutorModule {
         return new KtlintModule(repositories, resolvers, pinning, tool, strict, printing);
     }
 
-    public KtlintModule printing(boolean printing) {
+    public KtlintModule printing(BiConsumer<Boolean, String> printing) {
         return new KtlintModule(repositories, resolvers, pinning, tool, strict, printing);
     }
 
@@ -109,8 +109,8 @@ public class KtlintModule implements BuildExecutorModule {
         private final String tool;
         private final boolean strict;
 
-        private Check(String tool, boolean strict, Boolean printing) {
-            super("ktlint", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing == null ? ProcessBuildStep.printing("ktlint") : printing);
+        private Check(String tool, boolean strict, BiConsumer<Boolean, String> printing) {
+            super("ktlint", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
             this.tool = tool;
             this.strict = strict;
         }

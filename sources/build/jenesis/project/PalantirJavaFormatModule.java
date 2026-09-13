@@ -28,7 +28,7 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final String group;
     private final boolean verify;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public PalantirJavaFormatModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
         this(repositories, resolvers, null, "palantir-java-format", false, null);
@@ -39,7 +39,7 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
                                      Pinning pinning,
                                      String group,
                                      boolean verify,
-                                     Boolean printing) {
+                                     BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -60,7 +60,7 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
         return new PalantirJavaFormatModule(repositories, resolvers, pinning, group, verify, printing);
     }
 
-    public PalantirJavaFormatModule printing(boolean printing) {
+    public PalantirJavaFormatModule printing(BiConsumer<Boolean, String> printing) {
         return new PalantirJavaFormatModule(repositories, resolvers, pinning, group, verify, printing);
     }
 
@@ -100,7 +100,7 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
 
     private static class Format extends FormatBuildStep {
 
-        private Format(String group, boolean verify, Boolean printing) {
+        private Format(String group, boolean verify, BiConsumer<Boolean, String> printing) {
             super(group, verify, printing == null ? ProcessBuildStep.printing(group) : printing);
         }
 

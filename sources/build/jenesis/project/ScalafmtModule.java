@@ -31,10 +31,10 @@ public class ScalafmtModule implements BuildExecutorModule {
     private final String tool;
     private final String configFile;
     private final boolean strict;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public ScalafmtModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "scalafmt", ".scalafmt.conf", false, null);
+        this(repositories, resolvers, null, "scalafmt", ".scalafmt.conf", false, ProcessBuildStep.printing("scalafmt"));
     }
 
     private ScalafmtModule(Map<String, Repository> repositories,
@@ -43,7 +43,7 @@ public class ScalafmtModule implements BuildExecutorModule {
                            String tool,
                            String configFile,
                            boolean strict,
-                           Boolean printing) {
+                           BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -73,7 +73,7 @@ public class ScalafmtModule implements BuildExecutorModule {
         return new ScalafmtModule(repositories, resolvers, pinning, tool, configFile, strict, printing);
     }
 
-    public ScalafmtModule printing(boolean printing) {
+    public ScalafmtModule printing(BiConsumer<Boolean, String> printing) {
         return new ScalafmtModule(repositories, resolvers, pinning, tool, configFile, strict, printing);
     }
 
@@ -117,8 +117,8 @@ public class ScalafmtModule implements BuildExecutorModule {
         private final String configFile;
         private final boolean strict;
 
-        private Check(String tool, String configFile, boolean strict, Boolean printing) {
-            super("scalafmt", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing == null ? ProcessBuildStep.printing("scalafmt") : printing);
+        private Check(String tool, String configFile, boolean strict, BiConsumer<Boolean, String> printing) {
+            super("scalafmt", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
             this.tool = tool;
             this.configFile = configFile;
             this.strict = strict;

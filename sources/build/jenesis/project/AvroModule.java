@@ -32,10 +32,10 @@ public class AvroModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final String tool;
     private final List<String> arguments;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public AvroModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "avro", List.of(), null);
+        this(repositories, resolvers, null, "avro", List.of(), ProcessBuildStep.printing("avro"));
     }
 
     private AvroModule(Map<String, Repository> repositories,
@@ -43,7 +43,7 @@ public class AvroModule implements BuildExecutorModule {
                        Pinning pinning,
                        String tool,
                        List<String> arguments,
-                       Boolean printing) {
+                       BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -64,7 +64,7 @@ public class AvroModule implements BuildExecutorModule {
         return new AvroModule(repositories, resolvers, pinning, tool, arguments, printing);
     }
 
-    public AvroModule printing(boolean printing) {
+    public AvroModule printing(BiConsumer<Boolean, String> printing) {
         return new AvroModule(repositories, resolvers, pinning, tool, arguments, printing);
     }
 
@@ -122,8 +122,8 @@ public class AvroModule implements BuildExecutorModule {
                         String kind,
                         String extension,
                         List<String> arguments,
-                        Boolean printing) {
-            super("avro", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing == null ? ProcessBuildStep.printing("avro") : printing);
+                        BiConsumer<Boolean, String> printing) {
+            super("avro", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
             this.tool = tool;
             this.kind = kind;
             this.extension = extension;

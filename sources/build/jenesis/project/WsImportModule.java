@@ -34,10 +34,10 @@ public class WsImportModule implements BuildExecutorModule {
     private final String packageName;
     private final String location;
     private final List<String> arguments;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public WsImportModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "wsimport", null, null, List.of(), null);
+        this(repositories, resolvers, null, "wsimport", null, null, List.of(), ProcessBuildStep.printing("wsimport"));
     }
 
     private WsImportModule(Map<String, Repository> repositories,
@@ -47,7 +47,7 @@ public class WsImportModule implements BuildExecutorModule {
                            String packageName,
                            String location,
                            List<String> arguments,
-                           Boolean printing) {
+                           BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -78,7 +78,7 @@ public class WsImportModule implements BuildExecutorModule {
         return new WsImportModule(repositories, resolvers, pinning, tool, packageName, location, arguments, printing);
     }
 
-    public WsImportModule printing(boolean printing) {
+    public WsImportModule printing(BiConsumer<Boolean, String> printing) {
         return new WsImportModule(repositories, resolvers, pinning, tool, packageName, location, arguments, printing);
     }
 
@@ -129,8 +129,8 @@ public class WsImportModule implements BuildExecutorModule {
                          String packageName,
                          String location,
                          List<String> arguments,
-                         Boolean printing) {
-            super("wsimport", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing == null ? ProcessBuildStep.printing("wsimport") : printing);
+                         BiConsumer<Boolean, String> printing) {
+            super("wsimport", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
             this.tool = tool;
             this.packageName = packageName;
             this.location = location;

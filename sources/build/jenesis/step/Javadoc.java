@@ -17,22 +17,22 @@ public class Javadoc extends JdkProcessBuildStep {
         this(factory.apply("javadoc", "bin/javadoc"), null, false, printing("javadoc"));
     }
 
-    private Javadoc(Function<List<String>, ? extends ProcessHandler> factory, String within, boolean classpath, boolean verbose) {
-        super("javadoc", factory, verbose);
+    private Javadoc(Function<List<String>, ? extends ProcessHandler> factory, String within, boolean classpath, BiConsumer<Boolean, String> printing) {
+        super("javadoc", factory, printing);
         this.within = within;
         this.classpath = classpath;
     }
 
     public Javadoc within(String within) {
-        return new Javadoc(factory, within, classpath, verbose);
+        return new Javadoc(factory, within, classpath, printing);
     }
 
     public Javadoc classpath(boolean classpath) {
-        return new Javadoc(factory, within, classpath, verbose);
+        return new Javadoc(factory, within, classpath, printing);
     }
 
-    public Javadoc verbose(boolean verbose) {
-        return new Javadoc(factory, within, classpath, verbose);
+    public Javadoc verbose(BiConsumer<Boolean, String> printing) {
+        return new Javadoc(factory, within, classpath, printing);
     }
 
     @Override

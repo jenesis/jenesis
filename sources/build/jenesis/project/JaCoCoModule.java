@@ -25,17 +25,17 @@ public class JaCoCoModule implements BuildExecutorModule {
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
     private final String tool;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public JaCoCoModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "jacoco", null);
+        this(repositories, resolvers, null, "jacoco", ProcessBuildStep.printing("jacoco"));
     }
 
     private JaCoCoModule(Map<String, Repository> repositories,
                          Map<String, Resolver> resolvers,
                          Pinning pinning,
                          String tool,
-                         Boolean printing) {
+                         BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -51,7 +51,7 @@ public class JaCoCoModule implements BuildExecutorModule {
         return new JaCoCoModule(repositories, resolvers, pinning, tool, printing);
     }
 
-    public JaCoCoModule printing(boolean printing) {
+    public JaCoCoModule printing(BiConsumer<Boolean, String> printing) {
         return new JaCoCoModule(repositories, resolvers, pinning, tool, printing);
     }
 
@@ -93,8 +93,8 @@ public class JaCoCoModule implements BuildExecutorModule {
 
         private final String tool;
 
-        private Report(String tool, Boolean printing) {
-            super("jacoco", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing == null ? ProcessBuildStep.printing("jacoco") : printing);
+        private Report(String tool, BiConsumer<Boolean, String> printing) {
+            super("jacoco", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
             this.tool = tool;
         }
 

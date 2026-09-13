@@ -14,13 +14,13 @@ public class Jar extends JdkProcessBuildStep {
         this(factory.apply("jar", "bin/jar"), sort, printing("jar"));
     }
 
-    private Jar(Function<List<String>, ? extends ProcessHandler> factory, Sort sort, boolean verbose) {
-        super("jar", factory, verbose);
+    private Jar(Function<List<String>, ? extends ProcessHandler> factory, Sort sort, BiConsumer<Boolean, String> printing) {
+        super("jar", factory, printing);
         this.sort = sort;
     }
 
-    public Jar verbose(boolean verbose) {
-        return new Jar(factory, sort, verbose);
+    public Jar verbose(BiConsumer<Boolean, String> printing) {
+        return new Jar(factory, sort, printing);
     }
 
     @Override

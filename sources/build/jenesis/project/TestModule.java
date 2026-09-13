@@ -39,7 +39,7 @@ public class TestModule implements BuildExecutorModule {
     private final boolean reporting;
     private final String group;
     private final List<ObservabilityEngine> observers;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
     private final boolean skip;
 
     public TestModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
@@ -75,7 +75,7 @@ public class TestModule implements BuildExecutorModule {
                 SequencedProperties.systemFlag("jenesis.test.reporting"),
                 "main",
                 List.of(),
-                null,
+                ProcessBuildStep.printing("tests"),
                 SequencedProperties.systemFlag("jenesis.test.skip"));
     }
 
@@ -96,7 +96,7 @@ public class TestModule implements BuildExecutorModule {
                        boolean reporting,
                        String group,
                        List<ObservabilityEngine> observers,
-                       Boolean printing,
+                       BiConsumer<Boolean, String> printing,
                        boolean skip) {
         this.skip = skip;
         this.engine = engine;
@@ -453,7 +453,7 @@ public class TestModule implements BuildExecutorModule {
                 skip);
     }
 
-    public TestModule printing(boolean printing) {
+    public TestModule printing(BiConsumer<Boolean, String> printing) {
         return new TestModule(engine,
                 isTest,
                 factory,
@@ -739,13 +739,13 @@ public class TestModule implements BuildExecutorModule {
                     boolean reporting,
                     String group,
                     List<ObservabilityEngine> observers,
-                    Boolean printing,
+                    BiConsumer<Boolean, String> printing,
                     String incrementalDigest) {
             super(factory == null ? ProcessHandler.OfProcess.ofJavaHome("bin/java") : factory,
                     pathPlacement,
                     jarsOnly,
                     group,
-                    printing == null ? ProcessBuildStep.printing("tests") : printing);
+                    printing);
             this.engine = engine;
             this.isTest = isTest;
             this.moduleName = moduleName;

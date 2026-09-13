@@ -37,10 +37,10 @@ public class ScalaDocumentationModule implements BuildExecutorModule {
     private final String group;
     private final String within;
     private final transient Function<List<String>, ? extends ProcessHandler> factory;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public ScalaDocumentationModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "scaladoc", "main", null, null, null);
+        this(repositories, resolvers, null, "scaladoc", "main", null, null, ProcessBuildStep.printing("scaladoc"));
     }
 
     private ScalaDocumentationModule(Map<String, Repository> repositories,
@@ -50,7 +50,7 @@ public class ScalaDocumentationModule implements BuildExecutorModule {
                                      String group,
                                      String within,
                                      Function<List<String>, ? extends ProcessHandler> factory,
-                                     Boolean printing) {
+                                     BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -81,7 +81,7 @@ public class ScalaDocumentationModule implements BuildExecutorModule {
         return new ScalaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
     }
 
-    public ScalaDocumentationModule printing(boolean printing) {
+    public ScalaDocumentationModule printing(BiConsumer<Boolean, String> printing) {
         return new ScalaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
     }
 
@@ -154,12 +154,12 @@ public class ScalaDocumentationModule implements BuildExecutorModule {
         private final String tool;
         private final String group;
 
-        private Document(String within, String tool, String group, Boolean printing) {
+        private Document(String within, String tool, String group, BiConsumer<Boolean, String> printing) {
             this(within, tool, group, ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
         }
 
-        private Document(String within, String tool, String group, Function<List<String>, ? extends ProcessHandler> factory, Boolean printing) {
-            super("scaladoc", factory, printing == null ? ProcessBuildStep.printing("scaladoc") : printing);
+        private Document(String within, String tool, String group, Function<List<String>, ? extends ProcessHandler> factory, BiConsumer<Boolean, String> printing) {
+            super("scaladoc", factory, printing);
             this.within = within;
             this.tool = tool;
             this.group = group;

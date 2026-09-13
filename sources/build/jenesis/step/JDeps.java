@@ -12,12 +12,12 @@ public class JDeps extends JdkProcessBuildStep {
         this(factory.apply("jdeps", "bin/jdeps"), printing("jdeps"));
     }
 
-    private JDeps(Function<List<String>, ? extends ProcessHandler> factory, boolean verbose) {
-        super("jdeps", factory, verbose);
+    private JDeps(Function<List<String>, ? extends ProcessHandler> factory, BiConsumer<Boolean, String> printing) {
+        super("jdeps", factory, printing);
     }
 
-    public JDeps verbose(boolean verbose) {
-        return new JDeps(factory, verbose);
+    public JDeps verbose(BiConsumer<Boolean, String> printing) {
+        return new JDeps(factory, printing);
     }
 
     @Override

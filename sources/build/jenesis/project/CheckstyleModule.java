@@ -31,10 +31,10 @@ public class CheckstyleModule implements BuildExecutorModule {
     private final String tool;
     private final String configFile;
     private final boolean strict;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public CheckstyleModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "checkstyle", "checkstyle.xml", false, null);
+        this(repositories, resolvers, null, "checkstyle", "checkstyle.xml", false, ProcessBuildStep.printing("checkstyle"));
     }
 
     private CheckstyleModule(Map<String, Repository> repositories,
@@ -43,7 +43,7 @@ public class CheckstyleModule implements BuildExecutorModule {
                              String tool,
                              String configFile,
                              boolean strict,
-                             Boolean printing) {
+                             BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -73,7 +73,7 @@ public class CheckstyleModule implements BuildExecutorModule {
         return new CheckstyleModule(repositories, resolvers, pinning, tool, configFile, strict, printing);
     }
 
-    public CheckstyleModule printing(boolean printing) {
+    public CheckstyleModule printing(BiConsumer<Boolean, String> printing) {
         return new CheckstyleModule(repositories, resolvers, pinning, tool, configFile, strict, printing);
     }
 
@@ -117,8 +117,8 @@ public class CheckstyleModule implements BuildExecutorModule {
         private final String configFile;
         private final boolean strict;
 
-        private Check(String tool, String configFile, boolean strict, Boolean printing) {
-            super("checkstyle", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing == null ? ProcessBuildStep.printing("checkstyle") : printing);
+        private Check(String tool, String configFile, boolean strict, BiConsumer<Boolean, String> printing) {
+            super("checkstyle", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
             this.tool = tool;
             this.configFile = configFile;
             this.strict = strict;
