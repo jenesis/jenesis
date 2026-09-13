@@ -10,17 +10,17 @@ public final class DependencyTreeReport {
     private final PrintStream out;
     private final boolean compact;
 
-    public DependencyTreeReport() {
-        this(System.out);
-    }
-
     public DependencyTreeReport(PrintStream out) {
         this(out, false);
     }
 
-    public DependencyTreeReport(PrintStream out, boolean compact) {
+    private DependencyTreeReport(PrintStream out, boolean compact) {
         this.out = out;
         this.compact = compact;
+    }
+
+    public DependencyTreeReport compact(boolean compact) {
+        return new DependencyTreeReport(out, compact);
     }
 
     public void render(Resolver.Resolution resolution) {

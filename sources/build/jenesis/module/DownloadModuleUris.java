@@ -18,17 +18,17 @@ public class DownloadModuleUris implements BuildStep {
     private final String prefix;
     private final Supplier<List<URI>> locations;
 
-    public DownloadModuleUris() {
-        this("module");
-    }
-
     public DownloadModuleUris(String prefix) {
-        this(prefix, () -> List.of(DEFAULT));
+        this(prefix, (Supplier<List<URI>> & Serializable) () -> List.of(DEFAULT));
     }
 
-    public <S extends Supplier<List<URI>> & Serializable> DownloadModuleUris(String prefix, S locations) {
+    private DownloadModuleUris(String prefix, Supplier<List<URI>> locations) {
         this.prefix = prefix;
         this.locations = locations;
+    }
+
+    public <S extends Supplier<List<URI>> & Serializable> DownloadModuleUris locations(S locations) {
+        return new DownloadModuleUris(prefix, locations);
     }
 
     @Override

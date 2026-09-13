@@ -167,7 +167,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     images.add("jlink");
                 }
                 if (packaging.jpackage() != null) {
-                    sub.addStep("jpackage", new JPackage(factory, packaging.jpackage()), packaging.jlink()
+                    sub.addStep("jpackage", new JPackage(factory).type(packaging.jpackage()), packaging.jlink()
                             ? Stream.concat(Stream.of("jlink"), inputs.stream())
                             : inputs.stream());
                     images.add("jpackage");

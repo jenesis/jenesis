@@ -41,9 +41,5 @@ public interface MavenResolver extends Resolver {
         public RootPom(InputStream pom) {
             this(pom, null, null, false, null);
         }
-
-        public RootPom(InputStream pom, String checksum) {
-            this(pom, checksum, null, false, null);
-        }
     }
 }
