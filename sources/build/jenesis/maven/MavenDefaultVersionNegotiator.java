@@ -265,11 +265,19 @@ public class MavenDefaultVersionNegotiator implements MavenVersionNegotiator {
     private static boolean isStable(Item item) {
         return switch (item) {
             case IntegerItem _ -> true;
-            case StringItem stringItem -> !PRERELEASE.contains(stringItem.value())
+            case StringItem stringItem -> !PRERELEASE.contains(letters(stringItem.value()))
                     && comparableQualifier(stringItem.value()).compareTo(RELEASE_INDEX) >= 0;
             case ListItem listItem -> listItem.items().stream()
                     .allMatch(MavenDefaultVersionNegotiator::isStable);
         };
+    }
+
+    private static String letters(String value) {
+        int end = 0;
+        while (end < value.length() && Character.isLetter(value.charAt(end))) {
+            end++;
+        }
+        return value.substring(0, end);
     }
 
     private static String toStable(Metadata metadata, String groupId, String artifactId) {
@@ -287,7 +295,8 @@ public class MavenDefaultVersionNegotiator implements MavenVersionNegotiator {
     private static final String RELEASE_INDEX = String.valueOf(QUALIFIERS.indexOf(""));
     private static final Map<String, String> ALIASES = Map.of(
             "ga", "", "final", "", "release", "", "cr", "rc");
-    private static final Set<String> PRERELEASE = Set.of("ea", "preview");
+    private static final Set<String> PRERELEASE = Set.of(
+            "ea", "pre", "prerelease", "preview", "dev", "nightly", "canary", "next", "test", "adhoc");
 
     private static String comparableQualifier(String value) {
         int index = QUALIFIERS.indexOf(value);

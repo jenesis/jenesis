@@ -287,15 +287,28 @@ public class MavenDefaultVersionNegotiatorTest {
     @Test
     public void stable_rejects_every_pre_release_qualifier() {
         assertThat(List.of("1.0-alpha-1", "1.0-beta-2", "1.0-milestone-1", "6.2.0-M2",
-                        "1.0-rc1", "1.0-CR1", "1.0-SNAPSHOT", "25-ea", "2.0.0-preview"))
+                        "1.0-rc1", "1.0-CR1", "1.0-SNAPSHOT", "25-ea", "2.0.0-preview",
+                        "1.0.0-dev1", "2.6.0-20230325-dd7fc54-NIGHTLY", "12.6.1.PreRelease.0",
+                        "0.8.0-next.0", "0.0.1-test", "1.0-pre", "1.0.0-canary.3",
+                        "2.10.0-adhoc.20240830.12942.0.v3e4e9451"))
                 .allSatisfy(version -> assertThat(MavenDefaultVersionNegotiator.isStable(version))
                         .as(version)
                         .isFalse());
     }
 
     @Test
+    public void stable_rejects_a_qualifier_carrying_build_metadata() {
+        assertThat(MavenDefaultVersionNegotiator.isStable("11-ea+24"))
+                .as("a plus is neither a separator nor a digit, so the qualifier tokenises as ea+"
+                        + " and an exact match on ea would let every early-access build through")
+                .isFalse();
+    }
+
+    @Test
     public void stable_keeps_a_release_and_a_service_pack() {
-        assertThat(List.of("1.0", "21.0.3", "7.0.0.Final", "1.0-sp1", "3.27.0"))
+        assertThat(List.of("1.0", "21.0.3", "7.0.0.Final", "1.0-sp1", "3.27.0",
+                        "31.1-jre", "2.0.10.android", "1.0-RELEASE", "05.00.00-MS-GA",
+                        "1.4.300.LIFERAY-PATCHED-1", "accounts_v1-rev20250804-2.0.0", "1.0.0-stable"))
                 .allSatisfy(version -> assertThat(MavenDefaultVersionNegotiator.isStable(version))
                         .as(version)
                         .isTrue());
