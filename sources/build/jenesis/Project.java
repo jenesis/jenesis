@@ -680,6 +680,10 @@ public record Project(
                           Drop transitive dependencies of <module>, each with the subtree it pulled
                           in, from the compile path, runtime path and generated pom alike. Repeated
                           lines add up. Excluding from a module that is not required is an error.
+                          It is scoped to the path through <module>, as in Maven, so a coordinate
+                          reached by two paths needs an exclusion on each. A sibling project module
+                          is one such path: its generated pom is flat, so a consumer meets that
+                          closure again through the sibling and excludes it there as well.
                       @jenesis.override <module> <carrier>...
                           Replace a module with the modules already carrying its packages, for a
                           dependency that shades another module (Tomcat Embed shades the Servlet
