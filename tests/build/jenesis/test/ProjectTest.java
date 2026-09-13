@@ -175,15 +175,15 @@ public class ProjectTest {
 
     @Test
     public void configuration_reference_splices_the_default() {
-        System.setProperty("jenesis.project.configuration", "shared" + File.pathSeparator + "@");
+        System.setProperty("jenesis.project.configuration", "shared,@");
         assertThat(new Project(Path.of(".")).configuration())
                 .containsExactly(Path.of(".").resolve("shared"), Path.of(".").resolve("build.jenesis"));
     }
 
     @Test
     public void configuration_named_reference_splices_a_property_value() {
-        System.setProperty("jenesis.test.sample.key", "shared" + File.pathSeparator + "extra");
-        System.setProperty("jenesis.project.configuration", "@jenesis.test.sample.key" + File.pathSeparator + "@");
+        System.setProperty("jenesis.test.sample.key", "shared,extra");
+        System.setProperty("jenesis.project.configuration", "@jenesis.test.sample.key,@");
         assertThat(new Project(Path.of(".")).configuration())
                 .containsExactly(Path.of(".").resolve("shared"),
                         Path.of(".").resolve("extra"),
@@ -211,7 +211,7 @@ public class ProjectTest {
     @Test
     public void boms_reference_splices_the_configuration() {
         System.setProperty("jenesis.project.configuration", "config");
-        System.setProperty("jenesis.project.boms", "platform" + File.pathSeparator + "@");
+        System.setProperty("jenesis.project.boms", "platform,@");
         assertThat(new Project(Path.of(".")).boms())
                 .containsExactly(Path.of(".").resolve("platform"), Path.of(".").resolve("config"));
     }

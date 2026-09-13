@@ -18,6 +18,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class DependenciesAliasTest {
@@ -183,6 +184,54 @@ public class DependenciesAliasTest {
                 "org.example/named-lib/1.0"))
                 .hasStackTraceContaining(IllegalArgumentException.class.getName())
                 .hasStackTraceContaining("Target of module alias toolkit.named is already the named module lib.named");
+    }
+
+    @Test
+    public void an_alias_naming_what_its_own_target_declares_is_a_confirmation() throws IOException {
+        addPom("org.example", "amn-lib", "1.0", List.of());
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        manifest.getMainAttributes().putValue("Automatic-Module-Name", "toolkit.amn");
+        addJar("org/example/amn-lib/1.0/amn-lib-1.0.jar", manifest, Map.of(
+                "amnlib/Amn.class", new byte[]{1, 2, 3}));
+
+        assertThatCode(() -> resolve(Map.of("toolkit.amn", "org.example/amn-lib"),
+                "org.example/amn-lib/1.0"))
+                .as("a target that grew the very name the alias gives it says the same thing twice,"
+                        + " and the alias is what routes the requirement past the module index")
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    public void a_confirming_alias_is_reported_when_asked_for() throws IOException {
+        addPom("org.example", "amn-lib", "1.0", List.of());
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        manifest.getMainAttributes().putValue("Automatic-Module-Name", "toolkit.amn");
+        addJar("org/example/amn-lib/1.0/amn-lib-1.0.jar", manifest, Map.of(
+                "amnlib/Amn.class", new byte[]{1, 2, 3}));
+        StringBuilder captured = new StringBuilder();
+        printing = line -> captured.append(line).append('\n');
+        resolve(Map.of("toolkit.amn", "org.example/amn-lib"), "org.example/amn-lib/1.0");
+        assertThat(captured.toString())
+                .as("an alias kept after its target grew the name is legal and pointless, and only a"
+                        + " report distinguishes the two")
+                .contains("maven/org.example/amn-lib/1.0 already declares toolkit.amn");
+    }
+
+    @Test
+    public void an_alias_naming_what_a_named_target_declares_is_a_confirmation() throws IOException {
+        Path classes = compile("named", "module-info.java", """
+                module toolkit.named {
+                }
+                """);
+        addPom("org.example", "named-lib", "1.0", List.of());
+        jarOf(Files.createDirectories(mavenRepoFolder.resolve("org/example/named-lib/1.0"))
+                .resolve("named-lib-1.0.jar"), classes, null);
+
+        assertThatCode(() -> resolve(Map.of("toolkit.named", "org.example/named-lib"),
+                "org.example/named-lib/1.0"))
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -372,6 +421,8 @@ public class DependenciesAliasTest {
                 """.formatted(version));
     }
 
+    private Consumer<String> printing;
+
     private Path resolve(Map<String, String> aliases, String... coordinates) throws IOException {
         SequencedProperties requires = new SequencedProperties();
         for (String coordinate : coordinates) {
@@ -390,9 +441,9 @@ public class DependenciesAliasTest {
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addSource("dependencies", dependencies);
         executor.addModule("resolved", new Dependencies(
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {
-                })),
-                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))), "dependencies");
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
+                Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven())))
+                .printing(printing), "dependencies");
         next = executor.execute().get("resolved");
         return next;
     }

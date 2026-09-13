@@ -194,8 +194,7 @@ public class DependenciesOverrideTest {
 
     private Path resolve(Map<String, String> overrides, String... modules) throws IOException {
         MavenDefaultRepository maven = new MavenDefaultRepository(
-                mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {
-        });
+                mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null);
         declare(overrides, modules);
         return execute(new Dependencies(
                 Map.of("maven", maven, "module", discovery()),

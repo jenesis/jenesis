@@ -155,7 +155,7 @@ public record Execution(Project project, String mainClass, String module) {
             javaArgs.add(candidate.mainClass);
         }
         javaArgs.addAll(List.of(arguments));
-        if (Boolean.getBoolean("jenesis.execute.docker")) {
+        if (SequencedProperties.systemFlag("jenesis.execute.docker")) {
             String image = System.getProperty("jenesis.execute.docker.image");
             Path root = project.root().toAbsolutePath().normalize();
             DockerizedJava docker = image == null ? new DockerizedJava(root) : new DockerizedJava(root, image);
@@ -168,7 +168,7 @@ public record Execution(Project project, String mainClass, String module) {
             docker = docker.mounts(System.getProperty("jenesis.execute.docker.mount"), root, true);
             docker = docker.mounts(System.getProperty("jenesis.execute.docker.mountWritable"), root, false);
             docker = docker.envs(System.getProperty("jenesis.execute.docker.env"));
-            if (Boolean.parseBoolean(System.getProperty("jenesis.print.docker", "true"))) {
+            if (SequencedProperties.systemFlag("jenesis.print.docker", true)) {
                 System.out.println("Launching Java execution within Docker image: " + docker.image());
             }
             return docker.execute(javaArgs);

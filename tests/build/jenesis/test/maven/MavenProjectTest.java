@@ -699,7 +699,7 @@ public class MavenProjectTest {
         root.addModule("maven", MavenProject.make(project,
                 "main",
                 "maven",
-                Map.of("maven", new MavenDefaultRepository(repository.toUri(), null, Map.of(), _ -> {})),
+                Map.of("maven", new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)),
                 Map.of("maven", new MavenPomResolver()),
                 null,
                 Collections.emptyNavigableSet(),

@@ -51,14 +51,16 @@ once where the object is constructed:
 
 - the public no-argument or short constructor reads the property with its default
   (`System.getProperty("jenesis.executor.digest", "MD5")`, `Integer.getInteger("jenesis.executor.concurrency", 0)`,
-  `Boolean.parseBoolean(System.getProperty("jenesis.source.pmd", "true"))`);
+  `SequencedProperties.systemFlag("jenesis.source.pmd", true)`);
 - a private canonical constructor takes every value explicitly;
 - the wither overrides one value and calls the canonical constructor.
 
 A property is therefore never read again later, and a caller that constructs the object itself is never
-surprised by the environment. Choose the reading deliberately: `Boolean.getBoolean` means `=true` is required,
-`getProperty(...) != null` means presence alone switches it on, `parseBoolean(getProperty(..., "true"))` means
-an opt-out. Environment variables are fallbacks for the repository settings only
+surprised by the environment. Every boolean setting is read with `SequencedProperties.systemFlag(key)` or
+`systemFlag(key, default)` and nothing else: the property absent is the default, `=true` or the property named
+with no value at all is true, `=false` is false, and any other value is an `IllegalArgumentException` naming
+what would be valid. `Boolean.getBoolean` is not used, because it reads `=false` and a bare `-Dkey` alike as
+false and a misspelt value as false as well. Environment variables are fallbacks for the repository settings only
 (`MAVEN_REPOSITORY_URI`, `JENESIS_REPOSITORY_TOKEN`, …). `jenesis.properties` at the project root and the
 profile files feed the same properties; `Project.perform` and `Project.run` load them before anything is
 constructed. A new property is added in three places - the constructor that reads it, the catalogue behind the

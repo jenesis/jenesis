@@ -416,10 +416,41 @@ public class TestModuleTest {
 
             SequencedMap<String, Path> outputs = executor.execute();
 
-            assertThat(outputs).doesNotContainKeys("test/resolved", "test/dependencies", "test/executed");
+            assertThat(outputs)
+                    .as("nothing is wired at all when no engine resolves, skipped or not")
+                    .doesNotContainKeys("test/resolved", "test/dependencies", "test/executed");
         } finally {
             System.clearProperty("jenesis.test.skip");
         }
+    }
+
+    @Test
+    public void skipping_execution_still_resolves_what_running_would_need() throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                new TestModule(Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                _ -> {})),
+                        Map.of("maven", new MavenPomResolver()))
+                        .isTest(candidate -> candidate.endsWith("TestSample"))
+                        .jarsOnly(false)
+                        .skip(true),
+                "dependencies", "classes");
+
+        SequencedMap<String, Path> outputs = executor.execute();
+
+        assertThat(outputs)
+                .as("a pin run skips tests, and the closure running them needs is exactly what it has"
+                        + " to see to write a checksum for the console launcher")
+                .containsKey("test/artifacts")
+                .doesNotContainKey("test/executed");
+        assertThat(outputs.get("test/artifacts")).isDirectoryContaining(
+                file -> file.getFileName().toString().equals("dependencies.properties"));
     }
 
     @Test

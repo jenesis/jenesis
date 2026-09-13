@@ -111,15 +111,9 @@ public class SignaturesTest {
     }
 
     private String printed(Signatures signatures) throws IOException {
-        PrintStream out = System.out;
-        ByteArrayOutputStream captured = new ByteArrayOutputStream();
-        System.setOut(new PrintStream(captured, true, StandardCharsets.UTF_8));
-        try {
-            run(signatures);
-        } finally {
-            System.setOut(out);
-        }
-        return captured.toString(StandardCharsets.UTF_8);
+        StringBuilder captured = new StringBuilder();
+        run(signatures.printing(line -> captured.append(line).append(System.lineSeparator())));
+        return captured.toString();
     }
 
     private Signatures step(Path signature, String... status) {
@@ -132,7 +126,7 @@ public class SignaturesTest {
     public void names_each_verified_coordinate_and_its_signer_when_asked() throws IOException {
         resolved("maven/org.example/lib", "1.0", null);
         declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
-        assertThat(printed(step(signature("lib"), validated(PRIMARY)).printing(true)))
+        assertThat(printed(step(signature("lib"), validated(PRIMARY))))
                 .as("a verified coordinate is named with the key that signed it")
                 .contains("[VERIFIED]")
                 .contains("main/maven/org.example/lib 1.0")
@@ -142,7 +136,7 @@ public class SignaturesTest {
     @Test
     public void names_each_coordinate_no_declaration_covers_when_asked() throws IOException {
         resolved("maven/org.example/lib", "1.0", null);
-        assertThat(printed(step(signature("lib"), validated(PRIMARY)).printing(true)))
+        assertThat(printed(step(signature("lib"), validated(PRIMARY))))
                 .as("what is missing is what a move to strict would have to declare")
                 .contains("[UNDECLARED]")
                 .contains("main/maven/org.example/lib 1.0");
@@ -152,8 +146,16 @@ public class SignaturesTest {
     public void prints_nothing_unless_asked() throws IOException {
         resolved("maven/org.example/lib", "1.0", null);
         declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
-        assertThat(printed(step(signature("lib"), validated(PRIMARY))))
-                .as("a quiet step stays quiet")
+        PrintStream out = System.out;
+        ByteArrayOutputStream captured = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(captured, true, StandardCharsets.UTF_8));
+        try {
+            run(step(signature("lib"), validated(PRIMARY)));
+        } finally {
+            System.setOut(out);
+        }
+        assertThat(captured.toString(StandardCharsets.UTF_8))
+                .as("a step with no consumer writes nowhere, rather than to a consumer that discards")
                 .isEmpty();
     }
 

@@ -121,8 +121,7 @@ public class DependenciesModuleClaimTest {
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addSource("dependencies", dependencies);
         executor.addModule("resolved", new Dependencies(
-                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), _ -> {
-                })),
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()))), "dependencies");
         next = executor.execute().get("resolved");
         return next;
