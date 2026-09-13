@@ -31,10 +31,10 @@ public class SpotBugsModule implements BuildExecutorModule {
     private final String group;
     private final String configFile;
     private final boolean strict;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public SpotBugsModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "spotbugs", "main", "spotbugs-exclude.xml", false, null);
+        this(repositories, resolvers, null, "spotbugs", "main", "spotbugs-exclude.xml", false, ProcessBuildStep.printing("spotbugs"));
     }
 
     private SpotBugsModule(Map<String, Repository> repositories,
@@ -44,7 +44,7 @@ public class SpotBugsModule implements BuildExecutorModule {
                            String group,
                            String configFile,
                            boolean strict,
-                           Boolean printing) {
+                           BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -79,7 +79,7 @@ public class SpotBugsModule implements BuildExecutorModule {
         return new SpotBugsModule(repositories, resolvers, pinning, tool, group, configFile, strict, printing);
     }
 
-    public SpotBugsModule printing(boolean printing) {
+    public SpotBugsModule printing(BiConsumer<Boolean, String> printing) {
         return new SpotBugsModule(repositories, resolvers, pinning, tool, group, configFile, strict, printing);
     }
 
@@ -124,8 +124,8 @@ public class SpotBugsModule implements BuildExecutorModule {
         private final String configFile;
         private final boolean strict;
 
-        private Check(String tool, String group, String configFile, boolean strict, Boolean printing) {
-            super("spotbugs", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing == null ? ProcessBuildStep.printing("spotbugs") : printing);
+        private Check(String tool, String group, String configFile, boolean strict, BiConsumer<Boolean, String> printing) {
+            super("spotbugs", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
             this.tool = tool;
             this.group = group;
             this.configFile = configFile;

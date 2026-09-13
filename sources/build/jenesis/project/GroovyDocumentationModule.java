@@ -38,10 +38,10 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
     private final String within;
     private final boolean includeJava;
     private final transient Function<List<String>, ? extends ProcessHandler> factory;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public GroovyDocumentationModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "groovydoc", "main", null, false, null, null);
+        this(repositories, resolvers, null, "groovydoc", "main", null, false, null, ProcessBuildStep.printing("groovydoc"));
     }
 
     private GroovyDocumentationModule(Map<String, Repository> repositories,
@@ -52,7 +52,7 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
                                       String within,
                                       boolean includeJava,
                                       Function<List<String>, ? extends ProcessHandler> factory,
-                                      Boolean printing) {
+                                      BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -88,7 +88,7 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
         return new GroovyDocumentationModule(repositories, resolvers, pinning, tool, group, within, includeJava, factory, printing);
     }
 
-    public GroovyDocumentationModule printing(boolean printing) {
+    public GroovyDocumentationModule printing(BiConsumer<Boolean, String> printing) {
         return new GroovyDocumentationModule(repositories, resolvers, pinning, tool, group, within, includeJava, factory, printing);
     }
 
@@ -159,12 +159,12 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
         private final String tool;
         private final String group;
 
-        private Document(String within, boolean includeJava, String tool, String group, Boolean printing) {
+        private Document(String within, boolean includeJava, String tool, String group, BiConsumer<Boolean, String> printing) {
             this(within, includeJava, tool, group, ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
         }
 
-        private Document(String within, boolean includeJava, String tool, String group, Function<List<String>, ? extends ProcessHandler> factory, Boolean printing) {
-            super("groovydoc", factory, printing == null ? ProcessBuildStep.printing("groovydoc") : printing);
+        private Document(String within, boolean includeJava, String tool, String group, Function<List<String>, ? extends ProcessHandler> factory, BiConsumer<Boolean, String> printing) {
+            super("groovydoc", factory, printing);
             this.within = within;
             this.includeJava = includeJava;
             this.tool = tool;

@@ -33,10 +33,10 @@ public class XjcModule implements BuildExecutorModule {
     private final String tool;
     private final String packageName;
     private final List<String> arguments;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public XjcModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "xjc", null, List.of(), null);
+        this(repositories, resolvers, null, "xjc", null, List.of(), ProcessBuildStep.printing("xjc"));
     }
 
     private XjcModule(Map<String, Repository> repositories,
@@ -45,7 +45,7 @@ public class XjcModule implements BuildExecutorModule {
                       String tool,
                       String packageName,
                       List<String> arguments,
-                      Boolean printing) {
+                      BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -71,7 +71,7 @@ public class XjcModule implements BuildExecutorModule {
         return new XjcModule(repositories, resolvers, pinning, tool, packageName, arguments, printing);
     }
 
-    public XjcModule printing(boolean printing) {
+    public XjcModule printing(BiConsumer<Boolean, String> printing) {
         return new XjcModule(repositories, resolvers, pinning, tool, packageName, arguments, printing);
     }
 
@@ -120,8 +120,8 @@ public class XjcModule implements BuildExecutorModule {
         private Generate(String tool,
                          String packageName,
                          List<String> arguments,
-                         Boolean printing) {
-            super("xjc", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing == null ? ProcessBuildStep.printing("xjc") : printing);
+                         BiConsumer<Boolean, String> printing) {
+            super("xjc", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
             this.tool = tool;
             this.packageName = packageName;
             this.arguments = arguments;

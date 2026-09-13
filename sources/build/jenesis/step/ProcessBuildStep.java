@@ -28,7 +28,7 @@ public abstract class ProcessBuildStep implements BuildStep {
 
     protected final transient Function<List<String>, ? extends ProcessHandler> factory;
     private final String command;
-    protected final transient boolean verbose;
+    protected final transient BiConsumer<Boolean, String> printing;
     protected final transient Consumer<String> announcing;
     private final transient Semaphore permits;
 
@@ -38,23 +38,23 @@ public abstract class ProcessBuildStep implements BuildStep {
 
     protected ProcessBuildStep(String command,
                                Function<List<String>, ? extends ProcessHandler> factory,
-                               boolean verbose) {
+                               BiConsumer<Boolean, String> printing) {
         int concurrency = Integer.getInteger("jenesis.process.concurrency", 0);
         if (concurrency < 0) {
             throw new IllegalArgumentException("Process concurrency must not be negative: " + concurrency);
         }
-        this(command, factory, verbose, concurrency == 0
+        this(command, factory, printing, concurrency == 0
                 ? null
                 : PERMITS.computeIfAbsent(concurrency, Semaphore::new));
     }
 
     protected ProcessBuildStep(String command,
                                Function<List<String>, ? extends ProcessHandler> factory,
-                               boolean verbose,
+                               BiConsumer<Boolean, String> printing,
                                Semaphore permits) {
         this.command = command;
         this.factory = factory;
-        this.verbose = verbose;
+        this.printing = printing;
         this.announcing = SequencedProperties.systemFlag("jenesis.print.command") ? System.out::println : null;
         this.permits = permits;
     }
@@ -71,9 +71,11 @@ public abstract class ProcessBuildStep implements BuildStep {
         }
     }
 
-    protected static boolean printing(String command) {
+    public static BiConsumer<Boolean, String> printing(String command) {
         return SequencedProperties.systemFlag("jenesis.print." + command,
-                SequencedProperties.systemFlag("jenesis.print.process"));
+                SequencedProperties.systemFlag("jenesis.print.process"))
+                ? (error, line) -> System.out.println(paint(error ? 131 : 244, command + " >>>> " + line))
+                : null;
     }
 
     protected List<String> configurations() {
@@ -94,13 +96,13 @@ public abstract class ProcessBuildStep implements BuildStep {
     }
 
     protected ProcessHandler.Tee tee(Executor executor, ProcessHandler handler) {
-        if (!verbose) {
+        if (printing == null) {
             return null;
         }
-        System.out.println(paint(66, command + " >>>> " + String.join(" ", handler.commands())));
+        printing.accept(false, String.join(" ", handler.commands()));
         return new ProcessHandler.Tee(executor,
-                line -> System.out.println(paint(244, command + " >>>> " + line)),
-                line -> System.out.println(paint(131, command + " >>>> " + line)));
+                line -> printing.accept(false, line),
+                line -> printing.accept(true, line));
     }
 
     private static String paint(int code, String text) {

@@ -28,8 +28,8 @@ public class Javac extends JdkProcessBuildStep {
                   boolean includeResources,
                   PathPlacement pathPlacement,
                   String group,
-                  boolean verbose) {
-        super("javac", factory, verbose);
+                  BiConsumer<Boolean, String> printing) {
+        super("javac", factory, printing);
         this.includeResources = includeResources;
         this.pathPlacement = pathPlacement;
         this.group = group;
@@ -46,19 +46,19 @@ public class Javac extends JdkProcessBuildStep {
     }
 
     public Javac includeResources(boolean includeResources) {
-        return new Javac(factory, includeResources, pathPlacement, group, verbose);
+        return new Javac(factory, includeResources, pathPlacement, group, printing);
     }
 
     public Javac pathPlacement(PathPlacement pathPlacement) {
-        return new Javac(factory, includeResources, pathPlacement, group, verbose);
+        return new Javac(factory, includeResources, pathPlacement, group, printing);
     }
 
     public Javac group(String group) {
-        return new Javac(factory, includeResources, pathPlacement, group, verbose);
+        return new Javac(factory, includeResources, pathPlacement, group, printing);
     }
 
-    public Javac verbose(boolean verbose) {
-        return new Javac(factory, includeResources, pathPlacement, group, verbose);
+    public Javac verbose(BiConsumer<Boolean, String> printing) {
+        return new Javac(factory, includeResources, pathPlacement, group, printing);
     }
 
     @Override

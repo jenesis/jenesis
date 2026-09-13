@@ -36,10 +36,10 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
     private final String group;
     private final String within;
     private final transient Function<List<String>, ? extends ProcessHandler> factory;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public DokkaDocumentationModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "dokka", "main", null, null, null);
+        this(repositories, resolvers, null, "dokka", "main", null, null, ProcessBuildStep.printing("dokka"));
     }
 
     private DokkaDocumentationModule(Map<String, Repository> repositories,
@@ -49,7 +49,7 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
                                      String group,
                                      String within,
                                      Function<List<String>, ? extends ProcessHandler> factory,
-                                     Boolean printing) {
+                                     BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -80,7 +80,7 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
         return new DokkaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
     }
 
-    public DokkaDocumentationModule printing(boolean printing) {
+    public DokkaDocumentationModule printing(BiConsumer<Boolean, String> printing) {
         return new DokkaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
     }
 
@@ -137,12 +137,12 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
         private final String tool;
         private final String group;
 
-        private Document(String within, String tool, String group, Boolean printing) {
+        private Document(String within, String tool, String group, BiConsumer<Boolean, String> printing) {
             this(within, tool, group, ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
         }
 
-        private Document(String within, String tool, String group, Function<List<String>, ? extends ProcessHandler> factory, Boolean printing) {
-            super("dokka", factory, printing == null ? ProcessBuildStep.printing("dokka") : printing);
+        private Document(String within, String tool, String group, Function<List<String>, ? extends ProcessHandler> factory, BiConsumer<Boolean, String> printing) {
+            super("dokka", factory, printing);
             this.within = within;
             this.tool = tool;
             this.group = group;

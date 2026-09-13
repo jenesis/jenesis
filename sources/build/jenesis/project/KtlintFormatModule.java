@@ -28,7 +28,7 @@ public class KtlintFormatModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final String group;
     private final boolean verify;
-    private final Boolean printing;
+    private final transient BiConsumer<Boolean, String> printing;
 
     public KtlintFormatModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
         this(repositories, resolvers, null, "ktlint-format", false, null);
@@ -39,7 +39,7 @@ public class KtlintFormatModule implements BuildExecutorModule {
                                Pinning pinning,
                                String group,
                                boolean verify,
-                               Boolean printing) {
+                               BiConsumer<Boolean, String> printing) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -64,7 +64,7 @@ public class KtlintFormatModule implements BuildExecutorModule {
         return new KtlintFormatModule(repositories, resolvers, pinning, group, verify, printing);
     }
 
-    public KtlintFormatModule printing(boolean printing) {
+    public KtlintFormatModule printing(BiConsumer<Boolean, String> printing) {
         return new KtlintFormatModule(repositories, resolvers, pinning, group, verify, printing);
     }
 
@@ -104,7 +104,7 @@ public class KtlintFormatModule implements BuildExecutorModule {
 
     private static class Format extends FormatBuildStep {
 
-        private Format(String group, boolean verify, Boolean printing) {
+        private Format(String group, boolean verify, BiConsumer<Boolean, String> printing) {
             super(group, verify, printing == null ? ProcessBuildStep.printing(group) : printing);
         }
 
