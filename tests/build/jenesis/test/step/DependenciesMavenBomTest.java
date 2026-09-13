@@ -22,6 +22,7 @@ import build.jenesis.maven.MavenRepository;
 import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class DependenciesMavenBomTest {
 
@@ -171,6 +172,38 @@ public class DependenciesMavenBomTest {
                 Map.of("maven", new MavenPomResolver())));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).contains("main/compile/maven/org.acme/lib/3.0");
+    }
+
+    @Test
+    public void strict_pinning_names_the_bill_of_materials_that_moved_a_version() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.acme/lib", "");
+        requires.store(dependencies.resolve(BuildStep.REQUIRES));
+        SequencedProperties versions = new SequencedProperties();
+        versions.setProperty("main/maven/org.acme/lib", "1.0 SHA-256/8943fd8f317f46b8ab10ccd163777312f486b4ed24953460a1c2d16993d3daa5");
+        versions.store(dependencies.resolve(BuildStep.VERSIONS));
+        SequencedProperties boms = new SequencedProperties();
+        boms.setProperty("entry/main/maven/org.slf4j/slf4j-api", "2.0.18");
+        boms.store(dependencies.resolve(BuildStep.BOMS));
+        assertThatThrownBy(() -> apply(new Dependencies(
+                Map.of("maven", maven(Map.of("org.acme/lib/pom/1.0", """
+                        <project xmlns="http://maven.apache.org/POM/4.0.0">
+                            <modelVersion>4.0.0</modelVersion>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.slf4j</groupId>
+                                    <artifactId>slf4j-api</artifactId>
+                                    <version>2.0.16</version>
+                                </dependency>
+                            </dependencies>
+                        </project>
+                        """))),
+                Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT)))
+                .as("a version-only entry re-versions what other modules reach transitively, and the"
+                        + " module that fails never named the coordinate at all")
+                .hasStackTraceContaining("No checksum pinned for maven/org.slf4j/slf4j-api/2.0.18")
+                .hasStackTraceContaining("A bill of materials manages it at this version"
+                        + " and records no checksum");
     }
 
     @Test

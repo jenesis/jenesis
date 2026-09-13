@@ -719,7 +719,10 @@ public class Dependencies implements BuildExecutorModule {
                     if (entry.getValue().isEmpty()
                             && !internals.get(entry.getKey())
                             && !pinnedFiles.contains(placed.get(entry.getKey()))) {
-                        throw new IllegalStateException("No checksum pinned for " + entry.getKey() + " (strict pinning is enabled)");
+                        throw new IllegalStateException("No checksum pinned for "
+                                + entry.getKey()
+                                + " (strict pinning is enabled)"
+                                + managing(managed, entry.getKey()));
                     }
                 }
             }
@@ -939,6 +942,34 @@ public class Dependencies implements BuildExecutorModule {
     }
 
     private record Claim(String dependency, Path file) {
+    }
+
+    private static String managing(
+            SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>> managed,
+            String key) {
+        int lastSlash = key.lastIndexOf('/');
+        if (lastSlash < 1) {
+            return "";
+        }
+        String coordinate = key.substring(0, lastSlash), version = key.substring(lastSlash + 1);
+        for (SequencedMap<String, SequencedMap<String, String>> byRepository : managed.values()) {
+            for (Map.Entry<String, SequencedMap<String, String>> repository : byRepository.entrySet()) {
+                for (Map.Entry<String, String> entry : repository.getValue().entrySet()) {
+                    if (!coordinate.equals(repository.getKey() + "/" + entry.getKey())) {
+                        continue;
+                    }
+                    String value = entry.getValue();
+                    int space = value.indexOf(' ');
+                    if (!version.equals(space < 0 ? value : value.substring(0, space))) {
+                        continue;
+                    }
+                    return ". A bill of materials manages it at this version and records no checksum,"
+                            + " so no pin covers what it resolves to: record the checksum beside the"
+                            + " version in the bill of materials, or stop managing the coordinate there";
+                }
+            }
+        }
+        return "";
     }
 
     private static Path index(Path folder) {
