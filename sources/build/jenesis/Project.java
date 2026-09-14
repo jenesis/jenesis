@@ -1797,7 +1797,7 @@ public record Project(
                 project.digest|SHA-256|Algorithm for pin and dependency checksums
                 dependency.signature|none|Signatures verified after download: none|declared|strict
                 signature.command|gpgv|Binary forked to verify detached OpenPGP signatures; a name is looked up on the PATH, a path is used as given
-                signature.keys|keyserver.ubuntu.com lookup|Key servers, comma-separated and queried left to right, <fingerprint> substituted; empty fetches nothing (env JENESIS_SIGNATURE_KEYS)
+                signature.keys|keyserver.ubuntu.com lookup|Key servers, comma-separated and queried left to right, <fingerprint> substituted; @ splices the default and @<name> another setting; empty fetches nothing (env JENESIS_SIGNATURE_KEYS)
                 signature.cache|.jenesis/keys|Folder holding the fetched keys, one file per fingerprint
                 signature.expiry|signing|An expired signing key: ignored accepts it, signing accepts what it signed before expiring, current rejects it
                 project.metadata||Comma-separated extra metadata files

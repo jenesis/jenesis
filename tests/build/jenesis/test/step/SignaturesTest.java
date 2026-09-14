@@ -120,6 +120,8 @@ public class SignaturesTest {
     private Signatures step(Path signature, String... status) {
         return new Signatures(Map.of("maven", publishing(signature)))
                 .verification(Verification.DECLARED)
+                .keys("")
+                .cache(root.resolve("keys"))
                 .factory(reporting(status));
     }
 
@@ -226,6 +228,43 @@ public class SignaturesTest {
         declared("unsigned/ignored", "main/maven/org.example/lib");
         assertThatCode(() -> run(step(null).verification(Verification.STRICT)))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    public void refuses_a_key_server_reference_that_resolves_to_nothing() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(signature("lib"), validated(PRIMARY)).keys("@jenesis.test.absent")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Unresolved key server reference: @jenesis.test.absent");
+    }
+
+    @Test
+    public void refuses_a_key_server_reference_that_points_at_itself() throws IOException {
+        System.setProperty("jenesis.test.loop", "@jenesis.test.loop");
+        try {
+            resolved("maven/org.example/lib", "1.0", null);
+            declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+            assertThatThrownBy(() -> run(step(signature("lib"), validated(PRIMARY)).keys("@jenesis.test.loop")))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Circular key server reference: @jenesis.test.loop");
+        } finally {
+            System.clearProperty("jenesis.test.loop");
+        }
+    }
+
+    @Test
+    public void reads_a_key_server_list_out_of_the_reference_it_names() throws IOException {
+        System.setProperty("jenesis.test.servers", root.resolve("keys").toUri() + "<fingerprint>.asc");
+        try {
+            resolved("maven/org.example/lib", "1.0", null);
+            declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+            assertThatCode(() -> run(step(signature("lib"), validated(PRIMARY)).keys("@jenesis.test.servers")))
+                    .as("the reference expands to a list, and a server with no such key is not fatal")
+                    .doesNotThrowAnyException();
+        } finally {
+            System.clearProperty("jenesis.test.servers");
+        }
     }
 
     @Test

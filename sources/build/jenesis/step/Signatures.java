@@ -434,6 +434,10 @@ public class Signatures extends ProcessBuildStep {
 
     private Path keyring(Set<String> declared, BuildStepContext context) throws IOException {
         Path file = context.supplement().resolve("keyring.gpg");
+        List<String> servers = new ArrayList<>();
+        if (keys != null && !keys.isBlank()) {
+            servers(keys, new HashSet<>(), servers);
+        }
         try (OutputStream out = Files.newOutputStream(file)) {
             for (String declaration : declared) {
                 if (unsigned(declaration)) {
@@ -441,7 +445,7 @@ public class Signatures extends ProcessBuildStep {
                 }
                 String fingerprint = declaration.substring(declaration.indexOf('/') + 1)
                         .toUpperCase(Locale.ROOT);
-                byte[] key = key(fingerprint);
+                byte[] key = key(fingerprint, servers);
                 if (key != null) {
                     out.write(key);
                 }
@@ -461,21 +465,48 @@ public class Signatures extends ProcessBuildStep {
                 : environment;
     }
 
-    private byte[] key(String fingerprint) throws IOException {
+    private static void servers(String text, Set<String> visited, List<String> target) {
+        for (String entry : text.split(",")) {
+            String candidate = entry.trim();
+            if (candidate.isEmpty()) {
+                continue;
+            }
+            if (candidate.startsWith("@")) {
+                String name = candidate.substring(1);
+                if (name.isEmpty()) {
+                    String environment = System.getenv("JENESIS_SIGNATURE_KEYS");
+                    if (environment != null && visited.add("JENESIS_SIGNATURE_KEYS")) {
+                        servers(environment, visited, target);
+                        visited.remove("JENESIS_SIGNATURE_KEYS");
+                    } else {
+                        target.add("https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr"
+                                + "&search=0x<fingerprint>");
+                    }
+                } else {
+                    String value = System.getProperty(name, System.getenv(name));
+                    if (value == null) {
+                        throw new IllegalStateException("Unresolved key server reference: @" + name);
+                    }
+                    if (!visited.add(name)) {
+                        throw new IllegalStateException("Circular key server reference: @" + name);
+                    }
+                    servers(value, visited, target);
+                    visited.remove(name);
+                }
+            } else {
+                target.add(candidate);
+            }
+        }
+    }
+
+    private byte[] key(String fingerprint, List<String> servers) throws IOException {
         Path cached = cache.resolve(fingerprint + ".gpg");
         if (Files.isRegularFile(cached)) {
             return Files.readAllBytes(cached);
         }
-        if (keys == null || keys.isBlank()) {
-            return null;
-        }
         byte[] key = null;
         SequencedMap<String, String> refused = new LinkedHashMap<>();
-        for (String server : keys.split(",")) {
-            String endpoint = server.trim();
-            if (endpoint.isEmpty()) {
-                continue;
-            }
+        for (String endpoint : servers) {
             URI uri = URI.create(endpoint.replace("<fingerprint>", fingerprint));
             try (InputStream stream = Repository.open(uri, null)) {
                 key = dearmoured(new String(stream.readAllBytes(), StandardCharsets.US_ASCII));
