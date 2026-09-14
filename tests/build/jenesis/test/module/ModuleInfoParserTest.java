@@ -1112,6 +1112,40 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void signature_tag_accepts_the_unsigned_algorithm_and_its_modes() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.signature unsigned/missing org.example/lib
+                 * @jenesis.signature unsigned/ignored org.example/other
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.signatures())
+                .as("the coordinate publishes no signature, so the value carries the mode instead")
+                .containsEntry("unsigned/missing", "main/maven/org.example/lib")
+                .containsEntry("unsigned/ignored", "main/maven/org.example/other");
+    }
+
+    @Test
+    public void signature_tag_still_refuses_an_algorithm_with_an_empty_fingerprint() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.signature OpenPGP/ org.example/lib
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("no algorithm may omit its value, so a typo is never a valid declaration")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("expected <algorithm>/<fingerprint>");
+    }
+
+    @Test
     public void signature_tag_expands_every_token_it_lists() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**

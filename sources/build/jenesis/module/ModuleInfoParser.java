@@ -397,7 +397,7 @@ public class ModuleInfoParser {
                                         || slash == fingerprint.length() - 1) {
                                     throw new IllegalArgumentException("Malformed @jenesis.signature"
                                             + " fingerprint '" + fingerprint
-                                            + "': expected <algorithm>/<fingerprint>."
+                                            + "': expected <algorithm>/<fingerprint>, or unsigned/missing or unsigned/ignored for a coordinate that publishes no signature."
                                             + " A tag owns every line below it until the next tag, so prose"
                                             + " written under a signature is read as part of it; move it above"
                                             + " the tag block");

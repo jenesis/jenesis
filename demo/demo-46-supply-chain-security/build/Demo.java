@@ -29,14 +29,17 @@ public class Demo {
                     + " so this half needs a POSIX shell");
             return;
         }
-        if (run(null, List.of("gpg", "--version")) != null) {
-            System.out.println("[skipped] gpg is not installed, so signatures cannot be verified here");
+        if (run(null, List.of("gpg", "--version")) != null
+                || run(null, List.of("gpgv", "--version")) != null) {
+            System.out.println("[skipped] gpg and gpgv are not both installed,"
+                    + " so signatures cannot be signed and verified here");
             return;
         }
         Path work = Path.of("target").toAbsolutePath();
         Path jar = published(work);
         Path home = generatedKey(work);
         String fingerprint = signed(home, jar);
+        vaulted(home, work, fingerprint);
 
         // 3. The declared scope verifies exactly the coordinates a declaration covers.
         // This project declares none, so nothing is verified and the build is untouched.
@@ -83,28 +86,30 @@ public class Demo {
         // 9. A key that has since expired still vouches for what it signed while it was
         // valid, which is the common case for an old release: the keyservers publish no
         // extended expiry, yet the signature was made years before the key lapsed. The
-        // clock is moved past the expiry with a wrapper named by path, which is also
-        // what jenesis.signature.command accepts besides a name on the PATH.
+        // key here is given seconds to live and the demo waits for it, because gpgv
+        // reads the real clock and has no option to pretend otherwise.
         String expiringFingerprint = expiringKey(home, jar);
+        vaulted(home, work, expiringFingerprint);
         Path cached = Path.of("target", "artifacts");
         if (Files.isDirectory(cached)) {
             delete(cached);
         }
-        Path faked = fakedClock(work);
+        long expired = System.currentTimeMillis() + 6_000;
+        while (System.currentTimeMillis() < expired) {
+            Thread.sleep(200);
+        }
         String declared = Files.readString(declaration);
         try {
             Files.writeString(declaration, declared.replace(" */",
                     " * @jenesis.signature OpenPGP/" + expiringFingerprint + " org.example/*\n */"));
             expectSignature("expired: what the key signed before it lapsed is still accepted",
-                    true, home, "strict", "signed",
-                    List.of("-Djenesis.signature.command=" + faked));
+                    true, home, "strict", "signed", List.of());
 
             // 10. The same artifact under the strictest reading of expiry, where the key
             // must be unexpired today. That is the previous behaviour, kept as an option.
             expectSignature("expired: the same signature under expiry measured against today",
                     false, home, "strict", "signed",
-                    List.of("-Djenesis.signature.command=" + faked,
-                            "-Djenesis.signature.expiry=current"));
+                    List.of("-Djenesis.signature.expiry=current"));
         } finally {
             Files.writeString(declaration, declared);
         }
@@ -161,7 +166,7 @@ public class Demo {
 
     private static String expiringKey(Path home, Path jar) throws Exception {
         gpg(home, "--quick-generate-key", "Jenesis Demo (expiring) <expiry@jenesis.invalid>",
-                "default", "default", "1d");
+                "default", "default", "seconds=5");
         String expiring = fingerprintOf(home, "expiry@jenesis.invalid");
         gpg(home, "--detach-sign", "--armor", "--local-user", expiring,
                 "--output", jar + ".asc", jar.toString());
@@ -188,13 +193,10 @@ public class Demo {
         throw new IllegalStateException("No key for " + identity + " reported by gpg:\n" + listed);
     }
 
-    private static Path fakedClock(Path work) throws Exception {
-        Path wrapper = work.resolve("gpg-after-expiry");
-        Files.writeString(wrapper, "#!/bin/sh\nexec gpg --faked-system-time "
-                + Instant.now().plus(2, ChronoUnit.DAYS).getEpochSecond()
-                + " \"$@\"\n");
-        Files.setPosixFilePermissions(wrapper, PosixFilePermissions.fromString("rwx------"));
-        return wrapper;
+    private static void vaulted(Path home, Path work, String key) throws Exception {
+        Path vault = work.resolve("keys");
+        Files.createDirectories(vault);
+        gpg(home, "--export", "--output", vault.resolve(key + ".gpg").toString(), key);
     }
 
     private static String signed(Path home, Path jar) throws Exception {
@@ -245,6 +247,8 @@ public class Demo {
                 "-Djenesis.maven.local=" + artifacts));
         if (verification != null) {
             command.add("-Djenesis.dependency.signature=" + verification);
+            command.add("-Djenesis.openpgp.local=" + Path.of("target", "keys").toAbsolutePath());
+            command.add("-Djenesis.openpgp.uri=");
         }
         command.addAll(options);
         command.addAll(List.of("build/jenesis/Make.java", "build"));

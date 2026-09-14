@@ -18,7 +18,7 @@ public class Signatures extends ProcessBuildStep {
 
     private static final String STATUS = "[GNUPG:] ";
 
-    private static final List<String> VERIFY = List.of("--batch", "--no-tty", "--status-fd", "1", "--verify");
+    private static final List<String> VERIFY = List.of("--status-fd", "1");
 
     private final transient Map<String, Repository> repositories;
     private final Verification verification;
@@ -31,7 +31,7 @@ public class Signatures extends ProcessBuildStep {
         this(repositories,
                 Verification.fromProperty(),
                 KeyExpiry.fromProperty(),
-                System.getProperty("jenesis.signature.command", "gpg"),
+                System.getProperty("jenesis.signature.command", "gpgv"),
                 null,
                 SequencedProperties.systemFlag("jenesis.print.signatures") ? System.out::println : null);
     }
@@ -42,7 +42,7 @@ public class Signatures extends ProcessBuildStep {
                        String command,
                        Function<List<String>, ? extends ProcessHandler> supplied,
                        Consumer<String> printing) {
-        super("gpg", supplied == null ? ProcessHandler.OfProcess.ofCommand(command) : supplied);
+        super("gpgv", supplied == null ? ProcessHandler.OfProcess.ofCommand(command) : supplied);
         this.repositories = repositories;
         this.verification = verification;
         this.expiry = expiry;
@@ -133,6 +133,8 @@ public class Signatures extends ProcessBuildStep {
         }
         List<String> prefix = new ArrayList<>(prepended(properties(arguments)));
         prefix.addAll(VERIFY);
+        prefix.add("--keyring");
+        prefix.add(keyring(executor, declared.keySet(), context).toAbsolutePath().toString());
         SequencedMap<String, SequencedMap<String, String>> candidates = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : resolved.entrySet()) {
             String key = entry.getKey();
@@ -194,6 +196,15 @@ public class Signatures extends ProcessBuildStep {
                 }
                 continue;
             }
+            if (accepted.stream().anyMatch("unsigned/ignored"::equalsIgnoreCase)) {
+                if (printing != null) {
+                    print("[UNVERIFIED]",
+                            BuildExecutorCallback.YELLOW,
+                            token + " " + version,
+                            "unsigned/ignored accepts it signed or not");
+                }
+                continue;
+            }
             int repositorySlash = coordinate.indexOf('/');
             Repository repository = repositorySlash < 1
                     ? null
@@ -205,18 +216,29 @@ public class Signatures extends ProcessBuildStep {
             String relative = coordinate.substring(repositorySlash + 1) + "/" + version;
             Path signature = materialise(executor, context, repository, relative, true);
             if (signature == null) {
+                SequencedSet<String> acknowledged = new LinkedHashSet<>(accepted);
+                acknowledged.removeIf(declaration -> !unsigned(declaration));
                 if (printing != null) {
-                    print("[UNSIGNED]",
+                    print(acknowledged.isEmpty() ? "[UNSIGNED]" : "[UNVERIFIED]",
                             BuildExecutorCallback.YELLOW,
                             token + " " + version,
-                            "a key is declared for it but no signature is published");
+                            acknowledged.isEmpty()
+                                    ? "a key is declared for it but no signature is published"
+                                    : "no signature is published, which "
+                                            + String.join(", ", acknowledged) + " accepts");
                 }
-                violations.add(token + " " + version + ": a key is declared for it but no signature is published");
+                if (acknowledged.isEmpty()) {
+                    violations.add(token + " " + version
+                            + ": a key is declared for it but no signature is published; if that is reviewed"
+                            + " and accepted, declare it as unsigned/missing, which fails again once a"
+                            + " signature appears, or unsigned/ignored, which never looks");
+                }
                 continue;
             }
             Status status = verify(executor, context, prefix, Path.of(candidate.getKey()), signature);
             if (status.failure() != null) {
-                violations.add(token + " " + version + ": " + status.failure());
+                violations.add(token + " " + version + ": " + status.failure()
+                        + (status.missing() == null ? "" : missing(accepted)));
                 continue;
             }
             if (status.fingerprint() == null) {
@@ -233,8 +255,12 @@ public class Signatures extends ProcessBuildStep {
             if (accepted.stream().noneMatch(fingerprint::equalsIgnoreCase)) {
                 violations.add(token + " " + version + ": signed by " + fingerprint
                         + " but only " + String.join(", ", accepted)
-                        + (accepted.size() == 1 ? " is" : " are") + " declared for it; add "
-                        + fingerprint + " to a @jenesis.signature line to accept a key rotation");
+                        + (accepted.size() == 1 ? " is" : " are") + " declared for it; "
+                        + (accepted.stream().anyMatch("unsigned/missing"::equalsIgnoreCase)
+                                ? "a signature has appeared where unsigned/missing said there was none,"
+                                        + " so replace that line with " + fingerprint
+                                : "add " + fingerprint
+                                        + " to a @jenesis.signature line to accept a key rotation"));
                 continue;
             }
             MavenDependencyKey.Versioned pomKey = null;
@@ -272,8 +298,10 @@ public class Signatures extends ProcessBuildStep {
                     : "OpenPGP/" + pomStatus.fingerprint().toUpperCase(Locale.ROOT);
             if (pomStatus.failure() != null) {
                 violations.add(token + " " + version + ": for its POM, " + pomStatus.failure()
-                        + "; a repository that re-serialises POMs invalidates them, so resolve from one that"
-                        + " serves the published bytes");
+                        + (pomStatus.missing() == null
+                                ? "; a repository that re-serialises POMs invalidates them, so resolve from one"
+                                        + " that serves the published bytes"
+                                : missing(accepted)));
             } else if (signer == null) {
                 violations.add(token + " " + version + ": gpg reported no validated signature for its POM");
             } else if (!signer.equalsIgnoreCase(fingerprint)) {
@@ -332,7 +360,7 @@ public class Signatures extends ProcessBuildStep {
             Thread.currentThread().interrupt();
             throw new InterruptedIOException("Interrupted while verifying " + file);
         }
-        String fingerprint = null, failure = null;
+        String fingerprint = null, failure = null, missing = null;
         long signed = -1, expired = -1;
         boolean keyExpired = false;
         for (String line : Files.readAllLines(output, StandardCharsets.ISO_8859_1)) {
@@ -359,10 +387,7 @@ public class Signatures extends ProcessBuildStep {
                 case "BADSIG" -> failure = "the signature does not match the file";
                 case "EXPKEYSIG" -> keyExpired = true;
                 case "REVKEYSIG" -> failure = "the signing key was revoked";
-                case "NO_PUBKEY" -> failure = "the public key "
-                        + (tokens.length > 1 ? tokens[1] : "")
-                        + " is not available; obtain it, verify it against the project's published keys,"
-                        + " and import it";
+                case "NO_PUBKEY" -> missing = tokens.length > 1 ? tokens[1] : "";
                 case "ERRSIG" -> {
                     if (failure == null) {
                         failure = "the signature could not be checked";
@@ -375,6 +400,9 @@ public class Signatures extends ProcessBuildStep {
         if (keyExpired && failure == null) {
             failure = expired(signed, expired);
         }
+        if (missing != null) {
+            failure = "the public key " + missing + " is not available";
+        }
         if (exitCode != 0 && fingerprint == null && failure == null) {
             throw new IllegalStateException("Unexpected exit code " + exitCode + " and no signature verdict from "
                     + command
@@ -382,10 +410,87 @@ public class Signatures extends ProcessBuildStep {
                     + "\nTo reproduce, execute:\n "
                     + String.join(" ", handler.commands())
                     + (Files.isRegularFile(error)
-                            ? "\n\nError:\n" + Files.readString(error, StandardCharsets.ISO_8859_1)
+                            ? "\n\nError:\n" + new String(Files.readAllBytes(error), NATIVE_ENCODING)
                             : ""));
         }
-        return new Status(fingerprint, failure, signed, keyExpired ? expired : -1);
+        return new Status(fingerprint, failure, signed, keyExpired ? expired : -1, missing);
+    }
+
+    private Path keyring(Executor executor, Set<String> declared, BuildStepContext context) throws IOException {
+        Path file = context.supplement().resolve("keyring.gpg");
+        try (OutputStream out = Files.newOutputStream(file)) {
+            for (String declaration : declared) {
+                if (unsigned(declaration)) {
+                    continue;
+                }
+                int slash = declaration.indexOf('/');
+                String algorithm = declaration.substring(0, slash);
+                Repository keys = repositories.get(algorithm);
+                if (keys == null) {
+                    throw new IllegalStateException("No repository is registered as '"
+                            + algorithm
+                            + "' to resolve the key that "
+                            + declaration
+                            + " declares; register one under that name, or declare the coordinate"
+                            + " unsigned/missing or unsigned/ignored");
+                }
+                String fingerprint = declaration.substring(slash + 1).toUpperCase(Locale.ROOT);
+                byte[] key;
+                try (InputStream stream = keys.fetch(executor, fingerprint)
+                        .orElseThrow(() -> new IOException("No key server holds it"))
+                        .toInputStream()) {
+                    key = stream.readAllBytes();
+                } catch (IOException e) {
+                    if (printing != null) {
+                        print("[UNFETCHED]",
+                                BuildExecutorCallback.YELLOW,
+                                declaration,
+                                e.getMessage() == null ? e.toString() : e.getMessage());
+                    }
+                    continue;
+                }
+                String text = new String(key, StandardCharsets.US_ASCII);
+                out.write(text.regionMatches(0, "-----BEGIN PGP", 0, 14) ? dearmoured(text) : key);
+            }
+        }
+        return file;
+    }
+
+    private static byte[] dearmoured(String armoured) {
+        int begin = armoured.indexOf("-----BEGIN PGP PUBLIC KEY BLOCK-----");
+        int end = armoured.indexOf("-----END PGP PUBLIC KEY BLOCK-----");
+        if (begin < 0 || end < begin) {
+            throw new IllegalArgumentException("No OpenPGP public key block in the response");
+        }
+        StringBuilder base64 = new StringBuilder();
+        boolean body = false;
+        for (String line : armoured.substring(begin, end).lines().skip(1).toList()) {
+            String trimmed = line.trim();
+            if (!body) {
+                if (trimmed.isEmpty()) {
+                    body = true;
+                } else if (trimmed.indexOf(':') < 0) {
+                    body = true;
+                    base64.append(trimmed);
+                }
+                continue;
+            }
+            if (!trimmed.isEmpty() && !trimmed.startsWith("=")) {
+                base64.append(trimmed);
+            }
+        }
+        return Base64.getMimeDecoder().decode(base64.toString());
+    }
+
+    private static boolean unsigned(String declaration) {
+        return declaration.equalsIgnoreCase("unsigned/missing")
+                || declaration.equalsIgnoreCase("unsigned/ignored");
+    }
+
+    private static String missing(SequencedSet<String> accepted) {
+        return ", and is declared as "
+                + String.join(", ", accepted)
+                + "; obtain that key, verify the fingerprint against the project's published keys, and import it";
     }
 
     private String expired(long signed, long expired) {
@@ -416,7 +521,7 @@ public class Signatures extends ProcessBuildStep {
         }
     }
 
-    private record Status(String fingerprint, String failure, long signed, long expired) {
+    private record Status(String fingerprint, String failure, long signed, long expired, String missing) {
 
         private String dates() {
             StringBuilder dates = new StringBuilder();

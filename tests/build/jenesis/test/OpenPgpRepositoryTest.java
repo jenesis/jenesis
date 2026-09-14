@@ -1,0 +1,112 @@
+package build.jenesis.test;
+
+import module java.base;
+import module jdk.httpserver;
+import module org.junit.jupiter.api;
+import build.jenesis.OpenPgpRepository;
+import build.jenesis.Repository;
+import build.jenesis.RepositoryItem;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+public class OpenPgpRepositoryTest {
+
+    private static final String FINGERPRINT = "B4D5C1E7000000000000000000000000000000AA";
+
+    @TempDir
+    private Path root;
+
+    @Test
+    public void asks_a_key_server_the_way_the_protocol_says() throws Exception {
+        List<String> asked = new ArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            asked.add(exchange.getRequestURI().toString());
+            byte[] body = "key bytes".getBytes(StandardCharsets.US_ASCII);
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+        server.start();
+        System.setProperty("jenesis.repository.insecure", "true");
+        try {
+            Optional<RepositoryItem> item = new OpenPgpRepository(
+                    URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"))
+                    .local(root)
+                    .fetch(Runnable::run, FINGERPRINT);
+            assertThat(item).isPresent();
+            try (InputStream stream = item.orElseThrow().toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.US_ASCII)).isEqualTo("key bytes");
+            }
+            assertThat(asked)
+                    .as("the fingerprint is asked for by the HKP lookup the server publishes")
+                    .containsExactly("/pks/lookup?op=get&options=mr&search=0x" + FINGERPRINT);
+            assertThat(root.resolve(FINGERPRINT + ".gpg"))
+                    .as("what a server answered is held under the fingerprint it answered for")
+                    .exists();
+        } finally {
+            System.clearProperty("jenesis.repository.insecure");
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void resolves_a_server_list_out_of_the_reference_it_names() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            byte[] body = "referenced".getBytes(StandardCharsets.US_ASCII);
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+        server.start();
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.test.servers", "http://127.0.0.1:" + server.getAddress().getPort() + "/");
+        System.setProperty("jenesis.openpgp.uri", "@jenesis.test.servers");
+        System.setProperty("jenesis.openpgp.local", root.toString());
+        try {
+            assertThat(OpenPgpRepository.of().fetch(Runnable::run, FINGERPRINT))
+                    .as("the reference names a property whose value is the server list")
+                    .isPresent();
+        } finally {
+            System.clearProperty("jenesis.openpgp.local");
+            System.clearProperty("jenesis.openpgp.uri");
+            System.clearProperty("jenesis.test.servers");
+            System.clearProperty("jenesis.repository.insecure");
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void answers_from_the_cache_without_asking_anyone() throws Exception {
+        Files.writeString(root.resolve(FINGERPRINT + ".gpg"), "vendored");
+        Optional<RepositoryItem> item = new OpenPgpRepository(URI.create("http://127.0.0.1:1/"))
+                .local(root)
+                .fetch(Runnable::run, FINGERPRINT);
+        assertThat(item)
+                .as("a cached key is served without reaching a server that is not listening")
+                .isPresent();
+    }
+
+    @Test
+    public void refuses_a_key_server_reached_over_plaintext() {
+        assertThatThrownBy(() -> new OpenPgpRepository(URI.create("http://127.0.0.1:1/"))
+                .fetch(Runnable::run, FINGERPRINT))
+                .as("a key server inherits the repository posture on plaintext")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("insecure scheme");
+    }
+
+    @Test
+    public void falls_through_to_the_next_server_that_answers() throws Exception {
+        Repository silent = (_, _) -> Optional.empty();
+        Repository answering = (_, coordinate) -> Optional.of(
+                () -> new ByteArrayInputStream(coordinate.getBytes(StandardCharsets.US_ASCII)));
+        assertThat(answering.prepend(silent).fetch(Runnable::run, FINGERPRINT))
+                .as("a server with no such key leaves the next one to answer")
+                .isPresent();
+    }
+}

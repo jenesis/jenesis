@@ -129,6 +129,7 @@ public record Project(
                 repositories.putIfAbsent("maven",
                         MavenDefaultRepository.of()
                                 .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                repositories.putIfAbsent("OpenPGP", OpenPgpRepository.of());
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
                 resolvers.putIfAbsent("maven", new MavenPomResolver());
                 SequencedSet<String> mavenDeps = new LinkedHashSet<>();
@@ -190,6 +191,7 @@ public record Project(
                 repositories.putIfAbsent("module",
                         JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)
                                 .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                repositories.putIfAbsent("OpenPGP", OpenPgpRepository.of());
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
                 resolvers.putIfAbsent("module", new ModularJarResolver(false));
                 SequencedSet<String> modulesDeps = new LinkedHashSet<>();
@@ -265,6 +267,7 @@ public record Project(
                 repositories.putIfAbsent("module",
                         JenesisModuleRepository.of(JenesisRepository.Scope.ARTIFACT)
                                 .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                repositories.putIfAbsent("OpenPGP", OpenPgpRepository.of());
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
                 resolvers.putIfAbsent("maven", new MavenPomResolver());
                 resolvers.putIfAbsent("module", new MavenModuleResolver("maven",
@@ -654,6 +657,11 @@ public record Project(
                           default none verifies nothing, so a consumer who trusts the pins needs no
                           gpg at all. A coordinate's POM is verified with its artifact and must carry
                           the same signer, which closes the gap that POMs are read but never pinned.
+                          The algorithm unsigned names no key, because there is none to name, and
+                          its value says what to do when one turns up: unsigned/missing accepts a
+                          coordinate that publishes no signature and fails once one appears, so an
+                          upstream that starts signing is discovered rather than missed, and
+                          unsigned/ignored never looks. Either lets strict hold everywhere else.
                           Key material comes from the local gpg keyring and is never fetched; an
                           unknown key is reported rather than retrieved. A lone
                           signature-<name>.properties token instead reads `<algo>/<hex>=<token>...`
@@ -662,12 +670,25 @@ public record Project(
                           serves many modules; a list is never resolved from a repository, since one
                           that had to be downloaded would itself need verifying. A declaration never
                           switches verification on by itself, and when it is switched on it forks
-                          gpg, which must then be installed and on the PATH: a Java implementation
+                          gpgv, which must then be installed and on the PATH: a Java implementation
                           would have to be resolved from the repository being verified, and a
-                          verifier downloaded on trust verifies nothing. The verifier is an ordinary forked
-                          tool, so jenesis.print.gpg shows each invocation, jenesis.print.signatures
-                          names what was covered, and jenesis.signature.command names a different
-                          binary.
+                          verifier downloaded on trust verifies nothing. gpgv reads a keyring file
+                          and nothing else, so no home directory, agent or trust database takes
+                          part; the build assembles that keyring from the declared fingerprints
+                          alone, asking the repository registered under the algorithm a line
+                          names: OpenPGP resolves through OpenPgpRepository, which asks the
+                          jenesis.openpgp.uri servers for the fingerprint over HKP and holds what
+                          it fetched in jenesis.openpgp.local. Those servers are asked in turn
+                          because they speak one protocol; a key store that does not is registered
+                          as its own repository rather than added to that list. A key the keyring holds is therefore a key a
+                          line declares, and NO_PUBKEY means no line covers the signer. Registering
+                          another repository under that name replaces where keys come from, so a
+                          key store that is not an HTTP key server needs no change here. Fetching by fingerprint is not
+                          trust in the server: the comparison is against the declared fingerprint,
+                          so a server can withhold a key but never substitute one. The verifier is an ordinary
+                          forked tool, so jenesis.print.gpgv shows each invocation,
+                          jenesis.print.signatures names what was covered, and
+                          jenesis.signature.command names a different binary.
                       @jenesis.alias <module> <groupId>/<artifactId>[/<type>[/<classifier>]]
                           Require a Maven artifact under a stable module name, so a non-modular jar
                           needs no derived automatic name. Carries no version: a pin or BOM entry
@@ -1784,7 +1805,7 @@ public record Project(
                 project.version||Version stamped onto every produced artifact
                 project.digest|SHA-256|Algorithm for pin and dependency checksums
                 dependency.signature|none|Signatures verified after download: none|declared|strict
-                signature.command|gpg|Binary forked to verify detached OpenPGP signatures
+                signature.command|gpgv|Binary forked to verify detached OpenPGP signatures; a name is looked up on the PATH, a path is used as given
                 signature.expiry|signing|An expired signing key: ignored accepts it, signing accepts what it signed before expiring, current rejects it
                 project.metadata||Comma-separated extra metadata files
                 project.configuration|build.jenesis|Comma-separated folders searched for tool configuration files; @ splices the default
@@ -1843,6 +1864,8 @@ public record Project(
                 module.uri||Jenesis module remotes, likewise (env JENESIS_REPOSITORY_URI)
                 module.local||Local module cache folder (env JENESIS_REPOSITORY_LOCAL)
                 module.token||Bearer token for the module remote (env JENESIS_REPOSITORY_TOKEN)
+                openpgp.uri|https://keyserver.ubuntu.com/|HKP key server roots, likewise; a server speaking another protocol is another repository (env OPENPGP_REPOSITORY_URI)
+                openpgp.local|.jenesis/keys|Local key cache folder, one file per fingerprint (env OPENPGP_REPOSITORY_LOCAL)
                 cache.uri||Build cache: a file:// folder, or an http(s):// cache server
                 cache.project||Project name sent to a cache server (env JENESIS_CACHE_PROJECT)
                 cache.key||Access key sent to a cache server (env JENESIS_CACHE_KEY)
@@ -1989,6 +2012,18 @@ public record Project(
             if (Files.isDirectory(mavenLocal)) {
                 docker = docker.mount(mavenLocal, mavenLocal.toString(), true);
                 docker = docker.env("MAVEN_REPOSITORY_LOCAL", mavenLocal.toString());
+            }
+            String openPgpRepositoryUri = System.getProperty("jenesis.openpgp.uri", System.getenv("OPENPGP_REPOSITORY_URI"));
+            if (openPgpRepositoryUri != null) {
+                docker = docker.env("OPENPGP_REPOSITORY_URI", openPgpRepositoryUri);
+            }
+            String openPgpRepositoryLocal = System.getProperty("jenesis.openpgp.local", System.getenv("OPENPGP_REPOSITORY_LOCAL"));
+            if (openPgpRepositoryLocal != null) {
+                Path openPgpLocal = Path.of(openPgpRepositoryLocal).toAbsolutePath().normalize();
+                if (Files.isDirectory(openPgpLocal) && !openPgpLocal.startsWith(root)) {
+                    docker = docker.mount(openPgpLocal, openPgpLocal.toString(), true);
+                }
+                docker = docker.env("OPENPGP_REPOSITORY_LOCAL", openPgpLocal.toString());
             }
             String jenesisRepositoryLocal = System.getProperty("jenesis.module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
             Path jenesisLocal = (jenesisRepositoryLocal == null

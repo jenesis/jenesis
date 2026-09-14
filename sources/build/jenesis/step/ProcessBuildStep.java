@@ -12,7 +12,7 @@ public abstract class ProcessBuildStep implements BuildStep {
 
     public static final String PROCESS = "process/";
 
-    private static final Charset NATIVE_ENCODING = nativeEncoding();
+    protected static final Charset NATIVE_ENCODING = nativeEncoding();
 
     private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
 
