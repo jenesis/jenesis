@@ -122,6 +122,29 @@ public class SignaturesRunTest {
     }
 
     @Test
+    public void reads_a_status_stream_whose_user_id_is_not_utf_8() throws Exception {
+        List<String> emitting = List.of("sh", "-c", "printf '"
+                + "[GNUPG:] GOODSIG DEADBEEF \\311amonn McManus <test@example.invalid>\\n"
+                + "[GNUPG:] VALIDSIG " + fingerprint + " 2026-09-11 1000 0 4 0 1 8 00 " + fingerprint + "\\n'");
+        Map<String, Repository> repositories = Map.of("maven", (MavenRepository) (_, _, _, _, type, _, checksum) ->
+                Optional.ofNullable("jar".equals(type) && "asc".equals(checksum)
+                        ? RepositoryItem.ofFile(detached)
+                        : null));
+        assertThatCode(() -> new Signatures(repositories)
+                .verification(Verification.DECLARED)
+                .factory(ProcessHandler.OfProcess.of(emitting))
+                .apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                                input,
+                                Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join())
+                .as("a Latin-1 user id is data, not a build error: only the ASCII status tokens are read")
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     public void rejects_a_signature_from_a_key_gpg_does_not_hold() throws Exception {
         Path stranger = Files.createDirectory(root.resolve("stranger"));
         Files.setPosixFilePermissions(stranger, PosixFilePermissions.fromString("rwx------"));

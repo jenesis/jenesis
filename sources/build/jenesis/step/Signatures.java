@@ -319,7 +319,7 @@ public class Signatures extends ProcessBuildStep {
             throw new InterruptedIOException("Interrupted while verifying " + file);
         }
         String fingerprint = null, failure = null;
-        for (String line : Files.readAllLines(output)) {
+        for (String line : Files.readAllLines(output, StandardCharsets.ISO_8859_1)) {
             if (!line.startsWith(STATUS)) {
                 continue;
             }
@@ -351,9 +351,12 @@ public class Signatures extends ProcessBuildStep {
         if (exitCode != 0 && fingerprint == null && failure == null) {
             throw new IllegalStateException("Unexpected exit code " + exitCode + " and no signature verdict from "
                     + command
+                    + " for " + file
                     + "\nTo reproduce, execute:\n "
                     + String.join(" ", handler.commands())
-                    + (Files.isRegularFile(error) ? "\n\nError:\n" + Files.readString(error) : ""));
+                    + (Files.isRegularFile(error)
+                            ? "\n\nError:\n" + Files.readString(error, StandardCharsets.ISO_8859_1)
+                            : ""));
         }
         return new Status(fingerprint, failure);
     }
