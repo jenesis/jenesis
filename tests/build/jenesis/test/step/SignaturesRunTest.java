@@ -161,7 +161,7 @@ public class SignaturesRunTest {
                 "Jenesis Expiry Test <expiry@example.invalid>",
                 "default",
                 "default",
-                "seconds=3600");
+                "1d");
         String expiring = fingerprintOf("expiry@example.invalid");
         gpg("--detach-sign",
                 "--armor",

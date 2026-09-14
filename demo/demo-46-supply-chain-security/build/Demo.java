@@ -161,7 +161,7 @@ public class Demo {
 
     private static String expiringKey(Path home, Path jar) throws Exception {
         gpg(home, "--quick-generate-key", "Jenesis Demo (expiring) <expiry@jenesis.invalid>",
-                "default", "default", "seconds=3600");
+                "default", "default", "1d");
         String expiring = fingerprintOf(home, "expiry@jenesis.invalid");
         gpg(home, "--detach-sign", "--armor", "--local-user", expiring,
                 "--output", jar + ".asc", jar.toString());
