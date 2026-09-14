@@ -755,6 +755,13 @@ public record Project(
                       jacoco.properties         test-coverage report
                       graal.properties          native-image reachability agent during the test run
                       pitest.properties         PIT mutation testing
+                      japicmp.properties        japicmp compares the built jar against the last release of
+                                                the module's own coordinate, or of baseline=<groupId>/
+                                                <artifactId>[/<version>]; report-only until an
+                                                error-on-<kind> key says otherwise
+                                                (access, include, exclude, format, ignore-missing-classes,
+                                                only-incompatible, only-modified, semantic-versioning,
+                                                error-on-binary-incompatibility, ...)
                       javaformat.properties     formatter=google|palantir
                       xjc.properties            JAXB: every .xsd compiled, every .xjb a binding; the
                                                 generated package is compiled into the module
@@ -1977,6 +1984,7 @@ public record Project(
                 observe.jacoco|true|JaCoCo coverage, activated by a jacoco.properties
                 observe.native|true|native-image reachability agent, activated by a graal.properties
                 mutate.pitest|true|PIT mutation testing, activated by a pitest.properties
+                artifact.japicmp|true|japicmp API comparison, activated by a japicmp.properties
                 jreleaser.executable|jreleaser|The JReleaser executable a release runs
                 jreleaser.command|full-release|The JReleaser command a release runs
                 jreleaser.config||JReleaser configuration file
