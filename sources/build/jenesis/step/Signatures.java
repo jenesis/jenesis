@@ -5,6 +5,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.KeyExpiry;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
@@ -21,12 +22,15 @@ public class Signatures extends ProcessBuildStep {
 
     private final transient Map<String, Repository> repositories;
     private final Verification verification;
+    private final KeyExpiry expiry;
     private final String command;
+    private final transient Function<List<String>, ? extends ProcessHandler> supplied;
     private final transient Consumer<String> printing;
 
     public Signatures(Map<String, Repository> repositories) {
         this(repositories,
                 Verification.fromProperty(),
+                KeyExpiry.fromProperty(),
                 System.getProperty("jenesis.signature.command", "gpg"),
                 null,
                 SequencedProperties.systemFlag("jenesis.print.signatures") ? System.out::println : null);
@@ -34,30 +38,37 @@ public class Signatures extends ProcessBuildStep {
 
     private Signatures(Map<String, Repository> repositories,
                        Verification verification,
+                       KeyExpiry expiry,
                        String command,
-                       Function<List<String>, ? extends ProcessHandler> factory,
+                       Function<List<String>, ? extends ProcessHandler> supplied,
                        Consumer<String> printing) {
-        super("gpg", factory == null ? ProcessHandler.OfProcess.ofCommand(command) : factory);
+        super("gpg", supplied == null ? ProcessHandler.OfProcess.ofCommand(command) : supplied);
         this.repositories = repositories;
         this.verification = verification;
+        this.expiry = expiry;
         this.command = command;
+        this.supplied = supplied;
         this.printing = printing;
     }
 
     public Signatures verification(Verification verification) {
-        return new Signatures(repositories, verification, command, factory, printing);
+        return new Signatures(repositories, verification, expiry, command, supplied, printing);
+    }
+
+    public Signatures expiry(KeyExpiry expiry) {
+        return new Signatures(repositories, verification, expiry, command, supplied, printing);
     }
 
     public Signatures command(String command) {
-        return new Signatures(repositories, verification, command, factory, printing);
+        return new Signatures(repositories, verification, expiry, command, supplied, printing);
     }
 
     public Signatures factory(Function<List<String>, ? extends ProcessHandler> factory) {
-        return new Signatures(repositories, verification, command, factory, printing);
+        return new Signatures(repositories, verification, expiry, command, factory, printing);
     }
 
     public Signatures printing(Consumer<String> printing) {
-        return new Signatures(repositories, verification, command, factory, printing);
+        return new Signatures(repositories, verification, expiry, command, supplied, printing);
     }
 
     private void print(String marker, String colour, String coordinate, String detail) {
@@ -214,7 +225,10 @@ public class Signatures extends ProcessBuildStep {
             }
             String fingerprint = "OpenPGP/" + status.fingerprint().toUpperCase(Locale.ROOT);
             if (printing != null && accepted.stream().anyMatch(fingerprint::equalsIgnoreCase)) {
-                print("[VERIFIED]", BuildExecutorCallback.GREEN, token + " " + version, fingerprint);
+                print(status.expired() < 0 ? "[VERIFIED]" : "[EXPIRED]",
+                        status.expired() < 0 ? BuildExecutorCallback.GREEN : BuildExecutorCallback.YELLOW,
+                        token + " " + version,
+                        fingerprint + status.dates());
             }
             if (accepted.stream().noneMatch(fingerprint::equalsIgnoreCase)) {
                 violations.add(token + " " + version + ": signed by " + fingerprint
@@ -319,7 +333,9 @@ public class Signatures extends ProcessBuildStep {
             throw new InterruptedIOException("Interrupted while verifying " + file);
         }
         String fingerprint = null, failure = null;
-        for (String line : Files.readAllLines(output)) {
+        long signed = -1, expired = -1;
+        boolean keyExpired = false;
+        for (String line : Files.readAllLines(output, StandardCharsets.ISO_8859_1)) {
             if (!line.startsWith(STATUS)) {
                 continue;
             }
@@ -331,9 +347,17 @@ public class Signatures extends ProcessBuildStep {
                     } else if (tokens.length > 1) {
                         fingerprint = tokens[1];
                     }
+                    if (tokens.length > 3) {
+                        signed = seconds(tokens[3]);
+                    }
+                }
+                case "KEYEXPIRED" -> {
+                    if (tokens.length > 1) {
+                        expired = Math.max(expired, seconds(tokens[1]));
+                    }
                 }
                 case "BADSIG" -> failure = "the signature does not match the file";
-                case "EXPKEYSIG" -> failure = "the signing key has expired";
+                case "EXPKEYSIG" -> keyExpired = true;
                 case "REVKEYSIG" -> failure = "the signing key was revoked";
                 case "NO_PUBKEY" -> failure = "the public key "
                         + (tokens.length > 1 ? tokens[1] : "")
@@ -348,16 +372,65 @@ public class Signatures extends ProcessBuildStep {
                 }
             }
         }
+        if (keyExpired && failure == null) {
+            failure = expired(signed, expired);
+        }
         if (exitCode != 0 && fingerprint == null && failure == null) {
             throw new IllegalStateException("Unexpected exit code " + exitCode + " and no signature verdict from "
                     + command
+                    + " for " + file
                     + "\nTo reproduce, execute:\n "
                     + String.join(" ", handler.commands())
-                    + (Files.isRegularFile(error) ? "\n\nError:\n" + Files.readString(error) : ""));
+                    + (Files.isRegularFile(error)
+                            ? "\n\nError:\n" + Files.readString(error, StandardCharsets.ISO_8859_1)
+                            : ""));
         }
-        return new Status(fingerprint, failure);
+        return new Status(fingerprint, failure, signed, keyExpired ? expired : -1);
     }
 
-    private record Status(String fingerprint, String failure) {
+    private String expired(long signed, long expired) {
+        return switch (expiry) {
+            case IGNORED -> null;
+            case CURRENT -> "the signing key has expired; -Djenesis.signature.expiry=signing accepts a"
+                    + " signature that the key made before it expired";
+            case SIGNING -> {
+                if (signed < 0 || expired < 0) {
+                    yield "the signing key has expired and " + command
+                            + " did not report when, so it cannot be told whether the signature predates it;"
+                            + " -Djenesis.signature.expiry=ignored accepts it regardless";
+                }
+                yield signed < expired ? null : "the signature was made at "
+                        + Instant.ofEpochSecond(signed)
+                        + ", after the signing key expired at "
+                        + Instant.ofEpochSecond(expired)
+                        + "; -Djenesis.signature.expiry=ignored accepts it regardless";
+            }
+        };
+    }
+
+    private static long seconds(String token) {
+        try {
+            return Long.parseLong(token);
+        } catch (NumberFormatException _) {
+            return -1;
+        }
+    }
+
+    private record Status(String fingerprint, String failure, long signed, long expired) {
+
+        private String dates() {
+            StringBuilder dates = new StringBuilder();
+            if (signed >= 0) {
+                dates.append(" signed ").append(date(signed));
+            }
+            if (expired >= 0) {
+                dates.append(dates.isEmpty() ? " " : ", ").append("key expired ").append(date(expired));
+            }
+            return dates.toString();
+        }
+
+        private static LocalDate date(long seconds) {
+            return Instant.ofEpochSecond(seconds).atZone(ZoneOffset.UTC).toLocalDate();
+        }
     }
 }

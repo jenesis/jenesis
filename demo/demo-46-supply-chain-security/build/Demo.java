@@ -80,6 +80,36 @@ public class Demo {
         expectSignature("rotated: the same contradiction is never looked for by default",
                 true, home, null, "rotated");
 
+        // 9. A key that has since expired still vouches for what it signed while it was
+        // valid, which is the common case for an old release: the keyservers publish no
+        // extended expiry, yet the signature was made years before the key lapsed. The
+        // clock is moved past the expiry with a wrapper named by path, which is also
+        // what jenesis.signature.command accepts besides a name on the PATH.
+        Path expiringHome = expiringKey(work);
+        String expiringFingerprint = signed(expiringHome, jar);
+        Path cached = Path.of("target", "artifacts");
+        if (Files.isDirectory(cached)) {
+            delete(cached);
+        }
+        Path faked = fakedClock(work);
+        String declared = Files.readString(declaration);
+        try {
+            Files.writeString(declaration, declared.replace(" */",
+                    " * @jenesis.signature OpenPGP/" + expiringFingerprint + " org.example/*\n */"));
+            expectSignature("expired: what the key signed before it lapsed is still accepted",
+                    true, expiringHome, "strict", "signed",
+                    List.of("-Djenesis.signature.command=" + faked));
+
+            // 10. The same artifact under the strictest reading of expiry, where the key
+            // must be unexpired today. That is the previous behaviour, kept as an option.
+            expectSignature("expired: the same signature under expiry measured against today",
+                    false, expiringHome, "strict", "signed",
+                    List.of("-Djenesis.signature.command=" + faked,
+                            "-Djenesis.signature.expiry=current"));
+        } finally {
+            Files.writeString(declaration, declared);
+        }
+
         System.out.println();
         System.out.println("Pinning blocked the unverified and the tampered dependency,");
         System.out.println("and signature verification blocked the one signed by another key.");
@@ -130,6 +160,29 @@ public class Demo {
         return home;
     }
 
+    private static Path expiringKey(Path work) throws Exception {
+        Path home = work.resolve("gnupg-expiring");
+        if (Files.isDirectory(home)) {
+            delete(home);
+        }
+        Files.createDirectories(home);
+        if (home.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+            Files.setPosixFilePermissions(home, PosixFilePermissions.fromString("rwx------"));
+        }
+        gpg(home, "--quick-generate-key", "Jenesis Demo (expiring) <demo@jenesis.invalid>",
+                "default", "default", "seconds=3600");
+        return home;
+    }
+
+    private static Path fakedClock(Path work) throws Exception {
+        Path wrapper = work.resolve("gpg-after-expiry");
+        Files.writeString(wrapper, "#!/bin/sh\nexec gpg --faked-system-time "
+                + Instant.now().plus(2, ChronoUnit.DAYS).getEpochSecond()
+                + " \"$@\"\n");
+        Files.setPosixFilePermissions(wrapper, PosixFilePermissions.fromString("rwx------"));
+        return wrapper;
+    }
+
     private static String signed(Path home, Path jar) throws Exception {
         gpg(home, "--detach-sign", "--armor", "--output", jar + ".asc", jar.toString());
         Path pom = jar.resolveSibling("lib-1.0.pom");
@@ -163,6 +216,15 @@ public class Demo {
                                         Path home,
                                         String verification,
                                         String project) throws Exception {
+        expectSignature(description, success, home, verification, project, List.of());
+    }
+
+    private static void expectSignature(String description,
+                                        boolean success,
+                                        Path home,
+                                        String verification,
+                                        String project,
+                                        List<String> options) throws Exception {
         Path artifacts = Files.createDirectories(Path.of("target", "artifacts").toAbsolutePath());
         List<String> command = new ArrayList<>(List.of(System.getProperty("java.home") + "/bin/java",
                 "-Djenesis.maven.uri=" + Path.of("target", "repository").toAbsolutePath().toUri(),
@@ -170,6 +232,7 @@ public class Demo {
         if (verification != null) {
             command.add("-Djenesis.dependency.signature=" + verification);
         }
+        command.addAll(options);
         command.addAll(List.of("build/jenesis/Make.java", "build"));
         String failure = run(Path.of(project), command, home);
         if ((failure == null) != success) {

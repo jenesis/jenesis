@@ -211,6 +211,21 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             } else {
                 names.add(command);
             }
+            if (command.indexOf('/') != -1 || command.indexOf(File.separatorChar) != -1) {
+                File direct = new File(command);
+                if (direct.isFile()) {
+                    return direct.getPath();
+                }
+                for (String name : names) {
+                    File program = new File(name);
+                    if (program.isFile()) {
+                        return program.getPath();
+                    }
+                }
+                throw new IllegalStateException("Could not locate '"
+                        + command
+                        + "': it names a path, but no executable file is there");
+            }
             List<String> homes = new ArrayList<>();
             String graalvm = System.getenv("GRAALVM_HOME");
             if (graalvm != null) {
