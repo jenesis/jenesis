@@ -181,6 +181,35 @@ public class SignaturesTest {
     }
 
     @Test
+    public void accepts_an_unsigned_artifact_a_reviewed_exception_covers() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/none", "main/maven/org.example/lib");
+        assertThatCode(() -> run(step(null).verification(Verification.STRICT)))
+                .as("a reviewed exception lets strict hold everywhere else when one artifact is unsigned")
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    public void still_refuses_an_unsigned_artifact_no_exception_covers() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(null).verification(Verification.STRICT)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no signature is published")
+                .hasMessageContaining("OpenPGP/none");
+    }
+
+    @Test
+    public void refuses_a_signed_artifact_declared_as_unsigned() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/none", "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(signature("lib"), validated(PRIMARY))))
+                .as("a signature appearing where none was expected is a stale exception, not a pass")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("OpenPGP/none");
+    }
+
+    @Test
     public void rejects_an_artifact_whose_signature_does_not_match() throws IOException {
         resolved("maven/org.example/lib", "1.0", null);
         declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");

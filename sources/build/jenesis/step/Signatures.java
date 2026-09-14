@@ -18,6 +18,8 @@ public class Signatures extends ProcessBuildStep {
 
     private static final String STATUS = "[GNUPG:] ";
 
+    private static final String UNSIGNED = "OpenPGP/none";
+
     private static final List<String> VERIFY = List.of("--batch", "--no-tty", "--status-fd", "1", "--verify");
 
     private final transient Map<String, Repository> repositories;
@@ -205,13 +207,22 @@ public class Signatures extends ProcessBuildStep {
             String relative = coordinate.substring(repositorySlash + 1) + "/" + version;
             Path signature = materialise(executor, context, repository, relative, true);
             if (signature == null) {
+                SequencedSet<String> acknowledged = new LinkedHashSet<>(accepted);
+                acknowledged.removeIf(declaration -> !unsigned(declaration));
                 if (printing != null) {
-                    print("[UNSIGNED]",
+                    print(acknowledged.isEmpty() ? "[UNSIGNED]" : "[UNVERIFIED]",
                             BuildExecutorCallback.YELLOW,
                             token + " " + version,
-                            "a key is declared for it but no signature is published");
+                            acknowledged.isEmpty()
+                                    ? "a key is declared for it but no signature is published"
+                                    : "no signature is published, which "
+                                            + String.join(", ", acknowledged) + " accepts");
                 }
-                violations.add(token + " " + version + ": a key is declared for it but no signature is published");
+                if (acknowledged.isEmpty()) {
+                    violations.add(token + " " + version
+                            + ": a key is declared for it but no signature is published; if that is reviewed"
+                            + " and accepted, declare it as " + UNSIGNED + " instead of a fingerprint");
+                }
                 continue;
             }
             Status status = verify(executor, context, prefix, Path.of(candidate.getKey()), signature);
@@ -389,6 +400,11 @@ public class Signatures extends ProcessBuildStep {
                             : ""));
         }
         return new Status(fingerprint, failure, signed, keyExpired ? expired : -1, missing);
+    }
+
+    private static boolean unsigned(String declaration) {
+        int slash = declaration.indexOf('/');
+        return slash > 0 && declaration.substring(slash + 1).equalsIgnoreCase("none");
     }
 
     private static String missing(SequencedSet<String> accepted) {

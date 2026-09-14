@@ -654,6 +654,9 @@ public record Project(
                           default none verifies nothing, so a consumer who trusts the pins needs no
                           gpg at all. A coordinate's POM is verified with its artifact and must carry
                           the same signer, which closes the gap that POMs are read but never pinned.
+                          A fingerprint of none, as in OpenPGP/none, declares that a coordinate
+                          publishes no signature and that this was reviewed, so strict accepts it
+                          and holds everywhere else; a signature appearing for it then fails.
                           Key material comes from the local gpg keyring and is never fetched; an
                           unknown key is reported rather than retrieved. A lone
                           signature-<name>.properties token instead reads `<algo>/<hex>=<token>...`
