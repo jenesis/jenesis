@@ -164,7 +164,7 @@ public class DependenciesOverrideTest {
     }
 
     private Repository discovery() {
-        return (_, coordinate) -> Optional.ofNullable(discovered.get(coordinate))
+        return (_, coordinate, _) -> Optional.ofNullable(discovered.get(coordinate))
                 .map(body -> (RepositoryItem) () -> new ByteArrayInputStream(
                         body.getBytes(StandardCharsets.UTF_8)));
     }

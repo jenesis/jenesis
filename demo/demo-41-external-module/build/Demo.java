@@ -57,10 +57,10 @@ public class Demo {
         // Serve the staged jar under the custom coordinate demo.plugin, ahead of
         // the default Jenesis repository (which already consults the local export
         // in ~/.jenesis) that resolves its build.jenesis and org.json dependencies.
-        Repository local = (executor, coordinate) -> {
+        Repository local = (executor, coordinate, extension) -> {
             int slash = coordinate.indexOf('/');
             String module = slash < 0 ? coordinate : coordinate.substring(0, slash);
-            return module.equals("demo.plugin")
+            return extension == null && module.equals("demo.plugin")
                     ? Optional.of(RepositoryItem.ofFile(pluginJar))
                     : Optional.empty();
         };

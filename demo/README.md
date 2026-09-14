@@ -106,7 +106,7 @@ Quick index
 | 43 | [`custom-modular`](demo-43-custom-modular/README.md)         | The same via `ModularProject.make(root, assembler)` for modules       | `java build/Demo.java`             |
 | 44 | [`custom-build`](demo-44-custom-build/README.md)             | No `Project` at all: wire a `BuildExecutor` by hand                   | `java build/Demo.java`             |
 | 45 | [`docker-isolation`](demo-45-docker-isolation/README.md)     | A standard build whose test and artifact `main` both grab host secrets, and how Docker confines them | `java build/jenesis/Make.java`  |
-| 46 | [`supply-chain-security`](demo-46-supply-chain-security/README.md) | Three questions about a dependency and what answers each: may we use one we cannot verify (strict pinning), are these the bytes we vetted (a checksum), and were they the ones upstream produced (`@jenesis.signature`, checked against a local gpg as each artifact is downloaded) | `java build/Demo.java`             |
+| 46 | [`supply-chain-security`](demo-46-supply-chain-security/README.md) | Three questions about a dependency and what answers each: may we use one we cannot verify (strict pinning), are these the bytes we vetted (a checksum), and were they the ones upstream produced - `@jenesis.signature`, naming either an OpenPGP key checked with a local gpg, or a Sigstore identity read from a bundle beside the artifact with no key and no gpg at all | `java build/Demo.java`             |
 | 47 | [`publishing`](demo-47-publishing/README.md)                 | Assemble a Maven Central ready bundle (POM metadata + sources/javadoc jars) and resolve it back | `java build/Demo.java`             |
 | 48 | [`native-image`](demo-48-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
 | 49 | [`build-cache`](demo-49-build-cache/README.md)               | A content-addressed build cache serving step outputs across builds - project-local (`-Djenesis.project.cache`), shared via a URI (`-Djenesis.cache.uri=`), or local layered in front of a remote; shown by bootstrapping it then serving a full `-Djenesis.executor.rebuild=true` from it | `java build/jenesis/Make.java`  |
@@ -958,9 +958,10 @@ CI one. There are no assertions; each actor just reports what it managed to do.
 ## 29. Supply-chain security - [`supply-chain-security`](demo-46-supply-chain-security/README.md)
 
 Pinning has two halves, and this demo shows both by getting them wrong on purpose.
-`supply-chain-security` has two modules and a `build/Demo.java` that asserts each
-fails to build: an **`unpinned`** module whose dependency carries a version but no
-checksum, and a **`tampered`** module whose dependency is pinned to a wrong
+`supply-chain-security` has a `build/Demo.java` that asserts fifteen outcomes across
+seven standalone modular projects - there is no `pom.xml` in it at all. Two of them
+get pinning wrong: an **`unpinned`** project whose dependency carries a version but no
+checksum, and a **`tampered`** project whose dependency is pinned to a wrong
 `SHA-256`. The unpinned one builds by default but is rejected under
 `pinning(Pinning.STRICT)` (a hardened environment can refuse any unverified
 dependency); the tampered one fails **regardless** of strict pinning, because the
@@ -989,6 +990,19 @@ blocked identically. That half is self-contained and commits nothing binary: the
 builds a byte-reproducible jar, generates a throwaway key, signs the jar and its POM,
 and publishes all four files to a `file:` repository under `target/`, so nothing
 reaches the network.
+
+The same question has a second answer that keeps no key at all. **`attested`** declares
+`@jenesis.signature Sigstore/github.com/sigstore/protobuf-specs`, an identity rather than
+a fingerprint, and verifies a published release against the Sigstore bundle beside it: a
+certificate that named the workflow which built it and lived ten minutes, and a
+transparency log entry fixing when it signed. The path is a prefix that narrows by segment
+and stops before the tag a release was built from, so one line covers every future
+version the way a fingerprint does. **`forked`** declares another repository for the same
+artifact and is blocked, though its bundle is genuine - the `rotated` case again, for an
+identity. That half forks no gpg, fetches no key and configures no trust root, since the
+tool carries the published root of the public Sigstore instance as source; it does need
+the network, because a bundle exists only once a certificate authority and a public log
+have seen the signer, and it prints `[skipped]` when Maven Central cannot be reached.
 
 The new ideas are **strict pinning vs. checksum verification** - the former decides
 *whether* an unverified dependency may be used at all, the latter proves a pinned

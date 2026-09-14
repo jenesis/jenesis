@@ -10,6 +10,7 @@ import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.Sigstore;
 import build.jenesis.Verification;
 import build.jenesis.maven.MavenDependencyKey;
 import build.jenesis.maven.MavenRepository;
@@ -24,6 +25,8 @@ public class Signatures extends ProcessBuildStep {
     private final Verification verification;
     private final KeyExpiry expiry;
     private final String command;
+    private final String issuers;
+    private final transient URI trustedRoot;
     private final transient Function<List<String>, ? extends ProcessHandler> supplied;
     private final transient Consumer<String> printing;
 
@@ -31,7 +34,12 @@ public class Signatures extends ProcessBuildStep {
         this(repositories,
                 Verification.fromProperty(),
                 KeyExpiry.fromProperty(),
-                System.getProperty("jenesis.signature.command", "gpgv"),
+                System.getProperty("jenesis.openpgp.command", "gpgv"),
+                System.getProperty("jenesis.sigstore.issuers",
+                        "github.com=token.actions.githubusercontent.com"),
+                System.getProperty("jenesis.sigstore.uri") == null
+                        ? null
+                        : URI.create(System.getProperty("jenesis.sigstore.uri")),
                 null,
                 SequencedProperties.systemFlag("jenesis.print.signatures") ? System.out::println : null);
     }
@@ -40,6 +48,8 @@ public class Signatures extends ProcessBuildStep {
                        Verification verification,
                        KeyExpiry expiry,
                        String command,
+                       String issuers,
+                       URI trustedRoot,
                        Function<List<String>, ? extends ProcessHandler> supplied,
                        Consumer<String> printing) {
         super("gpgv", supplied == null ? ProcessHandler.OfProcess.ofCommand(command) : supplied);
@@ -47,28 +57,38 @@ public class Signatures extends ProcessBuildStep {
         this.verification = verification;
         this.expiry = expiry;
         this.command = command;
+        this.issuers = issuers;
+        this.trustedRoot = trustedRoot;
         this.supplied = supplied;
         this.printing = printing;
     }
 
     public Signatures verification(Verification verification) {
-        return new Signatures(repositories, verification, expiry, command, supplied, printing);
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing);
     }
 
     public Signatures expiry(KeyExpiry expiry) {
-        return new Signatures(repositories, verification, expiry, command, supplied, printing);
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing);
     }
 
     public Signatures command(String command) {
-        return new Signatures(repositories, verification, expiry, command, supplied, printing);
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing);
+    }
+
+    public Signatures issuers(String issuers) {
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing);
+    }
+
+    public Signatures trustedRoot(URI trustedRoot) {
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing);
     }
 
     public Signatures factory(Function<List<String>, ? extends ProcessHandler> factory) {
-        return new Signatures(repositories, verification, expiry, command, factory, printing);
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, factory, printing);
     }
 
     public Signatures printing(Consumer<String> printing) {
-        return new Signatures(repositories, verification, expiry, command, supplied, printing);
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing);
     }
 
     private void print(String marker, String colour, String coordinate, String detail) {
@@ -131,6 +151,7 @@ public class Signatures extends ProcessBuildStep {
                 }
             }
         }
+        Sigstore sigstore = new Sigstore().trustedRoot(trustedRoot);
         List<String> prefix = new ArrayList<>(prepended(properties(arguments)));
         prefix.addAll(VERIFY);
         prefix.add("--keyring");
@@ -214,8 +235,69 @@ public class Signatures extends ProcessBuildStep {
                 continue;
             }
             String relative = coordinate.substring(repositorySlash + 1) + "/" + version;
-            Path signature = materialise(executor, context, repository, relative, true);
+            SequencedSet<String> bundled = new LinkedHashSet<>(accepted);
+            bundled.removeIf(declaration -> !bundled(declaration));
+            SequencedSet<String> keys = new LinkedHashSet<>(accepted);
+            keys.removeIf(declaration -> unsigned(declaration) || bundled(declaration));
+            boolean attested = false;
+            if (!bundled.isEmpty()) {
+                Path bundle = materialise(executor, context, repository, relative, "sigstore.json");
+                if (bundle != null) {
+                    Sigstore.Attestation attestation;
+                    try {
+                        attestation = sigstore.verify(Path.of(candidate.getKey()), bundle);
+                    } catch (GeneralSecurityException | RuntimeException e) {
+                        violations.add(token + " " + version + ": " + reason(e));
+                        continue;
+                    }
+                    String matched = null, misissued = null;
+                    for (String declaration : bundled) {
+                        if (!names(declaration, attestation.identity())) {
+                            continue;
+                        }
+                        if (issuer(host(declaration)).equals(attestation.issuer())) {
+                            matched = declaration;
+                            break;
+                        }
+                        misissued = declaration;
+                    }
+                    if (matched == null) {
+                        violations.add(token + " " + version + ": " + (misissued == null
+                                ? "signed by " + attestation.identity()
+                                        + " through " + attestation.issuer()
+                                        + ", but only " + String.join(", ", bundled)
+                                        + (bundled.size() == 1 ? " is" : " are") + " declared for it; add "
+                                        + suggested(attestation)
+                                        + " to a @jenesis.signature line to accept this signer"
+                                : "signed by " + attestation.identity() + ", which " + misissued
+                                        + " covers, but issued by " + attestation.issuer()
+                                        + " rather than " + issuer(host(misissued))
+                                        + "; name what issues " + host(misissued) + " identities with"
+                                        + " -Djenesis.sigstore.issuers=" + host(misissued)
+                                        + "=" + bare(attestation.issuer())));
+                        continue;
+                    }
+                    if (printing != null) {
+                        print("[VERIFIED]",
+                                BuildExecutorCallback.GREEN,
+                                token + " " + version,
+                                matched + " as " + attestation.identity() + ", recorded " + attestation.recorded());
+                    }
+                    String violation = attests(executor, context, repository, sigstore,
+                            descriptor(repository, relative, version), attestation);
+                    if (violation != null) {
+                        violations.add(token + " " + version + ": " + violation);
+                        continue;
+                    }
+                    attested = true;
+                }
+            }
+            boolean identity = !bundled.isEmpty() && keys.isEmpty();
+            Path signature = identity ? null : materialise(executor, context, repository, relative, "asc");
             if (signature == null) {
+                if (attested) {
+                    continue;
+                }
                 SequencedSet<String> acknowledged = new LinkedHashSet<>(accepted);
                 acknowledged.removeIf(declaration -> !unsigned(declaration));
                 if (printing != null) {
@@ -223,13 +305,18 @@ public class Signatures extends ProcessBuildStep {
                             BuildExecutorCallback.YELLOW,
                             token + " " + version,
                             acknowledged.isEmpty()
-                                    ? "a key is declared for it but no signature is published"
+                                    ? (identity
+                                            ? "an identity is declared for it but no Sigstore bundle is published"
+                                            : "a key is declared for it but no signature is published")
                                     : "no signature is published, which "
                                             + String.join(", ", acknowledged) + " accepts");
                 }
                 if (acknowledged.isEmpty()) {
                     violations.add(token + " " + version
-                            + ": a key is declared for it but no signature is published; if that is reviewed"
+                            + (identity
+                                    ? ": an identity is declared for it but no Sigstore bundle is published"
+                                    : ": a key is declared for it but no signature is published")
+                            + "; if that is reviewed"
                             + " and accepted, declare it as unsigned/missing, which fails again once a"
                             + " signature appears, or unsigned/ignored, which never looks");
                 }
@@ -263,23 +350,12 @@ public class Signatures extends ProcessBuildStep {
                                         + " to a @jenesis.signature line to accept a key rotation"));
                 continue;
             }
-            MavenDependencyKey.Versioned pomKey = null;
-            if (repository instanceof MavenRepository) {
-                try {
-                    pomKey = MavenDependencyKey.parse(relative);
-                } catch (IllegalArgumentException _) {
-                    pomKey = null;
-                }
-            }
-            if (pomKey == null) {
+            String descriptor = descriptor(repository, relative, version);
+            if (descriptor == null) {
                 continue;
             }
-            String descriptor = new MavenDependencyKey(pomKey.key().groupId(),
-                    pomKey.key().artifactId(),
-                    "pom",
-                    null).coordinate(null, version);
-            Path pomSignature = materialise(executor, context, repository, descriptor, true);
-            Path pom = pomSignature == null ? null : materialise(executor, context, repository, descriptor, false);
+            Path pomSignature = materialise(executor, context, repository, descriptor, "asc");
+            Path pom = pomSignature == null ? null : materialise(executor, context, repository, descriptor, null);
             if (pomSignature == null) {
                 if (verification == Verification.STRICT) {
                     violations.add(token + " " + version
@@ -320,10 +396,8 @@ public class Signatures extends ProcessBuildStep {
                              BuildStepContext context,
                              Repository repository,
                              String coordinate,
-                             boolean detached) throws IOException {
-        RepositoryItem item = (detached
-                ? repository.signature(executor, coordinate)
-                : repository.fetch(executor, coordinate)).orElse(null);
+                             String extension) throws IOException {
+        RepositoryItem item = repository.fetch(executor, coordinate, extension).orElse(null);
         if (item == null) {
             return null;
         }
@@ -331,7 +405,7 @@ public class Signatures extends ProcessBuildStep {
         if (file != null) {
             return file;
         }
-        Path target = Files.createTempFile(context.supplement(), "fetched", detached ? ".asc" : ".tmp");
+        Path target = Files.createTempFile(context.supplement(), "fetched", extension == null ? ".tmp" : "." + extension);
         try (InputStream inputStream = item.toInputStream()) {
             Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
         }
@@ -351,7 +425,7 @@ public class Signatures extends ProcessBuildStep {
         } catch (IllegalStateException e) {
             throw new IllegalStateException("Could not locate '" + command
                     + "' to verify dependency signatures: install GnuPG, or name another command with"
-                    + " -Djenesis.signature.command", e);
+                    + " -Djenesis.openpgp.command", e);
         }
         int exitCode;
         try {
@@ -420,7 +494,7 @@ public class Signatures extends ProcessBuildStep {
         Path file = context.supplement().resolve("keyring.gpg");
         try (OutputStream out = Files.newOutputStream(file)) {
             for (String declaration : declared) {
-                if (unsigned(declaration)) {
+                if (unsigned(declaration) || bundled(declaration)) {
                     continue;
                 }
                 int slash = declaration.indexOf('/');
@@ -482,6 +556,107 @@ public class Signatures extends ProcessBuildStep {
         return Base64.getMimeDecoder().decode(base64.toString());
     }
 
+    private String attests(Executor executor,
+                           BuildStepContext context,
+                           Repository repository,
+                           Sigstore sigstore,
+                           String descriptor,
+                           Sigstore.Attestation attestation) throws IOException {
+        if (descriptor == null) {
+            return null;
+        }
+        Path bundle = materialise(executor, context, repository, descriptor, "sigstore.json");
+        if (bundle == null) {
+            return verification == Verification.STRICT
+                    ? "its artifact carries a Sigstore bundle but its POM publishes none"
+                    : null;
+        }
+        Path pom = materialise(executor, context, repository, descriptor, null);
+        if (pom == null) {
+            return "a Sigstore bundle is published for its POM but the POM itself did not resolve";
+        }
+        Sigstore.Attestation signer;
+        try {
+            signer = sigstore.verify(pom, bundle);
+        } catch (GeneralSecurityException | RuntimeException e) {
+            return "for its POM, " + reason(e);
+        }
+        return signer.identity().equals(attestation.identity())
+                ? null
+                : "its POM is signed by " + signer.identity() + " but its artifact by " + attestation.identity();
+    }
+
+    private static boolean names(String declaration, String identity) {
+        String prefix = "https://" + declaration.substring(declaration.indexOf('/') + 1);
+        return identity.equals(prefix) || identity.startsWith(prefix + "/") || identity.startsWith(prefix + "@");
+    }
+
+    private static String bare(String issuer) {
+        int scheme = issuer.indexOf("://");
+        return scheme < 0 ? issuer : issuer.substring(scheme + 3);
+    }
+
+    private static String host(String declaration) {
+        String value = declaration.substring(declaration.indexOf('/') + 1);
+        int slash = value.indexOf('/');
+        if (slash < 1) {
+            throw new IllegalArgumentException(declaration + " names no path below an identity host, expected"
+                    + " a form such as Sigstore/github.com/<owner>/<repository>");
+        }
+        return value.substring(0, slash);
+    }
+
+    private String issuer(String host) {
+        for (String entry : issuers.split(",")) {
+            int equals = entry.indexOf('=');
+            if (equals > 0 && entry.substring(0, equals).trim().equals(host)) {
+                String issuer = entry.substring(equals + 1).trim();
+                if (issuer.contains("://")) {
+                    throw new IllegalArgumentException("An issuer of jenesis.sigstore.issuers is named as it is"
+                            + " in an identity, without a scheme: " + host + "="
+                            + issuer.substring(issuer.indexOf("://") + 3));
+                }
+                return "https://" + issuer;
+            }
+        }
+        return "https://" + host;
+    }
+
+    private static String suggested(Sigstore.Attestation attestation) {
+        String path = attestation.identity().startsWith("https://")
+                ? attestation.identity().substring(8)
+                : attestation.identity();
+        int end = -1;
+        for (int index = 0; index < 3; index++) {
+            end = path.indexOf('/', end + 1);
+            if (end < 0) {
+                return "Sigstore/" + path;
+            }
+        }
+        return "Sigstore/" + path.substring(0, end);
+    }
+
+    private static String reason(Throwable throwable) {
+        return throwable.getMessage() == null ? throwable.toString() : throwable.getMessage();
+    }
+
+    private static String descriptor(Repository repository, String relative, String version) {
+        if (!(repository instanceof MavenRepository)) {
+            return null;
+        }
+        try {
+            MavenDependencyKey.Versioned parsed = MavenDependencyKey.parse(relative);
+            return new MavenDependencyKey(parsed.key().groupId(), parsed.key().artifactId(), "pom", null)
+                    .coordinate(null, version);
+        } catch (IllegalArgumentException _) {
+            return null;
+        }
+    }
+
+    private static boolean bundled(String declaration) {
+        return declaration.startsWith("Sigstore/");
+    }
+
     private static boolean unsigned(String declaration) {
         return declaration.equalsIgnoreCase("unsigned/missing")
                 || declaration.equalsIgnoreCase("unsigned/ignored");
@@ -496,19 +671,19 @@ public class Signatures extends ProcessBuildStep {
     private String expired(long signed, long expired) {
         return switch (expiry) {
             case IGNORED -> null;
-            case CURRENT -> "the signing key has expired; -Djenesis.signature.expiry=signing accepts a"
+            case CURRENT -> "the signing key has expired; -Djenesis.openpgp.expiry=signing accepts a"
                     + " signature that the key made before it expired";
             case SIGNING -> {
                 if (signed < 0 || expired < 0) {
                     yield "the signing key has expired and " + command
                             + " did not report when, so it cannot be told whether the signature predates it;"
-                            + " -Djenesis.signature.expiry=ignored accepts it regardless";
+                            + " -Djenesis.openpgp.expiry=ignored accepts it regardless";
                 }
                 yield signed < expired ? null : "the signature was made at "
                         + Instant.ofEpochSecond(signed)
                         + ", after the signing key expired at "
                         + Instant.ofEpochSecond(expired)
-                        + "; -Djenesis.signature.expiry=ignored accepts it regardless";
+                        + "; -Djenesis.openpgp.expiry=ignored accepts it regardless";
             }
         };
     }

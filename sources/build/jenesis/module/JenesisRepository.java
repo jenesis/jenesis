@@ -13,7 +13,8 @@ public interface JenesisRepository extends Repository {
     }
 
     @Override
-    default Optional<RepositoryItem> fetch(Executor executor, String coordinate) throws IOException {
+    default Optional<RepositoryItem> fetch(Executor executor, String coordinate, String extension)
+            throws IOException {
         int colon = coordinate.lastIndexOf(':');
         String type = colon < 0 ? "jar" : coordinate.substring(colon + 1);
         String identifier = colon < 0 ? coordinate : coordinate.substring(0, colon);
@@ -25,27 +26,15 @@ public interface JenesisRepository extends Repository {
         if (dash >= 0) {
             module = module.substring(0, dash);
         }
-        Optional<RepositoryItem> item = fetch(executor, module, classifier, version, type);
-        if (item.isEmpty() && type.equals("jmod")) {
+        Optional<RepositoryItem> item = fetch(executor,
+                module,
+                classifier,
+                version,
+                extension == null ? type : type + "." + extension);
+        if (item.isEmpty() && extension == null && type.equals("jmod")) {
             return fetch(executor, module, classifier, version, "jar");
         }
         return item;
-    }
-
-    @Override
-    default Optional<RepositoryItem> signature(Executor executor, String coordinate) throws IOException {
-        int colon = coordinate.lastIndexOf(':');
-        String type = colon < 0 ? "jar" : coordinate.substring(colon + 1);
-        String identifier = colon < 0 ? coordinate : coordinate.substring(0, colon);
-        int slash = identifier.indexOf('/');
-        String module = slash < 0 ? identifier : identifier.substring(0, slash);
-        String version = slash < 0 ? null : identifier.substring(slash + 1);
-        int dash = module.indexOf('-');
-        String classifier = dash < 0 ? null : module.substring(dash + 1);
-        if (dash >= 0) {
-            module = module.substring(0, dash);
-        }
-        return fetch(executor, module, classifier, version, type + ".asc");
     }
 
     @Override
@@ -67,8 +56,9 @@ public interface JenesisRepository extends Repository {
             }
 
             @Override
-            public Optional<RepositoryItem> signature(Executor executor, String coordinate) throws IOException {
-                return cached.signature(executor, coordinate);
+            public Optional<RepositoryItem> fetch(Executor executor, String coordinate, String extension)
+                    throws IOException {
+                return cached.fetch(executor, coordinate, extension);
             }
         };
     }

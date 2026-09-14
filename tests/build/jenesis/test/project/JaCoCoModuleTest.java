@@ -106,7 +106,7 @@ public class JaCoCoModuleTest {
     }
 
     private static Repository serving(Path jar) {
-        return (_, _) -> Optional.of(RepositoryItem.ofFile(jar));
+        return (_, _, _) -> Optional.of(RepositoryItem.ofFile(jar));
     }
 
     private BuildExecutor newExecutor() throws IOException {

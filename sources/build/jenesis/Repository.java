@@ -5,16 +5,16 @@ import module java.base;
 @FunctionalInterface
 public interface Repository {
 
-    Optional<RepositoryItem> fetch(Executor executor, String coordinate) throws IOException;
+    Optional<RepositoryItem> fetch(Executor executor, String coordinate, String extension) throws IOException;
 
-    default Optional<RepositoryItem> signature(Executor executor, String coordinate) throws IOException {
-        return Optional.empty();
+    default Optional<RepositoryItem> fetch(Executor executor, String coordinate) throws IOException {
+        return fetch(executor, coordinate, null);
     }
 
     default Repository prepend(Repository repository) {
-        return (executor, coordinate) -> {
-            Optional<RepositoryItem> candidate = repository.fetch(executor, coordinate);
-            return candidate.isPresent() ? candidate : fetch(executor, coordinate);
+        return (executor, coordinate, extension) -> {
+            Optional<RepositoryItem> candidate = repository.fetch(executor, coordinate, extension);
+            return candidate.isPresent() ? candidate : fetch(executor, coordinate, extension);
         };
     }
 
@@ -27,13 +27,14 @@ public interface Repository {
     }
 
     default Repository spilled(Path folder) {
-        return (executor, coordinate) -> {
-            Optional<RepositoryItem> candidate = fetch(executor, coordinate);
+        return (executor, coordinate, extension) -> {
+            Optional<RepositoryItem> candidate = fetch(executor, coordinate, extension);
             RepositoryItem item = candidate.orElse(null);
             if (item == null || item.file().isPresent()) {
                 return candidate;
             }
-            return Optional.of(item.spill(folder.resolve(BuildExecutorModule.encode(coordinate) + ".jar")));
+            return Optional.of(item.spill(folder.resolve(BuildExecutorModule.encode(coordinate)
+                    + (extension == null ? ".jar" : "." + extension))));
         };
     }
 
@@ -63,19 +64,15 @@ public interface Repository {
         return new Repository() {
 
             @Override
-            public Optional<RepositoryItem> fetch(Executor executor, String coordinate) throws IOException {
-                return locate(executor, coordinate, ".jar", false);
-            }
-
-            @Override
-            public Optional<RepositoryItem> signature(Executor executor, String coordinate) throws IOException {
-                return locate(executor, coordinate, ".asc", true);
+            public Optional<RepositoryItem> fetch(Executor executor, String coordinate, String extension)
+                    throws IOException {
+                return locate(executor, coordinate, extension == null ? ".jar" : "." + extension, extension);
             }
 
             private Optional<RepositoryItem> locate(Executor executor,
                                                     String coordinate,
                                                     String suffix,
-                                                    boolean detached) throws IOException {
+                                                    String extension) throws IOException {
                 try {
                     Path candidate = folder.resolve(BuildExecutorModule.encode(coordinate) + suffix);
                     boolean preexisting = Files.exists(candidate);
@@ -84,9 +81,9 @@ public interface Repository {
                             return candidate;
                         }
                         try {
-                            RepositoryItem item = (detached
-                                    ? origin.signature(executor, coordinate)
-                                    : origin.fetch(executor, coordinate)).orElse(null);
+                            RepositoryItem item = (extension == null
+                                    ? origin.fetch(executor, coordinate)
+                                    : origin.fetch(executor, coordinate, extension)).orElse(null);
                             if (item == null) {
                                 return null;
                             }
@@ -130,7 +127,7 @@ public interface Repository {
     }
 
     static Repository empty() {
-        return (_, _) -> Optional.empty();
+        return (_, _, _) -> Optional.empty();
     }
 
     static InputStream open(URI uri, String token) throws IOException {
@@ -287,7 +284,10 @@ public interface Repository {
             F versionResolver,
             Retry retry,
             Consumer<URI> callback) {
-        return (_, coordinate) -> {
+        return (_, coordinate, extension) -> {
+            if (extension != null) {
+                return Optional.empty();
+            }
             URI candidate = uris.get(coordinate);
             if (candidate == null && versionResolver != null) {
                 int slash = coordinate.lastIndexOf('/');
@@ -314,15 +314,15 @@ public interface Repository {
     }
 
     static Repository ofFiles(Map<String, Path> files) {
-        return (_, coordinate) -> {
-            Path file = files.get(coordinate);
+        return (_, coordinate, extension) -> {
+            Path file = extension == null ? files.get(coordinate) : null;
             return file == null ? Optional.empty() : Optional.of(RepositoryItem.ofFile(file));
         };
     }
 
     static Repository files() {
-        return (_, coordinate) -> {
-            Path file = Paths.get(coordinate);
+        return (_, coordinate, extension) -> {
+            Path file = Paths.get(extension == null ? coordinate : coordinate + "." + extension);
             return Files.exists(file) ? Optional.of(RepositoryItem.ofFile(file)) : Optional.empty();
         };
     }

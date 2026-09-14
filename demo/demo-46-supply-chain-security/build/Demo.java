@@ -7,19 +7,24 @@ import build.jenesis.Project;
 public class Demo {
 
     static void main(String[] args) throws Exception {
-        // Baseline: a version-only dependency resolves and builds by default.
+        // Baseline: a version-only dependency resolves and builds by default. The fixture, the
+        // throwaway keys and the artifact cache are all built under target/, so the run starts from
+        // nothing rather than from what a previous one signed.
         wipe();
-        new Project(Path.of(".")).pinning(null).build("+unpinned");
+        wipe("unpinned");
+        new Project(Path.of("unpinned")).pinning(null).build();
         System.out.println("[ok]      unpinned: a version-only dependency builds by default");
 
         // 1. ... but strict pinning rejects it - there is no checksum to verify.
         expectFailure("unpinned: a version-only dependency under strict pinning",
-                () -> new Project(Path.of(".")).pinning(Pinning.STRICT).build("+unpinned"));
+                "unpinned",
+                () -> new Project(Path.of("unpinned")).pinning(Pinning.STRICT).build());
 
         // 2. A wrong checksum fails the build even without strict pinning: every
         // download is verified against its pin regardless.
         expectFailure("tampered: a dependency whose pinned checksum does not match",
-                () -> new Project(Path.of(".")).pinning(null).build("+tampered"));
+                "tampered",
+                () -> new Project(Path.of("tampered")).pinning(null).build());
 
         // A checksum only proves the bytes did not change since they were vetted.
         // The rest of this demo is about who produced them in the first place, which
@@ -109,14 +114,88 @@ public class Demo {
             // must be unexpired today. That is the previous behaviour, kept as an option.
             expectSignature("expired: the same signature under expiry measured against today",
                     false, home, "strict", "signed",
-                    List.of("-Djenesis.signature.expiry=current"));
+                    List.of("-Djenesis.openpgp.expiry=current"));
         } finally {
             Files.writeString(declaration, declared);
         }
 
+        // 11. The same question answered without anyone holding a key. Sigstore issues a
+        // certificate that names the identity which authenticated to an identity provider,
+        // valid for ten minutes, and records the signature in a public log; what a consumer
+        // verifies afterwards is that identity and that log entry. @jenesis.signature declares
+        // it instead of a fingerprint. Nothing is fetched to check one: the bundle beside the
+        // artifact carries the certificate, and the tool carries the trust root, so this half
+        // forks no gpg at all. It does need a published bundle, since a certificate authority
+        // and a public log cannot be stood up here the way a throwaway key can.
+        if (!published()) {
+            System.out.println("[skipped] no published bundle could be reached, so identities are not verified here");
+            return;
+        }
+        Path vouching = Files.writeString(Path.of("target", "vouches-for-nothing.json"),
+                "{\"certificateAuthorities\":[],\"tlogs\":[]}");
+
+        expectIdentity("attested: a dependency verified against the identity its declaration names",
+                true, "declared", "attested", List.of());
+
+        // 12. The bundle is genuine and the log entry is real, so only the comparison against
+        // the declaration catches a release that came from somewhere else.
+        expectIdentity("forked: the same bundle, declared to come from a different repository",
+                false, "declared", "forked", List.of());
+
+        // 13. Under strict the POM must carry a bundle from the same identity, which closes the
+        // gap that POMs are read during resolution but never pinned.
+        expectIdentity("attested: under strict, the POM carries a bundle from that identity too",
+                true, "strict", "attested", List.of());
+
+        // 14. The trust root the tool carries is the published one of the public Sigstore
+        // instance. Naming another replaces it wholesale, which is how a private instance is
+        // reached - and how a build stops, when what it names vouches for nothing.
+        expectIdentity("named: the same build against a trust root that vouches for nothing",
+                false, "declared", "attested", List.of("-Djenesis.sigstore.uri=" + vouching.toUri()));
+
         System.out.println();
-        System.out.println("Pinning blocked the unverified and the tampered dependency,");
-        System.out.println("and signature verification blocked the one signed by another key.");
+        System.out.println("Pinning blocked the unverified and the tampered dependency, a declared key");
+        System.out.println("blocked the artifact signed by another, and a declared identity blocked the");
+        System.out.println("one built somewhere else - the last of them without a key anywhere.");
+    }
+
+    private static boolean published() {
+        try {
+            URLConnection connection = URI.create(
+                    "https://repo1.maven.org/maven2/dev/sigstore/protobuf-specs/0.5.2/"
+                            + "protobuf-specs-0.5.2.jar.sigstore.json").toURL().openConnection();
+            connection.setConnectTimeout(15_000);
+            connection.setReadTimeout(15_000);
+            try (InputStream stream = connection.getInputStream()) {
+                return stream.readAllBytes().length > 0;
+            }
+        } catch (IOException _) {
+            return false;
+        }
+    }
+
+    private static void expectIdentity(String description,
+                                       boolean success,
+                                       String verification,
+                                       String project,
+                                       List<String> options) throws Exception {
+        List<String> command = new ArrayList<>(List.of(System.getProperty("java.home") + "/bin/java",
+                "-Djenesis.maven.local=" + Path.of("target", "artifacts").toAbsolutePath(),
+                "-Djenesis.dependency.signature=" + verification,
+                "-Djenesis.print.signatures=true"));
+        command.addAll(options);
+        command.addAll(List.of("build/jenesis/Make.java", "build"));
+        String failure = run(Path.of(project), command);
+        if ((failure == null) != success) {
+            throw new AssertionError("Expected "
+                    + (success ? "success" : "failure")
+                    + " but the build "
+                    + (failure == null ? "succeeded" : "failed")
+                    + ": "
+                    + description
+                    + (failure == null ? "" : "\n" + failure));
+        }
+        System.out.println((success ? "[ok]      " : "[blocked] ") + description);
     }
 
     private static Path published(Path work) throws Exception {
@@ -284,8 +363,8 @@ public class Demo {
         return process.waitFor() == 0 ? null : output;
     }
 
-    private static void expectFailure(String description, Build build) throws IOException {
-        wipe();
+    private static void expectFailure(String description, String project, Build build) throws IOException {
+        wipe(project);
         try {
             build.run();
         } catch (Throwable _) {
@@ -296,7 +375,11 @@ public class Demo {
     }
 
     private static void wipe() throws IOException {
-        Path target = Path.of("target");
+        wipe(".");
+    }
+
+    private static void wipe(String project) throws IOException {
+        Path target = Path.of(project, "target");
         if (Files.isDirectory(target)) {
             delete(target);
         }
