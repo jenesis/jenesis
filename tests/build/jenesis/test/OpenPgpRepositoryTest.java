@@ -210,8 +210,8 @@ public class OpenPgpRepositoryTest {
 
     @Test
     public void falls_through_to_the_next_server_that_answers() throws Exception {
-        Repository silent = (_, _) -> Optional.empty();
-        Repository answering = (_, coordinate) -> Optional.of(
+        Repository silent = (_, _, _) -> Optional.empty();
+        Repository answering = (_, coordinate, _) -> Optional.of(
                 () -> new ByteArrayInputStream(coordinate.getBytes(StandardCharsets.US_ASCII)));
         assertThat(answering.prepend(silent).fetch(Runnable::run, FINGERPRINT))
                 .as("a server with no such key leaves the next one to answer")

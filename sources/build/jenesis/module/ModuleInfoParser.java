@@ -393,11 +393,14 @@ public class ModuleInfoParser {
                                 }
                                 String fingerprint = declaration.substring(0, split);
                                 int slash = fingerprint.indexOf('/');
-                                if (slash < 1 || slash != fingerprint.lastIndexOf('/')
-                                        || slash == fingerprint.length() - 1) {
+                                boolean identity = fingerprint.startsWith("Sigstore/");
+                                if (slash < 1 || slash == fingerprint.length() - 1
+                                        || (identity
+                                                ? fingerprint.indexOf('/', slash + 1) < 0
+                                                : slash != fingerprint.lastIndexOf('/'))) {
                                     throw new IllegalArgumentException("Malformed @jenesis.signature"
                                             + " fingerprint '" + fingerprint
-                                            + "': expected <algorithm>/<fingerprint>, or unsigned/missing or unsigned/ignored for a coordinate that publishes no signature."
+                                            + "': expected <algorithm>/<fingerprint>, Sigstore/<host>/<path> for an identity a certificate names, or unsigned/missing or unsigned/ignored for a coordinate that publishes no signature."
                                             + " A tag owns every line below it until the next tag, so prose"
                                             + " written under a signature is read as part of it; move it above"
                                             + " the tag block");

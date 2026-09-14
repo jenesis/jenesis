@@ -602,8 +602,9 @@ public record Project(
                       versions.properties   <group>/<repository>/<coordinate> -> <version>[ <algo>/<hex>]
                       boms.properties       bom/<...> -> [<version>[ <algo>/<hex>]] references and
                                             entry/<...> -> expanded entries; merged below versions
-                      signatures.properties <algo>/<hex> -> space-separated coordinate tokens, each
-                                            optionally ending in /* for a whole groupId
+                      signatures.properties <algo>/<hex>, or Sigstore/<host>/<path> for an identity,
+                                            -> space-separated coordinate tokens, each optionally
+                                            ending in /* for a whole groupId
                       exclusions.properties <group>/<scope>/<repository>/<coordinate> -> comma-separated
                                             <groupId>/<artifactId>
                       inventory.properties  what staging reads: artifacts, sources, documentation,
@@ -642,7 +643,7 @@ public record Project(
                           no tests, runs none, is never staged.
                       @jenesis.pin <token> <ver> [<algo>/<hex>] [(<guard>)]
                           Pin a version and optionally a content checksum.
-                      @jenesis.signature <algo>/<hex> <token>... | [<group>/]signature-<name>.properties
+                      @jenesis.signature <algo>/<hex> | Sigstore/<host>/<path> <token>... | [<group>/]signature-<name>.properties
                           Declare the OpenPGP key that signs these coordinates' artifacts - the
                           fingerprint first, because one key normally signs many. A Maven token may
                           end in /* to cover every artifact of one groupId. Carries no version: one
@@ -688,7 +689,27 @@ public record Project(
                           so a server can withhold a key but never substitute one. The verifier is an ordinary
                           forked tool, so jenesis.print.gpgv shows each invocation,
                           jenesis.print.signatures names what was covered, and
-                          jenesis.signature.command names a different binary.
+                          jenesis.openpgp.command names a different binary.
+                          Sigstore/<host>/<path> declares an identity rather than a key, for a
+                          coordinate whose repository publishes a .sigstore.json beside the artifact:
+                          nothing is fetched to check it, because the bundle carries the signing
+                          certificate and the transparency log entry that records when it signed, and
+                          the certificate is trusted for that recorded moment rather than for today -
+                          it was valid for ten minutes and is long expired by the time anyone reads
+                          it. The path is a prefix of the identity the certificate names, so a
+                          declaration covers what lies below it and narrows a segment at a time:
+                          Sigstore/github.com/acme covers every repository of an owner,
+                          Sigstore/github.com/acme/lib one repository, and a workflow file may follow.
+                          The ref a release was built from is never written, because that is the part
+                          that moves, which is what lets one line cover every future release the way
+                          a fingerprint does. The host names the issuer that must have authenticated
+                          the identity, through jenesis.sigstore.issuers. What a bundle is checked
+                          against is a sigstore-trusted-root.json read from jenesis.project.signatures
+                          beside the key lists, and never resolved from a repository, for the reason a
+                          key list is not: a trust root downloaded on trust verifies nothing.
+                          Both forms may cover one coordinate, and each is then verified against
+                          whatever it publishes; a coordinate covered only by an identity forks no
+                          gpg at all, since the whole check is JDK cryptography in process.
                       @jenesis.alias <module> <groupId>/<artifactId>[/<type>[/<classifier>]]
                           Require a Maven artifact under a stable module name, so a non-modular jar
                           needs no derived automatic name. Carries no version: a pin or BOM entry
@@ -852,11 +873,16 @@ public record Project(
                     did not change since they were vetted, not who produced them; @jenesis.signature
                     declares the OpenPGP key that signs a coordinate, and -Djenesis.dependency.signature
                     checks the detached signature with a local gpg as each artifact is downloaded, so
-                    the run that establishes a pin is the run that proves who produced it.
+                    the run that establishes a pin is the run that proves who produced it. The same
+                    tag declares a Sigstore identity instead, as Sigstore/<host>/<path>, for a
+                    coordinate that publishes a .sigstore.json: a certificate that named the workflow
+                    which built it and lived ten minutes, trusted for the moment a transparency log
+                    recorded rather than for today, checked in process against a
+                    sigstore-trusted-root.json held beside the key lists.
 
                     ## 13. Copy a demo: they are the recipe book
 
-                    52 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    51 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -1876,8 +1902,10 @@ public record Project(
                 project.version||Version stamped onto every produced artifact
                 project.digest|SHA-256|Algorithm for pin and dependency checksums
                 dependency.signature|none|Signatures verified after download: none|declared|strict
-                signature.command|gpgv|Binary forked to verify detached OpenPGP signatures; a name is looked up on the PATH, a path is used as given
-                signature.expiry|signing|An expired signing key: ignored accepts it, signing accepts what it signed before expiring, current rejects it
+                openpgp.command|gpgv|Binary forked to verify detached OpenPGP signatures; a name is looked up on the PATH, a path is used as given
+                openpgp.expiry|signing|An expired signing key: ignored accepts it, signing accepts what it signed before expiring, current rejects it
+                sigstore.uri||URI of the Sigstore trust root; default: the published root of the public instance, carried as source
+                sigstore.issuers|github.com=token.actions.githubusercontent.com|Comma-separated <host>=<issuer> pairs, both named without a scheme, for identity hosts whose OpenID Connect issuer is not the host itself
                 project.metadata||Comma-separated extra metadata files
                 project.configuration|build.jenesis|Comma-separated folders searched for tool configuration files; @ splices the default
                 project.boms||Comma-separated locations of local pin-<name>.properties; default: the configuration folders

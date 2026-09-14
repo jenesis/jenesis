@@ -19,7 +19,7 @@ public class MavenDefaultRepositoryTest {
     public void cached_repository_prepended_with_overlay_resolves_sibling_without_caching() throws IOException {
         Path sibling = local.resolve("sibling.jar");
         Files.writeString(sibling, "sibling-content");
-        Repository overlay = (_, coordinate) -> coordinate.equals("group/artifact/1")
+        Repository overlay = (_, coordinate, _) -> coordinate.equals("group/artifact/1")
                 ? Optional.of(RepositoryItem.ofFile(sibling))
                 : Optional.empty();
         int[] remoteCalls = {0};
@@ -50,7 +50,7 @@ public class MavenDefaultRepositoryTest {
         Files.writeString(Files
                 .createDirectories(repository.resolve("group/artifact/1"))
                 .resolve("artifact-1.jar"), "remote-content");
-        Repository emptyOverlay = (_, _) -> Optional.empty();
+        Repository emptyOverlay = (_, _, _) -> Optional.empty();
         Path cache = Files.createDirectory(result.resolve("cache"));
         MavenRepository merged = new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)
                 .cached(cache)

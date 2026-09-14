@@ -129,7 +129,7 @@ public class SignaturesTest {
     }
 
     private Repository vaulted() {
-        return (_, coordinate) -> {
+        return (_, coordinate, _) -> {
             Path candidate = root.resolve("keys").resolve(coordinate + ".gpg");
             return Files.isRegularFile(candidate)
                     ? Optional.of(RepositoryItem.ofFile(candidate))
@@ -276,11 +276,29 @@ public class SignaturesTest {
     @Test
     public void refuses_an_algorithm_no_repository_resolves() throws IOException {
         resolved("maven/org.example/lib", "1.0", null);
-        declared("Sigstore/" + PRIMARY, "main/maven/org.example/lib");
+        declared("Notary/" + PRIMARY, "main/maven/org.example/lib");
         assertThatThrownBy(() -> run(step(signature("lib"), validated(PRIMARY))))
                 .as("an algorithm nothing can resolve is a configuration error, not a missing key")
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("No repository is registered as 'Sigstore'");
+                .hasMessageContaining("No repository is registered as 'Notary'");
+    }
+
+    @Test
+    public void refuses_a_coordinate_whose_identity_is_declared_but_publishes_no_bundle() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("Sigstore/github.com/example/lib", "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(signature("lib"), validated(PRIMARY))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no Sigstore bundle is published");
+    }
+
+    @Test
+    public void accepts_an_absent_bundle_where_unsigned_missing_says_there_is_none() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("Sigstore/github.com/example/lib", "main/maven/org.example/lib");
+        declared("unsigned/missing", "main/maven/org.example/lib");
+        assertThatCode(() -> run(step(signature("lib"), validated(PRIMARY))))
+                .doesNotThrowAnyException();
     }
 
     @Test

@@ -49,7 +49,7 @@ public class GroovyDocumentationModuleTest {
         executor.addModule(
                 "groovydoc",
                 new GroovyDocumentationModule(
-                        Map.of("maven", (_, _) -> Optional.of(RepositoryItem.ofFile(groovydocJar))),
+                        Map.of("maven", (_, _, _) -> Optional.of(RepositoryItem.ofFile(groovydocJar))),
                         Map.of("maven", Resolver.identity()))
                         .factory(commands -> {
                             captured.addAll(commands);

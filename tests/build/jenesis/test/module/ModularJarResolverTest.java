@@ -83,7 +83,7 @@ public class ModularJarResolverTest {
         assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "module",
-                Map.of("module", (_, coordinate) -> {
+                Map.of("module", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toAliasingJar("root",
                                 "toolkit.lib=org.example/plain-lib",
@@ -107,7 +107,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", require("transitive", 0));
                         case "transitive" -> toJar("transitive", require("last", 0));
@@ -130,7 +130,7 @@ public class ModularJarResolverTest {
         Resolver.Resolution resolution = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", require("a", 0), require("b", 0));
                         case "a" -> toJar("a");
@@ -159,7 +159,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", require("optional", ClassFile.ACC_STATIC_PHASE));
                         case "optional" -> toJar("optional");
@@ -178,7 +178,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", require("propagated",
                                 ClassFile.ACC_STATIC_PHASE | ClassFile.ACC_TRANSITIVE));
@@ -200,7 +200,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root",
                                 require("zeta", 0),
@@ -226,7 +226,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", require("propagated",
                                 ClassFile.ACC_STATIC_PHASE | ClassFile.ACC_TRANSITIVE));
@@ -300,7 +300,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.2.3");
                         default -> null;
@@ -318,7 +318,7 @@ public class ModularJarResolverTest {
         assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> Optional.of(toJar("root", "../evil"))),
+                Map.of("foo", (_, coordinate, _) -> Optional.of(toJar("root", "../evil"))),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(),
                 DependencyScope.COMPILE))
@@ -332,7 +332,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", (String) null);
                         default -> null;
@@ -350,7 +350,7 @@ public class ModularJarResolverTest {
         assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("imposter");
                         default -> null;
@@ -370,7 +370,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root/9.9" -> toJar("root", "9.9");
                         default -> null;
@@ -388,7 +388,7 @@ public class ModularJarResolverTest {
         assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root/9.9" -> toJar("root", "1.0");
                         default -> null;
@@ -409,7 +409,7 @@ public class ModularJarResolverTest {
         assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     fetched.put(coordinate, "");
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0");
@@ -430,7 +430,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(true).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root/9.9" -> toJar("root", "1.0");
                         default -> null;
@@ -448,7 +448,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root/7.0" -> toJar("root", (String) null);
                         default -> null;
@@ -466,7 +466,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0", require("transitive", 0));
                         case "transitive" -> toJar("transitive", "2.0");
@@ -487,7 +487,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0",
                                 require("alpha", 0),
@@ -513,7 +513,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     fetched.put(coordinate, "");
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0", require("pinned", 0, "1.0"));
@@ -537,7 +537,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     fetched.put(coordinate, "");
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0", require("plain", 0));
@@ -561,7 +561,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     fetched.put(coordinate, "");
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0", require("dep", 0, "1.0"));
@@ -585,7 +585,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     fetched.put(coordinate, "");
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0", require("middle", 0, "1.0"));
@@ -611,7 +611,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     fetched.put(coordinate, "");
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0",
@@ -638,7 +638,7 @@ public class ModularJarResolverTest {
                 ModuleVersionNegotiator.ignore()).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     fetched.put(coordinate, "");
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0",
@@ -668,7 +668,7 @@ public class ModularJarResolverTest {
                 ModuleVersionNegotiator.ignore()).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     fetched.put(coordinate, "");
                     RepositoryItem item = switch (coordinate) {
                         case "root/1.0" -> toJar("root", "1.0",
@@ -697,7 +697,7 @@ public class ModularJarResolverTest {
                 ModuleVersionNegotiator.fail()).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0",
                                 require("middle", 0, "1.0"),
@@ -723,7 +723,7 @@ public class ModularJarResolverTest {
                 ModuleVersionNegotiator.fail()).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0",
                                 require("middle", 0, "1.0"),
@@ -750,7 +750,7 @@ public class ModularJarResolverTest {
                 ModuleVersionNegotiator.fail()).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0",
                                 require("middle", 0, "1.0"),
@@ -779,7 +779,7 @@ public class ModularJarResolverTest {
             assertThatThrownBy(() -> resolver.dependencies(
                     Runnable::run,
                     "foo",
-                    Map.of("foo", (_, coordinate) -> {
+                    Map.of("foo", (_, coordinate, _) -> {
                         RepositoryItem item = switch (coordinate) {
                             case "root" -> toJar("root", "1.0", require("dep", 0, "../../secret"));
                             default -> null;
@@ -804,7 +804,7 @@ public class ModularJarResolverTest {
             assertThatThrownBy(() -> resolver.dependencies(
                     Runnable::run,
                     "foo",
-                    Map.of("foo", (_, coordinate) -> {
+                    Map.of("foo", (_, coordinate, _) -> {
                         RepositoryItem item = switch (coordinate) {
                             case "root" -> toJar("root", "1.0", require("dep", 0, "../../secret"));
                             default -> null;
@@ -825,7 +825,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0", require("transitive", 0));
                         case "transitive/9.9" -> toJar("transitive", "9.9");
@@ -846,7 +846,7 @@ public class ModularJarResolverTest {
         assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0", require("dep", 0, "../../secret"));
                         default -> null;
@@ -869,7 +869,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toMultiReleaseJar("root", "1.0", versions);
                         default -> null;
@@ -890,7 +890,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toMultiReleaseJar("root", "1.0", versions);
                         default -> null;
@@ -909,7 +909,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     fetched.put(coordinate, "");
                     RepositoryItem item = switch (coordinate) {
                         case "root-windows-x86_64/9.9" -> toJar("root", "9.9");
@@ -930,7 +930,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     fetched.put(coordinate, "");
                     RepositoryItem item = switch (coordinate) {
                         case "root-windows-x86_64" -> toJar("root", "1.2.3");
@@ -951,7 +951,7 @@ public class ModularJarResolverTest {
         SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     fetched.put(coordinate, "");
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0", require("dep", 0));
@@ -974,7 +974,7 @@ public class ModularJarResolverTest {
         assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root-win/9.9" -> toJar("root", "1.0");
                         default -> null;
@@ -994,7 +994,7 @@ public class ModularJarResolverTest {
         assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, _) -> Optional.empty()),
+                Map.of("foo", (_, _, _) -> Optional.empty()),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("root", ":")),
                 DependencyScope.COMPILE))
@@ -1007,7 +1007,7 @@ public class ModularJarResolverTest {
         assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, _) -> Optional.empty()),
+                Map.of("foo", (_, _, _) -> Optional.empty()),
                 new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
                 new LinkedHashMap<>(Map.of("root", ":win:")),
                 DependencyScope.COMPILE))
@@ -1020,7 +1020,7 @@ public class ModularJarResolverTest {
         assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", ":win:1.0");
                         default -> null;
@@ -1040,7 +1040,7 @@ public class ModularJarResolverTest {
         assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
                 Runnable::run,
                 "foo",
-                Map.of("foo", (_, coordinate) -> {
+                Map.of("foo", (_, coordinate, _) -> {
                     RepositoryItem item = switch (coordinate) {
                         case "root" -> toJar("root", "1.0", require("dep", 0, ":win:1.0"));
                         default -> null;

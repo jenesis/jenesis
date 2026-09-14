@@ -186,11 +186,11 @@ public class PiTestModuleTest {
     }
 
     private static Repository serving(Path jar) {
-        return (_, _) -> Optional.of(RepositoryItem.ofFile(jar));
+        return (_, _, _) -> Optional.of(RepositoryItem.ofFile(jar));
     }
 
     private Repository files() {
-        return (_, coordinate) -> {
+        return (_, coordinate, _) -> {
             Path file = Files.write(
                     Files.createDirectories(root.resolve("served")).resolve(coordinate.replace('/', '-') + ".jar"),
                     coordinate.getBytes(StandardCharsets.UTF_8));

@@ -790,7 +790,7 @@ public class MavenModuleResolverTest {
     public void bom_floats_to_discovery_pom_version() throws IOException {
         Path properties = Files.writeString(mavenRepoFolder.resolve("acme.platform-2.0.properties"), "bar = 2.0\n");
         Map<String, String> fetched = new LinkedHashMap<>();
-        Repository repository = (_, coordinate) -> {
+        Repository repository = (_, coordinate, _) -> {
             fetched.put(coordinate, "");
             return switch (coordinate) {
                 case "acme.platform:pom" -> Optional.of((RepositoryItem) () -> new ByteArrayInputStream("""
@@ -820,7 +820,7 @@ public class MavenModuleResolverTest {
     @Test
     public void bom_without_discovery_pom_keeps_declared_version() throws IOException {
         Path properties = Files.writeString(mavenRepoFolder.resolve("acme.platform-1.0.properties"), "bar = 1.0\n");
-        Repository repository = (_, coordinate) -> switch (coordinate) {
+        Repository repository = (_, coordinate, _) -> switch (coordinate) {
             case "acme.platform/1.0:properties" -> Optional.of(RepositoryItem.ofFile(properties));
             default -> Optional.empty();
         };
@@ -848,7 +848,7 @@ public class MavenModuleResolverTest {
     }
 
     private static Repository stubRepository(Map<String, String> fetched, Map<String, String> bodies) {
-        return (_, coordinate) -> {
+        return (_, coordinate, _) -> {
             fetched.put(coordinate, "");
             String body = bodies.get(coordinate);
             if (body == null) {
