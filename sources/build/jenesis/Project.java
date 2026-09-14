@@ -166,7 +166,8 @@ public record Project(
             String prefix = BUILD + "/maven/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
             executor.addModule(PIN, new PinModule(project.root(),
                     "pom.xml",
-                    (path, file) -> new PinPom("maven", path, List.of(file), project.hashFunction())), BUILD);
+                    (path, file) -> new PinPom("maven", path, List.of(file), project.hashFunction()),
+                    project.hashFunction()), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", new Tree(), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
@@ -233,7 +234,8 @@ public record Project(
                     "modular", new JenesisModuleRepositoryExport(), BuildExecutorModule.PREVIOUS + STAGE + "/modular"), STAGE);
             String prefix = BUILD + "/modules/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
             executor.addModule(PIN, new PinModule(project.root(), "module-info.java",
-                    (path, file) -> new PinModuleInfo("module", path, List.of(file), project.hashFunction())), BUILD);
+                    (path, file) -> new PinModuleInfo("module", path, List.of(file), project.hashFunction()),
+                    project.hashFunction()), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", new Tree(), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
@@ -311,7 +313,8 @@ public record Project(
             executor.addModule(PIN,
                     new PinModule(project.root(),
                             "module-info.java",
-                            (path, file) -> new PinModuleInfo("module", path, List.of(file), project.hashFunction())),
+                            (path, file) -> new PinModuleInfo("module", path, List.of(file), project.hashFunction()),
+                            project.hashFunction()),
                     BUILD);
             executor.addStep(DEPENDENCIES, new Tree(), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
@@ -809,7 +812,10 @@ public record Project(
                     checksums back into pom.xml (<dependencyManagement> with <!--Checksum/<algo>/<hex>-->
                     and a <!--jenesis.pin ... --> comment) or module-info.java (@jenesis.pin tags),
                     idempotently, refreshing only the lines matching the local platform. It covers the
-                    whole project; to pin one module, name its step rather than adding +<module>. Each
+                    whole project; to pin one module, name its step rather than adding +<module>.
+                    -Djenesis.pin.file=<path> writes the project's whole closure to that properties
+                    file instead of the declarations, in the grammar @jenesis.bom reads, which is how
+                    a local bill of materials is refreshed rather than hand-edited. Each
                     module resolves alone, so nothing makes them agree: pin/divergence reports every
                     coordinate the tree pins at more than one version, which is the signal that a
                     shared version table is overdue. Enforce
@@ -867,7 +873,10 @@ public record Project(
         }
     }
 
-    private record PinModule(Path root, String fileName, BiFunction<String, Path, BuildStep> stepFactory)
+    private record PinModule(Path root,
+                             String fileName,
+                             BiFunction<String, Path, BuildStep> stepFactory,
+                             HashDigestFunction hashFunction)
             implements BuildExecutorModule {
 
         @Override
@@ -885,18 +894,96 @@ public record Project(
                     }
                 }
             }
-            for (String path : paths) {
-                Path file = root.resolve(path).resolve(fileName);
-                if (!Files.isRegularFile(file)) {
-                    continue;
+            String collected = System.getProperty("jenesis.pin.file");
+            if (collected == null) {
+                for (String path : paths) {
+                    Path file = root.resolve(path).resolve(fileName);
+                    if (!Files.isRegularFile(file)) {
+                        continue;
+                    }
+                    buildExecutor.addStep("module-" + BuildExecutorModule.encode(path),
+                            stepFactory.apply(path, file),
+                            new LinkedHashSet<>(inherited.sequencedKeySet()));
                 }
-                buildExecutor.addStep("module-" + BuildExecutorModule.encode(path),
-                        stepFactory.apply(path, file),
+            } else {
+                buildExecutor.addStep("file",
+                        new Pins(paths, root.resolve(collected).normalize(), hashFunction),
                         new LinkedHashSet<>(inherited.sequencedKeySet()));
             }
             buildExecutor.addStep("divergence",
                     new Divergence(paths),
                     new LinkedHashSet<>(inherited.sequencedKeySet()));
+        }
+    }
+
+    private record Pins(SequencedSet<String> paths, Path file, HashDigestFunction hashFunction)
+            implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            SequencedMap<String, String> entries = new TreeMap<>();
+            for (String path : paths) {
+                Set<String> internal = new LinkedHashSet<>();
+                for (String identity : Inventory.identities(arguments.values())) {
+                    internal.add(identity);
+                    int first = identity.indexOf('/'), last = identity.lastIndexOf('/');
+                    if (first > 0 && last > first) {
+                        internal.add(identity.substring(0, last));
+                    }
+                }
+                for (Map.Entry<String, Inventory.Dependency> dependency
+                        : Inventory.closure(arguments.values(), path).entrySet()) {
+                    String group = dependency.getValue().group();
+                    String key = dependency.getKey().substring(group.length() + 1);
+                    if (!group.equals("main") || internal.contains(key)) {
+                        continue;
+                    }
+                    int lastSlash = key.lastIndexOf('/'), firstSlash = key.indexOf('/');
+                    if (lastSlash <= 0 || lastSlash == firstSlash) {
+                        continue;
+                    }
+                    String coordinate = key.substring(0, lastSlash);
+                    String value = key.substring(lastSlash + 1);
+                    Inventory.Dependency resolved = dependency.getValue();
+                    String checksum = resolved.jar() != null && Files.isRegularFile(resolved.jar())
+                            ? hashFunction.encodedHash(resolved.jar())
+                            : resolved.checksum();
+                    if (checksum != null && !checksum.isEmpty()) {
+                        value += " " + checksum;
+                    }
+                    String entry;
+                    if (coordinate.startsWith("module/")) {
+                        String module = coordinate.substring("module/".length());
+                        int dash = module.indexOf('-');
+                        if (dash >= 0) {
+                            value = ":" + module.substring(dash + 1) + ":" + value;
+                            module = module.substring(0, dash);
+                        }
+                        entry = module;
+                    } else {
+                        String maven = coordinate.startsWith("maven/")
+                                ? coordinate.substring("maven/".length())
+                                : null;
+                        entry = maven != null
+                                && maven.indexOf('/') > 0
+                                && maven.indexOf('/') == maven.lastIndexOf('/')
+                                ? maven
+                                : coordinate;
+                    }
+                    entries.putIfAbsent(entry, value);
+                }
+            }
+            SequencedProperties pins = new SequencedProperties();
+            entries.forEach(pins::setProperty);
+            Path parent = file.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            pins.store(file);
+            return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }
 
@@ -1740,6 +1827,7 @@ public record Project(
                 dependency.pin||strict|versions|ignore; unset keeps existing pins and tolerates missing ones
                 resolver.maven|maven|maven|closest|latest|release|stable: which version a Maven coordinate resolves to; stable skips pre-release qualifiers
                 resolver.module|first|first|ignore|fail: what to do with the versions a module-info records
+                pin.file||Write the whole project's pins to this properties file instead of the module declarations
                 pin.checksum|true|Record content checksums in the pins that the pin selector writes
                 pin.bom|keep|keep|flatten: whether pinning keeps BOM references or resolves them away
                 platform.<token>||true adds a platform token and false removes one, selecting guarded pins
