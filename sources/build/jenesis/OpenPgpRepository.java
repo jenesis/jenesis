@@ -4,7 +4,9 @@ import module java.base;
 
 public class OpenPgpRepository implements Repository {
 
-    public static final URI DEFAULT = URI.create("https://keyserver.ubuntu.com/");
+    public static final List<URI> DEFAULTS = List.of(
+            URI.create("https://keyserver.ubuntu.com/"),
+            URI.create("https://keys.openpgp.org/"));
 
     private final URI server;
     private final Path local;
@@ -63,7 +65,7 @@ public class OpenPgpRepository implements Repository {
                         servers(environment, visited, target);
                         visited.remove("OPENPGP_REPOSITORY_URI");
                     } else {
-                        target.add(DEFAULT);
+                        target.addAll(DEFAULTS);
                     }
                 } else {
                     String value = System.getProperty(name, System.getenv(name));

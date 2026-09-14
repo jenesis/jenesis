@@ -81,6 +81,38 @@ public class OpenPgpRepositoryTest {
     }
 
     @Test
+    public void asks_the_second_server_when_the_first_does_not_hold_the_key() throws Exception {
+        HttpServer absent = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        absent.createContext("/", exchange -> exchange.sendResponseHeaders(404, -1));
+        absent.start();
+        HttpServer holding = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        holding.createContext("/", exchange -> {
+            byte[] body = "second".getBytes(StandardCharsets.US_ASCII);
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+        });
+        holding.start();
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.openpgp.uri",
+                "http://127.0.0.1:" + absent.getAddress().getPort() + "/,"
+                        + "http://127.0.0.1:" + holding.getAddress().getPort() + "/");
+        System.setProperty("jenesis.openpgp.local", root.toString());
+        try {
+            assertThat(OpenPgpRepository.of().fetch(Runnable::run, FINGERPRINT))
+                    .as("a server that does not hold the key leaves the next one to answer")
+                    .isPresent();
+        } finally {
+            System.clearProperty("jenesis.openpgp.local");
+            System.clearProperty("jenesis.openpgp.uri");
+            System.clearProperty("jenesis.repository.insecure");
+            absent.stop(0);
+            holding.stop(0);
+        }
+    }
+
+    @Test
     public void answers_from_the_cache_without_asking_anyone() throws Exception {
         Files.writeString(root.resolve(FINGERPRINT + ".gpg"), "vendored");
         Optional<RepositoryItem> item = new OpenPgpRepository(URI.create("http://127.0.0.1:1/"))
