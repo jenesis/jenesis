@@ -34,8 +34,7 @@ public class Signatures extends ProcessBuildStep {
                 Verification.fromProperty(),
                 KeyExpiry.fromProperty(),
                 System.getProperty("jenesis.signature.command", "gpgv"),
-                System.getProperty("jenesis.signature.keys",
-                        "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x<fingerprint>"),
+                keyServers(),
                 Path.of(System.getProperty("jenesis.signature.cache", ".jenesis/keys")),
                 null,
                 SequencedProperties.systemFlag("jenesis.print.signatures") ? System.out::println : null);
@@ -451,6 +450,17 @@ public class Signatures extends ProcessBuildStep {
         return file;
     }
 
+    private static String keyServers() {
+        String property = System.getProperty("jenesis.signature.keys");
+        if (property != null) {
+            return property;
+        }
+        String environment = System.getenv("JENESIS_SIGNATURE_KEYS");
+        return environment == null
+                ? "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x<fingerprint>"
+                : environment;
+    }
+
     private byte[] key(String fingerprint) throws IOException {
         Path cached = cache.resolve(fingerprint + ".gpg");
         if (Files.isRegularFile(cached)) {
@@ -459,19 +469,30 @@ public class Signatures extends ProcessBuildStep {
         if (keys == null || keys.isBlank()) {
             return null;
         }
-        byte[] key;
-        try {
-            try (InputStream stream = Repository.open(
-                    URI.create(keys.replace("<fingerprint>", fingerprint)),
-                    null)) {
-                key = dearmoured(new String(stream.readAllBytes(), StandardCharsets.US_ASCII));
+        byte[] key = null;
+        SequencedMap<String, String> refused = new LinkedHashMap<>();
+        for (String server : keys.split(",")) {
+            String endpoint = server.trim();
+            if (endpoint.isEmpty()) {
+                continue;
             }
-        } catch (IOException | IllegalArgumentException e) {
-            if (printing != null) {
+            URI uri = URI.create(endpoint.replace("<fingerprint>", fingerprint));
+            try (InputStream stream = Repository.open(uri, null)) {
+                key = dearmoured(new String(stream.readAllBytes(), StandardCharsets.US_ASCII));
+                break;
+            } catch (IOException | RuntimeException e) {
+                refused.put(uri.getHost() == null ? uri.getScheme() : uri.getHost(),
+                        e.getMessage() == null ? e.toString() : e.getMessage());
+            }
+        }
+        if (key == null) {
+            if (printing != null && !refused.isEmpty()) {
                 print("[UNFETCHED]",
                         BuildExecutorCallback.YELLOW,
                         "OpenPGP/" + fingerprint,
-                        e.getMessage() == null ? e.toString() : e.getMessage());
+                        refused.entrySet().stream()
+                                .map(entry -> entry.getKey() + ": " + entry.getValue())
+                                .collect(Collectors.joining("; ")));
             }
             return null;
         }

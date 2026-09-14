@@ -672,9 +672,11 @@ public record Project(
                           verifier downloaded on trust verifies nothing. gpgv reads a keyring file
                           and nothing else, so no home directory, agent or trust database takes
                           part; the build assembles that keyring from the declared fingerprints
-                          alone, fetching each from jenesis.signature.keys into
+                          alone, fetching each from the jenesis.signature.keys servers into
                           jenesis.signature.cache, so a key it holds is a key a line declares and
-                          NO_PUBKEY means no line covers the signer. The verifier is an ordinary
+                          NO_PUBKEY means no line covers the signer. Fetching by fingerprint is not
+                          trust in the server: the comparison is against the declared fingerprint,
+                          so a server can withhold a key but never substitute one. The verifier is an ordinary
                           forked tool, so jenesis.print.gpgv shows each invocation,
                           jenesis.print.signatures names what was covered, and
                           jenesis.signature.command names a different binary.
@@ -1795,7 +1797,7 @@ public record Project(
                 project.digest|SHA-256|Algorithm for pin and dependency checksums
                 dependency.signature|none|Signatures verified after download: none|declared|strict
                 signature.command|gpgv|Binary forked to verify detached OpenPGP signatures; a name is looked up on the PATH, a path is used as given
-                signature.keys|keyserver.ubuntu.com lookup|Where a declared key is fetched from, <fingerprint> substituted; empty fetches nothing
+                signature.keys|keyserver.ubuntu.com lookup|Key servers, comma-separated and queried left to right, <fingerprint> substituted; empty fetches nothing (env JENESIS_SIGNATURE_KEYS)
                 signature.cache|.jenesis/keys|Folder holding the fetched keys, one file per fingerprint
                 signature.expiry|signing|An expired signing key: ignored accepts it, signing accepts what it signed before expiring, current rejects it
                 project.metadata||Comma-separated extra metadata files

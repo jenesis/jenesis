@@ -16,6 +16,7 @@ import build.jenesis.maven.MavenRepository;
 import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.Signatures;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -272,6 +273,33 @@ public class SignaturesRunTest {
                 .join())
                 .as("process-gpgv.properties adds a keyring beside the one the build assembles")
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    public void falls_through_to_the_next_key_server_that_answers() throws Exception {
+        Path served = root.resolve(fingerprint + ".asc");
+        gpg("--export", "--armor", "--output", served.toString(), fingerprint);
+        Path empty = Files.createDirectory(root.resolve("uncached"));
+        Map<String, Repository> repositories = Map.of("maven", (MavenRepository) (_, _, _, _, type, _, checksum) ->
+                Optional.ofNullable("jar".equals(type) && "asc".equals(checksum)
+                        ? RepositoryItem.ofFile(detached)
+                        : null));
+        assertThatCode(() -> new Signatures(repositories)
+                .verification(Verification.DECLARED)
+                .cache(empty)
+                .keys(root.toUri() + "absent-<fingerprint>.asc , " + root.toUri() + "<fingerprint>.asc")
+                .apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                                input,
+                                Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join())
+                .as("the first endpoint has no such key, so the second is asked")
+                .doesNotThrowAnyException();
+        assertThat(empty.resolve(fingerprint + ".gpg"))
+                .as("what one endpoint served is cached, so no endpoint is asked twice")
+                .exists();
     }
 
     @Test
