@@ -897,8 +897,49 @@ public record Project(
     private record PinModule(Path root,
                              String fileName,
                              BiFunction<String, Path, BuildStep> stepFactory,
+                             Path file,
+                             SequencedSet<Path> provided,
                              HashDigestFunction hashFunction)
             implements BuildExecutorModule {
+
+        private PinModule(Path root,
+                          String fileName,
+                          BiFunction<String, Path, BuildStep> stepFactory,
+                          HashDigestFunction hashFunction) {
+            this(root,
+                    fileName,
+                    stepFactory,
+                    fileFromProperty(root),
+                    providedFromProperty(root),
+                    hashFunction);
+        }
+
+        private static Path fileFromProperty(Path root) {
+            String value = System.getProperty("jenesis.pin.file");
+            return value == null ? null : root.resolve(value).normalize();
+        }
+
+        private static SequencedSet<Path> providedFromProperty(Path root) {
+            SequencedSet<Path> provided = new LinkedHashSet<>();
+            String value = System.getProperty("jenesis.pin.provided");
+            if (value != null) {
+                for (String entry : value.split(",")) {
+                    String candidate = entry.trim();
+                    if (!candidate.isEmpty()) {
+                        provided.add(root.resolve(candidate).normalize());
+                    }
+                }
+            }
+            return provided;
+        }
+
+        PinModule file(Path file) {
+            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction);
+        }
+
+        PinModule provided(SequencedSet<Path> provided) {
+            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction);
+        }
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
@@ -915,8 +956,7 @@ public record Project(
                     }
                 }
             }
-            String collected = System.getProperty("jenesis.pin.file");
-            if (collected == null) {
+            if (file == null) {
                 for (String path : paths) {
                     Path file = root.resolve(path).resolve(fileName);
                     if (!Files.isRegularFile(file)) {
@@ -927,18 +967,8 @@ public record Project(
                             new LinkedHashSet<>(inherited.sequencedKeySet()));
                 }
             } else {
-                SequencedSet<Path> provided = new LinkedHashSet<>();
-                String elsewhere = System.getProperty("jenesis.pin.provided");
-                if (elsewhere != null) {
-                    for (String entry : elsewhere.split(",")) {
-                        String candidate = entry.trim();
-                        if (!candidate.isEmpty()) {
-                            provided.add(root.resolve(candidate).normalize());
-                        }
-                    }
-                }
                 buildExecutor.addStep("file",
-                        new Pins(paths, root.resolve(collected).normalize(), provided, hashFunction),
+                        new Pins(paths, file, provided, hashFunction),
                         new LinkedHashSet<>(inherited.sequencedKeySet()));
             }
             buildExecutor.addStep("divergence",
