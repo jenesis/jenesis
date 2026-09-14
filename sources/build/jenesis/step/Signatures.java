@@ -22,6 +22,7 @@ public class Signatures extends ProcessBuildStep {
     private final transient Map<String, Repository> repositories;
     private final Verification verification;
     private final String command;
+    private final transient Function<List<String>, ? extends ProcessHandler> supplied;
     private final transient Consumer<String> printing;
 
     public Signatures(Map<String, Repository> repositories) {
@@ -35,21 +36,22 @@ public class Signatures extends ProcessBuildStep {
     private Signatures(Map<String, Repository> repositories,
                        Verification verification,
                        String command,
-                       Function<List<String>, ? extends ProcessHandler> factory,
+                       Function<List<String>, ? extends ProcessHandler> supplied,
                        Consumer<String> printing) {
-        super("gpg", factory == null ? ProcessHandler.OfProcess.ofCommand(command) : factory);
+        super("gpg", supplied == null ? ProcessHandler.OfProcess.ofCommand(command) : supplied);
         this.repositories = repositories;
         this.verification = verification;
         this.command = command;
+        this.supplied = supplied;
         this.printing = printing;
     }
 
     public Signatures verification(Verification verification) {
-        return new Signatures(repositories, verification, command, factory, printing);
+        return new Signatures(repositories, verification, command, supplied, printing);
     }
 
     public Signatures command(String command) {
-        return new Signatures(repositories, verification, command, factory, printing);
+        return new Signatures(repositories, verification, command, supplied, printing);
     }
 
     public Signatures factory(Function<List<String>, ? extends ProcessHandler> factory) {
@@ -57,7 +59,7 @@ public class Signatures extends ProcessBuildStep {
     }
 
     public Signatures printing(Consumer<String> printing) {
-        return new Signatures(repositories, verification, command, factory, printing);
+        return new Signatures(repositories, verification, command, supplied, printing);
     }
 
     private void print(String marker, String colour, String coordinate, String detail) {

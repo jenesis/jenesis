@@ -145,6 +145,29 @@ public class SignaturesRunTest {
     }
 
     @Test
+    public void accepts_a_verifier_named_by_path_rather_than_on_the_path() throws Exception {
+        Path wrapper = root.resolve("gpg-wrapper");
+        Files.writeString(wrapper, "#!/bin/sh\nexec gpg --homedir " + home + " \"$@\"\n");
+        Files.setPosixFilePermissions(wrapper, PosixFilePermissions.fromString("rwx------"));
+        Map<String, Repository> repositories = Map.of("maven", (MavenRepository) (_, _, _, _, type, _, checksum) ->
+                Optional.ofNullable("jar".equals(type) && "asc".equals(checksum)
+                        ? RepositoryItem.ofFile(detached)
+                        : null));
+        assertThatCode(() -> new Signatures(repositories)
+                .verification(Verification.DECLARED)
+                .command(wrapper.toAbsolutePath().toString())
+                .apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                                input,
+                                Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join())
+                .as("an absolute path to a wrapper names the verifier without changing the PATH")
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     public void rejects_a_signature_from_a_key_gpg_does_not_hold() throws Exception {
         Path stranger = Files.createDirectory(root.resolve("stranger"));
         Files.setPosixFilePermissions(stranger, PosixFilePermissions.fromString("rwx------"));
