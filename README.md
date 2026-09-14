@@ -56,7 +56,7 @@ What is in this repository
 | `distribution/` | Packager templates that override JReleaser's own, per distribution: the Homebrew formulae, which wrap each command rather than symlinking it so a script still finds its own installation, and the Scoop manifest that describes jpx rather than the build tool. JReleaser would look for these under `src/jreleaser/distributions/`, so each packager in `jreleaser.yml` names its `templateDirectory` here instead - this project has no `src/` tree. |
 | `build/jenesis` | A symlink to `sources/build/jenesis`, so the project builds itself with itself. |
 | `benchmark/` | The performance harness and its methodology, see [`benchmark/README.md`](benchmark/README.md). |
-| `installation/` | `install.sh`, the script served at `get.jenesis.build`, and `install.test.sh`, its tests: each mode is installed into a throwaway project and built, run by CI on every platform. |
+| `installation/` | `install.sh`, the script served at `get.jenesis.build`, and `install.test.sh`, its tests: each mode is installed into a throwaway project and built, run by CI on every platform. `worker.js` is the Cloudflare Worker that serves that script from the default branch, with `worker.test.js` covering it on Node's built-in runner. |
 | `pom.xml` | A plain Maven build of the same sources, kept as a fallback (below). |
 
 Building it

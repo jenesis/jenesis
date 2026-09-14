@@ -1,0 +1,10 @@
+{
+  "name": "jenesis-installation-worker",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cloudflare Worker serving install.sh at get.jenesis.build",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
