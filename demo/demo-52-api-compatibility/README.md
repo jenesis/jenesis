@@ -86,7 +86,7 @@ Report-only, until you ask for a gate
 Like the linters, japicmp records what it finds and keeps the build green. The report lands in the
 step's own output:
 
-    target/build/.../assemble/compatibility/japicmp/compare/output/reports/japicmp/japicmp-report.xml
+    target/build/.../assemble/artifact/japicmp/compare/output/reports/japicmp/japicmp-report.xml
 
 and a `stage` build collects it with every other report kind, one folder per module. The module's
 `inventory.properties` records a `<module>.report.japicmp` entry pointing at it.
@@ -109,7 +109,7 @@ compiled against 1.0.0, so the build stops and names the change:
 Switching it off
 ----------------
 
-`-Djenesis.compatibility.japicmp=false` keeps `japicmp.properties` in place and skips the comparison,
+`-Djenesis.artifact.japicmp=false` keeps `japicmp.properties` in place and skips the comparison,
 the same opt-out every inferred tool has.
 
 Pinning

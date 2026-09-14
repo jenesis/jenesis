@@ -1239,7 +1239,7 @@ Like the linters, the check is report-only: it writes
 report kind, and keeps the build green. Four `error-on-*` keys turn a finding into
 a failure - binary incompatibility, source incompatibility, any modification at
 all, or a semantic-versioning violation - and the failure names the change that
-caused it. `-Djenesis.compatibility.japicmp=false` is the usual opt-out.
+caused it. `-Djenesis.artifact.japicmp=false` is the usual opt-out.
 
 Current pin state of the demos: every demo is committed pinned with checksums.
 `java-pom`, `java-pom-multi`, `java-modular`, and `java-modular-multi` pin their

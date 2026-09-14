@@ -10,7 +10,7 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 
-public class InferredApiCompatibilityModule implements BuildExecutorModule {
+public class InferredArtifactQualityModule implements BuildExecutorModule {
 
     public static final String JAPICMP = "japicmp";
 
@@ -34,14 +34,14 @@ public class InferredApiCompatibilityModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final Function<JApiCmpModule, BuildExecutorModule> japicmp;
 
-    public InferredApiCompatibilityModule(SequencedSet<Path> configuration,
+    public InferredArtifactQualityModule(SequencedSet<Path> configuration,
                                           Map<String, Repository> repositories,
                                           Map<String, Resolver> resolvers) {
         this(configuration, repositories, resolvers, null,
-                enabledBy("jenesis.compatibility.japicmp"));
+                enabledBy("jenesis.artifact.japicmp"));
     }
 
-    private InferredApiCompatibilityModule(SequencedSet<Path> configuration,
+    private InferredArtifactQualityModule(SequencedSet<Path> configuration,
                                            Map<String, Repository> repositories,
                                            Map<String, Resolver> resolvers,
                                            Pinning pinning,
@@ -57,12 +57,12 @@ public class InferredApiCompatibilityModule implements BuildExecutorModule {
         return SequencedProperties.systemFlag(property, true) ? module -> module : null;
     }
 
-    public InferredApiCompatibilityModule pinning(Pinning pinning) {
-        return new InferredApiCompatibilityModule(configuration, repositories, resolvers, pinning, japicmp);
+    public InferredArtifactQualityModule pinning(Pinning pinning) {
+        return new InferredArtifactQualityModule(configuration, repositories, resolvers, pinning, japicmp);
     }
 
-    public InferredApiCompatibilityModule japicmp(Function<JApiCmpModule, BuildExecutorModule> japicmp) {
-        return new InferredApiCompatibilityModule(configuration, repositories, resolvers, pinning, japicmp);
+    public InferredArtifactQualityModule japicmp(Function<JApiCmpModule, BuildExecutorModule> japicmp) {
+        return new InferredArtifactQualityModule(configuration, repositories, resolvers, pinning, japicmp);
     }
 
     @Override

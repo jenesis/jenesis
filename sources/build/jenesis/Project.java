@@ -1984,7 +1984,7 @@ public record Project(
                 observe.jacoco|true|JaCoCo coverage, activated by a jacoco.properties
                 observe.native|true|native-image reachability agent, activated by a graal.properties
                 mutate.pitest|true|PIT mutation testing, activated by a pitest.properties
-                compatibility.japicmp|true|japicmp API comparison, activated by a japicmp.properties
+                artifact.japicmp|true|japicmp API comparison, activated by a japicmp.properties
                 jreleaser.executable|jreleaser|The JReleaser executable a release runs
                 jreleaser.command|full-release|The JReleaser command a release runs
                 jreleaser.config||JReleaser configuration file

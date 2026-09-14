@@ -26,7 +26,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                             Function<InferredSourceFormattingModule, BuildExecutorModule> format,
                                             Function<InferredComplianceModule, BuildExecutorModule> compliance,
                                             Function<InferredJavaToolchainModule, BuildExecutorModule> toolchain,
-                                            Function<InferredApiCompatibilityModule, BuildExecutorModule> compatibility,
+                                            Function<InferredArtifactQualityModule, BuildExecutorModule> artifact,
                                             Function<InferredTestObservationModule, BuildExecutorModule> observe,
                                             Function<InferredDocumentationModule, BuildExecutorModule> documentation) implements MultiProjectAssembler<ProjectModuleDescriptor> {
 
@@ -41,31 +41,31 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
     }
 
     public InferredMultiProjectAssembler check(Function<InferredSourceCodeQualityModule, BuildExecutorModule> check) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, compatibility, observe, documentation);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation);
     }
 
     public InferredMultiProjectAssembler format(Function<InferredSourceFormattingModule, BuildExecutorModule> format) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, compatibility, observe, documentation);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation);
     }
 
     public InferredMultiProjectAssembler compliance(Function<InferredComplianceModule, BuildExecutorModule> compliance) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, compatibility, observe, documentation);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation);
     }
 
     public InferredMultiProjectAssembler toolchain(Function<InferredJavaToolchainModule, BuildExecutorModule> toolchain) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, compatibility, observe, documentation);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation);
     }
 
-    public InferredMultiProjectAssembler compatibility(Function<InferredApiCompatibilityModule, BuildExecutorModule> compatibility) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, compatibility, observe, documentation);
+    public InferredMultiProjectAssembler artifact(Function<InferredArtifactQualityModule, BuildExecutorModule> artifact) {
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation);
     }
 
     public InferredMultiProjectAssembler observe(Function<InferredTestObservationModule, BuildExecutorModule> observe) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, compatibility, observe, documentation);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation);
     }
 
     public InferredMultiProjectAssembler documentation(Function<InferredDocumentationModule, BuildExecutorModule> documentation) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, compatibility, observe, documentation);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation);
     }
 
     @Override
@@ -119,9 +119,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             descriptor.resources().stream(),
                             sbom == null ? Stream.<String>empty() : Stream.of("sbom"))
                             .flatMap(Function.identity()));
-            sub.addModule("compatibility",
-                    compatibility.apply(
-                            new InferredApiCompatibilityModule(descriptor.configuration(), repositories, resolvers)
+            sub.addModule("artifact",
+                    artifact.apply(
+                            new InferredArtifactQualityModule(descriptor.configuration(), repositories, resolvers)
                                     .pinning(descriptor.pinning())),
                     Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             if (descriptor.test()) {
