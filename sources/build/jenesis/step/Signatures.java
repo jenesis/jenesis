@@ -216,7 +216,8 @@ public class Signatures extends ProcessBuildStep {
             }
             Status status = verify(executor, context, prefix, Path.of(candidate.getKey()), signature);
             if (status.failure() != null) {
-                violations.add(token + " " + version + ": " + status.failure());
+                violations.add(token + " " + version + ": " + status.failure()
+                        + (status.missing() == null ? "" : missing(accepted)));
                 continue;
             }
             if (status.fingerprint() == null) {
@@ -272,8 +273,10 @@ public class Signatures extends ProcessBuildStep {
                     : "OpenPGP/" + pomStatus.fingerprint().toUpperCase(Locale.ROOT);
             if (pomStatus.failure() != null) {
                 violations.add(token + " " + version + ": for its POM, " + pomStatus.failure()
-                        + "; a repository that re-serialises POMs invalidates them, so resolve from one that"
-                        + " serves the published bytes");
+                        + (pomStatus.missing() == null
+                                ? "; a repository that re-serialises POMs invalidates them, so resolve from one"
+                                        + " that serves the published bytes"
+                                : missing(accepted)));
             } else if (signer == null) {
                 violations.add(token + " " + version + ": gpg reported no validated signature for its POM");
             } else if (!signer.equalsIgnoreCase(fingerprint)) {
@@ -332,7 +335,7 @@ public class Signatures extends ProcessBuildStep {
             Thread.currentThread().interrupt();
             throw new InterruptedIOException("Interrupted while verifying " + file);
         }
-        String fingerprint = null, failure = null;
+        String fingerprint = null, failure = null, missing = null;
         long signed = -1, expired = -1;
         boolean keyExpired = false;
         for (String line : Files.readAllLines(output, StandardCharsets.ISO_8859_1)) {
@@ -359,10 +362,7 @@ public class Signatures extends ProcessBuildStep {
                 case "BADSIG" -> failure = "the signature does not match the file";
                 case "EXPKEYSIG" -> keyExpired = true;
                 case "REVKEYSIG" -> failure = "the signing key was revoked";
-                case "NO_PUBKEY" -> failure = "the public key "
-                        + (tokens.length > 1 ? tokens[1] : "")
-                        + " is not available; obtain it, verify it against the project's published keys,"
-                        + " and import it";
+                case "NO_PUBKEY" -> missing = tokens.length > 1 ? tokens[1] : "";
                 case "ERRSIG" -> {
                     if (failure == null) {
                         failure = "the signature could not be checked";
@@ -375,6 +375,9 @@ public class Signatures extends ProcessBuildStep {
         if (keyExpired && failure == null) {
             failure = expired(signed, expired);
         }
+        if (missing != null) {
+            failure = "the public key " + missing + " is not available";
+        }
         if (exitCode != 0 && fingerprint == null && failure == null) {
             throw new IllegalStateException("Unexpected exit code " + exitCode + " and no signature verdict from "
                     + command
@@ -385,7 +388,13 @@ public class Signatures extends ProcessBuildStep {
                             ? "\n\nError:\n" + Files.readString(error, StandardCharsets.ISO_8859_1)
                             : ""));
         }
-        return new Status(fingerprint, failure, signed, keyExpired ? expired : -1);
+        return new Status(fingerprint, failure, signed, keyExpired ? expired : -1, missing);
+    }
+
+    private static String missing(SequencedSet<String> accepted) {
+        return ", and is declared as "
+                + String.join(", ", accepted)
+                + "; obtain that key, verify the fingerprint against the project's published keys, and import it";
     }
 
     private String expired(long signed, long expired) {
@@ -416,7 +425,7 @@ public class Signatures extends ProcessBuildStep {
         }
     }
 
-    private record Status(String fingerprint, String failure, long signed, long expired) {
+    private record Status(String fingerprint, String failure, long signed, long expired, String missing) {
 
         private String dates() {
             StringBuilder dates = new StringBuilder();

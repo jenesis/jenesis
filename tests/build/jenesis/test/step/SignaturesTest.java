@@ -305,6 +305,20 @@ public class SignaturesTest {
     }
 
     @Test
+    public void names_the_declared_key_a_missing_one_should_have_been() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(signature("lib"),
+                "[GNUPG:] ERRSIG DEADBEEF 1 8 00 1000 9 DEADBEEF",
+                "[GNUPG:] NO_PUBKEY DEADBEEF")))
+                .as("the fingerprint to import is the declared one, which gpg cannot report")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("DEADBEEF is not available")
+                .hasMessageContaining("declared as OpenPGP/" + PRIMARY)
+                .hasMessageContaining("import it");
+    }
+
+    @Test
     public void names_the_missing_public_key_rather_than_passing_silently() throws IOException {
         resolved("maven/org.example/lib", "1.0", null);
         declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
