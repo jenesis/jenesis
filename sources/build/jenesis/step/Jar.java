@@ -8,6 +8,8 @@ import build.jenesis.BuildStepContext;
 
 public class Jar extends JdkProcessBuildStep {
 
+    private static final Attributes.Name CREATED_BY = new Attributes.Name("Created-By");
+
     private final Sort sort;
 
     public Jar(ProcessHandler.Factory factory, Sort sort) {
@@ -46,26 +48,26 @@ public class Jar extends JdkProcessBuildStep {
                 manifestFiles.add(candidate);
             }
         }
-        if (!manifestFiles.isEmpty()) {
-            Manifest merged = new Manifest();
-            for (Path path : manifestFiles) {
-                Manifest current;
-                try (InputStream in = Files.newInputStream(path)) {
-                    current = new Manifest(in);
-                }
-                mergeAttributes(merged.getMainAttributes(), current.getMainAttributes(), path);
-                for (Map.Entry<String, Attributes> entry : current.getEntries().entrySet()) {
-                    Attributes target = merged.getEntries().computeIfAbsent(entry.getKey(), _ -> new Attributes());
-                    mergeAttributes(target, entry.getValue(), path);
-                }
+        Manifest merged = new Manifest();
+        for (Path path : manifestFiles) {
+            Manifest current;
+            try (InputStream in = Files.newInputStream(path)) {
+                current = new Manifest(in);
             }
-            Path output = context.supplement().resolve(Versions.MANIFEST);
-            try (OutputStream out = Files.newOutputStream(output)) {
-                merged.write(out);
+            mergeAttributes(merged.getMainAttributes(), current.getMainAttributes(), path);
+            for (Map.Entry<String, Attributes> entry : current.getEntries().entrySet()) {
+                Attributes target = merged.getEntries().computeIfAbsent(entry.getKey(), _ -> new Attributes());
+                mergeAttributes(target, entry.getValue(), path);
             }
-            commands.add("--manifest");
-            commands.add(output.toString());
         }
+        merged.getMainAttributes().putIfAbsent(Attributes.Name.MANIFEST_VERSION, "1.0");
+        merged.getMainAttributes().putIfAbsent(CREATED_BY, "Jenesis");
+        Path output = context.supplement().resolve(Versions.MANIFEST);
+        try (OutputStream out = Files.newOutputStream(output)) {
+            merged.write(out);
+        }
+        commands.add("--manifest");
+        commands.add(output.toString());
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
