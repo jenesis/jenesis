@@ -12,11 +12,14 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
+import build.jenesis.Pinning;
 import build.jenesis.step.Inventory;
 import build.jenesis.SequencedProperties;
 
 public class PinModuleInfo implements BuildStep {
 
+
+    private final transient Semaphore permits = Pinning.permits();
 
     private final String prefix;
     private final String path;
@@ -93,23 +96,12 @@ public class PinModuleInfo implements BuildStep {
         return true;
     }
 
-    private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
-
-    private static Semaphore permits() {
-        int concurrency = Integer.getInteger("jenesis.pin.concurrency",
-                Runtime.getRuntime().availableProcessors());
-        if (concurrency < 0) {
-            throw new IllegalArgumentException("Pin concurrency must not be negative: " + concurrency);
-        }
-        return concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Semaphore::new);
-    }
-
     @Override
     public CompletionStage<BuildStepResult> apply(Executor executor,
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        Semaphore permits = permits();
+        Semaphore permits = this.permits;
         if (permits == null) {
             return pin(arguments);
         }

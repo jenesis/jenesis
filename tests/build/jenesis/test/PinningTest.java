@@ -12,6 +12,30 @@ public class PinningTest {
     @AfterEach
     public void clear() {
         System.clearProperty("jenesis.dependency.pin");
+        System.clearProperty("jenesis.pin.concurrency");
+    }
+
+    @Test
+    public void every_pin_writer_shares_one_ceiling() {
+        System.setProperty("jenesis.pin.concurrency", "3");
+        assertThat(Pinning.permits())
+                .as("a pom writer and a module-info writer bound one fan-out between them, not one each")
+                .isSameAs(Pinning.permits());
+        assertThat(Pinning.permits().availablePermits()).isEqualTo(3);
+    }
+
+    @Test
+    public void an_unbounded_fan_out_holds_no_permit_at_all() {
+        System.setProperty("jenesis.pin.concurrency", "0");
+        assertThat(Pinning.permits()).isNull();
+    }
+
+    @Test
+    public void refuses_a_ceiling_below_nothing() {
+        System.setProperty("jenesis.pin.concurrency", "-1");
+        assertThatThrownBy(Pinning::permits)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Pin concurrency must not be negative: -1");
     }
 
     @Test
