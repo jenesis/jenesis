@@ -449,15 +449,11 @@ public class Signatures extends ProcessBuildStep {
                     }
                     continue;
                 }
-                out.write(armoured(key) ? dearmoured(new String(key, StandardCharsets.US_ASCII)) : key);
+                String text = new String(key, StandardCharsets.US_ASCII);
+                out.write(text.regionMatches(0, "-----BEGIN PGP", 0, 14) ? dearmoured(text) : key);
             }
         }
         return file;
-    }
-
-    private static boolean armoured(byte[] key) {
-        return new String(key, 0, Math.min(key.length, 64), StandardCharsets.US_ASCII)
-                .contains("-----BEGIN PGP");
     }
 
     private static byte[] dearmoured(String armoured) {

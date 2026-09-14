@@ -8,7 +8,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.KeyExpiry;
-import build.jenesis.PgpRepository;
+import build.jenesis.OpenPgpRepository;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SequencedProperties;

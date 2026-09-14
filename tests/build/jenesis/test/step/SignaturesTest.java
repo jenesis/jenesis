@@ -8,7 +8,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.KeyExpiry;
-import build.jenesis.PgpRepository;
+import build.jenesis.OpenPgpRepository;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SequencedProperties;
@@ -32,7 +32,7 @@ public class SignaturesTest {
 
     @AfterEach
     public void clear() {
-        System.clearProperty("jenesis.signature.keys");
+        System.clearProperty("jenesis.openpgp.uri");
     }
 
     @BeforeEach
@@ -252,8 +252,8 @@ public class SignaturesTest {
     public void refuses_a_key_server_reference_that_resolves_to_nothing() throws IOException {
         resolved("maven/org.example/lib", "1.0", null);
         declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
-        System.setProperty("jenesis.signature.keys", "@jenesis.test.absent");
-        assertThatThrownBy(() -> run(step(signature("lib"), PgpRepository.of(), validated(PRIMARY))))
+        System.setProperty("jenesis.openpgp.uri", "@jenesis.test.absent");
+        assertThatThrownBy(() -> run(step(signature("lib"), OpenPgpRepository.of(), validated(PRIMARY))))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Unresolved key server reference: @jenesis.test.absent");
     }
@@ -264,8 +264,8 @@ public class SignaturesTest {
         try {
             resolved("maven/org.example/lib", "1.0", null);
             declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
-            System.setProperty("jenesis.signature.keys", "@jenesis.test.loop");
-        assertThatThrownBy(() -> run(step(signature("lib"), PgpRepository.of(), validated(PRIMARY))))
+            System.setProperty("jenesis.openpgp.uri", "@jenesis.test.loop");
+        assertThatThrownBy(() -> run(step(signature("lib"), OpenPgpRepository.of(), validated(PRIMARY))))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Circular key server reference: @jenesis.test.loop");
         } finally {

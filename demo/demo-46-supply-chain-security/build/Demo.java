@@ -247,8 +247,8 @@ public class Demo {
                 "-Djenesis.maven.local=" + artifacts));
         if (verification != null) {
             command.add("-Djenesis.dependency.signature=" + verification);
-            command.add("-Djenesis.signature.cache=" + Path.of("target", "keys").toAbsolutePath());
-            command.add("-Djenesis.signature.keys=");
+            command.add("-Djenesis.openpgp.local=" + Path.of("target", "keys").toAbsolutePath());
+            command.add("-Djenesis.openpgp.uri=");
         }
         command.addAll(options);
         command.addAll(List.of("build/jenesis/Make.java", "build"));

@@ -2,41 +2,44 @@ package build.jenesis;
 
 import module java.base;
 
-public class PgpRepository implements Repository {
+public class OpenPgpRepository implements Repository {
 
-    public static final URI OFFICIAL = URI.create("https://keyserver.ubuntu.com/");
+    public static final URI DEFAULT = URI.create("https://keyserver.ubuntu.com/");
 
     private final URI server;
     private final Path local;
     private final Repository.Retry retry;
 
-    public PgpRepository(URI server) {
+    public OpenPgpRepository(URI server) {
         this(server, null, new Repository.Retry());
     }
 
-    private PgpRepository(URI server, Path local, Repository.Retry retry) {
+    private OpenPgpRepository(URI server, Path local, Repository.Retry retry) {
         this.server = server;
         this.local = local;
         this.retry = retry;
     }
 
-    public PgpRepository local(Path local) {
-        return new PgpRepository(server, local, retry);
+    public OpenPgpRepository local(Path local) {
+        return new OpenPgpRepository(server, local, retry);
     }
 
-    public PgpRepository retry(Repository.Retry retry) {
-        return new PgpRepository(server, local, retry);
+    public OpenPgpRepository retry(Repository.Retry retry) {
+        return new OpenPgpRepository(server, local, retry);
     }
 
     public static Repository of() {
-        String property = System.getProperty("jenesis.signature.keys");
-        String text = property == null ? System.getenv("JENESIS_SIGNATURE_KEYS") : property;
-        Path local = Path.of(System.getProperty("jenesis.signature.cache", ".jenesis/keys"));
+        String property = System.getProperty("jenesis.openpgp.uri");
+        String text = property == null ? System.getenv("OPENPGP_REPOSITORY_URI") : property;
+        Path local = Path.of(System.getProperty("jenesis.openpgp.local",
+                System.getenv("OPENPGP_REPOSITORY_LOCAL") == null
+                        ? ".jenesis/keys"
+                        : System.getenv("OPENPGP_REPOSITORY_LOCAL")));
         List<URI> servers = new ArrayList<>();
         servers(text == null ? "@" : text, new HashSet<>(), servers);
         Repository repository = (_, coordinate) -> cached(local, coordinate);
         for (int index = servers.size() - 1; index >= 0; index--) {
-            repository = repository.prepend(new PgpRepository(servers.get(index)).local(local));
+            repository = repository.prepend(new OpenPgpRepository(servers.get(index)).local(local));
         }
         return repository;
     }
@@ -55,12 +58,12 @@ public class PgpRepository implements Repository {
             if (candidate.startsWith("@")) {
                 String name = candidate.substring(1);
                 if (name.isEmpty()) {
-                    String environment = System.getenv("JENESIS_SIGNATURE_KEYS");
-                    if (environment != null && visited.add("JENESIS_SIGNATURE_KEYS")) {
+                    String environment = System.getenv("OPENPGP_REPOSITORY_URI");
+                    if (environment != null && visited.add("OPENPGP_REPOSITORY_URI")) {
                         servers(environment, visited, target);
-                        visited.remove("JENESIS_SIGNATURE_KEYS");
+                        visited.remove("OPENPGP_REPOSITORY_URI");
                     } else {
-                        target.add(OFFICIAL);
+                        target.add(DEFAULT);
                     }
                 } else {
                     String value = System.getProperty(name, System.getenv(name));

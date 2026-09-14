@@ -3,14 +3,14 @@ package build.jenesis.test;
 import module java.base;
 import module jdk.httpserver;
 import module org.junit.jupiter.api;
-import build.jenesis.PgpRepository;
+import build.jenesis.OpenPgpRepository;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class PgpRepositoryTest {
+public class OpenPgpRepositoryTest {
 
     private static final String FINGERPRINT = "B4D5C1E7000000000000000000000000000000AA";
 
@@ -32,7 +32,7 @@ public class PgpRepositoryTest {
         server.start();
         System.setProperty("jenesis.repository.insecure", "true");
         try {
-            Optional<RepositoryItem> item = new PgpRepository(
+            Optional<RepositoryItem> item = new OpenPgpRepository(
                     URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"))
                     .local(root)
                     .fetch(Runnable::run, FINGERPRINT);
@@ -65,15 +65,15 @@ public class PgpRepositoryTest {
         server.start();
         System.setProperty("jenesis.repository.insecure", "true");
         System.setProperty("jenesis.test.servers", "http://127.0.0.1:" + server.getAddress().getPort() + "/");
-        System.setProperty("jenesis.signature.keys", "@jenesis.test.servers");
-        System.setProperty("jenesis.signature.cache", root.toString());
+        System.setProperty("jenesis.openpgp.uri", "@jenesis.test.servers");
+        System.setProperty("jenesis.openpgp.local", root.toString());
         try {
-            assertThat(PgpRepository.of().fetch(Runnable::run, FINGERPRINT))
+            assertThat(OpenPgpRepository.of().fetch(Runnable::run, FINGERPRINT))
                     .as("the reference names a property whose value is the server list")
                     .isPresent();
         } finally {
-            System.clearProperty("jenesis.signature.cache");
-            System.clearProperty("jenesis.signature.keys");
+            System.clearProperty("jenesis.openpgp.local");
+            System.clearProperty("jenesis.openpgp.uri");
             System.clearProperty("jenesis.test.servers");
             System.clearProperty("jenesis.repository.insecure");
             server.stop(0);
@@ -83,7 +83,7 @@ public class PgpRepositoryTest {
     @Test
     public void answers_from_the_cache_without_asking_anyone() throws Exception {
         Files.writeString(root.resolve(FINGERPRINT + ".gpg"), "vendored");
-        Optional<RepositoryItem> item = new PgpRepository(URI.create("http://127.0.0.1:1/"))
+        Optional<RepositoryItem> item = new OpenPgpRepository(URI.create("http://127.0.0.1:1/"))
                 .local(root)
                 .fetch(Runnable::run, FINGERPRINT);
         assertThat(item)
@@ -93,7 +93,7 @@ public class PgpRepositoryTest {
 
     @Test
     public void refuses_a_key_server_reached_over_plaintext() {
-        assertThatThrownBy(() -> new PgpRepository(URI.create("http://127.0.0.1:1/"))
+        assertThatThrownBy(() -> new OpenPgpRepository(URI.create("http://127.0.0.1:1/"))
                 .fetch(Runnable::run, FINGERPRINT))
                 .as("a key server inherits the repository posture on plaintext")
                 .isInstanceOf(IllegalStateException.class)
