@@ -1156,7 +1156,7 @@ public class MavenPomResolver implements MavenResolver {
                                 || slash == fingerprint.length() - 1) {
                             throw new IllegalArgumentException("Malformed jenesis.signature fingerprint '"
                                     + fingerprint
-                                    + "': expected <algorithm>/<fingerprint>."
+                                    + "': expected <algorithm>/<fingerprint>, or unsigned/missing or unsigned/ignored for a coordinate that publishes no signature."
                                     + " Every line inside a jenesis.signature comment is a declaration of its"
                                     + " own, so prose written among them is read as one; move it outside the"
                                     + " comment");

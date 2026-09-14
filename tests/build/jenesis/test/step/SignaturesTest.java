@@ -8,6 +8,8 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.KeyExpiry;
+import build.jenesis.OpenPgpRepository;
+import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SequencedProperties;
 import build.jenesis.Verification;
@@ -27,6 +29,11 @@ public class SignaturesTest {
     @TempDir
     private Path root;
     private Path previous, next, supplement, input;
+
+    @AfterEach
+    public void clear() {
+        System.clearProperty("jenesis.openpgp.uri");
+    }
 
     @BeforeEach
     public void setUp() throws Exception {
@@ -118,7 +125,20 @@ public class SignaturesTest {
     }
 
     private Signatures step(Path signature, String... status) {
-        return new Signatures(Map.of("maven", publishing(signature)))
+        return step(signature, vaulted(), status);
+    }
+
+    private Repository vaulted() {
+        return (_, coordinate) -> {
+            Path candidate = root.resolve("keys").resolve(coordinate + ".gpg");
+            return Files.isRegularFile(candidate)
+                    ? Optional.of(RepositoryItem.ofFile(candidate))
+                    : Optional.empty();
+        };
+    }
+
+    private Signatures step(Path signature, Repository keys, String... status) {
+        return new Signatures(Map.of("maven", publishing(signature), "OpenPGP", keys))
                 .verification(Verification.DECLARED)
                 .factory(reporting(status));
     }
@@ -178,6 +198,89 @@ public class SignaturesTest {
                 .hasMessageContaining("OpenPGP/" + PRIMARY)
                 .hasMessageContaining("OpenPGP/" + SUBKEY)
                 .hasMessageContaining("add OpenPGP/" + PRIMARY + " to a @jenesis.signature line");
+    }
+
+    @Test
+    public void accepts_an_unsigned_artifact_a_reviewed_exception_covers() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("unsigned/missing", "main/maven/org.example/lib");
+        assertThatCode(() -> run(step(null).verification(Verification.STRICT)))
+                .as("a reviewed exception lets strict hold everywhere else when one artifact is unsigned")
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    public void still_refuses_an_unsigned_artifact_no_exception_covers() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(null).verification(Verification.STRICT)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no signature is published")
+                .hasMessageContaining("unsigned/missing");
+    }
+
+    @Test
+    public void discovers_a_signature_added_after_it_was_declared_missing() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("unsigned/missing", "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(signature("lib"), validated(PRIMARY))))
+                .as("an upstream that starts signing is the thing unsigned/missing exists to catch")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("a signature has appeared")
+                .hasMessageContaining("OpenPGP/" + PRIMARY);
+    }
+
+    @Test
+    public void never_looks_at_a_coordinate_declared_ignored() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("unsigned/ignored", "main/maven/org.example/lib");
+        assertThatCode(() -> run(step(signature("lib"), validated(PRIMARY))
+                .verification(Verification.STRICT)))
+                .as("ignored accepts the coordinate whether or not a signature turned up")
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    public void accepts_an_unsigned_artifact_declared_ignored() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("unsigned/ignored", "main/maven/org.example/lib");
+        assertThatCode(() -> run(step(null).verification(Verification.STRICT)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    public void refuses_a_key_server_reference_that_resolves_to_nothing() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        System.setProperty("jenesis.openpgp.uri", "@jenesis.test.absent");
+        assertThatThrownBy(() -> run(step(signature("lib"), OpenPgpRepository.of(), validated(PRIMARY))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Unresolved key server reference: @jenesis.test.absent");
+    }
+
+    @Test
+    public void refuses_a_key_server_reference_that_points_at_itself() throws IOException {
+        System.setProperty("jenesis.test.loop", "@jenesis.test.loop");
+        try {
+            resolved("maven/org.example/lib", "1.0", null);
+            declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+            System.setProperty("jenesis.openpgp.uri", "@jenesis.test.loop");
+        assertThatThrownBy(() -> run(step(signature("lib"), OpenPgpRepository.of(), validated(PRIMARY))))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Circular key server reference: @jenesis.test.loop");
+        } finally {
+            System.clearProperty("jenesis.test.loop");
+        }
+    }
+
+    @Test
+    public void refuses_an_algorithm_no_repository_resolves() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("Sigstore/" + PRIMARY, "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(signature("lib"), validated(PRIMARY))))
+                .as("an algorithm nothing can resolve is a configuration error, not a missing key")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No repository is registered as 'Sigstore'");
     }
 
     @Test
@@ -305,6 +408,20 @@ public class SignaturesTest {
     }
 
     @Test
+    public void names_the_declared_key_a_missing_one_should_have_been() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(signature("lib"),
+                "[GNUPG:] ERRSIG DEADBEEF 1 8 00 1000 9 DEADBEEF",
+                "[GNUPG:] NO_PUBKEY DEADBEEF")))
+                .as("the fingerprint to import is the declared one, which gpg cannot report")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("DEADBEEF is not available")
+                .hasMessageContaining("declared as OpenPGP/" + PRIMARY)
+                .hasMessageContaining("import it");
+    }
+
+    @Test
     public void names_the_missing_public_key_rather_than_passing_silently() throws IOException {
         resolved("maven/org.example/lib", "1.0", null);
         declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
@@ -395,12 +512,22 @@ public class SignaturesTest {
     }
 
     @Test
-    public void matches_a_declared_fingerprint_regardless_of_case() throws IOException {
+    public void matches_a_declared_fingerprint_regardless_of_its_case() throws IOException {
         resolved("maven/org.example/lib", "1.0", null);
-        declared("openpgp/" + PRIMARY.toLowerCase(Locale.ROOT), "main/maven/org.example/lib");
+        declared("OpenPGP/" + PRIMARY.toLowerCase(Locale.ROOT), "main/maven/org.example/lib");
         assertThatCode(() -> run(step(signature("lib"), validated(PRIMARY))))
-                .as("a lower-case declaration is the same key, not a contradiction")
+                .as("a lower-case fingerprint is the same key, not a contradiction")
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    public void refuses_an_algorithm_whose_case_does_not_match_a_repository() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("openpgp/" + PRIMARY, "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(signature("lib"), validated(PRIMARY))))
+                .as("the algorithm names a repository, and a repository name is matched exactly")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No repository is registered as 'openpgp'");
     }
 
     @Test
@@ -409,7 +536,7 @@ public class SignaturesTest {
         declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
         Path pom = Files.writeString(root.resolve("lib.pom"), "<project/>");
         assertThatCode(() -> run(new Signatures(
-                Map.of("maven", publishing(signature("lib"), pom, signature("pom"))))
+                Map.of("maven", publishing(signature("lib"), pom, signature("pom")), "OpenPGP", vaulted()))
                 .verification(Verification.DECLARED)
                 .factory(reporting(List.of(validated(PRIMARY)), List.of(validated(PRIMARY))))))
                 .doesNotThrowAnyException();
@@ -421,7 +548,7 @@ public class SignaturesTest {
         declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
         Path pom = Files.writeString(root.resolve("lib.pom"), "<project/>");
         assertThatThrownBy(() -> run(new Signatures(
-                Map.of("maven", publishing(signature("lib"), pom, signature("pom"))))
+                Map.of("maven", publishing(signature("lib"), pom, signature("pom")), "OpenPGP", vaulted()))
                 .verification(Verification.DECLARED)
                 .factory(reporting(List.of(validated(PRIMARY)), List.of(validated(SUBKEY))))))
                 .isInstanceOf(IllegalStateException.class)
@@ -435,7 +562,7 @@ public class SignaturesTest {
         declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
         Path pom = Files.writeString(root.resolve("lib.pom"), "<project/>");
         assertThatThrownBy(() -> run(new Signatures(
-                Map.of("maven", publishing(signature("lib"), pom, signature("pom"))))
+                Map.of("maven", publishing(signature("lib"), pom, signature("pom")), "OpenPGP", vaulted()))
                 .verification(Verification.DECLARED)
                 .factory(reporting(List.of(validated(PRIMARY)),
                         List.of("[GNUPG:] BADSIG DEADBEEF Example")))))

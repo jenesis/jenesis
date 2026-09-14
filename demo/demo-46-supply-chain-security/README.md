@@ -134,8 +134,8 @@ no extension is published, the signature is still the one the key made while it 
 | `current` | is always rejected, however old the signature                               |
 
 The two `expired` rows above are the same artifact and the same signature, read once under the default and
-once under `current`. The demo moves the clock past the expiry with a small wrapper script that it names by
-path, which is the other thing `jenesis.signature.command` accepts besides a name to look up on the `PATH`.
+once under `current`. The key is given seconds to live and the demo waits for it to lapse, because the
+verifier reads the real clock: `gpgv` has no option to pretend otherwise.
 
 Because it is a separate step, switching the property on does not re-download anything:
 the `artifacts` step's output is unchanged, and only `signatures` runs. The fetched `.asc`
