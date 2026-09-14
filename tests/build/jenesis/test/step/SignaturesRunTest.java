@@ -272,6 +272,27 @@ public class SignaturesRunTest {
     }
 
     @Test
+    public void reads_a_key_a_server_armoured_with_headers_of_its_own() throws Exception {
+        Path armoured = Files.createDirectory(root.resolve("armoured"));
+        Path exported = root.resolve("exported.asc");
+        gpg("--export", "--armor", "--output", exported.toString(), fingerprint);
+        List<String> lines = new ArrayList<>(Files.readAllLines(exported));
+        lines.addAll(1, List.of("Version: Hockeypuck 2.2", "Comment: Hostname: ", ""));
+        Files.write(armoured.resolve(fingerprint + ".gpg"), lines);
+        assertThatCode(() -> new Signatures(serving(vaulted(armoured)))
+                .verification(Verification.DECLARED)
+                .apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                                input,
+                                Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join())
+                .as("a key server armours its answer and adds headers of its own, which are not key material")
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     public void rejects_a_signature_from_a_key_gpg_does_not_hold() throws Exception {
         Path stranger = Files.createDirectory(root.resolve("stranger"));
         Files.setPosixFilePermissions(stranger, PosixFilePermissions.fromString("rwx------"));
