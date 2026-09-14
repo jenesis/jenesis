@@ -183,7 +183,7 @@ public class SignaturesTest {
     @Test
     public void accepts_an_unsigned_artifact_a_reviewed_exception_covers() throws IOException {
         resolved("maven/org.example/lib", "1.0", null);
-        declared("OpenPGP/none", "main/maven/org.example/lib");
+        declared("unsigned/missing", "main/maven/org.example/lib");
         assertThatCode(() -> run(step(null).verification(Verification.STRICT)))
                 .as("a reviewed exception lets strict hold everywhere else when one artifact is unsigned")
                 .doesNotThrowAnyException();
@@ -196,17 +196,36 @@ public class SignaturesTest {
         assertThatThrownBy(() -> run(step(null).verification(Verification.STRICT)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("no signature is published")
-                .hasMessageContaining("OpenPGP/none");
+                .hasMessageContaining("unsigned/missing");
     }
 
     @Test
-    public void refuses_a_signed_artifact_declared_as_unsigned() throws IOException {
+    public void discovers_a_signature_added_after_it_was_declared_missing() throws IOException {
         resolved("maven/org.example/lib", "1.0", null);
-        declared("OpenPGP/none", "main/maven/org.example/lib");
+        declared("unsigned/missing", "main/maven/org.example/lib");
         assertThatThrownBy(() -> run(step(signature("lib"), validated(PRIMARY))))
-                .as("a signature appearing where none was expected is a stale exception, not a pass")
+                .as("an upstream that starts signing is the thing unsigned/missing exists to catch")
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("OpenPGP/none");
+                .hasMessageContaining("a signature has appeared")
+                .hasMessageContaining("OpenPGP/" + PRIMARY);
+    }
+
+    @Test
+    public void never_looks_at_a_coordinate_declared_ignored() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("unsigned/ignored", "main/maven/org.example/lib");
+        assertThatCode(() -> run(step(signature("lib"), validated(PRIMARY))
+                .verification(Verification.STRICT)))
+                .as("ignored accepts the coordinate whether or not a signature turned up")
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    public void accepts_an_unsigned_artifact_declared_ignored() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("unsigned/ignored", "main/maven/org.example/lib");
+        assertThatCode(() -> run(step(null).verification(Verification.STRICT)))
+                .doesNotThrowAnyException();
     }
 
     @Test

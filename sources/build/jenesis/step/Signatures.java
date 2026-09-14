@@ -18,8 +18,6 @@ public class Signatures extends ProcessBuildStep {
 
     private static final String STATUS = "[GNUPG:] ";
 
-    private static final String UNSIGNED = "OpenPGP/none";
-
     private static final List<String> VERIFY = List.of("--status-fd", "1");
 
     private final transient Map<String, Repository> repositories;
@@ -215,6 +213,15 @@ public class Signatures extends ProcessBuildStep {
                 }
                 continue;
             }
+            if (accepted.stream().anyMatch("unsigned/ignored"::equalsIgnoreCase)) {
+                if (printing != null) {
+                    print("[UNVERIFIED]",
+                            BuildExecutorCallback.YELLOW,
+                            token + " " + version,
+                            "unsigned/ignored accepts it signed or not");
+                }
+                continue;
+            }
             int repositorySlash = coordinate.indexOf('/');
             Repository repository = repositorySlash < 1
                     ? null
@@ -240,7 +247,8 @@ public class Signatures extends ProcessBuildStep {
                 if (acknowledged.isEmpty()) {
                     violations.add(token + " " + version
                             + ": a key is declared for it but no signature is published; if that is reviewed"
-                            + " and accepted, declare it as " + UNSIGNED + " instead of a fingerprint");
+                            + " and accepted, declare it as unsigned/missing, which fails again once a"
+                            + " signature appears, or unsigned/ignored, which never looks");
                 }
                 continue;
             }
@@ -264,8 +272,12 @@ public class Signatures extends ProcessBuildStep {
             if (accepted.stream().noneMatch(fingerprint::equalsIgnoreCase)) {
                 violations.add(token + " " + version + ": signed by " + fingerprint
                         + " but only " + String.join(", ", accepted)
-                        + (accepted.size() == 1 ? " is" : " are") + " declared for it; add "
-                        + fingerprint + " to a @jenesis.signature line to accept a key rotation");
+                        + (accepted.size() == 1 ? " is" : " are") + " declared for it; "
+                        + (accepted.stream().anyMatch("unsigned/missing"::equalsIgnoreCase)
+                                ? "a signature has appeared where unsigned/missing said there was none,"
+                                        + " so replace that line with " + fingerprint
+                                : "add " + fingerprint
+                                        + " to a @jenesis.signature line to accept a key rotation"));
                 continue;
             }
             MavenDependencyKey.Versioned pomKey = null;
@@ -497,8 +509,8 @@ public class Signatures extends ProcessBuildStep {
     }
 
     private static boolean unsigned(String declaration) {
-        int slash = declaration.indexOf('/');
-        return slash > 0 && declaration.substring(slash + 1).equalsIgnoreCase("none");
+        return declaration.equalsIgnoreCase("unsigned/missing")
+                || declaration.equalsIgnoreCase("unsigned/ignored");
     }
 
     private static String missing(SequencedSet<String> accepted) {
