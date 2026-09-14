@@ -1950,6 +1950,7 @@ public record Project(
                 resolver.module|first|first|ignore|fail: what to do with the versions a module-info records
                 pin.file||Write the whole project's pins to this properties file instead of the module declarations
                 pin.provided||Comma-separated pin files whose entries this one leaves out, where the version and hash are the same
+                pin.concurrency|(processor count)|Rewrite at most this many modules' pins at once; 0 is unbounded
                 pin.checksum|true|Record content checksums in the pins that the pin selector writes
                 pin.bom|keep|keep|flatten: whether pinning keeps BOM references or resolves them away
                 platform.<token>||true adds a platform token and false removes one, selecting guarded pins
