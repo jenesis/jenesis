@@ -74,6 +74,7 @@ jobs:
           - { name: custom-modular, dir: demo-43-custom-modular, entry: build/Demo.java }
           - { name: custom-build, dir: demo-44-custom-build, entry: build/Demo.java }
           - { name: supply-chain-security, dir: demo-46-supply-chain-security, entry: build/Demo.java }
+          - { name: pin-reports, dir: demo-04-java-modular-multi, entry: build/jenesis/Make.java pin, flags: '-Djenesis.test.skip -Djenesis.print.pins=true -Djenesis.print.divergence=true -Djenesis.print.aliases=true -Djenesis.print.fetch=true', verify: 'find target -name divergence.properties | grep -q .' }
           - { name: publishing, dir: demo-47-publishing, entry: build/Demo.java }
           - { name: kotlin-plugin, dir: demo-20-kotlin-plugin, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: sbom, dir: demo-14-sbom, entry: build/jenesis/Make.java, verify: 'find target -name "*.cdx.json" | grep -q .' }

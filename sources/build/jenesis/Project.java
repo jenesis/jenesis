@@ -900,10 +900,18 @@ public record Project(
         }
     }
 
-    private record Divergence(SequencedSet<String> paths, Consumer<String> printing) implements BuildStep {
+    private static final class Divergence implements BuildStep {
+
+        private final SequencedSet<String> paths;
+        private final transient Consumer<String> printing;
 
         private Divergence(SequencedSet<String> paths) {
             this(paths, SequencedProperties.systemFlag("jenesis.print.divergence") ? System.out::println : null);
+        }
+
+        private Divergence(SequencedSet<String> paths, Consumer<String> printing) {
+            this.paths = paths;
+            this.printing = printing;
         }
 
         @Override
