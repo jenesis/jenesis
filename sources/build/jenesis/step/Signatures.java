@@ -427,7 +427,7 @@ public class Signatures extends ProcessBuildStep {
                     + "\nTo reproduce, execute:\n "
                     + String.join(" ", handler.commands())
                     + (Files.isRegularFile(error)
-                            ? "\n\nError:\n" + Files.readString(error, StandardCharsets.ISO_8859_1)
+                            ? "\n\nError:\n" + new String(Files.readAllBytes(error), NATIVE_ENCODING)
                             : ""));
         }
         return new Status(fingerprint, failure, signed, keyExpired ? expired : -1, missing);
