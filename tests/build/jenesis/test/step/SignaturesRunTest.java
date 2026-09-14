@@ -24,22 +24,27 @@ public class SignaturesRunTest {
 
     @TempDir
     private Path root;
-    private Path previous, next, supplement, input, home, jar, detached;
+    private Path previous, next, supplement, input, home, vault, jar, detached;
     private String fingerprint;
 
     static boolean gpgAvailable() {
         if (System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")) {
             return false;
         }
-        try {
-            return new ProcessBuilder("gpg", "--version")
-                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
-                    .start()
-                    .waitFor() == 0;
-        } catch (IOException | InterruptedException _) {
-            return false;
+        for (String command : List.of("gpg", "gpgv")) {
+            try {
+                if (new ProcessBuilder(command, "--version")
+                        .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                        .redirectError(ProcessBuilder.Redirect.DISCARD)
+                        .start()
+                        .waitFor() != 0) {
+                    return false;
+                }
+            } catch (IOException | InterruptedException _) {
+                return false;
+            }
         }
+        return true;
     }
 
     @BeforeEach
@@ -49,18 +54,24 @@ public class SignaturesRunTest {
         supplement = Files.createDirectory(root.resolve("supplement"));
         input = Files.createDirectory(root.resolve("input"));
         home = Files.createDirectory(root.resolve("gnupg"));
+        vault = Files.createDirectory(root.resolve("keys"));
         Files.setPosixFilePermissions(home, PosixFilePermissions.fromString("rwx------"));
         gpg("--quick-generate-key", "Jenesis Signature Test <test@example.invalid>", "default", "default", "never");
         fingerprint = fingerprint();
         jar = Files.writeString(input.resolve("lib.jar"), "artifact bytes\n");
         detached = root.resolve("lib.jar.asc");
         gpg("--detach-sign", "--armor", "--output", detached.toString(), jar.toString());
+        vaulted(fingerprint);
         SequencedProperties index = new SequencedProperties();
         index.setProperty("main/compile/maven/org.example/lib/1.0", "lib.jar");
         index.store(input.resolve(BuildStep.DEPENDENCIES));
         SequencedProperties declarations = new SequencedProperties();
         declarations.setProperty("OpenPGP/" + fingerprint, "main/maven/org.example/lib");
         declarations.store(input.resolve(BuildStep.SIGNATURES));
+    }
+
+    private void vaulted(String key) throws Exception {
+        gpg("--export", "--output", vault.resolve(key + ".gpg").toString(), key);
     }
 
     private void gpg(String... arguments) throws Exception {
@@ -120,20 +131,19 @@ public class SignaturesRunTest {
     }
 
     private void run(Path keyring) throws IOException {
-        run(keyring, List.of(), KeyExpiry.SIGNING);
+        run(keyring, KeyExpiry.SIGNING);
     }
 
-    private void run(Path keyring, List<String> options, KeyExpiry expiry) throws IOException {
+    private void run(Path keyring, KeyExpiry expiry) throws IOException {
         Map<String, Repository> repositories = Map.of("maven", (MavenRepository) (_, _, _, _, type, _, checksum) ->
                 Optional.ofNullable("jar".equals(type) && "asc".equals(checksum)
                         ? RepositoryItem.ofFile(detached)
                         : null));
-        List<String> command = new ArrayList<>(List.of("gpg", "--homedir", keyring.toString()));
-        command.addAll(options);
         new Signatures(repositories)
                 .verification(Verification.DECLARED)
                 .expiry(expiry)
-                .factory(ProcessHandler.OfProcess.of(command))
+                .cache(keyring)
+                .keys("")
                 .apply(Runnable::run,
                         new BuildStepContext(previous, next, supplement),
                         new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -145,24 +155,25 @@ public class SignaturesRunTest {
 
     @Test
     public void accepts_the_fingerprint_gpg_reports_for_a_genuine_signature() {
-        assertThatCode(() -> run(home)).doesNotThrowAnyException();
+        assertThatCode(() -> run(vault)).doesNotThrowAnyException();
     }
 
     @Test
     public void rejects_an_artifact_whose_bytes_changed_after_signing() throws Exception {
         Files.writeString(jar, "tampered bytes\n");
-        assertThatThrownBy(() -> run(home))
+        assertThatThrownBy(() -> run(vault))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("does not match the file");
     }
 
-    private void signedByAnExpiringKey() throws Exception {
+    private void signedByAnExpiringKey(String expiry) throws Exception {
         gpg("--quick-generate-key",
                 "Jenesis Expiry Test <expiry@example.invalid>",
                 "default",
                 "default",
-                "1d");
+                expiry);
         String expiring = fingerprintOf("expiry@example.invalid");
+        vaulted(expiring);
         gpg("--detach-sign",
                 "--armor",
                 "--local-user", expiring,
@@ -173,31 +184,21 @@ public class SignaturesRunTest {
         declarations.store(input.resolve(BuildStep.SIGNATURES));
     }
 
-    private static List<String> longAfterTheKeyExpired() {
-        return List.of("--faked-system-time",
-                Long.toString(Instant.now().plus(2, ChronoUnit.DAYS).getEpochSecond()));
-    }
-
     @Test
-    public void accepts_what_a_key_signed_before_it_expired() throws Exception {
-        signedByAnExpiringKey();
-        assertThatCode(() -> run(home, longAfterTheKeyExpired(), KeyExpiry.SIGNING))
-                .as("gpg reports EXPKEYSIG, but the signature predates the expiry it reports")
+    public void reads_every_expiry_mode_from_a_key_that_really_expired() throws Exception {
+        signedByAnExpiringKey("seconds=5");
+        long expired = System.currentTimeMillis() + 6_000;
+        while (System.currentTimeMillis() < expired) {
+            Thread.sleep(200);
+        }
+        assertThatCode(() -> run(vault, KeyExpiry.SIGNING))
+                .as("gpgv reports EXPKEYSIG, and the signature predates the expiry it reports")
                 .doesNotThrowAnyException();
-    }
-
-    @Test
-    public void rejects_what_an_expired_key_signed_when_expiry_is_measured_against_today() throws Exception {
-        signedByAnExpiringKey();
-        assertThatThrownBy(() -> run(home, longAfterTheKeyExpired(), KeyExpiry.CURRENT))
+        assertThatThrownBy(() -> run(vault, KeyExpiry.CURRENT))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("has expired");
-    }
-
-    @Test
-    public void accepts_an_expired_key_outright_when_expiry_is_ignored() throws Exception {
-        signedByAnExpiringKey();
-        assertThatCode(() -> run(home, longAfterTheKeyExpired(), KeyExpiry.IGNORED))
+        assertThatCode(() -> run(vault, KeyExpiry.IGNORED))
+                .as("ignored accepts it whenever it signed")
                 .doesNotThrowAnyException();
     }
 
@@ -227,7 +228,7 @@ public class SignaturesRunTest {
     @Test
     public void accepts_a_verifier_named_by_path_rather_than_on_the_path() throws Exception {
         Path wrapper = root.resolve("gpg-wrapper");
-        Files.writeString(wrapper, "#!/bin/sh\nexec gpg --homedir " + home + " \"$@\"\n");
+        Files.writeString(wrapper, "#!/bin/sh\nexec gpgv \"$@\"\n");
         Files.setPosixFilePermissions(wrapper, PosixFilePermissions.fromString("rwx------"));
         Map<String, Repository> repositories = Map.of("maven", (MavenRepository) (_, _, _, _, type, _, checksum) ->
                 Optional.ofNullable("jar".equals(type) && "asc".equals(checksum)
@@ -235,6 +236,8 @@ public class SignaturesRunTest {
                         : null));
         assertThatCode(() -> new Signatures(repositories)
                 .verification(Verification.DECLARED)
+                .cache(vault)
+                .keys("")
                 .command(wrapper.toAbsolutePath().toString())
                 .apply(Runnable::run,
                         new BuildStepContext(previous, next, supplement),
@@ -250,13 +253,16 @@ public class SignaturesRunTest {
     @Test
     public void reads_the_keyring_a_process_configuration_names() throws Exception {
         Files.createDirectory(input.resolve("process"));
-        Files.writeString(input.resolve("process/gpg.properties"), "--homedir=" + home + "\n");
+        Files.writeString(input.resolve("process/gpgv.properties"),
+                "--keyring=" + vault.resolve(fingerprint + ".gpg") + "\n");
         Map<String, Repository> repositories = Map.of("maven", (MavenRepository) (_, _, _, _, type, _, checksum) ->
                 Optional.ofNullable("jar".equals(type) && "asc".equals(checksum)
                         ? RepositoryItem.ofFile(detached)
                         : null));
         assertThatCode(() -> new Signatures(repositories)
                 .verification(Verification.DECLARED)
+                .cache(Files.createDirectory(root.resolve("bare")))
+                .keys("")
                 .apply(Runnable::run,
                         new BuildStepContext(previous, next, supplement),
                         new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -264,7 +270,7 @@ public class SignaturesRunTest {
                                 Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
                 .toCompletableFuture()
                 .join())
-                .as("process-gpg.properties names the keyring, so no environment variable has to")
+                .as("process-gpgv.properties adds a keyring beside the one the build assembles")
                 .doesNotThrowAnyException();
     }
 

@@ -665,12 +665,17 @@ public record Project(
                           serves many modules; a list is never resolved from a repository, since one
                           that had to be downloaded would itself need verifying. A declaration never
                           switches verification on by itself, and when it is switched on it forks
-                          gpg, which must then be installed and on the PATH: a Java implementation
+                          gpgv, which must then be installed and on the PATH: a Java implementation
                           would have to be resolved from the repository being verified, and a
-                          verifier downloaded on trust verifies nothing. The verifier is an ordinary forked
-                          tool, so jenesis.print.gpg shows each invocation, jenesis.print.signatures
-                          names what was covered, and jenesis.signature.command names a different
-                          binary.
+                          verifier downloaded on trust verifies nothing. gpgv reads a keyring file
+                          and nothing else, so no home directory, agent or trust database takes
+                          part; the build assembles that keyring from the declared fingerprints
+                          alone, fetching each from jenesis.signature.keys into
+                          jenesis.signature.cache, so a key it holds is a key a line declares and
+                          NO_PUBKEY means no line covers the signer. The verifier is an ordinary
+                          forked tool, so jenesis.print.gpgv shows each invocation,
+                          jenesis.print.signatures names what was covered, and
+                          jenesis.signature.command names a different binary.
                       @jenesis.alias <module> <groupId>/<artifactId>[/<type>[/<classifier>]]
                           Require a Maven artifact under a stable module name, so a non-modular jar
                           needs no derived automatic name. Carries no version: a pin or BOM entry
@@ -1787,7 +1792,9 @@ public record Project(
                 project.version||Version stamped onto every produced artifact
                 project.digest|SHA-256|Algorithm for pin and dependency checksums
                 dependency.signature|none|Signatures verified after download: none|declared|strict
-                signature.command|gpg|Binary forked to verify detached OpenPGP signatures
+                signature.command|gpgv|Binary forked to verify detached OpenPGP signatures; a name is looked up on the PATH, a path is used as given
+                signature.keys|keyserver.ubuntu.com lookup|Where a declared key is fetched from, <fingerprint> substituted; empty fetches nothing
+                signature.cache|.jenesis/keys|Folder holding the fetched keys, one file per fingerprint
                 signature.expiry|signing|An expired signing key: ignored accepts it, signing accepts what it signed before expiring, current rejects it
                 project.metadata||Comma-separated extra metadata files
                 project.configuration|build.jenesis|Comma-separated folders searched for tool configuration files; @ splices the default
