@@ -248,6 +248,27 @@ public class SignaturesRunTest {
     }
 
     @Test
+    public void reads_the_keyring_a_process_configuration_names() throws Exception {
+        Files.createDirectory(input.resolve("process"));
+        Files.writeString(input.resolve("process/gpg.properties"), "--homedir=" + home + "\n");
+        Map<String, Repository> repositories = Map.of("maven", (MavenRepository) (_, _, _, _, type, _, checksum) ->
+                Optional.ofNullable("jar".equals(type) && "asc".equals(checksum)
+                        ? RepositoryItem.ofFile(detached)
+                        : null));
+        assertThatCode(() -> new Signatures(repositories)
+                .verification(Verification.DECLARED)
+                .apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                                input,
+                                Map.of(Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join())
+                .as("process-gpg.properties names the keyring, so no environment variable has to")
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     public void rejects_a_signature_from_a_key_gpg_does_not_hold() throws Exception {
         Path stranger = Files.createDirectory(root.resolve("stranger"));
         Files.setPosixFilePermissions(stranger, PosixFilePermissions.fromString("rwx------"));
