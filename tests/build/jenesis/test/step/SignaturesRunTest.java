@@ -76,14 +76,33 @@ public class SignaturesRunTest {
                 .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                 .redirectErrorStream(false)
                 .start();
-        process.getErrorStream().transferTo(OutputStream.nullOutputStream());
+        String error = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
         if (process.waitFor() != 0) {
-            throw new IllegalStateException("Failed to run gpg " + String.join(" ", arguments));
+            throw new IllegalStateException("Failed to run gpg "
+                    + String.join(" ", arguments)
+                    + (error.isBlank() ? "" : ":\n" + error));
         }
     }
 
     private String fingerprint() throws Exception {
         return fingerprintIn(home);
+    }
+
+    private String fingerprintOf(String identity) throws Exception {
+        Process process = new ProcessBuilder("gpg",
+                "--homedir", home.toString(),
+                "--batch", "--with-colons", "--fingerprint").start();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        process.waitFor();
+        String candidate = null;
+        for (String line : output.split("\n")) {
+            if (line.startsWith("fpr:")) {
+                candidate = line.split(":")[9];
+            } else if (line.startsWith("uid:") && line.contains(identity)) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException("No key for " + identity + " in:\n" + output);
     }
 
     private String fingerprintIn(Path keyring) throws Exception {
@@ -137,20 +156,21 @@ public class SignaturesRunTest {
                 .hasMessageContaining("does not match the file");
     }
 
-    private Path expiringKeyring() throws Exception {
-        Path expiring = Files.createDirectory(root.resolve("expiring"));
-        Files.setPosixFilePermissions(expiring, PosixFilePermissions.fromString("rwx------"));
-        gpgIn(expiring,
-                "--quick-generate-key",
+    private void signedByAnExpiringKey() throws Exception {
+        gpg("--quick-generate-key",
                 "Jenesis Expiry Test <expiry@example.invalid>",
                 "default",
                 "default",
                 "seconds=3600");
-        gpgIn(expiring, "--detach-sign", "--armor", "--output", detached.toString(), jar.toString());
+        String expiring = fingerprintOf("expiry@example.invalid");
+        gpg("--detach-sign",
+                "--armor",
+                "--local-user", expiring,
+                "--output", detached.toString(),
+                jar.toString());
         SequencedProperties declarations = new SequencedProperties();
-        declarations.setProperty("OpenPGP/" + fingerprintIn(expiring), "main/maven/org.example/lib");
+        declarations.setProperty("OpenPGP/" + expiring, "main/maven/org.example/lib");
         declarations.store(input.resolve(BuildStep.SIGNATURES));
-        return expiring;
     }
 
     private static List<String> longAfterTheKeyExpired() {
@@ -160,24 +180,24 @@ public class SignaturesRunTest {
 
     @Test
     public void accepts_what_a_key_signed_before_it_expired() throws Exception {
-        Path expiring = expiringKeyring();
-        assertThatCode(() -> run(expiring, longAfterTheKeyExpired(), KeyExpiry.SIGNING))
+        signedByAnExpiringKey();
+        assertThatCode(() -> run(home, longAfterTheKeyExpired(), KeyExpiry.SIGNING))
                 .as("gpg reports EXPKEYSIG, but the signature predates the expiry it reports")
                 .doesNotThrowAnyException();
     }
 
     @Test
     public void rejects_what_an_expired_key_signed_when_expiry_is_measured_against_today() throws Exception {
-        Path expiring = expiringKeyring();
-        assertThatThrownBy(() -> run(expiring, longAfterTheKeyExpired(), KeyExpiry.CURRENT))
+        signedByAnExpiringKey();
+        assertThatThrownBy(() -> run(home, longAfterTheKeyExpired(), KeyExpiry.CURRENT))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("has expired");
     }
 
     @Test
     public void accepts_an_expired_key_outright_when_expiry_is_ignored() throws Exception {
-        Path expiring = expiringKeyring();
-        assertThatCode(() -> run(expiring, longAfterTheKeyExpired(), KeyExpiry.IGNORED))
+        signedByAnExpiringKey();
+        assertThatCode(() -> run(home, longAfterTheKeyExpired(), KeyExpiry.IGNORED))
                 .doesNotThrowAnyException();
     }
 

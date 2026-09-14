@@ -85,8 +85,7 @@ public class Demo {
         // extended expiry, yet the signature was made years before the key lapsed. The
         // clock is moved past the expiry with a wrapper named by path, which is also
         // what jenesis.signature.command accepts besides a name on the PATH.
-        Path expiringHome = expiringKey(work);
-        String expiringFingerprint = signed(expiringHome, jar);
+        String expiringFingerprint = expiringKey(home, jar);
         Path cached = Path.of("target", "artifacts");
         if (Files.isDirectory(cached)) {
             delete(cached);
@@ -97,13 +96,13 @@ public class Demo {
             Files.writeString(declaration, declared.replace(" */",
                     " * @jenesis.signature OpenPGP/" + expiringFingerprint + " org.example/*\n */"));
             expectSignature("expired: what the key signed before it lapsed is still accepted",
-                    true, expiringHome, "strict", "signed",
+                    true, home, "strict", "signed",
                     List.of("-Djenesis.signature.command=" + faked));
 
             // 10. The same artifact under the strictest reading of expiry, where the key
             // must be unexpired today. That is the previous behaviour, kept as an option.
             expectSignature("expired: the same signature under expiry measured against today",
-                    false, expiringHome, "strict", "signed",
+                    false, home, "strict", "signed",
                     List.of("-Djenesis.signature.command=" + faked,
                             "-Djenesis.signature.expiry=current"));
         } finally {
@@ -160,18 +159,33 @@ public class Demo {
         return home;
     }
 
-    private static Path expiringKey(Path work) throws Exception {
-        Path home = work.resolve("gnupg-expiring");
-        if (Files.isDirectory(home)) {
-            delete(home);
-        }
-        Files.createDirectories(home);
-        if (home.getFileSystem().supportedFileAttributeViews().contains("posix")) {
-            Files.setPosixFilePermissions(home, PosixFilePermissions.fromString("rwx------"));
-        }
-        gpg(home, "--quick-generate-key", "Jenesis Demo (expiring) <demo@jenesis.invalid>",
+    private static String expiringKey(Path home, Path jar) throws Exception {
+        gpg(home, "--quick-generate-key", "Jenesis Demo (expiring) <expiry@jenesis.invalid>",
                 "default", "default", "seconds=3600");
-        return home;
+        String expiring = fingerprintOf(home, "expiry@jenesis.invalid");
+        gpg(home, "--detach-sign", "--armor", "--local-user", expiring,
+                "--output", jar + ".asc", jar.toString());
+        Path pom = jar.resolveSibling("lib-1.0.pom");
+        gpg(home, "--detach-sign", "--armor", "--local-user", expiring,
+                "--output", pom + ".asc", pom.toString());
+        return expiring;
+    }
+
+    private static String fingerprintOf(Path home, String identity) throws Exception {
+        Process process = new ProcessBuilder("gpg",
+                "--homedir", home.toString(),
+                "--batch", "--with-colons", "--fingerprint").redirectErrorStream(false).start();
+        String listed = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        process.waitFor();
+        String candidate = null;
+        for (String line : listed.split("\n")) {
+            if (line.startsWith("fpr:")) {
+                candidate = line.split(":")[9];
+            } else if (line.startsWith("uid:") && line.contains(identity)) {
+                return candidate;
+            }
+        }
+        throw new IllegalStateException("No key for " + identity + " reported by gpg:\n" + listed);
     }
 
     private static Path fakedClock(Path work) throws Exception {
