@@ -75,6 +75,7 @@ jobs:
           - { name: custom-build, dir: demo-44-custom-build, entry: build/Demo.java }
           - { name: supply-chain-security, dir: demo-46-supply-chain-security, entry: build/Demo.java }
           - { name: pin-to-file, dir: demo-04-java-modular-multi, entry: build/jenesis/Make.java pin, flags: '-Djenesis.test.skip -Djenesis.pin.file=target/pins.properties', verify: 'grep -q "^org.junit.jupiter=" target/pins.properties' }
+          - { name: pin-provided, dir: demo-04-java-modular-multi, entry: build/jenesis/Make.java pin, flags: '-Djenesis.test.skip -Djenesis.pin.file=target/first.properties', verify: 'java -Djenesis.test.skip -Djenesis.pin.file=target/second.properties -Djenesis.pin.provided=target/first.properties build/jenesis/Make.java pin && grep -q "^org.junit.jupiter=" target/first.properties && ! grep -q "^org.junit.jupiter=" target/second.properties' }
           - { name: pin-reports, dir: demo-04-java-modular-multi, entry: build/jenesis/Make.java pin, flags: '-Djenesis.test.skip -Djenesis.print.pins=true -Djenesis.print.divergence=true -Djenesis.print.aliases=true -Djenesis.print.fetch=true', verify: 'find target -name divergence.properties | grep -q .' }
           - { name: publishing, dir: demo-47-publishing, entry: build/Demo.java }
           - { name: kotlin-plugin, dir: demo-20-kotlin-plugin, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }

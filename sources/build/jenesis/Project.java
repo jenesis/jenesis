@@ -897,8 +897,49 @@ public record Project(
     private record PinModule(Path root,
                              String fileName,
                              BiFunction<String, Path, BuildStep> stepFactory,
+                             Path file,
+                             SequencedSet<Path> provided,
                              HashDigestFunction hashFunction)
             implements BuildExecutorModule {
+
+        private PinModule(Path root,
+                          String fileName,
+                          BiFunction<String, Path, BuildStep> stepFactory,
+                          HashDigestFunction hashFunction) {
+            this(root,
+                    fileName,
+                    stepFactory,
+                    fileFromProperty(root),
+                    providedFromProperty(root),
+                    hashFunction);
+        }
+
+        private static Path fileFromProperty(Path root) {
+            String value = System.getProperty("jenesis.pin.file");
+            return value == null ? null : root.resolve(value).normalize();
+        }
+
+        private static SequencedSet<Path> providedFromProperty(Path root) {
+            SequencedSet<Path> provided = new LinkedHashSet<>();
+            String value = System.getProperty("jenesis.pin.provided");
+            if (value != null) {
+                for (String entry : value.split(",")) {
+                    String candidate = entry.trim();
+                    if (!candidate.isEmpty()) {
+                        provided.add(root.resolve(candidate).normalize());
+                    }
+                }
+            }
+            return provided;
+        }
+
+        PinModule file(Path file) {
+            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction);
+        }
+
+        PinModule provided(SequencedSet<Path> provided) {
+            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction);
+        }
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
@@ -915,8 +956,7 @@ public record Project(
                     }
                 }
             }
-            String collected = System.getProperty("jenesis.pin.file");
-            if (collected == null) {
+            if (file == null) {
                 for (String path : paths) {
                     Path file = root.resolve(path).resolve(fileName);
                     if (!Files.isRegularFile(file)) {
@@ -928,7 +968,7 @@ public record Project(
                 }
             } else {
                 buildExecutor.addStep("file",
-                        new Pins(paths, root.resolve(collected).normalize(), hashFunction),
+                        new Pins(paths, file, provided, hashFunction),
                         new LinkedHashSet<>(inherited.sequencedKeySet()));
             }
             buildExecutor.addStep("divergence",
@@ -937,8 +977,16 @@ public record Project(
         }
     }
 
-    private record Pins(SequencedSet<String> paths, Path file, HashDigestFunction hashFunction)
+    private record Pins(SequencedSet<String> paths,
+                        Path file,
+                        SequencedSet<Path> provided,
+                        HashDigestFunction hashFunction)
             implements BuildStep {
+
+        @Override
+        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+            return true;
+        }
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
@@ -995,6 +1043,22 @@ public record Project(
                                 : coordinate;
                     }
                     entries.putIfAbsent(entry, value);
+                }
+            }
+            for (Path other : provided) {
+                if (!Files.isRegularFile(other)) {
+                    throw new IllegalStateException("No such file in jenesis.pin.provided: " + other);
+                }
+                SequencedProperties covered = SequencedProperties.ofFiles(other);
+                for (String key : covered.stringPropertyNames()) {
+                    String value = covered.getProperty(key).trim();
+                    int space = value.indexOf(' ');
+                    if (space < 0) {
+                        continue;
+                    }
+                    if (value.equals(entries.get(key))) {
+                        entries.remove(key);
+                    }
                 }
             }
             SequencedProperties pins = new SequencedProperties();
@@ -1850,6 +1914,7 @@ public record Project(
                 resolver.maven|maven|maven|closest|latest|release|stable: which version a Maven coordinate resolves to; stable skips pre-release qualifiers
                 resolver.module|first|first|ignore|fail: what to do with the versions a module-info records
                 pin.file||Write the whole project's pins to this properties file instead of the module declarations
+                pin.provided||Comma-separated pin files whose entries this one leaves out, where the version and hash are the same
                 pin.checksum|true|Record content checksums in the pins that the pin selector writes
                 pin.bom|keep|keep|flatten: whether pinning keeps BOM references or resolves them away
                 platform.<token>||true adds a platform token and false removes one, selecting guarded pins
