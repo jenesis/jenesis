@@ -7,6 +7,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.KeyExpiry;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SequencedProperties;
 import build.jenesis.Verification;
@@ -195,6 +196,85 @@ public class SignaturesTest {
         assertThatThrownBy(() -> run(step(signature("lib"),
                 validated(PRIMARY),
                 "[GNUPG:] REVKEYSIG DEADBEEF Example")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("revoked");
+    }
+
+    private static String expiredKey(long expired) {
+        return "[GNUPG:] KEYEXPIRED " + expired;
+    }
+
+    private static final String EXPIRED_SIGNATURE = "[GNUPG:] EXPKEYSIG DEADBEEF Example";
+
+    @Test
+    public void accepts_a_signature_an_expired_key_made_while_it_was_still_valid() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThatCode(() -> run(step(signature("lib"),
+                expiredKey(2000),
+                EXPIRED_SIGNATURE,
+                validated(PRIMARY))))
+                .as("a key that expired after it signed vouched for these bytes while it was trusted")
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    public void rejects_a_signature_an_expired_key_made_after_it_expired() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(signature("lib"),
+                expiredKey(500),
+                EXPIRED_SIGNATURE,
+                validated(PRIMARY))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("after the signing key expired");
+    }
+
+    @Test
+    public void rejects_an_expired_key_whose_expiry_date_was_not_reported() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(signature("lib"),
+                EXPIRED_SIGNATURE,
+                validated(PRIMARY))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("did not report when");
+    }
+
+    @Test
+    public void rejects_any_expired_key_when_expiry_is_measured_against_today() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(signature("lib"),
+                expiredKey(2000),
+                EXPIRED_SIGNATURE,
+                validated(PRIMARY)).expiry(KeyExpiry.CURRENT)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("has expired");
+    }
+
+    @Test
+    public void accepts_a_signature_made_after_expiry_when_expiry_is_ignored() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThatCode(() -> run(step(signature("lib"),
+                expiredKey(500),
+                EXPIRED_SIGNATURE,
+                validated(PRIMARY)).expiry(KeyExpiry.IGNORED)))
+                .as("ignored is the escape hatch for a key whose expiry cannot be judged at all")
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    public void reports_a_revoked_key_ahead_of_an_expired_one() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(signature("lib"),
+                expiredKey(2000),
+                EXPIRED_SIGNATURE,
+                "[GNUPG:] REVKEYSIG DEADBEEF Example",
+                validated(PRIMARY))))
+                .as("revocation is unconditional, so a lenient expiry mode must not mask it")
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("revoked");
     }

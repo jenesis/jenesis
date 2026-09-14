@@ -27,6 +27,8 @@ Run it
     [blocked] rotated: the declared key is not the one that signed the artifact
     [blocked] vendored: a local key list is consulted like an inline declaration
     [ok]      rotated: the same contradiction is never looked for by default
+    [ok]      expired: what the key signed before it lapsed is still accepted
+    [blocked] expired: the same signature under expiry measured against today
 
 The signature half is self-contained and reaches no network, and **nothing binary is
 committed**: `Demo.java` builds a byte-reproducible jar, generates a throwaway key in a
@@ -115,6 +117,23 @@ step. `jenesis.dependency.signature` selects how much it checks, and defaults to
 `-Djenesis.print.signatures` names each coordinate that was checked with the key that signed it, and each one
 no declaration covers - under `declared` that second list is exactly what `strict` would refuse, so it is how
 you find out what to declare before switching.
+
+## An expired signing key
+
+A key expires; the release it signed years earlier does not change. Since the expiry lives in a self-signature
+rather than in the fingerprint, an `@jenesis.signature` line survives an expiry extension untouched - but where
+no extension is published, the signature is still the one the key made while it was trusted.
+`jenesis.signature.expiry` says how much that counts for:
+
+| Value     | An expired signing key                                                     |
+|-----------|-----------------------------------------------------------------------------|
+| `ignored` | is accepted, whenever it signed                                             |
+| `signing` | is accepted for what it signed before it expired; the default               |
+| `current` | is always rejected, however old the signature                               |
+
+The two `expired` rows above are the same artifact and the same signature, read once under the default and
+once under `current`. The demo moves the clock past the expiry with a small wrapper script that it names by
+path, which is the other thing `jenesis.signature.command` accepts besides a name to look up on the `PATH`.
 
 Because it is a separate step, switching the property on does not re-download anything:
 the `artifacts` step's output is unchanged, and only `signatures` runs. The fetched `.asc`
