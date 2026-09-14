@@ -1785,6 +1785,7 @@ public record Project(
                 project.digest|SHA-256|Algorithm for pin and dependency checksums
                 dependency.signature|none|Signatures verified after download: none|declared|strict
                 signature.command|gpg|Binary forked to verify detached OpenPGP signatures
+                signature.expiry|signing|An expired signing key: ignored accepts it, signing accepts what it signed before expiring, current rejects it
                 project.metadata||Comma-separated extra metadata files
                 project.configuration|build.jenesis|Comma-separated folders searched for tool configuration files; @ splices the default
                 project.boms||Comma-separated locations of local pin-<name>.properties; default: the configuration folders
