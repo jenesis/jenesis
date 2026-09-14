@@ -10,7 +10,6 @@
         <sourceDirectory>sources</sourceDirectory>
     </build>
     <!--jenesis.pin
-    japicmp/maven/build.jenesis.demo/api-compatibility 1.0.0 SHA-256/218b277824c13d1ea8022e66b9b2f4a1c94bf6af496696a67406a50d9d701368
     japicmp/maven/com.github.siom79.japicmp/japicmp 0.26.2 SHA-256/317c4d11ef25469203d6de9c5b804c62392f52e3edc9e42e42161a192335bc3a
     japicmp/maven/com.google.errorprone/error_prone_annotations 2.36.0 SHA-256/77440e270b0bc9a249903c5a076c36a722c4886ca4f42675f2903a1c53ed61a5
     japicmp/maven/com.google.guava/failureaccess 1.0.3 SHA-256/cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb

@@ -1231,8 +1231,10 @@ A demo has never published anything, so this one publishes its own previous rele
 staged tree is already a Maven repository layout - writes the `maven-metadata.xml`
 that makes a floating version resolvable, and then builds this project at 1.1.0 with
 that repository prepended to Maven Central through `Project.repositories(...)`. The
-baseline pin in `pom.xml` therefore carries the checksum of a jar the demo builds
-itself, which only works because a Jenesis build is reproducible.
+baseline is deliberately not pinned: it is a jar the demo builds, so its checksum is
+whatever machine produced it, the same reason `internal-module` pins its plugin's
+dependencies but never the plugin. This is the one demo CI runs with
+`jenesis.dependency.pin=versions` rather than `strict`.
 
 Like the linters, the check is report-only: it writes
 `reports/japicmp/japicmp-report.xml`, which a `stage` build collects with every other

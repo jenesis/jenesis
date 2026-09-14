@@ -117,7 +117,16 @@ Pinning
 
 japicmp resolves in its own `japicmp` group, kept apart from the module's own dependencies, and floats
 a `RELEASE` version until pinned. The baseline resolves in that same group, without its transitive
-dependencies, because only its own byte code is compared. `java build/Demo.java pin` records the whole
-closure with `SHA-256` checksums into the `<!--jenesis.pin-->` block of `pom.xml`, the baseline
-included - a Jenesis build is reproducible, so the jar phase one produces hashes the same everywhere,
-which is what lets this demo build under `-Djenesis.dependency.pin=strict` in CI.
+dependencies, because only its own byte code is compared. `java build/Demo.java pin` records that
+closure with `SHA-256` checksums into the `<!--jenesis.pin-->` block of `pom.xml`.
+
+**The baseline itself is not pinned, and should not be.** It is a jar this demo builds, so its checksum
+is whatever the machine that ran `pin` produced - pin it and every other machine fails the digest. That
+is the same reason the `internal-module` and `external-module` demos pin the plugin's `build.jenesis`
+and `org.json` closure but never the plugin they compile themselves. A library that really publishes has
+no such problem: its baseline was released by somebody, and pins like any other dependency.
+
+`pin` does still offer a line for it, because it recognises a locally built artifact by the coordinate
+and version this build produced (1.1.0) and the baseline is a different version (1.0.0). Drop that one
+line if you re-run `pin`. CI therefore builds this demo with `-Djenesis.dependency.pin=versions` rather
+than the `strict` every other demo uses: versions are pinned, checksums are not demanded.
