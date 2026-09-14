@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>build.jenesis.demo</groupId>
+    <artifactId>api-compatibility</artifactId>
+    <version>1.1.0</version>
+
+    <build>
+        <sourceDirectory>sources</sourceDirectory>
+    </build>
+    <!--jenesis.pin
+    japicmp/maven/build.jenesis.demo/api-compatibility 1.0.0 SHA-256/218b277824c13d1ea8022e66b9b2f4a1c94bf6af496696a67406a50d9d701368
+    japicmp/maven/com.github.siom79.japicmp/japicmp 0.26.2 SHA-256/317c4d11ef25469203d6de9c5b804c62392f52e3edc9e42e42161a192335bc3a
+    japicmp/maven/com.google.errorprone/error_prone_annotations 2.36.0 SHA-256/77440e270b0bc9a249903c5a076c36a722c4886ca4f42675f2903a1c53ed61a5
+    japicmp/maven/com.google.guava/failureaccess 1.0.3 SHA-256/cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb
+    japicmp/maven/com.google.guava/guava 33.4.8-jre SHA-256/f3d7f57f67fd622f4d468dfdd692b3a5e3909246c28017ac3263405f0fe617ed
+    japicmp/maven/com.google.guava/listenablefuture 9999.0-empty-to-avoid-conflict-with-guava SHA-256/b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99
+    japicmp/maven/com.google.j2objc/j2objc-annotations 3.0.0 SHA-256/88241573467ddca44ffd4d74aa04c2bbfd11bf7c17e0c342c94c9de7a70a7c64
+    japicmp/maven/com.sun.istack/istack-commons-runtime 3.0.8 SHA-256/4ffabb06be454a05e4398e20c77fa2b6308d4b88dfbef7ca30a76b5b7d5505ef
+    japicmp/maven/com.sun.xml.fastinfoset/FastInfoset 1.2.16 SHA-256/056f3a1e144409f21ed16afc26805f58e9a21f3fce1543c42d400719d250c511
+    japicmp/maven/jakarta.activation/jakarta.activation-api 1.2.1 SHA-256/8b0a0f52fa8b05c5431921a063ed866efaa41dadf2e3a7ee3e1961f2b0d9645b
+    japicmp/maven/jakarta.xml.bind/jakarta.xml.bind-api 2.3.2 SHA-256/69156304079bdeed9fc0ae3b39389f19b3cc4ba4443bc80508995394ead742ea
+    japicmp/maven/org.glassfish.jaxb/jaxb-runtime 2.3.2 SHA-256/e6e0a1e89fb6ff786279e6a0082d5cef52dc2ebe67053d041800737652b4fd1b
+    japicmp/maven/org.glassfish.jaxb/txw2 2.3.2 SHA-256/4a6a9f483388d461b81aa9a28c685b8b74c0597993bf1884b04eddbca95f48fe
+    japicmp/maven/org.javassist/javassist 3.30.2-GA SHA-256/eba37290994b5e4868f3af98ff113f6244a6b099385d9ad46881307d3cb01aaf
+    japicmp/maven/org.jspecify/jspecify 1.0.0 SHA-256/1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab
+    japicmp/maven/org.jvnet.staxex/stax-ex 1.8.1 SHA-256/20522549056e9e50aa35ef0b445a2e47a53d06be0b0a9467d704e2483ffb049a
+    -->
+</project>

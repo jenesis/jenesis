@@ -10,8 +10,9 @@ code-quality tools, bring in other JVM languages and lint them too, measure and
 benchmark what you built, customize or replace the build template itself, lock down
 the supply chain, assemble a release for Maven Central, compile a module ahead of
 time into a GraalVM native binary, share build outputs through a content-addressed
-cache, and finally run somebody else's released program without building anything
-at all.
+cache, check that the jar you are about to publish still matches the API you
+published last, and finally run somebody else's released program without building
+anything at all.
 
 Every demo has its own `build/jenesis` symlink into this repository's
 `sources/build/jenesis`, so each runs in isolation from inside its own directory
@@ -111,6 +112,7 @@ Quick index
 | 49 | [`build-cache`](demo-49-build-cache/README.md)               | A content-addressed build cache serving step outputs across builds - project-local (`-Djenesis.project.cache`), shared via a URI (`-Djenesis.cache.uri=`), or local layered in front of a remote; shown by bootstrapping it then serving a full `-Djenesis.executor.rebuild=true` from it | `java build/jenesis/Make.java`  |
 | 50 | [`jpx`](demo-50-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
 | 51 | [`startup`](demo-51-startup/README.md)                       | What the entry point costs: `Make.java` names no engine class, so the Java launcher compiles one small file rather than the whole engine, and then compiles the build sources once and runs from those classes - 8.0s to 3.6s for a build that runs once, and 0.8s for a repeat. `jenesis.make.daemon` adds a reused JVM on top | `java build/jenesis/Make.java` |
+| 52 | [`api-compatibility`](demo-52-api-compatibility/README.md)   | Guard the API you already published: an empty `japicmp.properties` makes japicmp compare the built jar's byte code against the last release of the same coordinate - the demo publishes that release itself, then builds the next one against it - report-only until an `error-on-*` key turns a breaking change into a failed build | `java build/Demo.java`             |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1204,6 +1206,40 @@ that compiles little and about a third on a five-module one. The daemon serves o
 flags travel with a call, cleared and set again around every build, while
 anything a running JVM cannot change - the build sources, the environment, the
 JVM arguments - replaces the daemon instead. `--stop` shuts it down.
+
+## 35. Guarding a published API - [`api-compatibility`](demo-52-api-compatibility/README.md)
+
+The last gate is the one that protects the people who already depend on you.
+`api-compatibility` turns on japicmp with a `japicmp.properties` config file, and japicmp
+compares the byte code of the jar this build produced against the byte code of the
+jar the last release produced. Byte code, not sources, is the right level: it is
+what a caller actually linked against, so a removed method, a narrowed return type
+or a tightened modifier shows up whether or not the sources still look compatible.
+
+The new idea is **a baseline the build works out for itself**. The config file here
+is empty, and that is the whole configuration: with no `baseline` key, japicmp
+compares against `<this module's groupId>/<its artifactId>` at `RELEASE`, so every
+build measures the change you are about to publish against the release before it,
+and the version floats rather than being re-pointed by hand. A `baseline=` key names
+another coordinate instead - a vendored fork checked against upstream, say - read by
+how many slashes it carries. Either way japicmp and the baseline resolve in a
+`japicmp` group of their own, and the baseline resolves without its transitive
+dependencies, since only its own byte code is compared.
+
+A demo has never published anything, so this one publishes its own previous release:
+`build/Demo.java` builds `released/` (the same coordinate at 1.0.0), stages it - a
+staged tree is already a Maven repository layout - writes the `maven-metadata.xml`
+that makes a floating version resolvable, and then builds this project at 1.1.0 with
+that repository prepended to Maven Central through `Project.repositories(...)`. The
+baseline pin in `pom.xml` therefore carries the checksum of a jar the demo builds
+itself, which only works because a Jenesis build is reproducible.
+
+Like the linters, the check is report-only: it writes
+`reports/japicmp/japicmp-report.xml`, which a `stage` build collects with every other
+report kind, and keeps the build green. Four `error-on-*` keys turn a finding into
+a failure - binary incompatibility, source incompatibility, any modification at
+all, or a semantic-versioning violation - and the failure names the change that
+caused it. `-Djenesis.compatibility.japicmp=false` is the usual opt-out.
 
 Current pin state of the demos: every demo is committed pinned with checksums.
 `java-pom`, `java-pom-multi`, `java-modular`, and `java-modular-multi` pin their
