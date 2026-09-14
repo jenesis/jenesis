@@ -230,4 +230,42 @@ public class JarTest {
         assertThat(Files.readAllBytes(firstNext.resolve(BuildStep.ARTIFACTS + "classes.jar")))
                 .isEqualTo(Files.readAllBytes(secondNext.resolve(BuildStep.ARTIFACTS + "classes.jar")));
     }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void records_the_tool_rather_than_the_jdk_that_ran_it(boolean process) throws IOException {
+        Files.createDirectory(classes.resolve(Javac.CLASSES));
+        new Jar(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
+                .toCompletableFuture().join();
+
+        assertThat(mainAttributes().getValue("Created-By"))
+                .as("a jar that records the running JDK cannot be reproduced on another one")
+                .isEqualTo("Jenesis");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void a_declared_created_by_is_left_alone(boolean process) throws IOException {
+        Files.createDirectory(classes.resolve(Javac.CLASSES));
+        Files.writeString(classes.resolve("manifest.mf"), """
+                Manifest-Version: 1.0
+                Created-By: Something Else
+                """);
+        new Jar(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
+                .toCompletableFuture().join();
+
+        assertThat(mainAttributes().getValue("Created-By")).isEqualTo("Something Else");
+    }
+
+    private Attributes mainAttributes() throws IOException {
+        try (JarFile jar = new JarFile(next.resolve(BuildStep.ARTIFACTS + "classes.jar").toFile())) {
+            return jar.getManifest().getMainAttributes();
+        }
+    }
 }
