@@ -60,7 +60,7 @@ public class DependenciesResolutionTest implements Serializable {
     }
 
     private Repository files(Map<String, String> contents) {
-        return (_, coordinate) -> {
+        return (_, coordinate, _) -> {
             String content = contents.getOrDefault(coordinate, coordinate);
             int colon = coordinate.lastIndexOf(':');
             String identifier = colon < 0 ? coordinate : coordinate.substring(0, colon);
@@ -178,7 +178,7 @@ public class DependenciesResolutionTest implements Serializable {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/qux", "");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
-        Repository streaming = (_, coordinate) -> Optional.of(
+        Repository streaming = (_, coordinate, _) -> Optional.of(
                 () -> new ByteArrayInputStream(coordinate.getBytes(StandardCharsets.UTF_8)));
         execute(new Dependencies(Map.of("foo", streaming), Map.of("foo", (executor, prefix, repositories, descriptors, _, _) -> {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
@@ -481,7 +481,7 @@ public class DependenciesResolutionTest implements Serializable {
         properties.setProperty("main/compile/foo/bar", "");
         properties.store(dependencies.resolve(BuildStep.REQUIRES));
         AtomicReference<String> produced = new AtomicReference<>("first");
-        Repository internal = (_, coordinate) -> {
+        Repository internal = (_, coordinate, _) -> {
             Path file = Files.write(artifacts.resolve(coordinate.replace('/', '-') + ".jar"),
                     produced.get().getBytes(StandardCharsets.UTF_8));
             return Optional.of(RepositoryItem.ofFile(file, true));
@@ -799,7 +799,7 @@ public class DependenciesResolutionTest implements Serializable {
         boms.setProperty("bom/main/module/acme.platform", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
         Dependencies resolve = new Dependencies(
-                Map.of("module", (_, _) -> Optional.empty()),
+                Map.of("module", (_, _, _) -> Optional.empty()),
                 Map.of("module", versioning()));
         assertThatThrownBy(() -> execute(resolve))
                 .hasStackTraceContaining("Failed to fetch BOM main/module/acme.platform")

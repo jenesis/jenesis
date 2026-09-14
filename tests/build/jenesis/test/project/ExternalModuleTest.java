@@ -566,7 +566,7 @@ public class ExternalModuleTest {
     }
 
     private static Repository versionInsensitive(Map<String, Path> files) {
-        return (_, coordinate) -> {
+        return (_, coordinate, _) -> {
             int slash = coordinate.indexOf('/');
             String name = slash < 0 ? coordinate : coordinate.substring(0, slash);
             Path file = files.get(name);

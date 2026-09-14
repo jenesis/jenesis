@@ -321,9 +321,9 @@ public class Dependencies implements BuildExecutorModule {
             repositories.forEach((name, repository) -> {
                 Repository effective = repository;
                 if (!previousArtifacts.isEmpty()) {
-                    effective = effective.prepend((_, coordinate) -> Optional
-                            .ofNullable(previousArtifacts.get(coordinate))
-                            .map(RepositoryItem::ofFile));
+                    effective = effective.prepend((_, coordinate, extension) -> extension == null
+                            ? Optional.ofNullable(previousArtifacts.get(coordinate)).map(RepositoryItem::ofFile)
+                            : Optional.empty());
                 }
                 wrapped.put(name, effective.materialized(libs));
             });

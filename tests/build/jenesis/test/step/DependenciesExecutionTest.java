@@ -36,7 +36,7 @@ public class DependenciesExecutionTest {
         dependencies.store(input.resolve(BuildStep.REQUIRES));
         buildExecutor.addSource("input", input);
         buildExecutor.addModule("output", new Dependencies(
-                Map.of("foo", (_, coordinate) -> Optional.of(() -> new ByteArrayInputStream(
+                Map.of("foo", (_, coordinate, _) -> Optional.of(() -> new ByteArrayInputStream(
                         coordinate.getBytes(StandardCharsets.UTF_8)))),
                 Map.of("foo", Resolver.identity())), "input");
         SequencedMap<String, Path> steps = buildExecutor.execute();

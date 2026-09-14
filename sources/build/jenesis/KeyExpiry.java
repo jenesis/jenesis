@@ -7,11 +7,11 @@ public enum KeyExpiry {
     IGNORED, SIGNING, CURRENT;
 
     public static KeyExpiry fromProperty() {
-        String property = System.getProperty("jenesis.signature.expiry", "signing");
+        String property = System.getProperty("jenesis.openpgp.expiry", "signing");
         try {
             return KeyExpiry.valueOf(property.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException _) {
-            throw new IllegalArgumentException("Unknown jenesis.signature.expiry '" + property
+            throw new IllegalArgumentException("Unknown jenesis.openpgp.expiry '" + property
                     + "', expected one of: ignored, signing, current");
         }
     }

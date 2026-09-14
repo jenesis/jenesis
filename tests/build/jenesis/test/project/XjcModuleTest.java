@@ -64,7 +64,7 @@ public class XjcModuleTest {
     }
 
     private Repository files() {
-        return (_, coordinate) -> {
+        return (_, coordinate, _) -> {
             Path file = Files.write(
                     Files.createDirectories(root.resolve("served")).resolve(coordinate.replace('/', '-') + ".jar"),
                     coordinate.getBytes(StandardCharsets.UTF_8));

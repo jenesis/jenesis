@@ -1146,6 +1146,22 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void rejects_a_signature_scheme_it_does_not_know() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.signature sigstore/github.com/example/lib org.example/lib
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("a scheme the tool does not know is an error naming the forms it does")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Sigstore/<host>/<path>");
+    }
+
+    @Test
     public void signature_tag_expands_every_token_it_lists() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**

@@ -137,7 +137,7 @@ public class SignaturesRunTest {
     }
 
     private static Repository vaulted(Path vault) {
-        return (_, coordinate) -> {
+        return (_, coordinate, _) -> {
             Path candidate = vault.resolve(coordinate + ".gpg");
             return Files.isRegularFile(candidate)
                     ? Optional.of(RepositoryItem.ofFile(candidate))

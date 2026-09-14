@@ -7,11 +7,13 @@ Three questions about a dependency, and what answers each:
 |----------|-------------|
 | May we use a dependency we cannot verify at all? | **strict pinning** |
 | Are these the exact bytes we vetted? | **a pin checksum** |
-| Were the bytes we vetted the ones upstream produced? | **`@jenesis.signature`** |
+| Were the bytes we vetted the ones upstream produced? | **`@jenesis.signature`**, naming a **key** or an **identity** |
 
 The first two are pinning's halves. The third is the one no hash can reach: a checksum is
 taken from whatever the repository served, so a swapped artifact is written in as an
-accepted pin just the same. This demo proves all three by getting each wrong on purpose.
+accepted pin just the same. It has two answers here, because there are two ways to say who
+produced an artifact: an OpenPGP key somebody keeps, and a Sigstore identity nobody keeps a
+key for at all. This demo proves all of it by getting each wrong on purpose.
 
 Run it
 ------
@@ -29,8 +31,12 @@ Run it
     [ok]      rotated: the same contradiction is never looked for by default
     [ok]      expired: what the key signed before it lapsed is still accepted
     [blocked] expired: the same signature under expiry measured against today
+    [ok]      attested: a dependency verified against the identity its declaration names
+    [blocked] forked: the same bundle, declared to come from a different repository
+    [ok]      attested: under strict, the POM carries a bundle from that identity too
+    [blocked] named: the same build against a trust root that vouches for nothing
 
-The signature half is self-contained and reaches no network, and **nothing binary is
+The key half is self-contained and reaches no network, and **nothing binary is
 committed**: `Demo.java` builds a byte-reproducible jar, generates a throwaway key in a
 gpg home under `target/`, signs both the jar and its POM with it, and publishes all four
 files to a `file:` Maven repository - then builds three standalone projects against it. If
@@ -40,8 +46,7 @@ there is nothing the remaining six cases could verify.
 Pinning: whether, and which bytes
 ---------------------------------
 
-`Demo.java` builds one module at a time with a `+<module>` selector. Both get one
-guarantee wrong:
+`Demo.java` builds one project at a time, in process. Both get one guarantee wrong:
 
 - **`unpinned`** declares a dependency with a version but **no checksum**. It builds by
   default, but fails under **strict pinning** (`pinning(Pinning.STRICT)`, the in-code
@@ -73,11 +78,11 @@ whole mechanism rests on, and a tool that filled the line in from whatever it do
 would be recording its own guess. Widening trust across a whole group with `/*` is the
 same kind of decision, made once and visible in the diff.
 
-These are **modular** projects, so the declaration is a javadoc tag on `module-info.java`
-beside the `@jenesis.pin` lines, exactly as `@jenesis.bom` is. A `pom.xml` has no
-equivalent form: a Maven project states its BOM imports in `<dependencyManagement>` and
-has no place for a key, so the signature half of this demo is modular while the pinning
-half is Maven.
+Every project here is **modular**, so each declaration is a javadoc tag on
+`module-info.java` beside the `@jenesis.pin` lines, exactly as `@jenesis.bom` is. A
+`pom.xml` has no equivalent form: a Maven project states its BOM imports in
+`<dependencyManagement>` and has no place for a key or an identity, which is why there is
+no `pom.xml` in this demo at all.
 
 One vetted list can serve many modules. A declaration naming a lone
 `signature-<name>.properties` reads its keys from a local file instead, the shape
@@ -125,7 +130,7 @@ visible rather than silent.
 A key expires; the release it signed years earlier does not change. Since the expiry lives in a self-signature
 rather than in the fingerprint, an `@jenesis.signature` line survives an expiry extension untouched - but where
 no extension is published, the signature is still the one the key made while it was trusted.
-`jenesis.signature.expiry` says how much that counts for:
+`jenesis.openpgp.expiry` says how much that counts for:
 
 | Value     | An expired signing key                                                     |
 |-----------|-----------------------------------------------------------------------------|
@@ -192,14 +197,16 @@ a repository which re-serialises POMs invalidates their signatures, so resolve f
 that serves the published bytes. The demo signs both the jar and the POM, so it forks gpg
 twice for the one coordinate.
 
-When verification is switched on - and only then - it forks `gpg`, which must then be
-installed and on the `PATH`. A build that has not enabled it needs none of this. Forking
+When verification is switched on for an OpenPGP declaration - and only then - it forks
+`gpg`, which must then be installed and on the `PATH`. A coordinate declared by a Sigstore
+identity instead, which [`sigstore`](../demo-52-sigstore/README.md) covers, forks nothing:
+that bundle carries its own certificate and log entry and is checked in process. A build that has not enabled it needs none of this. Forking
 rather than linking is deliberate: a
 Java OpenPGP library would have to be resolved from a repository - the very thing being
 verified - and a verifier you downloaded on trust verifies nothing. It is also why a
 hardened machine for writing pins is one where the JDK and gpg are already present and
 vetted, rather than one that fetches them on the way. `jenesis.print.gpg` shows each
-invocation and `jenesis.signature.command` names a different binary. A broken invocation fails loudly
+invocation and `jenesis.openpgp.command` names a different binary. A broken invocation fails loudly
 with the command to reproduce, rather than passing for "no signature found".
 
 Where the keys come from
@@ -217,24 +224,123 @@ The key this demo uses is generated fresh on every run and thrown away with `tar
 signs nothing else and is worth no trust whatsoever - which is also why none of it is
 committed: a repository of sources should not carry jars, signatures or keys.
 
+Identities: signing without keeping a key
+-----------------------------------------
+
+Everything above rests on somebody holding a private key for years. Sigstore answers the
+same question without one: the signer authenticates to an identity provider, a certificate
+authority issues a certificate that is valid for **ten minutes** and names that identity,
+the signature goes into a public append-only log, and the private key is discarded. What a
+consumer verifies afterwards is an identity and a log entry rather than a key somebody
+kept.
+
+`@jenesis.signature` therefore takes a second form, and `attested/sources/module-info.java`
+carries it beside an ordinary pin:
+
+    @jenesis.alias protobuf.specs dev.sigstore/protobuf-specs
+    @jenesis.pin dev.sigstore/protobuf-specs 0.5.2 SHA-256/e2368fd2...
+    @jenesis.signature Sigstore/github.com/sigstore/protobuf-specs dev.sigstore/*
+
+Read against the certificate that signed that release, the declaration is:
+
+    Sigstore / github.com / sigstore / protobuf-specs
+       |           |           |           `- repository
+       |           |           `- owner
+       |           `- issuer token.actions.githubusercontent.com
+       `- material comes from the bundle beside the artifact, nothing is fetched to check it
+
+    accepts  https://github.com/sigstore/protobuf-specs/.github/workflows/java-release.yml@refs/tags/release/java/v0.5.2
+                              ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**The path is a prefix, narrowing by segment.** `Sigstore/github.com/sigstore` covers every
+repository of an owner, the line above covers one repository, and a workflow file may
+follow it to cover one workflow. A prefix ends at a `/` or an `@`, so `protobuf-spec` never
+covers `protobuf-specs`.
+
+**The ref is never written.** The identity ends in `@refs/tags/release/java/v0.5.2`, and
+that is the one part that moves with every release. Stopping before it is what lets a
+single line cover every future version, the way a fingerprint does.
+
+**The host names the issuer too.** It is the host itself unless `jenesis.sigstore.issuers`
+names another, which today it does only for
+`github.com=token.actions.githubusercontent.com`. GitLab and anything self-hosted need no
+entry, because `gitlab.com` issues its own identities.
+
+`forked/` declares `Sigstore/github.com/acme/protobuf-specs` for the same dependency. Its
+bundle verifies perfectly and its log entry is real, so only the comparison against the
+declaration catches a release that came from somewhere else - exactly what `rotated/` shows
+for a key, and what no checksum can see.
+
+Why a certificate that expired still verifies
+----------------------------------------------
+
+The certificate in that bundle was valid for ten minutes on one day in August. It is
+expired now, and that is the design rather than a lapse. Verification does not ask whether
+the certificate is valid today; it asks whether it was valid at the moment the transparency
+log recorded the signature. A ten-minute certificate plus an unforgeable timestamp is what
+replaces a long-lived key: there is nothing left to steal after the signature is made, and
+no key to revoke, rotate or outlive - which is also why this half needs no `gpg`, no
+keyring and no key server. The check is JDK cryptography in process, over a bundle the
+repository publishes beside the artifact.
+
+Where the trust root comes from
+-------------------------------
+
+A bundle carries its own certificate and log entry, but something has to say which
+certificate authority and which log are the real ones. **The tool carries that trust root
+as source**: the published root of the public Sigstore instance, vendored into every
+project that vendors Jenesis and reviewed in the same diff. So a project that adds a
+declaration needs nothing else, and no build downloads a trust root.
+
+`jenesis.sigstore.uri` names another, and is the only way another is read - for a private
+Sigstore instance, or a root that has rotated since this one was vendored. The last
+`[blocked]` line is that: the same build and the same declaration, against a trust root
+that vouches for nothing.
+
+Unlike the key half, this one **needs the network**: a bundle exists only once a
+certificate authority has seen an identity and a public log has recorded the entry, so it
+cannot be manufactured here the way a throwaway key can. The demo verifies a published
+release, `dev.sigstore:protobuf-specs:0.5.2`, and prints `[skipped]` for this half if it
+cannot be reached.
+
+Two answers, and when each applies
+-----------------------------------
+
+|                         | OpenPGP | Sigstore |
+|-------------------------|---------|----------|
+| What a project declares | a key fingerprint | an identity prefix, and the issuer that authenticated it |
+| What the signer keeps   | a private key, for years | nothing, after ten minutes |
+| What a rotation costs   | a new fingerprint in the diff | nothing, until the workflow or repository moves |
+| Verifier                | forked `gpgv` | in process, `java.security` alone |
+| Trust material          | keys fetched by fingerprint | a trust root the tool carries |
+| Coverage on Maven Central | almost everything | a small minority |
+
+Both forms may cover one coordinate, and each is then verified against whatever that
+coordinate publishes, so a project migrating from one to the other declares both and
+neither is weakened. That last row is what decides how this is used today: of nine widely
+used artifacts checked while writing this demo, exactly one carried a `.sigstore.json` and
+all nine carried a `.asc`.
+
 Layout
 ------
 
     demo-46-supply-chain-security
     |-- build/jenesis            symlink to ../../../sources/build/jenesis
-    |-- build/Demo.java          builds and signs the fixture, asserts all nine outcomes
-    |-- pom.xml                  aggregator over the two pinning modules
-    |-- unpinned/pom.xml         commons-lang3 with a version but no checksum
-    |-- tampered/pom.xml         commons-lang3 pinned to a deliberately wrong SHA-256
-    |-- signed/                  standalone modular project declaring no key
-    |-- rotated/                 standalone modular project declaring the wrong key
-    `-- vendored/                the same wrong key, taken from a local key list
+    |-- build/Demo.java          builds and signs the fixture, asserts all fifteen outcomes
+    |-- unpinned/                commons-lang3 with a version but no checksum
+    |-- tampered/                commons-lang3 pinned to a deliberately wrong SHA-256
+    |-- signed/                  declares no key, then the right one
+    |-- rotated/                 declares a key that did not sign the artifact
+    |-- vendored/                the same wrong key, taken from a local key list
+    |-- attested/                declares the identity that really signed a published release
+    `-- forked/                  declares another repository for that same release
 
-The jar, its POM, both signatures, the key and the `file:` repository are all built under
-`target/` at run time, so nothing binary is committed.
+Every project is a standalone modular project; there is no `pom.xml` anywhere. The jar, its
+POM, both signatures, the keys and the `file:` repository are built under `target/` at run
+time, so nothing binary is committed.
 
-The pinning modules are wrong on purpose, so unlike the other demos this part is *not* a
-project that builds - it is a project that must *not* build.
+Several projects are wrong on purpose, so unlike the other demos this one is not only a
+project that builds - it is partly a set of projects that must *not* build.
 
 Updating pins: refresh versions and hashes
 ------------------------------------------

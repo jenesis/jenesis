@@ -8,27 +8,16 @@ import build.jenesis.RepositoryItem;
 public interface MavenRepository extends Repository {
 
     @Override
-    default Optional<RepositoryItem> fetch(Executor executor, String coordinate) throws IOException {
+    default Optional<RepositoryItem> fetch(Executor executor, String coordinate, String extension)
+            throws IOException {
         MavenDependencyKey.Versioned parsed = MavenDependencyKey.parse(coordinate);
         return fetch(executor,
                 parsed.key().groupId(),
                 parsed.key().artifactId(),
                 parsed.version(),
-                parsed.key().type(),
+                extension == null ? parsed.key().type() : parsed.key().type() == null ? "jar" : parsed.key().type(),
                 parsed.key().classifier(),
-                null);
-    }
-
-    @Override
-    default Optional<RepositoryItem> signature(Executor executor, String coordinate) throws IOException {
-        MavenDependencyKey.Versioned parsed = MavenDependencyKey.parse(coordinate);
-        return fetch(executor,
-                parsed.key().groupId(),
-                parsed.key().artifactId(),
-                parsed.version(),
-                parsed.key().type() == null ? "jar" : parsed.key().type(),
-                parsed.key().classifier(),
-                "asc");
+                extension);
     }
 
     @Override
@@ -53,8 +42,8 @@ public interface MavenRepository extends Repository {
                                                   String checksum) throws IOException {
                 String coordinate = new MavenDependencyKey(groupId, artifactId, type, classifier)
                         .coordinate(null, version);
-                if ("asc".equals(checksum)) {
-                    return cached.signature(executor, coordinate);
+                if ("asc".equals(checksum) || "sigstore.json".equals(checksum)) {
+                    return cached.fetch(executor, coordinate, checksum);
                 }
                 if (checksum != null) {
                     return MavenRepository.this.fetch(executor, groupId, artifactId, version, type, classifier, checksum);

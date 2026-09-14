@@ -306,7 +306,7 @@ public class RepositoryTest {
     public void cached_does_not_cache_internal_items_and_preserves_the_flag() throws IOException {
         Path source = Files.writeString(folder.resolve("live.jar"), "live");
         Path cache = Files.createDirectory(folder.resolve("cache"));
-        Repository underlying = (_, _) -> Optional.of(RepositoryItem.ofFile(source, true));
+        Repository underlying = (_, _, _) -> Optional.of(RepositoryItem.ofFile(source, true));
 
         Optional<RepositoryItem> item = underlying.cached(cache).fetch(Runnable::run, "module/foo/1.0");
 
@@ -320,7 +320,7 @@ public class RepositoryTest {
     public void cached_copies_external_items_into_the_cache() throws IOException {
         Path source = Files.writeString(folder.resolve("remote.jar"), "remote");
         Path cache = Files.createDirectory(folder.resolve("cache"));
-        Repository underlying = (_, _) -> Optional.of(RepositoryItem.ofFile(source, false));
+        Repository underlying = (_, _, _) -> Optional.of(RepositoryItem.ofFile(source, false));
 
         Optional<RepositoryItem> item = underlying.cached(cache).fetch(Runnable::run, "module/foo/1.0");
 
@@ -335,7 +335,7 @@ public class RepositoryTest {
     public void cached_references_local_items_in_place_without_caching() throws IOException {
         Path source = Files.writeString(folder.resolve("local.jar"), "local");
         Path cache = Files.createDirectory(folder.resolve("cache"));
-        Repository underlying = (_, _) -> Optional.of(new RepositoryItem() {
+        Repository underlying = (_, _, _) -> Optional.of(new RepositoryItem() {
             @Override
             public Optional<Path> file() {
                 return Optional.of(source);
@@ -366,7 +366,7 @@ public class RepositoryTest {
         Path source = Files.writeString(folder.resolve("local.jar"), "local");
         Path inner = Files.createDirectory(folder.resolve("inner"));
         Path outer = Files.createDirectory(folder.resolve("outer"));
-        Repository underlying = (_, _) -> Optional.of(new RepositoryItem() {
+        Repository underlying = (_, _, _) -> Optional.of(new RepositoryItem() {
             @Override
             public Optional<Path> file() {
                 return Optional.of(source);
@@ -396,7 +396,7 @@ public class RepositoryTest {
     public void materialized_snapshots_local_items_into_the_folder() throws IOException {
         Path source = Files.writeString(folder.resolve("local.jar"), "local");
         Path snapshot = Files.createDirectory(folder.resolve("snapshot"));
-        Repository underlying = (_, _) -> Optional.of(new RepositoryItem() {
+        Repository underlying = (_, _, _) -> Optional.of(new RepositoryItem() {
             @Override
             public Optional<Path> file() {
                 return Optional.of(source);
@@ -426,7 +426,7 @@ public class RepositoryTest {
     public void materialized_keeps_internal_items_in_place_and_preserves_the_flag() throws IOException {
         Path source = Files.writeString(folder.resolve("live.jar"), "live");
         Path snapshot = Files.createDirectory(folder.resolve("snapshot"));
-        Repository underlying = (_, _) -> Optional.of(RepositoryItem.ofFile(source, true));
+        Repository underlying = (_, _, _) -> Optional.of(RepositoryItem.ofFile(source, true));
 
         Optional<RepositoryItem> item = underlying.materialized(snapshot).fetch(Runnable::run, "module/foo/1.0");
 
@@ -445,7 +445,7 @@ public class RepositoryTest {
                 throw new IOException("interrupted");
             }
         };
-        Repository underlying = (_, _) -> Optional.of(failing);
+        Repository underlying = (_, _, _) -> Optional.of(failing);
 
         assertThatThrownBy(() -> underlying.cached(cache).fetch(Runnable::run, "module/foo/1.0"))
                 .isInstanceOf(IOException.class);

@@ -253,7 +253,7 @@ public class JpxTest {
         Path older = jpx.install("org.example:plain-tool@2.0").folder();
         Path newer = jpx.install("org.example:plain-tool@1.0").folder();
         Files.setLastModifiedTime(newer.resolve(Jpx.PROPERTIES), FileTime.from(Instant.now().plusSeconds(60)));
-        Repository offline = (_, coordinate) -> {
+        Repository offline = (_, coordinate, _) -> {
             throw new IOException("Offline, but fetched: " + coordinate);
         };
         Jpx offlineJpx = new Jpx(storage,
@@ -744,7 +744,7 @@ public class JpxTest {
     }
 
     private static Repository streaming(Repository delegate) {
-        return (executor, coordinate) -> {
+        return (executor, coordinate, _) -> {
             Optional<RepositoryItem> candidate = delegate.fetch(executor, coordinate);
             RepositoryItem item = candidate.orElse(null);
             if (item == null || item.file().isEmpty()) {

@@ -44,7 +44,10 @@ public class OpenPgpRepository implements Repository {
         List<OpenPgpRepository> chain = servers.stream()
                 .map(server -> new OpenPgpRepository(server).local(local))
                 .toList();
-        return (executor, coordinate) -> {
+        return (executor, coordinate, extension) -> {
+            if (extension != null) {
+                return Optional.empty();
+            }
             Object lock = FETCHING.computeIfAbsent(coordinate, _ -> new Object());
             synchronized (lock) {
                 try {
@@ -117,7 +120,10 @@ public class OpenPgpRepository implements Repository {
     }
 
     @Override
-    public Optional<RepositoryItem> fetch(Executor executor, String coordinate) throws IOException {
+    public Optional<RepositoryItem> fetch(Executor executor, String coordinate, String extension) throws IOException {
+        if (extension != null) {
+            return Optional.empty();
+        }
         if (local != null) {
             Optional<RepositoryItem> candidate = cached(local, coordinate);
             if (candidate.isPresent()) {

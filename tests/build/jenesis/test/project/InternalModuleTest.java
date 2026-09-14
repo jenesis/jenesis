@@ -514,14 +514,14 @@ public class InternalModuleTest {
 
     private static Repository recording(List<String> asked, Map<String, Path> files) {
         Repository delegate = versionInsensitive(files);
-        return (executor, coordinate) -> {
+        return (executor, coordinate, _) -> {
             asked.add(coordinate);
             return delegate.fetch(executor, coordinate);
         };
     }
 
     private static Repository versionInsensitive(Map<String, Path> files) {
-        return (_, coordinate) -> {
+        return (_, coordinate, _) -> {
             int slash = coordinate.indexOf('/');
             String name = slash < 0 ? coordinate : coordinate.substring(0, slash);
             Path file = files.get(name);
