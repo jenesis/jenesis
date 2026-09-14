@@ -4,7 +4,11 @@ import module java.base;
 
 public class OpenPgpRepository implements Repository {
 
-    public static final URI DEFAULT = URI.create("https://keyserver.ubuntu.com/");
+    public static final List<URI> DEFAULTS = List.of(
+            URI.create("https://keyserver.ubuntu.com/"),
+            URI.create("https://keys.openpgp.org/"));
+
+    private static final ConcurrentMap<String, Object> FETCHING = new ConcurrentHashMap<>();
 
     private final URI server;
     private final Path local;
@@ -37,11 +41,41 @@ public class OpenPgpRepository implements Repository {
                         : System.getenv("OPENPGP_REPOSITORY_LOCAL")));
         List<URI> servers = new ArrayList<>();
         servers(text == null ? "@" : text, new HashSet<>(), servers);
-        Repository repository = (_, coordinate) -> cached(local, coordinate);
-        for (int index = servers.size() - 1; index >= 0; index--) {
-            repository = repository.prepend(new OpenPgpRepository(servers.get(index)).local(local));
-        }
-        return repository;
+        List<OpenPgpRepository> chain = servers.stream()
+                .map(server -> new OpenPgpRepository(server).local(local))
+                .toList();
+        return (executor, coordinate) -> {
+            Object lock = FETCHING.computeIfAbsent(coordinate, _ -> new Object());
+            synchronized (lock) {
+                try {
+                    Optional<RepositoryItem> candidate = cached(local, coordinate);
+                    if (candidate.isPresent()) {
+                        return candidate;
+                    }
+                    SequencedMap<String, String> refused = new LinkedHashMap<>();
+                    for (OpenPgpRepository repository : chain) {
+                        try {
+                            Optional<RepositoryItem> served = repository.fetch(executor, coordinate);
+                            if (served.isPresent()) {
+                                return served;
+                            }
+                            refused.put(repository.server.toString(), "404");
+                        } catch (IOException e) {
+                            refused.put(repository.server.toString(),
+                                    e.getMessage() == null ? e.toString() : e.getMessage());
+                        }
+                    }
+                    if (refused.values().stream().anyMatch(answer -> !answer.equals("404"))) {
+                        throw new IOException(refused.entrySet().stream()
+                                .map(entry -> entry.getKey() + " answered " + entry.getValue())
+                                .collect(Collectors.joining("; ")));
+                    }
+                    return Optional.empty();
+                } finally {
+                    FETCHING.remove(coordinate, lock);
+                }
+            }
+        };
     }
 
     private static Optional<RepositoryItem> cached(Path local, String coordinate) {
@@ -63,7 +97,7 @@ public class OpenPgpRepository implements Repository {
                         servers(environment, visited, target);
                         visited.remove("OPENPGP_REPOSITORY_URI");
                     } else {
-                        target.add(DEFAULT);
+                        target.addAll(DEFAULTS);
                     }
                 } else {
                     String value = System.getProperty(name, System.getenv(name));
@@ -90,14 +124,18 @@ public class OpenPgpRepository implements Repository {
                 return candidate;
             }
         }
+        return served(coordinate);
+    }
+
+    private Optional<RepositoryItem> served(String coordinate) throws IOException {
+        URI uri = server.resolve("pks/lookup?op=get&options=mr&search=0x" + coordinate);
         byte[] key;
-        try (InputStream stream = Repository.open(
-                server.resolve("pks/lookup?op=get&options=mr&search=0x" + coordinate),
-                null,
-                retry)) {
+        try (InputStream stream = Repository.open(uri, null, retry)) {
             key = stream.readAllBytes();
-        } catch (IOException _) {
+        } catch (FileNotFoundException _) {
             return Optional.empty();
+        } catch (IOException e) {
+            throw new IOException(e.getMessage() == null ? e.toString() : e.getMessage(), e);
         }
         if (local == null) {
             return Optional.of(() -> new ByteArrayInputStream(key));

@@ -1,33 +1,3 @@
-This file holds the OpenPGP keys that sign Jenesis releases.
-
-Check a downloaded artifact:
-
-    gpg --import KEYS
-    gpg --verify build.jenesis-<version>.jar.asc build.jenesis-<version>.jar
-
-Declare the key to a Jenesis build, which then checks every artifact it downloads
-under this coordinate against it:
-
-    @jenesis.signature OpenPGP/B4AC8CDC141AF0AE468D16921DA784CCB5C46DD5 build.jenesis/*
-
-A KEYS file is only as trustworthy as the repository it came from, so confirm the
-fingerprint against a second source before relying on it. The same fingerprint is
-published at https://jenesis.build/tool/securing-the-supply-chain/#signing-key and
-served by the maintainer's GitHub account at https://github.com/raphw.gpg.
-
-The current signing key, and the key it replaced in 2019, which is revoked and kept
-here so the succession can be checked:
-
-pub   rsa4096 2019-11-07 [SC]
-      B4AC8CDC141AF0AE468D16921DA784CCB5C46DD5
-uid   Rafael Winterhalter <rafael.wth@gmail.com>
-sub   rsa4096 2019-11-08 [S]
-      A7892505CF1A58076453E52D7999BEFBA1039E8B
-
-pub   dsa1024 2013-07-25 [SCA] [revoked: 2019-11-08]
-      F42B96B8648B5C4A1C43A62FBB2914C1FA0811C3
-uid   Rafael Winterhalter (raphw) <rafael.wth@gmail.com>
-
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 
 mQINBF3Ep5QBEADZfs6o1IpZbZ1qlBkoJ7oWL0vFCcdPUgF/PRFXWKlsuFHVVV/N
@@ -112,43 +82,41 @@ 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
-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
-+ua1Dys=
-=66HO
+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
+vvICkc3m62RNUgkmtjvx8eFFVBJP
+=b6cC
 -----END PGP PUBLIC KEY BLOCK-----
