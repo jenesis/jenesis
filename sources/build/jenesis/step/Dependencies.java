@@ -347,6 +347,20 @@ public class Dependencies implements BuildExecutorModule {
                                     + " repository first, as maven/<groupId>/<artifactId>/<type>/<classifier>,"
                                     + " because a bare <groupId>/<artifactId> reads the first segment as one");
                         }
+                        String aliased = moduleAliases
+                                .getOrDefault(key.substring(0, groupSlash), Collections.emptyNavigableMap())
+                                .getOrDefault(repository, Collections.emptyNavigableMap())
+                                .get(key.substring(repositorySlash + 1));
+                        if (aliased != null) {
+                            throw new IllegalArgumentException("Bill of materials entry '"
+                                    + key.substring(repositorySlash + 1)
+                                    + "' names a module this project aliases to "
+                                    + aliased
+                                    + ": an entry under a module name is looked up in the module"
+                                    + " repository by every module importing the file, which is the"
+                                    + " lookup the alias exists to replace. Pin the coordinate the"
+                                    + " alias names instead, or drop the alias");
+                        }
                         merged.put(key, token.getValue());
                         covering.put(key, token.getValue());
                         continue;
@@ -539,8 +553,11 @@ public class Dependencies implements BuildExecutorModule {
                         if (!deferred.isEmpty()) {
                             SequencedMap<String, SequencedSet<String>> absent = new LinkedHashMap<>();
                             for (Map.Entry<String, SequencedSet<String>> entry : deferred.entrySet()) {
-                                if (!resolution.vertices().containsKey(repo + "/" + entry.getKey())) {
+                                Resolver.Vertex node = resolution.vertices().get(repo + "/" + entry.getKey());
+                                if (node == null) {
                                     absent.put(entry.getKey() + "/LATEST", entry.getValue());
+                                } else if (!entry.getValue().isEmpty() && node.resolvedVersion() != null) {
+                                    absent.put(entry.getKey() + "/" + node.resolvedVersion(), entry.getValue());
                                 }
                             }
                             if (!absent.isEmpty()) {

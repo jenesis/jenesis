@@ -235,6 +235,28 @@ public class DependenciesAliasTest {
     }
 
     @Test
+    public void an_excluded_transitive_of_an_aliased_requirement_is_dropped() throws IOException {
+        addPom("org.example", "unwanted", "1.0", List.of());
+        addJar("org/example/unwanted/1.0/unwanted-1.0.jar", null, Map.of("unwanted/U.class", new byte[]{1}));
+        addPom("org.example", "aliased-lib", "1.0", List.of("org.example/unwanted/1.0"));
+        addJar("org/example/aliased-lib/1.0/aliased-lib-1.0.jar", null, Map.of("aliased/A.class", new byte[]{1}));
+        addPom("org.example", "reaching-lib", "1.0", List.of("org.example/aliased-lib/1.0"));
+        addJar("org/example/reaching-lib/1.0/reaching-lib-1.0.jar", null, Map.of("reaching/R.class", new byte[]{1}));
+        excludes = Map.of("org.example/aliased-lib", "org.example/unwanted");
+
+        Path next = resolve(Map.of("toolkit.aliased", "org.example/aliased-lib"),
+                "org.example/reaching-lib/1.0",
+                "org.example/aliased-lib");
+
+        SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
+        assertThat(index.stringPropertyNames())
+                .as("an aliased requirement is kept out of the first resolution so the closure can"
+                        + " pick its version, and its exclusions went missing with it whenever"
+                        + " something else already reached the coordinate")
+                .noneMatch(key -> key.contains("org.example/unwanted"));
+    }
+
+    @Test
     public void an_alias_colliding_with_a_resolved_module_is_rejected() throws IOException {
         plainLib();
         Path classes = compile("named", "module-info.java", """
@@ -422,6 +444,7 @@ public class DependenciesAliasTest {
     }
 
     private Consumer<String> printing;
+    private Map<String, String> excludes;
 
     private Path resolve(Map<String, String> aliases, String... coordinates) throws IOException {
         SequencedProperties requires = new SequencedProperties();
@@ -429,6 +452,12 @@ public class DependenciesAliasTest {
             requires.setProperty("main/compile/maven/" + coordinate, "");
         }
         requires.store(dependencies.resolve(BuildStep.REQUIRES));
+        if (excludes != null) {
+            SequencedProperties exclusions = new SequencedProperties();
+            excludes.forEach((token, dropped) ->
+                    exclusions.setProperty("main/compile/maven/" + token, dropped));
+            exclusions.store(dependencies.resolve(BuildStep.EXCLUSIONS));
+        }
         if (!aliases.isEmpty()) {
             SequencedProperties declared = new SequencedProperties();
             aliases.forEach((alias, token) -> declared.setProperty("main/maven/" + alias, token));
