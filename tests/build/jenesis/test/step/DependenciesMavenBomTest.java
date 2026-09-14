@@ -239,6 +239,26 @@ public class DependenciesMavenBomTest {
     }
 
     @Test
+    public void a_bill_of_materials_entry_contradicting_an_alias_is_rejected() throws IOException {
+        SequencedProperties requires = new SequencedProperties();
+        requires.setProperty("main/compile/maven/org.acme/lib", "");
+        requires.store(dependencies.resolve(BuildStep.REQUIRES));
+        SequencedProperties aliases = new SequencedProperties();
+        aliases.setProperty("main/module/com.acme.lib", "org.acme/lib");
+        aliases.store(dependencies.resolve(BuildStep.ALIASES));
+        SequencedProperties boms = new SequencedProperties();
+        boms.setProperty("entry/main/module/com.acme.lib", "2.0");
+        boms.store(dependencies.resolve(BuildStep.BOMS));
+        assertThatThrownBy(() -> apply(new Dependencies(
+                Map.of("maven", maven(Map.of()), "module", maven(Map.of())),
+                Map.of("maven", new MavenPomResolver()))))
+                .as("an entry under a module name sends every module importing the file to the module"
+                        + " repository, which is the lookup the alias exists to replace")
+                .hasStackTraceContaining("names a module this project aliases to org.acme/lib")
+                .hasStackTraceContaining("Pin the coordinate the alias names instead");
+    }
+
+    @Test
     public void a_bill_of_materials_entry_naming_no_repository_is_rejected() throws IOException {
         SequencedProperties requires = new SequencedProperties();
         requires.setProperty("main/compile/maven/org.acme/lib", "");
