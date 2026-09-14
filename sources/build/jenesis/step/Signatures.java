@@ -24,8 +24,6 @@ public class Signatures extends ProcessBuildStep {
     private final Verification verification;
     private final KeyExpiry expiry;
     private final String command;
-    private final String keys;
-    private final Path cache;
     private final transient Function<List<String>, ? extends ProcessHandler> supplied;
     private final transient Consumer<String> printing;
 
@@ -34,8 +32,6 @@ public class Signatures extends ProcessBuildStep {
                 Verification.fromProperty(),
                 KeyExpiry.fromProperty(),
                 System.getProperty("jenesis.signature.command", "gpgv"),
-                keyServers(),
-                Path.of(System.getProperty("jenesis.signature.cache", ".jenesis/keys")),
                 null,
                 SequencedProperties.systemFlag("jenesis.print.signatures") ? System.out::println : null);
     }
@@ -44,8 +40,6 @@ public class Signatures extends ProcessBuildStep {
                        Verification verification,
                        KeyExpiry expiry,
                        String command,
-                       String keys,
-                       Path cache,
                        Function<List<String>, ? extends ProcessHandler> supplied,
                        Consumer<String> printing) {
         super("gpgv", supplied == null ? ProcessHandler.OfProcess.ofCommand(command) : supplied);
@@ -53,38 +47,28 @@ public class Signatures extends ProcessBuildStep {
         this.verification = verification;
         this.expiry = expiry;
         this.command = command;
-        this.keys = keys;
-        this.cache = cache;
         this.supplied = supplied;
         this.printing = printing;
     }
 
     public Signatures verification(Verification verification) {
-        return new Signatures(repositories, verification, expiry, command, keys, cache, supplied, printing);
+        return new Signatures(repositories, verification, expiry, command, supplied, printing);
     }
 
     public Signatures expiry(KeyExpiry expiry) {
-        return new Signatures(repositories, verification, expiry, command, keys, cache, supplied, printing);
-    }
-
-    public Signatures keys(String keys) {
-        return new Signatures(repositories, verification, expiry, command, keys, cache, supplied, printing);
-    }
-
-    public Signatures cache(Path cache) {
-        return new Signatures(repositories, verification, expiry, command, keys, cache, supplied, printing);
+        return new Signatures(repositories, verification, expiry, command, supplied, printing);
     }
 
     public Signatures command(String command) {
-        return new Signatures(repositories, verification, expiry, command, keys, cache, supplied, printing);
+        return new Signatures(repositories, verification, expiry, command, supplied, printing);
     }
 
     public Signatures factory(Function<List<String>, ? extends ProcessHandler> factory) {
-        return new Signatures(repositories, verification, expiry, command, keys, cache, factory, printing);
+        return new Signatures(repositories, verification, expiry, command, factory, printing);
     }
 
     public Signatures printing(Consumer<String> printing) {
-        return new Signatures(repositories, verification, expiry, command, keys, cache, supplied, printing);
+        return new Signatures(repositories, verification, expiry, command, supplied, printing);
     }
 
     private void print(String marker, String colour, String coordinate, String detail) {
@@ -150,7 +134,7 @@ public class Signatures extends ProcessBuildStep {
         List<String> prefix = new ArrayList<>(prepended(properties(arguments)));
         prefix.addAll(VERIFY);
         prefix.add("--keyring");
-        prefix.add(keyring(declared.keySet(), context).toAbsolutePath().toString());
+        prefix.add(keyring(executor, declared.keySet(), context).toAbsolutePath().toString());
         SequencedMap<String, SequencedMap<String, String>> candidates = new LinkedHashMap<>();
         for (Map.Entry<String, String> entry : resolved.entrySet()) {
             String key = entry.getKey();
@@ -432,106 +416,48 @@ public class Signatures extends ProcessBuildStep {
         return new Status(fingerprint, failure, signed, keyExpired ? expired : -1, missing);
     }
 
-    private Path keyring(Set<String> declared, BuildStepContext context) throws IOException {
+    private Path keyring(Executor executor, Set<String> declared, BuildStepContext context) throws IOException {
         Path file = context.supplement().resolve("keyring.gpg");
-        List<String> servers = new ArrayList<>();
-        if (keys != null && !keys.isBlank()) {
-            servers(keys, new HashSet<>(), servers);
-        }
         try (OutputStream out = Files.newOutputStream(file)) {
             for (String declaration : declared) {
                 if (unsigned(declaration)) {
                     continue;
                 }
-                String fingerprint = declaration.substring(declaration.indexOf('/') + 1)
-                        .toUpperCase(Locale.ROOT);
-                byte[] key = key(fingerprint, servers);
-                if (key != null) {
-                    out.write(key);
+                int slash = declaration.indexOf('/');
+                String algorithm = declaration.substring(0, slash);
+                Repository keys = repositories.get(algorithm);
+                if (keys == null) {
+                    throw new IllegalStateException("No repository is registered as '"
+                            + algorithm
+                            + "' to resolve the key that "
+                            + declaration
+                            + " declares; register one under that name, or declare the coordinate"
+                            + " unsigned/missing or unsigned/ignored");
                 }
+                String fingerprint = declaration.substring(slash + 1).toUpperCase(Locale.ROOT);
+                byte[] key;
+                try (InputStream stream = keys.fetch(executor, fingerprint)
+                        .orElseThrow(() -> new IOException("No key server holds it"))
+                        .toInputStream()) {
+                    key = stream.readAllBytes();
+                } catch (IOException e) {
+                    if (printing != null) {
+                        print("[UNFETCHED]",
+                                BuildExecutorCallback.YELLOW,
+                                declaration,
+                                e.getMessage() == null ? e.toString() : e.getMessage());
+                    }
+                    continue;
+                }
+                out.write(armoured(key) ? dearmoured(new String(key, StandardCharsets.US_ASCII)) : key);
             }
         }
         return file;
     }
 
-    private static String keyServers() {
-        String property = System.getProperty("jenesis.signature.keys");
-        if (property != null) {
-            return property;
-        }
-        String environment = System.getenv("JENESIS_SIGNATURE_KEYS");
-        return environment == null
-                ? "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x<fingerprint>"
-                : environment;
-    }
-
-    private static void servers(String text, Set<String> visited, List<String> target) {
-        for (String entry : text.split(",")) {
-            String candidate = entry.trim();
-            if (candidate.isEmpty()) {
-                continue;
-            }
-            if (candidate.startsWith("@")) {
-                String name = candidate.substring(1);
-                if (name.isEmpty()) {
-                    String environment = System.getenv("JENESIS_SIGNATURE_KEYS");
-                    if (environment != null && visited.add("JENESIS_SIGNATURE_KEYS")) {
-                        servers(environment, visited, target);
-                        visited.remove("JENESIS_SIGNATURE_KEYS");
-                    } else {
-                        target.add("https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr"
-                                + "&search=0x<fingerprint>");
-                    }
-                } else {
-                    String value = System.getProperty(name, System.getenv(name));
-                    if (value == null) {
-                        throw new IllegalStateException("Unresolved key server reference: @" + name);
-                    }
-                    if (!visited.add(name)) {
-                        throw new IllegalStateException("Circular key server reference: @" + name);
-                    }
-                    servers(value, visited, target);
-                    visited.remove(name);
-                }
-            } else {
-                target.add(candidate);
-            }
-        }
-    }
-
-    private byte[] key(String fingerprint, List<String> servers) throws IOException {
-        Path cached = cache.resolve(fingerprint + ".gpg");
-        if (Files.isRegularFile(cached)) {
-            return Files.readAllBytes(cached);
-        }
-        byte[] key = null;
-        SequencedMap<String, String> refused = new LinkedHashMap<>();
-        for (String endpoint : servers) {
-            URI uri = URI.create(endpoint.replace("<fingerprint>", fingerprint));
-            try (InputStream stream = Repository.open(uri, null)) {
-                key = dearmoured(new String(stream.readAllBytes(), StandardCharsets.US_ASCII));
-                break;
-            } catch (IOException | RuntimeException e) {
-                refused.put(uri.getHost() == null ? uri.getScheme() : uri.getHost(),
-                        e.getMessage() == null ? e.toString() : e.getMessage());
-            }
-        }
-        if (key == null) {
-            if (printing != null && !refused.isEmpty()) {
-                print("[UNFETCHED]",
-                        BuildExecutorCallback.YELLOW,
-                        "OpenPGP/" + fingerprint,
-                        refused.entrySet().stream()
-                                .map(entry -> entry.getKey() + ": " + entry.getValue())
-                                .collect(Collectors.joining("; ")));
-            }
-            return null;
-        }
-        Files.createDirectories(cache);
-        Path temporary = Files.createTempFile(cache, "key", ".gpg");
-        Files.write(temporary, key);
-        Files.move(temporary, cached, StandardCopyOption.REPLACE_EXISTING);
-        return key;
+    private static boolean armoured(byte[] key) {
+        return new String(key, 0, Math.min(key.length, 64), StandardCharsets.US_ASCII)
+                .contains("-----BEGIN PGP");
     }
 
     private static byte[] dearmoured(String armoured) {

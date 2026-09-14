@@ -129,6 +129,7 @@ public record Project(
                 repositories.putIfAbsent("maven",
                         MavenDefaultRepository.of()
                                 .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                repositories.putIfAbsent("OpenPGP", PgpRepository.of());
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
                 resolvers.putIfAbsent("maven", new MavenPomResolver());
                 SequencedSet<String> mavenDeps = new LinkedHashSet<>();
@@ -190,6 +191,7 @@ public record Project(
                 repositories.putIfAbsent("module",
                         JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)
                                 .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                repositories.putIfAbsent("OpenPGP", PgpRepository.of());
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
                 resolvers.putIfAbsent("module", new ModularJarResolver(false));
                 SequencedSet<String> modulesDeps = new LinkedHashSet<>();
@@ -265,6 +267,7 @@ public record Project(
                 repositories.putIfAbsent("module",
                         JenesisModuleRepository.of(JenesisRepository.Scope.ARTIFACT)
                                 .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                repositories.putIfAbsent("OpenPGP", PgpRepository.of());
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
                 resolvers.putIfAbsent("maven", new MavenPomResolver());
                 resolvers.putIfAbsent("module", new MavenModuleResolver("maven",
@@ -672,9 +675,13 @@ public record Project(
                           verifier downloaded on trust verifies nothing. gpgv reads a keyring file
                           and nothing else, so no home directory, agent or trust database takes
                           part; the build assembles that keyring from the declared fingerprints
-                          alone, fetching each from the jenesis.signature.keys servers into
-                          jenesis.signature.cache, so a key it holds is a key a line declares and
-                          NO_PUBKEY means no line covers the signer. Fetching by fingerprint is not
+                          alone, asking the repository registered under the algorithm a line
+                          names: OpenPGP resolves through PgpRepository, which asks the
+                          jenesis.signature.keys servers for the fingerprint over HKP and holds
+                          what it fetched in jenesis.signature.cache. A key the keyring holds is therefore a key a
+                          line declares, and NO_PUBKEY means no line covers the signer. Registering
+                          another repository under that name replaces where keys come from, so a
+                          key store that is not an HTTP key server needs no change here. Fetching by fingerprint is not
                           trust in the server: the comparison is against the declared fingerprint,
                           so a server can withhold a key but never substitute one. The verifier is an ordinary
                           forked tool, so jenesis.print.gpgv shows each invocation,
@@ -1797,8 +1804,8 @@ public record Project(
                 project.digest|SHA-256|Algorithm for pin and dependency checksums
                 dependency.signature|none|Signatures verified after download: none|declared|strict
                 signature.command|gpgv|Binary forked to verify detached OpenPGP signatures; a name is looked up on the PATH, a path is used as given
-                signature.keys|keyserver.ubuntu.com lookup|Key servers, comma-separated and queried left to right, <fingerprint> substituted; @ splices the default and @<name> another setting; empty fetches nothing (env JENESIS_SIGNATURE_KEYS)
-                signature.cache|.jenesis/keys|Folder holding the fetched keys, one file per fingerprint
+                signature.keys|https://keyserver.ubuntu.com/|OpenPGP key server roots, comma-separated and queried left to right; @ splices the default and @<name> another setting (env JENESIS_SIGNATURE_KEYS)
+                signature.cache|.jenesis/keys|Folder the OpenPGP repository holds fetched keys in, one file per fingerprint
                 signature.expiry|signing|An expired signing key: ignored accepts it, signing accepts what it signed before expiring, current rejects it
                 project.metadata||Comma-separated extra metadata files
                 project.configuration|build.jenesis|Comma-separated folders searched for tool configuration files; @ splices the default
