@@ -225,7 +225,10 @@ public class Signatures extends ProcessBuildStep {
             }
             String fingerprint = "OpenPGP/" + status.fingerprint().toUpperCase(Locale.ROOT);
             if (printing != null && accepted.stream().anyMatch(fingerprint::equalsIgnoreCase)) {
-                print("[VERIFIED]", BuildExecutorCallback.GREEN, token + " " + version, fingerprint);
+                print(status.expired() < 0 ? "[VERIFIED]" : "[EXPIRED]",
+                        status.expired() < 0 ? BuildExecutorCallback.GREEN : BuildExecutorCallback.YELLOW,
+                        token + " " + version,
+                        fingerprint + status.dates());
             }
             if (accepted.stream().noneMatch(fingerprint::equalsIgnoreCase)) {
                 violations.add(token + " " + version + ": signed by " + fingerprint
@@ -382,7 +385,7 @@ public class Signatures extends ProcessBuildStep {
                             ? "\n\nError:\n" + Files.readString(error, StandardCharsets.ISO_8859_1)
                             : ""));
         }
-        return new Status(fingerprint, failure);
+        return new Status(fingerprint, failure, signed, keyExpired ? expired : -1);
     }
 
     private String expired(long signed, long expired) {
@@ -413,6 +416,21 @@ public class Signatures extends ProcessBuildStep {
         }
     }
 
-    private record Status(String fingerprint, String failure) {
+    private record Status(String fingerprint, String failure, long signed, long expired) {
+
+        private String dates() {
+            StringBuilder dates = new StringBuilder();
+            if (signed >= 0) {
+                dates.append(" signed ").append(date(signed));
+            }
+            if (expired >= 0) {
+                dates.append(dates.isEmpty() ? " " : ", ").append("key expired ").append(date(expired));
+            }
+            return dates.toString();
+        }
+
+        private static LocalDate date(long seconds) {
+            return Instant.ofEpochSecond(seconds).atZone(ZoneOffset.UTC).toLocalDate();
+        }
     }
 }

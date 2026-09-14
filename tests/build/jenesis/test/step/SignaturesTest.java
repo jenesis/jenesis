@@ -219,6 +219,31 @@ public class SignaturesTest {
     }
 
     @Test
+    public void names_an_accepted_expired_key_apart_from_a_plain_verification() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThat(printed(step(signature("lib"),
+                expiredKey(2000),
+                EXPIRED_SIGNATURE,
+                validated(PRIMARY))))
+                .as("accepting an expired key is a relaxation, so it must not read as an ordinary pass")
+                .contains("[EXPIRED]")
+                .doesNotContain("[VERIFIED]")
+                .contains("signed 1970-01-01")
+                .contains("key expired 1970-01-01");
+    }
+
+    @Test
+    public void names_the_signing_date_of_an_ordinary_verification() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThat(printed(step(signature("lib"), validated(PRIMARY))))
+                .contains("[VERIFIED]")
+                .contains("signed 1970-01-01")
+                .doesNotContain("key expired");
+    }
+
+    @Test
     public void rejects_a_signature_an_expired_key_made_after_it_expired() throws IOException {
         resolved("maven/org.example/lib", "1.0", null);
         declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");

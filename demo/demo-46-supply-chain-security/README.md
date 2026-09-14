@@ -116,7 +116,9 @@ step. `jenesis.dependency.signature` selects how much it checks, and defaults to
 
 `-Djenesis.print.signatures` names each coordinate that was checked with the key that signed it, and each one
 no declaration covers - under `declared` that second list is exactly what `strict` would refuse, so it is how
-you find out what to declare before switching.
+you find out what to declare before switching. A coordinate accepted only because its key expired after it
+signed is marked `[EXPIRED]` rather than `[VERIFIED]`, with the signing and expiry dates, so the relaxation is
+visible rather than silent.
 
 ## An expired signing key
 
