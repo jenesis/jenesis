@@ -481,6 +481,30 @@ public class PinModuleInfoTest {
     }
 
     @Test
+    public void refuses_a_negative_ceiling_on_the_modules_rewritten_at_once() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.pin bar 0.9
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        writeResolved(Map.of("module/bar", "1.0 SHA-256/cafebabe"));
+        System.setProperty("jenesis.pin.concurrency", "-1");
+        try {
+            assertThatThrownBy(() -> run(file))
+                    .as("a pin run fans out one step per module and each holds a whole closure,"
+                            + " so the ceiling is what keeps a wide tree inside its heap")
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("Pin concurrency must not be negative: -1");
+        } finally {
+            System.clearProperty("jenesis.pin.concurrency");
+        }
+    }
+
+    @Test
     public void reports_a_preserved_pin_that_carries_no_checksum() throws IOException {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """

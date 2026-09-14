@@ -50,10 +50,40 @@ public class PinPom implements BuildStep {
         return true;
     }
 
+    private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
+
+    private static Semaphore permits() {
+        int concurrency = Integer.getInteger("jenesis.pin.concurrency",
+                Runtime.getRuntime().availableProcessors());
+        if (concurrency < 0) {
+            throw new IllegalArgumentException("Pin concurrency must not be negative: " + concurrency);
+        }
+        return concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Semaphore::new);
+    }
+
     @Override
     public CompletionStage<BuildStepResult> apply(Executor executor,
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
+            throws IOException {
+        Semaphore permits = permits();
+        if (permits == null) {
+            return pin(arguments);
+        }
+        try {
+            permits.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting to rewrite the pins of " + path, e);
+        }
+        try {
+            return pin(arguments);
+        } finally {
+            permits.release();
+        }
+    }
+
+    private CompletionStage<BuildStepResult> pin(SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         SequencedMap<String, Inventory.Dependency> closure = Inventory.closure(arguments.values(), path);
         Set<String> internal = collectInternal(Inventory.identities(arguments.values()));
