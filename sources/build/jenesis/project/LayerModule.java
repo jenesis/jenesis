@@ -80,9 +80,13 @@ public class LayerModule implements BuildExecutorModule {
                     continue;
                 }
                 for (Path jar : Dependencies.all(argument.folder())) {
+                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
+                    if (descriptor == null) {
+                        continue;
+                    }
                     PathPlacement.layers(jar).forEach((layer, tokens) -> {
                         Iterator<String> iterator = tokens.iterator();
-                        layers.setProperty(layer, iterator.next());
+                        layers.setProperty(layer, descriptor.name() + " " + iterator.next());
                         while (iterator.hasNext()) {
                             requires.setProperty("layer:" + layer + "/runtime/" + iterator.next(), "");
                         }

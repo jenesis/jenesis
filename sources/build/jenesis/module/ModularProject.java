@@ -337,8 +337,8 @@ public class ModularProject implements BuildExecutorModule {
             requires.store(context.next().resolve(BuildStep.REQUIRES));
             if (!info.layers().isEmpty()) {
                 SequencedProperties layers = new SequencedProperties();
-                info.layers().keySet().forEach(layer ->
-                        layers.setProperty(layer, info.layerApis().get(layer)));
+                info.layers().keySet().forEach(layer -> layers.setProperty(layer,
+                        info.coordinate() + " " + info.layerApis().get(layer)));
                 layers.store(context.next().resolve(BuildStep.LAYERS));
             }
             if (!info.attachments().isEmpty()) {

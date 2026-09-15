@@ -67,9 +67,10 @@ public class Demo {
             }
         }
 
-        // A bundle is run by a plain `java`, so the layer travels as a folder and the launch command
-        // names it. Inside an executable jar the same library needs no such option: the launcher
-        // reads the layer out of the jar it is already holding open.
+        // A bundle is run by a plain `java`, so each layer travels as a folder and the launch command
+        // names it: layer.<declaring module>.<name> here becomes jenesis.layer.<module>.<name>, the
+        // property the library's own code reads. Inside an executable jar no such option is needed -
+        // the launcher reads the layer out of the jar it is already holding open.
         for (String key : application.stringPropertyNames()) {
             if (key.startsWith("layer.")) {
                 command.add("-Djenesis." + key + "=" + unpacked.resolve(application.getProperty(key)));

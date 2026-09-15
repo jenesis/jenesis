@@ -62,8 +62,8 @@ and materialises them into a folder, exactly as it would for `Jenesis-Aliases` o
     modulepath/demo.layers.library...   the library
     modulepath/demo.layers.spi...       the API module - shared, so it is here and not in the layer
     modulepath/com.fasterxml.jackson.core-2.18.2.jar
-    layers/render/demo.layers.impl...           isolated
-    layers/render/com.fasterxml.jackson.core-2.15.4.jar
+    layers/demo.layers.library/render/demo.layers.impl...           isolated
+    layers/demo.layers.library/render/com.fasterxml.jackson.core-2.15.4.jar
 
 `demo.layers.impl` is *not* on the application's module path. `demo.layers.spi` is - and only
 there, which is what makes the `Report` instance that crosses the boundary a single class rather
@@ -96,12 +96,18 @@ What the build refuses
 Where the layer comes from at run time
 --------------------------------------
 
-`bundle=true` ships `layers/<name>/` beside `modulepath/` and records it in
+`bundle=true` ships `layers/<declaring module>/<name>/` beside `modulepath/` and records it in
 `application.properties`, so the launch command hands it over as
-`-Djenesis.layer.render=<unpacked>/layers/render`. Docker bakes the same option into its
+`-Djenesis.layer.demo.layers.library.render=<unpacked>/layers/demo.layers.library/render`. The
+declaring module is part of the key because a layer may itself hold a module that declares one -
+nesting is unbounded - and the runtime derives the same key from the module that calls it. Docker bakes the same option into its
 `ENTRYPOINT`, and a run through `Execute` passes it too.
 
 An executable jar (`launcher=true`) needs no such option: the layer travels inside the jar and the
 launcher reads it from there, never unpacking anything.
+
+Nesting needs no further mechanism: `Launcher.layer` parents a layer on its *caller's*, so a module
+inside one layer that asks for another gets a child of the first, and the API module they share
+resolves from there rather than from the application.
 
 A layer is defined while the JVM runs, so `native=true` rejects a project that declares one.

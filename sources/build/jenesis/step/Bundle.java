@@ -87,18 +87,12 @@ public class Bundle implements BuildStep {
             if (argument.removed()) {
                 continue;
             }
-            Path folder = argument.folder().resolve(Layers.LAYER_PATH);
-            if (!Files.isDirectory(folder)) {
-                continue;
-            }
-            try (DirectoryStream<Path> names = Files.newDirectoryStream(folder)) {
-                for (Path name : names) {
-                    SequencedMap<String, Path> isolated = layers.computeIfAbsent(
-                            name.getFileName().toString(), _ -> new TreeMap<>());
-                    try (DirectoryStream<Path> files = Files.newDirectoryStream(name)) {
-                        for (Path file : files) {
-                            isolated.putIfAbsent(file.getFileName().toString(), file);
-                        }
+            for (Map.Entry<String, Path> layer : Layers.folders(argument.folder()).entrySet()) {
+                SequencedMap<String, Path> isolated = layers.computeIfAbsent(
+                        layer.getKey(), _ -> new TreeMap<>());
+                try (DirectoryStream<Path> files = Files.newDirectoryStream(layer.getValue())) {
+                    for (Path file : files) {
+                        isolated.putIfAbsent(file.getFileName().toString(), file);
                     }
                 }
             }
@@ -108,7 +102,8 @@ public class Bundle implements BuildStep {
         if (mainModule != null) {
             application.setProperty("mainModule", mainModule);
         }
-        layers.forEach((name, _) -> application.setProperty("layer." + name, "layers/" + name));
+        layers.forEach((name, _) ->
+                application.setProperty("layer." + name.replace('/', '.'), "layers/" + name));
         graph.store(application);
         Path descriptor = context.supplement().resolve("application.properties");
         application.store(descriptor);

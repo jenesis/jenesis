@@ -34,15 +34,19 @@ public class Layers implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        SequencedMap<String, String> declared = declared(arguments);
+        SequencedMap<String, Declaration> declared = declared(arguments);
         if (declared.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         Path root = Files.createDirectory(context.next().resolve(LAYER_PATH));
         SequencedMap<String, ModuleDescriptor> host = descriptors(arguments);
-        for (Map.Entry<String, String> entry : declared.entrySet()) {
-            String layer = entry.getKey(), api = entry.getValue();
-            Path folder = Files.createDirectory(root.resolve(layer));
+        for (Map.Entry<String, Declaration> entry : declared.entrySet()) {
+            String layer = entry.getKey(), api = entry.getValue().api();
+            // layers/<declaring module>/<name>/: a layer may hold a module that declares one of its own, so
+            // the name alone is not a key. The runtime derives the same one from its caller.
+            Path folder = Files.createDirectories(root
+                    .resolve(entry.getValue().module())
+                    .resolve(layer));
             verify(layer, api, isolate(layer, api, closure(api, host), arguments, folder));
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
@@ -53,9 +57,9 @@ public class Layers implements BuildStep {
      * isolates is read from its resolved group rather than from here: a coordinate is declared, but its
      * whole closure is what ends up isolated.
      */
-    public static SequencedMap<String, String> declared(SequencedMap<String, BuildStepArgument> arguments)
+    public static SequencedMap<String, Declaration> declared(SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        SequencedMap<String, String> declared = new LinkedHashMap<>();
+        SequencedMap<String, Declaration> declared = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -68,11 +72,17 @@ public class Layers implements BuildStep {
             for (String layer : properties.stringPropertyNames()) {
                 SAFE_SEGMENT.accept("layer name", layer);
                 List<String> tokens = properties.words(layer);
-                if (tokens.isEmpty()) {
+                if (tokens.size() != 2) {
                     throw new IllegalArgumentException("Layer " + layer + " in " + declaration
-                            + " names no API module");
+                            + " is not '<declaring module> <api module>': " + tokens);
                 }
-                declared.putIfAbsent(layer, tokens.getFirst());
+                Declaration previous = declared.putIfAbsent(layer,
+                        new Declaration(tokens.getFirst(), tokens.getLast()));
+                if (previous != null && !previous.module().equals(tokens.getFirst())) {
+                    throw new IllegalStateException(previous.module() + " and " + tokens.getFirst()
+                            + " both declare a layer called " + layer
+                            + " - rename one, so a pin and a group name say which is meant");
+                }
             }
         }
         return declared;
@@ -202,5 +212,34 @@ public class Layers implements BuildStep {
 
     private static boolean platform(String module) {
         return module.startsWith("java.") || module.startsWith("jdk.");
+    }
+
+    /**
+     * The layers materialised into {@code folder}, each keyed {@code <declaring module>/<name>} - the key
+     * the runtime derives from its caller, and the one a packaging step turns into a path or a property.
+     */
+    public static SequencedMap<String, Path> folders(Path folder) throws IOException {
+        Path root = folder.resolve(LAYER_PATH);
+        if (!Files.isDirectory(root)) {
+            return Collections.emptyNavigableMap();
+        }
+        SequencedMap<String, Path> layers = new TreeMap<>();
+        try (DirectoryStream<Path> modules = Files.newDirectoryStream(root)) {
+            for (Path module : modules) {
+                if (!Files.isDirectory(module)) {
+                    continue;
+                }
+                try (DirectoryStream<Path> names = Files.newDirectoryStream(module)) {
+                    for (Path name : names) {
+                        layers.putIfAbsent(module.getFileName() + "/" + name.getFileName(), name);
+                    }
+                }
+            }
+        }
+        return layers;
+    }
+
+    /** A declared layer: the module that declares it, and the module it shares with it. */
+    public record Declaration(String module, String api) {
     }
 }

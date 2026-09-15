@@ -131,23 +131,47 @@ public class LayersTest {
         assertThat(next.resolve(Layers.LAYER_PATH)).doesNotExist();
     }
 
-    private BuildStepResult apply() throws IOException {
-        SequencedMap<Path, Checksum> files = new LinkedHashMap<>();
-        try (Stream<Path> walk = Files.walk(input)) {
-            walk.filter(Files::isRegularFile).forEach(file ->
-                    files.put(input.relativize(file), Checksum.of(ChecksumStatus.ADDED)));
+    @Test
+    public void rejects_two_modules_declaring_one_layer_name() throws IOException {
+        module(artifacts, "demo.api", builder -> builder.exports(PackageDesc.of("demo.api"), 0));
+        module(resolved, "demo.impl", builder -> builder.exports(PackageDesc.of("demo.impl"), 0));
+        index("layer:render/runtime/module/demo.impl", "resolved/demo.impl.jar");
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("render", "demo.host demo.api");
+        properties.store(input.resolve(BuildStep.LAYERS));
+        Path second = Files.createDirectory(root.resolve("second"));
+        SequencedProperties other = new SequencedProperties();
+        other.setProperty("render", "demo.other demo.api");
+        other.store(second.resolve(BuildStep.LAYERS));
+
+        assertThatThrownBy(() -> apply(second))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("both declare a layer called render");
+    }
+
+    private BuildStepResult apply(Path... extra) throws IOException {
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        List<Path> folders = new ArrayList<>(List.of(input));
+        folders.addAll(List.of(extra));
+        for (Path folder : folders) {
+            SequencedMap<Path, Checksum> files = new LinkedHashMap<>();
+            try (Stream<Path> walk = Files.walk(folder)) {
+                walk.filter(Files::isRegularFile).forEach(file ->
+                        files.put(folder.relativize(file), Checksum.of(ChecksumStatus.ADDED)));
+            }
+            arguments.put(folder.getFileName().toString(), new BuildStepArgument(folder, files));
         }
         return new Layers().apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(input, files))))
+                arguments)
                 .toCompletableFuture()
                 .join();
     }
 
     private void declare(String layer, String api) throws IOException {
         SequencedProperties properties = new SequencedProperties();
-        properties.setProperty(layer, api);
+        properties.setProperty(layer, "demo.host " + api);
         properties.store(input.resolve(BuildStep.LAYERS));
     }
 
@@ -161,7 +185,8 @@ public class LayersTest {
 
     private SequencedSet<String> layer(String name) throws IOException {
         SequencedSet<String> files = new TreeSet<>();
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(next.resolve(Layers.LAYER_PATH).resolve(name))) {
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(
+                next.resolve(Layers.LAYER_PATH).resolve("demo.host").resolve(name))) {
             for (Path file : stream) {
                 files.add(file.getFileName().toString());
             }

@@ -890,7 +890,8 @@ public class ModularProjectTest {
                 .as("an isolated coordinate lands in the layer's own group, never in main")
                 .contains(Map.entry("layer:render/runtime/maven/com.example/renderer-impl/1.2.3", ""));
         assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.LAYERS)))
-                .containsOnly(Map.entry("render", "my.library.spi"));
+                .as("the declaring module is part of the declaration, since a layer may hold one of its own")
+                .containsOnly(Map.entry("render", "foo my.library.spi"));
         assertThat(Files.readString(module.resolve("manifest.mf")))
                 .as("a consumer reconstructs the layer from the jar, not from these sources")
                 .contains("Jenesis-Layer: render=my.library.spi maven/com.example/renderer-impl");

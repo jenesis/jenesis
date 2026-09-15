@@ -71,17 +71,12 @@ public class Docker implements BuildStep {
             for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
                 jars.putIfAbsent(file.getFileName().toString(), file);
             }
-            Path isolated = argument.folder().resolve(Layers.LAYER_PATH);
-            if (Files.isDirectory(isolated)) {
-                try (DirectoryStream<Path> names = Files.newDirectoryStream(isolated)) {
-                    for (Path name : names) {
-                        SequencedMap<String, Path> modules = layers.computeIfAbsent(
-                                name.getFileName().toString(), _ -> new TreeMap<>());
-                        try (DirectoryStream<Path> files = Files.newDirectoryStream(name)) {
-                            for (Path file : files) {
-                                modules.putIfAbsent(file.getFileName().toString(), file);
-                            }
-                        }
+            for (Map.Entry<String, Path> layer : Layers.folders(argument.folder()).entrySet()) {
+                SequencedMap<String, Path> modules = layers.computeIfAbsent(
+                        layer.getKey(), _ -> new TreeMap<>());
+                try (DirectoryStream<Path> files = Files.newDirectoryStream(layer.getValue())) {
+                    for (Path file : files) {
+                        modules.putIfAbsent(file.getFileName().toString(), file);
                     }
                 }
             }
@@ -107,7 +102,9 @@ public class Docker implements BuildStep {
             if (!Files.isDirectory(target)) {
                 Files.createDirectory(target);
             }
-            copy(target.resolve(layer.getKey()), layer.getValue());
+            Path into = target.resolve(layer.getKey());
+            Files.createDirectories(into.getParent());
+            copy(into, layer.getValue());
         }
         Files.writeString(folder.resolve("Dockerfile"), dockerfile(mainClass,
                 modulepath.isEmpty() ? null : mainModule,
@@ -147,7 +144,7 @@ public class Docker implements BuildStep {
         List<String> command = new ArrayList<>();
         command.add("java");
         for (String layer : layers) {
-            command.add("-Djenesis.layer." + layer + "=/app/layers/" + layer);
+            command.add("-Djenesis.layer." + layer.replace('/', '.') + "=/app/layers/" + layer);
         }
         if (!classpath.isEmpty()) {
             command.add("--class-path");

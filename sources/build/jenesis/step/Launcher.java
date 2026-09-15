@@ -82,18 +82,12 @@ public class Launcher implements BuildStep {
             if (argument.removed()) {
                 continue;
             }
-            Path isolated = argument.folder().resolve(Layers.LAYER_PATH);
-            if (!Files.isDirectory(isolated)) {
-                continue;
-            }
-            try (DirectoryStream<Path> declared = Files.newDirectoryStream(isolated)) {
-                for (Path layer : declared) {
-                    SequencedMap<String, Path> modules = layers.computeIfAbsent(
-                            layer.getFileName().toString(), _ -> new TreeMap<>());
-                    try (DirectoryStream<Path> files = Files.newDirectoryStream(layer)) {
-                        for (Path file : files) {
-                            modules.putIfAbsent(file.getFileName().toString(), file);
-                        }
+            for (Map.Entry<String, Path> layer : Layers.folders(argument.folder()).entrySet()) {
+                SequencedMap<String, Path> modules = layers.computeIfAbsent(
+                        layer.getKey(), _ -> new TreeMap<>());
+                try (DirectoryStream<Path> files = Files.newDirectoryStream(layer.getValue())) {
+                    for (Path file : files) {
+                        modules.putIfAbsent(file.getFileName().toString(), file);
                     }
                 }
             }
