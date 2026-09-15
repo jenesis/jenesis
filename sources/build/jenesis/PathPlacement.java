@@ -35,6 +35,8 @@ public enum PathPlacement {
 
     public static final String OVERRIDES = "Jenesis-Overrides";
 
+    public static final String LAYERS = "Jenesis-Layer";
+
     private static final Pattern DERIVED_VERSION = Pattern.compile("\\d+(\\..*)?");
 
     private final boolean modular;
@@ -183,6 +185,48 @@ public enum PathPlacement {
             }
         }
         return overrides;
+    }
+
+    /**
+     * The layers a dependency declares, each name mapped to the API module it shares with its host followed
+     * by the coordinates it isolates: {@code <name>=<api> <coordinate>…}, layers separated by commas. A
+     * consumer reconstructs a dependency's layers from this rather than from its sources, the way it reads
+     * an alias or an override.
+     */
+    public static SequencedMap<String, SequencedSet<String>> layers(String declaration, String origin) {
+        SequencedMap<String, SequencedSet<String>> layers = new LinkedHashMap<>();
+        if (declaration == null || declaration.isBlank()) {
+            return layers;
+        }
+        for (String entry : declaration.split(",")) {
+            String pair = entry.trim();
+            if (pair.isEmpty()) {
+                continue;
+            }
+            int equals = pair.indexOf('=');
+            String name = equals < 0 ? "" : pair.substring(0, equals).trim();
+            String tokens = equals < 0 ? "" : pair.substring(equals + 1).trim();
+            if (name.isEmpty() || tokens.isEmpty()) {
+                throw new IllegalArgumentException("Malformed " + LAYERS + " entry '"
+                        + pair
+                        + "' in "
+                        + origin
+                        + ": expected <name>=<api-module> <coordinate>...");
+            }
+            SequencedSet<String> declared = new LinkedHashSet<>(List.of(tokens.split(" ")));
+            SequencedSet<String> previous = layers.putIfAbsent(name, declared);
+            if (previous != null && !previous.equals(declared)) {
+                throw new IllegalArgumentException("Conflicting " + LAYERS + " entries for "
+                        + name
+                        + " in "
+                        + origin
+                        + ": "
+                        + previous
+                        + " and "
+                        + declared);
+            }
+        }
+        return layers;
     }
 
     public static SequencedMap<String, String> aliases(String declaration, String origin) {

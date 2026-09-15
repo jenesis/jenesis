@@ -60,6 +60,8 @@ public class ModuleInfoParser {
             SequencedMap<String, String> signatures = new TreeMap<>();
             SequencedMap<String, SequencedMap<String, String>> bomVariants = new LinkedHashMap<>();
             SequencedMap<String, String> plugins = new LinkedHashMap<>();
+            SequencedMap<String, String> layerApis = new LinkedHashMap<>();
+            SequencedMap<String, SequencedSet<String>> layers = new LinkedHashMap<>();
             SequencedMap<String, String> attachments = new LinkedHashMap<>();
             String release = null;
             String name = null;
@@ -220,6 +222,35 @@ public class ModuleInfoParser {
                                     continue;
                                 }
                                 plugins.put(token.indexOf('/') < 0 ? "module/" + token : token, group);
+                            }
+                            case "jenesis.layer" -> {
+                                String declaration = content.replaceAll("\\s+", " ").trim();
+                                if (declaration.isEmpty()) {
+                                    continue;
+                                }
+                                String[] words = declaration.split(" ");
+                                if (words.length == 3 && words[1].equals("api")) {
+                                    String previous = layerApis.putIfAbsent(words[0], words[2]);
+                                    if (previous != null && !previous.equals(words[2])) {
+                                        throw new IllegalArgumentException("Layer "
+                                                + words[0]
+                                                + " names two API modules, "
+                                                + previous
+                                                + " and "
+                                                + words[2]
+                                                + ": a layer shares one module with its host");
+                                    }
+                                    layers.computeIfAbsent(words[0], _ -> new LinkedHashSet<>());
+                                } else if (words.length == 2) {
+                                    layers.computeIfAbsent(words[0], _ -> new LinkedHashSet<>())
+                                            .add(words[1].indexOf('/') < 0
+                                                    ? "module/" + words[1]
+                                                    : words[1]);
+                                } else {
+                                    throw new IllegalArgumentException("Malformed @jenesis.layer declaration '"
+                                            + declaration
+                                            + "': expected <layer> api <module>, or <layer> <coordinate>");
+                                }
                             }
                             case "jenesis.alias" -> {
                                 String declaration = content.replaceAll("\\s+", " ").trim();
@@ -451,6 +482,8 @@ public class ModuleInfoParser {
                     dependencies,
                     runtimeDependencies,
                     plugins,
+                    layerApis,
+                    layers,
                     attachments,
                     aliases,
                     excludes,

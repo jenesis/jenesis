@@ -77,6 +77,27 @@ public class Launcher implements BuildStep {
         if (mainClass == null || shaded == null || jars.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
+        SequencedMap<String, SequencedMap<String, Path>> layers = new TreeMap<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            Path isolated = argument.folder().resolve(Layers.LAYER_PATH);
+            if (!Files.isDirectory(isolated)) {
+                continue;
+            }
+            try (DirectoryStream<Path> declared = Files.newDirectoryStream(isolated)) {
+                for (Path layer : declared) {
+                    SequencedMap<String, Path> modules = layers.computeIfAbsent(
+                            layer.getFileName().toString(), _ -> new TreeMap<>());
+                    try (DirectoryStream<Path> files = Files.newDirectoryStream(layer)) {
+                        for (Path file : files) {
+                            modules.putIfAbsent(file.getFileName().toString(), file);
+                        }
+                    }
+                }
+            }
+        }
         SequencedMap<String, Path> classpath = new LinkedHashMap<>(), modulepath = new LinkedHashMap<>();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
             boolean onModulePath = mainModule != null && pathPlacement.test(entry.getValue());
@@ -105,6 +126,15 @@ public class Launcher implements BuildStep {
             }
             for (Map.Entry<String, Path> entry : modulepath.entrySet()) {
                 explode(out, entry.getValue(), "modulepath/" + entry.getKey() + "/", _ -> true);
+            }
+            // A layer is exploded under a prefix of its own, exactly as a dependency is under modulepath/.
+            // The prefix is what keeps its modules off the application's module path, and the launcher finds
+            // them there by scanning - the same way it finds the class path and the module path.
+            for (Map.Entry<String, SequencedMap<String, Path>> layer : layers.entrySet()) {
+                for (Map.Entry<String, Path> entry : layer.getValue().entrySet()) {
+                    explode(out, entry.getValue(),
+                            "layers/" + layer.getKey() + "/" + entry.getKey() + "/", _ -> true);
+                }
             }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));

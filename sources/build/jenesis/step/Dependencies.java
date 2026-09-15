@@ -647,6 +647,7 @@ public class Dependencies implements BuildExecutorModule {
                 }
             }
             SequencedMap<String, Path> placed = new LinkedHashMap<>();
+            SequencedMap<String, SequencedSet<String>> grouped = new LinkedHashMap<>();
             SequencedMap<String, String> checksums = new LinkedHashMap<>();
             SequencedMap<String, Boolean> internals = new LinkedHashMap<>();
             for (Map.Entry<String, Resolver.Resolved> entry : materialized.entrySet()) {
@@ -656,6 +657,7 @@ public class Dependencies implements BuildExecutorModule {
                     continue;
                 }
                 String dependency = key.substring(second + 1);
+                grouped.computeIfAbsent(dependency, _ -> new LinkedHashSet<>()).add(key.substring(0, first));
                 Resolver.Resolved artifact = entry.getValue();
                 String value = resolved.getProperty(key);
                 Path file = placed.get(dependency);
@@ -682,7 +684,7 @@ public class Dependencies implements BuildExecutorModule {
                     return left.isEmpty() ? right : left;
                 });
             }
-            SequencedMap<String, String> aliased = rename(placed, aliasTargets, modules, explicit, libs, printing);
+            SequencedMap<String, String> aliased = rename(placed, grouped, aliasTargets, modules, explicit, libs, printing);
             for (Map.Entry<String, Overridden> entry : overrideTargets.entrySet()) {
                 for (String carrier : entry.getValue().carriers()) {
                     if (!modules.containsKey(carrier)) {
@@ -839,6 +841,7 @@ public class Dependencies implements BuildExecutorModule {
     }
 
     private static SequencedMap<String, String> rename(SequencedMap<String, Path> placed,
+                                                       SequencedMap<String, SequencedSet<String>> grouped,
                                                        SequencedMap<String, Alias> declared,
                                                        SequencedMap<String, String> modules,
                                                        SequencedMap<String, Boolean> explicit,
@@ -953,15 +956,19 @@ public class Dependencies implements BuildExecutorModule {
                     ? PathPlacement.fileName(coordinate)
                     : PathPlacement.fileName(coordinate, module, alias == null);
             if (module != null) {
-                Claim carrier = carriers.putIfAbsent(module, new Claim(dependency, source));
-                if (carrier != null && !carrier.file().equals(source)) {
-                    throw new IllegalArgumentException(carrier.dependency()
-                            + " and "
-                            + dependency
-                            + " both carry module "
-                            + module
-                            + " - a module path resolves whichever of the two comes first,"
-                            + " so drop one with @jenesis.exclude");
+                for (String group : grouped.getOrDefault(dependency, Collections.emptyNavigableSet())) {
+                    Claim carrier = carriers.putIfAbsent(group + "/" + module, new Claim(dependency, source));
+                    if (carrier != null && !carrier.file().equals(source)) {
+                        throw new IllegalArgumentException(carrier.dependency()
+                                + " and "
+                                + dependency
+                                + " both carry module "
+                                + module
+                                + " in group "
+                                + group
+                                + " - a module path resolves whichever of the two comes first,"
+                                + " so drop one with @jenesis.exclude");
+                    }
                 }
             }
             Claim previous = claims.putIfAbsent(name, new Claim(dependency, source));
