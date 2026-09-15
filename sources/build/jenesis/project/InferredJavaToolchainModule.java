@@ -107,7 +107,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
 
     private JavaToolchainModule toolchain() {
         BuildExecutorModule compiled = compiler == null ? null : compiler.apply(
-                new InferredCompilerChainModule(repositories, resolvers)
+                new InferredCompilerChainModule(configuration, repositories, resolvers)
                         .pinning(pinning)
                         .pathPlacement(pathPlacement));
         if (compiled == null) {

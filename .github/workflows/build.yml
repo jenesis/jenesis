@@ -78,6 +78,7 @@ jobs:
           - { name: pitest, dir: demo-33-pitest, entry: build/jenesis/Make.java, verify: 'find target -path "*reports/pitest/mutations.xml" -exec grep -l "calc.Calculator" {} + | grep -q .' }
           - { name: jmh, dir: demo-34-jmh, entry: build/jenesis/Execute.java, verify: 'jar tf "$(find target -name classes.jar | head -1)" | grep -q "META-INF/BenchmarkList"' }
           - { name: antlr, dir: demo-57-antlr, entry: build/jenesis/Execute.java, verify: 'jar tf "$(find target -name classes.jar | head -1)" | grep -q "demo/antlr/calc/CalcVisitor.class"' }
+          - { name: error-prone, dir: demo-58-error-prone, entry: build/Demo.java, verify: 'find target -name classes.jar -print -quit | grep -q .' }
           - { name: api-compatibility, dir: demo-35-api-compatibility, entry: build/Demo.java, flags: -Djenesis.dependency.pin=versions, verify: 'find target -path "*reports/japicmp/japicmp-report.xml" -exec grep -l "library.Library" {} + | grep -q .' }
           - { name: kotlin, dir: demo-36-kotlin, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: kotlin-documentation, dir: demo-36-kotlin, entry: build/jenesis/Make.java, flags: -Djenesis.project.documentation=true, verify: 'find target -type d -name documentation | grep -q .' }

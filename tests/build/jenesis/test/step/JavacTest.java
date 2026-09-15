@@ -652,6 +652,43 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void keeps_a_compiler_plugin_in_the_unnamed_module(boolean process) throws IOException {
+        Files.createDirectories(sources.resolve(BuildStep.SOURCES));
+        Files.writeString(sources.resolve(BuildStep.SOURCES).resolve("module-info.java"),
+                "module sample { exports sample; }\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; public class Sample { }\n");
+        Path processorRoot = Files.createDirectories(root.resolve("processor").resolve("resolved"));
+        Files.copy(buildProcessorJar(Files.createDirectories(root.resolve("plain")), "plain", "Plain", null),
+                processorRoot.resolve("plain.jar"));
+        Files.copy(buildProcessorJar(Files.createDirectories(root.resolve("modular")), "modular", "Modular", "proc.modular"),
+                processorRoot.resolve("modular.jar"));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("plugin/plugin/maven/plain", "resolved/plain.jar");
+        index.setProperty("javac/plugin/maven/modular", "resolved/modular.jar");
+        index.store(root.resolve("processor").resolve(BuildStep.DEPENDENCIES));
+
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sources", new BuildStepArgument(sources, Map.of(
+                Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("sources/sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("processors/artifacts", new BuildStepArgument(root.resolve("processor"), Map.of(
+                Path.of("resolved/plain.jar"), Checksum.of(ChecksumStatus.ADDED),
+                Path.of("resolved/modular.jar"), Checksum.of(ChecksumStatus.ADDED))));
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL)
+                .apply(Runnable::run, new BuildStepContext(previous, next, supplement), arguments)
+                .toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        String args = Files.readString(supplement.resolve("javac.args"));
+        assertThat(args)
+                .as("a compiler plugin is only reachable from the unnamed module, where --add-exports can grant it"
+                        + " the compiler internals it reads, so every processor joins it on the class path")
+                .contains("--processor-path")
+                .doesNotContain("--processor-module-path");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void falls_back_to_the_processor_class_path_for_a_jar_that_cannot_be_a_module(boolean process)
             throws IOException {
         Files.createDirectories(sources.resolve(BuildStep.SOURCES));
