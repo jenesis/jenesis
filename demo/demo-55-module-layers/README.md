@@ -19,12 +19,12 @@ which builds the project, unpacks the produced `bundle.zip`, launches the app ou
 prints:
 
     the application's jackson-core 2.18.2, loaded by jdk.internal.loader.ClassLoaders$AppClassLoader@...
-    the library's private jackson-core 2.15.4, loaded by build.jenesis.launcher.InMemoryClassLoader@...
+    the library's private jackson-core 2.15.4, loaded by jdk.internal.loader.Loader@...
         and one layer deeper: jackson-core 2.13.5
 
-Three loaders, three versions, one package name. Each layer gets an `InMemoryClassLoader` of its own,
-the same kind the application's own jars are served by, whether the layer travels inside an executable
-jar or as a path list beside an unpacked one.
+Three loaders, three versions, one package name. Here the layer's jars are files beside the unpacked
+bundle, so the JDK's own layer loader reads them; inside an executable jar, where there is no file to
+name, the launcher reads them from the jar it is already holding open instead.
 
 The four modules
 ----------------
