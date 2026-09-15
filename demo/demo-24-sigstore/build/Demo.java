@@ -50,7 +50,7 @@ public class Demo {
         if (trustedRoot != null) {
             command.add("-Djenesis.sigstore.uri=" + trustedRoot);
         }
-        command.addAll(List.of("build/jenesis/Make.java", "build"));
+        command.add("build/jenesis/Make.java");
         ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true);
         builder.directory(Path.of(project).toFile());
         Process process = builder.start();
