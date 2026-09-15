@@ -18,6 +18,11 @@ Jenesis auto-detects the MAVEN layout from the `pom.xml`, resolves and downloads
 `commons-lang3` from Maven Central (or `~/.m2`), and compiles `Sample.java`
 against it.
 
+No selector was passed, so the **default target** ran: `build`, which resolves,
+compiles, packages and tests every module. Everything else is named explicitly -
+`pin`, `stage`, `dependencies` below - so a command with nothing after it is
+always the whole build, and the demos never spell `build` out.
+
 Layout
 ------
 

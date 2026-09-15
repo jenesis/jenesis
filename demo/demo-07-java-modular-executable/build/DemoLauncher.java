@@ -28,7 +28,7 @@ public class DemoLauncher {
         Project project = new Project(Path.of("."))
                 .profiles(Path.of("launcher"))
                 .assembler(new InferredMultiProjectAssembler());
-        project.build("build");
+        project.build();
 
         // The launcher step writes the executable jar under
         // <module>/launcher/bundle/output/launcher/<name>.jar; locate it in the build tree.

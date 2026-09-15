@@ -25,7 +25,7 @@ public class Demo {
         // the default build writes a bundle/bundle.zip for every module with a main class.
         Project project = new Project(Path.of("."))
                 .assembler(new InferredMultiProjectAssembler());
-        project.build("build");
+        project.build();
 
         // The bundle step writes the archive under .../package/bundle/output/bundle/bundle.zip.
         // It is not collected into stage/, so locate it in the build tree the same way the

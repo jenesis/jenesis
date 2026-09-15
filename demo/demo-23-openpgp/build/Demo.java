@@ -50,8 +50,7 @@ public class Demo {
                 "-Djenesis.dependency.signature=" + verification,
                 "-Djenesis.print.signatures=true",
                 "-Djenesis.test.skip",
-                "build/jenesis/Make.java",
-                "build");
+                "build/jenesis/Make.java");
         ProcessBuilder builder = new ProcessBuilder(command).redirectErrorStream(true);
         builder.directory(Path.of(project).toFile());
         Process process = builder.start();
