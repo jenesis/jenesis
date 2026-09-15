@@ -10,7 +10,7 @@ from nothing again.
 
 This demo runs the same build through a daemon instead:
 
-    java build/jenesis/Make.java build
+    java build/jenesis/Make.java
 
 A daemon is never started unless asked for: set `jenesis.make.daemon=true` in
 `jenesis.properties` at the project root, or pass `-Djenesis.make.daemon=true`.
@@ -38,7 +38,7 @@ the configuration API, and `Make` is the entry point.
 | command                                        | cold  | warm  |
 |------------------------------------------------|-------|-------|
 | `... -Djenesis.make.compile=false`             | 8.0s  | 8.6s  |
-| `java build/jenesis/Make.java build` (default) | 3.6s  | 0.75s |
+| `java build/jenesis/Make.java` (default) | 3.6s  | 0.75s |
 | `... -Djenesis.make.daemon=true`               | 3.7s  | 0.66s |
 | `java -cp … build.jenesis.Make` (installed)    | 3.7s  | 0.15s |
 
@@ -82,8 +82,8 @@ is the client's own compile. The build itself takes 0.44s in a cold JVM and
 Running it
 ----------
 
-    java build/jenesis/Make.java build     # first call compiles and starts the daemon
-    java build/jenesis/Make.java build     # later calls reuse it
+    java build/jenesis/Make.java     # first call compiles and starts the daemon
+    java build/jenesis/Make.java     # later calls reuse it
     java build/jenesis/Make.java --stop    # shut it down
 
 A project that drives its own build rather than `Project` asks for the same thing
