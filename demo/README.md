@@ -115,7 +115,7 @@ Quick index
 | 52 | [`publishing`](demo-52-publishing/README.md)                 | Assemble a Maven Central ready bundle (POM metadata + sources/javadoc jars) and resolve it back | `java build/Demo.java`             |
 | 53 | [`native-image`](demo-53-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
 | 54 | [`jpx`](demo-54-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
-| 55 | [`module-layers`](demo-55-module-layers/README.md)           | A library keeps a dependency private: `@jenesis.layer` isolates it in a run-time `ModuleLayer` of its own, reached through a shared API module, so two versions of one library coexist with no package relocated and the consumer declares nothing | `java build/Demo.java`             |
+| 55 | [`module-layers`](demo-55-module-layers/README.md)           | A library keeps a dependency private: `@jenesis.layer` isolates it in a run-time `ModuleLayer` of its own, reached through a shared API module, so three versions of one library coexist - nested, and exercised by tests - with no package relocated and the consumer declaring nothing | `java build/Demo.java`             |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1235,6 +1235,12 @@ The library requires `build.jenesis.launcher` and asks for its layer by name, so
 itself and its consumers know nothing. They do not have to: the declaration travels in the library's
 jar as a `Jenesis-Layer` manifest header, and any build that resolves that jar reconstructs the
 layer from it, exactly as it already does for `Jenesis-Aliases` and `Jenesis-Overrides`.
+
+Discovery runs to a fixpoint, so nesting is unbounded: a module isolated in one layer may isolate a
+dependency of its own in another, and `Launcher.layer` parents each on its *caller's*, so the inner
+one is a child of the outer rather than of the application. Tests get layers too - a `@jenesis.test`
+module's JVM is handed `jenesis.layer.<module>.<name>` exactly as a deployment would be, so a
+library bootstraps its layer in a test run the same way it does in production.
 
 What crosses the boundary is the API module, and everything it reaches is shared with the layer -
 derived rather than declared - so producer and consumer exchange the very same classes and a service

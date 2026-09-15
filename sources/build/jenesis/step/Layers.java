@@ -95,7 +95,10 @@ public class Layers implements BuildStep {
      */
     private static SequencedSet<String> closure(String api, SequencedMap<String, ModuleDescriptor> host) {
         SequencedSet<String> shared = new LinkedHashSet<>();
-        Deque<String> pending = new ArrayDeque<>(List.of(api));
+        // The launcher is the mechanism a layer is reached through, not a dependency to isolate: a second
+        // copy would mean a second Launcher class, with a cache of its own, defining layers the host cannot
+        // see. It is shared like the API module, and for the same reason.
+        Deque<String> pending = new ArrayDeque<>(List.of(api, "build.jenesis.launcher"));
         while (!pending.isEmpty()) {
             String module = pending.removeFirst();
             if (platform(module) || !shared.add(module)) {

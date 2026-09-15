@@ -464,7 +464,20 @@ public class Dependencies implements BuildExecutorModule {
             SequencedProperties graph = new SequencedProperties();
             SequencedProperties licenses = new SequencedProperties();
             int edge = 0;
-            for (Map.Entry<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>> groupEntry : requires.entrySet()) {
+            SequencedProperties layers = new SequencedProperties();
+            // A dependency may declare a layer, and a module inside that layer may declare one of its own,
+            // so discovery runs to a fixpoint: resolve a round, read Jenesis-Layer off what it produced,
+            // and queue whatever is new. `discovered` also breaks a cycle, which would otherwise mean a
+            // layer nested inside itself without end.
+            SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>>
+                    pending = new LinkedHashMap<>(requires);
+            SequencedSet<String> discovered = new LinkedHashSet<>();
+            while (!pending.isEmpty()) {
+            SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>>
+                    round = pending;
+            pending = new LinkedHashMap<>();
+            SequencedSet<String> before = new LinkedHashSet<>(materialized.sequencedKeySet());
+            for (Map.Entry<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>> groupEntry : round.entrySet()) {
                 String group = groupEntry.getKey();
                 for (String scope : groupEntry.getValue().sequencedKeySet()) {
                     DependencyScope intent = scope.equals("compile") ? DependencyScope.COMPILE : DependencyScope.RUNTIME;
@@ -645,6 +658,38 @@ public class Dependencies implements BuildExecutorModule {
                         }
                     }
                 }
+            }
+            for (String key : materialized.sequencedKeySet()) {
+                if (before.contains(key)) {
+                    continue;
+                }
+                for (Map.Entry<String, SequencedSet<String>> layer
+                        : PathPlacement.layers(materialized.get(key).file()).entrySet()) {
+                    if (!discovered.add(layer.getKey())) {
+                        continue;
+                    }
+                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(materialized.get(key).file());
+                    Iterator<String> tokens = layer.getValue().iterator();
+                    layers.setProperty(layer.getKey(),
+                            (descriptor == null ? key : descriptor.name()) + " " + tokens.next());
+                    while (tokens.hasNext()) {
+                        String token = tokens.next();
+                        int slash = token.indexOf('/');
+                        if (slash < 1) {
+                            throw new IllegalArgumentException("Malformed " + PathPlacement.LAYERS
+                                    + " coordinate '" + token + "' in " + key
+                                    + ": expected <repository>/<coordinate>");
+                        }
+                        pending.computeIfAbsent("layer:" + layer.getKey(), _ -> new LinkedHashMap<>())
+                                .computeIfAbsent("runtime", _ -> new LinkedHashMap<>())
+                                .computeIfAbsent(token.substring(0, slash), _ -> new LinkedHashMap<>())
+                                .putIfAbsent(token.substring(slash + 1), "");
+                    }
+                }
+            }
+            }
+            if (!layers.isEmpty()) {
+                layers.store(context.next().resolve(BuildStep.LAYERS));
             }
             SequencedMap<String, Path> placed = new LinkedHashMap<>();
             SequencedMap<String, SequencedSet<String>> grouped = new LinkedHashMap<>();
