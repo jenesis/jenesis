@@ -10,6 +10,21 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 public class SequencedPropertiesTest {
 
     @Test
+    public void stores_properties_in_the_order_they_were_set() throws IOException {
+        SequencedProperties original = new SequencedProperties();
+        for (String key : List.of("zebra", "alpha", "middle", "beta")) {
+            original.setProperty(key, "1");
+        }
+        StringWriter writer = new StringWriter();
+        original.store(writer, null);
+        assertThat(writer.toString().lines().map(line -> line.substring(0, line.indexOf('='))))
+                .as("Properties sorts what it stores and iterates its own table by hash,"
+                        + " so only the sequenced delegate reaching both keeps a written file as written")
+                .containsExactly("zebra", "alpha", "middle", "beta");
+        assertThat(original.stringPropertyNames()).containsExactly("zebra", "alpha", "middle", "beta");
+    }
+
+    @Test
     public void can_suppress_comments_and_subsequent_newline() throws IOException {
         SequencedProperties original = new SequencedProperties();
         for (char character = 'z'; character >= 'a'; character--) {
