@@ -51,7 +51,7 @@ public class Inventory implements BuildStep {
                 Path.of(JPackage.PACKAGES),
                 Path.of(JMod.JMODS),
                 Path.of(JLink.RUNTIME),
-                Path.of(Layers.LAYER_PATH),
+                Path.of(Layers.MEMBERSHIP),
                 Path.of(NativeImage.NATIVE),
                 Path.of(NativeImage.METADATA),
                 Path.of(REPORTS)));
@@ -160,8 +160,8 @@ public class Inventory implements BuildStep {
             if (Files.isRegularFile(licensesFile)) {
                 dependencyLicenses.add(licensesFile);
             }
-            Path layered = folder.resolve(Layers.LAYER_PATH);
-            if (layers == null && Files.isDirectory(layered)) {
+            Path layered = folder.resolve(Layers.MEMBERSHIP);
+            if (layers == null && Files.isRegularFile(layered)) {
                 layers = layered;
             }
             Path runtime = folder.resolve(JLink.RUNTIME);

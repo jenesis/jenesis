@@ -128,7 +128,7 @@ public class LayersTest {
         index("main/runtime/module/demo.impl", "resolved/demo.impl.jar");
 
         assertThat(apply().next()).isTrue();
-        assertThat(next.resolve(Layers.LAYER_PATH)).doesNotExist();
+        assertThat(next.resolve(Layers.MEMBERSHIP)).doesNotExist();
     }
 
     @Test
@@ -183,15 +183,9 @@ public class LayersTest {
         properties.store(input.resolve(BuildStep.DEPENDENCIES));
     }
 
+    /** What the layer holds, by file name - nothing is copied, so this is the membership it recorded. */
     private SequencedSet<String> layer(String name) throws IOException {
-        SequencedSet<String> files = new TreeSet<>();
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(
-                next.resolve(Layers.LAYER_PATH).resolve("demo.host").resolve(name))) {
-            for (Path file : stream) {
-                files.add(file.getFileName().toString());
-            }
-        }
-        return files;
+        return new TreeSet<>(Layers.membership(next).getOrDefault("demo.host." + name, new LinkedHashSet<>()));
     }
 
     private static void module(Path folder,

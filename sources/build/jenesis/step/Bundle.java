@@ -82,18 +82,33 @@ public class Bundle implements BuildStep {
                 classpath.put(entry.getKey(), entry.getValue());
             }
         }
-        SequencedMap<String, SequencedMap<String, Path>> layers = new TreeMap<>();
+        SequencedMap<String, SequencedSet<String>> layers = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
             }
-            for (Map.Entry<String, Path> layer : Layers.folders(argument.folder()).entrySet()) {
-                SequencedMap<String, Path> isolated = layers.computeIfAbsent(
-                        layer.getKey(), _ -> new TreeMap<>());
-                try (DirectoryStream<Path> files = Files.newDirectoryStream(layer.getValue())) {
-                    for (Path file : files) {
-                        isolated.putIfAbsent(file.getFileName().toString(), file);
-                    }
+            layers.putAll(Layers.membership(argument.folder()));
+        }
+        // A layer's jars are resolved in a group of its own, so they are not in the application's
+        // selection; take them by the names the layer records, and nothing else that happens to be
+        // resolved - a tool's own closure is not part of the application.
+        SequencedSet<String> named = new LinkedHashSet<>();
+        layers.values().forEach(named::addAll);
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            for (Path jar : Dependencies.all(argument.folder())) {
+                if (named.contains(jar.getFileName().toString())) {
+                    jars.putIfAbsent(jar.getFileName().toString(), jar);
+                }
+            }
+        }
+        for (SequencedSet<String> names : layers.values()) {
+            for (String name : names) {
+                Path jar = jars.get(name);
+                if (jar != null) {
+                    modulepath.putIfAbsent(name, jar);
                 }
             }
         }
@@ -102,8 +117,16 @@ public class Bundle implements BuildStep {
         if (mainModule != null) {
             application.setProperty("mainModule", mainModule);
         }
-        layers.forEach((name, _) ->
-                application.setProperty("layer." + name.replace('/', '.'), "layers/" + name));
+        // A layer's modules are bundled among the application's, so a jar both need is stored once; the
+        // module path then has to be named rather than handed over as a folder, since it holds more than
+        // the application itself may read.
+        if (!layers.isEmpty()) {
+            application.setProperty("modulepath", String.join(",", modulepath.sequencedKeySet().stream()
+                    .filter(name -> layers.values().stream().noneMatch(names -> names.contains(name)))
+                    .toList()));
+            layers.forEach((name, names) ->
+                    application.setProperty("layer." + name, String.join(",", names)));
+        }
         graph.store(application);
         Path descriptor = context.supplement().resolve("application.properties");
         application.store(descriptor);
@@ -116,11 +139,7 @@ public class Bundle implements BuildStep {
             for (Map.Entry<String, Path> entry : modulepath.entrySet()) {
                 writeEntry(out, "modulepath/" + entry.getKey(), entry.getValue());
             }
-            for (Map.Entry<String, SequencedMap<String, Path>> layer : layers.entrySet()) {
-                for (Map.Entry<String, Path> entry : layer.getValue().entrySet()) {
-                    writeEntry(out, "layers/" + layer.getKey() + "/" + entry.getKey(), entry.getValue());
-                }
-            }
+
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }

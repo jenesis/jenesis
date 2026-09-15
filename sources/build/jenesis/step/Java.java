@@ -122,7 +122,8 @@ public abstract class Java extends JdkProcessBuildStep {
                                                  SequencedMap<String, SequencedMap<String, String>> properties)
             throws IOException {
         List<String> classPath = new ArrayList<>(), modulePath = new ArrayList<>();
-        SequencedMap<String, Path> layers = new TreeMap<>();
+        SequencedMap<String, SequencedSet<String>> layers = new TreeMap<>();
+        SequencedMap<String, Path> pool = new LinkedHashMap<>();
         ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
             BuildStepArgument argument = entry.getValue();
@@ -148,7 +149,10 @@ public abstract class Java extends JdkProcessBuildStep {
             for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
                 graph.place(pathPlacement, file, modulePath, classPath);
             }
-            layers.putAll(Layers.folders(argument.folder()));
+            for (Path jar : Dependencies.all(argument.folder())) {
+                pool.putIfAbsent(jar.getFileName().toString(), jar);
+            }
+            layers.putAll(Layers.membership(argument.folder()));
             SequencedMap<String, String> folders = properties.get(entry.getKey());
             if (folders != null) {
                 for (Map.Entry<String, List<String>> paths : List.of(
@@ -177,8 +181,13 @@ public abstract class Java extends JdkProcessBuildStep {
         options.put(CLASS_PATH, String.join(File.pathSeparator, classPath));
         List<String> prefixes = new ArrayList<>(argumentFile(context.supplement().resolve("java.args"), options));
         prefixes.addAll(graph.arguments());
-        layers.forEach((name, folder) ->
-                prefixes.add("-Djenesis.layer." + name.replace('/', '.') + "=" + folder));
+        // A layer is a named module path, not a folder: its jars sit among the application's, each stored
+        // once under a name that carries its version, and the property names them.
+        layers.forEach((name, names) -> prefixes.add("-Djenesis.layer." + name + "=" + names.stream()
+                .map(pool::get)
+                .filter(Objects::nonNull)
+                .map(Path::toString)
+                .collect(Collectors.joining(File.pathSeparator))));
         return commands(executor, context, arguments).thenApplyAsync(commands -> Stream.concat(
                 prefixes.stream(),
                 commands.stream()).toList(), executor);

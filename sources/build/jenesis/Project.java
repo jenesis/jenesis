@@ -753,7 +753,9 @@ public record Project(
                           name - Launcher.load("<name>", Contract.class) - so its own consumers declare
                           nothing and need not know. Discovery runs to a fixpoint, so a module inside a
                           layer may declare one of its own; each layer is a child of its caller's, and a
-                          test JVM is handed jenesis.layer.<module>.<name> like any deployment. It may not require what it isolates: an isolated module
+                          test JVM is handed jenesis.layer.<module>.<name> like any deployment. A layer's
+                          modules are stored among the application's rather than apart, each dependency
+                          named once with its version, so a jar both need is stored once and loaded twice. It may not require what it isolates: an isolated module
                           is off its path, which javac reports on its own. The declaration reaches consumers
                           through the Jenesis-Layer manifest header. bundle and launcher both ship a layer;
                           native=true rejects one, because a layer is defined while the JVM runs.

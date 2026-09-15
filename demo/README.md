@@ -1231,6 +1231,10 @@ layer; `@jenesis.layer render module/demo.layers.impl` names what the layer hold
 dependency group of its own, `layer:render` - pinned, checksum-verified and reported like any other
 group, and addressed the way `plugin:scala` already is.
 
+Nothing is placed anywhere special for it: a dependency is materialised once under a name carrying
+its version, so versions stand side by side and a jar a layer and the application both need is one
+file named in two lists - stored once, loaded twice.
+
 The library requires `build.jenesis.launcher` and asks for its layer by name, so it bootstraps
 itself and its consumers know nothing. They do not have to: the declaration travels in the library's
 jar as a `Jenesis-Layer` manifest header, and any build that resolves that jar reconstructs the

@@ -11,7 +11,8 @@ import build.jenesis.SequencedProperties;
 
 public class Layers implements BuildStep {
 
-    public static final String LAYER_PATH = "layers/";
+    /** Names the dependencies each layer holds: {@code <declaring module>.<name>=<jar>,<jar>}. */
+    public static final String MEMBERSHIP = "layered.properties";
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
 
@@ -38,17 +39,18 @@ public class Layers implements BuildStep {
         if (declared.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
-        Path root = Files.createDirectory(context.next().resolve(LAYER_PATH));
         SequencedMap<String, ModuleDescriptor> host = descriptors(arguments);
+        SequencedProperties membership = new SequencedProperties();
         for (Map.Entry<String, Declaration> entry : declared.entrySet()) {
             String layer = entry.getKey(), api = entry.getValue().api();
-            // layers/<declaring module>/<name>/: a layer may hold a module that declares one of its own, so
-            // the name alone is not a key. The runtime derives the same one from its caller.
-            Path folder = Files.createDirectories(root
-                    .resolve(entry.getValue().module())
-                    .resolve(layer));
-            verify(layer, api, isolate(layer, api, closure(api, host), arguments, folder));
+            SequencedMap<String, ModuleDescriptor> isolated = new LinkedHashMap<>();
+            SequencedSet<String> names = isolate(layer, api, closure(api, host), arguments, isolated);
+            verify(layer, api, isolated);
+            // <declaring module>.<name>: a layer may hold a module that declares one of its own, so the
+            // name alone is not a key. The runtime builds the same one from the module that calls it.
+            membership.setProperty(entry.getValue().module() + "." + layer, String.join(",", names));
         }
+        membership.store(context.next().resolve(MEMBERSHIP));
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
@@ -112,12 +114,18 @@ public class Layers implements BuildStep {
         return shared;
     }
 
-    private static SequencedMap<String, ModuleDescriptor> isolate(String layer,
-                                                                  String api,
-                                                                  SequencedSet<String> shared,
-                                                                  SequencedMap<String, BuildStepArgument> arguments,
-                                                                  Path folder) throws IOException {
-        SequencedMap<String, ModuleDescriptor> isolated = new LinkedHashMap<>();
+    /**
+     * The file names a layer holds. Nothing is copied: a dependency is already materialised once, under a
+     * name that carries its version, so a jar a layer and the application both need is one file named twice
+     * and simply loaded twice.
+     */
+    private static SequencedSet<String> isolate(String layer,
+                                                String api,
+                                                SequencedSet<String> shared,
+                                                SequencedMap<String, BuildStepArgument> arguments,
+                                                SequencedMap<String, ModuleDescriptor> isolated)
+            throws IOException {
+        SequencedSet<String> names = new LinkedHashSet<>();
         SequencedMap<String, String> carriers = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -138,7 +146,7 @@ public class Layers implements BuildStep {
                 String carrier = carriers.putIfAbsent(descriptor.name(), file);
                 if (carrier == null) {
                     isolated.put(descriptor.name(), descriptor);
-                    BuildStep.linkOrCopy(folder.resolve(file), jar);
+                    names.add(file);
                 } else if (!carrier.equals(file)) {
                     throw new IllegalStateException(carrier + " and " + file + " both carry module "
                             + descriptor.name() + " in layer " + layer + " - a layer resolves whichever of"
@@ -151,7 +159,24 @@ public class Layers implements BuildStep {
                     + " already shared through " + api + " - a dependency whose types the API module reaches"
                     + " is exposed by it, and cannot be isolated behind it");
         }
-        return isolated;
+        return names;
+    }
+
+    /** The layers a module's build materialised, each key mapped to the file names it holds. */
+    public static SequencedMap<String, SequencedSet<String>> membership(Path folder) throws IOException {
+        Path file = folder.resolve(MEMBERSHIP);
+        if (!Files.isRegularFile(file)) {
+            return Collections.emptyNavigableMap();
+        }
+        SequencedProperties properties = SequencedProperties.ofFiles(file);
+        SequencedMap<String, SequencedSet<String>> membership = new LinkedHashMap<>();
+        for (String layer : properties.stringPropertyNames()) {
+            List<String> names = properties.entries(layer);
+            membership.put(layer, names == null
+                    ? new LinkedHashSet<>()
+                    : new LinkedHashSet<>(names));
+        }
+        return membership;
     }
 
     private SequencedMap<String, ModuleDescriptor> descriptors(SequencedMap<String, BuildStepArgument> arguments)
@@ -215,31 +240,6 @@ public class Layers implements BuildStep {
 
     private static boolean platform(String module) {
         return module.startsWith("java.") || module.startsWith("jdk.");
-    }
-
-    /**
-     * The layers materialised into {@code folder}, each keyed {@code <declaring module>/<name>} - the key
-     * the runtime derives from its caller, and the one a packaging step turns into a path or a property.
-     */
-    public static SequencedMap<String, Path> folders(Path folder) throws IOException {
-        Path root = folder.resolve(LAYER_PATH);
-        if (!Files.isDirectory(root)) {
-            return Collections.emptyNavigableMap();
-        }
-        SequencedMap<String, Path> layers = new TreeMap<>();
-        try (DirectoryStream<Path> modules = Files.newDirectoryStream(root)) {
-            for (Path module : modules) {
-                if (!Files.isDirectory(module)) {
-                    continue;
-                }
-                try (DirectoryStream<Path> names = Files.newDirectoryStream(module)) {
-                    for (Path name : names) {
-                        layers.putIfAbsent(module.getFileName() + "/" + name.getFileName(), name);
-                    }
-                }
-            }
-        }
-        return layers;
     }
 
     /** A declared layer: the module that declares it, and the module it shares with it. */

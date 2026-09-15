@@ -79,18 +79,28 @@ Any build that resolves that jar reads the header, resolves those coordinates in
 and materialises them into a folder, exactly as it would for `Jenesis-Aliases` or
 `Jenesis-Overrides`. The result is visible in the bundle:
 
-    modulepath/demo.layers.app...       the application
-    modulepath/demo.layers.library...   the library
-    modulepath/demo.layers.spi...       the API module - shared, so it is here and not in the layer
-    modulepath/com.fasterxml.jackson.core-2.18.2.jar
-    layers/demo.layers.library/render/demo.layers.impl...           isolated
-    layers/demo.layers.library/render/com.fasterxml.jackson.core-2.15.4.jar
-    layers/demo.layers.impl/inner/demo.layers.nested...             isolated one level deeper
-    layers/demo.layers.impl/inner/com.fasterxml.jackson.core-2.13.5.jar
+    modulepath/classes.jar                              every jar, stored once
+    modulepath/demo.layers.library-1-SNAPSHOT.jar
+    modulepath/demo.layers.spi-1-SNAPSHOT.jar
+    modulepath/com.fasterxml.jackson.core-2.18.2.jar    the application's
+    modulepath/com.fasterxml.jackson.core-2.15.4.jar    the library's
+    modulepath/com.fasterxml.jackson.core-2.13.5.jar    one layer deeper
+    modulepath/demo.layers.impl-1-SNAPSHOT.jar
+    modulepath/demo.layers.nested-1-SNAPSHOT.jar
 
-`demo.layers.impl` is *not* on the application's module path. `demo.layers.spi` is - and only
-there, which is what makes the `Report` instance that crosses the boundary a single class rather
-than two of the same name.
+    application.properties
+      modulepath=classes.jar,demo.layers.library-...,demo.layers.spi-...,...2.18.2.jar
+      layer.demo.layers.library.render=demo.layers.impl-...,...2.15.4.jar
+      layer.demo.layers.impl.inner=demo.layers.nested-...,...2.13.5.jar
+
+Nothing is placed anywhere special. A dependency is materialised once under a name that carries its
+version, so three versions of one library stand side by side, and a jar a layer and the application
+both need is one file named in two lists - stored once, loaded twice. The module path is *named*
+rather than handed over as a folder, because the folder holds more than the application may read.
+
+`demo.layers.impl` is not named in `modulepath`, so the application never reads it.
+`demo.layers.spi` is named there and in no layer - which is what makes the `Report` instance that
+crosses the boundary a single class rather than two of the same name.
 
 `build.jenesis.launcher` is shared with every layer too, for the same reason the API module is: it
 is the mechanism a layer is reached through, not a dependency to isolate, and a second copy would
@@ -123,11 +133,10 @@ What the build refuses
 Where the layer comes from at run time
 --------------------------------------
 
-`bundle=true` ships `layers/<declaring module>/<name>/` beside `modulepath/` and records it in
-`application.properties`, so the launch command hands it over as
-`-Djenesis.layer.demo.layers.library.render=<unpacked>/layers/demo.layers.library/render`. The
-declaring module is part of the key because a layer may itself hold a module that declares one -
-nesting is unbounded - and the runtime derives the same key from the module that calls it. Docker bakes the same option into its
+`bundle=true` records each layer's membership in `application.properties`, so the launch command
+names the jars: `-Djenesis.layer.demo.layers.library.render=<unpacked>/modulepath/demo.layers.impl-….jar:…`.
+The declaring module is part of the key because a layer may itself hold a module that declares one -
+nesting is unbounded - and the runtime builds the same key from the module that calls it. Docker bakes the same option into its
 `ENTRYPOINT`, and a run through `Execute` passes it too.
 
 An executable jar (`launcher=true`) needs no such option: the layer travels inside the jar and the

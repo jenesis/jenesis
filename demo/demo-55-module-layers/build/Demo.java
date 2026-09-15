@@ -59,8 +59,15 @@ public class Demo {
 
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
+        // With layers present the module path is named rather than handed over as a folder: a layer's
+        // jars sit among the application's, stored once, and the application must not read them.
         command.add("--module-path");
-        command.add(unpacked.resolve("modulepath").toString());
+        String named = application.getProperty("modulepath");
+        command.add(named == null
+                ? unpacked.resolve("modulepath").toString()
+                : Stream.of(named.split(","))
+                        .map(name -> unpacked.resolve("modulepath").resolve(name).toString())
+                        .collect(Collectors.joining(File.pathSeparator)));
         for (String option : application.getProperty("javaOptions", "").split(" ")) {
             if (!option.isEmpty()) {
                 command.add(option);
@@ -73,7 +80,9 @@ public class Demo {
         // the launcher reads the layer out of the jar it is already holding open.
         for (String key : application.stringPropertyNames()) {
             if (key.startsWith("layer.")) {
-                command.add("-Djenesis." + key + "=" + unpacked.resolve(application.getProperty(key)));
+                command.add("-Djenesis." + key + "=" + Stream.of(application.getProperty(key).split(","))
+                        .map(name -> unpacked.resolve("modulepath").resolve(name).toString())
+                        .collect(Collectors.joining(File.pathSeparator)));
             }
         }
 

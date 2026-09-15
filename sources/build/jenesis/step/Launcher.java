@@ -77,18 +77,22 @@ public class Launcher implements BuildStep {
         if (mainClass == null || shaded == null || jars.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
-        SequencedMap<String, SequencedMap<String, Path>> layers = new TreeMap<>();
+        SequencedMap<String, SequencedSet<String>> layers = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
             }
-            for (Map.Entry<String, Path> layer : Layers.folders(argument.folder()).entrySet()) {
-                SequencedMap<String, Path> modules = layers.computeIfAbsent(
-                        layer.getKey(), _ -> new TreeMap<>());
-                try (DirectoryStream<Path> files = Files.newDirectoryStream(layer.getValue())) {
-                    for (Path file : files) {
-                        modules.putIfAbsent(file.getFileName().toString(), file);
-                    }
+            layers.putAll(Layers.membership(argument.folder()));
+        }
+        SequencedSet<String> named = new LinkedHashSet<>();
+        layers.values().forEach(named::addAll);
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            for (Path file : Dependencies.all(argument.folder())) {
+                if (named.contains(file.getFileName().toString())) {
+                    jars.putIfAbsent(file.getFileName().toString(), file);
                 }
             }
         }
@@ -105,6 +109,10 @@ public class Launcher implements BuildStep {
         if (!classpath.isEmpty()) {
             application.setProperty("classpath", String.join(",", classpath.sequencedKeySet()));
         }
+        // A layer's modules are exploded among the application's, so a jar both need is stored once; the
+        // declaration is what tells them apart, and what the launcher withholds from the application.
+        layers.forEach((layer, names) ->
+                application.setProperty("layer." + layer, String.join(",", names)));
         Path descriptor = context.supplement().resolve("application.properties");
         application.store(descriptor);
         Manifest manifest = new Manifest();
@@ -121,15 +129,7 @@ public class Launcher implements BuildStep {
             for (Map.Entry<String, Path> entry : modulepath.entrySet()) {
                 explode(out, entry.getValue(), "modulepath/" + entry.getKey() + "/", _ -> true);
             }
-            // A layer is exploded under a prefix of its own, exactly as a dependency is under modulepath/.
-            // The prefix is what keeps its modules off the application's module path, and the launcher finds
-            // them there by scanning - the same way it finds the class path and the module path.
-            for (Map.Entry<String, SequencedMap<String, Path>> layer : layers.entrySet()) {
-                for (Map.Entry<String, Path> entry : layer.getValue().entrySet()) {
-                    explode(out, entry.getValue(),
-                            "layers/" + layer.getKey() + "/" + entry.getKey() + "/", _ -> true);
-                }
-            }
+
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
