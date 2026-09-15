@@ -124,6 +124,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             new InferredArtifactQualityModule(descriptor.configuration(), repositories, resolvers)
                                     .pinning(descriptor.pinning())),
                     Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
+            sub.addModule("layers",
+                    new LayerModule(repositories, resolvers).pinning(descriptor.pinning()),
+                    Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             if (descriptor.test()) {
                 Path module = null;
                 for (String manifest : descriptor.manifests()) {

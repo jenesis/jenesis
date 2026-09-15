@@ -250,6 +250,46 @@ public class ModularProject implements BuildExecutorModule {
                         + info.requires()
                         + ")");
             }
+            if (!info.layers().isEmpty() && !info.requires().contains("build.jenesis.launcher")) {
+                throw new IllegalStateException("Module '"
+                        + info.coordinate()
+                        + "' declares a layer but does not 'requires build.jenesis.launcher;' - a layer is"
+                        + " defined by the module that declares it, through the launcher's own API");
+            }
+            for (Map.Entry<String, SequencedSet<String>> layer : info.layers().entrySet()) {
+                String api = info.layerApis().get(layer.getKey());
+                if (api == null) {
+                    throw new IllegalStateException("Layer "
+                            + layer.getKey()
+                            + " of module '"
+                            + info.coordinate()
+                            + "' names no API module - declare @jenesis.layer "
+                            + layer.getKey()
+                            + " api <module>, the one module the layer shares with this one");
+                }
+                if (!info.requires().contains(api)) {
+                    throw new IllegalStateException("Module '"
+                            + info.coordinate()
+                            + "' shares "
+                            + api
+                            + " with layer "
+                            + layer.getKey()
+                            + " but does not require it - a layer's API module is read from its host");
+                }
+                for (String coordinate : layer.getValue()) {
+                    String module = coordinate.startsWith("module/") ? coordinate.substring(7) : null;
+                    if (module != null && info.requires().contains(module)) {
+                        throw new IllegalStateException("Module '"
+                                + info.coordinate()
+                                + "' requires "
+                                + module
+                                + ", which it isolates in layer "
+                                + layer.getKey()
+                                + ": an isolated module is not on this module's path, so reach it through a"
+                                + " service the layer provides");
+                    }
+                }
+            }
             SequencedMap<String, String> versions = new LinkedHashMap<>(info.versions());
             for (Map.Entry<String, SequencedMap<String, String>> variant : info.variants().entrySet()) {
                 String selected = platform.select(variant.getKey(),
@@ -273,6 +313,14 @@ public class ModularProject implements BuildExecutorModule {
             }
             info.plugins().forEach((coordinate, group) ->
                     requires.setProperty(group + "/plugin/" + coordinate, ""));
+            info.layers().forEach((layer, coordinates) -> coordinates.forEach(coordinate ->
+                    requires.setProperty("layer:"
+                            + layer
+                            + "/runtime/"
+                            + coordinate
+                            + (coordinate.startsWith("module/")
+                                    ? ""
+                                    : version(versions, "layer:" + layer + "/" + coordinate)), "")));
             info.attachments().forEach((key, _) -> {
                 int slash = key.indexOf('/');
                 int second = key.indexOf('/', slash + 1);
@@ -287,6 +335,12 @@ public class ModularProject implements BuildExecutorModule {
                         + (repository.equals("module") ? "" : version(versions, key)), "");
             });
             requires.store(context.next().resolve(BuildStep.REQUIRES));
+            if (!info.layers().isEmpty()) {
+                SequencedProperties layers = new SequencedProperties();
+                info.layers().keySet().forEach(layer ->
+                        layers.setProperty(layer, info.layerApis().get(layer)));
+                layers.store(context.next().resolve(BuildStep.LAYERS));
+            }
             if (!info.attachments().isEmpty()) {
                 SequencedProperties attachments = new SequencedProperties();
                 info.attachments().forEach((key, options) -> {
@@ -310,7 +364,7 @@ public class ModularProject implements BuildExecutorModule {
                 }
                 overrides.store(context.next().resolve(BuildStep.OVERRIDES));
             }
-            if (!targets.isEmpty() || !info.overrides().isEmpty()) {
+            if (!targets.isEmpty() || !info.overrides().isEmpty() || !info.layers().isEmpty()) {
                 Manifest manifest = new Manifest();
                 manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
                 if (!targets.isEmpty()) {
@@ -323,6 +377,21 @@ public class ModularProject implements BuildExecutorModule {
                     info.overrides().forEach((module, carriers) ->
                             declarations.add(module + "=" + String.join(" ", carriers)));
                     manifest.getMainAttributes().putValue(PathPlacement.OVERRIDES, String.join(",", declarations));
+                }
+                if (!info.layers().isEmpty()) {
+                    // The coordinates carry their pinned version, because a consumer resolves them itself:
+                    // this header is the whole instruction for reconstructing the layer, and a coordinate
+                    // without a version would let the consumer land on a different one.
+                    List<String> declarations = new ArrayList<>();
+                    info.layers().forEach((layer, coordinates) -> {
+                        List<String> tokens = new ArrayList<>(List.of(info.layerApis().get(layer)));
+                        coordinates.forEach(coordinate -> tokens.add(coordinate
+                                + (coordinate.startsWith("module/")
+                                        ? ""
+                                        : version(versions, "layer:" + layer + "/" + coordinate))));
+                        declarations.add(layer + "=" + String.join(" ", tokens));
+                    });
+                    manifest.getMainAttributes().putValue(PathPlacement.LAYERS, String.join(",", declarations));
                 }
                 try (OutputStream out = Files.newOutputStream(context.next().resolve(Versions.MANIFEST))) {
                     manifest.write(out);

@@ -228,6 +228,7 @@ public record Project(
                 stage.addStep("modular", new ModularStaging(), inherited.sequencedKeySet());
                 stage.addStep("packages", new ImageStaging("package").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("runtime", new ImageStaging("image"), inherited.sequencedKeySet());
+                stage.addStep("layers", new ImageStaging("layers"), inherited.sequencedKeySet());
                 stage.addStep("native", new ImageStaging("native").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("docker", new ImageStaging("docker"), inherited.sequencedKeySet());
                 stage.addStep("reports", new ReportStaging(), inherited.sequencedKeySet());
@@ -304,6 +305,7 @@ public record Project(
                 stage.addStep("modular", new ModularStaging(), inherited.sequencedKeySet());
                 stage.addStep("packages", new ImageStaging("package").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("runtime", new ImageStaging("image"), inherited.sequencedKeySet());
+                stage.addStep("layers", new ImageStaging("layers"), inherited.sequencedKeySet());
                 stage.addStep("native", new ImageStaging("native").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("docker", new ImageStaging("docker"), inherited.sequencedKeySet());
                 stage.addStep("reports", new ReportStaging(), inherited.sequencedKeySet());
@@ -736,6 +738,23 @@ public record Project(
                           transitively and drops every resolved artifact declaring the overridden
                           module, so the packages appear once. Reaches consumers through the
                           Jenesis-Overrides manifest header. A carrier nothing declares is an error.
+                      @jenesis.layer <name> api <module> | <name> <token>
+                          Keep a dependency private: resolve it, and its whole closure, into a run-time
+                          ModuleLayer of its own rather than onto this module's path. Two versions of one
+                          library then coexist with no package relocated - what shading is used for, without
+                          rewriting a class file. `api` names the one module this module and the layer share;
+                          the other form names a coordinate the layer isolates, resolving it in the group
+                          layer:<name>, which pins, verifies and reports like any other group.
+                          The API module and everything it reaches are shared, so producer and consumer
+                          exchange the very same classes and a service crosses as a plain interface call. A
+                          dependency the API module reaches is exposed by it and cannot be isolated behind
+                          it, which the build says rather than leaving to a LinkageError later.
+                          The declaring module requires build.jenesis.launcher and asks for the layer by
+                          name - Launcher.load("<name>", Contract.class) - so its own consumers declare
+                          nothing and need not know. It may not require what it isolates: an isolated module
+                          is off its path, which javac reports on its own. The declaration reaches consumers
+                          through the Jenesis-Layer manifest header. bundle and launcher both ship a layer;
+                          native=true rejects one, because a layer is defined while the JVM runs.
                       @jenesis.bom <token> [<ver> [<algo>/<hex>]] [(<guard>)]
                           Import managed versions. A bare <module> names a BOM properties file in the
                           module repository, floating latest without a version; <groupId>/<artifactId>

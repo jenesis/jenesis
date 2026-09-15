@@ -82,11 +82,33 @@ public class Bundle implements BuildStep {
                 classpath.put(entry.getKey(), entry.getValue());
             }
         }
+        SequencedMap<String, SequencedMap<String, Path>> layers = new TreeMap<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            Path folder = argument.folder().resolve(Layers.LAYER_PATH);
+            if (!Files.isDirectory(folder)) {
+                continue;
+            }
+            try (DirectoryStream<Path> names = Files.newDirectoryStream(folder)) {
+                for (Path name : names) {
+                    SequencedMap<String, Path> isolated = layers.computeIfAbsent(
+                            name.getFileName().toString(), _ -> new TreeMap<>());
+                    try (DirectoryStream<Path> files = Files.newDirectoryStream(name)) {
+                        for (Path file : files) {
+                            isolated.putIfAbsent(file.getFileName().toString(), file);
+                        }
+                    }
+                }
+            }
+        }
         SequencedProperties application = new SequencedProperties();
         application.setProperty("mainClass", mainClass);
         if (mainModule != null) {
             application.setProperty("mainModule", mainModule);
         }
+        layers.forEach((name, _) -> application.setProperty("layer." + name, "layers/" + name));
         graph.store(application);
         Path descriptor = context.supplement().resolve("application.properties");
         application.store(descriptor);
@@ -98,6 +120,11 @@ public class Bundle implements BuildStep {
             }
             for (Map.Entry<String, Path> entry : modulepath.entrySet()) {
                 writeEntry(out, "modulepath/" + entry.getKey(), entry.getValue());
+            }
+            for (Map.Entry<String, SequencedMap<String, Path>> layer : layers.entrySet()) {
+                for (Map.Entry<String, Path> entry : layer.getValue().entrySet()) {
+                    writeEntry(out, "layers/" + layer.getKey() + "/" + entry.getKey(), entry.getValue());
+                }
             }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));

@@ -55,6 +55,7 @@ public class Docker implements BuildStep {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         SequencedMap<String, Path> jars = new TreeMap<>();
+        SequencedMap<String, SequencedMap<String, Path>> layers = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -69,6 +70,20 @@ public class Docker implements BuildStep {
             }
             for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
                 jars.putIfAbsent(file.getFileName().toString(), file);
+            }
+            Path isolated = argument.folder().resolve(Layers.LAYER_PATH);
+            if (Files.isDirectory(isolated)) {
+                try (DirectoryStream<Path> names = Files.newDirectoryStream(isolated)) {
+                    for (Path name : names) {
+                        SequencedMap<String, Path> modules = layers.computeIfAbsent(
+                                name.getFileName().toString(), _ -> new TreeMap<>());
+                        try (DirectoryStream<Path> files = Files.newDirectoryStream(name)) {
+                            for (Path file : files) {
+                                modules.putIfAbsent(file.getFileName().toString(), file);
+                            }
+                        }
+                    }
+                }
             }
         }
         if (jars.isEmpty()) {
@@ -87,11 +102,19 @@ public class Docker implements BuildStep {
         Path folder = Files.createDirectory(context.next().resolve(DOCKER));
         copy(folder.resolve("classpath"), classpath);
         copy(folder.resolve("modulepath"), modulepath);
+        for (Map.Entry<String, SequencedMap<String, Path>> layer : layers.entrySet()) {
+            Path target = folder.resolve("layers");
+            if (!Files.isDirectory(target)) {
+                Files.createDirectory(target);
+            }
+            copy(target.resolve(layer.getKey()), layer.getValue());
+        }
         Files.writeString(folder.resolve("Dockerfile"), dockerfile(mainClass,
                 modulepath.isEmpty() ? null : mainModule,
                 graph.arguments(),
                 classpath.sequencedKeySet(),
-                modulepath.sequencedKeySet()));
+                modulepath.sequencedKeySet(),
+                layers.sequencedKeySet()));
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
@@ -109,7 +132,8 @@ public class Docker implements BuildStep {
                               String mainModule,
                               List<String> relaxations,
                               SequencedSet<String> classpath,
-                              SequencedSet<String> modulepath) {
+                              SequencedSet<String> modulepath,
+                              SequencedSet<String> layers) {
         StringBuilder builder = new StringBuilder("FROM ").append(from).append("\nWORKDIR /app\n");
         if (!modulepath.isEmpty()) {
             builder.append("COPY modulepath/ /app/modulepath/\n");
@@ -117,8 +141,14 @@ public class Docker implements BuildStep {
         if (!classpath.isEmpty()) {
             builder.append("COPY classpath/ /app/classpath/\n");
         }
+        if (!layers.isEmpty()) {
+            builder.append("COPY layers/ /app/layers/\n");
+        }
         List<String> command = new ArrayList<>();
         command.add("java");
+        for (String layer : layers) {
+            command.add("-Djenesis.layer." + layer + "=/app/layers/" + layer);
+        }
         if (!classpath.isEmpty()) {
             command.add("--class-path");
             command.add("/app/classpath/*");

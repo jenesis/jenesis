@@ -62,6 +62,13 @@ public class Pom implements BuildStep {
         for (String key : requires.stringPropertyNames()) {
             int first = key.indexOf('/');
             int second = key.indexOf('/', first + 1);
+            // A layer's contents are not this module's dependencies: a consumer must not put them on its
+            // own path, which is the whole point of isolating them. They reach a consumer through the
+            // Jenesis-Layer manifest header instead, which says where they belong rather than that they
+            // are needed.
+            if (key.startsWith("layer:")) {
+                continue;
+            }
             coordinateScopes.computeIfAbsent(key.substring(second + 1), _ -> new LinkedHashSet<>())
                     .add(key.substring(first + 1, second));
         }
