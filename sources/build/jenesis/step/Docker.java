@@ -56,6 +56,7 @@ public class Docker implements BuildStep {
         }
         SequencedMap<String, Path> jars = new TreeMap<>();
         SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
+        SequencedMap<String, String> agents = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -72,6 +73,9 @@ public class Docker implements BuildStep {
                 jars.putIfAbsent(file.getFileName().toString(), file);
             }
             layers.putAll(Layers.membership(argument.folder()));
+            // An attached agent is handed to the JVM, not merely copied into the image, so the entry
+            // point starts the application the same way `Execute` starts it.
+            agents.putAll(Inventory.agents(argument.folder()));
         }
         if (jars.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
@@ -115,6 +119,9 @@ public class Docker implements BuildStep {
                 stored.putIfAbsent(name, jar);
             }
         }
+        // Only what this image ships is handed to the JVM: an inventory reachable from here may describe a
+        // sibling module, whose agent is no part of this launch and whose jar is not in this image.
+        agents.keySet().retainAll(stored.sequencedKeySet());
         Path folder = Files.createDirectory(context.next().resolve(DOCKER)), store = folder.resolve("jars");
         Files.createDirectories(store);
         for (Map.Entry<String, Path> entry : stored.entrySet()) {
@@ -124,12 +131,14 @@ public class Docker implements BuildStep {
         // that names many jars would otherwise grow the `ENTRYPOINT` past reading, and past what the
         // platform accepts.
         List<String> command = new ArrayList<>();
+        agents.forEach((jar, options) -> command.add("-javaagent:/app/jars/" + jar
+                + (options.isEmpty() ? "" : "=" + options)));
         // A layer splits the two paths as the application does, and names both: what carries a module is
         // resolved, and the rest is the unnamed module its automatic modules read.
         layers.forEach((layer, membership) -> {
-            command.add("-Djenesis.layer.modulepath." + layer + "=" + path(membership.modulepath()));
+            command.add("-Djlayer.modulepath." + layer + "=" + path(membership.modulepath()));
             if (!membership.classpath().isEmpty()) {
-                command.add("-Djenesis.layer.classpath." + layer + "=" + path(membership.classpath()));
+                command.add("-Djlayer.classpath." + layer + "=" + path(membership.classpath()));
             }
         });
         if (!classpath.isEmpty()) {

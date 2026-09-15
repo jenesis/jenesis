@@ -267,6 +267,15 @@ public class ModularProject implements BuildExecutorModule {
                             + layer.getKey()
                             + " api <module>, the one module the layer shares with this one");
                 }
+                if (layer.getValue().isEmpty()) {
+                    throw new IllegalStateException("Layer "
+                            + layer.getKey()
+                            + " of module '"
+                            + info.coordinate()
+                            + "' isolates nothing - declare @jenesis.layer "
+                            + layer.getKey()
+                            + " provider <coordinate>, the root the layer holds");
+                }
                 if (!info.requires().contains(api)) {
                     throw new IllegalStateException("Module '"
                             + info.coordinate()

@@ -196,9 +196,9 @@ public abstract class Java extends JdkProcessBuildStep {
         // A layer names its jars rather than a folder, and splits the two paths as the application does:
         // its jars sit among the application's, each stored once under a name that carries its version.
         layers.forEach((name, membership) -> {
-            options.add("-Djenesis.layer.modulepath." + name + "=" + path(membership.modulepath(), pool));
+            options.add("-Djlayer.modulepath." + name + "=" + path(membership.modulepath(), pool));
             if (!membership.classpath().isEmpty()) {
-                options.add("-Djenesis.layer.classpath." + name + "=" + path(membership.classpath(), pool));
+                options.add("-Djlayer.classpath." + name + "=" + path(membership.classpath(), pool));
             }
         });
         // Everything the launch needs travels in one argument file, so neither a long path nor a layer

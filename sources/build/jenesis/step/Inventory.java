@@ -10,6 +10,30 @@ import build.jenesis.SequencedProperties;
 public class Inventory implements BuildStep {
 
     public static final String INVENTORY = "inventory.properties";
+
+    /**
+     * The agents a module attaches, by the file name of the jar each resolved to, mapped to the options it
+     * is given. An attachment names a coordinate and the index that resolved it is written elsewhere, so
+     * this is where the two already meet: a packaging step needs only to know which of the jars it holds is
+     * an agent, and the file name says that.
+     */
+    public static SequencedMap<String, String> agents(Path folder) throws IOException {
+        Path file = folder.resolve(INVENTORY);
+        if (!Files.isRegularFile(file)) {
+            return Collections.emptyNavigableMap();
+        }
+        SequencedProperties properties = SequencedProperties.ofFiles(file);
+        SequencedMap<String, String> agents = new LinkedHashMap<>();
+        for (String key : properties.stringPropertyNames()) {
+            int agent = key.indexOf(".agent.");
+            if (agent < 0 || key.indexOf('.', agent + ".agent.".length()) >= 0) {
+                continue;
+            }
+            agents.putIfAbsent(Path.of(properties.getProperty(key)).getFileName().toString(),
+                    properties.getProperty(key + ".arguments", ""));
+        }
+        return agents;
+    }
     public static final String POM = "pom.xml";
 
     private final String group;

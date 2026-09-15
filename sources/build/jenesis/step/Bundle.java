@@ -83,11 +83,15 @@ public class Bundle implements BuildStep {
             }
         }
         SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
+        SequencedMap<String, String> agents = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
             }
             layers.putAll(Layers.membership(argument.folder()));
+            // An attached agent is handed to the JVM, not merely shipped with it: the artifact has to
+            // start the same way `Execute` starts it, or an agent runs in a build and nowhere else.
+            agents.putAll(Inventory.agents(argument.folder()));
         }
         // A layer's jars are resolved in a group of its own, so they are not in the application's
         // selection; take them by the names the layer records, and nothing else that happens to be
@@ -110,6 +114,9 @@ public class Bundle implements BuildStep {
                 }
             }
         }
+        // Only what this artifact ships is handed to the JVM: an inventory reachable from here may describe
+        // a sibling module, whose agent is no part of this launch and whose jar is not in this bundle.
+        agents.keySet().retainAll(jars.sequencedKeySet());
         // The descriptor is the launch itself, as a Java argument file: `java @application.unix.args` from
         // the folder the bundle was unpacked into needs no reader and no parser, and no path length can
         // grow the command line past what the platform accepts. One file per path separator, because that
@@ -124,7 +131,7 @@ public class Bundle implements BuildStep {
                     context.supplement().resolve("application." + platform.getKey() + ".args"),
                     command(mainClass, mainModule, graph.arguments(),
                             classpath.sequencedKeySet(), modulepath.sequencedKeySet(),
-                            layers, platform.getValue())));
+                            layers, agents, platform.getValue())));
         }
         SequencedMap<String, Path> stored = new TreeMap<>(classpath);
         stored.putAll(modulepath);
@@ -158,15 +165,18 @@ public class Bundle implements BuildStep {
                                         SequencedSet<String> classpath,
                                         SequencedSet<String> modulepath,
                                         SequencedMap<String, Layers.Membership> layers,
+                                        SequencedMap<String, String> agents,
                                         String separator) {
         List<String> command = new ArrayList<>();
+        agents.forEach((jar, options) -> command.add("-javaagent:jars/" + jar
+                + (options.isEmpty() ? "" : "=" + options)));
         // A layer splits the two paths as the application does, and names both: what carries a module is
         // resolved, and the rest is the unnamed module its automatic modules read.
         layers.forEach((name, membership) -> {
-            command.add("-Djenesis.layer.modulepath." + name + "="
+            command.add("-Djlayer.modulepath." + name + "="
                     + path(membership.modulepath(), separator));
             if (!membership.classpath().isEmpty()) {
-                command.add("-Djenesis.layer.classpath." + name + "="
+                command.add("-Djlayer.classpath." + name + "="
                         + path(membership.classpath(), separator));
             }
         });

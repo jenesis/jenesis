@@ -117,10 +117,10 @@ public class Launcher implements BuildStep {
         // A layer splits the two paths as the application does, and names both: what carries a module is
         // resolved, and the rest is the unnamed module its automatic modules read.
         layers.forEach((layer, membership) -> {
-            application.setProperty("layer.modulepath." + layer,
+            application.setProperty("modulepath." + layer,
                     String.join(",", membership.modulepath()));
             if (!membership.classpath().isEmpty()) {
-                application.setProperty("layer.classpath." + layer,
+                application.setProperty("classpath." + layer,
                         String.join(",", membership.classpath()));
             }
         });

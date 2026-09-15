@@ -52,12 +52,12 @@ public class Layers implements BuildStep {
             SequencedSet<String> unnamed = new LinkedHashSet<>();
             SequencedSet<String> names = isolate(layer, api, closure(api, host), arguments, isolated, unnamed);
             verify(layer, api, isolated);
-            // <declaring module>.<name>: a layer may hold a module that declares one of its own, so the
-            // name alone is not a key. The runtime builds the same one from the module that calls it.
-            String key = entry.getValue().module() + "." + layer;
-            membership.setProperty(MODULE_PATH + key, String.join(",", names));
+            // A layer is named on its own, as the layer:<name> group it resolves in already is, so a
+            // duplicate is refused rather than scoped away. Keying it by the declaring module would ask
+            // the caller to be a named module, and whoever consumes a jar decides that, not its author.
+            membership.setProperty(MODULE_PATH + layer, String.join(",", names));
             if (!unnamed.isEmpty()) {
-                membership.setProperty(CLASS_PATH + key, String.join(",", unnamed));
+                membership.setProperty(CLASS_PATH + layer, String.join(",", unnamed));
             }
         }
         membership.store(context.next().resolve(MEMBERSHIP));

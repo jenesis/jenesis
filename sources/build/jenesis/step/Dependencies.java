@@ -471,7 +471,7 @@ public class Dependencies implements BuildExecutorModule {
             // layer nested inside itself without end.
             SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>>
                     pending = new LinkedHashMap<>(requires);
-            SequencedSet<String> discovered = new LinkedHashSet<>();
+            SequencedMap<String, String> discovered = new LinkedHashMap<>();
             while (!pending.isEmpty()) {
             SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>>
                     round = pending;
@@ -665,8 +665,20 @@ public class Dependencies implements BuildExecutorModule {
                 }
                 for (Map.Entry<String, SequencedSet<String>> layer
                         : PathPlacement.layers(materialized.get(key).file()).entrySet()) {
-                    if (!discovered.add(layer.getKey())) {
-                        continue;
+                    // A layer is named on its own, here as in the layer:<name> group it resolves in, so a
+                    // second declaration of one name is a conflict rather than a duplicate to drop: the
+                    // two would resolve into one group and one of them would quietly not be what it asked
+                    // for. Whoever holds both renames one, or excludes it.
+                    // By coordinate, not by the key, which repeats one artifact once per scope.
+                    String coordinate = key.substring(key.indexOf('/', key.indexOf('/') + 1) + 1);
+                    String previous = discovered.put(layer.getKey(), coordinate);
+                    if (previous != null) {
+                        if (previous.equals(coordinate)) {
+                            continue;
+                        }
+                        throw new IllegalStateException(previous + " and " + coordinate
+                                + " both declare a layer called " + layer.getKey()
+                                + " - a layer is named on its own, so rename one of them or keep one out");
                     }
                     ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(materialized.get(key).file());
                     Iterator<String> tokens = layer.getValue().iterator();

@@ -241,15 +241,16 @@ public class ModuleInfoParser {
                                                 + ": a layer shares one module with its host");
                                     }
                                     layers.computeIfAbsent(words[0], _ -> new LinkedHashSet<>());
-                                } else if (words.length == 2) {
+                                } else if (words.length == 3 && words[1].equals("provider")) {
                                     layers.computeIfAbsent(words[0], _ -> new LinkedHashSet<>())
-                                            .add(words[1].indexOf('/') < 0
-                                                    ? "module/" + words[1]
-                                                    : words[1]);
+                                            .add(words[2].indexOf('/') < 0
+                                                    ? "module/" + words[2]
+                                                    : words[2]);
                                 } else {
                                     throw new IllegalArgumentException("Malformed @jenesis.layer declaration '"
                                             + declaration
-                                            + "': expected <layer> api <module>, or <layer> <coordinate>");
+                                            + "': expected <layer> api <module>,"
+                                            + " or <layer> provider <coordinate>");
                                 }
                             }
                             case "jenesis.alias" -> {

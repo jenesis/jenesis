@@ -738,22 +738,25 @@ public record Project(
                           transitively and drops every resolved artifact declaring the overridden
                           module, so the packages appear once. Reaches consumers through the
                           Jenesis-Overrides manifest header. A carrier nothing declares is an error.
-                      @jenesis.layer <name> api <module> | <name> <token>
+                      @jenesis.layer <name> api <module> | <name> provider <token>
                           Keep a dependency private: resolve it, and its whole closure, into a run-time
                           ModuleLayer of its own rather than onto this module's path. Two versions of one
                           library then coexist with no package relocated - what shading is used for, without
                           rewriting a class file. `api` names the one module this module and the layer share;
-                          the other form names a coordinate the layer isolates, resolving it in the group
-                          layer:<name>, which pins, verifies and reports like any other group.
+                          `provider` names a coordinate the layer isolates, resolving it in the group
+                          layer:<name>, which pins, verifies and reports like any other group. Every line
+                          names which of the two it declares, so neither is the bare one.
                           The API module and everything it reaches are shared, so producer and consumer
                           exchange the very same classes and a service crosses as a plain interface call. A
                           dependency the API module reaches is exposed by it and cannot be isolated behind
                           it, which the build says rather than leaving to a LinkageError later.
                           The declaring module requires build.jenesis.launcher and asks for the layer by
-                          name - Launcher.load("<name>", Contract.class) - so its own consumers declare
+                          name - Launcher.instance("<name>", Contract.class) - so its own consumers declare
                           nothing and need not know. Discovery runs to a fixpoint, so a module inside a
                           layer may declare one of its own; each layer is a child of its caller's, and a
-                          test JVM is handed jenesis.layer.modulepath.<module>.<name> like any deployment.
+                          test JVM is handed jlayer.modulepath.<name> like any deployment. That is a
+                          jlayer.* key rather than a jenesis.* one: it configures no build, it is read by
+                          the application a build produced.
                           A layer splits a module path and a class path as the application does: what
                           carries a module identity - a module-info, an Automatic-Module-Name, or a name
                           given in modules.properties - is resolved, and the long tail a legacy library

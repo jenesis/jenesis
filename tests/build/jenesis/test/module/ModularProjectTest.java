@@ -873,7 +873,7 @@ public class ModularProjectTest {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
                  * @jenesis.layer render api my.library.spi
-                 * @jenesis.layer render maven/com.example/renderer-impl
+                 * @jenesis.layer render provider maven/com.example/renderer-impl
                  * @jenesis.pin layer:render/maven/com.example/renderer-impl 1.2.3
                  */
                 module foo {
@@ -902,7 +902,7 @@ public class ModularProjectTest {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
                  * @jenesis.layer render api my.library.spi
-                 * @jenesis.layer render module/com.example.impl
+                 * @jenesis.layer render provider module/com.example.impl
                  */
                 module foo {
                   requires my.library.spi;
@@ -922,7 +922,7 @@ public class ModularProjectTest {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
                  * @jenesis.layer render api my.library.spi
-                 * @jenesis.layer render module/com.example.impl
+                 * @jenesis.layer render provider module/com.example.impl
                  */
                 module foo {
                   requires build.jenesis.launcher;
@@ -941,7 +941,7 @@ public class ModularProjectTest {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
                  * @jenesis.layer render api my.library.spi
-                 * @jenesis.layer render com.example.impl
+                 * @jenesis.layer render provider com.example.impl
                  */
                 module foo {
                   requires build.jenesis.launcher;
@@ -959,10 +959,30 @@ public class ModularProjectTest {
     }
 
     @Test
+    public void rejects_a_layer_without_anything_to_isolate() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render api my.library.spi
+                 */
+                module foo {
+                  requires build.jenesis.launcher;
+                  requires my.library.spi;
+                }
+                """);
+        BuildExecutor executor = executor();
+        executor.addModule("module", new ModularProject("module", project));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .as("a layer named on one side only is said here, not as an empty group resolving nothing")
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("Layer render of module 'foo' isolates nothing - declare"
+                        + " @jenesis.layer render provider <coordinate>, the root the layer holds");
+    }
+
+    @Test
     public void rejects_a_layer_without_an_api_module() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
-                 * @jenesis.layer render module/com.example.impl
+                 * @jenesis.layer render provider module/com.example.impl
                  */
                 module foo {
                   requires build.jenesis.launcher;

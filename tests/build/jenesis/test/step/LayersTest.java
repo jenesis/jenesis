@@ -213,7 +213,7 @@ public class LayersTest {
     }
 
     private Layers.Membership membership(String name) throws IOException {
-        return Layers.membership(next).getOrDefault("demo.host." + name,
+        return Layers.membership(next).getOrDefault(name,
                 new Layers.Membership(new LinkedHashSet<>(), new LinkedHashSet<>()));
     }
 

@@ -4,7 +4,7 @@
  * (the app jar plus {@code slf4j-api}) split into a {@code modulepath/}, with an
  * {@code application.properties} naming the entry point - a single, self-contained
  * input to drop onto a stock JRE base image. It is the bundle counterpart of the
- * jpackage app-image in {@code ../demo-06-java-modular-executable}.
+ * jpackage app-image in {@code ../demo-07-java-modular-executable}.
  *
  * The {@code @jenesis.main} tag names the module's main class, which is what makes
  * the module runnable: the build records {@code main=sample.Sample} in the module's
