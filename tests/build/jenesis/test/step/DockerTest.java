@@ -55,8 +55,11 @@ public class DockerTest {
                 "FROM example:latest",
                 "WORKDIR /app",
                 "COPY jars/ /app/jars/",
-                "ENTRYPOINT [\"java\", \"--class-path\", \"/app/jars/app.jar:/app/jars/lib.jar\", "
-                        + "\"sample.Sample\"]");
+                "COPY application.args /app/",
+                "ENTRYPOINT [\"java\", \"@/app/application.args\"]");
+        assertThat(arguments(folder))
+                .as("the entry point names an argument file, so no path can outgrow the command line")
+                .containsExactly("--class-path", "/app/jars/app.jar:/app/jars/lib.jar", "sample.Sample");
     }
 
     @Test
@@ -82,8 +85,11 @@ public class DockerTest {
                 "FROM example:latest",
                 "WORKDIR /app",
                 "COPY jars/ /app/jars/",
-                "ENTRYPOINT [\"java\", \"--module-path\", \"/app/jars/sample.jar\", "
-                        + "\"--module\", \"sample/sample.Sample\"]");
+                "COPY application.args /app/",
+                "ENTRYPOINT [\"java\", \"@/app/application.args\"]");
+        assertThat(arguments(folder)).containsExactly(
+                "--module-path", "/app/jars/sample.jar",
+                "--module", "sample/sample.Sample");
     }
 
     @Test
@@ -109,11 +115,11 @@ public class DockerTest {
         Path folder = next.resolve(Docker.DOCKER);
         assertThat(folder.resolve("jars/sample.jar")).isRegularFile();
         assertThat(folder.resolve("jars/lib.jar")).isRegularFile();
-        assertThat(dockerfile(folder)).contains(
-                "ENTRYPOINT [\"java\", \"--class-path\", \"/app/jars/lib.jar\", "
-                        + "\"--module-path\", \"/app/jars/sample.jar\", "
-                        + "\"--add-modules\", \"ALL-MODULE-PATH,ALL-DEFAULT\", "
-                        + "\"--module\", \"sample/sample.Sample\"]");
+        assertThat(arguments(folder)).containsExactly(
+                "--class-path", "/app/jars/lib.jar",
+                "--module-path", "/app/jars/sample.jar",
+                "--add-modules", "ALL-MODULE-PATH,ALL-DEFAULT",
+                "--module", "sample/sample.Sample");
     }
 
     @Test
@@ -133,6 +139,12 @@ public class DockerTest {
 
     private static List<String> dockerfile(Path folder) throws IOException {
         return Files.readAllLines(folder.resolve("Dockerfile"));
+    }
+
+    private static List<String> arguments(Path folder) throws IOException {
+        return Files.readAllLines(folder.resolve("application.args")).stream()
+                .map(line -> line.substring(1, line.length() - 1))
+                .toList();
     }
 
     private static void writePlainJar(Path path) throws IOException {

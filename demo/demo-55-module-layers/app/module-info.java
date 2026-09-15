@@ -4,11 +4,11 @@
  *
  * @jenesis.release 25
  * @jenesis.main demo.layers.app.Main
- * @jenesis.pin build.jenesis/build.jenesis.launcher 1-SNAPSHOT SHA-256/23735dd00c6898715a3090749c0e1a5f94bfa85b6936bc86389eee6d5b194efa
+ * @jenesis.pin build.jenesis/build.jenesis.launcher 1-SNAPSHOT SHA-256/4b28e0c25eae01673e00ec0bb12f9b9450b4398268fc9c33ec0d17f71b2f92ac
  * @jenesis.pin com.fasterxml.jackson.core 2.18.2 SHA-256/d8054ae7c0d1c2d2f55d28e46026ebe5892881f3fab5f439233184381c3b4a1f
  * @jenesis.pin com.fasterxml.jackson.core/jackson-core 2.18.2 SHA-256/d8054ae7c0d1c2d2f55d28e46026ebe5892881f3fab5f439233184381c3b4a1f
  * @jenesis.pin layer:inner/maven/com.fasterxml.jackson.core/jackson-core 2.13.5 SHA-256/48f36a025311d0464ad8dda4512a20c79e279a9550f63f3179d731d94482474b
- * @jenesis.pin layer:render/maven/build.jenesis/build.jenesis.launcher 1-SNAPSHOT SHA-256/23735dd00c6898715a3090749c0e1a5f94bfa85b6936bc86389eee6d5b194efa
+ * @jenesis.pin layer:render/maven/build.jenesis/build.jenesis.launcher 1-SNAPSHOT SHA-256/4b28e0c25eae01673e00ec0bb12f9b9450b4398268fc9c33ec0d17f71b2f92ac
  * @jenesis.pin layer:render/maven/com.fasterxml.jackson.core/jackson-core 2.15.4 SHA-256/8dc9210dd285db366f45f518dd1e6a9ccfeb0f1a8e184a899fe96d29edf1fd94
  */
 module demo.layers.app {

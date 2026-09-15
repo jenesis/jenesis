@@ -88,10 +88,13 @@ and materialises them into a folder, exactly as it would for `Jenesis-Aliases` o
     jars/demo.layers.impl-1-SNAPSHOT.jar
     jars/demo.layers.nested-1-SNAPSHOT.jar
 
-    application.properties
-      modulepath=classes.jar,demo.layers.library-...,demo.layers.spi-...,...2.18.2.jar
-      layer.demo.layers.library.render=demo.layers.impl-...,...2.15.4.jar
-      layer.demo.layers.impl.inner=demo.layers.nested-...,...2.13.5.jar
+    application.unix.args   (and application.windows.args, the same with ';')
+      "-Djenesis.layer.demo.layers.impl.inner=jars/demo.layers.nested-...:jars/...2.13.5.jar"
+      "-Djenesis.layer.demo.layers.library.render=jars/demo.layers.impl-...:jars/...2.15.4.jar"
+      "--module-path"
+      "jars/build.jenesis.launcher-...:jars/classes.jar:jars/...2.18.2.jar:jars/demo.layers.library-...:jars/demo.layers.spi-..."
+      "--module"
+      "demo.layers.app/demo.layers.app.Main"
 
 Nothing is placed anywhere special, and one store is enough because no path is a folder. A dependency
 is materialised once under a name that carries its version, so three versions of one library stand side
@@ -133,11 +136,11 @@ What the build refuses
 Where the layer comes from at run time
 --------------------------------------
 
-`bundle=true` records each layer's membership in `application.properties`, so the launch command
-names the jars: `-Djenesis.layer.demo.layers.library.render=<unpacked>/jars/demo.layers.impl-….jar:…`.
+`bundle=true` writes each layer into the argument file that *is* the launch, as a
+`-Djenesis.layer.<declaring module>.<name>` naming its jars beside the module path that omits them.
 The declaring module is part of the key because a layer may itself hold a module that declares one -
-nesting is unbounded - and the runtime builds the same key from the module that calls it. Docker bakes the same option into its
-`ENTRYPOINT`, and a run through `Execute` passes it too.
+nesting is unbounded - and the runtime builds the same key from the module that calls it. Docker
+copies the same file into its image, and a run through `Execute` passes the same option.
 
 An executable jar (`launcher=true`) needs no such option: the layer travels inside the jar and the
 launcher reads it from there, never unpacking anything.

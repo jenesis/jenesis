@@ -52,43 +52,15 @@ public class Demo {
             }
         }
 
-        Properties application = new Properties();
-        try (InputStream in = Files.newInputStream(unpacked.resolve("application.properties"))) {
-            application.load(in);
-        }
-
+        // The argument file is the launch itself: the module path, the layer properties and the entry
+        // point are all in it, so a deployment runs `java @application.<platform>.args` from the folder
+        // it unpacked into. Each layer travels as -Djenesis.layer.<module>.<name>, the property the
+        // library's own code reads; inside an executable jar no such option is needed, because the
+        // launcher reads the layer out of the jar it is already holding open.
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
-        // The module path is named rather than handed over as a folder: a layer's jars sit among the
-        // application's in one store, stored once, and the application must not read them.
-        command.add("--module-path");
-        command.add(path(unpacked, application.getProperty("modulepath", "")));
-        for (String option : application.getProperty("javaOptions", "").split(" ")) {
-            if (!option.isEmpty()) {
-                command.add(option);
-            }
-        }
-
-        // A bundle is run by a plain `java`, so the launch command names each layer's jars:
-        // layer.<declaring module>.<name> here becomes jenesis.layer.<module>.<name>, the property
-        // the library's own code reads. Inside an executable jar no such option is needed - the
-        // launcher reads the layer out of the jar it is already holding open.
-        for (String key : application.stringPropertyNames()) {
-            if (key.startsWith("layer.")) {
-                command.add("-Djenesis." + key + "=" + path(unpacked, application.getProperty(key)));
-            }
-        }
-
-        command.add("-m");
-        command.add(application.getProperty("mainModule") + "/" + application.getProperty("mainClass"));
+        command.add("@application." + (File.pathSeparatorChar == ';' ? "windows" : "unix") + ".args");
         command.addAll(List.of(args));
-        System.exit(new ProcessBuilder(command).inheritIO().start().waitFor());
-    }
-
-    private static String path(Path unpacked, String names) {
-        return Stream.of(names.split(","))
-                .filter(name -> !name.isBlank())
-                .map(name -> unpacked.resolve("jars").resolve(name.strip()).toString())
-                .collect(Collectors.joining(File.pathSeparator));
+        System.exit(new ProcessBuilder(command).directory(unpacked.toFile()).inheritIO().start().waitFor());
     }
 }

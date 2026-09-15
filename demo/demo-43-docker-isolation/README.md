@@ -239,24 +239,24 @@ bundle:
 That stages a `bundle.zip` under `target/` carrying everything the app needs to
 launch, with no assumptions about the host:
 
-    application.properties        mainModule=demo.dockerisolation, mainClass=sample.Sample
-    modulepath/*.jar              the modular jar (this module)
-    classpath/*.jar               any plain-classpath jars
+    application.unix.args         the launch, as a Java argument file
+    application.windows.args      the same launch, with Windows path separators
+    jars/*.jar                    every jar of the closure, stored once
 
-Because the bundle is self-describing - `application.properties` names the entry
-point and the two folders split the run path - any JVM base image can run it.
-Unzip it into an `eclipse-temurin` (or any JDK/JRE) image and launch the command
-those properties spell out:
+Because the bundle carries its launch rather than a description of it - the argument
+file names the module path, the class path and the entry point - any JVM base image
+can run it without reading anything. Unzip it into an `eclipse-temurin` (or any
+JDK/JRE) image and hand `java` the file:
 
     FROM eclipse-temurin:25-jre
-    COPY modulepath/ /app/modulepath/
+    COPY jars/ /app/jars/
+    COPY application.unix.args /app/
     WORKDIR /app
     USER 1000:1000
-    ENTRYPOINT ["java", "--module-path", "modulepath", \
-                "--module", "demo.dockerisolation/sample.Sample"]
+    ENTRYPOINT ["java", "@application.unix.args"]
 
-A classpath-only app swaps the `--module-path`/`--module` pair for
-`-cp 'classpath/*' <mainClass>`. The same image definition works under Podman.
+A classpath-only app needs no change here: the argument file names a `--class-path`
+and a main class instead of a module, and the `ENTRYPOINT` is the same. The same image definition works under Podman.
 Unlike `jpackage`/`jlink`, the bundle embeds no runtime, so the JVM comes from the
 base image and a single image can be rebased onto a newer JVM without rebuilding
 the app.

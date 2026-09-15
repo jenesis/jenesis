@@ -114,40 +114,32 @@ public class Docker implements BuildStep {
         for (Map.Entry<String, Path> entry : stored.entrySet()) {
             BuildStep.linkOrCopy(store.resolve(entry.getKey()), entry.getValue());
         }
-        Files.writeString(folder.resolve("Dockerfile"), dockerfile(mainClass,
-                modulepath.isEmpty() ? null : mainModule,
-                graph.arguments(),
-                classpath.sequencedKeySet(),
-                modulepath.sequencedKeySet(),
-                layers));
-        return CompletableFuture.completedStage(new BuildStepResult(true));
-    }
-
-    private String dockerfile(String mainClass,
-                              String mainModule,
-                              List<String> relaxations,
-                              SequencedSet<String> classpath,
-                              SequencedSet<String> modulepath,
-                              SequencedMap<String, SequencedSet<String>> layers) {
-        StringBuilder builder = new StringBuilder("FROM ").append(from)
-                .append("\nWORKDIR /app\nCOPY jars/ /app/jars/\n");
+        // The entry point names an argument file rather than the whole command line: a path or a layer
+        // that names many jars would otherwise grow the `ENTRYPOINT` past reading, and past what the
+        // platform accepts.
         List<String> command = new ArrayList<>();
-        command.add("java");
         layers.forEach((layer, names) -> command.add("-Djenesis.layer." + layer + "=" + path(names)));
         if (!classpath.isEmpty()) {
             command.add("--class-path");
-            command.add(path(classpath));
+            command.add(path(classpath.sequencedKeySet()));
         }
-        if (mainModule == null) {
+        if (modulepath.isEmpty()) {
             command.add(mainClass);
         } else {
             command.add("--module-path");
-            command.add(path(modulepath));
-            command.addAll(relaxations);
+            command.add(path(modulepath.sequencedKeySet()));
+            command.addAll(graph.arguments());
             command.add("--module");
             command.add(mainModule + "/" + mainClass);
         }
-        return builder.append("ENTRYPOINT [").append(quoted(command)).append("]\n").toString();
+        ProcessBuildStep.argumentFile(folder.resolve("application.args"), command);
+        Files.writeString(folder.resolve("Dockerfile"), new StringBuilder("FROM ").append(from)
+                .append("\nWORKDIR /app\nCOPY jars/ /app/jars/\nCOPY application.args /app/\n")
+                .append("ENTRYPOINT [")
+                .append(quoted(List.of("java", "@/app/application.args")))
+                .append("]\n")
+                .toString());
+        return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
     private static String path(SequencedSet<String> names) {

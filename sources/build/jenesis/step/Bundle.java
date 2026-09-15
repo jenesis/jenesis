@@ -104,19 +104,22 @@ public class Bundle implements BuildStep {
                 }
             }
         }
-        SequencedProperties application = new SequencedProperties();
-        application.setProperty("mainClass", mainClass);
-        if (mainModule != null) {
-            application.setProperty("mainModule", mainModule);
+        // The descriptor is the launch itself, as a Java argument file: `java @application.unix.args` from
+        // the folder the bundle was unpacked into needs no reader and no parser, and no path length can
+        // grow the command line past what the platform accepts. One file per path separator, because that
+        // is the only thing about the launch that a bundle cannot know in advance - a bundle is built
+        // once and unpacked wherever, so it carries both rather than the separator of whoever built it.
+        SequencedMap<String, Path> descriptors = new LinkedHashMap<>();
+        for (Map.Entry<String, String> platform : List.of(
+                Map.entry("unix", ":"),
+                Map.entry("windows", ";")
+        )) {
+            descriptors.put("application." + platform.getKey() + ".args", ProcessBuildStep.argumentFile(
+                    context.supplement().resolve("application." + platform.getKey() + ".args"),
+                    command(mainClass, mainModule, graph.arguments(),
+                            classpath.sequencedKeySet(), modulepath.sequencedKeySet(),
+                            layers, platform.getValue())));
         }
-        // Every path is spelled out rather than handed over as a folder, which is what lets one store hold
-        // the application's jars and every layer's alike: a jar more than one path names is stored once.
-        application.setProperty("classpath", String.join(",", classpath.sequencedKeySet()));
-        application.setProperty("modulepath", String.join(",", modulepath.sequencedKeySet()));
-        layers.forEach((name, names) -> application.setProperty("layer." + name, String.join(",", names)));
-        graph.store(application);
-        Path descriptor = context.supplement().resolve("application.properties");
-        application.store(descriptor);
         SequencedMap<String, Path> stored = new TreeMap<>(classpath);
         stored.putAll(modulepath);
         for (Map.Entry<String, SequencedSet<String>> layer : layers.entrySet()) {
@@ -131,12 +134,46 @@ public class Bundle implements BuildStep {
         }
         Path zip = Files.createDirectory(context.next().resolve(BUNDLE)).resolve("bundle.zip");
         try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zip))) {
-            writeEntry(out, "application.properties", descriptor);
+            for (Map.Entry<String, Path> entry : descriptors.entrySet()) {
+                writeEntry(out, entry.getKey(), entry.getValue());
+            }
             for (Map.Entry<String, Path> entry : stored.entrySet()) {
                 writeEntry(out, "jars/" + entry.getKey(), entry.getValue());
             }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
+    }
+
+    // Every path is spelled out rather than handed over as a folder, which is what lets one store hold
+    // the application's jars and every layer's alike: a jar more than one path names is stored once.
+    private static List<String> command(String mainClass,
+                                        String mainModule,
+                                        List<String> relaxations,
+                                        SequencedSet<String> classpath,
+                                        SequencedSet<String> modulepath,
+                                        SequencedMap<String, SequencedSet<String>> layers,
+                                        String separator) {
+        List<String> command = new ArrayList<>();
+        layers.forEach((name, names) -> command.add(
+                "-Djenesis.layer." + name + "=" + path(names, separator)));
+        if (!classpath.isEmpty()) {
+            command.add("--class-path");
+            command.add(path(classpath, separator));
+        }
+        if (modulepath.isEmpty()) {
+            command.add(mainClass);
+        } else {
+            command.add("--module-path");
+            command.add(path(modulepath, separator));
+            command.addAll(relaxations);
+            command.add("--module");
+            command.add(mainModule + "/" + mainClass);
+        }
+        return command;
+    }
+
+    private static String path(SequencedSet<String> names, String separator) {
+        return names.stream().map(name -> "jars/" + name).collect(Collectors.joining(separator));
     }
 
     private static void writeEntry(ZipOutputStream out, String name, Path file) throws IOException {

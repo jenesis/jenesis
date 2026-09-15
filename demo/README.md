@@ -68,7 +68,7 @@ Quick index
 | 5  | [`startup`](demo-05-startup/README.md)                       | What the entry point costs: `Make.java` names no engine class, so the Java launcher compiles one small file rather than the whole engine, and then compiles the build sources once and runs from those classes - 8.0s to 3.6s for a build that runs once, and 0.8s for a repeat. `jenesis.make.daemon` adds a reused JVM on top | `java build/jenesis/Make.java` |
 | 6  | [`java-pom-executable`](demo-06-java-pom-executable/README.md)       | A runnable Maven project: a `<mainClass>` entry point + dependency, packaged into a native app image with `jpackage` | `java build/Demo.java`              |
 | 7  | [`java-modular-executable`](demo-07-java-modular-executable/README.md) | The same as a Java module: entry point via `@jenesis.main` + dependency, packaged with `jpackage` (and a plain `.jmod` + `jlink` runtime, and a `bundle` zip) | `java build/Demo.java`              |
-| 8  | [`bundle`](demo-08-bundle/README.md)                       | Ship a modular app as a `bundle.zip` of just its jars (one `jars/` store plus an `application.properties` naming what each path holds) for a stock JRE base, then unpack and run it - selected by a `packaging.properties` with `bundle=true` | `java build/Demo.java`             |
+| 8  | [`bundle`](demo-08-bundle/README.md)                       | Ship a modular app as a `bundle.zip` of just its jars (one `jars/` store plus an argument file per platform that *is* the launch, run as `java @application.unix.args`) for a stock JRE base, then unpack and run it - selected by a `packaging.properties` with `bundle=true` | `java build/Demo.java`             |
 | 9  | [`java-multi-release`](demo-09-java-multi-release/README.md) | A modular multi-release JAR: Java 21 baseline plus a Java 25 override of one utility, selected by the runtime | `java build/jenesis/Execute.java`  |
 | 10 | [`javac-arguments`](demo-10-javac-arguments/README.md)      | Pass extra flags to `javac` through a `process-javac.properties` config file - here `-parameters`, so method parameter names survive into the bytecode (verified at run time by reflection) | `java build/jenesis/Execute.java`  |
 | 11 | [`annotations`](demo-11-annotations/README.md)              | Run a Java annotation processor declared with `@jenesis.plugin`; the same jar on the module path stays dormant unless declared | `java build/jenesis/Make.java`  |
@@ -269,7 +269,7 @@ the lower-level pieces `jpackage` uses internally: a `.jmod` staged beside the m
 jar, and a `jlink` runtime image trimmed to the module graph under `stage/runtime`,
 runnable from its own `bin/java -m` - the foundation [`custom-jmod`](demo-46-custom-jmod/README.md) later
 builds on. And two no-runtime forms: `bundle=true` writes a `bundle.zip` of just the
-jars plus an `application.properties` to unzip onto an off-the-shelf JRE base (its own
+jars plus an argument file per platform to unzip onto an off-the-shelf JRE base (its own
 [`bundle`](demo-08-bundle/README.md) demo unpacks the zip and runs it on a stock JRE; also
 used to ship the app as a container image in `docker-isolation`), while
 `launcher=true` shades the published `build.jenesis.launcher` into a
@@ -281,8 +281,8 @@ The container form is the one file the bundle still left to write by hand, so bo
 executable demos also commit a `docker` profile. A `docker=<base image>` line in
 `packaging.properties` - valued like `jpackage`, because the base image is the one
 thing the build cannot infer - stages a complete build context under `stage/docker`:
-a generated `Dockerfile` beside the `jars/` it copies, its
-`ENTRYPOINT` the same entry point every other packaging form reads. Everything else
+a generated `Dockerfile` beside the `jars/` it copies and the argument file its
+`ENTRYPOINT` names, carrying the same entry point every other packaging form reads. Everything else
 is fixed, since a Dockerfile inherits `ENV`, `WORKDIR`, `USER` and `EXPOSE` from its
 base, so image environment belongs in a base image rather than in build configuration.
 The build never invokes a container tool, so it needs no Docker installation to

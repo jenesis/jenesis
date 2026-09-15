@@ -176,18 +176,29 @@ public abstract class Java extends JdkProcessBuildStep {
                 }
             }
         }
-        SequencedMap<String, String> options = new LinkedHashMap<>();
-        options.put(MODULE_PATH, String.join(File.pathSeparator, modulePath));
-        options.put(CLASS_PATH, String.join(File.pathSeparator, classPath));
-        List<String> prefixes = new ArrayList<>(argumentFile(context.supplement().resolve("java.args"), options));
-        prefixes.addAll(graph.arguments());
+        List<String> options = new ArrayList<>();
+        for (Map.Entry<String, List<String>> path : List.of(
+                Map.entry(MODULE_PATH, modulePath),
+                Map.entry(CLASS_PATH, classPath)
+        )) {
+            if (!path.getValue().isEmpty()) {
+                options.add(path.getKey());
+                options.add(String.join(File.pathSeparator, path.getValue()));
+            }
+        }
+        options.addAll(graph.arguments());
         // A layer is a named module path, not a folder: its jars sit among the application's, each stored
         // once under a name that carries its version, and the property names them.
-        layers.forEach((name, names) -> prefixes.add("-Djenesis.layer." + name + "=" + names.stream()
+        layers.forEach((name, names) -> options.add("-Djenesis.layer." + name + "=" + names.stream()
                 .map(pool::get)
                 .filter(Objects::nonNull)
                 .map(Path::toString)
                 .collect(Collectors.joining(File.pathSeparator))));
+        // Everything the launch needs travels in one argument file, so neither a long path nor a layer
+        // that names many jars can grow the command line past what the platform accepts.
+        List<String> prefixes = options.isEmpty()
+                ? List.of()
+                : List.of("@" + argumentFile(context.supplement().resolve("java.args"), options));
         return commands(executor, context, arguments).thenApplyAsync(commands -> Stream.concat(
                 prefixes.stream(),
                 commands.stream()).toList(), executor);
