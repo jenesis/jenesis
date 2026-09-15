@@ -814,6 +814,10 @@ public record Project(
                                                 (access, include, exclude, format, ignore-missing-classes,
                                                 only-incompatible, only-modified, semantic-versioning,
                                                 error-on-binary-incompatibility, ...)
+                      errorprone.properties     turns on the Error Prone declared with
+                                                @jenesis.plugin javac <coordinate>; javac forks so the
+                                                compiler internals it reads can be exported to it
+                                                (arguments, appended to -Xplugin:ErrorProne)
                       javaformat.properties     formatter=google|palantir
                       xjc.properties            JAXB: every .xsd compiled, every .xjb a binding; the
                                                 generated package is compiled into the module
@@ -931,7 +935,8 @@ public record Project(
                       Runnable output    06, 07 java-*-executable (jpackage), 08 bundle (jars for a
                                          stock JRE), 09 java-multi-release, 53 native-image (GraalVM)
                       Compiler control   10 javac-arguments (process-javac.properties),
-                                         11 annotations (an annotation processor via @jenesis.plugin)
+                                         11 annotations (an annotation processor via @jenesis.plugin),
+                                         58 error-prone (a javac plugin)
                       Generated sources  12 data-formats (xjc, protoc, avro),
                                          13 service-contracts (wsimport, OpenAPI),
                                          57 antlr (a grammar)
@@ -2040,6 +2045,7 @@ public record Project(
                 source.scalastyle|true|Scalastyle, activated by a scalastyle-config.xml
                 source.scalafmt|true|scalafmt checking, activated by a .scalafmt.conf
                 source.codenarc|true|CodeNarc, activated by a codenarc.groovy
+                compile.errorprone|true|Error Prone over the javac plugin declared with @jenesis.plugin javac, activated by an errorprone.properties; javac forks to grant it the compiler internals it reads
                 format.java|true|The Java formatter a javaformat.properties selects
                 format.ktlint|true|ktlint formatting
                 format.scalafmt|true|scalafmt formatting

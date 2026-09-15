@@ -147,6 +147,7 @@ public class Javac extends JdkProcessBuildStep {
                 processorPath = new ArrayList<>(),
                 siblingClasses = new ArrayList<>(),
                 commands = new ArrayList<>(List.of("-d", target.toString()));
+        boolean compilerPlugins = false;
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -156,6 +157,10 @@ public class Javac extends JdkProcessBuildStep {
             }
             for (Path jar : Dependencies.select(argument.folder(), "plugin", "plugin")) {
                 processorPath.add(jar.toString());
+            }
+            for (Path jar : Dependencies.select(argument.folder(), "javac", "plugin")) {
+                processorPath.add(jar.toString());
+                compilerPlugins = true;
             }
             Path sources = argument.folder().resolve(Bind.SOURCES),
                     classes = argument.folder().resolve(CLASSES);
@@ -242,7 +247,7 @@ public class Javac extends JdkProcessBuildStep {
                         .append("\"\n");
             }
             if (!processorPath.isEmpty()) {
-                boolean processorModules = pathPlacement.modular();
+                boolean processorModules = pathPlacement.modular() && !compilerPlugins;
                 if (processorModules) {
                     try {
                         ModuleFinder.of(processorPath.stream().map(Path::of).toArray(Path[]::new)).findAll();

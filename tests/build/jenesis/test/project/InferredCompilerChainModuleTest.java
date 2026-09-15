@@ -41,6 +41,7 @@ public class InferredCompilerChainModuleTest {
         executor.addModule(
                 "chain",
                 new InferredCompilerChainModule(
+                        Collections.emptyNavigableSet(),
                         Map.of("maven", MavenDefaultRepository.of()),
                         Map.of("maven", new MavenPomResolver())),
                 "project");
@@ -85,6 +86,7 @@ public class InferredCompilerChainModuleTest {
         executor.addModule(
                 "chain",
                 new InferredCompilerChainModule(
+                        Collections.emptyNavigableSet(),
                         Map.of("maven", MavenDefaultRepository.of()),
                         Map.of("maven", new MavenPomResolver())),
                 "project");
@@ -163,6 +165,7 @@ public class InferredCompilerChainModuleTest {
         executor.addModule(
                 "chain",
                 new InferredCompilerChainModule(
+                        Collections.emptyNavigableSet(),
                         Map.of("maven", MavenDefaultRepository.of()),
                         Map.of("maven", new MavenPomResolver())),
                 "project");
@@ -196,6 +199,7 @@ public class InferredCompilerChainModuleTest {
         executor.addModule(
                 "chain",
                 new InferredCompilerChainModule(
+                        Collections.emptyNavigableSet(),
                         Map.of("maven", MavenDefaultRepository.of()),
                         Map.of("maven", new MavenPomResolver())),
                 "project");
@@ -230,6 +234,7 @@ public class InferredCompilerChainModuleTest {
         executor.addModule(
                 "chain",
                 new InferredCompilerChainModule(
+                        Collections.emptyNavigableSet(),
                         Map.of("maven", MavenDefaultRepository.of()),
                         Map.of("maven", new MavenPomResolver())),
                 "project");
@@ -257,6 +262,7 @@ public class InferredCompilerChainModuleTest {
         executor.addModule(
                 "chain",
                 new InferredCompilerChainModule(
+                        Collections.emptyNavigableSet(),
                         Map.of("maven", MavenDefaultRepository.of()),
                         Map.of("maven", new MavenPomResolver())),
                 "project");
@@ -434,6 +440,7 @@ public class InferredCompilerChainModuleTest {
         executor.addModule(
                 "chain",
                 new InferredCompilerChainModule(
+                        Collections.emptyNavigableSet(),
                         Map.of("maven", MavenDefaultRepository.of()),
                         Map.of("maven", new MavenPomResolver())),
                 "project");
