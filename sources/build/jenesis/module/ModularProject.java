@@ -250,6 +250,31 @@ public class ModularProject implements BuildExecutorModule {
                         + info.requires()
                         + ")");
             }
+            if (info.layer() != null) {
+                throw new IllegalStateException("Module '"
+                        + info.coordinate()
+                        + "' declares @jenesis.layer "
+                        + info.layer()
+                        + " with no coordinate: a layer's content is declared by the application that"
+                        + " defines the layer, so declare @jenesis.layer "
+                        + info.layer()
+                        + " module/"
+                        + info.coordinate()
+                        + " there instead");
+            }
+            for (String dependency : info.requires()) {
+                String isolating = info.layers().get("module/" + dependency);
+                if (isolating != null) {
+                    throw new IllegalStateException("Module '"
+                            + info.coordinate()
+                            + "' requires "
+                            + dependency
+                            + ", which @jenesis.layer isolates in layer "
+                            + isolating
+                            + ": an isolated module is not on the application's module path, so reach it"
+                            + " through a service the layer provides");
+                }
+            }
             SequencedMap<String, String> versions = new LinkedHashMap<>(info.versions());
             for (Map.Entry<String, SequencedMap<String, String>> variant : info.variants().entrySet()) {
                 String selected = platform.select(variant.getKey(),
@@ -273,6 +298,12 @@ public class ModularProject implements BuildExecutorModule {
             }
             info.plugins().forEach((coordinate, group) ->
                     requires.setProperty(group + "/plugin/" + coordinate, ""));
+            info.layers().forEach((coordinate, isolating) -> requires.setProperty(isolating
+                    + "/runtime/"
+                    + coordinate
+                    + (coordinate.startsWith("module/")
+                            ? ""
+                            : version(versions, isolating + "/" + coordinate)), ""));
             info.attachments().forEach((key, _) -> {
                 int slash = key.indexOf('/');
                 int second = key.indexOf('/', slash + 1);
@@ -287,6 +318,13 @@ public class ModularProject implements BuildExecutorModule {
                         + (repository.equals("module") ? "" : version(versions, key)), "");
             });
             requires.store(context.next().resolve(BuildStep.REQUIRES));
+            if (!info.layers().isEmpty() || !info.shared().isEmpty()) {
+                SequencedProperties layers = new SequencedProperties();
+                info.layers().values().forEach(isolating -> layers.setProperty(isolating, ""));
+                info.shared().forEach((isolating, modules) ->
+                        layers.setProperty(isolating + "/shared", String.join(",", modules)));
+                layers.store(context.next().resolve(BuildStep.LAYERS));
+            }
             if (!info.attachments().isEmpty()) {
                 SequencedProperties attachments = new SequencedProperties();
                 info.attachments().forEach((key, options) -> {

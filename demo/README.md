@@ -11,8 +11,9 @@ benchmark what you built, customize or replace the build template itself, lock d
 the supply chain, assemble a release for Maven Central, compile a module ahead of
 time into a GraalVM native binary, share build outputs through a content-addressed
 cache, check that the jar you are about to publish still matches the API you
-published last, and finally run somebody else's released program without building
-anything at all.
+published last, run somebody else's released program without building anything at
+all, and finally hold two versions of one library in a single JVM without relocating
+a single package.
 
 Every demo has its own `build/jenesis` symlink into this repository's
 `sources/build/jenesis`, so each runs in isolation from inside its own directory
@@ -114,6 +115,7 @@ Quick index
 | 52 | [`publishing`](demo-52-publishing/README.md)                 | Assemble a Maven Central ready bundle (POM metadata + sources/javadoc jars) and resolve it back | `java build/Demo.java`             |
 | 53 | [`native-image`](demo-53-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
 | 54 | [`jpx`](demo-54-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
+| 55 | [`module-layers`](demo-55-module-layers/README.md)           | Hold two versions of one library in one JVM without relocating a package: `@jenesis.layer` isolates a dependency and its closure in a run-time `ModuleLayer` of its own, reached through a shared seam module rather than through shading | `java build/Demo.java`             |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1213,6 +1215,40 @@ Resolution reaches the default repositories - the Jenesis module repository for
 module names, Maven Central for coordinates - each fronted by the local
 `~/.jenesis/` exports and `~/.m2/`, and each redirectable at a mirror through
 `JENESIS_REPOSITORY_URI` and `MAVEN_REPOSITORY_URI`.
+
+## 38. Two versions of one library - [`module-layers`](demo-55-module-layers/README.md)
+
+Every demo so far assumed the module path can hold what the build resolves. It cannot
+always: a module path admits one module per name, so when two parts of a program need
+two versions of the same library, something has to give. The usual answer elsewhere is
+shading - rewrite the bytecode, rename the packages, and hope nothing reflected on them.
+Jenesis has no shading and does not want one; relocation takes reflection,
+`Class.forName`, resource lookup, `META-INF/services`, jar signatures and stack traces
+with it.
+
+A dependency group can instead be declared a run-time **layer**. `@jenesis.layer render
+module/demo.layers.renderer` puts that module and its whole transitive closure into the
+`render` group, which resolves, pins, verifies and reports like any other group but is
+kept off the application's module path at compile time *and* at run time and is
+materialised into a `layers/render/` folder of its own. At run time the application
+defines it as a child `ModuleLayer` with its own class loader, and both versions
+coexist under their original package names.
+
+The compiler does the enforcing for free: the layer's group is not on the application's
+`--module-path`, so a direct reference to an isolated type is a compile error rather
+than a `NoClassDefFoundError` in production. What crosses instead is the *seam* - a
+module the layer resolves from its parent rather than duplicating, declared
+`@jenesis.layer render shared demo.layers.api`, so both sides hold the very same
+classes and the call across the boundary is a plain interface call rather than a proxy.
+The build rejects a layer that provides a service contract it also isolates, and a
+module shared with a layer whose own closure reaches back into it - the case the JVM
+reports much later as a `LinkageError` far from its cause.
+
+A layer is defined at run time, so `native=true` rejects a project that declares one
+and `launcher=true` does too; `bundle=true` is the packaging that ships layers today,
+carrying `layers/<name>/` beside `modulepath/` and naming it in
+`application.properties`.
+
 
 Cross-cutting concepts
 ----------------------

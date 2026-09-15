@@ -51,6 +51,7 @@ public class Inventory implements BuildStep {
                 Path.of(JPackage.PACKAGES),
                 Path.of(JMod.JMODS),
                 Path.of(JLink.RUNTIME),
+                Path.of(Layers.LAYER_PATH),
                 Path.of(NativeImage.NATIVE),
                 Path.of(NativeImage.METADATA),
                 Path.of(REPORTS)));
@@ -72,6 +73,7 @@ public class Inventory implements BuildStep {
         boolean modular = false;
         Path image = null;
         Path runtimeImage = null;
+        Path layers = null;
         Path nativeBinary = null;
         Path metadataImage = null;
         Path dockerContext = null;
@@ -157,6 +159,10 @@ public class Inventory implements BuildStep {
             Path licensesFile = folder.resolve(Dependencies.LICENSES);
             if (Files.isRegularFile(licensesFile)) {
                 dependencyLicenses.add(licensesFile);
+            }
+            Path layered = folder.resolve(Layers.LAYER_PATH);
+            if (layers == null && Files.isDirectory(layered)) {
+                layers = layered;
             }
             Path runtime = folder.resolve(JLink.RUNTIME);
             if (runtimeImage == null && Files.isDirectory(runtime)) {
@@ -272,6 +278,9 @@ public class Inventory implements BuildStep {
         }
         if (runtimeImage != null) {
             inventory.setProperty(prefix + "image", relativize(context, runtimeImage));
+        }
+        if (layers != null) {
+            inventory.setProperty(prefix + "layers", relativize(context, layers));
         }
         if (nativeBinary != null) {
             inventory.setProperty(prefix + "native", relativize(context, nativeBinary));

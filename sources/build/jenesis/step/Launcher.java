@@ -77,6 +77,12 @@ public class Launcher implements BuildStep {
         if (mainClass == null || shaded == null || jars.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
+        SequencedSet<String> layers = Layers.declared(arguments).sequencedKeySet();
+        if (!layers.isEmpty()) {
+            throw new IllegalStateException("Layers " + layers + " cannot be reached from a launcher jar,"
+                    + " as their modules would live inside it rather than beside it - package the application"
+                    + " with bundle=true, which ships the layers as folders");
+        }
         SequencedMap<String, Path> classpath = new LinkedHashMap<>(), modulepath = new LinkedHashMap<>();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
             boolean onModulePath = mainModule != null && pathPlacement.test(entry.getValue());

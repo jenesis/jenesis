@@ -122,6 +122,7 @@ public abstract class Java extends JdkProcessBuildStep {
                                                  SequencedMap<String, SequencedMap<String, String>> properties)
             throws IOException {
         List<String> classPath = new ArrayList<>(), modulePath = new ArrayList<>();
+        SequencedMap<String, Path> layers = new TreeMap<>();
         ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
             BuildStepArgument argument = entry.getValue();
@@ -146,6 +147,14 @@ public abstract class Java extends JdkProcessBuildStep {
             }
             for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
                 graph.place(pathPlacement, file, modulePath, classPath);
+            }
+            Path isolated = argument.folder().resolve(Layers.LAYER_PATH);
+            if (Files.isDirectory(isolated)) {
+                try (DirectoryStream<Path> names = Files.newDirectoryStream(isolated)) {
+                    for (Path name : names) {
+                        layers.putIfAbsent(name.getFileName().toString(), name);
+                    }
+                }
             }
             SequencedMap<String, String> folders = properties.get(entry.getKey());
             if (folders != null) {
@@ -175,6 +184,7 @@ public abstract class Java extends JdkProcessBuildStep {
         options.put(CLASS_PATH, String.join(File.pathSeparator, classPath));
         List<String> prefixes = new ArrayList<>(argumentFile(context.supplement().resolve("java.args"), options));
         prefixes.addAll(graph.arguments());
+        layers.forEach((name, folder) -> prefixes.add("-Djenesis.layer." + name + "=" + folder));
         return commands(executor, context, arguments).thenApplyAsync(commands -> Stream.concat(
                 prefixes.stream(),
                 commands.stream()).toList(), executor);

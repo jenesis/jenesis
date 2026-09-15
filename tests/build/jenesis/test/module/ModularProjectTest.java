@@ -860,4 +860,91 @@ public class ModularProjectTest {
         assertThat(module.getProperty("main")).isNull();
     }
 
+    @Test
+    public void emits_layers_properties_and_isolated_requires_from_javadoc_declarations() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render maven/org.example/renderer
+                 * @jenesis.layer render shared org.slf4j
+                 * @jenesis.pin render/maven/org.example/renderer 1.2.3
+                 */
+                module foo {
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path module = results.get("module/module-/manifests");
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES)))
+                .as("an isolated coordinate lands in the layer's own group, never in main")
+                .containsOnly(Map.entry("render/runtime/maven/org.example/renderer/1.2.3", ""));
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.LAYERS))).containsOnly(
+                Map.entry("render", ""),
+                Map.entry("render/shared", "org.slf4j"));
+    }
+
+    @Test
+    public void writes_no_layers_file_without_a_declaration() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                module foo {
+                  requires bar;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(results.get("module/module-/manifests").resolve(BuildStep.LAYERS)).doesNotExist();
+    }
+
+    @Test
+    public void rejects_a_requires_on_an_isolated_module() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render org.example.renderer
+                 */
+                module foo {
+                  requires org.example.renderer;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+        executor.addModule("module", new ModularProject("module", project));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("Module 'foo' requires org.example.renderer, which @jenesis.layer isolates"
+                        + " in layer render: an isolated module is not on the application's module path,"
+                        + " so reach it through a service the layer provides");
+    }
+    @Test
+    public void rejects_a_module_that_declares_itself_into_a_layer() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render
+                 */
+                module foo {
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+        executor.addModule("module", new ModularProject("module", project));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("Module 'foo' declares @jenesis.layer render with no coordinate:"
+                        + " a layer's content is declared by the application that defines the layer,"
+                        + " so declare @jenesis.layer render module/foo there instead");
+    }
 }

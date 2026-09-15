@@ -228,6 +228,7 @@ public record Project(
                 stage.addStep("modular", new ModularStaging(), inherited.sequencedKeySet());
                 stage.addStep("packages", new ImageStaging("package").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("runtime", new ImageStaging("image"), inherited.sequencedKeySet());
+                stage.addStep("layers", new ImageStaging("layers"), inherited.sequencedKeySet());
                 stage.addStep("native", new ImageStaging("native").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("docker", new ImageStaging("docker"), inherited.sequencedKeySet());
                 stage.addStep("reports", new ReportStaging(), inherited.sequencedKeySet());
@@ -304,6 +305,7 @@ public record Project(
                 stage.addStep("modular", new ModularStaging(), inherited.sequencedKeySet());
                 stage.addStep("packages", new ImageStaging("package").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("runtime", new ImageStaging("image"), inherited.sequencedKeySet());
+                stage.addStep("layers", new ImageStaging("layers"), inherited.sequencedKeySet());
                 stage.addStep("native", new ImageStaging("native").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("docker", new ImageStaging("docker"), inherited.sequencedKeySet());
                 stage.addStep("reports", new ReportStaging(), inherited.sequencedKeySet());
@@ -736,6 +738,30 @@ public record Project(
                           transitively and drops every resolved artifact declaring the overridden
                           module, so the packages appear once. Reaches consumers through the
                           Jenesis-Overrides manifest header. A carrier nothing declares is an error.
+                      @jenesis.layer <name> [<token> | shared <module>...]
+                          Isolate a dependency and its whole transitive closure in a run-time
+                          ModuleLayer of its own, which is how two versions of one library coexist
+                          without shading: nothing is relocated, the second copy simply gets its own
+                          class loader. Two words put <token>'s closure into the dependency group
+                          <name>, which resolves, pins, verifies and reports like any other group but
+                          is kept off the application's module path at compile time and at run time
+                          and is materialised into a layers/<name>/ folder. Three or more words with
+                          `shared` name modules the layer resolves from its parent instead of
+                          duplicating - the seam, the only classes both sides hold in common, and the
+                          only ones that may cross. One word is rejected and names the two-word line to
+                          write instead: a layer's content is declared by the application defining it,
+                          not by the module being isolated.
+                          Compilation enforces the boundary for free: the layer's group is not on the
+                          application's --module-path, so naming an isolated type is a compile error
+                          rather than a NoClassDefFoundError in production. The application therefore
+                          reaches the layer through a service - `uses` on the module doing the lookup,
+                          ServiceLoader.load(layer, Contract.class) - and the build rejects a layer
+                          that provides a contract it also isolates, a module shared with a layer
+                          whose closure reaches back into it, and a jar in a layer that carries no
+                          module. Defining a layer needs a JVM, so native=true and launcher=true both
+                          reject one; bundle=true ships layers/<name>/ beside modulepath/ and names it
+                          in application.properties, and a run through Execute or Docker passes the
+                          folder as -Djenesis.layer.<name>. See demo-55-module-layers.
                       @jenesis.bom <token> [<ver> [<algo>/<hex>]] [(<guard>)]
                           Import managed versions. A bare <module> names a BOM properties file in the
                           module repository, floating latest without a version; <groupId>/<artifactId>

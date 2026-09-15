@@ -17,6 +17,7 @@ import build.jenesis.step.JLink;
 import build.jenesis.step.JMod;
 import build.jenesis.step.JPackage;
 import build.jenesis.step.Jar;
+import build.jenesis.step.Layers;
 import build.jenesis.step.NativeImage;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
@@ -123,6 +124,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     artifact.apply(
                             new InferredArtifactQualityModule(descriptor.configuration(), repositories, resolvers)
                                     .pinning(descriptor.pinning())),
+                    Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
+            sub.addStep("layers",
+                    new Layers(),
                     Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             if (descriptor.test()) {
                 Path module = null;

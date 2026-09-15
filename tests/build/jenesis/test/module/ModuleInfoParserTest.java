@@ -1388,4 +1388,98 @@ public class ModuleInfoParserTest {
                 .hasMessageContaining("Malformed @jenesis.signature token '<p>Vetted'")
                 .hasMessageContaining("move it above the tag block");
     }
+    @Test
+    public void jenesis_layer_isolates_a_coordinate_and_normalizes_a_bare_module() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render maven/org.example/renderer
+                 * @jenesis.layer render org.example.legacy
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.layers()).containsExactly(
+                Map.entry("maven/org.example/renderer", "render"),
+                Map.entry("module/org.example.legacy", "render"));
+        assertThat(info.layer()).isNull();
+        assertThat(info.shared()).isEmpty();
+    }
+
+    @Test
+    public void jenesis_layer_declares_a_module_into_a_layer() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.layer()).isEqualTo("render");
+        assertThat(info.layers()).isEmpty();
+    }
+
+    @Test
+    public void jenesis_layer_shares_modules_with_the_parent_layer() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render shared org.slf4j demo.api
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.shared()).containsExactly(
+                Map.entry("render", new LinkedHashSet<>(List.of("org.slf4j", "demo.api"))));
+        assertThat(info.layers())
+                .as("a shared declaration names modules of the parent, not coordinates to isolate")
+                .isEmpty();
+    }
+
+    @Test
+    public void jenesis_layer_reads_a_module_named_shared_as_a_coordinate() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render shared
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.layers())
+                .as("two words are always <layer> <coordinate>, so a module named shared stays reachable")
+                .containsExactly(Map.entry("module/shared", "render"));
+        assertThat(info.shared()).isEmpty();
+    }
+
+    @Test
+    public void jenesis_layer_rejects_a_third_word_that_is_not_shared() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render exposes org.slf4j
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.layer declaration 'render exposes org.slf4j'")
+                .hasMessageContaining("expected <layer>, <layer> <coordinate>, or <layer> shared <module>...");
+    }
+
+    @Test
+    public void jenesis_layer_rejects_a_module_in_two_layers() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render
+                 * @jenesis.layer report
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("a module lives in at most one layer");
+    }
 }
