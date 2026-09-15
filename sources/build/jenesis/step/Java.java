@@ -122,7 +122,7 @@ public abstract class Java extends JdkProcessBuildStep {
                                                  SequencedMap<String, SequencedMap<String, String>> properties)
             throws IOException {
         List<String> classPath = new ArrayList<>(), modulePath = new ArrayList<>();
-        SequencedMap<String, SequencedSet<String>> layers = new TreeMap<>();
+        SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
         SequencedMap<String, Path> pool = new LinkedHashMap<>();
         ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
@@ -187,13 +187,14 @@ public abstract class Java extends JdkProcessBuildStep {
             }
         }
         options.addAll(graph.arguments());
-        // A layer is a named module path, not a folder: its jars sit among the application's, each stored
-        // once under a name that carries its version, and the property names them.
-        layers.forEach((name, names) -> options.add("-Djenesis.layer." + name + "=" + names.stream()
-                .map(pool::get)
-                .filter(Objects::nonNull)
-                .map(Path::toString)
-                .collect(Collectors.joining(File.pathSeparator))));
+        // A layer names its jars rather than a folder, and splits the two paths as the application does:
+        // its jars sit among the application's, each stored once under a name that carries its version.
+        layers.forEach((name, membership) -> {
+            options.add("-Djenesis.layer.modulepath." + name + "=" + path(membership.modulepath(), pool));
+            if (!membership.classpath().isEmpty()) {
+                options.add("-Djenesis.layer.classpath." + name + "=" + path(membership.classpath(), pool));
+            }
+        });
         // Everything the launch needs travels in one argument file, so neither a long path nor a layer
         // that names many jars can grow the command line past what the platform accepts.
         List<String> prefixes = options.isEmpty()
@@ -202,5 +203,13 @@ public abstract class Java extends JdkProcessBuildStep {
         return commands(executor, context, arguments).thenApplyAsync(commands -> Stream.concat(
                 prefixes.stream(),
                 commands.stream()).toList(), executor);
+    }
+
+    private static String path(SequencedSet<String> names, SequencedMap<String, Path> pool) {
+        return names.stream()
+                .map(pool::get)
+                .filter(Objects::nonNull)
+                .map(Path::toString)
+                .collect(Collectors.joining(File.pathSeparator));
     }
 }

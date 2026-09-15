@@ -82,7 +82,7 @@ public class Bundle implements BuildStep {
                 classpath.put(entry.getKey(), entry.getValue());
             }
         }
-        SequencedMap<String, SequencedSet<String>> layers = new TreeMap<>();
+        SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -93,7 +93,7 @@ public class Bundle implements BuildStep {
         // selection; take them by the names the layer records, and nothing else that happens to be
         // resolved - a tool's own closure is not part of the application.
         SequencedSet<String> named = new LinkedHashSet<>();
-        layers.values().forEach(named::addAll);
+        layers.values().forEach(membership -> named.addAll(membership.all()));
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -122,8 +122,8 @@ public class Bundle implements BuildStep {
         }
         SequencedMap<String, Path> stored = new TreeMap<>(classpath);
         stored.putAll(modulepath);
-        for (Map.Entry<String, SequencedSet<String>> layer : layers.entrySet()) {
-            for (String name : layer.getValue()) {
+        for (Map.Entry<String, Layers.Membership> layer : layers.entrySet()) {
+            for (String name : layer.getValue().all()) {
                 Path jar = jars.get(name);
                 if (jar == null) {
                     throw new IllegalStateException("Layer " + layer.getKey() + " names " + name
@@ -151,11 +151,19 @@ public class Bundle implements BuildStep {
                                         List<String> relaxations,
                                         SequencedSet<String> classpath,
                                         SequencedSet<String> modulepath,
-                                        SequencedMap<String, SequencedSet<String>> layers,
+                                        SequencedMap<String, Layers.Membership> layers,
                                         String separator) {
         List<String> command = new ArrayList<>();
-        layers.forEach((name, names) -> command.add(
-                "-Djenesis.layer." + name + "=" + path(names, separator)));
+        // A layer splits the two paths as the application does, and names both: what carries a module is
+        // resolved, and the rest is the unnamed module its automatic modules read.
+        layers.forEach((name, membership) -> {
+            command.add("-Djenesis.layer.modulepath." + name + "="
+                    + path(membership.modulepath(), separator));
+            if (!membership.classpath().isEmpty()) {
+                command.add("-Djenesis.layer.classpath." + name + "="
+                        + path(membership.classpath(), separator));
+            }
+        });
         if (!classpath.isEmpty()) {
             command.add("--class-path");
             command.add(path(classpath, separator));

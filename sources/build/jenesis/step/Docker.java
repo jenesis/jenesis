@@ -55,7 +55,7 @@ public class Docker implements BuildStep {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         SequencedMap<String, Path> jars = new TreeMap<>();
-        SequencedMap<String, SequencedSet<String>> layers = new TreeMap<>();
+        SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -99,8 +99,8 @@ public class Docker implements BuildStep {
                 resolved.putIfAbsent(jar.getFileName().toString(), jar);
             }
         }
-        for (Map.Entry<String, SequencedSet<String>> layer : layers.entrySet()) {
-            for (String name : layer.getValue()) {
+        for (Map.Entry<String, Layers.Membership> layer : layers.entrySet()) {
+            for (String name : layer.getValue().all()) {
                 Path jar = resolved.get(name);
                 if (jar == null) {
                     throw new IllegalStateException("Layer " + layer.getKey() + " names " + name
@@ -118,7 +118,14 @@ public class Docker implements BuildStep {
         // that names many jars would otherwise grow the `ENTRYPOINT` past reading, and past what the
         // platform accepts.
         List<String> command = new ArrayList<>();
-        layers.forEach((layer, names) -> command.add("-Djenesis.layer." + layer + "=" + path(names)));
+        // A layer splits the two paths as the application does, and names both: what carries a module is
+        // resolved, and the rest is the unnamed module its automatic modules read.
+        layers.forEach((layer, membership) -> {
+            command.add("-Djenesis.layer.modulepath." + layer + "=" + path(membership.modulepath()));
+            if (!membership.classpath().isEmpty()) {
+                command.add("-Djenesis.layer.classpath." + layer + "=" + path(membership.classpath()));
+            }
+        });
         if (!classpath.isEmpty()) {
             command.add("--class-path");
             command.add(path(classpath.sequencedKeySet()));

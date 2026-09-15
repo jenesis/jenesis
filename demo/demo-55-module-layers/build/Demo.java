@@ -13,7 +13,7 @@ import build.jenesis.project.InferredMultiProjectAssembler;
  * which prints two versions of one library, in one JVM, with no package relocated:
  *
  *     the application's jackson-core 2.18.2, loaded by jdk.internal.loader.ClassLoaders$AppClassLoader@...
- *     the library's private jackson-core 2.15.4, loaded by jdk.internal.loader.Loader@...
+ *     the library's private jackson-core 2.15.4, loaded by build.jenesis.launcher.InMemoryClassLoader@...
  */
 public class Demo {
 
@@ -54,7 +54,7 @@ public class Demo {
 
         // The argument file is the launch itself: the module path, the layer properties and the entry
         // point are all in it, so a deployment runs `java @application.<platform>.args` from the folder
-        // it unpacked into. Each layer travels as -Djenesis.layer.<module>.<name>, the property the
+        // it unpacked into. Each layer travels as -Djenesis.layer.<path>.<module>.<name>, the property the
         // library's own code reads; inside an executable jar no such option is needed, because the
         // launcher reads the layer out of the jar it is already holding open.
         List<String> command = new ArrayList<>();

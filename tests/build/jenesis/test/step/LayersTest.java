@@ -74,7 +74,7 @@ public class LayersTest {
 
         assertThatThrownBy(this::apply)
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Layer render isolates nothing")
+                .hasMessageContaining("Layer render holds no module")
                 .hasMessageContaining("already shared through demo.api");
     }
 
@@ -96,7 +96,25 @@ public class LayersTest {
     }
 
     @Test
-    public void rejects_a_jar_that_carries_no_module() throws IOException {
+    public void reads_a_jar_without_a_module_through_the_layers_class_path() throws IOException {
+        module(artifacts, "demo.api", builder -> builder.exports(PackageDesc.of("demo.api"), 0));
+        module(resolved, "demo.impl", builder -> builder.exports(PackageDesc.of("demo.impl"), 0));
+        plainJar(resolved.resolve("legacy.jar"));
+        index("layer:render/runtime/module/demo.impl", "resolved/demo.impl.jar",
+                "layer:render/runtime/maven/org.example/legacy", "resolved/legacy.jar");
+        declare("render", "demo.api");
+
+        assertThat(apply().next()).isTrue();
+        assertThat(layer("render"))
+                .as("what carries a module identity is resolved")
+                .containsExactly("demo.impl.jar");
+        assertThat(unnamed("render"))
+                .as("the long tail a legacy library drags is the layer's own unnamed module, not a refusal")
+                .containsExactly("legacy.jar");
+    }
+
+    @Test
+    public void rejects_a_layer_that_holds_no_module_at_all() throws IOException {
         module(artifacts, "demo.api", builder -> builder.exports(PackageDesc.of("demo.api"), 0));
         plainJar(resolved.resolve("legacy.jar"));
         index("layer:render/runtime/maven/org.example/legacy", "resolved/legacy.jar");
@@ -104,7 +122,8 @@ public class LayersTest {
 
         assertThatThrownBy(this::apply)
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("legacy.jar carries no module but is isolated in layer render")
+                .hasMessageContaining("Layer render holds no module")
+                .hasMessageContaining("[legacy.jar], which carry no module identity")
                 .hasMessageContaining("modules.properties");
     }
 
@@ -183,9 +202,19 @@ public class LayersTest {
         properties.store(input.resolve(BuildStep.DEPENDENCIES));
     }
 
-    /** What the layer holds, by file name - nothing is copied, so this is the membership it recorded. */
+    /** What the layer resolves, by file name - nothing is copied, so this is the membership it recorded. */
     private SequencedSet<String> layer(String name) throws IOException {
-        return new TreeSet<>(Layers.membership(next).getOrDefault("demo.host." + name, new LinkedHashSet<>()));
+        return new TreeSet<>(membership(name).modulepath());
+    }
+
+    /** What the layer reads through its class path, by file name. */
+    private SequencedSet<String> unnamed(String name) throws IOException {
+        return new TreeSet<>(membership(name).classpath());
+    }
+
+    private Layers.Membership membership(String name) throws IOException {
+        return Layers.membership(next).getOrDefault("demo.host." + name,
+                new Layers.Membership(new LinkedHashSet<>(), new LinkedHashSet<>()));
     }
 
     private static void module(Path folder,

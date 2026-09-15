@@ -1243,8 +1243,16 @@ layer from it, exactly as it already does for `Jenesis-Aliases` and `Jenesis-Ove
 Discovery runs to a fixpoint, so nesting is unbounded: a module isolated in one layer may isolate a
 dependency of its own in another, and `Launcher.layer` parents each on its *caller's*, so the inner
 one is a child of the outer rather than of the application. Tests get layers too - a `@jenesis.test`
-module's JVM is handed `jenesis.layer.<module>.<name>` exactly as a deployment would be, so a
+module's JVM is handed `jenesis.layer.modulepath.<module>.<name>` exactly as a deployment would be, so a
 library bootstraps its layer in a test run the same way it does in production.
+
+A layer splits a module path and a class path exactly as the application does, because the libraries
+worth isolating are usually the ones that were never modularized. What carries a module identity - a
+`module-info`, an `Automatic-Module-Name`, or a name given in `modules.properties` - is resolved into
+the layer; the long tail such a library drags is the layer's own class path, read by its automatic
+modules as it would be on a plain `java -cp`. So a legacy library is reached by naming *it*, not its
+whole tree. Only an automatic module reads the unnamed module, which is the module system's rule
+rather than this tool's, so a layer that holds no module at all is refused.
 
 What crosses the boundary is the API module, and everything it reaches is shared with the layer -
 derived rather than declared - so producer and consumer exchange the very same classes and a service

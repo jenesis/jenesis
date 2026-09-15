@@ -19,10 +19,12 @@ which builds the project, unpacks the produced `bundle.zip`, launches the app ou
 prints:
 
     the application's jackson-core 2.18.2, loaded by jdk.internal.loader.ClassLoaders$AppClassLoader@...
-    the library's private jackson-core 2.15.4, loaded by jdk.internal.loader.Loader@...
+    the library's private jackson-core 2.15.4, loaded by build.jenesis.launcher.InMemoryClassLoader@...
         and one layer deeper: jackson-core 2.13.5
 
-Three loaders, three versions, one package name.
+Three loaders, three versions, one package name. Each layer gets an `InMemoryClassLoader` of its own,
+the same kind the application's own jars are served by, whether the layer travels inside an executable
+jar or as a path list beside an unpacked one.
 
 The four modules
 ----------------
@@ -121,6 +123,27 @@ The consequence is worth stating plainly: **a dependency whose types your API mo
 exposed by it, and cannot be isolated behind it.** That is true of shading too; the difference is
 that here the build says so instead of leaving it to a `LinkageError` later.
 
+Legacy trees and the layer's class path
+---------------------------------------
+
+A layer splits the two paths exactly as the application does, because the libraries worth isolating are
+usually the ones that were never modularized. What carries a module identity - a `module-info`, an
+`Automatic-Module-Name`, or a name you give it in `modules.properties` - is resolved into the layer. The
+rest is the layer's own class path, and the descriptor names both:
+
+    layer.modulepath.demo.layers.library.render=demo.layers.impl-...,...2.15.4.jar
+    layer.classpath.demo.layers.library.render=commons-logging-1.2.jar,...
+
+So a legacy library is reached by naming *it*, not its whole tree: alias the one jar your code calls, and
+its long tail is read through the class path, as it would be on a plain `java -cp`.
+
+One rule of the module system decides how this can be used: **only an automatic module reads the unnamed
+module.** A jar promoted to an automatic module by an alias can therefore use the tail; a module with a
+real `module-info` cannot, and javac will not let it try. That is the usual shape anyway - what you isolate
+is a non-modular library, and what gives it a name is the alias.
+
+A layer that holds no module at all is refused, because a layer is reached through the modules it holds.
+
 What the build refuses
 ----------------------
 
@@ -131,7 +154,8 @@ What the build refuses
 - a layer that isolates nothing, because the API module already shares all of it;
 - a layer that provides a contract it also holds - the host would look that service up against a
   different class of the same name and find no provider, silently;
-- a jar in a layer that carries no module, since a named module cannot read the unnamed module.
+- a layer that holds no module at all, since a layer is reached through the modules it holds - name one
+  with `modules.properties` and the rest is read through the layer's class path.
 
 Where the layer comes from at run time
 --------------------------------------

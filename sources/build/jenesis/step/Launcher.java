@@ -77,7 +77,7 @@ public class Launcher implements BuildStep {
         if (mainClass == null || shaded == null || jars.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
-        SequencedMap<String, SequencedSet<String>> layers = new TreeMap<>();
+        SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -88,7 +88,7 @@ public class Launcher implements BuildStep {
         // selection; take them by the names the layer records, and nothing else that happens to be
         // resolved - a tool's own closure is not part of the application.
         SequencedSet<String> named = new LinkedHashSet<>();
-        layers.values().forEach(named::addAll);
+        layers.values().forEach(membership -> named.addAll(membership.all()));
         SequencedMap<String, Path> isolated = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -114,14 +114,22 @@ public class Launcher implements BuildStep {
         // the application's jars and every layer's alike: a jar more than one path names is stored once.
         application.setProperty("classpath", String.join(",", classpath.sequencedKeySet()));
         application.setProperty("modulepath", String.join(",", modulepath.sequencedKeySet()));
-        layers.forEach((layer, names) ->
-                application.setProperty("layer." + layer, String.join(",", names)));
+        // A layer splits the two paths as the application does, and names both: what carries a module is
+        // resolved, and the rest is the unnamed module its automatic modules read.
+        layers.forEach((layer, membership) -> {
+            application.setProperty("layer.modulepath." + layer,
+                    String.join(",", membership.modulepath()));
+            if (!membership.classpath().isEmpty()) {
+                application.setProperty("layer.classpath." + layer,
+                        String.join(",", membership.classpath()));
+            }
+        });
         Path descriptor = context.supplement().resolve("application.properties");
         application.store(descriptor);
         SequencedMap<String, Path> stored = new TreeMap<>(classpath);
         stored.putAll(modulepath);
-        for (Map.Entry<String, SequencedSet<String>> layer : layers.entrySet()) {
-            for (String member : layer.getValue()) {
+        for (Map.Entry<String, Layers.Membership> layer : layers.entrySet()) {
+            for (String member : layer.getValue().all()) {
                 Path file = isolated.get(member);
                 if (file == null) {
                     throw new IllegalStateException("Layer " + layer.getKey() + " names " + member

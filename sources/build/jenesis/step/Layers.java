@@ -11,8 +11,13 @@ import build.jenesis.SequencedProperties;
 
 public class Layers implements BuildStep {
 
-    /** Names the dependencies each layer holds: {@code <declaring module>.<name>=<jar>,<jar>}. */
+    /**
+     * Names what each layer holds on each of its two paths:
+     * {@code modulepath.<declaring module>.<name>=<jar>,<jar>} and its {@code classpath.} counterpart.
+     */
     public static final String MEMBERSHIP = "layered.properties";
+
+    private static final String MODULE_PATH = "modulepath.", CLASS_PATH = "classpath.";
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
 
@@ -44,11 +49,16 @@ public class Layers implements BuildStep {
         for (Map.Entry<String, Declaration> entry : declared.entrySet()) {
             String layer = entry.getKey(), api = entry.getValue().api();
             SequencedMap<String, ModuleDescriptor> isolated = new LinkedHashMap<>();
-            SequencedSet<String> names = isolate(layer, api, closure(api, host), arguments, isolated);
+            SequencedSet<String> unnamed = new LinkedHashSet<>();
+            SequencedSet<String> names = isolate(layer, api, closure(api, host), arguments, isolated, unnamed);
             verify(layer, api, isolated);
             // <declaring module>.<name>: a layer may hold a module that declares one of its own, so the
             // name alone is not a key. The runtime builds the same one from the module that calls it.
-            membership.setProperty(entry.getValue().module() + "." + layer, String.join(",", names));
+            String key = entry.getValue().module() + "." + layer;
+            membership.setProperty(MODULE_PATH + key, String.join(",", names));
+            if (!unnamed.isEmpty()) {
+                membership.setProperty(CLASS_PATH + key, String.join(",", unnamed));
+            }
         }
         membership.store(context.next().resolve(MEMBERSHIP));
         return CompletableFuture.completedStage(new BuildStepResult(true));
@@ -115,15 +125,18 @@ public class Layers implements BuildStep {
     }
 
     /**
-     * The file names a layer holds. Nothing is copied: a dependency is already materialised once, under a
-     * name that carries its version, so a jar a layer and the application both need is one file named twice
-     * and simply loaded twice.
+     * The file names a layer holds, split the way the application's own closure is: what carries a module
+     * identity is resolved, and the rest becomes the layer's class path, which its automatic modules read
+     * as they would on a real {@code -cp}. Nothing is copied: a dependency is already materialised once,
+     * under a name that carries its version, so a jar a layer and the application both need is one file
+     * named twice and simply loaded twice.
      */
     private static SequencedSet<String> isolate(String layer,
                                                 String api,
                                                 SequencedSet<String> shared,
                                                 SequencedMap<String, BuildStepArgument> arguments,
-                                                SequencedMap<String, ModuleDescriptor> isolated)
+                                                SequencedMap<String, ModuleDescriptor> isolated,
+                                                SequencedSet<String> unnamed)
             throws IOException {
         SequencedSet<String> names = new LinkedHashSet<>();
         SequencedMap<String, String> carriers = new LinkedHashMap<>();
@@ -134,10 +147,11 @@ public class Layers implements BuildStep {
             for (Path jar : Dependencies.select(argument.folder(), "layer:" + layer, "runtime")) {
                 ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
                 if (descriptor == null) {
-                    throw new IllegalStateException(jar.getFileName() + " carries no module but is isolated in"
-                            + " layer " + layer + " - a layer resolves modules only, as a named module cannot"
-                            + " read the unnamed module; declare it in modules.properties to derive a"
-                            + " descriptor, or keep it out of the layer");
+                    // The long tail of a library worth isolating is jars that were never modularized, and
+                    // naming each one is the work a layer exists to avoid. An alias still names what the
+                    // layer's own modules require by name; the rest is read through the class path.
+                    unnamed.add(jar.getFileName().toString());
+                    continue;
                 }
                 if (shared.contains(descriptor.name())) {
                     continue;
@@ -155,26 +169,60 @@ public class Layers implements BuildStep {
             }
         }
         if (isolated.isEmpty()) {
-            throw new IllegalStateException("Layer " + layer + " isolates nothing: everything it resolves is"
-                    + " already shared through " + api + " - a dependency whose types the API module reaches"
-                    + " is exposed by it, and cannot be isolated behind it");
+            throw new IllegalStateException("Layer " + layer + " holds no module: " + (unnamed.isEmpty()
+                    ? "everything it resolves is already shared through " + api + " - a dependency whose"
+                            + " types the API module reaches is exposed by it, and cannot be isolated"
+                            + " behind it"
+                    : "it resolves " + unnamed + ", which carry no module identity - a layer is reached"
+                            + " through the modules it holds, so name one with modules.properties"));
         }
         return names;
     }
 
-    /** The layers a module's build materialised, each key mapped to the file names it holds. */
-    public static SequencedMap<String, SequencedSet<String>> membership(Path folder) throws IOException {
+    /** What one layer holds: the jars it resolves as modules, and the jars that are its unnamed module. */
+    public record Membership(SequencedSet<String> modulepath, SequencedSet<String> classpath) {
+
+        public SequencedSet<String> all() {
+            SequencedSet<String> all = new LinkedHashSet<>(modulepath);
+            all.addAll(classpath);
+            return all;
+        }
+    }
+
+    /** The layers a module's build materialised, each key mapped to what it holds on each of its paths. */
+    public static SequencedMap<String, Membership> membership(Path folder) throws IOException {
         Path file = folder.resolve(MEMBERSHIP);
         if (!Files.isRegularFile(file)) {
             return Collections.emptyNavigableMap();
         }
         SequencedProperties properties = SequencedProperties.ofFiles(file);
-        SequencedMap<String, SequencedSet<String>> membership = new LinkedHashMap<>();
-        for (String layer : properties.stringPropertyNames()) {
-            List<String> names = properties.entries(layer);
-            membership.put(layer, names == null
+        SequencedMap<String, SequencedSet<String>> modules = new LinkedHashMap<>(), classes = new LinkedHashMap<>();
+        for (String key : properties.stringPropertyNames()) {
+            SequencedMap<String, SequencedSet<String>> target;
+            String prefix;
+            if (key.startsWith(MODULE_PATH)) {
+                target = modules;
+                prefix = MODULE_PATH;
+            } else if (key.startsWith(CLASS_PATH)) {
+                target = classes;
+                prefix = CLASS_PATH;
+            } else {
+                throw new IllegalStateException("Layer entry '" + key + "' in " + file + " names neither a"
+                        + " module path nor a class path - expected '" + MODULE_PATH + "<declaring module>"
+                        + ".<name>' or '" + CLASS_PATH + "<declaring module>.<name>'");
+            }
+            List<String> names = properties.entries(key);
+            target.put(key.substring(prefix.length()), names == null
                     ? new LinkedHashSet<>()
                     : new LinkedHashSet<>(names));
+        }
+        SequencedMap<String, Membership> membership = new LinkedHashMap<>();
+        SequencedSet<String> layers = new LinkedHashSet<>(modules.sequencedKeySet());
+        layers.addAll(classes.sequencedKeySet());
+        for (String layer : layers) {
+            membership.put(layer, new Membership(
+                    modules.getOrDefault(layer, new LinkedHashSet<>()),
+                    classes.getOrDefault(layer, new LinkedHashSet<>())));
         }
         return membership;
     }
