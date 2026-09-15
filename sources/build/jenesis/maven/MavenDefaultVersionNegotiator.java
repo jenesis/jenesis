@@ -112,6 +112,76 @@ public class MavenDefaultVersionNegotiator implements MavenVersionNegotiator {
         return (S) (Supplier<MavenVersionNegotiator> & Serializable) () -> new MavenDefaultVersionNegotiator(toDocumentBuilderFactory());
     }
 
+    @SuppressWarnings("unchecked")
+    public static <S extends Supplier<MavenVersionNegotiator> & Serializable> S fail() {
+        return (S) (Supplier<MavenVersionNegotiator> & Serializable) () -> new MavenDefaultVersionNegotiator(toDocumentBuilderFactory()) {
+            @Override
+            public String resolve(Executor executor,
+                                  MavenRepository repository,
+                                  String groupId,
+                                  String artifactId,
+                                  String type,
+                                  String classifier,
+                                  String current,
+                                  SequencedSet<String> versions) {
+                throw diverging(groupId, artifactId, type, classifier, versions);
+            }
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <S extends Supplier<MavenVersionNegotiator> & Serializable> S managed() {
+        return (S) (Supplier<MavenVersionNegotiator> & Serializable) () -> new MavenDefaultVersionNegotiator(toDocumentBuilderFactory()) {
+            @Override
+            public String resolve(Executor executor,
+                                  MavenRepository repository,
+                                  String groupId,
+                                  String artifactId,
+                                  String type,
+                                  String classifier,
+                                  String current,
+                                  SequencedSet<String> versions) {
+                throw diverging(groupId, artifactId, type, classifier, versions);
+            }
+
+            @Override
+            public void discovered(String groupId,
+                                   String artifactId,
+                                   String type,
+                                   String classifier,
+                                   String version,
+                                   boolean managed) {
+                if (!managed) {
+                    throw new IllegalStateException("No managed version for "
+                            + coordinate(groupId, artifactId, type, classifier)
+                            + " which resolved to "
+                            + version
+                            + " as another dependency's POM declares it"
+                            + " (add it to dependencyManagement, or run the pin selector)");
+                }
+            }
+        };
+    }
+
+    private static IllegalStateException diverging(String groupId,
+                                                   String artifactId,
+                                                   String type,
+                                                   String classifier,
+                                                   SequencedSet<String> versions) {
+        return new IllegalStateException("Diverging versions "
+                + versions
+                + " required for "
+                + coordinate(groupId, artifactId, type, classifier)
+                + " (add it to dependencyManagement, or run the pin selector)");
+    }
+
+    private static String coordinate(String groupId, String artifactId, String type, String classifier) {
+        return groupId
+                + ":" + artifactId
+                + (type == null || type.equals("jar") ? "" : ":" + type)
+                + (classifier == null ? "" : ":" + classifier);
+    }
+
     @Override
     public String resolve(Executor executor,
                           MavenRepository repository,

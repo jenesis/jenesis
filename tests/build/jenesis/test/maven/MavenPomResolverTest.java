@@ -48,7 +48,9 @@ public class MavenPomResolverTest {
                 "maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven()),
                 "latest", new MavenPomResolver(MavenDefaultVersionNegotiator.latest()),
                 "release", new MavenPomResolver(MavenDefaultVersionNegotiator.release()),
-                "closest", new MavenPomResolver(MavenDefaultVersionNegotiator.closest()));
+                "closest", new MavenPomResolver(MavenDefaultVersionNegotiator.closest()),
+                "fail", new MavenPomResolver(MavenDefaultVersionNegotiator.fail()),
+                "managed", new MavenPomResolver(MavenDefaultVersionNegotiator.managed()));
         for (Map.Entry<String, MavenPomResolver> entry : cases.entrySet()) {
             System.setProperty("jenesis.resolver.maven", entry.getKey());
             assertThat(serialize(new MavenPomResolver()))
@@ -70,7 +72,7 @@ public class MavenPomResolverTest {
         assertThatThrownBy(MavenPomResolver::new)
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Unknown jenesis.resolver.maven 'nonsense',"
-                        + " expected one of: maven, latest, release, stable, closest");
+                        + " expected one of: maven, latest, release, stable, closest, fail, managed");
     }
 
     @Test
@@ -86,6 +88,131 @@ public class MavenPomResolverTest {
                 .as("the resolver travels in the step's serialized form, which is its cache key,"
                         + " so a resolution decided differently cannot be served from the cache")
                 .isNotEqualTo(serialize(new MavenPomResolver()));
+    }
+
+    @Test
+    public void fail_rejects_two_dependencies_that_require_different_versions() throws IOException {
+        addDivergingClosure();
+
+        assertThatThrownBy(() -> new MavenPomResolver(MavenDefaultVersionNegotiator.fail()).dependencies(
+                Runnable::run, mavenRepository, "group", "artifact", "1", null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Diverging versions")
+                .hasMessageContaining("shared:artifact");
+    }
+
+    @Test
+    public void fail_accepts_a_closure_that_agrees_on_every_version() throws IOException {
+        addAgreeingClosure();
+
+        assertThatCode(() -> new MavenPomResolver(MavenDefaultVersionNegotiator.fail()).dependencies(
+                Runnable::run, mavenRepository, "group", "artifact", "1", null))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    public void managed_rejects_a_version_only_a_dependency_names() throws IOException {
+        addAgreeingClosure();
+
+        assertThatThrownBy(() -> new MavenPomResolver(MavenDefaultVersionNegotiator.managed()).dependencies(
+                Runnable::run, mavenRepository, "group", "artifact", "1", null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No managed version for shared:artifact");
+    }
+
+    @Test
+    public void managed_accepts_a_version_the_root_dependency_management_names() throws IOException {
+        addAgreeingClosure("""
+                <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>shared</groupId>
+                                <artifactId>artifact</artifactId>
+                                <version>1</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    """);
+
+        assertThatCode(() -> new MavenPomResolver(MavenDefaultVersionNegotiator.managed()).dependencies(
+                Runnable::run, mavenRepository, "group", "artifact", "1", null))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    public void managed_accepts_what_the_project_declares_itself() throws IOException {
+        addToRepository("group", "artifact", "1", rootPom("", "middle"));
+        addToRepository("middle", "artifact", "1", leafPom());
+
+        assertThatCode(() -> new MavenPomResolver(MavenDefaultVersionNegotiator.managed()).dependencies(
+                Runnable::run, mavenRepository, "group", "artifact", "1", null))
+                .as("a dependency the project declares itself is a version the project named")
+                .doesNotThrowAnyException();
+    }
+
+    private void addAgreeingClosure() throws IOException {
+        addAgreeingClosure("");
+    }
+
+    private void addAgreeingClosure(String management) throws IOException {
+        addToRepository("group", "artifact", "1", rootPom(management, "middle"));
+        addToRepository("middle", "artifact", "1", middlePom("1"));
+        addToRepository("shared", "artifact", "1", leafPom());
+    }
+
+    private void addDivergingClosure() throws IOException {
+        addToRepository("group", "artifact", "1", rootPom("", "middle", "other"));
+        addToRepository("middle", "artifact", "1", middlePom("1"));
+        addToRepository("other", "artifact", "1", middlePom("2"));
+        addToRepository("shared", "artifact", "1", leafPom());
+        addToRepository("shared", "artifact", "2", leafPom());
+    }
+
+    private static String rootPom(String management, String... groupIds) {
+        StringBuilder dependencies = new StringBuilder();
+        for (String groupId : groupIds) {
+            dependencies.append(dependencyOn(groupId, "1"));
+        }
+        return """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    %s<dependencies>
+                        %s
+                    </dependencies>
+                </project>
+                """.formatted(management, dependencies);
+    }
+
+    private static String middlePom(String version) {
+        return """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        %s
+                    </dependencies>
+                </project>
+                """.formatted(dependencyOn("shared", version));
+    }
+
+    private static String leafPom() {
+        return """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                </project>
+                """;
+    }
+
+    private static String dependencyOn(String groupId, String version) {
+        return """
+                <dependency>
+                            <groupId>%s</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>%s</version>
+                        </dependency>
+                        """.formatted(groupId, version);
     }
 
     private static byte[] serialize(Object value) throws IOException {
