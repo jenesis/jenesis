@@ -45,7 +45,7 @@ instead: the ones that customize, replace, or drive the template directly
 (`custom-assembler`, `internal-module`, `external-module`,
 `custom-maven`, `custom-modular`, `custom-build`, `custom-jmod`,
 `publishing`), the ones that assert the build fails on a policy violation
-(`compliance`, `vulnerabilities`, `supply-chain-security`), and the two
+(`pinning`, `openpgp`, `sigstore`, `compliance`, `vulnerabilities`), and the two
 executable demos (`java-pom-executable`, `java-modular-executable`), which stage a
 `jpackage` image and run it with the arguments you pass, and additionally ship a
 `build/DemoNative.java` sibling that builds a native installer and a
@@ -60,59 +60,60 @@ Quick index
 -----------
 
 | #  | Demo                                                 | Shows                                                                 | Run from the demo dir              |
-| -- | ---------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------- |
 | 1  | [`java-pom`](demo-01-java-pom/README.md)                     | A single Maven (`pom.xml`) project: `javac` + one real dependency, pinned | `java build/jenesis/Make.java`  |
 | 2  | [`java-modular`](demo-02-java-modular/README.md)             | The same project as a Java module (`module-info.java`, no `pom.xml`)  | `java build/jenesis/Make.java`  |
 | 3  | [`java-pom-multi`](demo-03-java-pom-multi/README.md)         | Many Maven modules: a library + a consumer that depends on it and an external artifact | `java build/jenesis/Make.java`  |
 | 4  | [`java-modular-multi`](demo-04-java-modular-multi/README.md) | The multi-module project as Java modules                              | `java build/jenesis/Make.java`  |
-| 5  | [`java-pom-executable`](demo-05-java-pom-executable/README.md)       | A runnable Maven project: a `<mainClass>` entry point + dependency, packaged into a native app image with `jpackage` | `java build/Demo.java`              |
-| 6  | [`java-modular-executable`](demo-06-java-modular-executable/README.md) | The same as a Java module: entry point via `@jenesis.main` + dependency, packaged with `jpackage` (and a plain `.jmod` + `jlink` runtime, and a `bundle` zip) | `java build/Demo.java`              |
-| 7  | [`bundle`](demo-07-bundle/README.md)                       | Ship a modular app as a `bundle.zip` of just its jars (split into `modulepath/`/`classpath/` plus an `application.properties`) for a stock JRE base, then unpack and run it - selected by a `packaging.properties` with `bundle=true` | `java build/Demo.java`             |
-| 8  | [`java-multi-release`](demo-08-java-multi-release/README.md) | A modular multi-release JAR: Java 21 baseline plus a Java 25 override of one utility, selected by the runtime | `java build/jenesis/Execute.java`  |
-| 9  | [`javac-arguments`](demo-09-javac-arguments/README.md)      | Pass extra flags to `javac` through a `process-javac.properties` config file - here `-parameters`, so method parameter names survive into the bytecode (verified at run time by reflection) | `java build/jenesis/Execute.java`  |
-| 10 | [`annotations`](demo-10-annotations/README.md)              | Run a Java annotation processor declared with `@jenesis.plugin`; the same jar on the module path stays dormant unless declared | `java build/jenesis/Make.java`  |
-| 11 | [`data-formats`](demo-11-data-formats/README.md)             | Generate sources as part of the build: three modules, three wire formats - an XML schema through `xjc`, a `.proto` through `protoc` and its gRPC plugin, an Avro schema through `avro-tools` - each turned on by its own config file and compiled into its module | `java build/jenesis/Make.java`  |
-| 12 | [`service-contracts`](demo-12-service-contracts/README.md)   | The same generation for service contracts: a WSDL through `wsimport` and an OpenAPI document through the OpenAPI Generator, of whose generated project only the source folder is collected | `java build/jenesis/Make.java`  |
-| 13 | [`java-quality`](demo-13-java-quality/README.md)             | Inferred code quality for Java: Checkstyle, PMD, SpotBugs, and a verifying `google-java-format`, each turned on by its config file | `java build/jenesis/Make.java`  |
-| 14 | [`sbom`](demo-14-sbom/README.md)                             | Emit a CycloneDX SBOM (embedded in the jar, staged as a report, and attached to the Maven repo for publication), on by default; an optional `sbom.properties` selects the format (`json`, `xml`, or `none` to disable) | `java build/jenesis/Make.java`  |
-| 15 | [`compliance`](demo-15-compliance/README.md)               | License gate over the resolved dependencies: each declared license is SPDX-normalized and checked against an allow/deny policy in `licensing.properties`; ships a GPL dependency rejected by a permissive-only policy | `java build/Demo.java`             |
-| 16 | [`vulnerabilities`](demo-16-vulnerabilities/README.md)     | Known-vulnerability gate: a `vulnerability.properties` file queries OSV.dev for the resolved coordinates and fails at or above a severity threshold; ships a deliberately vulnerable `log4j-core` 2.14.1 (Log4Shell) | `java build/Demo.java`             |
-| 17 | [`profiles`](demo-17-profiles/README.md)                     | Build profiles: a `release` profile selected with `-Djenesis.make.profiles=release` turns on source jars and chains to a `supply-chain` profile that enforces strict dependency pinning (the SBOM is emitted automatically) | `java build/jenesis/Make.java`  |
-| 18 | [`kotlin`](demo-18-kotlin/README.md)                         | Java + Kotlin in one module; exports a pure-Kotlin package            | `java build/jenesis/Make.java`  |
-| 19 | [`kotlin-quality`](demo-19-kotlin-quality/README.md)         | Inferred code quality for Kotlin: detekt and ktlint, with ktlint also verifying formatting | `java build/jenesis/Make.java`  |
-| 20 | [`kotlin-plugin`](demo-20-kotlin-plugin/README.md)           | Run a Kotlin compiler plugin (kotlinx.serialization) declared with `@jenesis.plugin kotlinc <repo>/<coord>`, passed to the compiler as `-Xplugin=` | `java build/jenesis/Make.java`  |
-| 21 | [`scala`](demo-21-scala/README.md)                           | Java + Scala 3 in one module; exports a pure-Scala package            | `java build/jenesis/Make.java`  |
-| 22 | [`scala-quality`](demo-22-scala-quality/README.md)           | Inferred code quality for Scala: Scalastyle and scalafmt, with scalafmt also verifying formatting | `java build/jenesis/Make.java`  |
-| 23 | [`groovy`](demo-23-groovy/README.md)                         | Java + Groovy in one module; why a Groovy-only package cannot be exported | `java build/jenesis/Make.java`  |
-| 24 | [`groovy-quality`](demo-24-groovy-quality/README.md)         | Inferred code quality for Groovy: CodeNarc lints the sources          | `java build/jenesis/Make.java`  |
-| 25 | [`code-coverage`](demo-25-code-coverage/README.md)          | Inferred test observation: JaCoCo records coverage during the test run and renders an HTML/XML report, enabled by a `jacoco.properties` config file | `java build/jenesis/Make.java`  |
-| 26 | [`test-selection`](demo-26-test-selection/README.md)         | Re-run only the tests a change can affect (`-Djenesis.test.incremental`), a watch-mode development-loop optimisation | `java build/Demo.java`             |
-| 27 | [`pitest`](demo-27-pitest/README.md)                         | Mutation testing: a `pitest.properties` config file makes the build run PIT, which seeds faults into the code and checks the tests catch them | `java build/jenesis/Make.java`  |
-| 28 | [`jmh`](demo-28-jmh/README.md)                               | Generate, compile and run a JMH benchmark: the harness comes from an annotation processor declared with `@jenesis.plugin`, JMH and its unnamed dependencies get module names with `@jenesis.alias`, and `@jenesis.main` runs it | `java build/jenesis/Execute.java`  |
-| 29 | [`agents`](demo-29-agents/README.md)                         | Attach libraries as Java agents with `@jenesis.attach`: Mockito as a dependency that also attaches to the test JVM, and the OpenTelemetry agent attached to the main run without ever joining a compile or runtime path | `java build/Demo.java`             |
-| 30 | [`maven-exclusions`](demo-30-maven-exclusions/README.md)     | A dependency with an `<exclusions>` block; a test asserts the excluded transitive is absent, and `@jenesis.exclude` states the same thing without a pom | `java build/jenesis/Make.java`  |
-| 31 | [`bom`](demo-31-bom/README.md)                               | Bills of materials: a Maven BOM's `dependencyManagement` imported via `@jenesis.bom` with its hashes brought in by the `pin` goal, next to a local `pin-<name>.properties` whose hashed entries need no pins at all; both overridable by local `@jenesis.pin` tags and strong enough for strict pinning | `java build/jenesis/Make.java`  |
-| 32 | [`module-layout`](demo-32-module-layout/README.md)           | Explicitly select the pure MODULAR layout (via `jenesis.properties`): resolve by module name, emit a modular jar with no `pom.xml` | `java build/jenesis/Make.java`  |
-| 33 | [`module-classifier`](demo-33-module-classifier/README.md)   | Pin a classified variant of a module (`:jdk-flow:0.4.3`): the build fetches the classifier artifact, validated by checksum and asserted at runtime | `java build/jenesis/Execute.java`  |
-| 34 | [`module-alias`](demo-34-module-alias/README.md)             | Give a plain jar with no module identity (no `module-info`, no `Automatic-Module-Name`) a stable name with `@jenesis.alias`, so it can be `requires`d and `opens`d like any module - shown with args4j 2.33 - then a `modules.properties` rewrites the closure into explicit named modules with `jdeps`, so the alias becomes linkable into a `jlink` image | `java build/jenesis/Execute.java`  |
-| 35 | [`module-override`](demo-35-module-override/README.md)       | Require an API whose packages a dependency already ships: Tomcat Embed exports the `jakarta.servlet` and `jakarta.el` packages under its own module names, so a modular library that states `requires jakarta.servlet` in its descriptor - here the Jakarta Server Pages API - cannot share a module path with it. `@jenesis.override` places package-less modules of those names that read the carriers, and drops the artifacts that would carry the packages twice | `java build/jenesis/Execute.java`  |
-| 36 | [`platform-guard`](demo-36-platform-guard/README.md)         | Select a dependency variant per platform: guarded pin lines (`(windows)`) matched against the `-Djenesis.platform.<token>=true` flags, with an unguarded fallback | `java build/jenesis/Execute.java`  |
-| 37 | [`platform-guard-pom`](demo-37-platform-guard-pom/README.md)  | The same guards in a `pom.xml`'s `<!--jenesis.pin-->` block: switch a transitive's pinned version per platform, each variant checksummed | `java build/jenesis/Execute.java`  |
-| 38 | [`custom-assembler`](demo-38-custom-assembler/README.md)     | Wrap the assembler to preprocess sources before the regular flow      | `java build/Demo.java`             |
-| 39 | [`custom-jmod`](demo-39-custom-jmod/README.md)               | Wrap the assembler to pack extra content into a `.jmod`, `jlink` it into a runtime, and `jpackage` that into a runnable app | `java build/Demo.java`             |
-| 40 | [`internal-module`](demo-40-internal-module/README.md)       | Move that preprocessing into a build module loaded from local source | `java build/Demo.java`             |
-| 41 | [`external-module`](demo-41-external-module/README.md)       | Resolve the same build module as a published coordinate | `java build/Demo.java`             |
-| 42 | [`custom-maven`](demo-42-custom-maven/README.md)             | Drive a multi-module Maven build via `MavenProject.make(root, assembler)`, no `Project` | `java build/Demo.java`             |
-| 43 | [`custom-modular`](demo-43-custom-modular/README.md)         | The same via `ModularProject.make(root, assembler)` for modules       | `java build/Demo.java`             |
-| 44 | [`custom-build`](demo-44-custom-build/README.md)             | No `Project` at all: wire a `BuildExecutor` by hand                   | `java build/Demo.java`             |
-| 45 | [`docker-isolation`](demo-45-docker-isolation/README.md)     | A standard build whose test and artifact `main` both grab host secrets, and how Docker confines them | `java build/jenesis/Make.java`  |
-| 46 | [`supply-chain-security`](demo-46-supply-chain-security/README.md) | Three questions about a dependency and what answers each: may we use one we cannot verify (strict pinning), are these the bytes we vetted (a checksum), and were they the ones upstream produced - `@jenesis.signature`, naming either an OpenPGP key checked with a local gpg, or a Sigstore identity read from a bundle beside the artifact with no key and no gpg at all | `java build/Demo.java`             |
-| 47 | [`publishing`](demo-47-publishing/README.md)                 | Assemble a Maven Central ready bundle (POM metadata + sources/javadoc jars) and resolve it back | `java build/Demo.java`             |
-| 48 | [`native-image`](demo-48-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
-| 49 | [`build-cache`](demo-49-build-cache/README.md)               | A content-addressed build cache serving step outputs across builds - project-local (`-Djenesis.project.cache`), shared via a URI (`-Djenesis.cache.uri=`), or local layered in front of a remote; shown by bootstrapping it then serving a full `-Djenesis.executor.rebuild=true` from it | `java build/jenesis/Make.java`  |
-| 50 | [`jpx`](demo-50-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
-| 51 | [`startup`](demo-51-startup/README.md)                       | What the entry point costs: `Make.java` names no engine class, so the Java launcher compiles one small file rather than the whole engine, and then compiles the build sources once and runs from those classes - 8.0s to 3.6s for a build that runs once, and 0.8s for a repeat. `jenesis.make.daemon` adds a reused JVM on top | `java build/jenesis/Make.java` |
-| 52 | [`api-compatibility`](demo-52-api-compatibility/README.md)   | Guard the API you already published: an empty `japicmp.properties` makes japicmp compare the built jar's byte code against the last release of the same coordinate - the demo publishes that release itself, then builds the next one against it - report-only until an `error-on-*` key turns a breaking change into a failed build | `java build/Demo.java`             |
+| 5  | [`startup`](demo-05-startup/README.md)                       | What the entry point costs: `Make.java` names no engine class, so the Java launcher compiles one small file rather than the whole engine, and then compiles the build sources once and runs from those classes - 8.0s to 3.6s for a build that runs once, and 0.8s for a repeat. `jenesis.make.daemon` adds a reused JVM on top | `java build/jenesis/Make.java` |
+| 6  | [`java-pom-executable`](demo-06-java-pom-executable/README.md)       | A runnable Maven project: a `<mainClass>` entry point + dependency, packaged into a native app image with `jpackage` | `java build/Demo.java`              |
+| 7  | [`java-modular-executable`](demo-07-java-modular-executable/README.md) | The same as a Java module: entry point via `@jenesis.main` + dependency, packaged with `jpackage` (and a plain `.jmod` + `jlink` runtime, and a `bundle` zip) | `java build/Demo.java`              |
+| 8  | [`bundle`](demo-08-bundle/README.md)                       | Ship a modular app as a `bundle.zip` of just its jars (split into `modulepath/`/`classpath/` plus an `application.properties`) for a stock JRE base, then unpack and run it - selected by a `packaging.properties` with `bundle=true` | `java build/Demo.java`             |
+| 9  | [`java-multi-release`](demo-09-java-multi-release/README.md) | A modular multi-release JAR: Java 21 baseline plus a Java 25 override of one utility, selected by the runtime | `java build/jenesis/Execute.java`  |
+| 10 | [`javac-arguments`](demo-10-javac-arguments/README.md)      | Pass extra flags to `javac` through a `process-javac.properties` config file - here `-parameters`, so method parameter names survive into the bytecode (verified at run time by reflection) | `java build/jenesis/Execute.java`  |
+| 11 | [`annotations`](demo-11-annotations/README.md)              | Run a Java annotation processor declared with `@jenesis.plugin`; the same jar on the module path stays dormant unless declared | `java build/jenesis/Make.java`  |
+| 12 | [`data-formats`](demo-12-data-formats/README.md)             | Generate sources as part of the build: three modules, three wire formats - an XML schema through `xjc`, a `.proto` through `protoc` and its gRPC plugin, an Avro schema through `avro-tools` - each turned on by its own config file and compiled into its module | `java build/jenesis/Make.java`  |
+| 13 | [`service-contracts`](demo-13-service-contracts/README.md)   | The same generation for service contracts: a WSDL through `wsimport` and an OpenAPI document through the OpenAPI Generator, of whose generated project only the source folder is collected | `java build/jenesis/Make.java`  |
+| 14 | [`maven-exclusions`](demo-14-maven-exclusions/README.md)     | A dependency with an `<exclusions>` block; a test asserts the excluded transitive is absent, and `@jenesis.exclude` states the same thing without a pom | `java build/jenesis/Make.java`  |
+| 15 | [`bom`](demo-15-bom/README.md)                               | Bills of materials: a Maven BOM's `dependencyManagement` imported via `@jenesis.bom` with its hashes brought in by the `pin` goal, next to a local `pin-<name>.properties` whose hashed entries need no pins at all; both overridable by local `@jenesis.pin` tags and strong enough for strict pinning | `java build/jenesis/Make.java`  |
+| 16 | [`module-alias`](demo-16-module-alias/README.md)             | Give a plain jar with no module identity (no `module-info`, no `Automatic-Module-Name`) a stable name with `@jenesis.alias`, so it can be `requires`d and `opens`d like any module - shown with args4j 2.33 - then a `modules.properties` rewrites the closure into explicit named modules with `jdeps`, so the alias becomes linkable into a `jlink` image | `java build/jenesis/Execute.java`  |
+| 17 | [`module-classifier`](demo-17-module-classifier/README.md)   | Pin a classified variant of a module (`:jdk-flow:0.4.3`): the build fetches the classifier artifact, validated by checksum and asserted at runtime | `java build/jenesis/Execute.java`  |
+| 18 | [`module-layout`](demo-18-module-layout/README.md)           | Explicitly select the pure MODULAR layout (via `jenesis.properties`): resolve by module name, emit a modular jar with no `pom.xml` | `java build/jenesis/Make.java`  |
+| 19 | [`module-override`](demo-19-module-override/README.md)       | Require an API whose packages a dependency already ships: Tomcat Embed exports the `jakarta.servlet` and `jakarta.el` packages under its own module names, so a modular library that states `requires jakarta.servlet` in its descriptor - here the Jakarta Server Pages API - cannot share a module path with it. `@jenesis.override` places package-less modules of those names that read the carriers, and drops the artifacts that would carry the packages twice | `java build/jenesis/Execute.java`  |
+| 20 | [`platform-guard`](demo-20-platform-guard/README.md)         | Select a dependency variant per platform: guarded pin lines (`(windows)`) matched against the `-Djenesis.platform.<token>=true` flags, with an unguarded fallback | `java build/jenesis/Execute.java`  |
+| 21 | [`platform-guard-pom`](demo-21-platform-guard-pom/README.md)  | The same guards in a `pom.xml`'s `<!--jenesis.pin-->` block: switch a transitive's pinned version per platform, each variant checksummed | `java build/jenesis/Execute.java`  |
+| 22 | [`pinning`](demo-22-pinning/README.md)                       | A pin records a version and the SHA-256 of the bytes it served: a version-only dependency builds until strict pinning refuses it, and a checksum that does not match fails without strict pinning being asked for at all | `java build/Demo.java`             |
+| 23 | [`openpgp`](demo-23-openpgp/README.md)                       | Who produced the bytes, answered by a key: `@jenesis.signature` names the fingerprint AssertJ really signs with, a rotated fingerprint is blocked though the signature is valid, a vetted list serves many modules, and strict refuses the transitive nothing vouches for | `java build/Demo.java`             |
+| 24 | [`sigstore`](demo-24-sigstore/README.md)                     | The same question without a key: a Sigstore identity names the workflow that released a dependency, verified in process against the bundle beside the artifact and the trust root the tool carries; another repository declared for it is blocked | `java build/Demo.java`             |
+| 25 | [`sbom`](demo-25-sbom/README.md)                             | Emit a CycloneDX SBOM (embedded in the jar, staged as a report, and attached to the Maven repo for publication), on by default; an optional `sbom.properties` selects the format (`json`, `xml`, or `none` to disable) | `java build/jenesis/Make.java`  |
+| 26 | [`compliance`](demo-26-compliance/README.md)               | License gate over the resolved dependencies: each declared license is SPDX-normalized and checked against an allow/deny policy in `licensing.properties`; ships a GPL dependency rejected by a permissive-only policy | `java build/Demo.java`             |
+| 27 | [`vulnerabilities`](demo-27-vulnerabilities/README.md)     | Known-vulnerability gate: a `vulnerability.properties` file queries OSV.dev for the resolved coordinates and fails at or above a severity threshold; ships a deliberately vulnerable `log4j-core` 2.14.1 (Log4Shell) | `java build/Demo.java`             |
+| 28 | [`java-quality`](demo-28-java-quality/README.md)             | Inferred code quality for Java: Checkstyle, PMD, SpotBugs, and a verifying `google-java-format`, each turned on by its config file | `java build/jenesis/Make.java`  |
+| 29 | [`code-coverage`](demo-29-code-coverage/README.md)          | Inferred test observation: JaCoCo records coverage during the test run and renders an HTML/XML report, enabled by a `jacoco.properties` config file | `java build/jenesis/Make.java`  |
+| 30 | [`test-selection`](demo-30-test-selection/README.md)         | Re-run only the tests a change can affect (`-Djenesis.test.incremental`), a watch-mode development-loop optimisation | `java build/Demo.java`             |
+| 31 | [`pitest`](demo-31-pitest/README.md)                         | Mutation testing: a `pitest.properties` config file makes the build run PIT, which seeds faults into the code and checks the tests catch them | `java build/jenesis/Make.java`  |
+| 32 | [`jmh`](demo-32-jmh/README.md)                               | Generate, compile and run a JMH benchmark: the harness comes from an annotation processor declared with `@jenesis.plugin`, JMH and its unnamed dependencies get module names with `@jenesis.alias`, and `@jenesis.main` runs it | `java build/jenesis/Execute.java`  |
+| 33 | [`api-compatibility`](demo-33-api-compatibility/README.md)   | Guard the API you already published: an empty `japicmp.properties` makes japicmp compare the built jar's byte code against the last release of the same coordinate - the demo publishes that release itself, then builds the next one against it - report-only until an `error-on-*` key turns a breaking change into a failed build | `java build/Demo.java`             |
+| 34 | [`kotlin`](demo-34-kotlin/README.md)                         | Java + Kotlin in one module; exports a pure-Kotlin package            | `java build/jenesis/Make.java`  |
+| 35 | [`kotlin-quality`](demo-35-kotlin-quality/README.md)         | Inferred code quality for Kotlin: detekt and ktlint, with ktlint also verifying formatting | `java build/jenesis/Make.java`  |
+| 36 | [`kotlin-plugin`](demo-36-kotlin-plugin/README.md)           | Run a Kotlin compiler plugin (kotlinx.serialization) declared with `@jenesis.plugin kotlinc <repo>/<coord>`, passed to the compiler as `-Xplugin=` | `java build/jenesis/Make.java`  |
+| 37 | [`scala`](demo-37-scala/README.md)                           | Java + Scala 3 in one module; exports a pure-Scala package            | `java build/jenesis/Make.java`  |
+| 38 | [`scala-quality`](demo-38-scala-quality/README.md)           | Inferred code quality for Scala: Scalastyle and scalafmt, with scalafmt also verifying formatting | `java build/jenesis/Make.java`  |
+| 39 | [`groovy`](demo-39-groovy/README.md)                         | Java + Groovy in one module; why a Groovy-only package cannot be exported | `java build/jenesis/Make.java`  |
+| 40 | [`groovy-quality`](demo-40-groovy-quality/README.md)         | Inferred code quality for Groovy: CodeNarc lints the sources          | `java build/jenesis/Make.java`  |
+| 41 | [`profiles`](demo-41-profiles/README.md)                     | Build profiles: a `release` profile selected with `-Djenesis.make.profiles=release` turns on source jars and chains to a `supply-chain` profile that enforces strict dependency pinning (the SBOM is emitted automatically) | `java build/jenesis/Make.java`  |
+| 42 | [`build-cache`](demo-42-build-cache/README.md)               | A content-addressed build cache serving step outputs across builds - project-local (`-Djenesis.project.cache`), shared via a URI (`-Djenesis.cache.uri=`), or local layered in front of a remote; shown by bootstrapping it then serving a full `-Djenesis.executor.rebuild=true` from it | `java build/jenesis/Make.java`  |
+| 43 | [`docker-isolation`](demo-43-docker-isolation/README.md)     | A standard build whose test and artifact `main` both grab host secrets, and how Docker confines them | `java build/jenesis/Make.java`  |
+| 44 | [`agents`](demo-44-agents/README.md)                         | Attach libraries as Java agents with `@jenesis.attach`: Mockito as a dependency that also attaches to the test JVM, and the OpenTelemetry agent attached to the main run without ever joining a compile or runtime path | `java build/Demo.java`             |
+| 45 | [`custom-assembler`](demo-45-custom-assembler/README.md)     | Wrap the assembler to preprocess sources before the regular flow      | `java build/Demo.java`             |
+| 46 | [`custom-jmod`](demo-46-custom-jmod/README.md)               | Wrap the assembler to pack extra content into a `.jmod`, `jlink` it into a runtime, and `jpackage` that into a runnable app | `java build/Demo.java`             |
+| 47 | [`internal-module`](demo-47-internal-module/README.md)       | Move that preprocessing into a build module loaded from local source | `java build/Demo.java`             |
+| 48 | [`external-module`](demo-48-external-module/README.md)       | Resolve the same build module as a published coordinate | `java build/Demo.java`             |
+| 49 | [`custom-maven`](demo-49-custom-maven/README.md)             | Drive a multi-module Maven build via `MavenProject.make(root, assembler)`, no `Project` | `java build/Demo.java`             |
+| 50 | [`custom-modular`](demo-50-custom-modular/README.md)         | The same via `ModularProject.make(root, assembler)` for modules       | `java build/Demo.java`             |
+| 51 | [`custom-build`](demo-51-custom-build/README.md)             | No `Project` at all: wire a `BuildExecutor` by hand                   | `java build/Demo.java`             |
+| 52 | [`publishing`](demo-52-publishing/README.md)                 | Assemble a Maven Central ready bundle (POM metadata + sources/javadoc jars) and resolve it back | `java build/Demo.java`             |
+| 53 | [`native-image`](demo-53-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
+| 54 | [`jpx`](demo-54-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -196,7 +197,30 @@ way Jenesis detects the test engine from the resolved jars (JUnit 5), wires the
 JUnit Platform console runner automatically, and runs the tests as part of the
 build. Each demo's `README.md` covers the test wiring in full.
 
-## 4. Packaging a runnable application - [`java-pom-executable`](demo-05-java-pom-executable/README.md), [`java-modular-executable`](demo-06-java-modular-executable/README.md), [`bundle`](demo-07-bundle/README.md)
+## 4. What starting a build costs - [`startup`](demo-05-startup/README.md)
+
+The Java launcher compiles the file you name, plus everything it references,
+before any of its code runs. So the entry point decides what a build costs before
+the build can decide anything, and a file declaring `Project` costs its whole
+closure - about 1.5 seconds before `main` is reached.
+
+`Make.java` is that entry point and names no engine class, so the Java launcher has
+one small file to compile. It then compiles the build sources once and runs the
+build from those classes, which is on by default because a single batch compile
+beats the Java launcher compiling class by class as it loads them: 8.0 seconds down to
+3.6 for a build that runs once, and 0.8 for a repeat.
+
+`jenesis.make.daemon` adds a reused JVM on top, keeping a warm JIT between calls.
+It is off by default, since compiling once already removes the large fixed cost.
+What it saves after that is compiling speed rather than setup - a Jenesis build
+has no script to parse, and spends its time inside javac, which a JVM that has
+already compiled a few modules runs faster - so it is worth nothing on a build
+that compiles little and about a third on a five-module one. The daemon serves one project, one request at a time; only `-Djenesis.*`
+flags travel with a call, cleared and set again around every build, while
+anything a running JVM cannot change - the build sources, the environment, the
+JVM arguments - replaces the daemon instead. `--stop` shuts it down.
+
+## 5. Packaging a runnable application - [`java-pom-executable`](demo-06-java-pom-executable/README.md), [`java-modular-executable`](demo-07-java-modular-executable/README.md), [`bundle`](demo-08-bundle/README.md)
 
 A module that declares an entry point can be packaged into a **native, self-contained
 application image** by the JDK's `jpackage`. These two demos are the runnable
@@ -241,10 +265,10 @@ Two more outputs round out the packaging menu, both opt-in `packaging.properties
 shown on `java-modular-executable`. `jmod=true` and `jlink=true` build
 the lower-level pieces `jpackage` uses internally: a `.jmod` staged beside the modular
 jar, and a `jlink` runtime image trimmed to the module graph under `stage/runtime`,
-runnable from its own `bin/java -m` - the foundation [`custom-jmod`](demo-39-custom-jmod/README.md) later
+runnable from its own `bin/java -m` - the foundation [`custom-jmod`](demo-46-custom-jmod/README.md) later
 builds on. And two no-runtime forms: `bundle=true` writes a `bundle.zip` of just the
 jars plus an `application.properties` to unzip onto an off-the-shelf JRE base (its own
-[`bundle`](demo-07-bundle/README.md) demo unpacks the zip and runs it on a stock JRE; also
+[`bundle`](demo-08-bundle/README.md) demo unpacks the zip and runs it on a stock JRE; also
 used to ship the app as a container image in `docker-isolation`), while
 `launcher=true` shades the published `build.jenesis.launcher` into a
 **single executable jar** you run with `java -jar foo.jar` - dependencies exploded into
@@ -269,7 +293,7 @@ The new idea is that **the build produces a runnable artifact, not just a jar**,
 that one entry-point declaration (`@jenesis.main` / `<mainClass>`) drives launching,
 packaging, and runtime-image linking through the same `module.properties` field.
 
-## 5. A multi-release JAR - [`java-multi-release`](demo-08-java-multi-release/README.md)
+## 6. A multi-release JAR - [`java-multi-release`](demo-09-java-multi-release/README.md)
 
 `java-multi-release` is a modular project (a `module-info.java`, no `pom.xml`, so
 the MODULAR_TO_MAVEN layout) that produces a single JAR carrying two
@@ -290,7 +314,7 @@ module's `@jenesis.main`:
 There are no module dependencies here - the demo is only about the multi-release
 packaging - so unlike `java-modular` it has nothing to pin.
 
-## 6. Configuring the Java compiler - [`javac-arguments`](demo-09-javac-arguments/README.md), [`annotations`](demo-10-annotations/README.md)
+## 7. Configuring the Java compiler - [`javac-arguments`](demo-10-javac-arguments/README.md), [`annotations`](demo-11-annotations/README.md)
 
 `javac-arguments` passes an extra flag to `javac` without a build script. A
 `process-javac.properties` file in a configuration location lists arguments for
@@ -335,7 +359,7 @@ The version is pinned the usual way, with the `pin` step writing back a
 `@jenesis.pin org.immutables/value 2.12.2 SHA-256/...` line (the Maven
 `<groupId>/<artifactId>`), both in the default `main` group.
 
-## 7. Generating sources instead of writing them - [`data-formats`](demo-11-data-formats/README.md), [`service-contracts`](demo-12-service-contracts/README.md)
+## 8. Generating sources instead of writing them - [`data-formats`](demo-12-data-formats/README.md), [`service-contracts`](demo-13-service-contracts/README.md)
 
 Not every source file is written by hand. `data-formats` builds three modules from
 three schemas: `order.xsd` through the JAXB binding compiler, `greeting.proto` through
@@ -389,24 +413,315 @@ themselves by extension, an OpenAPI document is a `.yaml` like any other - so
 `openapi.properties` names it, and shows a generator that writes a whole project of which
 only the source folder is collected.
 
-## 8. Code quality for Java - [`java-quality`](demo-13-java-quality/README.md)
+## 9. Excluding a transitive dependency - [`maven-exclusions`](demo-14-maven-exclusions/README.md)
 
-`java-quality` turns on a set of code-quality tools without a build script: each
-tool runs because its configuration file is present at the project root. A
-`checkstyle.xml` and a `pmd.xml` lint the sources, a `spotbugs-exclude.xml` brings
-in SpotBugs over the compiled classes, and a `javaformat.properties` file selects
-`google-java-format`.
+A Maven dependency drags in a transitive subtree, and `<exclusions>` prunes part
+of it. `maven-exclusions` declares Apache Commons Text but excludes its Apache
+Commons Lang transitive, and a test confirms the result: Commons Text is on the
+class path, Commons Lang is not.
 
-The new idea is **inference from configuration**. Jenesis binds the matched file
-from the configuration directory (the project root by default) into the build,
-which is how a root-level filter reaches SpotBugs even though SpotBugs runs after
-`javac` and sees only classes. Each tool resolves in its own group, so its closure
-never collides with the project's dependencies. The linters are report-only by
-default; the formatter runs in *verify* mode, failing the build when a source is
-not already formatted, and a single `-Djenesis.format.rewrite=true` flips it to
-rewrite the sources in place.
+The new idea is **exclusions, and where they apply**. A pom decides a transitive
+subtree wherever it is read, so the `MODULAR_TO_MAVEN` layout has the same problem
+and states the same fix as a tag instead of an element:
+`@jenesis.exclude <module> <groupId>/<artifactId>...`, one line per module and any
+number of targets on it. Only the purely modular layout has nothing to prune -
+resolution there matches module descriptors and never reads a pom - and there the
+tag is rejected rather than ignored. The test looks the classes up as resources rather than with
+`Class.forName(...)` (loading a Commons Text class would link it against the
+missing Commons Lang), and - exactly as in Maven, where test scope extends
+compile scope - the exclusion applies to the test class path too, not just the
+main one.
 
-## 9. Software bill of materials - [`sbom`](demo-14-sbom/README.md)
+## 10. Bills of materials - [`bom`](demo-15-bom/README.md)
+
+Where per-dependency `@jenesis.pin` tags pin each artifact in place, `bom`
+moves version curation into bills of materials, one per integrity model. An
+`@jenesis.bom org.slf4j/slf4j-bom 2.0.16` tag imports a Maven BOM's
+effective `dependencyManagement` from Maven Central; since POM bytes are not
+stable across repositories, the reference carries no hash, and the `pin`
+goal instead pins each artifact resolved through it with a computed
+checksum. An `@jenesis.bom pin-lang3.properties` tag reads a local
+properties file - found in the project's BOM locations
+(`jenesis.project.boms`, defaulting to the configuration location), which
+profiles never touch - whose byte-stable entries carry the version and
+`SHA-256` checksum for both the module name and its Maven coordinate, so no
+pin lines are needed at all. BOM keys follow the pin token grammar without
+the group (bare module name, Maven `groupId/artifactId`, or explicit
+`repository/coordinate`); the group, and an optional platform guard, sit on
+the `@jenesis.bom` declaration instead (`kotlinc/pin-lang3.properties`
+merges the entries into the `kotlinc` group). A BOM can equally be fetched
+from the module repository by naming its coordinate - versioned and
+checksummed, or floating to the latest published file - and the demo shows
+the precedence rules: a local `@jenesis.pin` overrides any BOM entry, the
+last declared BOM wins a conflict, and both models satisfy
+`-Djenesis.dependency.pin=strict`. What the resolver does with the versions
+that survive is a separate switch: `-Djenesis.resolver.maven` picks between
+Maven's nearest-wins rules (`maven`, the default), the same without range
+arbitration (`closest`), and the upgrade probes that ignore declared and
+pinned versions entirely (`latest`, `release`).
+
+## 11. Aliasing a plain library - [`module-alias`](demo-16-module-alias/README.md)
+
+The MODULAR_TO_MAVEN layout resolves dependencies by module name, but plenty of
+common libraries carry no module identity: no `module-info`, and not even an
+`Automatic-Module-Name` manifest entry. On the module path such a jar becomes an
+automatic module named after its *file*, which is unstable and cannot be
+`requires`d reliably. `module-alias` gives one a name the project chooses.
+args4j - a small command-line parser - is aliased with
+`@jenesis.alias org.kohsuke.args4j args4j/args4j`, and the module then
+`requires org.kohsuke.args4j;` as if it were a real module. Because args4j
+declares no identity of its own, the alias gives the jar the name by *renaming*
+it: the resolved closure already holds the artifact, and it lands in `resolved/`
+under the aliased file name as a hard link, so the JDK derives exactly the
+automatic module the project asked for and the bytes are never touched - a
+pinned checksum keeps describing the file, and the shared artifact cache stays
+untouched. The name is a first-class module name, so the
+demo also `opens demo.cli to org.kohsuke.args4j;` - args4j sets the `@Option`
+fields by reflection, and delete that `opens` and the run fails with an
+`InaccessibleObjectException` naming `org.kohsuke.args4j`, which is the proof the
+aliased library runs as the module the project declared. The alias target is
+pinned like any Maven coordinate; args4j is held at `2.33`, the last release
+before it grew an `Automatic-Module-Name` of its own (a newer one already has a
+name, so the alias would read it under that instead - aliasing is for the
+artifacts with no name to offer). Run it with
+`java build/jenesis/Execute.java -name Ada -shout`, which builds the module,
+launches its `@jenesis.main`, and prints `HELLO, ADA!`.
+
+The demo then carries the same library one step further. An alias makes args4j
+*requirable*, but only as an **automatic** module, and an automatic module declares
+no `requires` of its own - so `jlink`, which needs a complete explicit graph to
+decide what belongs in an image, refuses it: `automatic module cannot be used with
+jlink`. A `build.jenesis/modules.properties` holding `mode=declared` closes that
+gap. It rewrites the resolved closure at the head of the module's assembly: jars
+that already declare a `module-info` pass through byte for byte, the rest are
+renamed to the module name they are to carry, a single `jdeps` run over the whole
+set works out what each one actually reads, and a generated `module-info.class` is
+injected into a copy of each jar. That rewritten closure then *replaces* the
+resolved one for everything the module builds - `javac`, the tests, and the
+packaging - which is the point: a module graph that does not hold together fails at
+compile or test time, not first in the shipped image. With `jlink=true` beside it,
+`java build/jenesis/Make.java stage` links a four-module runtime that runs the
+app with no class path and no `--add-modules`. `mode=synthetic` will instead invent
+a content-derived `build.jenesis.pseudo.module<hash>` for a deep transitive nobody
+wants to name by hand, and `mode=none` is how one module opts out of a project-wide
+file. What keeps reading the *resolved* closure is everything that describes what
+was fetched: the SBOM, the license and vulnerability checks, and the inventory
+`pin` reads - so a rewritten jar's bytes never reach a `@jenesis.pin` checksum.
+
+## 12. Selecting a classified module variant - [`module-classifier`](demo-17-module-classifier/README.md)
+
+Some artifacts publish **classified variants** beside their default jar - the same
+module name, different bytes, distinguished by what Maven calls a *classifier*.
+`module-classifier` builds on the MODULAR layout from the previous demo and selects
+such a variant through the pin value alone, with a leading-colon qualifier
+`:<classifier>[:<version>]`:
+
+    @jenesis.pin mutiny.zero :jdk-flow:0.4.3 SHA-256/0556f076191921250e5c9e21b9674d252bf2c4c515491e087fec93f383292b17
+
+The pin stays keyed by the bare module name - the classifier is part of the value,
+never the coordinate - so it applies wherever the module appears in the closure,
+and only one variant of a module name can be selected, mirroring the module path's
+own uniqueness rule. Per-machine selection composes on top as plain data: a pin
+line ending in a parenthesised guard (`(windows)`, `(linux,aarch64)`) applies only when
+its tokens are all contained in the active platform - the detected OS and chipset
+plus any token a `-Djenesis.platform.<token>=true` flag adds - with the unguarded
+line as the fallback. Every variant stays committed in source, so the build remains
+reproducible from the repository alone.
+
+The demo pins the `jdk-flow` variant of `mutiny.zero`, a deliberately
+OS-independent classifier: it exposes `java.util.concurrent.Flow` types where the
+default jar exposes `org.reactivestreams` ones. That makes the selection observable
+three times over, on any machine: the sample only compiles against the classified
+API, the pinned checksum only matches the classified bytes, and the entry point
+asserts at runtime that `mutiny.zero` requires nothing but `java.base` (the default
+jar carries `requires transitive org.reactivestreams`). Run
+`java build/jenesis/Execute.java` to build and launch it.
+
+## 13. Choosing the pure modular layout - [`module-layout`](demo-18-module-layout/README.md)
+
+`module-layout` is the same shape of project as `demo-02-java-modular` - a
+`module-info.java` requiring a named module - but a `jenesis.properties` at its
+root selects the layout: `jenesis.project.layout=modular`. The launcher loads that
+file before the build, so the stock `java build/jenesis/Make.java` picks the
+pure MODULAR layout with no custom launcher (the command-line
+`-Djenesis.project.layout=modular` wins over it, and an in-code build can call
+`new Project(Path.of(".")).layout(Project.Layout.MODULAR)`).
+
+The new idea is the **layout choice**. A `module-info.java` with no `pom.xml`
+auto-detects MODULAR_TO_MAVEN, which translates each `requires` into a Maven
+coordinate, resolves the closure through Maven, and emits the modular jar *plus* a
+generated `pom.xml`. The pure **MODULAR** layout instead resolves dependencies by
+Java module name against the Jenesis module repository and emits **only the
+modular jar - no `pom.xml`** - so the build never touches Maven coordinates at all;
+`stage` then produces `target/stage/modular` with no `target/stage/maven`. Because
+every dependency is resolved as a named module the closure is provably
+module-path-consumable, which is also why MODULAR is opt-in (it cannot resolve a
+dependency that ships only as an automatic module, so `AUTO` never picks it).
+Reach for it when artifacts are consumed only as Java modules and you want no POMs
+in the pipeline; keep the default when you also need a `pom.xml`. Resolving by
+module name also raises the question of which recorded version wins when two
+`module-info.class` files disagree, which `-Djenesis.resolver.module` answers:
+`first` (the default) keeps the nearest, `fail` rejects the disagreement, and
+`ignore` keeps no compiled version at all.
+
+## 14. Overriding a shaded module - [`module-override`](demo-19-module-override/README.md)
+
+The module system gives every package exactly one owning module, and a library
+that needs an API declares `requires` on the module that owns it. Tomcat Embed is
+the notable exception, and the exception is a mistake on its side: instead of
+depending on the Jakarta APIs it copies their packages into its own jars and
+declares module descriptors that export them under its own names.
+`org.apache.tomcat.embed.core` exports `jakarta.servlet` and
+`jakarta.servlet.http`, `org.apache.tomcat.embed.el` claims `jakarta.el`, and
+`org.apache.tomcat.embed.websocket` claims `jakarta.websocket` and
+`jakarta.websocket.client`. Two modules then export one package, which a module
+descriptor is supposed to make impossible, and only Tomcat can fix it.
+
+The damage is not confined to code you write. A *modular* library built against
+the servlet API names it the only way a module can, in its descriptor: the Jakarta
+Server Pages API states `requires transitive jakarta.servlet` and
+`requires transitive jakarta.el`. Modules of those names must be on the path or it
+does not resolve, and a module can neither read a package from a module that does
+not declare it nor be talked out of the name it states. Tomcat supplies the
+packages but not the names, so the demo without its override tags fails twice
+over - once for the library, once for the module's own requires:
+
+    error: module not found: jakarta.el
+    error: module demo.override reads package jakarta.servlet
+           from both jakarta.servlet and org.apache.tomcat.embed.core
+
+There is no arrangement of `requires` that satisfies both. `@jenesis.override
+jakarta.servlet org.apache.tomcat.embed.core` states the relationship once per
+module. Jenesis places a module of that name that holds no packages and requires
+the carrier `transitive`, so reading it reads Tomcat's copy under the API's name -
+readability is what `requires` grants, and the packages come from the carrier's
+own unqualified exports. And it drops every resolved artifact declaring the
+overridden module, so the closure holds those packages once, whether that artifact
+was required directly or arrived through somebody else's pom. The Server Pages
+API, compiled against the real servlet API and never recompiled, then resolves and
+reads Tomcat:
+
+    jakarta.servlet.jsp.JspFactory is read from jakarta.servlet.jsp
+    jakarta.servlet.jsp declares transitive jakarta.servlet
+
+Because the generated pom is the resolved closure, a Maven consumer flattening
+this project onto a class path gets one copy too, and the declaration reaches
+Jenesis consumers through the `Jenesis-Overrides` manifest header. The descriptor
+still says `requires jakarta.servlet`, which is the point: the published contract
+names the API, not the server implementing it here.
+
+Two limits follow from the placed module holding no code. A qualified
+`exports ... to jakarta.servlet` or `opens ... to jakarta.servlet` grants access to
+it rather than to the carrier that does the reflecting, so open to the carrier or
+unqualified. And requiring it reads everything the carrier exports, so code can
+compile against `org.apache.catalina` while only declaring `requires
+jakarta.servlet`.
+
+## 15. Selecting a variant per platform - [`platform-guard`](demo-20-platform-guard/README.md), [`platform-guard-pom`](demo-21-platform-guard-pom/README.md)
+
+The `module-classifier` demo committed one classified variant explicitly; `platform-guard`
+declares several and lets the build pick. A `@jenesis.pin` line may end with a
+bracketed **guard**, matched against the active platform: the detected OS and
+chipset (e.g. `linux,x86_64`) plus any token a `-Djenesis.platform.<token>=true`
+system property adds on top:
+
+    @jenesis.pin mutiny.zero 1.1.1 SHA-256/2ba03737...
+    @jenesis.pin mutiny.zero :jdk-flow:0.4.3 SHA-256/0556f076... (legacy)
+
+A guard matches when all of its tokens are contained in the active set; the most
+specific match wins, the unguarded line is the fallback, and equally specific
+distinct matches fail the build. Tokens are free-form - a real project guards
+with `(windows)` or `(macos,aarch64)`, while this demo uses the neutral token
+`legacy` so the differential selection is observable on any machine: the default
+build resolves `mutiny.zero` 1.1.1, and
+`java -Djenesis.platform.legacy=true build/jenesis/Execute.java` adds the `legacy`
+token so the guarded `jdk-flow` variant of 0.4.3 is resolved instead, with the
+entry point printing which variant is on the module path. The platform is a field
+of the manifests step, so adding a flag invalidates exactly the affected selection
+- no `target/` cleanup needed - and every variant stays committed with its own
+checksum, so the build remains reproducible from the repository alone on every
+platform.
+
+`platform-guard-pom` shows the same guards in a Maven project: pin lines in the
+`pom.xml`'s `<!--jenesis.pin ... -->` comment block take the identical bracketed
+guard, here switching which `commons-lang3` **transitive** the declared
+`commons-text` resolves against. Versions.properties acts as a bill of materials
+at any closure depth, but two Maven boundaries apply: a directly declared
+`<version>` wins over the bill of materials (guard transitives, or do not declare
+the version directly), and a guard can never force in a classifier, since Maven
+dependency management matches classifiers as part of the coordinate key rather
+than contributing them. Re-pinning obeys the guard on both layouts: only the line
+that matched the local platform is refreshed, every other line is preserved
+byte-for-byte, and a guarded key stays in the comment block rather than migrating
+into `<dependencyManagement>`.
+
+## 16. Pinning a dependency - [`pinning`](demo-22-pinning/README.md)
+
+A pin records two things in your own sources: the exact version of a dependency, and
+the `SHA-256` of the bytes that version served. Every later build re-hashes what it
+downloads and compares, so a pinned project resolves the same closure on every machine
+and fails if a repository serves something else. `pinning` has three tiny projects and
+gets each half wrong on purpose: `pinned` carries a version and a matching checksum and
+builds, `unpinned` carries a version alone, and `tampered` carries a checksum of zeroes.
+
+The two failures answer different questions. **`unpinned` builds by default** - a version
+was asked for and that version arrived - but fails under **strict pinning**, because
+there is nothing to verify the download against; that is the mode a hardened build wants,
+since one unpinned coordinate otherwise costs the guarantee for the whole closure.
+**`tampered` fails regardless**, because every download is compared against its pin.
+
+Nothing writes those lines by hand: `java build/jenesis/Make.java pin` resolves the
+closure and records what it found, and `-Djenesis.dependency.pin=ignore` before a `pin`
+run is how a project deliberately refreshes to newer versions. The new idea is that a
+checksum answers *which bytes*, and strict pinning answers *whether an unverifiable
+dependency may be used at all* - neither of them answers who produced the bytes, which
+is what the next two demos are for.
+
+## 17. Who produced the bytes - [`openpgp`](demo-23-openpgp/README.md)
+
+A checksum is taken from whatever the repository served, so it proves a dependency has
+not changed since you vetted it - not that what you vetted was genuine. `@jenesis.signature`
+names the OpenPGP key that signs a coordinate's artifacts, and right after each download
+the build fetches the detached signature published beside the artifact, assembles a keyring
+from the fingerprints declared, and asks a local `gpgv` to check it.
+
+`openpgp` verifies a real dependency, `org.assertj:assertj-core`, against the key AssertJ
+really signs with: nothing is generated, signed or faked here. A `declared` project names
+the right fingerprint and passes; a `rotated` one names another and is blocked even though
+the published signature is perfectly valid, which is precisely what naming the key buys
+over a checksum; a `vendored` one reads the same fingerprint from a local
+`signature-<name>.properties` list, the shape a project uses to vet a key once and share
+it between modules.
+
+The last pair is what `-Djenesis.dependency.signature=strict` adds over `declared`: AssertJ
+brings Byte Buddy with it, nothing vouches for that coordinate, and strict refuses the
+build until a `complete` project declares a key for it too. The new idea is **provenance as
+a declaration rather than a record**: the line carries no version, so vetting a key once
+covers every future release from it, where a checksum covers exactly one file.
+
+## 18. Signing without keeping a key - [`sigstore`](demo-24-sigstore/README.md)
+
+The same question, answered without anyone holding a key. The signer authenticates to an
+identity provider, a certificate authority issues a certificate that is valid for ten
+minutes and names that identity, the signature is recorded in a public append-only log,
+and the private key is discarded. What a build verifies afterwards is an identity and a
+log entry, both carried in a bundle published beside the artifact.
+
+`@jenesis.signature` therefore takes a second form, `Sigstore/<host>/<path>`, and
+`sigstore` verifies a real dependency with it: `attested` declares the repository that
+really released `dev.sigstore:protobuf-specs` and passes, `forked` declares another and is
+blocked although its bundle is genuine. The path is a prefix that narrows an owner, a
+repository and a workflow file at a time, and stops before the tag a release was built
+from - that part moves with every version, so leaving it out is what lets one line cover
+every future release.
+
+Nothing is installed and nothing is configured: no key is fetched, no keyring assembled and
+no `gpg` forked, because the bundle carries its own certificate and log entry and the tool
+carries the trust root to check them against. The certificate in it expired minutes after
+it was issued, which is the design rather than a lapse - verification asks whether it was
+valid when the log recorded the signature, not whether it is valid today.
+
+## 19. Software bill of materials - [`sbom`](demo-25-sbom/README.md)
 
 `sbom` emits a CycloneDX software bill of materials on every build: it is on by
 default. An optional `sbom.properties` selects the format (`format=json`, the default,
@@ -419,7 +734,7 @@ collected on `stage` into `target/stage/reports/sbom/`, and - when a Maven
 repository is staged - attached as `<artifact>-<version>-cyclonedx.json` next to
 the pom so `export` publishes it to Maven Central.
 
-## 10. Dependency compliance - [`compliance`](demo-15-compliance/README.md), [`vulnerabilities`](demo-16-vulnerabilities/README.md)
+## 20. Dependency compliance - [`compliance`](demo-26-compliance/README.md), [`vulnerabilities`](demo-27-vulnerabilities/README.md)
 
 Two gates over the resolved dependency graph - the same graph the SBOM records -
 each turned on by a property file in the configuration directory and run by the
@@ -448,75 +763,24 @@ finding to a warning that passes). The demo ships a deliberately vulnerable
 (`GHSA-jfh8-c2jp-5v3q`). The OSV fetch runs only when this file is present, so a
 build never reaches the network unless asked.
 
-## 11. Build profiles - [`profiles`](demo-17-profiles/README.md)
+## 21. Code quality for Java - [`java-quality`](demo-28-java-quality/README.md)
 
-`profiles` shows how a named set of properties switches features on together. A
-profile is a `*.properties` file at the project root; `jenesis.make.profiles`
-selects one (or a comma-separated list, the `.properties` suffix optional), loaded
-before the build is configured. Profiles compose by chaining - a loaded file may
-set `jenesis.make.profiles` itself to pull in more. The demo's `release`
-profile turns on source jars and chains to a `supply-chain` profile that enforces
-strict dependency pinning, so `-Djenesis.make.profiles=release` produces a
-hardened publication build in one switch (the SBOM from section 8 is emitted
-automatically either way). Every property a profile sets is a default, so the
-command line always wins. The always-loaded base is `jenesis.properties` (optional).
+`java-quality` turns on a set of code-quality tools without a build script: each
+tool runs because its configuration file is present at the project root. A
+`checkstyle.xml` and a `pmd.xml` lint the sources, a `spotbugs-exclude.xml` brings
+in SpotBugs over the compiled classes, and a `javaformat.properties` file selects
+`google-java-format`.
 
-## 12. Kotlin - [`kotlin`](demo-18-kotlin/README.md), [`kotlin-quality`](demo-19-kotlin-quality/README.md), [`kotlin-plugin`](demo-20-kotlin-plugin/README.md)
+The new idea is **inference from configuration**. Jenesis binds the matched file
+from the configuration directory (the project root by default) into the build,
+which is how a root-level filter reaches SpotBugs even though SpotBugs runs after
+`javac` and sees only classes. Each tool resolves in its own group, so its closure
+never collides with the project's dependencies. The linters are report-only by
+default; the formatter runs in *verify* mode, failing the build when a source is
+not already formatted, and a single `-Djenesis.format.rewrite=true` flips it to
+rewrite the sources in place.
 
-Jenesis drives non-Java compilers through the same inferred compiler chain, with
-no language-specific configuration beyond the sources. `kotlin` is a
-MODULAR_TO_MAVEN module (a `module-info.java`, no `pom.xml`) that mixes a `.java`
-source with Kotlin. The chain compiles Kotlin *before* `javac` (the Kotlin
-compiler reads `.java` as source for resolution but emits only Kotlin classes), and
-`javac` then sees those classes through `--patch-module`; that ordering lets the
-module export a package holding *only* Kotlin, which the demo does. The resolved
-Kotlin compiler is pinned in its own **group**, `kotlinc`, so its closure never
-collides with the project's `main`-group dependencies.
-
-`kotlin-quality` carries the same configuration-file inference shown for Java
-(section 7) to Kotlin: detekt (`detekt.yml`) and ktlint (`.editorconfig`) lint the
-sources, and ktlint doubles as a verifying formatter sharing the
-`-Djenesis.format.rewrite=true` switch. Each tool floats its own `RELEASE` while the
-compiler stays pinned in the `kotlinc` group.
-
-`kotlin-plugin` adds a compiler plugin. The same `@jenesis.plugin` tag that wires a
-Java annotation processor (section 6) wires compiler plugins for the other
-languages - naming a compiler before the coordinate routes the plugin to that
-compiler:
-
-    @jenesis.plugin kotlinc maven/org.jetbrains.kotlin/kotlin-serialization-compiler-plugin
-
-Jenesis resolves the plugin in the `kotlinc` group, version-coordinated to the
-compiler, and the Kotlin compiler passes it as `-Xplugin=<jar>`. The
-kotlinx.serialization plugin then generates `Point.serializer()` for the
-`@Serializable` data class, which `Use` references - delete the `@jenesis.plugin`
-line and the build fails, exactly like the annotation processor demo.
-
-## 13. Scala - [`scala`](demo-21-scala/README.md), [`scala-quality`](demo-22-scala-quality/README.md)
-
-Scala works exactly like Kotlin. `scala` is a MODULAR_TO_MAVEN module that mixes a
-`.java` source with Scala; the chain compiles Scala before `javac`, which sees the
-Scala classes through `--patch-module`, so the module exports a pure-Scala package.
-The Scala compiler is pinned in its own `scalac` group.
-
-`scala-quality` infers Scalastyle (`scalastyle-config.xml`) and scalafmt
-(`.scalafmt.conf`) from their configuration files, with scalafmt doubling as a
-verifying formatter. A compiler plugin would route to the `scalac` group and pass
-as `-Xplugin:`, the same shape as Kotlin's plugin.
-
-## 14. Groovy - [`groovy`](demo-23-groovy/README.md), [`groovy-quality`](demo-24-groovy-quality/README.md)
-
-Groovy follows the same pattern with one difference: `groovyc` resolves Java only
-from the compiled class path, so it must run *after* `javac` and cannot populate a
-package before the export is validated. An exported package therefore needs at
-least one Java type; the demo's `README.md` explains why this is permanent for
-Groovy but not for Kotlin or Scala. The Groovy compiler is pinned in its own
-`groovyc` group.
-
-`groovy-quality` lints with CodeNarc (`codenarc.xml`); there is no inferred Groovy
-formatter, so it is lint-only.
-
-## 15. Test coverage, selection, mutation, and benchmarking - [`code-coverage`](demo-25-code-coverage/README.md), [`test-selection`](demo-26-test-selection/README.md), [`pitest`](demo-27-pitest/README.md), [`jmh`](demo-28-jmh/README.md)
+## 22. Test coverage, selection, mutation, and benchmarking - [`code-coverage`](demo-29-code-coverage/README.md), [`test-selection`](demo-30-test-selection/README.md), [`pitest`](demo-31-pitest/README.md), [`jmh`](demo-32-jmh/README.md)
 
 `code-coverage` adds the first *test observation* engine: JaCoCo. A
 `jacoco.properties` config file enables it (the `jenesis.observe.jacoco` property
@@ -570,7 +834,161 @@ demo.bench.jmh_generated to jmh.core` exports a package that exists only after g
 The processor itself needs no name, because a processor whose jar cannot be a module is passed
 on the processor class path instead of the processor module path.
 
-## 16. Attaching Java agents - [`agents`](demo-29-agents/README.md)
+## 23. Guarding a published API - [`api-compatibility`](demo-33-api-compatibility/README.md)
+
+The last gate is the one that protects the people who already depend on you.
+`api-compatibility` turns on japicmp with a `japicmp.properties` config file, and japicmp
+compares the byte code of the jar this build produced against the byte code of the
+jar the last release produced. Byte code, not sources, is the right level: it is
+what a caller actually linked against, so a removed method, a narrowed return type
+or a tightened modifier shows up whether or not the sources still look compatible.
+
+The new idea is **a baseline the build works out for itself**. The config file here
+is empty, and that is the whole configuration: with no `baseline` key, japicmp
+compares against `<this module's groupId>/<its artifactId>` at `RELEASE`, so every
+build measures the change you are about to publish against the release before it,
+and the version floats rather than being re-pointed by hand. A `baseline=` key names
+another coordinate instead - a vendored fork checked against upstream, say - read by
+how many slashes it carries. Either way japicmp and the baseline resolve in a
+`japicmp` group of their own, and the baseline resolves without its transitive
+dependencies, since only its own byte code is compared.
+
+A demo has never published anything, so this one publishes its own previous release:
+`build/Demo.java` builds `released/` (the same coordinate at 1.0.0), stages it - a
+staged tree is already a Maven repository layout - writes the `maven-metadata.xml`
+that makes a floating version resolvable, and then builds this project at 1.1.0 with
+that repository prepended to Maven Central through `Project.repositories(...)`. The
+baseline is deliberately not pinned: it is a jar the demo builds, so its checksum is
+whatever machine produced it, the same reason `internal-module` pins its plugin's
+dependencies but never the plugin. This is the one demo CI runs with
+`jenesis.dependency.pin=versions` rather than `strict`.
+
+Like the linters, the check is report-only: it writes
+`reports/japicmp/japicmp-report.xml`, which a `stage` build collects with every other
+report kind, and keeps the build green. Four `error-on-*` keys turn a finding into
+a failure - binary incompatibility, source incompatibility, any modification at
+all, or a semantic-versioning violation - and the failure names the change that
+caused it. `-Djenesis.artifact.japicmp=false` is the usual opt-out.
+## 24. Kotlin - [`kotlin`](demo-34-kotlin/README.md), [`kotlin-quality`](demo-35-kotlin-quality/README.md), [`kotlin-plugin`](demo-36-kotlin-plugin/README.md)
+
+Jenesis drives non-Java compilers through the same inferred compiler chain, with
+no language-specific configuration beyond the sources. `kotlin` is a
+MODULAR_TO_MAVEN module (a `module-info.java`, no `pom.xml`) that mixes a `.java`
+source with Kotlin. The chain compiles Kotlin *before* `javac` (the Kotlin
+compiler reads `.java` as source for resolution but emits only Kotlin classes), and
+`javac` then sees those classes through `--patch-module`; that ordering lets the
+module export a package holding *only* Kotlin, which the demo does. The resolved
+Kotlin compiler is pinned in its own **group**, `kotlinc`, so its closure never
+collides with the project's `main`-group dependencies.
+
+`kotlin-quality` carries the same configuration-file inference shown for Java
+(section 7) to Kotlin: detekt (`detekt.yml`) and ktlint (`.editorconfig`) lint the
+sources, and ktlint doubles as a verifying formatter sharing the
+`-Djenesis.format.rewrite=true` switch. Each tool floats its own `RELEASE` while the
+compiler stays pinned in the `kotlinc` group.
+
+`kotlin-plugin` adds a compiler plugin. The same `@jenesis.plugin` tag that wires a
+Java annotation processor (section 6) wires compiler plugins for the other
+languages - naming a compiler before the coordinate routes the plugin to that
+compiler:
+
+    @jenesis.plugin kotlinc maven/org.jetbrains.kotlin/kotlin-serialization-compiler-plugin
+
+Jenesis resolves the plugin in the `kotlinc` group, version-coordinated to the
+compiler, and the Kotlin compiler passes it as `-Xplugin=<jar>`. The
+kotlinx.serialization plugin then generates `Point.serializer()` for the
+`@Serializable` data class, which `Use` references - delete the `@jenesis.plugin`
+line and the build fails, exactly like the annotation processor demo.
+
+## 25. Scala - [`scala`](demo-37-scala/README.md), [`scala-quality`](demo-38-scala-quality/README.md)
+
+Scala works exactly like Kotlin. `scala` is a MODULAR_TO_MAVEN module that mixes a
+`.java` source with Scala; the chain compiles Scala before `javac`, which sees the
+Scala classes through `--patch-module`, so the module exports a pure-Scala package.
+The Scala compiler is pinned in its own `scalac` group.
+
+`scala-quality` infers Scalastyle (`scalastyle-config.xml`) and scalafmt
+(`.scalafmt.conf`) from their configuration files, with scalafmt doubling as a
+verifying formatter. A compiler plugin would route to the `scalac` group and pass
+as `-Xplugin:`, the same shape as Kotlin's plugin.
+
+## 26. Groovy - [`groovy`](demo-39-groovy/README.md), [`groovy-quality`](demo-40-groovy-quality/README.md)
+
+Groovy follows the same pattern with one difference: `groovyc` resolves Java only
+from the compiled class path, so it must run *after* `javac` and cannot populate a
+package before the export is validated. An exported package therefore needs at
+least one Java type; the demo's `README.md` explains why this is permanent for
+Groovy but not for Kotlin or Scala. The Groovy compiler is pinned in its own
+`groovyc` group.
+
+`groovy-quality` lints with CodeNarc (`codenarc.xml`); there is no inferred Groovy
+formatter, so it is lint-only.
+
+## 27. Build profiles - [`profiles`](demo-41-profiles/README.md)
+
+`profiles` shows how a named set of properties switches features on together. A
+profile is a `*.properties` file at the project root; `jenesis.make.profiles`
+selects one (or a comma-separated list, the `.properties` suffix optional), loaded
+before the build is configured. Profiles compose by chaining - a loaded file may
+set `jenesis.make.profiles` itself to pull in more. The demo's `release`
+profile turns on source jars and chains to a `supply-chain` profile that enforces
+strict dependency pinning, so `-Djenesis.make.profiles=release` produces a
+hardened publication build in one switch (the SBOM from section 8 is emitted
+automatically either way). Every property a profile sets is a default, so the
+command line always wins. The always-loaded base is `jenesis.properties` (optional).
+
+## 28. A shared build cache - [`build-cache`](demo-42-build-cache/README.md)
+
+Every build already caches incrementally under `target/`: each step is
+content-hashed on its inputs and outputs, so a warm rebuild only re-runs what
+changed. `build-cache` adds the second tier - a **shared cache** outside
+`target/`, switched on with `-Djenesis.project.cache` (or an explicit
+`-Djenesis.cache.uri=<uri>`), that hands a step its finished output
+instead of running it. The cache is content-addressed
+(`<folder>/<step-hash>/<inputs-hash>/`): the step hash identifies the step from
+its serialized form, the inputs hash folds every input file's content hash, and a
+hit materializes the cached output by hard link, so reads are near free while the
+step body is skipped entirely.
+
+The demo makes the second tier visible with `-Djenesis.executor.rebuild=true`,
+which deletes `target/` before building so the *incremental* cache is gone and
+every step is a forced miss. The shared cache lives outside `target/`, so a first
+build bootstraps it and a second `rebuild` is served from it - the compile,
+class, and jar steps return in ~0.00s, marked `[EXECUTED]` because the output was
+produced, just not by `javac`. An optional `cache.properties` at the cache root
+tunes the writes (`steps`/`versions`/`size` caps with `lru` eviction, `touch`,
+`compressed` for a packed zip layout, and `read`/`write` toggles - `write=false`
+for read-only consumers, both off to disable), all defaulted so the file is
+optional. `BuildExecutorFileCache` is
+one implementation of the pluggable `BuildExecutorCache` seam: a remote
+HTTP/object-store backend is another implementation of the same `fetch`/`store`
+interface, and the local folder is the on-disk analogue - point several checkouts
+or a CI workspace and a laptop at one folder and a step compiled once is reused
+wherever its inputs match.
+
+## 29. Confining the build with Docker - [`docker-isolation`](demo-43-docker-isolation/README.md)
+
+A build executes untrusted code even when nothing about it is customised: the
+stock pipeline runs your tests (and whatever your test dependencies pull in), and
+the artifact it produces has a `main` that runs later - all with the rights of
+whoever started the build. `docker-isolation` is a plain `Project`-based build
+(deliberately not customised - a custom launcher's own `main` would only add
+another place for a vulnerability to hide) whose **test** and artifact **`main`**
+each read a secret file (`~/.demo-credentials`) and a secret environment variable
+(`DEMO_SECRET`), then overwrite the file. Run on the host with the stock launchers
+(`java build/jenesis/Make.java`, then `java build/jenesis/Execute.java`), both
+actors reach the secrets.
+
+The new idea is that **Jenesis can run the build and the launched program inside a
+throwaway container** - `-Djenesis.execute.docker=true` sandboxes the program's
+`main`, `-Djenesis.project.docker=true` sandboxes the build (the test included) -
+where the host home and environment are absent, so neither secret is in reach. The
+demo also shows the consequence of the local Maven/Jenesis repositories being
+mounted **read-only**: dependencies must be pre-cached, and `export` fails inside
+the container. It needs a Docker daemon, so it is a local exercise rather than a
+CI one. There are no assertions; each actor just reports what it managed to do.
+
+## 30. Attaching Java agents - [`agents`](demo-44-agents/README.md)
 
 Some libraries have to run as a `-javaagent` rather than be called through an
 API. `agents` attaches two of them with the `@jenesis.attach` tag, each next to
@@ -598,249 +1016,7 @@ match attaches to the test run only. The demo's `build/Demo.java` runs the build
 (Mockito attaches to the tests) and then the application (OpenTelemetry attaches
 to the run) in one go.
 
-## 17. Excluding a transitive dependency - [`maven-exclusions`](demo-30-maven-exclusions/README.md)
-
-A Maven dependency drags in a transitive subtree, and `<exclusions>` prunes part
-of it. `maven-exclusions` declares Apache Commons Text but excludes its Apache
-Commons Lang transitive, and a test confirms the result: Commons Text is on the
-class path, Commons Lang is not.
-
-The new idea is **exclusions, and where they apply**. A pom decides a transitive
-subtree wherever it is read, so the `MODULAR_TO_MAVEN` layout has the same problem
-and states the same fix as a tag instead of an element:
-`@jenesis.exclude <module> <groupId>/<artifactId>...`, one line per module and any
-number of targets on it. Only the purely modular layout has nothing to prune -
-resolution there matches module descriptors and never reads a pom - and there the
-tag is rejected rather than ignored. The test looks the classes up as resources rather than with
-`Class.forName(...)` (loading a Commons Text class would link it against the
-missing Commons Lang), and - exactly as in Maven, where test scope extends
-compile scope - the exclusion applies to the test class path too, not just the
-main one.
-
-## 18. Bills of materials - [`bom`](demo-31-bom/README.md)
-
-Where per-dependency `@jenesis.pin` tags pin each artifact in place, `bom`
-moves version curation into bills of materials, one per integrity model. An
-`@jenesis.bom org.slf4j/slf4j-bom 2.0.16` tag imports a Maven BOM's
-effective `dependencyManagement` from Maven Central; since POM bytes are not
-stable across repositories, the reference carries no hash, and the `pin`
-goal instead pins each artifact resolved through it with a computed
-checksum. An `@jenesis.bom pin-lang3.properties` tag reads a local
-properties file - found in the project's BOM locations
-(`jenesis.project.boms`, defaulting to the configuration location), which
-profiles never touch - whose byte-stable entries carry the version and
-`SHA-256` checksum for both the module name and its Maven coordinate, so no
-pin lines are needed at all. BOM keys follow the pin token grammar without
-the group (bare module name, Maven `groupId/artifactId`, or explicit
-`repository/coordinate`); the group, and an optional platform guard, sit on
-the `@jenesis.bom` declaration instead (`kotlinc/pin-lang3.properties`
-merges the entries into the `kotlinc` group). A BOM can equally be fetched
-from the module repository by naming its coordinate - versioned and
-checksummed, or floating to the latest published file - and the demo shows
-the precedence rules: a local `@jenesis.pin` overrides any BOM entry, the
-last declared BOM wins a conflict, and both models satisfy
-`-Djenesis.dependency.pin=strict`. What the resolver does with the versions
-that survive is a separate switch: `-Djenesis.resolver.maven` picks between
-Maven's nearest-wins rules (`maven`, the default), the same without range
-arbitration (`closest`), and the upgrade probes that ignore declared and
-pinned versions entirely (`latest`, `release`).
-
-## 19. Choosing the pure modular layout - [`module-layout`](demo-32-module-layout/README.md)
-
-`module-layout` is the same shape of project as `demo-02-java-modular` - a
-`module-info.java` requiring a named module - but a `jenesis.properties` at its
-root selects the layout: `jenesis.project.layout=modular`. The launcher loads that
-file before the build, so the stock `java build/jenesis/Make.java` picks the
-pure MODULAR layout with no custom launcher (the command-line
-`-Djenesis.project.layout=modular` wins over it, and an in-code build can call
-`new Project(Path.of(".")).layout(Project.Layout.MODULAR)`).
-
-The new idea is the **layout choice**. A `module-info.java` with no `pom.xml`
-auto-detects MODULAR_TO_MAVEN, which translates each `requires` into a Maven
-coordinate, resolves the closure through Maven, and emits the modular jar *plus* a
-generated `pom.xml`. The pure **MODULAR** layout instead resolves dependencies by
-Java module name against the Jenesis module repository and emits **only the
-modular jar - no `pom.xml`** - so the build never touches Maven coordinates at all;
-`stage` then produces `target/stage/modular` with no `target/stage/maven`. Because
-every dependency is resolved as a named module the closure is provably
-module-path-consumable, which is also why MODULAR is opt-in (it cannot resolve a
-dependency that ships only as an automatic module, so `AUTO` never picks it).
-Reach for it when artifacts are consumed only as Java modules and you want no POMs
-in the pipeline; keep the default when you also need a `pom.xml`. Resolving by
-module name also raises the question of which recorded version wins when two
-`module-info.class` files disagree, which `-Djenesis.resolver.module` answers:
-`first` (the default) keeps the nearest, `fail` rejects the disagreement, and
-`ignore` keeps no compiled version at all.
-
-## 20. Selecting a classified module variant - [`module-classifier`](demo-33-module-classifier/README.md)
-
-Some artifacts publish **classified variants** beside their default jar - the same
-module name, different bytes, distinguished by what Maven calls a *classifier*.
-`module-classifier` builds on the MODULAR layout from the previous demo and selects
-such a variant through the pin value alone, with a leading-colon qualifier
-`:<classifier>[:<version>]`:
-
-    @jenesis.pin mutiny.zero :jdk-flow:0.4.3 SHA-256/0556f076191921250e5c9e21b9674d252bf2c4c515491e087fec93f383292b17
-
-The pin stays keyed by the bare module name - the classifier is part of the value,
-never the coordinate - so it applies wherever the module appears in the closure,
-and only one variant of a module name can be selected, mirroring the module path's
-own uniqueness rule. Per-machine selection composes on top as plain data: a pin
-line ending in a parenthesised guard (`(windows)`, `(linux,aarch64)`) applies only when
-its tokens are all contained in the active platform - the detected OS and chipset
-plus any token a `-Djenesis.platform.<token>=true` flag adds - with the unguarded
-line as the fallback. Every variant stays committed in source, so the build remains
-reproducible from the repository alone.
-
-The demo pins the `jdk-flow` variant of `mutiny.zero`, a deliberately
-OS-independent classifier: it exposes `java.util.concurrent.Flow` types where the
-default jar exposes `org.reactivestreams` ones. That makes the selection observable
-three times over, on any machine: the sample only compiles against the classified
-API, the pinned checksum only matches the classified bytes, and the entry point
-asserts at runtime that `mutiny.zero` requires nothing but `java.base` (the default
-jar carries `requires transitive org.reactivestreams`). Run
-`java build/jenesis/Execute.java` to build and launch it.
-
-## 21. Aliasing a plain library - [`module-alias`](demo-34-module-alias/README.md)
-
-The MODULAR_TO_MAVEN layout resolves dependencies by module name, but plenty of
-common libraries carry no module identity: no `module-info`, and not even an
-`Automatic-Module-Name` manifest entry. On the module path such a jar becomes an
-automatic module named after its *file*, which is unstable and cannot be
-`requires`d reliably. `module-alias` gives one a name the project chooses.
-args4j - a small command-line parser - is aliased with
-`@jenesis.alias org.kohsuke.args4j args4j/args4j`, and the module then
-`requires org.kohsuke.args4j;` as if it were a real module. Because args4j
-declares no identity of its own, the alias gives the jar the name by *renaming*
-it: the resolved closure already holds the artifact, and it lands in `resolved/`
-under the aliased file name as a hard link, so the JDK derives exactly the
-automatic module the project asked for and the bytes are never touched - a
-pinned checksum keeps describing the file, and the shared artifact cache stays
-untouched. The name is a first-class module name, so the
-demo also `opens demo.cli to org.kohsuke.args4j;` - args4j sets the `@Option`
-fields by reflection, and delete that `opens` and the run fails with an
-`InaccessibleObjectException` naming `org.kohsuke.args4j`, which is the proof the
-aliased library runs as the module the project declared. The alias target is
-pinned like any Maven coordinate; args4j is held at `2.33`, the last release
-before it grew an `Automatic-Module-Name` of its own (a newer one already has a
-name, so the alias would read it under that instead - aliasing is for the
-artifacts with no name to offer). Run it with
-`java build/jenesis/Execute.java -name Ada -shout`, which builds the module,
-launches its `@jenesis.main`, and prints `HELLO, ADA!`.
-
-The demo then carries the same library one step further. An alias makes args4j
-*requirable*, but only as an **automatic** module, and an automatic module declares
-no `requires` of its own - so `jlink`, which needs a complete explicit graph to
-decide what belongs in an image, refuses it: `automatic module cannot be used with
-jlink`. A `build.jenesis/modules.properties` holding `mode=declared` closes that
-gap. It rewrites the resolved closure at the head of the module's assembly: jars
-that already declare a `module-info` pass through byte for byte, the rest are
-renamed to the module name they are to carry, a single `jdeps` run over the whole
-set works out what each one actually reads, and a generated `module-info.class` is
-injected into a copy of each jar. That rewritten closure then *replaces* the
-resolved one for everything the module builds - `javac`, the tests, and the
-packaging - which is the point: a module graph that does not hold together fails at
-compile or test time, not first in the shipped image. With `jlink=true` beside it,
-`java build/jenesis/Make.java stage` links a four-module runtime that runs the
-app with no class path and no `--add-modules`. `mode=synthetic` will instead invent
-a content-derived `build.jenesis.pseudo.module<hash>` for a deep transitive nobody
-wants to name by hand, and `mode=none` is how one module opts out of a project-wide
-file. What keeps reading the *resolved* closure is everything that describes what
-was fetched: the SBOM, the license and vulnerability checks, and the inventory
-`pin` reads - so a rewritten jar's bytes never reach a `@jenesis.pin` checksum.
-
-## 22. Overriding a shaded module - [`module-override`](demo-35-module-override/README.md)
-
-The module system gives every package exactly one owning module, and a library
-that needs an API declares `requires` on the module that owns it. Tomcat Embed is
-the notable exception, and the exception is a mistake on its side: instead of
-depending on the Jakarta APIs it copies their packages into its own jars and
-declares module descriptors that export them under its own names.
-`org.apache.tomcat.embed.core` exports `jakarta.servlet` and
-`jakarta.servlet.http`, `org.apache.tomcat.embed.el` claims `jakarta.el`, and
-`org.apache.tomcat.embed.websocket` claims `jakarta.websocket` and
-`jakarta.websocket.client`. Two modules then export one package, which a module
-descriptor is supposed to make impossible, and only Tomcat can fix it.
-
-The damage is not confined to code you write. A *modular* library built against
-the servlet API names it the only way a module can, in its descriptor: the Jakarta
-Server Pages API states `requires transitive jakarta.servlet` and
-`requires transitive jakarta.el`. Modules of those names must be on the path or it
-does not resolve, and a module can neither read a package from a module that does
-not declare it nor be talked out of the name it states. Tomcat supplies the
-packages but not the names, so the demo without its override tags fails twice
-over - once for the library, once for the module's own requires:
-
-    error: module not found: jakarta.el
-    error: module demo.override reads package jakarta.servlet
-           from both jakarta.servlet and org.apache.tomcat.embed.core
-
-There is no arrangement of `requires` that satisfies both. `@jenesis.override
-jakarta.servlet org.apache.tomcat.embed.core` states the relationship once per
-module. Jenesis places a module of that name that holds no packages and requires
-the carrier `transitive`, so reading it reads Tomcat's copy under the API's name -
-readability is what `requires` grants, and the packages come from the carrier's
-own unqualified exports. And it drops every resolved artifact declaring the
-overridden module, so the closure holds those packages once, whether that artifact
-was required directly or arrived through somebody else's pom. The Server Pages
-API, compiled against the real servlet API and never recompiled, then resolves and
-reads Tomcat:
-
-    jakarta.servlet.jsp.JspFactory is read from jakarta.servlet.jsp
-    jakarta.servlet.jsp declares transitive jakarta.servlet
-
-Because the generated pom is the resolved closure, a Maven consumer flattening
-this project onto a class path gets one copy too, and the declaration reaches
-Jenesis consumers through the `Jenesis-Overrides` manifest header. The descriptor
-still says `requires jakarta.servlet`, which is the point: the published contract
-names the API, not the server implementing it here.
-
-Two limits follow from the placed module holding no code. A qualified
-`exports ... to jakarta.servlet` or `opens ... to jakarta.servlet` grants access to
-it rather than to the carrier that does the reflecting, so open to the carrier or
-unqualified. And requiring it reads everything the carrier exports, so code can
-compile against `org.apache.catalina` while only declaring `requires
-jakarta.servlet`.
-
-## 23. Selecting a variant per platform - [`platform-guard`](demo-36-platform-guard/README.md), [`platform-guard-pom`](demo-37-platform-guard-pom/README.md)
-
-The `module-classifier` demo committed one classified variant explicitly; `platform-guard`
-declares several and lets the build pick. A `@jenesis.pin` line may end with a
-bracketed **guard**, matched against the active platform: the detected OS and
-chipset (e.g. `linux,x86_64`) plus any token a `-Djenesis.platform.<token>=true`
-system property adds on top:
-
-    @jenesis.pin mutiny.zero 1.1.1 SHA-256/2ba03737...
-    @jenesis.pin mutiny.zero :jdk-flow:0.4.3 SHA-256/0556f076... (legacy)
-
-A guard matches when all of its tokens are contained in the active set; the most
-specific match wins, the unguarded line is the fallback, and equally specific
-distinct matches fail the build. Tokens are free-form - a real project guards
-with `(windows)` or `(macos,aarch64)`, while this demo uses the neutral token
-`legacy` so the differential selection is observable on any machine: the default
-build resolves `mutiny.zero` 1.1.1, and
-`java -Djenesis.platform.legacy=true build/jenesis/Execute.java` adds the `legacy`
-token so the guarded `jdk-flow` variant of 0.4.3 is resolved instead, with the
-entry point printing which variant is on the module path. The platform is a field
-of the manifests step, so adding a flag invalidates exactly the affected selection
-- no `target/` cleanup needed - and every variant stays committed with its own
-checksum, so the build remains reproducible from the repository alone on every
-platform.
-
-`platform-guard-pom` shows the same guards in a Maven project: pin lines in the
-`pom.xml`'s `<!--jenesis.pin ... -->` comment block take the identical bracketed
-guard, here switching which `commons-lang3` **transitive** the declared
-`commons-text` resolves against. Versions.properties acts as a bill of materials
-at any closure depth, but two Maven boundaries apply: a directly declared
-`<version>` wins over the bill of materials (guard transitives, or do not declare
-the version directly), and a guard can never force in a classifier, since Maven
-dependency management matches classifiers as part of the coordinate key rather
-than contributing them. Re-pinning obeys the guard on both layouts: only the line
-that matched the local platform is refreshed, every other line is preserved
-byte-for-byte, and a guarded key stays in the comment block rather than migrating
-into `<dependencyManagement>`.
-
-## 24. Customizing the build - [`custom-assembler`](demo-38-custom-assembler/README.md)
+## 31. Customizing the build - [`custom-assembler`](demo-45-custom-assembler/README.md)
 
 The remaining demos open up the template. `custom-assembler` keeps the standard
 MODULAR_TO_MAVEN flow but **wraps** the stock `InferredMultiProjectAssembler` so each
@@ -858,7 +1034,7 @@ transformation is simply interposed in front of it. Any step that produces a
 `sources/` tree (template expansion, code generation, license headers) fits the
 same shape. This demo is launched with `java build/Demo.java`.
 
-[`custom-jmod`](demo-39-custom-jmod/README.md) is a sibling example of the same wrapping technique, applied to a
+[`custom-jmod`](demo-46-custom-jmod/README.md) is a sibling example of the same wrapping technique, applied to a
 different extension point. It enables the stock `jmod`, `jlink`, and `jpackage`
 steps (a committed `packaging.properties` with `jmod=true`, `jlink=true`, and
 `jpackage=app-image`, read by the stock `new InferredMultiProjectAssembler()`)
@@ -873,7 +1049,7 @@ the jmod's config section, it travels `jmod -> jlink runtime -> jpackage image`,
 the launched app reads it back from its own `<java.home>/conf/` - content a jar cannot
 carry into a packaged runtime. Also `java build/Demo.java`.
 
-## 25. Preprocessing in a reusable build module - [`internal-module`](demo-40-internal-module/README.md), [`external-module`](demo-41-external-module/README.md)
+## 32. Preprocessing in a reusable build module - [`internal-module`](demo-47-internal-module/README.md), [`external-module`](demo-48-external-module/README.md)
 
 `internal-module` does the same preprocessing as `custom-assembler`, but moves it
 out of an inline step and into a **build module** - a `BuildExecutorModule`
@@ -892,7 +1068,7 @@ Java module name in the default `main` group.
 Together these show that build logic itself is just another module - it can be
 authored inline, loaded from source, or consumed as a versioned artifact.
 
-## 26. Driving the build without `Project` - [`custom-maven`](demo-42-custom-maven/README.md), [`custom-modular`](demo-43-custom-modular/README.md)
+## 33. Driving the build without `Project` - [`custom-maven`](demo-49-custom-maven/README.md), [`custom-modular`](demo-50-custom-modular/README.md)
 
 The previous customizations still went through `Project`. These two go a step
 further: they drive a multi-module build directly from a hand-written
@@ -915,7 +1091,7 @@ adapted with a one-line wrapper so each discovered descriptor becomes a
 `Project` itself uses) when you need a custom repository, strict pinning, or a
 specific digest.
 
-## 27. Dropping the template entirely - [`custom-build`](demo-44-custom-build/README.md)
+## 34. Dropping the template entirely - [`custom-build`](demo-51-custom-build/README.md)
 
 The last demo removes `Project`, the layout, and the assembler altogether and
 wires a `BuildExecutor` **by hand** in one `main` method. There is no `pom.xml`
@@ -933,88 +1109,7 @@ step down to the `BuildExecutor` primitives and build exactly the graph you want
 Run it with `java build/Demo.java`, then `java -cp target/jar/output/artifacts/classes.jar
 sample.Sample`.
 
-## 28. Confining the build with Docker - [`docker-isolation`](demo-45-docker-isolation/README.md)
-
-A build executes untrusted code even when nothing about it is customised: the
-stock pipeline runs your tests (and whatever your test dependencies pull in), and
-the artifact it produces has a `main` that runs later - all with the rights of
-whoever started the build. `docker-isolation` is a plain `Project`-based build
-(deliberately not customised - a custom launcher's own `main` would only add
-another place for a vulnerability to hide) whose **test** and artifact **`main`**
-each read a secret file (`~/.demo-credentials`) and a secret environment variable
-(`DEMO_SECRET`), then overwrite the file. Run on the host with the stock launchers
-(`java build/jenesis/Make.java`, then `java build/jenesis/Execute.java`), both
-actors reach the secrets.
-
-The new idea is that **Jenesis can run the build and the launched program inside a
-throwaway container** - `-Djenesis.execute.docker=true` sandboxes the program's
-`main`, `-Djenesis.project.docker=true` sandboxes the build (the test included) -
-where the host home and environment are absent, so neither secret is in reach. The
-demo also shows the consequence of the local Maven/Jenesis repositories being
-mounted **read-only**: dependencies must be pre-cached, and `export` fails inside
-the container. It needs a Docker daemon, so it is a local exercise rather than a
-CI one. There are no assertions; each actor just reports what it managed to do.
-
-## 29. Supply-chain security - [`supply-chain-security`](demo-46-supply-chain-security/README.md)
-
-Pinning has two halves, and this demo shows both by getting them wrong on purpose.
-`supply-chain-security` has a `build/Demo.java` that asserts fifteen outcomes across
-seven standalone modular projects - there is no `pom.xml` in it at all. Two of them
-get pinning wrong: an **`unpinned`** project whose dependency carries a version but no
-checksum, and a **`tampered`** project whose dependency is pinned to a wrong
-`SHA-256`. The unpinned one builds by default but is rejected under
-`pinning(Pinning.STRICT)` (a hardened environment can refuse any unverified
-dependency); the tampered one fails **regardless** of strict pinning, because the
-`Dependencies` step checks every fetched artifact against its pin and rejects a mismatch -
-exactly what would catch a swapped or compromised artifact.
-
-Neither hash answers *who produced these bytes*, though - a checksum is taken from
-whatever the repository served, so a swapped artifact is written in as an accepted
-pin just the same. `@jenesis.signature` names the OpenPGP key that signs a
-coordinate's artifacts: the fingerprint first, then the coordinates it covers,
-because one key normally signs many, and a Maven token may end in `/*` to cover a
-whole groupId. Nothing writes those lines - a fingerprint is checked against the
-upstream project's published KEYS and added by hand, as `@jenesis.bom` entries are.
-A declaration naming a lone `signature-<name>.properties` reads its keys from a local
-file instead, the shape `@jenesis.bom` already uses for a local pin file, so one vetted
-list serves many modules; a list is only ever read from disk. Verification happens right
-after download, as its own step inside the `Dependencies` module, and
-`jenesis.dependency.signature` decides how much of it happens: `declared` checks every
-coordinate a line covers, `strict` additionally refuses one no line covers, and the
-default `none` checks nothing. A **`signed`** project declares no key
-and so passes `declared` and fails `strict`, until the demo writes the real
-fingerprint in; a **`rotated`** one declares another key and is blocked, even though
-its signature is perfectly valid - only the comparison against the declaration can
-see that; a **`vendored`** one makes the same mistake through a local key list and is
-blocked identically. That half is self-contained and commits nothing binary: the demo
-builds a byte-reproducible jar, generates a throwaway key, signs the jar and its POM,
-and publishes all four files to a `file:` repository under `target/`, so nothing
-reaches the network.
-
-The same question has a second answer that keeps no key at all. **`attested`** declares
-`@jenesis.signature Sigstore/github.com/sigstore/protobuf-specs`, an identity rather than
-a fingerprint, and verifies a published release against the Sigstore bundle beside it: a
-certificate that named the workflow which built it and lived ten minutes, and a
-transparency log entry fixing when it signed. The path is a prefix that narrows by segment
-and stops before the tag a release was built from, so one line covers every future
-version the way a fingerprint does. **`forked`** declares another repository for the same
-artifact and is blocked, though its bundle is genuine - the `rotated` case again, for an
-identity. That half forks no gpg, fetches no key and configures no trust root, since the
-tool carries the published root of the public Sigstore instance as source; it does need
-the network, because a bundle exists only once a certificate authority and a public log
-have seen the signer, and it prints `[skipped]` when Maven Central cannot be reached.
-
-The new ideas are **strict pinning vs. checksum verification** - the former decides
-*whether* an unverified dependency may be used at all, the latter proves a pinned
-dependency is the exact artifact you vetted - and **provenance as a declaration
-rather than a record**. A signature line carries no version, so vetting a key once
-covers every future release that key signs, where a hash covers exactly one file and
-every version bump is a fresh, unvetted trust event. Verification is deliberately no
-part of `pin`: `pin` pins, and the demo's last case shows `rotated` building happily
-with its contradiction never looked for, because an ordinary build needs no gpg at
-all until you ask for it.
-
-## 30. Publishing to Maven Central - [`publishing`](demo-47-publishing/README.md)
+## 35. Publishing to Maven Central - [`publishing`](demo-52-publishing/README.md)
 
 The final demo closes the loop from sources to a release. Publishing to Central is
 two jobs - **produce a correct bundle** and **upload it** - and Jenesis owns the
@@ -1041,7 +1136,7 @@ to the `release` goal, a rehearsal by default, and its `environment` step hands 
 version this build stamped to the release tool so it is stated once rather than
 passed twice.
 
-## 31. Ahead-of-time native image - [`native-image`](demo-48-native-image/README.md)
+## 36. Ahead-of-time native image - [`native-image`](demo-53-native-image/README.md)
 
 `native-image` revisits the runnable-artifact idea from section 4 from the other
 end. There, `jpackage` bundled your bytecode with a `jlink`-trimmed JVM; here
@@ -1079,36 +1174,7 @@ successor: jpackage for a faithful bundle of the JVM you tested against, native-
 when startup latency and footprint dominate. Like `docker-isolation`, it needs tooling
 the CI runners lack (GraalVM), so it is a local exercise.
 
-## 32. A shared build cache - [`build-cache`](demo-49-build-cache/README.md)
-
-Every build already caches incrementally under `target/`: each step is
-content-hashed on its inputs and outputs, so a warm rebuild only re-runs what
-changed. `build-cache` adds the second tier - a **shared cache** outside
-`target/`, switched on with `-Djenesis.project.cache` (or an explicit
-`-Djenesis.cache.uri=<uri>`), that hands a step its finished output
-instead of running it. The cache is content-addressed
-(`<folder>/<step-hash>/<inputs-hash>/`): the step hash identifies the step from
-its serialized form, the inputs hash folds every input file's content hash, and a
-hit materializes the cached output by hard link, so reads are near free while the
-step body is skipped entirely.
-
-The demo makes the second tier visible with `-Djenesis.executor.rebuild=true`,
-which deletes `target/` before building so the *incremental* cache is gone and
-every step is a forced miss. The shared cache lives outside `target/`, so a first
-build bootstraps it and a second `rebuild` is served from it - the compile,
-class, and jar steps return in ~0.00s, marked `[EXECUTED]` because the output was
-produced, just not by `javac`. An optional `cache.properties` at the cache root
-tunes the writes (`steps`/`versions`/`size` caps with `lru` eviction, `touch`,
-`compressed` for a packed zip layout, and `read`/`write` toggles - `write=false`
-for read-only consumers, both off to disable), all defaulted so the file is
-optional. `BuildExecutorFileCache` is
-one implementation of the pluggable `BuildExecutorCache` seam: a remote
-HTTP/object-store backend is another implementation of the same `fetch`/`store`
-interface, and the local folder is the on-disk analogue - point several checkouts
-or a CI workspace and a laptop at one folder and a step compiled once is reused
-wherever its inputs match.
-
-## 33. Running a released program - [`jpx`](demo-50-jpx/README.md)
+## 37. Running a released program - [`jpx`](demo-54-jpx/README.md)
 
 Every demo so far built something. `jpx` builds nothing: it resolves a *published*
 module (or Maven artifact), installs its runtime closure once into
@@ -1198,64 +1264,6 @@ The group is the top isolation axis: a project's own dependencies live in the
 inheriting compile), and a *resolved compiler* lives in its own group (`kotlinc`,
 `scalac`, `groovyc`), so it never mixes with the project's own dependencies.
 
-## 34. What starting a build costs - [`startup`](demo-51-startup/README.md)
-
-The Java launcher compiles the file you name, plus everything it references,
-before any of its code runs. So the entry point decides what a build costs before
-the build can decide anything, and a file declaring `Project` costs its whole
-closure - about 1.5 seconds before `main` is reached.
-
-`Make.java` is that entry point and names no engine class, so the Java launcher has
-one small file to compile. It then compiles the build sources once and runs the
-build from those classes, which is on by default because a single batch compile
-beats the Java launcher compiling class by class as it loads them: 8.0 seconds down to
-3.6 for a build that runs once, and 0.8 for a repeat.
-
-`jenesis.make.daemon` adds a reused JVM on top, keeping a warm JIT between calls.
-It is off by default, since compiling once already removes the large fixed cost.
-What it saves after that is compiling speed rather than setup - a Jenesis build
-has no script to parse, and spends its time inside javac, which a JVM that has
-already compiled a few modules runs faster - so it is worth nothing on a build
-that compiles little and about a third on a five-module one. The daemon serves one project, one request at a time; only `-Djenesis.*`
-flags travel with a call, cleared and set again around every build, while
-anything a running JVM cannot change - the build sources, the environment, the
-JVM arguments - replaces the daemon instead. `--stop` shuts it down.
-
-## 35. Guarding a published API - [`api-compatibility`](demo-52-api-compatibility/README.md)
-
-The last gate is the one that protects the people who already depend on you.
-`api-compatibility` turns on japicmp with a `japicmp.properties` config file, and japicmp
-compares the byte code of the jar this build produced against the byte code of the
-jar the last release produced. Byte code, not sources, is the right level: it is
-what a caller actually linked against, so a removed method, a narrowed return type
-or a tightened modifier shows up whether or not the sources still look compatible.
-
-The new idea is **a baseline the build works out for itself**. The config file here
-is empty, and that is the whole configuration: with no `baseline` key, japicmp
-compares against `<this module's groupId>/<its artifactId>` at `RELEASE`, so every
-build measures the change you are about to publish against the release before it,
-and the version floats rather than being re-pointed by hand. A `baseline=` key names
-another coordinate instead - a vendored fork checked against upstream, say - read by
-how many slashes it carries. Either way japicmp and the baseline resolve in a
-`japicmp` group of their own, and the baseline resolves without its transitive
-dependencies, since only its own byte code is compared.
-
-A demo has never published anything, so this one publishes its own previous release:
-`build/Demo.java` builds `released/` (the same coordinate at 1.0.0), stages it - a
-staged tree is already a Maven repository layout - writes the `maven-metadata.xml`
-that makes a floating version resolvable, and then builds this project at 1.1.0 with
-that repository prepended to Maven Central through `Project.repositories(...)`. The
-baseline is deliberately not pinned: it is a jar the demo builds, so its checksum is
-whatever machine produced it, the same reason `internal-module` pins its plugin's
-dependencies but never the plugin. This is the one demo CI runs with
-`jenesis.dependency.pin=versions` rather than `strict`.
-
-Like the linters, the check is report-only: it writes
-`reports/japicmp/japicmp-report.xml`, which a `stage` build collects with every other
-report kind, and keeps the build green. Four `error-on-*` keys turn a finding into
-a failure - binary incompatibility, source incompatibility, any modification at
-all, or a semantic-versioning violation - and the failure names the change that
-caused it. `-Djenesis.artifact.japicmp=false` is the usual opt-out.
 
 Current pin state of the demos: every demo is committed pinned with checksums.
 `java-pom`, `java-pom-multi`, `java-modular`, and `java-modular-multi` pin their

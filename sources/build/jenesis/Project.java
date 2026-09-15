@@ -882,7 +882,7 @@ public record Project(
 
                     ## 13. Copy a demo: they are the recipe book
 
-                    51 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    54 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -892,29 +892,31 @@ public record Project(
                     https://github.com/jenesis/jenesis/tree/main/demo.
 
                       Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
-                                         04 java-modular-multi, 32 module-layout (forcing MODULAR)
-                      Runnable output    05, 06 java-*-executable (jpackage), 07 bundle (jars for a
-                                         stock JRE), 08 java-multi-release, 48 native-image (GraalVM)
-                      Compiler control   09 javac-arguments (process-javac.properties),
-                                         10 annotations (an annotation processor via @jenesis.plugin)
-                      Generated sources  11 data-formats (xjc, protoc, avro),
-                                         12 service-contracts (wsimport, OpenAPI)
-                      Other languages    18 kotlin, 20 kotlin-plugin, 21 scala, 23 groovy
-                      Quality gates      13 java-quality, 19 kotlin-quality, 22 scala-quality,
-                                         24 groovy-quality
-                      Tests              25 code-coverage (JaCoCo), 26 test-selection (incremental),
-                                         27 pitest (mutation), 28 jmh (benchmark harness)
-                      Dependencies       29 agents (@jenesis.attach), 30 maven-exclusions, 31 bom,
-                                         33 module-classifier, 34 module-alias, 35 module-override,
-                                         36, 37 platform-guard (per-platform variants)
-                      Supply chain       14 sbom, 15 compliance (licenses), 16 vulnerabilities (OSV),
-                                         17 profiles, 46 supply-chain-security (what must fail)
-                      Extending it       38 custom-assembler, 39 custom-jmod, 40 internal-module,
-                                         41 external-module, 42 custom-maven, 43 custom-modular,
-                                         44 custom-build (no Project at all)
-                      Operating it       45 docker-isolation, 47 publishing (Maven Central),
-                                         49 build-cache, 50 jpx (run a released program without
-                                         building), 51 startup (what launching costs)
+                                         04 java-modular-multi, 18 module-layout (forcing MODULAR)
+                      Starting a build   05 startup (what launching costs, and the daemon)
+                      Runnable output    06, 07 java-*-executable (jpackage), 08 bundle (jars for a
+                                         stock JRE), 09 java-multi-release, 53 native-image (GraalVM)
+                      Compiler control   10 javac-arguments (process-javac.properties),
+                                         11 annotations (an annotation processor via @jenesis.plugin)
+                      Generated sources  12 data-formats (xjc, protoc, avro),
+                                         13 service-contracts (wsimport, OpenAPI)
+                      Dependencies       14 maven-exclusions, 15 bom, 16 module-alias,
+                                         17 module-classifier, 19 module-override,
+                                         20, 21 platform-guard (per-platform variants)
+                      Trusting them      22 pinning (versions and checksums), 23 openpgp (a declared
+                                         key), 24 sigstore (a declared identity, no key at all),
+                                         25 sbom, 26 compliance (licenses), 27 vulnerabilities (OSV)
+                      Quality gates      28 java-quality, 33 api-compatibility (japicmp),
+                                         35 kotlin-quality, 38 scala-quality, 40 groovy-quality
+                      Tests              29 code-coverage (JaCoCo), 30 test-selection (incremental),
+                                         31 pitest (mutation), 32 jmh (benchmark harness)
+                      Other languages    34 kotlin, 36 kotlin-plugin, 37 scala, 39 groovy
+                      Operating it       41 profiles, 42 build-cache, 43 docker-isolation,
+                                         44 agents (@jenesis.attach), 52 publishing (Maven Central),
+                                         54 jpx (run a released program without building)
+                      Extending it       45 custom-assembler, 46 custom-jmod, 47 internal-module,
+                                         48 external-module, 49 custom-maven, 50 custom-modular,
+                                         51 custom-build (no Project at all)
 
                     ## 14. When stuck, read the source
 
