@@ -86,6 +86,12 @@ public class Docker implements BuildStep {
                 classpath.put(entry.getKey(), entry.getValue());
             }
         }
+        // A layer's class path is an unnamed module like any other, and the modules it reads have to be
+        // rooted for it: the application's own jars may all be modules and say nothing of the platform
+        // set a legacy tree inside a layer still expects.
+        if (layers.values().stream().anyMatch(membership -> !membership.classpath().isEmpty())) {
+            graph.unnamed();
+        }
         // Every path is spelled out rather than handed over as a folder, which is what lets one store hold
         // the application's jars and every layer's alike: a jar more than one path names is stored once.
         SequencedMap<String, Path> stored = new TreeMap<>(classpath);

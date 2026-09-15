@@ -116,6 +116,7 @@ Quick index
 | 53 | [`native-image`](demo-53-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
 | 54 | [`jpx`](demo-54-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
 | 55 | [`module-layers`](demo-55-module-layers/README.md)           | A library keeps a dependency private: `@jenesis.layer` isolates it in a run-time `ModuleLayer` of its own, reached through a shared API module, so three versions of one library coexist - nested, and exercised by tests - with no package relocated and the consumer declaring nothing | `java build/Demo.java`             |
+| 56 | [`module-layer-legacy`](demo-56-module-layer-legacy/README.md)    | The same mechanism over a legacy tree: commons-beanutils and the jars it drags name themselves nowhere, so one `@jenesis.alias` names the jar the code calls and the rest is read through the layer's own class path | `java build/Demo.java` |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 

@@ -92,6 +92,12 @@ public class Bundle implements BuildStep {
         // A layer's jars are resolved in a group of its own, so they are not in the application's
         // selection; take them by the names the layer records, and nothing else that happens to be
         // resolved - a tool's own closure is not part of the application.
+        // A layer's class path is an unnamed module like any other, and the modules it reads have to be
+        // rooted for it: the application's own jars may all be modules and say nothing of the platform
+        // set a legacy tree inside a layer still expects.
+        if (layers.values().stream().anyMatch(membership -> !membership.classpath().isEmpty())) {
+            graph.unnamed();
+        }
         SequencedSet<String> named = new LinkedHashSet<>();
         layers.values().forEach(membership -> named.addAll(membership.all()));
         for (BuildStepArgument argument : arguments.values()) {

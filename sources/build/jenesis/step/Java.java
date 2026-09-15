@@ -176,6 +176,12 @@ public abstract class Java extends JdkProcessBuildStep {
                 }
             }
         }
+        // A layer's class path is an unnamed module like any other, and the modules it reads have to be
+        // rooted for it: the application's own jars may all be modules and say nothing of the platform
+        // set a legacy tree inside a layer still expects.
+        if (layers.values().stream().anyMatch(membership -> !membership.classpath().isEmpty())) {
+            graph.unnamed();
+        }
         List<String> options = new ArrayList<>();
         for (Map.Entry<String, List<String>> path : List.of(
                 Map.entry(MODULE_PATH, modulePath),
