@@ -59,30 +59,23 @@ public class Demo {
 
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
-        // With layers present the module path is named rather than handed over as a folder: a layer's
-        // jars sit among the application's, stored once, and the application must not read them.
+        // The module path is named rather than handed over as a folder: a layer's jars sit among the
+        // application's in one store, stored once, and the application must not read them.
         command.add("--module-path");
-        String named = application.getProperty("modulepath");
-        command.add(named == null
-                ? unpacked.resolve("modulepath").toString()
-                : Stream.of(named.split(","))
-                        .map(name -> unpacked.resolve("modulepath").resolve(name).toString())
-                        .collect(Collectors.joining(File.pathSeparator)));
+        command.add(path(unpacked, application.getProperty("modulepath", "")));
         for (String option : application.getProperty("javaOptions", "").split(" ")) {
             if (!option.isEmpty()) {
                 command.add(option);
             }
         }
 
-        // A bundle is run by a plain `java`, so each layer travels as a folder and the launch command
-        // names it: layer.<declaring module>.<name> here becomes jenesis.layer.<module>.<name>, the
-        // property the library's own code reads. Inside an executable jar no such option is needed -
-        // the launcher reads the layer out of the jar it is already holding open.
+        // A bundle is run by a plain `java`, so the launch command names each layer's jars:
+        // layer.<declaring module>.<name> here becomes jenesis.layer.<module>.<name>, the property
+        // the library's own code reads. Inside an executable jar no such option is needed - the
+        // launcher reads the layer out of the jar it is already holding open.
         for (String key : application.stringPropertyNames()) {
             if (key.startsWith("layer.")) {
-                command.add("-Djenesis." + key + "=" + Stream.of(application.getProperty(key).split(","))
-                        .map(name -> unpacked.resolve("modulepath").resolve(name).toString())
-                        .collect(Collectors.joining(File.pathSeparator)));
+                command.add("-Djenesis." + key + "=" + path(unpacked, application.getProperty(key)));
             }
         }
 
@@ -90,5 +83,12 @@ public class Demo {
         command.add(application.getProperty("mainModule") + "/" + application.getProperty("mainClass"));
         command.addAll(List.of(args));
         System.exit(new ProcessBuilder(command).inheritIO().start().waitFor());
+    }
+
+    private static String path(Path unpacked, String names) {
+        return Stream.of(names.split(","))
+                .filter(name -> !name.isBlank())
+                .map(name -> unpacked.resolve("jars").resolve(name.strip()).toString())
+                .collect(Collectors.joining(File.pathSeparator));
     }
 }

@@ -52,9 +52,10 @@ public class BundleTest {
         Path zip = next.resolve(Bundle.BUNDLE).resolve("bundle.zip");
         assertThat(zip).isRegularFile();
         SequencedSet<String> entries = entries(zip);
-        assertThat(entries).contains("application.properties", "classpath/app.jar", "classpath/lib.jar");
-        assertThat(entries).noneMatch(name -> name.startsWith("modulepath/"));
+        assertThat(entries).contains("application.properties", "jars/app.jar", "jars/lib.jar");
         Properties application = application(zip);
+        assertThat(application.getProperty("classpath")).isEqualTo("app.jar,lib.jar");
+        assertThat(application.getProperty("modulepath")).isEmpty();
         assertThat(application.getProperty("mainClass")).isEqualTo("sample.Sample");
         assertThat(application.getProperty("mainModule")).isNull();
     }
@@ -90,9 +91,10 @@ public class BundleTest {
         assertThat(result.next()).isTrue();
         Path zip = next.resolve(Bundle.BUNDLE).resolve("bundle.zip");
         SequencedSet<String> entries = entries(zip);
-        assertThat(entries).contains("application.properties", "modulepath/sample.jar");
-        assertThat(entries).noneMatch(name -> name.startsWith("classpath/"));
+        assertThat(entries).contains("application.properties", "jars/sample.jar");
         Properties application = application(zip);
+        assertThat(application.getProperty("modulepath")).isEqualTo("sample.jar");
+        assertThat(application.getProperty("classpath")).isEmpty();
         assertThat(application.getProperty("mainClass")).isEqualTo("sample.Sample");
         assertThat(application.getProperty("mainModule")).isEqualTo("sample");
     }
@@ -129,7 +131,9 @@ public class BundleTest {
 
         assertThat(result.next()).isTrue();
         Path zip = next.resolve(Bundle.BUNDLE).resolve("bundle.zip");
-        assertThat(entries(zip)).contains("modulepath/sample.jar", "classpath/lib.jar");
+        assertThat(entries(zip)).contains("jars/sample.jar", "jars/lib.jar");
+        assertThat(application(zip).getProperty("modulepath")).isEqualTo("sample.jar");
+        assertThat(application(zip).getProperty("classpath")).isEqualTo("lib.jar");
         assertThat(application(zip).getProperty("javaOptions"))
                 .as("a consumer splices the options rather than deriving them from the layout")
                 .isEqualTo("--add-modules=ALL-MODULE-PATH,ALL-DEFAULT");
@@ -180,8 +184,9 @@ public class BundleTest {
         SequencedSet<String> entries = entries(zip);
         assertThat(entries)
                 .as("a jar named for its alias derives that module name wherever it is unpacked")
-                .contains("modulepath/sample.jar", "modulepath/alias.lib.jar");
-        assertThat(entries).noneMatch(name -> name.startsWith("classpath/"));
+                .contains("jars/sample.jar", "jars/alias.lib.jar");
+        assertThat(application(zip).getProperty("modulepath")).isEqualTo("alias.lib.jar,sample.jar");
+        assertThat(application(zip).getProperty("classpath")).isEmpty();
         assertThat(application(zip).getProperty("javaOptions"))
                 .isEqualTo("--add-modules=ALL-MODULE-PATH,ALL-DEFAULT");
     }

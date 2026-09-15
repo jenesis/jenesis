@@ -122,8 +122,17 @@ public class JPackage extends JdkProcessBuildStep {
             commands.add("--type");
             commands.add(type);
         }
-        commands.add(modular ? "--module-path" : "--input");
-        commands.add(input.toString());
+        if (modular) {
+            // Named rather than handed over as a folder: what is on the module path is spelled out, so
+            // adding a file to the staging folder never widens what the image resolves.
+            commands.add("--module-path");
+            commands.add(staged.values().stream()
+                    .map(file -> input.resolve(file.getFileName().toString()).toString())
+                    .collect(Collectors.joining(File.pathSeparator)));
+        } else {
+            commands.add("--input");
+            commands.add(input.toString());
+        }
         for (String option : graph.options()) {
             commands.add("--java-options");
             commands.add(option);

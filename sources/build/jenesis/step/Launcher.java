@@ -84,15 +84,19 @@ public class Launcher implements BuildStep {
             }
             layers.putAll(Layers.membership(argument.folder()));
         }
+        // A layer's jars are resolved in a group of its own, so they are not in the application's
+        // selection; take them by the names the layer records, and nothing else that happens to be
+        // resolved - a tool's own closure is not part of the application.
         SequencedSet<String> named = new LinkedHashSet<>();
         layers.values().forEach(named::addAll);
+        SequencedMap<String, Path> isolated = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
             }
             for (Path file : Dependencies.all(argument.folder())) {
                 if (named.contains(file.getFileName().toString())) {
-                    jars.putIfAbsent(file.getFileName().toString(), file);
+                    isolated.putIfAbsent(file.getFileName().toString(), file);
                 }
             }
         }
@@ -106,15 +110,26 @@ public class Launcher implements BuildStep {
         if (mainModule != null) {
             application.setProperty("mainModule", mainModule);
         }
-        if (!classpath.isEmpty()) {
-            application.setProperty("classpath", String.join(",", classpath.sequencedKeySet()));
-        }
-        // A layer's modules are exploded among the application's, so a jar both need is stored once; the
-        // declaration is what tells them apart, and what the launcher withholds from the application.
+        // Every path is spelled out rather than handed over as a folder, which is what lets one store hold
+        // the application's jars and every layer's alike: a jar more than one path names is stored once.
+        application.setProperty("classpath", String.join(",", classpath.sequencedKeySet()));
+        application.setProperty("modulepath", String.join(",", modulepath.sequencedKeySet()));
         layers.forEach((layer, names) ->
                 application.setProperty("layer." + layer, String.join(",", names)));
         Path descriptor = context.supplement().resolve("application.properties");
         application.store(descriptor);
+        SequencedMap<String, Path> stored = new TreeMap<>(classpath);
+        stored.putAll(modulepath);
+        for (Map.Entry<String, SequencedSet<String>> layer : layers.entrySet()) {
+            for (String member : layer.getValue()) {
+                Path file = isolated.get(member);
+                if (file == null) {
+                    throw new IllegalStateException("Layer " + layer.getKey() + " names " + member
+                            + ", which was not resolved for this application");
+                }
+                stored.putIfAbsent(member, file);
+            }
+        }
         Manifest manifest = new Manifest();
         manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
         manifest.getMainAttributes().put(Attributes.Name.MAIN_CLASS, MAIN_CLASS);
@@ -123,13 +138,9 @@ public class Launcher implements BuildStep {
         try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar), manifest)) {
             explode(out, shaded, "", entry -> entry.startsWith(LAUNCHER_PREFIX) && entry.endsWith(".class"));
             writeEntry(out, "application.properties", descriptor);
-            for (Map.Entry<String, Path> entry : classpath.entrySet()) {
-                explode(out, entry.getValue(), "classpath/" + entry.getKey() + "/", _ -> true);
+            for (Map.Entry<String, Path> entry : stored.entrySet()) {
+                explode(out, entry.getValue(), "jars/" + entry.getKey() + "/", _ -> true);
             }
-            for (Map.Entry<String, Path> entry : modulepath.entrySet()) {
-                explode(out, entry.getValue(), "modulepath/" + entry.getKey() + "/", _ -> true);
-            }
-
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }

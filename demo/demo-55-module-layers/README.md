@@ -79,24 +79,24 @@ Any build that resolves that jar reads the header, resolves those coordinates in
 and materialises them into a folder, exactly as it would for `Jenesis-Aliases` or
 `Jenesis-Overrides`. The result is visible in the bundle:
 
-    modulepath/classes.jar                              every jar, stored once
-    modulepath/demo.layers.library-1-SNAPSHOT.jar
-    modulepath/demo.layers.spi-1-SNAPSHOT.jar
-    modulepath/com.fasterxml.jackson.core-2.18.2.jar    the application's
-    modulepath/com.fasterxml.jackson.core-2.15.4.jar    the library's
-    modulepath/com.fasterxml.jackson.core-2.13.5.jar    one layer deeper
-    modulepath/demo.layers.impl-1-SNAPSHOT.jar
-    modulepath/demo.layers.nested-1-SNAPSHOT.jar
+    jars/classes.jar                              every jar, stored once
+    jars/demo.layers.library-1-SNAPSHOT.jar
+    jars/demo.layers.spi-1-SNAPSHOT.jar
+    jars/com.fasterxml.jackson.core-2.18.2.jar    the application's
+    jars/com.fasterxml.jackson.core-2.15.4.jar    the library's
+    jars/com.fasterxml.jackson.core-2.13.5.jar    one layer deeper
+    jars/demo.layers.impl-1-SNAPSHOT.jar
+    jars/demo.layers.nested-1-SNAPSHOT.jar
 
     application.properties
       modulepath=classes.jar,demo.layers.library-...,demo.layers.spi-...,...2.18.2.jar
       layer.demo.layers.library.render=demo.layers.impl-...,...2.15.4.jar
       layer.demo.layers.impl.inner=demo.layers.nested-...,...2.13.5.jar
 
-Nothing is placed anywhere special. A dependency is materialised once under a name that carries its
-version, so three versions of one library stand side by side, and a jar a layer and the application
-both need is one file named in two lists - stored once, loaded twice. The module path is *named*
-rather than handed over as a folder, because the folder holds more than the application may read.
+Nothing is placed anywhere special, and one store is enough because no path is a folder. A dependency
+is materialised once under a name that carries its version, so three versions of one library stand side
+by side, and a jar a layer and the application both need is one file named in two lists - stored once,
+loaded twice. Every path is *named*, because a folder holds whatever happens to be in it.
 
 `demo.layers.impl` is not named in `modulepath`, so the application never reads it.
 `demo.layers.spi` is named there and in no layer - which is what makes the `Report` instance that
@@ -134,7 +134,7 @@ Where the layer comes from at run time
 --------------------------------------
 
 `bundle=true` records each layer's membership in `application.properties`, so the launch command
-names the jars: `-Djenesis.layer.demo.layers.library.render=<unpacked>/modulepath/demo.layers.impl-….jar:…`.
+names the jars: `-Djenesis.layer.demo.layers.library.render=<unpacked>/jars/demo.layers.impl-….jar:…`.
 The declaring module is part of the key because a layer may itself hold a module that declares one -
 nesting is unbounded - and the runtime builds the same key from the module that calls it. Docker bakes the same option into its
 `ENTRYPOINT`, and a run through `Execute` passes it too.

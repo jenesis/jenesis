@@ -40,8 +40,8 @@ public class Demo {
                     .orElseThrow(() -> new IllegalStateException("No bundle.zip was produced"));
         }
 
-        // Unpack the bundle the way a deployment would: an application.properties plus a
-        // modulepath/ (and, for a non-modular app, a classpath/) holding the launch closure.
+        // Unpack the bundle the way a deployment would: an application.properties plus a jars/
+        // folder holding the launch closure, with each path named by the descriptor.
         Path unpacked = Files.createTempDirectory("bundle-");
         try (ZipFile archive = new ZipFile(zip.toFile())) {
             Enumeration<? extends ZipEntry> entries = archive.entries();
@@ -76,15 +76,17 @@ public class Demo {
         // Reconstruct the launch command a JRE-based deployment would run.
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
-        Path modulepath = unpacked.resolve("modulepath");
-        Path classpath = unpacked.resolve("classpath");
-        if (Files.isDirectory(modulepath)) {
+        // Both paths are spelled out: the descriptor names which of the stored jars each holds, so
+        // nothing is on a path merely by sitting in a folder.
+        String modulepath = path(unpacked, application.getProperty("modulepath", ""));
+        String classpath = path(unpacked, application.getProperty("classpath", ""));
+        if (!modulepath.isEmpty()) {
             command.add("--module-path");
-            command.add(modulepath.toString());
+            command.add(modulepath);
         }
-        if (Files.isDirectory(classpath)) {
+        if (!classpath.isEmpty()) {
             command.add("-classpath");
-            command.add(classpath.resolve("*").toString());
+            command.add(classpath);
         }
         for (String option : javaOptions.split(" ")) {
             if (!option.isEmpty()) {
@@ -99,5 +101,12 @@ public class Demo {
         }
         command.addAll(List.of(args));
         System.exit(new ProcessBuilder(command).inheritIO().start().waitFor());
+    }
+
+    private static String path(Path unpacked, String names) {
+        return Stream.of(names.split(","))
+                .filter(name -> !name.isBlank())
+                .map(name -> unpacked.resolve("jars").resolve(name.strip()).toString())
+                .collect(Collectors.joining(File.pathSeparator));
     }
 }

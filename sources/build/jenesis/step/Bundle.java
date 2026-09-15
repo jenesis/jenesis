@@ -104,42 +104,37 @@ public class Bundle implements BuildStep {
                 }
             }
         }
-        for (SequencedSet<String> names : layers.values()) {
-            for (String name : names) {
-                Path jar = jars.get(name);
-                if (jar != null) {
-                    modulepath.putIfAbsent(name, jar);
-                }
-            }
-        }
         SequencedProperties application = new SequencedProperties();
         application.setProperty("mainClass", mainClass);
         if (mainModule != null) {
             application.setProperty("mainModule", mainModule);
         }
-        // A layer's modules are bundled among the application's, so a jar both need is stored once; the
-        // module path then has to be named rather than handed over as a folder, since it holds more than
-        // the application itself may read.
-        if (!layers.isEmpty()) {
-            application.setProperty("modulepath", String.join(",", modulepath.sequencedKeySet().stream()
-                    .filter(name -> layers.values().stream().noneMatch(names -> names.contains(name)))
-                    .toList()));
-            layers.forEach((name, names) ->
-                    application.setProperty("layer." + name, String.join(",", names)));
-        }
+        // Every path is spelled out rather than handed over as a folder, which is what lets one store hold
+        // the application's jars and every layer's alike: a jar more than one path names is stored once.
+        application.setProperty("classpath", String.join(",", classpath.sequencedKeySet()));
+        application.setProperty("modulepath", String.join(",", modulepath.sequencedKeySet()));
+        layers.forEach((name, names) -> application.setProperty("layer." + name, String.join(",", names)));
         graph.store(application);
         Path descriptor = context.supplement().resolve("application.properties");
         application.store(descriptor);
+        SequencedMap<String, Path> stored = new TreeMap<>(classpath);
+        stored.putAll(modulepath);
+        for (Map.Entry<String, SequencedSet<String>> layer : layers.entrySet()) {
+            for (String name : layer.getValue()) {
+                Path jar = jars.get(name);
+                if (jar == null) {
+                    throw new IllegalStateException("Layer " + layer.getKey() + " names " + name
+                            + ", which was not resolved for this application");
+                }
+                stored.putIfAbsent(name, jar);
+            }
+        }
         Path zip = Files.createDirectory(context.next().resolve(BUNDLE)).resolve("bundle.zip");
         try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zip))) {
             writeEntry(out, "application.properties", descriptor);
-            for (Map.Entry<String, Path> entry : classpath.entrySet()) {
-                writeEntry(out, "classpath/" + entry.getKey(), entry.getValue());
+            for (Map.Entry<String, Path> entry : stored.entrySet()) {
+                writeEntry(out, "jars/" + entry.getKey(), entry.getValue());
             }
-            for (Map.Entry<String, Path> entry : modulepath.entrySet()) {
-                writeEntry(out, "modulepath/" + entry.getKey(), entry.getValue());
-            }
-
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }

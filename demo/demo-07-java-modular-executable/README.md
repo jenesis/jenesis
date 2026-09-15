@@ -189,16 +189,18 @@ module with a main class:
     java build/jenesis/Make.java
 
     bundle.zip
-    |-- application.properties     mainClass=sample.Sample, mainModule=demo.modular.executable
-    |-- modulepath/                jars that are modules (here the app jar and slf4j-api)
-    `-- classpath/                 any non-modular jars
+    |-- application.properties     mainClass=sample.Sample, mainModule=demo.modular.executable,
+    |                              modulepath=..., classpath=...
+    `-- jars/                      every jar of the closure, stored once
 
-The zip carries exactly the runtime closure `Execute` would launch, split the same
-way: real and automatic modules under `modulepath/`, the rest under `classpath/`.
+The zip carries exactly the runtime closure `Execute` would launch, in one store.
 `application.properties` is plain `key=value` lines describing the launch: `mainClass`,
-`mainModule` (only when the launcher is modular), and a `javaOptions` entry holding the
-JVM options the graph needs, written only when it needs any. An automatic module or a
-`classpath/` jar means `--add-modules=ALL-MODULE-PATH,ALL-DEFAULT` to root the whole
+`mainModule` (only when the launcher is modular), `modulepath` and `classpath` naming
+which of the stored jars each path holds, and a `javaOptions` entry holding the
+JVM options the graph needs, written only when it needs any. Every path is spelled out
+rather than handed over as a folder, so a jar is read because the descriptor names it
+and never because of where it sits. An automatic module or a class-path
+jar means `--add-modules=ALL-MODULE-PATH,ALL-DEFAULT` to root the whole
 module path and the default platform set,
 exactly as the jpackage section above describes; the consumer splices the options in
 verbatim rather than interpreting them. Here the closure is `demo.modular.executable` +
@@ -207,11 +209,12 @@ verbatim rather than interpreting them. Here the closure is `demo.modular.execut
 
     FROM eclipse-temurin:25-jre
     COPY bundle/ /opt/app/
-    ENTRYPOINT ["java", "--module-path", "/opt/app/modulepath", "-m", "demo.modular.executable/sample.Sample"]
+    ENTRYPOINT ["java", "--module-path", "/opt/app/jars/demo.modular.executable.jar:/opt/app/jars/org.slf4j.jar", \
+                "-m", "demo.modular.executable/sample.Sample"]
 
-For a non-modular project the zip holds only `classpath/` and an `application.properties`
-with just `mainClass`, launched with `java -cp 'classpath/*' sample.Sample` (see
-`../demo-06-java-pom-executable`).
+For a non-modular project `modulepath` is empty and `application.properties` carries just
+`mainClass` and the `classpath` list, launched with `java -cp jars/<jar>:jars/<jar> sample.Sample`
+(see `../demo-06-java-pom-executable`).
 
 A generated Dockerfile
 ----------------------
@@ -225,15 +228,16 @@ That Dockerfile does not have to be written by hand either: a `docker` key in
 
     target/stage/docker/output/module-sources/
     |-- Dockerfile
-    `-- modulepath/                the app jar and slf4j-api
+    `-- jars/                      the app jar and slf4j-api
 
-Because the module declares `mainModule`, the jars carrying a module descriptor land
-under `modulepath/` and the entry point launches the module, not a class:
+Because the module declares `mainModule`, the jars carrying a module descriptor are named
+on the module path and the entry point launches the module, not a class:
 
     FROM eclipse-temurin:25-jre
     WORKDIR /app
-    COPY modulepath/ /app/modulepath/
-    ENTRYPOINT ["java", "--module-path", "/app/modulepath", "--module", "demo.modular.executable/sample.Sample"]
+    COPY jars/ /app/jars/
+    ENTRYPOINT ["java", "--module-path", "/app/jars/demo.modular.executable.jar:/app/jars/org.slf4j.jar", \
+                "--module", "demo.modular.executable/sample.Sample"]
 
 The build never runs a container tool, so no Docker installation is involved in
 producing this. The staged folder is a complete build context:
@@ -254,12 +258,11 @@ jar, so modularity survives. The target resolves the published
     demo.modular.executable.jar
     |-- META-INF/MANIFEST.MF                  Main-Class: build.jenesis.launcher.Launcher
     |-- build/jenesis/launcher/*.class        the launcher (the jar's own unnamed module at run time)
-    |-- application.properties                mainClass, mainModule, classpath order
-    |-- modulepath/<dep>.jar/...              each modular/automatic dependency, exploded
-    `-- classpath/<dep>.jar/...               each plain dependency, exploded
+    |-- application.properties                mainClass, mainModule, modulepath, classpath
+    `-- jars/<dep>.jar/...                    each dependency, exploded
 
-The launcher's `Main-Class` reads `application.properties`, resolves the `modulepath/`
-subfolders into a fresh `ModuleLayer` and the `classpath/` ones into the unnamed module
+The launcher's `Main-Class` reads `application.properties`, resolves the jars `modulepath`
+names into a fresh `ModuleLayer` and the ones `classpath` names into the unnamed module
 of the same loader, and invokes the entry point - reconstructing what
 `java -p modulepath -cp classpath -m demo.modular.executable/sample.Sample` would do,
 all in process. Because each dependency keeps its own subfolder nothing is merged, so

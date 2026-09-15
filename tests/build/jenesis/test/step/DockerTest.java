@@ -49,14 +49,14 @@ public class DockerTest {
 
         assertThat(result.next()).isTrue();
         Path folder = next.resolve(Docker.DOCKER);
-        assertThat(folder.resolve("classpath/app.jar")).isRegularFile();
-        assertThat(folder.resolve("classpath/lib.jar")).isRegularFile();
-        assertThat(folder.resolve("modulepath")).doesNotExist();
+        assertThat(folder.resolve("jars/app.jar")).isRegularFile();
+        assertThat(folder.resolve("jars/lib.jar")).isRegularFile();
         assertThat(dockerfile(folder)).containsExactly(
                 "FROM example:latest",
                 "WORKDIR /app",
-                "COPY classpath/ /app/classpath/",
-                "ENTRYPOINT [\"java\", \"--class-path\", \"/app/classpath/*\", \"sample.Sample\"]");
+                "COPY jars/ /app/jars/",
+                "ENTRYPOINT [\"java\", \"--class-path\", \"/app/jars/app.jar:/app/jars/lib.jar\", "
+                        + "\"sample.Sample\"]");
     }
 
     @Test
@@ -77,13 +77,13 @@ public class DockerTest {
 
         assertThat(result.next()).isTrue();
         Path folder = next.resolve(Docker.DOCKER);
-        assertThat(folder.resolve("modulepath/sample.jar")).isRegularFile();
-        assertThat(folder.resolve("classpath")).doesNotExist();
+        assertThat(folder.resolve("jars/sample.jar")).isRegularFile();
         assertThat(dockerfile(folder)).containsExactly(
                 "FROM example:latest",
                 "WORKDIR /app",
-                "COPY modulepath/ /app/modulepath/",
-                "ENTRYPOINT [\"java\", \"--module-path\", \"/app/modulepath\", \"--module\", \"sample/sample.Sample\"]");
+                "COPY jars/ /app/jars/",
+                "ENTRYPOINT [\"java\", \"--module-path\", \"/app/jars/sample.jar\", "
+                        + "\"--module\", \"sample/sample.Sample\"]");
     }
 
     @Test
@@ -107,10 +107,11 @@ public class DockerTest {
 
         assertThat(result.next()).isTrue();
         Path folder = next.resolve(Docker.DOCKER);
-        assertThat(folder.resolve("modulepath/sample.jar")).isRegularFile();
-        assertThat(folder.resolve("classpath/lib.jar")).isRegularFile();
+        assertThat(folder.resolve("jars/sample.jar")).isRegularFile();
+        assertThat(folder.resolve("jars/lib.jar")).isRegularFile();
         assertThat(dockerfile(folder)).contains(
-                "ENTRYPOINT [\"java\", \"--class-path\", \"/app/classpath/*\", \"--module-path\", \"/app/modulepath\", "
+                "ENTRYPOINT [\"java\", \"--class-path\", \"/app/jars/lib.jar\", "
+                        + "\"--module-path\", \"/app/jars/sample.jar\", "
                         + "\"--add-modules\", \"ALL-MODULE-PATH,ALL-DEFAULT\", "
                         + "\"--module\", \"sample/sample.Sample\"]");
     }
