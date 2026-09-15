@@ -102,19 +102,25 @@ only your jars onto an off-the-shelf JRE base. For that, a `bundle=true` line in
     java build/jenesis/Make.java
 
     bundle.zip
-    |-- application.properties     mainClass=sample.Sample
-    `-- classpath/                 the app jar and commons-lang3
+    |-- application.unix.args      the launch, as a Java argument file
+    |-- application.windows.args   the same launch, with Windows path separators
+    `-- jars/                      the app jar and commons-lang3
 
-Because this is a classpath (non-modular) project, every jar goes under `classpath/`
-and `application.properties` carries just `mainClass`. Unzipped onto a JRE base, it
-needs no JDK and no jpackage:
+Every jar is stored once under `jars/`, and the argument file is the launch itself - here a
+`--class-path` and a main class, because this is a non-modular project:
+
+    "--class-path"
+    "jars/classes.jar:jars/org.apache.commons.lang3-3.14.0.jar"
+    "sample.Sample"
+
+Unzipped onto a JRE base, it needs no JDK, no jpackage and no descriptor reader:
 
     FROM eclipse-temurin:25-jre
     COPY bundle/ /opt/app/
-    ENTRYPOINT ["java", "-cp", "/opt/app/classpath/*", "sample.Sample"]
+    WORKDIR /opt/app
+    ENTRYPOINT ["java", "@application.unix.args"]
 
-The modular sibling instead splits its jars into
-`modulepath/` and `classpath/` and adds a `mainModule` entry.
+The modular sibling names its jars on `--module-path` and launches a module instead.
 
 A generated Dockerfile
 ----------------------
@@ -128,15 +134,19 @@ build cannot infer, and this demo commits `docker=eclipse-temurin:25-jre` as a
 
     target/stage/docker/output/module/
     |-- Dockerfile
-    `-- classpath/                 the app jar and commons-lang3
+    |-- application.args           the launch, as a Java argument file
+    `-- jars/                      the app jar and commons-lang3
 
-The generated file is the one written by hand above, with the entry point taken from
-the module's main class:
+The generated file is the one written by hand above, with the entry point taken from the
+module's main class. Every jar on the path is named rather than globbed, and the command
+travels in the argument file, so the `ENTRYPOINT` stays this size however many jars the
+application resolves:
 
     FROM eclipse-temurin:25-jre
     WORKDIR /app
-    COPY classpath/ /app/classpath/
-    ENTRYPOINT ["java", "--class-path", "/app/classpath/*", "sample.Sample"]
+    COPY jars/ /app/jars/
+    COPY application.args /app/
+    ENTRYPOINT ["java", "@/app/application.args"]
 
 The build never runs a container tool, so nothing here needs Docker installed. The
 staged folder is a complete build context, and creating the image is one command:
@@ -154,8 +164,8 @@ A single executable jar with the launcher
 A `launcher=true` line in `packaging.properties` turns the bundle into a **single
 executable jar** you run with `java -jar foo.jar`, by shading the published
 `build.jenesis:build.jenesis.launcher` into the jar root as its `Main-Class` and
-exploding each dependency into a `classpath/<jar>/` subfolder (this app is
-non-modular, so everything is class path). `build/DemoLauncher.java` activates the
+exploding each dependency into a `jars/<jar>/` subfolder, with `classpath` naming them
+(this app is non-modular, so everything is class path). `build/DemoLauncher.java` activates the
 committed `launcher` profile with `Project.profiles(...)`: the profile's
 `build.jenesis/launcher/packaging.properties` (`launcher=true`) outranks the module's
 own `packaging.properties`, then the demo builds and runs the produced jar:

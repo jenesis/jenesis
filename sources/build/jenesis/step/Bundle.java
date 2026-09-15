@@ -82,25 +82,122 @@ public class Bundle implements BuildStep {
                 classpath.put(entry.getKey(), entry.getValue());
             }
         }
-        SequencedProperties application = new SequencedProperties();
-        application.setProperty("mainClass", mainClass);
-        if (mainModule != null) {
-            application.setProperty("mainModule", mainModule);
+        SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
+        SequencedMap<String, String> agents = new LinkedHashMap<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            layers.putAll(Layers.membership(argument.folder()));
+            // An attached agent is handed to the JVM, not merely shipped with it: the artifact has to
+            // start the same way `Execute` starts it, or an agent runs in a build and nowhere else.
+            agents.putAll(Inventory.agents(argument.folder()));
         }
-        graph.store(application);
-        Path descriptor = context.supplement().resolve("application.properties");
-        application.store(descriptor);
+        // A layer's jars are resolved in a group of its own, so they are not in the application's
+        // selection; take them by the names the layer records, and nothing else that happens to be
+        // resolved - a tool's own closure is not part of the application.
+        // A layer's class path is an unnamed module like any other, and the modules it reads have to be
+        // rooted for it: the application's own jars may all be modules and say nothing of the platform
+        // set a legacy tree inside a layer still expects.
+        if (layers.values().stream().anyMatch(membership -> !membership.classpath().isEmpty())) {
+            graph.unnamed();
+        }
+        SequencedSet<String> named = new LinkedHashSet<>();
+        layers.values().forEach(membership -> named.addAll(membership.all()));
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            for (Path jar : Dependencies.all(argument.folder())) {
+                if (named.contains(jar.getFileName().toString())) {
+                    jars.putIfAbsent(jar.getFileName().toString(), jar);
+                }
+            }
+        }
+        // Only what this artifact ships is handed to the JVM: an inventory reachable from here may describe
+        // a sibling module, whose agent is no part of this launch and whose jar is not in this bundle.
+        agents.keySet().retainAll(jars.sequencedKeySet());
+        // The descriptor is the launch itself, as a Java argument file: `java @application.unix.args` from
+        // the folder the bundle was unpacked into needs no reader and no parser, and no path length can
+        // grow the command line past what the platform accepts. One file per path separator, because that
+        // is the only thing about the launch that a bundle cannot know in advance - a bundle is built
+        // once and unpacked wherever, so it carries both rather than the separator of whoever built it.
+        SequencedMap<String, Path> descriptors = new LinkedHashMap<>();
+        for (Map.Entry<String, String> platform : List.of(
+                Map.entry("unix", ":"),
+                Map.entry("windows", ";")
+        )) {
+            descriptors.put("application." + platform.getKey() + ".args", ProcessBuildStep.argumentFile(
+                    context.supplement().resolve("application." + platform.getKey() + ".args"),
+                    command(mainClass, mainModule, graph.arguments(),
+                            classpath.sequencedKeySet(), modulepath.sequencedKeySet(),
+                            layers, agents, platform.getValue())));
+        }
+        SequencedMap<String, Path> stored = new TreeMap<>(classpath);
+        stored.putAll(modulepath);
+        for (Map.Entry<String, Layers.Membership> layer : layers.entrySet()) {
+            for (String name : layer.getValue().all()) {
+                Path jar = jars.get(name);
+                if (jar == null) {
+                    throw new IllegalStateException("Layer " + layer.getKey() + " names " + name
+                            + ", which was not resolved for this application");
+                }
+                stored.putIfAbsent(name, jar);
+            }
+        }
         Path zip = Files.createDirectory(context.next().resolve(BUNDLE)).resolve("bundle.zip");
         try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zip))) {
-            writeEntry(out, "application.properties", descriptor);
-            for (Map.Entry<String, Path> entry : classpath.entrySet()) {
-                writeEntry(out, "classpath/" + entry.getKey(), entry.getValue());
+            for (Map.Entry<String, Path> entry : descriptors.entrySet()) {
+                writeEntry(out, entry.getKey(), entry.getValue());
             }
-            for (Map.Entry<String, Path> entry : modulepath.entrySet()) {
-                writeEntry(out, "modulepath/" + entry.getKey(), entry.getValue());
+            for (Map.Entry<String, Path> entry : stored.entrySet()) {
+                writeEntry(out, "jars/" + entry.getKey(), entry.getValue());
             }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
+    }
+
+    // Every path is spelled out rather than handed over as a folder, which is what lets one store hold
+    // the application's jars and every layer's alike: a jar more than one path names is stored once.
+    private static List<String> command(String mainClass,
+                                        String mainModule,
+                                        List<String> relaxations,
+                                        SequencedSet<String> classpath,
+                                        SequencedSet<String> modulepath,
+                                        SequencedMap<String, Layers.Membership> layers,
+                                        SequencedMap<String, String> agents,
+                                        String separator) {
+        List<String> command = new ArrayList<>();
+        agents.forEach((jar, options) -> command.add("-javaagent:jars/" + jar
+                + (options.isEmpty() ? "" : "=" + options)));
+        // A layer splits the two paths as the application does, and names both: what carries a module is
+        // resolved, and the rest is the unnamed module its automatic modules read.
+        layers.forEach((name, membership) -> {
+            command.add("-Djlayer.modulepath." + name + "="
+                    + path(membership.modulepath(), separator));
+            if (!membership.classpath().isEmpty()) {
+                command.add("-Djlayer.classpath." + name + "="
+                        + path(membership.classpath(), separator));
+            }
+        });
+        if (!classpath.isEmpty()) {
+            command.add("--class-path");
+            command.add(path(classpath, separator));
+        }
+        if (modulepath.isEmpty()) {
+            command.add(mainClass);
+        } else {
+            command.add("--module-path");
+            command.add(path(modulepath, separator));
+            command.addAll(relaxations);
+            command.add("--module");
+            command.add(mainModule + "/" + mainClass);
+        }
+        return command;
+    }
+
+    private static String path(SequencedSet<String> names, String separator) {
+        return names.stream().map(name -> "jars/" + name).collect(Collectors.joining(separator));
     }
 
     private static void writeEntry(ZipOutputStream out, String name, Path file) throws IOException {

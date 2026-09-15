@@ -77,6 +77,29 @@ public class Launcher implements BuildStep {
         if (mainClass == null || shaded == null || jars.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
+        SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            layers.putAll(Layers.membership(argument.folder()));
+        }
+        // A layer's jars are resolved in a group of its own, so they are not in the application's
+        // selection; take them by the names the layer records, and nothing else that happens to be
+        // resolved - a tool's own closure is not part of the application.
+        SequencedSet<String> named = new LinkedHashSet<>();
+        layers.values().forEach(membership -> named.addAll(membership.all()));
+        SequencedMap<String, Path> isolated = new TreeMap<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            for (Path file : Dependencies.all(argument.folder())) {
+                if (named.contains(file.getFileName().toString())) {
+                    isolated.putIfAbsent(file.getFileName().toString(), file);
+                }
+            }
+        }
         SequencedMap<String, Path> classpath = new LinkedHashMap<>(), modulepath = new LinkedHashMap<>();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
             boolean onModulePath = mainModule != null && pathPlacement.test(entry.getValue());
@@ -87,11 +110,34 @@ public class Launcher implements BuildStep {
         if (mainModule != null) {
             application.setProperty("mainModule", mainModule);
         }
-        if (!classpath.isEmpty()) {
-            application.setProperty("classpath", String.join(",", classpath.sequencedKeySet()));
-        }
+        // Every path is spelled out rather than handed over as a folder, which is what lets one store hold
+        // the application's jars and every layer's alike: a jar more than one path names is stored once.
+        application.setProperty("classpath", String.join(",", classpath.sequencedKeySet()));
+        application.setProperty("modulepath", String.join(",", modulepath.sequencedKeySet()));
+        // A layer splits the two paths as the application does, and names both: what carries a module is
+        // resolved, and the rest is the unnamed module its automatic modules read.
+        layers.forEach((layer, membership) -> {
+            application.setProperty("modulepath." + layer,
+                    String.join(",", membership.modulepath()));
+            if (!membership.classpath().isEmpty()) {
+                application.setProperty("classpath." + layer,
+                        String.join(",", membership.classpath()));
+            }
+        });
         Path descriptor = context.supplement().resolve("application.properties");
         application.store(descriptor);
+        SequencedMap<String, Path> stored = new TreeMap<>(classpath);
+        stored.putAll(modulepath);
+        for (Map.Entry<String, Layers.Membership> layer : layers.entrySet()) {
+            for (String member : layer.getValue().all()) {
+                Path file = isolated.get(member);
+                if (file == null) {
+                    throw new IllegalStateException("Layer " + layer.getKey() + " names " + member
+                            + ", which was not resolved for this application");
+                }
+                stored.putIfAbsent(member, file);
+            }
+        }
         Manifest manifest = new Manifest();
         manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
         manifest.getMainAttributes().put(Attributes.Name.MAIN_CLASS, MAIN_CLASS);
@@ -100,11 +146,8 @@ public class Launcher implements BuildStep {
         try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar), manifest)) {
             explode(out, shaded, "", entry -> entry.startsWith(LAUNCHER_PREFIX) && entry.endsWith(".class"));
             writeEntry(out, "application.properties", descriptor);
-            for (Map.Entry<String, Path> entry : classpath.entrySet()) {
-                explode(out, entry.getValue(), "classpath/" + entry.getKey() + "/", _ -> true);
-            }
-            for (Map.Entry<String, Path> entry : modulepath.entrySet()) {
-                explode(out, entry.getValue(), "modulepath/" + entry.getKey() + "/", _ -> true);
+            for (Map.Entry<String, Path> entry : stored.entrySet()) {
+                explode(out, entry.getValue(), "jars/" + entry.getKey() + "/", _ -> true);
             }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));

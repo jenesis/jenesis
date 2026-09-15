@@ -14,28 +14,34 @@ public class Pom implements BuildStep {
     private final Set<String> prefixes;
     private final Map<String, String> shared;
     private final boolean resolved;
+    private final String group;
     private final transient MavenPomEmitter emitter = new MavenPomEmitter();
 
     public Pom() {
-        this(Set.of("maven"), Map.of(), false);
+        this(Set.of("maven"), Map.of(), false, "main");
     }
 
-    private Pom(Set<String> prefixes, Map<String, String> shared, boolean resolved) {
+    private Pom(Set<String> prefixes, Map<String, String> shared, boolean resolved, String group) {
         this.prefixes = Set.copyOf(prefixes);
         this.shared = Map.copyOf(shared);
         this.resolved = resolved;
+        this.group = group;
     }
 
     public Pom prefixes(Set<String> prefixes) {
-        return new Pom(prefixes, shared, resolved);
+        return new Pom(prefixes, shared, resolved, group);
     }
 
     public Pom shared(Map<String, String> shared) {
-        return new Pom(prefixes, shared, resolved);
+        return new Pom(prefixes, shared, resolved, group);
     }
 
     public Pom resolved(boolean resolved) {
-        return new Pom(prefixes, shared, resolved);
+        return new Pom(prefixes, shared, resolved, group);
+    }
+
+    public Pom group(String group) {
+        return new Pom(prefixes, shared, resolved, group);
     }
 
     @Override
@@ -58,11 +64,47 @@ public class Pom implements BuildStep {
         SequencedProperties requires = SequencedProperties.ofFolders(folders, resolved ? DEPENDENCIES : REQUIRES);
         SequencedProperties exclusions = SequencedProperties.ofFolders(folders, EXCLUSIONS);
         SequencedProperties metadata = SequencedProperties.ofFolders(folders, METADATA);
+        // A layer's contents are not this module's dependencies: a consumer must not put them on its own
+        // path, which is the whole point of isolating them. They reach a consumer through the
+        // Jenesis-Layer manifest header instead, which says where they belong rather than that they are
+        // needed. Skipping the layer's own keys is not enough, because this list is the flattened closure
+        // and the isolated module contributes its dependencies under its own group as well - so a
+        // coordinate any layer holds is left out by coordinate, version included. A version the
+        // application itself resolves is a different coordinate and stays.
+        // A POM describes one group. What another group holds is not this module's dependency: a layer's
+        // contents above all, since a consumer putting them on its own path is what isolating them
+        // prevents - they travel in the Jenesis-Layer manifest header instead, which says where they
+        // belong rather than that they are needed. The API module a layer shares is declared twice, by
+        // this group because the module requires it and by the layer because the layer resolves it, and
+        // that is what tells it apart from what the layer alone holds. Only the declaring module's own
+        // file states both, so the two are read per file rather than from the merged view, where a
+        // module that is merely isolated would contribute its own dependencies under this group's name.
+        SequencedSet<String> isolated = new LinkedHashSet<>(), declared = new LinkedHashSet<>();
+        for (Path folder : folders) {
+            Path file = folder.resolve(resolved ? DEPENDENCIES : REQUIRES);
+            if (!Files.isRegularFile(file)) {
+                continue;
+            }
+            SequencedSet<String> foreign = new LinkedHashSet<>(), own = new LinkedHashSet<>();
+            for (String key : SequencedProperties.ofFiles(file).stringPropertyNames()) {
+                int second = key.indexOf('/', key.indexOf('/') + 1);
+                (key.startsWith(group + "/") ? own : foreign).add(key.substring(second + 1));
+            }
+            if (!foreign.isEmpty()) {
+                isolated.addAll(foreign);
+                declared.addAll(own);
+            }
+        }
+        isolated.removeAll(declared);
         SequencedMap<String, SequencedSet<String>> coordinateScopes = new LinkedHashMap<>();
         for (String key : requires.stringPropertyNames()) {
             int first = key.indexOf('/');
             int second = key.indexOf('/', first + 1);
-            coordinateScopes.computeIfAbsent(key.substring(second + 1), _ -> new LinkedHashSet<>())
+            String coordinate = key.substring(second + 1);
+            if (!key.startsWith(group + "/") || isolated.contains(coordinate)) {
+                continue;
+            }
+            coordinateScopes.computeIfAbsent(coordinate, _ -> new LinkedHashSet<>())
                     .add(key.substring(first + 1, second));
         }
         SequencedMap<String, String> coordinateExclusions = new LinkedHashMap<>();

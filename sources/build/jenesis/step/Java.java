@@ -122,6 +122,8 @@ public abstract class Java extends JdkProcessBuildStep {
                                                  SequencedMap<String, SequencedMap<String, String>> properties)
             throws IOException {
         List<String> classPath = new ArrayList<>(), modulePath = new ArrayList<>();
+        SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
+        SequencedMap<String, Path> pool = new LinkedHashMap<>();
         ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
             BuildStepArgument argument = entry.getValue();
@@ -147,6 +149,10 @@ public abstract class Java extends JdkProcessBuildStep {
             for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
                 graph.place(pathPlacement, file, modulePath, classPath);
             }
+            for (Path jar : Dependencies.all(argument.folder())) {
+                pool.putIfAbsent(jar.getFileName().toString(), jar);
+            }
+            layers.putAll(Layers.membership(argument.folder()));
             SequencedMap<String, String> folders = properties.get(entry.getKey());
             if (folders != null) {
                 for (Map.Entry<String, List<String>> paths : List.of(
@@ -170,13 +176,46 @@ public abstract class Java extends JdkProcessBuildStep {
                 }
             }
         }
-        SequencedMap<String, String> options = new LinkedHashMap<>();
-        options.put(MODULE_PATH, String.join(File.pathSeparator, modulePath));
-        options.put(CLASS_PATH, String.join(File.pathSeparator, classPath));
-        List<String> prefixes = new ArrayList<>(argumentFile(context.supplement().resolve("java.args"), options));
-        prefixes.addAll(graph.arguments());
+        // A layer's class path is an unnamed module like any other, and the modules it reads have to be
+        // rooted for it: the application's own jars may all be modules and say nothing of the platform
+        // set a legacy tree inside a layer still expects.
+        if (layers.values().stream().anyMatch(membership -> !membership.classpath().isEmpty())) {
+            graph.unnamed();
+        }
+        List<String> options = new ArrayList<>();
+        for (Map.Entry<String, List<String>> path : List.of(
+                Map.entry(MODULE_PATH, modulePath),
+                Map.entry(CLASS_PATH, classPath)
+        )) {
+            if (!path.getValue().isEmpty()) {
+                options.add(path.getKey());
+                options.add(String.join(File.pathSeparator, path.getValue()));
+            }
+        }
+        options.addAll(graph.arguments());
+        // A layer names its jars rather than a folder, and splits the two paths as the application does:
+        // its jars sit among the application's, each stored once under a name that carries its version.
+        layers.forEach((name, membership) -> {
+            options.add("-Djlayer.modulepath." + name + "=" + path(membership.modulepath(), pool));
+            if (!membership.classpath().isEmpty()) {
+                options.add("-Djlayer.classpath." + name + "=" + path(membership.classpath(), pool));
+            }
+        });
+        // Everything the launch needs travels in one argument file, so neither a long path nor a layer
+        // that names many jars can grow the command line past what the platform accepts.
+        List<String> prefixes = options.isEmpty()
+                ? List.of()
+                : List.of("@" + argumentFile(context.supplement().resolve("java.args"), options));
         return commands(executor, context, arguments).thenApplyAsync(commands -> Stream.concat(
                 prefixes.stream(),
                 commands.stream()).toList(), executor);
+    }
+
+    private static String path(SequencedSet<String> names, SequencedMap<String, Path> pool) {
+        return names.stream()
+                .map(pool::get)
+                .filter(Objects::nonNull)
+                .map(Path::toString)
+                .collect(Collectors.joining(File.pathSeparator));
     }
 }

@@ -63,14 +63,14 @@ public class LauncherTest {
                 .doesNotContain("module-info.class", "build/jenesis/launcher/module-info.class");
         assertThat(entries).contains(
                 "application.properties",
-                "classpath/app.jar/sample/Sample.class",
-                "classpath/lib.jar/lib/Lib.class");
-        assertThat(entries).noneMatch(name -> name.startsWith("modulepath/"));
+                "jars/app.jar/sample/Sample.class",
+                "jars/lib.jar/lib/Lib.class");
         assertThat(mainClass(jar)).isEqualTo("build.jenesis.launcher.Launcher");
         Properties descriptor = application(jar);
         assertThat(descriptor.getProperty("mainClass")).isEqualTo("sample.Sample");
         assertThat(descriptor.getProperty("mainModule")).isNull();
         assertThat(descriptor.getProperty("classpath")).isEqualTo("app.jar,lib.jar");
+        assertThat(descriptor.getProperty("modulepath")).isEmpty();
     }
 
     @Test
@@ -98,11 +98,11 @@ public class LauncherTest {
         assertThat(result.next()).isTrue();
         Path jar = next.resolve(Launcher.LAUNCHER).resolve("sample.jar");
         SequencedSet<String> entries = entries(jar);
-        assertThat(entries).contains("modulepath/sample.jar/sample/Sample.class", "modulepath/sample.jar/module-info.class");
-        assertThat(entries).noneMatch(name -> name.startsWith("classpath/"));
+        assertThat(entries).contains("jars/sample.jar/sample/Sample.class", "jars/sample.jar/module-info.class");
         Properties descriptor = application(jar);
         assertThat(descriptor.getProperty("mainModule")).isEqualTo("sample");
-        assertThat(descriptor.getProperty("classpath")).isNull();
+        assertThat(descriptor.getProperty("modulepath")).isEqualTo("sample.jar");
+        assertThat(descriptor.getProperty("classpath")).isEmpty();
     }
 
     @Test
@@ -132,9 +132,9 @@ public class LauncherTest {
         SequencedSet<String> entries = entries(jar);
         assertThat(entries)
                 .as("a CLASS_PATH placement keeps even a modular jar on the class path, not the module path")
-                .contains("classpath/sample.jar/sample/Sample.class", "classpath/sample.jar/module-info.class");
-        assertThat(entries).noneMatch(name -> name.startsWith("modulepath/"));
+                .contains("jars/sample.jar/sample/Sample.class", "jars/sample.jar/module-info.class");
         assertThat(application(jar).getProperty("classpath")).isEqualTo("sample.jar");
+        assertThat(application(jar).getProperty("modulepath")).isEmpty();
     }
 
     private static void writeLauncherJar(Path path) throws IOException {
