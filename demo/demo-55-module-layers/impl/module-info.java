@@ -4,8 +4,8 @@
  * the very class the library looks up.
  *
  * @jenesis.release 25
- * @jenesis.pin com.fasterxml.jackson.core 2.15.4
- * @jenesis.pin com.fasterxml.jackson.core/jackson-core 2.15.4
+ * @jenesis.pin com.fasterxml.jackson.core 2.15.4 SHA-256/8dc9210dd285db366f45f518dd1e6a9ccfeb0f1a8e184a899fe96d29edf1fd94
+ * @jenesis.pin com.fasterxml.jackson.core/jackson-core 2.15.4 SHA-256/8dc9210dd285db366f45f518dd1e6a9ccfeb0f1a8e184a899fe96d29edf1fd94
  */
 module demo.layers.impl {
     requires com.fasterxml.jackson.core;

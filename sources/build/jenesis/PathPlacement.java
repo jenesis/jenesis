@@ -146,6 +146,21 @@ public enum PathPlacement {
         return declarations(path).aliases();
     }
 
+    /** The layers a resolved dependency declares, read from its {@code Jenesis-Layer} header. */
+    public static SequencedMap<String, SequencedSet<String>> layers(Path path) throws IOException {
+        if (Files.isDirectory(path)) {
+            return Collections.emptyNavigableMap();
+        }
+        String declaration;
+        try (JarFile jar = new JarFile(path.toFile(), true, ZipFile.OPEN_READ, JarFile.runtimeVersion())) {
+            Manifest manifest = jar.getManifest();
+            declaration = manifest == null ? null : manifest.getMainAttributes().getValue(LAYERS);
+        } catch (ZipException _) {
+            return Collections.emptyNavigableMap();
+        }
+        return layers(declaration, path.toString());
+    }
+
     public static SequencedMap<String, SequencedSet<String>> overrides(String declaration, String origin) {
         SequencedMap<String, SequencedSet<String>> overrides = new LinkedHashMap<>();
         if (declaration == null || declaration.isBlank()) {

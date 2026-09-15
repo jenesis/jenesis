@@ -11,8 +11,9 @@ benchmark what you built, customize or replace the build template itself, lock d
 the supply chain, assemble a release for Maven Central, compile a module ahead of
 time into a GraalVM native binary, share build outputs through a content-addressed
 cache, check that the jar you are about to publish still matches the API you
-published last, and finally run somebody else's released program without building
-anything at all.
+published last, run somebody else's released program without building anything at
+all, and finally keep a dependency private so two versions of one library live in a single
+JVM with no package relocated.
 
 Every demo has its own `build/jenesis` symlink into this repository's
 `sources/build/jenesis`, so each runs in isolation from inside its own directory
@@ -114,6 +115,7 @@ Quick index
 | 52 | [`publishing`](demo-52-publishing/README.md)                 | Assemble a Maven Central ready bundle (POM metadata + sources/javadoc jars) and resolve it back | `java build/Demo.java`             |
 | 53 | [`native-image`](demo-53-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
 | 54 | [`jpx`](demo-54-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
+| 55 | [`module-layers`](demo-55-module-layers/README.md)           | A library keeps a dependency private: `@jenesis.layer` isolates it in a run-time `ModuleLayer` of its own, reached through a shared API module, so two versions of one library coexist with no package relocated and the consumer declares nothing | `java build/Demo.java`             |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1213,6 +1215,34 @@ Resolution reaches the default repositories - the Jenesis module repository for
 module names, Maven Central for coordinates - each fronted by the local
 `~/.jenesis/` exports and `~/.m2/`, and each redirectable at a mirror through
 `JENESIS_REPOSITORY_URI` and `MAVEN_REPOSITORY_URI`.
+
+## 38. Keeping a dependency private - [`module-layers`](demo-55-module-layers/README.md)
+
+Every demo so far assumed the module path can hold what the build resolves. It cannot always: a
+module path admits one module per name, so a library that needs a different version of some library
+than its consumer has nowhere to put it. The usual answer elsewhere is shading - rewrite the
+bytecode, rename the packages, and hope nothing reflected on them. Jenesis has no shading and does
+not want one; relocation takes reflection, `Class.forName`, resource lookup, `META-INF/services`,
+jar signatures and stack traces with it.
+
+The declaration goes on the module that needs the isolation, not on every application that consumes
+it. `@jenesis.layer render api demo.layers.spi` names the one module the library shares with its
+layer; `@jenesis.layer render module/demo.layers.impl` names what the layer holds, resolved in a
+dependency group of its own, `layer:render` - pinned, checksum-verified and reported like any other
+group, and addressed the way `plugin:scala` already is.
+
+The library requires `build.jenesis.launcher` and asks for its layer by name, so it bootstraps
+itself and its consumers know nothing. They do not have to: the declaration travels in the library's
+jar as a `Jenesis-Layer` manifest header, and any build that resolves that jar reconstructs the
+layer from it, exactly as it already does for `Jenesis-Aliases` and `Jenesis-Overrides`.
+
+What crosses the boundary is the API module, and everything it reaches is shared with the layer -
+derived rather than declared - so producer and consumer exchange the very same classes and a service
+instance crosses as an ordinary interface call rather than a proxy. The consequence is worth stating
+plainly, because it is true of shading too: a dependency whose types your API module reaches is
+exposed by it and cannot be isolated behind it. Here the build says so, instead of leaving it to a
+`LinkageError` far from its cause.
+
 
 Cross-cutting concepts
 ----------------------

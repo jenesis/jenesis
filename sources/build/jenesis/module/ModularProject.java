@@ -379,11 +379,18 @@ public class ModularProject implements BuildExecutorModule {
                     manifest.getMainAttributes().putValue(PathPlacement.OVERRIDES, String.join(",", declarations));
                 }
                 if (!info.layers().isEmpty()) {
+                    // The coordinates carry their pinned version, because a consumer resolves them itself:
+                    // this header is the whole instruction for reconstructing the layer, and a coordinate
+                    // without a version would let the consumer land on a different one.
                     List<String> declarations = new ArrayList<>();
-                    info.layers().forEach((layer, coordinates) -> declarations.add(layer
-                            + "="
-                            + info.layerApis().get(layer)
-                            + (coordinates.isEmpty() ? "" : " " + String.join(" ", coordinates))));
+                    info.layers().forEach((layer, coordinates) -> {
+                        List<String> tokens = new ArrayList<>(List.of(info.layerApis().get(layer)));
+                        coordinates.forEach(coordinate -> tokens.add(coordinate
+                                + (coordinate.startsWith("module/")
+                                        ? ""
+                                        : version(versions, "layer:" + layer + "/" + coordinate))));
+                        declarations.add(layer + "=" + String.join(" ", tokens));
+                    });
                     manifest.getMainAttributes().putValue(PathPlacement.LAYERS, String.join(",", declarations));
                 }
                 try (OutputStream out = Files.newOutputStream(context.next().resolve(Versions.MANIFEST))) {
