@@ -1979,8 +1979,8 @@ public record Project(
                 print.docker|true|The image notice when a build or run is containerized
                 print.jreleaser|true|The JReleaser command line when a release runs
                 dependency.pin||strict|versions|ignore; unset keeps existing pins and tolerates missing ones
-                resolver.maven|maven|maven|closest|latest|release|stable: which version a Maven coordinate resolves to; stable skips pre-release qualifiers
-                resolver.module|first|first|ignore|fail: what to do with the versions a module-info records
+                resolver.maven|maven|maven|closest|latest|release|stable|fail|managed: which version a Maven coordinate resolves to; stable skips pre-release qualifiers, fail rejects a coordinate two dependencies require at different versions, managed rejects that and any version only a dependency's POM names
+                resolver.module|first|first|ignore|fail|managed: what to do with the versions a module-info records; fail rejects two requires that record different versions, managed rejects that and any module only another module's requires names
                 pin.file||Write the whole project's pins to this properties file instead of the module declarations
                 pin.provided||Comma-separated pin files whose entries this one leaves out, where the version and hash are the same
                 pin.concurrency|(processor count)|Rewrite at most this many modules' pins at once; 0 is unbounded

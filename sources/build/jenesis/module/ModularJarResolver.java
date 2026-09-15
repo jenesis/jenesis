@@ -27,9 +27,10 @@ public class ModularJarResolver implements Resolver {
             case "first" -> ModuleVersionNegotiator.first();
             case "ignore" -> ModuleVersionNegotiator.ignore();
             case "fail" -> ModuleVersionNegotiator.fail();
+            case "managed" -> ModuleVersionNegotiator.managed();
             default -> throw new IllegalArgumentException("Unknown jenesis.resolver.module '"
                     + property
-                    + "', expected one of: first, ignore, fail");
+                    + "', expected one of: first, ignore, fail, managed");
         };
     }
 
@@ -68,6 +69,11 @@ public class ModularJarResolver implements Resolver {
         SequencedMap<String, Resolver.Vertex> nodes = new LinkedHashMap<>();
         Map<String, String> parents = new HashMap<>();
         Map<String, String> moduleCoordinates = new HashMap<>();
+        SequencedSet<String> declaredModules = new LinkedHashSet<>();
+        for (String coordinate : coordinates.sequencedKeySet()) {
+            int split = coordinate.indexOf('/');
+            declaredModules.add(split < 0 ? coordinate : coordinate.substring(0, split));
+        }
         Queue<String> queue = new ArrayDeque<>(coordinates.sequencedKeySet());
         int runtime = Runtime.version().feature();
         while (!queue.isEmpty()) {
@@ -196,6 +202,9 @@ public class ModularJarResolver implements Resolver {
                     Resolver.validate(jar, checksum, currentCoordinate);
                 }
                 dependencies.put(currentCoordinate, new Resolver.Resolved(jar, checksum == null ? "" : checksum, item.internal()));
+                if (!declaredModules.contains(current)) {
+                    negotiator.discovered(current, version, pin != null);
+                }
                 resolved.add(current);
                 moduleCoordinates.put(current, currentCoordinate);
                 nodes.put(prefix + "/" + current, new Resolver.Vertex(version, descriptor.name(), descriptor.isAutomatic(), item.internal(), List.of()));

@@ -29,9 +29,11 @@ public class MavenPomResolver implements MavenResolver {
             case "release" -> MavenDefaultVersionNegotiator.release();
             case "stable" -> MavenDefaultVersionNegotiator.stable();
             case "closest" -> MavenDefaultVersionNegotiator.closest();
+            case "fail" -> MavenDefaultVersionNegotiator.fail();
+            case "managed" -> MavenDefaultVersionNegotiator.managed();
             default -> throw new IllegalArgumentException("Unknown jenesis.resolver.maven '"
                     + property
-                    + "', expected one of: maven, latest, release, stable, closest");
+                    + "', expected one of: maven, latest, release, stable, closest, fail, managed");
         };
     }
 
@@ -347,6 +349,17 @@ public class MavenPomResolver implements MavenResolver {
                 }
             }
         } while (!conflicts.isEmpty());
+        for (MavenDependencyKey key : dependencies) {
+            if (initial.pom().dependencies().containsKey(key)) {
+                continue;
+            }
+            negotiator.discovered(key.groupId(),
+                    key.artifactId(),
+                    key.type(),
+                    key.classifier(),
+                    resolutions.get(key).currentVersion,
+                    initial.pom().managedDependencies().containsKey(key));
+        }
         SequencedMap<MavenDependencyKey, MavenDependencyValue> results = new LinkedHashMap<>();
         dependencies.forEach(key -> {
             DependencyResolution resolution = resolutions.get(key);

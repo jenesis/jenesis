@@ -23,4 +23,12 @@ public interface MavenVersionNegotiator {
                            SequencedSet<String> versions) throws IOException {
         return current;
     }
+
+    default void discovered(String groupId,
+                            String artifactId,
+                            String type,
+                            String classifier,
+                            String version,
+                            boolean managed) {
+    }
 }
