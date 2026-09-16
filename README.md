@@ -170,7 +170,7 @@ The workflow builds with `jenesis.project.version` set, then hands `target/stage
 [JReleaser](https://jreleaser.org) (`jreleaser.yml`), which signs and uploads to Maven Central, publishes the
 `sdk/jenesis-<version>.zip` and `sdk/jpx-<version>.zip` distributions to Homebrew and Scoop, and cuts the
 matching `v<version>` tag. `project.properties` carries the POM metadata that a module declaration cannot
-express. A final step publishes both archives to SDKMAN itself, against the vendor API at
+express. A further step publishes both archives to SDKMAN itself, against the vendor API at
 `state.sdkman.io`: it logs in with `SDKMAN_EMAIL` and `SDKMAN_PASSWORD` for a ten-minute token, then posts
 each candidate with its download URL, its SHA-256 and the `lts` and `latest` tags that make it the version
 `sdk install` resolves. The token expires quickly and the archives must already be attached to the release,
@@ -182,6 +182,17 @@ so a vendor account issued as an email and password cannot be used through it. W
 the way back is to uncomment the three `sdkman` blocks in `jreleaser.yml`, delete the **Publish the SDKMAN
 candidates** step, and hand JReleaser the vendor credentials through whatever environment variables it then
 defines. Nothing else in the release depends on the choice.
+
+The last two steps make both archives installable with [mise](https://mise.jdx.dev), for which JReleaser has
+no packager. The [packslip](https://packslip.dev) action attests each archive's build provenance, signs a
+release manifest for it with the job's own GitHub identity (hence `id-token: write` and
+`attestations: write`, and no secret) and attaches the bundle to the release: `packslip.sigstore.json` backs
+`mise use packslip:jenesis/jenesis`, `packslip.jpx.sigstore.json` backs `mise use packslip:jenesis/jenesis/jpx`.
+Each manifest names the commands mise puts on the path and requires Java 25; `jenesis-switch` is left out,
+because mise switches versions from `mise.toml` itself. mise links those commands where Homebrew wraps them,
+which is why every script follows a link back to its installation. mise remembers the signer as this
+workflow's file, so signing from any other workflow is a signer change that each user has to accept before
+mise installs again - the steps stay in `release.yml`. mise holds a new release back for 24 hours by default.
 
 Credentials never enter the build: it stops at the unsigned, validated bundle.
 

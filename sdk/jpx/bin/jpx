@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -e
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+SCRIPT="$0"
+while [ -L "$SCRIPT" ]; do
+    LINK="$(readlink "$SCRIPT")"
+    case "$LINK" in
+        /*) SCRIPT="$LINK" ;;
+        *) SCRIPT="$(dirname "$SCRIPT")/$LINK" ;;
+    esac
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT")" && pwd -P)"
 JPX_HOME="$(dirname "$SCRIPT_DIR")"
 
 if [ -n "${JAVA_HOME:-}" ] && [ -x "${JAVA_HOME}/bin/java" ]; then
