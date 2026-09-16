@@ -537,6 +537,54 @@ public class MavenDefaultRepositoryTest {
     }
 
     @Test
+    public void does_not_store_metadata_in_the_local_repository() throws IOException, NoSuchAlgorithmException {
+        Path folder = Files.createDirectories(repository.resolve("group/artifact"));
+        Files.writeString(folder.resolve("maven-metadata.xml"), "foo");
+        MessageDigest digest = MessageDigest.getInstance("MD5");
+        byte[] hash = digest.digest("foo".getBytes(StandardCharsets.UTF_8));
+        Files.writeString(folder.resolve("maven-metadata.xml.md5"), HexFormat.of().formatHex(hash));
+        Path dependency = result.resolve("dependency.xml");
+        try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(),
+                local,
+                Map.of("MD5", repository.toUri()), null).fetchMetadata(Runnable::run,
+                "group",
+                "artifact",
+                null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, dependency);
+        }
+        assertThat(dependency).content().isEqualTo("foo");
+        try (Stream<Path> stream = Files.walk(local)) {
+            assertThat(stream.filter(Files::isRegularFile))
+                    .as("metadata names a mutable path and must not enter the local repository")
+                    .isEmpty();
+        }
+    }
+
+    @Test
+    public void reads_metadata_again_once_it_changed() throws IOException {
+        Path folder = Files.createDirectories(repository.resolve("group/artifact"));
+        Files.writeString(folder.resolve("maven-metadata.xml"), "first");
+        MavenRepository store = new MavenDefaultRepository(repository.toUri(), local, Map.of(), null);
+        Path first = result.resolve("first.xml");
+        try (InputStream inputStream = store.fetchMetadata(Runnable::run,
+                "group",
+                "artifact",
+                null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, first);
+        }
+        assertThat(first).content().isEqualTo("first");
+        Files.writeString(folder.resolve("maven-metadata.xml"), "second");
+        Path second = result.resolve("second.xml");
+        try (InputStream inputStream = store.fetchMetadata(Runnable::run,
+                "group",
+                "artifact",
+                null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, second);
+        }
+        assertThat(second).content().isEqualTo("second");
+    }
+
+    @Test
     public void factory_queries_comma_separated_repositories_in_declared_order() throws IOException {
         Files.writeString(Files
                 .createDirectories(repository.resolve("first/group/artifact/1"))
