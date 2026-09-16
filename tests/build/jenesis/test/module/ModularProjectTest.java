@@ -860,4 +860,140 @@ public class ModularProjectTest {
         assertThat(module.getProperty("main")).isNull();
     }
 
+    private BuildExecutor executor() throws IOException {
+        return BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+    }
+
+    @Test
+    public void emits_layer_requires_declaration_and_manifest_from_javadoc() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render api my.library.spi
+                 * @jenesis.layer render provider maven/com.example/renderer-impl
+                 * @jenesis.pin layer:render/maven/com.example/renderer-impl 1.2.3
+                 */
+                module foo {
+                  requires build.jenesis.launcher;
+                  requires my.library.spi;
+                }
+                """);
+        BuildExecutor executor = executor();
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path module = results.get("module/module-/manifests");
+
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES)))
+                .as("an isolated coordinate lands in the layer's own group, never in main")
+                .contains(Map.entry("layer:render/runtime/maven/com.example/renderer-impl/1.2.3", ""));
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.LAYERS)))
+                .as("the declaring module is part of the declaration, since a layer may hold one of its own")
+                .containsOnly(Map.entry("render", "foo my.library.spi"));
+        assertThat(Files.readString(module.resolve("manifest.mf")))
+                .as("a consumer reconstructs the layer from the jar, not from these sources")
+                .contains("Jenesis-Layer: render=my.library.spi maven/com.example/renderer-impl");
+    }
+
+    @Test
+    public void rejects_a_layer_declared_without_the_launcher() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render api my.library.spi
+                 * @jenesis.layer render provider module/com.example.impl
+                 */
+                module foo {
+                  requires my.library.spi;
+                }
+                """);
+        BuildExecutor executor = executor();
+        executor.addModule("module", new ModularProject("module", project));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("Module 'foo' declares a layer but does not"
+                        + " 'requires build.jenesis.launcher;' - a layer is defined by the module that"
+                        + " declares it, through the launcher's own API");
+    }
+
+    @Test
+    public void rejects_a_layer_whose_api_module_is_not_required() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render api my.library.spi
+                 * @jenesis.layer render provider module/com.example.impl
+                 */
+                module foo {
+                  requires build.jenesis.launcher;
+                }
+                """);
+        BuildExecutor executor = executor();
+        executor.addModule("module", new ModularProject("module", project));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("Module 'foo' shares my.library.spi with layer render but does not"
+                        + " require it - a layer's API module is read from its host");
+    }
+
+    @Test
+    public void rejects_a_requires_on_a_module_the_same_module_isolates() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render api my.library.spi
+                 * @jenesis.layer render provider com.example.impl
+                 */
+                module foo {
+                  requires build.jenesis.launcher;
+                  requires my.library.spi;
+                  requires com.example.impl;
+                }
+                """);
+        BuildExecutor executor = executor();
+        executor.addModule("module", new ModularProject("module", project));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("Module 'foo' requires com.example.impl, which it isolates in layer"
+                        + " render: an isolated module is not on this module's path, so reach it through a"
+                        + " service the layer provides");
+    }
+
+    @Test
+    public void rejects_a_layer_without_anything_to_isolate() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render api my.library.spi
+                 */
+                module foo {
+                  requires build.jenesis.launcher;
+                  requires my.library.spi;
+                }
+                """);
+        BuildExecutor executor = executor();
+        executor.addModule("module", new ModularProject("module", project));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .as("a layer named on one side only is said here, not as an empty group resolving nothing")
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("Layer render of module 'foo' isolates nothing - declare"
+                        + " @jenesis.layer render provider <coordinate>, the root the layer holds");
+    }
+
+    @Test
+    public void rejects_a_layer_without_an_api_module() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render provider module/com.example.impl
+                 */
+                module foo {
+                  requires build.jenesis.launcher;
+                }
+                """);
+        BuildExecutor executor = executor();
+        executor.addModule("module", new ModularProject("module", project));
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasRootCauseMessage("Layer render of module 'foo' names no API module - declare"
+                        + " @jenesis.layer render api <module>, the one module the layer shares with this"
+                        + " one");
+    }
 }

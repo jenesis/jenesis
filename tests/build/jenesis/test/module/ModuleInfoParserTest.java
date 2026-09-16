@@ -1388,4 +1388,68 @@ public class ModuleInfoParserTest {
                 .hasMessageContaining("Malformed @jenesis.signature token '<p>Vetted'")
                 .hasMessageContaining("move it above the tag block");
     }
+    @Test
+    public void jenesis_layer_names_an_api_module_and_the_coordinates_it_isolates() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render api my.library.spi
+                 * @jenesis.layer render provider maven/com.example/renderer-impl
+                 * @jenesis.layer render provider org.example.legacy
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.layerApis()).containsExactly(Map.entry("render", "my.library.spi"));
+        assertThat(info.layers()).containsExactly(Map.entry("render",
+                new LinkedHashSet<>(List.of("maven/com.example/renderer-impl", "module/org.example.legacy"))));
+    }
+
+    @Test
+    public void jenesis_layer_rejects_a_malformed_declaration() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render shares my.library.spi
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.layer declaration 'render shares my.library.spi'")
+                .hasMessageContaining("expected <layer> api <module>, or <layer> provider <coordinate>");
+    }
+
+    @Test
+    public void jenesis_layer_rejects_a_coordinate_without_a_keyword() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render maven/com.example/renderer-impl
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .as("a layer names what each line declares, so neither side is the bare one")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.layer declaration"
+                        + " 'render maven/com.example/renderer-impl'")
+                .hasMessageContaining("expected <layer> api <module>, or <layer> provider <coordinate>");
+    }
+
+    @Test
+    public void jenesis_layer_rejects_two_api_modules_for_one_layer() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render api my.library.spi
+                 * @jenesis.layer render api other.spi
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Layer render names two API modules")
+                .hasMessageContaining("a layer shares one module with its host");
+    }
 }

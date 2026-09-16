@@ -93,6 +93,12 @@ public class NativeImage extends JdkProcessBuildStep {
         if (launcher == null || (modulePath.isEmpty() && classPath.isEmpty())) {
             return CompletableFuture.completedStage(null);
         }
+        SequencedSet<String> layers = Layers.declared(arguments).sequencedKeySet();
+        if (!layers.isEmpty()) {
+            throw new IllegalStateException("Layers " + layers + " cannot be defined in a native image,"
+                    + " as a native image resolves its module graph ahead of time - build the application"
+                    + " for a Java runtime, or keep the layers' modules on the application's module path");
+        }
         for (List<String> entries : List.of(modulePath, classPath)) {
             for (String entry : entries) {
                 if (entry.indexOf(File.pathSeparatorChar) != -1) {

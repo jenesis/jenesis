@@ -23,6 +23,7 @@ public interface BuildStep extends Serializable {
             EXCLUSIONS = "exclusions.properties",
             OVERRIDES = "overrides.properties",
             ATTACHMENTS = "attachments.properties",
+            LAYERS = "layers.properties",
             DEPENDENCIES = "dependencies.properties";
 
     default BuildExecutorModule asModule(String name) {
