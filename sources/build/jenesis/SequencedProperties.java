@@ -48,9 +48,14 @@ public class SequencedProperties extends Properties {
     }
 
     public static boolean systemFlag(String key, boolean defaultValue) {
+        Boolean value = systemFlagOrNull(key);
+        return value == null ? defaultValue : value;
+    }
+
+    public static Boolean systemFlagOrNull(String key) {
         String value = System.getProperty(key);
         if (value == null) {
-            return defaultValue;
+            return null;
         }
         return switch (value.trim().toLowerCase(Locale.ROOT)) {
             case "", "true" -> true;
