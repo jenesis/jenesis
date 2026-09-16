@@ -1,22 +1,20 @@
 package build;
 
 import module java.base;
-import build.jenesis.Project;
+import build.jenesis.Make;
 
 public class Demo {
 
-    static void main(String[] args) throws IOException {
-        expectFailure("log4j-core 2.14.1's critical Log4Shell advisory at the configured severity threshold",
-                () -> new Project(Path.of(".")).build());
+    static void main(String[] args) throws Exception {
+        expectFailure("log4j-core 2.14.1's critical Log4Shell advisory at the configured severity threshold");
         System.out.println();
         System.out.println("The vulnerability check blocked the build, as expected.");
     }
 
-    private static void expectFailure(String description, Build build) throws IOException {
+    private static void expectFailure(String description) throws Exception {
         wipe();
-        try {
-            build.run();
-        } catch (Throwable _) {
+        // The tool as the command line runs it, so what is asserted is the status a shell would see.
+        if (new Make("build.jenesis.Project").build().code() != 0) {
             System.out.println("[blocked] " + description);
             return;
         }
@@ -37,10 +35,5 @@ public class Demo {
                 }
             });
         }
-    }
-
-    @FunctionalInterface
-    private interface Build {
-        void run() throws Exception;
     }
 }
