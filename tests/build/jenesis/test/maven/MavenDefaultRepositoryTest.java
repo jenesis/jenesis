@@ -537,6 +537,155 @@ public class MavenDefaultRepositoryTest {
     }
 
     @Test
+    public void does_not_store_metadata_in_the_local_repository() throws IOException, NoSuchAlgorithmException {
+        Path folder = Files.createDirectories(repository.resolve("group/artifact"));
+        Files.writeString(folder.resolve("maven-metadata.xml"), "foo");
+        MessageDigest digest = MessageDigest.getInstance("MD5");
+        byte[] hash = digest.digest("foo".getBytes(StandardCharsets.UTF_8));
+        Files.writeString(folder.resolve("maven-metadata.xml.md5"), HexFormat.of().formatHex(hash));
+        Path dependency = result.resolve("dependency.xml");
+        try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(),
+                local,
+                Map.of("MD5", repository.toUri()), null).fetchMetadata(Runnable::run,
+                "group",
+                "artifact",
+                null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, dependency);
+        }
+        assertThat(dependency).content().isEqualTo("foo");
+        try (Stream<Path> stream = Files.walk(local)) {
+            assertThat(stream.filter(Files::isRegularFile))
+                    .as("metadata names a mutable path and must not enter the local repository")
+                    .isEmpty();
+        }
+    }
+
+    @Test
+    public void reads_metadata_again_once_it_changed() throws IOException {
+        Path folder = Files.createDirectories(repository.resolve("group/artifact"));
+        Files.writeString(folder.resolve("maven-metadata.xml"), "first");
+        MavenRepository store = new MavenDefaultRepository(repository.toUri(), local, Map.of(), null);
+        Path first = result.resolve("first.xml");
+        try (InputStream inputStream = store.fetchMetadata(Runnable::run,
+                "group",
+                "artifact",
+                null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, first);
+        }
+        assertThat(first).content().isEqualTo("first");
+        Files.writeString(folder.resolve("maven-metadata.xml"), "second");
+        Path second = result.resolve("second.xml");
+        try (InputStream inputStream = store.fetchMetadata(Runnable::run,
+                "group",
+                "artifact",
+                null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, second);
+        }
+        assertThat(second).content().isEqualTo("second");
+    }
+
+    @Test
+    public void refreshes_cached_metadata_while_the_repository_answers() throws IOException {
+        Path folder = Files.createDirectories(repository.resolve("group/artifact"));
+        Files.writeString(folder.resolve("maven-metadata.xml"), "first");
+        Path cache = Files.createDirectory(result.resolve("cache"));
+        MavenRepository store = new MavenDefaultRepository(repository.toUri(), null, Map.of(), null).cached(cache);
+        Path first = result.resolve("first.xml");
+        try (InputStream inputStream = store.fetchMetadata(Runnable::run,
+                "group",
+                "artifact",
+                null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, first);
+        }
+        assertThat(first).content().isEqualTo("first");
+        Files.writeString(folder.resolve("maven-metadata.xml"), "second");
+        Path second = result.resolve("second.xml");
+        try (InputStream inputStream = store.fetchMetadata(Runnable::run,
+                "group",
+                "artifact",
+                null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, second);
+        }
+        assertThat(second).content().isEqualTo("second");
+        assertThat(cache.resolve("group%2Fartifact%2Fmaven-metadata.xml")).content().isEqualTo("second");
+    }
+
+    @Test
+    public void serves_cached_metadata_when_the_repository_no_longer_answers() throws IOException {
+        Path folder = Files.createDirectories(repository.resolve("group/artifact"));
+        Files.writeString(folder.resolve("maven-metadata.xml"), "foo");
+        Path cache = Files.createDirectory(result.resolve("cache"));
+        MavenRepository store = new MavenDefaultRepository(repository.toUri(), null, Map.of(), null).cached(cache);
+        try (InputStream inputStream = store.fetchMetadata(Runnable::run,
+                "group",
+                "artifact",
+                null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, result.resolve("online.xml"));
+        }
+        Files.delete(folder.resolve("maven-metadata.xml"));
+        Path offline = result.resolve("offline.xml");
+        try (InputStream inputStream = store.fetchMetadata(Runnable::run,
+                "group",
+                "artifact",
+                null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, offline);
+        }
+        assertThat(offline).content().isEqualTo("foo");
+    }
+
+    @Test
+    public void serves_cached_metadata_when_the_repository_cannot_be_reached() throws IOException {
+        Files.writeString(Files
+                .createDirectories(repository.resolve("group/artifact"))
+                .resolve("maven-metadata.xml"), "foo");
+        Path cache = Files.createDirectory(result.resolve("cache"));
+        try (InputStream inputStream = new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)
+                .cached(cache)
+                .fetchMetadata(Runnable::run, "group", "artifact", null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, result.resolve("online.xml"));
+        }
+        Path offline = result.resolve("offline.xml");
+        try (InputStream inputStream = unreachable()
+                .cached(cache)
+                .fetchMetadata(Runnable::run, "group", "artifact", null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, offline);
+        }
+        assertThat(offline).content().isEqualTo("foo");
+    }
+
+    @Test
+    public void fails_on_metadata_when_the_repository_cannot_be_reached_and_nothing_is_cached() throws IOException {
+        Path cache = Files.createDirectory(result.resolve("cache"));
+        MavenRepository store = unreachable().cached(cache);
+        assertThatThrownBy(() -> store.fetchMetadata(Runnable::run, "group", "artifact", null))
+                .isInstanceOf(IOException.class)
+                .hasMessage("offline");
+    }
+
+    private static MavenRepository unreachable() {
+        return new MavenRepository() {
+            @Override
+            public Optional<RepositoryItem> fetch(Executor executor,
+                                                  String groupId,
+                                                  String artifactId,
+                                                  String version,
+                                                  String type,
+                                                  String classifier,
+                                                  String checksum) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<RepositoryItem> fetchMetadata(Executor executor,
+                                                          String groupId,
+                                                          String artifactId,
+                                                          String checksum) throws IOException {
+                throw new IOException("offline");
+            }
+        };
+    }
+
+    @Test
     public void factory_queries_comma_separated_repositories_in_declared_order() throws IOException {
         Files.writeString(Files
                 .createDirectories(repository.resolve("first/group/artifact/1"))

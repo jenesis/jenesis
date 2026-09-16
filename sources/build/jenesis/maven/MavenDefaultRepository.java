@@ -246,7 +246,7 @@ public class MavenDefaultRepository implements MavenRepository {
         if (callback != null) {
             callback.accept(path);
         }
-        return fetch(repository, path, checksum == null).materialize();
+        return fetch(repository, local, path, checksum == null).materialize();
     }
 
     @Override
@@ -260,11 +260,11 @@ public class MavenDefaultRepository implements MavenRepository {
         if (callback != null) {
             callback.accept(path);
         }
-        return fetch(repository, path, checksum == null).materialize();
+        return fetch(repository, null, path, checksum == null).materialize();
     }
 
-    private LazyRepositoryItem fetch(URI repository, String path, boolean validate) throws IOException {
-        Path cached = local == null ? null : BuildStep.resolveContained(local, path);
+    private LazyRepositoryItem fetch(URI repository, Path store, String path, boolean validate) throws IOException {
+        Path cached = store == null ? null : BuildStep.resolveContained(store, path);
         if (cached != null) {
             if (Files.exists(cached)) {
                 boolean valid = true;
@@ -272,6 +272,7 @@ public class MavenDefaultRepository implements MavenRepository {
                     for (Map.Entry<String, URI> entry : validations.entrySet()) {
                         LazyRepositoryItem item = fetch(
                                 entry.getValue(),
+                                store,
                                 path + "." + entry.getKey().toLowerCase(Locale.ROOT),
                                 false);
                         Optional<InputStream> candidate = item.toLazyInputStream();
@@ -310,6 +311,7 @@ public class MavenDefaultRepository implements MavenRepository {
         if (validate) {
             for (Map.Entry<String, URI> entry : validations.entrySet()) {
                 digests.put(fetch(entry.getValue(),
+                                store,
                                 path + "." + entry.getKey().toLowerCase(Locale.ROOT),
                                 false),
                         digest(entry.getKey()));
