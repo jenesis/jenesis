@@ -823,6 +823,9 @@ public record Project(
                                                 each platform needs its own checksum pin
                                                 (folders, classifier, plugins=<name>=<g>/<a>, arguments)
                       avro.properties           .avsc and .avpr, each in its own step (folders, arguments)
+                      antlr.properties          ANTLR: every .g4 compiled into package=<name>, which
+                                                also decides where the sources land
+                                                (folders, package, arguments)
                       wsimport.properties       JAX-WS client from .wsdl; location=<url> is required
                                                 and states where the description is served at run time
                                                 (folders, package, catalog, arguments)
@@ -930,7 +933,8 @@ public record Project(
                       Compiler control   10 javac-arguments (process-javac.properties),
                                          11 annotations (an annotation processor via @jenesis.plugin)
                       Generated sources  12 data-formats (xjc, protoc, avro),
-                                         13 service-contracts (wsimport, OpenAPI)
+                                         13 service-contracts (wsimport, OpenAPI),
+                                         57 antlr (a grammar)
                       Dependencies       14 maven-exclusions, 15 bom, 16 module-alias,
                                          17 module-classifier, 19 module-override,
                                          20, 21 platform-guard (per-platform variants)
@@ -2045,6 +2049,7 @@ public record Project(
                 generate.avro|true|Avro generation, activated by an avro.properties
                 generate.wsimport|true|JAX-WS generation, activated by a wsimport.properties
                 generate.openapi|true|OpenAPI generation, activated by an openapi.properties
+                generate.antlr|true|ANTLR generation, activated by an antlr.properties
                 observe.jacoco|true|JaCoCo coverage, activated by a jacoco.properties
                 observe.native|true|native-image reachability agent, activated by a graal.properties
                 mutate.pitest|true|PIT mutation testing, activated by a pitest.properties

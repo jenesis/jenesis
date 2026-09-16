@@ -5,8 +5,8 @@ These demos are meant to be read in order. Each one is self-contained and adds
 one idea on top of the last, so the sequence doubles as a tutorial through
 Jenesis' features: start with a single Maven project, turn it into a module,
 scale to many modules, package a module into a runnable application image, build
-a multi-release JAR, generate sources from a schema instead of writing them, infer
-code-quality tools, bring in other JVM languages and lint them too, measure and
+a multi-release JAR, generate sources from a schema or a grammar instead of
+writing them, infer code-quality tools, bring in other JVM languages and lint them too, measure and
 benchmark what you built, customize or replace the build template itself, lock down
 the supply chain, assemble a release for Maven Central, compile a module ahead of
 time into a GraalVM native binary, share build outputs through a content-addressed
@@ -117,6 +117,7 @@ Quick index
 | 54 | [`publishing`](demo-54-publishing/README.md)                 | Assemble a Maven Central ready bundle (POM metadata + sources/javadoc jars) and resolve it back | `java build/Demo.java`             |
 | 55 | [`native-image`](demo-55-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
 | 56 | [`jpx`](demo-56-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
+| 57 | [`antlr`](demo-57-antlr/README.md)                           | Generate a parser from an ANTLR grammar: a `.g4` under the module's `META-INF/build.jenesis` folder plus an `antlr.properties` naming the package, and the generated lexer, parser and visitor compile into the module while the tool itself resolves in its own `antlr` group | `java build/jenesis/Execute.java`  |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1324,3 +1325,25 @@ their compiler toolchain in its own group (`kotlinc`, `scalac`,
 `groovy` pins its `org.apache.groovy` library to the stable `5.0.6` and its
 `groovyc`-group compiler to `6.0.0-alpha-1`; `kotlin` and `scala` track whatever
 their compilers resolve (for `scala` that is often a release candidate).
+
+
+## 39. Generating a parser - [`antlr`](demo-57-antlr/README.md)
+
+`data-formats` and `service-contracts` generate sources from a wire format or a
+service description. `antlr` generates them from a grammar, and shows the same
+three moves a third time: the input lives under the module's
+`META-INF/build.jenesis/` folder, an `antlr.properties` in the configuration
+folder activates the generator, and the generated sources compile into the module
+as if they had been written by hand.
+
+What is new here is where the output lands. ANTLR is told the package with
+`-package`, but it writes every file into the directory it is given, so the step
+derives that directory from the same `package` key - `package=demo.antlr.calc`
+generates `demo/antlr/calc/CalcParser.java`. ANTLR also writes `.tokens` and
+`.interp` files beside its sources while it runs; the step keeps only the `.java`
+files, so nothing but sources reaches the jar.
+
+The split between the tool and the runtime is the usual one: the module declares
+`requires org.antlr.antlr4.runtime` because the generated code calls into it, and
+the ANTLR *tool* resolves in its own `antlr` group, pinned separately. Upgrading
+the generator never moves the runtime the program links against.
