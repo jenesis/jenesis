@@ -12,6 +12,12 @@ on:
         required: false
         type: string
 
+# Route Maven Central through the repository variable MAVEN_REPOSITORY_URI when set
+# (the Google Cloud mirror of Central, to avoid Central rate-limiting the runners),
+# falling back to Central itself so an unset variable never becomes an empty URI.
+env:
+  MAVEN_REPOSITORY_URI: ${{ vars.MAVEN_REPOSITORY_URI || 'https://repo1.maven.org/maven2/' }}
+
 jobs:
   release:
     runs-on: ubuntu-latest
