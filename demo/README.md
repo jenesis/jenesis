@@ -48,7 +48,7 @@ instead: the ones that customize, replace, or drive the template directly
 `custom-maven`, `custom-modular`, `custom-build`, `custom-jmod`,
 `publishing`), the ones that assert the build fails on a policy violation
 (`pinning`, `openpgp`, `sigstore`, `compliance`, `vulnerabilities`,
-`error-prone`), and the two
+`error-prone`), `code-signing` (which first generates a throwaway key), and the two
 executable demos (`java-pom-executable`, `java-modular-executable`), which stage a
 `jpackage` image and run it with the arguments you pass, and additionally ship a
 `build/DemoNative.java` sibling that builds a native installer and a
@@ -121,6 +121,7 @@ Quick index
 | 56 | [`jpx`](demo-56-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
 | 57 | [`antlr`](demo-57-antlr/README.md)                           | Generate a parser from an ANTLR grammar: a `.g4` under the module's `META-INF/build.jenesis` folder plus an `antlr.properties` naming the package, and the generated lexer, parser and visitor compile into the module while the tool itself resolves in its own `antlr` group | `java build/jenesis/Execute.java`  |
 | 58 | [`error-prone`](demo-58-error-prone/README.md)               | Run Error Prone as a `javac` plugin declared with `@jenesis.plugin javac <coordinate>`: an `errorprone.properties` promotes `ReferenceEquality` to an error and the build fails on a `==` comparison of two strings, then the same sources compile once the plugin is switched off through the assembler | `java build/Demo.java`             |
+| 59 | [`code-signing`](demo-59-code-signing/README.md)             | Sign the produced jar with `jarsigner`: the key is named by the environment rather than by anything beside the code, and the signed jar replaces the unsigned one before the inventory, the staged repositories or a publication ever see it | `java build/Demo.java`             |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1378,3 +1379,31 @@ export, and only the JVM that runs the compiler can grant them, through `-J`
 options that exist only for a forked `javac`. So the compile step forks while
 Error Prone is active, and every processor stays on the class path where
 `--add-exports ...=ALL-UNNAMED` reaches it.
+## 41. Signing the jar you publish - [`code-signing`](demo-59-code-signing/README.md)
+
+`openpgp` and `sigstore` answer who published the dependencies coming *in*.
+`code-signing` answers the same question about what goes *out*, and it answers it
+inside the archive: `jarsigner` writes a manifest of digests and a signature
+block into the jar itself, which a JVM can check as it loads the classes.
+
+Signing has no configuration file of its own. It is named by
+`jenesis.jarsigner.*` properties, which split between the project and the
+machine: the alias is usually the project's own, while the store's path and its
+password differ between a laptop, a release machine and a CI runner, so the
+project commits what it knows and a `-D` on the runner supplies the rest.
+Naming any of them says the project signs, and then leaving the key store, the
+alias or the password location unnamed fails the build rather than quietly
+shipping an unsigned jar. A release profile (see section 28) or
+`~/.jenesis/jenesis.properties` is where the committed half belongs.
+
+The password is never a value, not even a property value: `storepass` takes a
+location in `jarsigner`'s own grammar, `env <variable>` or `file <path>`, and
+anything else fails the build naming the two forms. The key store is referenced
+by path and never copied into `target/`, so no private key reaches the build tree
+or a shared build cache.
+
+The step sits where it belongs: it reads the jar the archiver wrote and writes the
+signed jar in its place, so the unsigned jar never leaves the toolchain. The
+module's inventory, the staged Maven and modular repositories, an `export` and a
+publication all see only the signed jar - and a detached OpenPGP or Sigstore
+signature, made later, covers the signed bytes.
