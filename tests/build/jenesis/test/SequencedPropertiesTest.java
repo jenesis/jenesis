@@ -172,4 +172,35 @@ public class SequencedPropertiesTest {
             System.clearProperty("jenesis.test.sample.flag");
         }
     }
+
+    @Test
+    public void a_system_flag_that_is_not_set_can_be_told_from_one_set_to_false() {
+        System.clearProperty("jenesis.test.sample.flag");
+        assertThat(SequencedProperties.systemFlagOrNull("jenesis.test.sample.flag")).isNull();
+        System.setProperty("jenesis.test.sample.flag", "false");
+        try {
+            assertThat(SequencedProperties.systemFlagOrNull("jenesis.test.sample.flag")).isFalse();
+        } finally {
+            System.clearProperty("jenesis.test.sample.flag");
+        }
+    }
+
+    @Test
+    public void a_system_flag_read_for_its_absence_reads_a_value_like_every_other() {
+        System.setProperty("jenesis.test.sample.flag", "");
+        try {
+            assertThat(SequencedProperties.systemFlagOrNull("jenesis.test.sample.flag")).isTrue();
+        } finally {
+            System.clearProperty("jenesis.test.sample.flag");
+        }
+        System.setProperty("jenesis.test.sample.flag", "yes");
+        try {
+            assertThatThrownBy(() -> SequencedProperties.systemFlagOrNull("jenesis.test.sample.flag"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Malformed value for jenesis.test.sample.flag: 'yes'"
+                            + " (expected true, false, or the property named with no value at all)");
+        } finally {
+            System.clearProperty("jenesis.test.sample.flag");
+        }
+    }
 }

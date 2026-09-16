@@ -56,13 +56,15 @@ once where the object is constructed:
 - the wither overrides one value and calls the canonical constructor.
 
 A property is therefore never read again later, and a caller that constructs the object itself is never
-surprised by the environment. Every boolean setting is read with `SequencedProperties.systemFlag(key)` or
-`systemFlag(key, default)` and nothing else: the property absent is the default, `=true` or the property named
-with no value at all is true, `=false` is false, and any other value is an `IllegalArgumentException` naming
-what would be valid. `Boolean.getBoolean` is not used, because it reads `=false` and a bare `-Dkey` alike as
-false and a misspelt value as false as well. Environment variables are fallbacks for the repository settings only
-(`MAVEN_REPOSITORY_URI`, `JENESIS_REPOSITORY_TOKEN`, …). `jenesis.properties` at the project root and the
-profile files feed the same properties; `Project.perform` and `Project.run` load them before anything is
+surprised by the environment. Every boolean setting is read with `SequencedProperties.systemFlag(key)`,
+`systemFlag(key, default)` or `systemFlagOrNull(key)` and nothing else: the property absent is the default,
+`=true` or the property named with no value at all is true, `=false` is false, and any other value is an
+`IllegalArgumentException` naming what would be valid. `systemFlagOrNull` answers `null` for the absent
+property, for a setting whose third state is the absence itself. `Boolean.getBoolean` is not used, because
+it reads `=false` and a bare `-Dkey` alike as false and a misspelt value as false as well. Environment
+variables are fallbacks for the repository settings only (`MAVEN_REPOSITORY_URI`,
+`JENESIS_REPOSITORY_TOKEN`, …). `jenesis.properties` at the project root and the profile files feed the
+same properties; `Project.perform` and `Project.run` load them before anything is
 constructed. A new property is added in three places - the constructor that reads it, the catalogue behind the
 `configuration` selector in `Project.java`, and the reference table in the user documentation. That catalogue
 is the tool's own property reference: one line per property, `<key>|<default>|<description>`, printed with the
