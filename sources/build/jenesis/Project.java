@@ -1928,7 +1928,7 @@ public record Project(
     private static void printConfiguration() {
         String catalogue = """
                 project.target|target|Folder the build writes its outputs to
-                project.artifacts||Folder resolved dependencies are cached in
+                project.artifacts||Folder resolved dependencies and repository metadata are cached in
                 project.layout|auto|auto|maven|modular|modular_to_maven; auto reads the project
                 project.sources|false|Assemble a sources jar for every module
                 project.documentation|false|Assemble a javadoc jar for every module
