@@ -60,6 +60,8 @@ jobs:
           - { name: module-classifier, dir: demo-17-module-classifier, entry: build/jenesis/Execute.java }
           - { name: module-layout, dir: demo-18-module-layout, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: module-override, dir: demo-19-module-override, entry: build/jenesis/Execute.java, verify: 'find target -name jakarta.servlet.jar | grep -q . && find target -name jakarta.el.jar | grep -q . && find target -name "jakarta.servlet.jsp-*.jar" | grep -q . && ! find target -name "jakarta.servlet-*.jar" | grep -q . && ! find target -name "jakarta.el-*.jar" | grep -q .' }
+          - { name: module-layers, dir: demo-20-module-layers, entry: build/Demo.java, verify: 'find target -name bundle.zip | grep -q . && unzip -p "$(find target -path "*module-app*" -name bundle.zip | head -1)" application.unix.args | grep -q -- "-Djlayer.modulepath."' }
+          - { name: module-layer-legacy, dir: demo-21-module-layer-legacy, entry: build/Demo.java, verify: 'unzip -p "$(find target -path "*module-app*" -name bundle.zip | head -1)" application.unix.args | grep -q -- "-Djlayer.classpath."' }
           - { name: platform-guard, dir: demo-22-platform-guard, entry: build/jenesis/Execute.java }
           - { name: platform-guard-legacy, dir: demo-22-platform-guard, entry: build/jenesis/Execute.java, flags: -Djenesis.platform.legacy=true }
           - { name: platform-guard-pom, dir: demo-23-platform-guard-pom, entry: build/jenesis/Execute.java }
