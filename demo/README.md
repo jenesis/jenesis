@@ -6,7 +6,8 @@ one idea on top of the last, so the sequence doubles as a tutorial through
 Jenesis' features: start with a single Maven project, turn it into a module,
 scale to many modules, package a module into a runnable application image, build
 a multi-release JAR, generate sources from a schema or a grammar instead of
-writing them, infer code-quality tools, bring in other JVM languages and lint them too, measure and
+writing them, infer code-quality tools and plug one into the compiler itself,
+bring in other JVM languages and lint them too, measure and
 benchmark what you built, customize or replace the build template itself, lock down
 the supply chain, assemble a release for Maven Central, compile a module ahead of
 time into a GraalVM native binary, share build outputs through a content-addressed
@@ -46,7 +47,8 @@ instead: the ones that customize, replace, or drive the template directly
 (`custom-assembler`, `internal-module`, `external-module`,
 `custom-maven`, `custom-modular`, `custom-build`, `custom-jmod`,
 `publishing`), the ones that assert the build fails on a policy violation
-(`pinning`, `openpgp`, `sigstore`, `compliance`, `vulnerabilities`), and the two
+(`pinning`, `openpgp`, `sigstore`, `compliance`, `vulnerabilities`,
+`error-prone`), and the two
 executable demos (`java-pom-executable`, `java-modular-executable`), which stage a
 `jpackage` image and run it with the arguments you pass, and additionally ship a
 `build/DemoNative.java` sibling that builds a native installer and a
@@ -118,6 +120,7 @@ Quick index
 | 55 | [`native-image`](demo-55-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
 | 56 | [`jpx`](demo-56-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
 | 57 | [`antlr`](demo-57-antlr/README.md)                           | Generate a parser from an ANTLR grammar: a `.g4` under the module's `META-INF/build.jenesis` folder plus an `antlr.properties` naming the package, and the generated lexer, parser and visitor compile into the module while the tool itself resolves in its own `antlr` group | `java build/jenesis/Execute.java`  |
+| 58 | [`error-prone`](demo-58-error-prone/README.md)               | Run Error Prone as a `javac` plugin declared with `@jenesis.plugin javac <coordinate>`: an `errorprone.properties` promotes `ReferenceEquality` to an error and the build fails on a `==` comparison of two strings, then the same sources compile once the plugin is switched off through the assembler | `java build/Demo.java`             |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1347,3 +1350,31 @@ The split between the tool and the runtime is the usual one: the module declares
 `requires org.antlr.antlr4.runtime` because the generated code calls into it, and
 the ANTLR *tool* resolves in its own `antlr` group, pinned separately. Upgrading
 the generator never moves the runtime the program links against.
+## 40. A plugin inside the compiler - [`error-prone`](demo-58-error-prone/README.md)
+
+`java-quality` runs Checkstyle, PMD and SpotBugs beside the compiler, over the
+sources or over the emitted bytecode. Error Prone runs *inside* the compiler: it
+is a `javac` plugin, so it sees the same typed AST `javac` does and reports
+through the compiler's own diagnostics, which is why it can catch a `==`
+comparison of two strings that both tools and the compiler otherwise let through.
+
+The plugin itself is declared on the module, with the tag every compiler plugin
+uses - `@jenesis.plugin javac maven/com.google.errorprone/error_prone_core`, the
+same shape as `@jenesis.plugin kotlinc ...` in section 25 - so there is only ever
+one place a plugin coordinate is named. An `errorprone.properties` is the switch
+that turns it on, and its `arguments` are appended to the `-Xplugin:ErrorProne`
+option, so every `-Xep:<Check>:OFF|WARN|ERROR` flag applies. The demo promotes
+`ReferenceEquality` to an error and the build fails; the second half of
+`build/Demo.java` then switches the plugin off through the assembler, nesting one
+configurator inside the other, and the same sources compile:
+
+    new Project(Path.of("."))
+            .assembler(new InferredMultiProjectAssembler().toolchain(toolchain ->
+                    toolchain.compiler(compiler -> compiler.errorprone(null))))
+            .build();
+
+Error Prone reads `com.sun.tools.javac` internals that `jdk.compiler` does not
+export, and only the JVM that runs the compiler can grant them, through `-J`
+options that exist only for a forked `javac`. So the compile step forks while
+Error Prone is active, and every processor stays on the class path where
+`--add-exports ...=ALL-UNNAMED` reaches it.

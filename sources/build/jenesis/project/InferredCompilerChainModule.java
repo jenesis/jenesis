@@ -12,16 +12,21 @@ import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.ErrorProne;
 import build.jenesis.step.Javac;
 import build.jenesis.step.ProcessHandler;
 
 public class InferredCompilerChainModule implements BuildExecutorModule {
 
     public static final String JAVAC = "javac", KOTLINC = "kotlinc", SCALAC = "scalac", GROOVYC = "groovyc", RESOURCE = "resource";
+    public static final String ERRORPRONE = "errorprone";
     public static final String COMPILE = "compile";
     private static final String SCAN = "scan";
     private static final String SCAN_FILE = "scan.properties";
 
+    private static final Set<String> ERRORPRONE_KEYS = Set.of("arguments");
+
+    private final SequencedSet<Path> configuration;
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
@@ -30,20 +35,27 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
     private final Function<KotlinCompilerModule, BuildExecutorModule> kotlinc;
     private final Function<ScalaCompilerModule, BuildExecutorModule> scalac;
     private final Function<GroovyCompilerModule, BuildExecutorModule> groovyc;
+    private final Function<ErrorProne, BuildStep> errorprone;
 
-    public InferredCompilerChainModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, PathPlacement.INFERRED,
-                step -> step, module -> module, module -> module, module -> module);
+    public InferredCompilerChainModule(SequencedSet<Path> configuration,
+                                       Map<String, Repository> repositories,
+                                       Map<String, Resolver> resolvers) {
+        this(configuration, repositories, resolvers, null, PathPlacement.INFERRED,
+                step -> step, module -> module, module -> module, module -> module,
+                SequencedProperties.systemFlag("jenesis.compile.errorprone", true) ? step -> step : null);
     }
 
-    private InferredCompilerChainModule(Map<String, Repository> repositories,
+    private InferredCompilerChainModule(SequencedSet<Path> configuration,
+                                        Map<String, Repository> repositories,
                                         Map<String, Resolver> resolvers,
                                         Pinning pinning,
                                         PathPlacement pathPlacement,
                                         Function<Javac, BuildStep> javac,
                                         Function<KotlinCompilerModule, BuildExecutorModule> kotlinc,
                                         Function<ScalaCompilerModule, BuildExecutorModule> scalac,
-                                        Function<GroovyCompilerModule, BuildExecutorModule> groovyc) {
+                                        Function<GroovyCompilerModule, BuildExecutorModule> groovyc,
+                                        Function<ErrorProne, BuildStep> errorprone) {
+        this.configuration = configuration;
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -52,30 +64,35 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
         this.kotlinc = kotlinc;
         this.scalac = scalac;
         this.groovyc = groovyc;
+        this.errorprone = errorprone;
     }
 
     public InferredCompilerChainModule pinning(Pinning pinning) {
-        return new InferredCompilerChainModule(repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc);
+        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone);
     }
 
     public InferredCompilerChainModule pathPlacement(PathPlacement pathPlacement) {
-        return new InferredCompilerChainModule(repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc);
+        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone);
     }
 
     public InferredCompilerChainModule javac(Function<Javac, BuildStep> javac) {
-        return new InferredCompilerChainModule(repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc);
+        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone);
     }
 
     public InferredCompilerChainModule kotlinc(Function<KotlinCompilerModule, BuildExecutorModule> kotlinc) {
-        return new InferredCompilerChainModule(repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc);
+        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone);
     }
 
     public InferredCompilerChainModule scalac(Function<ScalaCompilerModule, BuildExecutorModule> scalac) {
-        return new InferredCompilerChainModule(repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc);
+        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone);
     }
 
     public InferredCompilerChainModule groovyc(Function<GroovyCompilerModule, BuildExecutorModule> groovyc) {
-        return new InferredCompilerChainModule(repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc);
+        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone);
+    }
+
+    public InferredCompilerChainModule errorprone(Function<ErrorProne, BuildStep> errorprone) {
+        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone);
     }
 
     @Override
@@ -84,7 +101,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
         SequencedSet<String> compileInputs = new LinkedHashSet<>(inherited.sequencedKeySet());
         compileInputs.add(SCAN);
         buildExecutor.addModule(COMPILE,
-                new Compile(repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc),
+                new Compile(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone),
                 compileInputs);
     }
 
@@ -144,14 +161,16 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
         }
     }
 
-    private record Compile(Map<String, Repository> repositories,
+    private record Compile(SequencedSet<Path> configuration,
+                           Map<String, Repository> repositories,
                            Map<String, Resolver> resolvers,
                            Pinning pinning,
                            PathPlacement pathPlacement,
                            Function<Javac, BuildStep> javac,
                            Function<KotlinCompilerModule, BuildExecutorModule> kotlinc,
                            Function<ScalaCompilerModule, BuildExecutorModule> scalac,
-                           Function<GroovyCompilerModule, BuildExecutorModule> groovyc) implements BuildExecutorModule {
+                           Function<GroovyCompilerModule, BuildExecutorModule> groovyc,
+                           Function<ErrorProne, BuildStep> errorprone) implements BuildExecutorModule {
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
@@ -193,12 +212,20 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 }
             }
             if (hasJava) {
-                BuildStep compiler = javac.apply(new Javac(ProcessHandler.Factory.of())
+                BuildStep plugin = configured();
+                BuildStep compiler = javac.apply(new Javac(plugin == null
+                        ? ProcessHandler.Factory.of()
+                        : ProcessHandler.Factory.FORK)
                         .includeResources(!hasKotlin && !hasScala && !hasGroovy)
                         .pathPlacement(pathPlacement));
                 if (compiler != null) {
-                    buildExecutor.addStep(JAVAC, compiler, dependencies);
-                    SequencedSet<String> updated = new LinkedHashSet<>(dependencies);
+                    SequencedSet<String> javacInputs = new LinkedHashSet<>(dependencies);
+                    if (plugin != null) {
+                        buildExecutor.addStep(ERRORPRONE, plugin, sourceInputs);
+                        javacInputs.add(ERRORPRONE);
+                    }
+                    buildExecutor.addStep(JAVAC, compiler, javacInputs);
+                    SequencedSet<String> updated = new LinkedHashSet<>(javacInputs);
                     updated.add(JAVAC);
                     dependencies = updated;
                 }
@@ -215,6 +242,24 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
             if (hasResource && compilers != 1) {
                 buildExecutor.addStep(RESOURCE, new Resources(), sourceInputs);
             }
+        }
+
+        private BuildStep configured() throws IOException {
+            Path file = errorprone == null ? null : BuildStep.locate(configuration, "errorprone.properties");
+            if (file == null) {
+                return null;
+            }
+            SequencedProperties properties = SequencedProperties.ofFiles(file);
+            for (String key : properties.stringPropertyNames()) {
+                if (!ERRORPRONE_KEYS.contains(key)) {
+                    throw new IllegalArgumentException("Unknown Error Prone property: "
+                            + key
+                            + " (expected one of "
+                            + new TreeSet<>(ERRORPRONE_KEYS)
+                            + ")");
+                }
+            }
+            return errorprone.apply(new ErrorProne().arguments(properties.words("arguments")));
         }
     }
 
