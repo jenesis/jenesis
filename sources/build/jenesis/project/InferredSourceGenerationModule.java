@@ -16,7 +16,8 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
             PROTOC = "protoc",
             AVRO = "avro",
             WSIMPORT = "wsimport",
-            OPENAPI = "openapi";
+            OPENAPI = "openapi",
+            ANTLR = "antlr";
 
     public static final String PREPARE = "prepare", TOOL = "tool";
 
@@ -27,6 +28,7 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     private static final Set<String> AVRO_KEYS = Set.of("folders", "arguments");
     private static final Set<String> WSIMPORT_KEYS = Set.of("folders", "package", "location", "catalog", "arguments");
     private static final Set<String> OPENAPI_KEYS = Set.of("folders", "specification", "generator", "package", "sources", "arguments");
+    private static final Set<String> ANTLR_KEYS = Set.of("folders", "package", "arguments");
 
     private final SequencedSet<Path> configuration;
     private final Map<String, Repository> repositories;
@@ -37,6 +39,7 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     private final Function<AvroModule, BuildExecutorModule> avro;
     private final Function<WsImportModule, BuildExecutorModule> wsimport;
     private final Function<OpenApiModule, BuildExecutorModule> openapi;
+    private final Function<AntlrModule, BuildExecutorModule> antlr;
 
     public InferredSourceGenerationModule(SequencedSet<Path> configuration,
                                           Map<String, Repository> repositories,
@@ -46,7 +49,8 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                 enabledBy("jenesis.generate.protoc"),
                 enabledBy("jenesis.generate.avro"),
                 enabledBy("jenesis.generate.wsimport"),
-                enabledBy("jenesis.generate.openapi"));
+                enabledBy("jenesis.generate.openapi"),
+                enabledBy("jenesis.generate.antlr"));
     }
 
     private InferredSourceGenerationModule(SequencedSet<Path> configuration,
@@ -57,7 +61,8 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                                            Function<ProtocModule, BuildExecutorModule> protoc,
                                            Function<AvroModule, BuildExecutorModule> avro,
                                            Function<WsImportModule, BuildExecutorModule> wsimport,
-                                           Function<OpenApiModule, BuildExecutorModule> openapi) {
+                                           Function<OpenApiModule, BuildExecutorModule> openapi,
+                                           Function<AntlrModule, BuildExecutorModule> antlr) {
         this.configuration = configuration;
         this.repositories = repositories;
         this.resolvers = resolvers;
@@ -67,6 +72,7 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
         this.avro = avro;
         this.wsimport = wsimport;
         this.openapi = openapi;
+        this.antlr = antlr;
     }
 
     private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
@@ -74,27 +80,31 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     }
 
     public InferredSourceGenerationModule pinning(Pinning pinning) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi, antlr);
     }
 
     public InferredSourceGenerationModule xjc(Function<XjcModule, BuildExecutorModule> xjc) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi, antlr);
     }
 
     public InferredSourceGenerationModule protoc(Function<ProtocModule, BuildExecutorModule> protoc) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi, antlr);
     }
 
     public InferredSourceGenerationModule avro(Function<AvroModule, BuildExecutorModule> avro) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi, antlr);
     }
 
     public InferredSourceGenerationModule wsimport(Function<WsImportModule, BuildExecutorModule> wsimport) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi, antlr);
     }
 
     public InferredSourceGenerationModule openapi(Function<OpenApiModule, BuildExecutorModule> openapi) {
-        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi);
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi, antlr);
+    }
+
+    public InferredSourceGenerationModule antlr(Function<AntlrModule, BuildExecutorModule> antlr) {
+        return new InferredSourceGenerationModule(configuration, repositories, resolvers, pinning, xjc, protoc, avro, wsimport, openapi, antlr);
     }
 
     @Override
@@ -161,6 +171,17 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                             OpenApiModule.DOCUMENTS,
                             named(properties, "specification", OpenApiModule.SPECIFICATION)),
                     openapi.apply(sources == null ? module : module.sourceFolder(sources)));
+        }
+        properties = read(ANTLR, ANTLR_KEYS, antlr);
+        if (properties != null) {
+            generate(buildExecutor, inherited.sequencedKeySet(), ANTLR,
+                    prepare(properties, AntlrModule.FOLDER,
+                            Set.of(AntlrModule.GRAMMAR),
+                            new LinkedHashMap<>()),
+                    antlr.apply(new AntlrModule(repositories, resolvers)
+                            .pinning(pinning)
+                            .packageName(properties.value("package"))
+                            .arguments(properties.words("arguments"))));
         }
     }
 

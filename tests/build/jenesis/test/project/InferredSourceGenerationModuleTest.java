@@ -51,16 +51,21 @@ public class InferredSourceGenerationModuleTest {
         Files.writeString(project.resolve("avro.properties"), "");
         Files.writeString(project.resolve("wsimport.properties"), "package=demo.greeter\n");
         Files.writeString(project.resolve("openapi.properties"), "specification=greeting.yaml\n");
+        Files.writeString(project.resolve("antlr.properties"), "package=demo.calc\n");
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
         executor.addModule("generated", generation(), "project");
-        executor.execute("generated/avro/tool/required", "generated/wsimport/tool/required", "generated/openapi/tool/required");
+        executor.execute("generated/avro/tool/required",
+                "generated/wsimport/tool/required",
+                "generated/openapi/tool/required",
+                "generated/antlr/tool/required");
 
         assertThat(required("avro")).containsExactly("avro/runtime/maven/org.apache.avro/avro-tools/RELEASE");
         assertThat(required("wsimport")).containsExactly("wsimport/runtime/maven/com.sun.xml.ws/jaxws-tools/RELEASE");
         assertThat(required("openapi"))
                 .containsExactly("openapi/runtime/maven/org.openapitools/openapi-generator-cli/RELEASE");
+        assertThat(required("antlr")).containsExactly("antlr/runtime/maven/org.antlr/antlr4/RELEASE");
     }
 
     @Test
