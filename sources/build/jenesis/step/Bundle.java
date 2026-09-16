@@ -82,25 +82,103 @@ public class Bundle implements BuildStep {
                 classpath.put(entry.getKey(), entry.getValue());
             }
         }
-        SequencedProperties application = new SequencedProperties();
-        application.setProperty("mainClass", mainClass);
-        if (mainModule != null) {
-            application.setProperty("mainModule", mainModule);
+        SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
+        SequencedMap<String, String> agents = new LinkedHashMap<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            layers.putAll(Layers.membership(argument.folder()));
+            agents.putAll(Inventory.agents(argument.folder()));
         }
-        graph.store(application);
-        Path descriptor = context.supplement().resolve("application.properties");
-        application.store(descriptor);
+        if (layers.values().stream().anyMatch(membership -> !membership.classpath().isEmpty())) {
+            graph.unnamed();
+        }
+        SequencedSet<String> named = new LinkedHashSet<>();
+        layers.values().forEach(membership -> named.addAll(membership.all()));
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            for (Path jar : Dependencies.all(argument.folder())) {
+                if (named.contains(jar.getFileName().toString())) {
+                    jars.putIfAbsent(jar.getFileName().toString(), jar);
+                }
+            }
+        }
+        agents.keySet().retainAll(jars.sequencedKeySet());
+        SequencedMap<String, Path> descriptors = new LinkedHashMap<>();
+        for (Map.Entry<String, String> platform : List.of(
+                Map.entry("unix", ":"),
+                Map.entry("windows", ";")
+        )) {
+            descriptors.put("application." + platform.getKey() + ".args", ProcessBuildStep.argumentFile(
+                    context.supplement().resolve("application." + platform.getKey() + ".args"),
+                    command(mainClass, mainModule, graph.arguments(),
+                            classpath.sequencedKeySet(), modulepath.sequencedKeySet(),
+                            layers, agents, platform.getValue())));
+        }
+        SequencedMap<String, Path> stored = new TreeMap<>(classpath);
+        stored.putAll(modulepath);
+        for (Map.Entry<String, Layers.Membership> layer : layers.entrySet()) {
+            for (String name : layer.getValue().all()) {
+                Path jar = jars.get(name);
+                if (jar == null) {
+                    throw new IllegalStateException("Layer " + layer.getKey() + " names " + name
+                            + ", which was not resolved for this application");
+                }
+                stored.putIfAbsent(name, jar);
+            }
+        }
         Path zip = Files.createDirectory(context.next().resolve(BUNDLE)).resolve("bundle.zip");
         try (ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(zip))) {
-            writeEntry(out, "application.properties", descriptor);
-            for (Map.Entry<String, Path> entry : classpath.entrySet()) {
-                writeEntry(out, "classpath/" + entry.getKey(), entry.getValue());
+            for (Map.Entry<String, Path> entry : descriptors.entrySet()) {
+                writeEntry(out, entry.getKey(), entry.getValue());
             }
-            for (Map.Entry<String, Path> entry : modulepath.entrySet()) {
-                writeEntry(out, "modulepath/" + entry.getKey(), entry.getValue());
+            for (Map.Entry<String, Path> entry : stored.entrySet()) {
+                writeEntry(out, "jars/" + entry.getKey(), entry.getValue());
             }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
+    }
+
+    private static List<String> command(String mainClass,
+                                        String mainModule,
+                                        List<String> relaxations,
+                                        SequencedSet<String> classpath,
+                                        SequencedSet<String> modulepath,
+                                        SequencedMap<String, Layers.Membership> layers,
+                                        SequencedMap<String, String> agents,
+                                        String separator) {
+        List<String> command = new ArrayList<>();
+        agents.forEach((jar, options) -> command.add("-javaagent:jars/" + jar
+                + (options.isEmpty() ? "" : "=" + options)));
+        layers.forEach((name, membership) -> {
+            command.add("-Djlayer.modulepath." + name + "="
+                    + path(membership.modulepath(), separator));
+            if (!membership.classpath().isEmpty()) {
+                command.add("-Djlayer.classpath." + name + "="
+                        + path(membership.classpath(), separator));
+            }
+        });
+        if (!classpath.isEmpty()) {
+            command.add("--class-path");
+            command.add(path(classpath, separator));
+        }
+        if (modulepath.isEmpty()) {
+            command.add(mainClass);
+        } else {
+            command.add("--module-path");
+            command.add(path(modulepath, separator));
+            command.addAll(relaxations);
+            command.add("--module");
+            command.add(mainModule + "/" + mainClass);
+        }
+        return command;
+    }
+
+    private static String path(SequencedSet<String> names, String separator) {
+        return names.stream().map(name -> "jars/" + name).collect(Collectors.joining(separator));
     }
 
     private static void writeEntry(ZipOutputStream out, String name, Path file) throws IOException {

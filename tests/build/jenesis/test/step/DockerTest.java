@@ -49,14 +49,17 @@ public class DockerTest {
 
         assertThat(result.next()).isTrue();
         Path folder = next.resolve(Docker.DOCKER);
-        assertThat(folder.resolve("classpath/app.jar")).isRegularFile();
-        assertThat(folder.resolve("classpath/lib.jar")).isRegularFile();
-        assertThat(folder.resolve("modulepath")).doesNotExist();
+        assertThat(folder.resolve("jars/app.jar")).isRegularFile();
+        assertThat(folder.resolve("jars/lib.jar")).isRegularFile();
         assertThat(dockerfile(folder)).containsExactly(
                 "FROM example:latest",
                 "WORKDIR /app",
-                "COPY classpath/ /app/classpath/",
-                "ENTRYPOINT [\"java\", \"--class-path\", \"/app/classpath/*\", \"sample.Sample\"]");
+                "COPY jars/ /app/jars/",
+                "COPY application.args /app/",
+                "ENTRYPOINT [\"java\", \"@/app/application.args\"]");
+        assertThat(arguments(folder))
+                .as("the entry point names an argument file, so no path can outgrow the command line")
+                .containsExactly("--class-path", "/app/jars/app.jar:/app/jars/lib.jar", "sample.Sample");
     }
 
     @Test
@@ -77,13 +80,16 @@ public class DockerTest {
 
         assertThat(result.next()).isTrue();
         Path folder = next.resolve(Docker.DOCKER);
-        assertThat(folder.resolve("modulepath/sample.jar")).isRegularFile();
-        assertThat(folder.resolve("classpath")).doesNotExist();
+        assertThat(folder.resolve("jars/sample.jar")).isRegularFile();
         assertThat(dockerfile(folder)).containsExactly(
                 "FROM example:latest",
                 "WORKDIR /app",
-                "COPY modulepath/ /app/modulepath/",
-                "ENTRYPOINT [\"java\", \"--module-path\", \"/app/modulepath\", \"--module\", \"sample/sample.Sample\"]");
+                "COPY jars/ /app/jars/",
+                "COPY application.args /app/",
+                "ENTRYPOINT [\"java\", \"@/app/application.args\"]");
+        assertThat(arguments(folder)).containsExactly(
+                "--module-path", "/app/jars/sample.jar",
+                "--module", "sample/sample.Sample");
     }
 
     @Test
@@ -107,12 +113,13 @@ public class DockerTest {
 
         assertThat(result.next()).isTrue();
         Path folder = next.resolve(Docker.DOCKER);
-        assertThat(folder.resolve("modulepath/sample.jar")).isRegularFile();
-        assertThat(folder.resolve("classpath/lib.jar")).isRegularFile();
-        assertThat(dockerfile(folder)).contains(
-                "ENTRYPOINT [\"java\", \"--class-path\", \"/app/classpath/*\", \"--module-path\", \"/app/modulepath\", "
-                        + "\"--add-modules\", \"ALL-MODULE-PATH,ALL-DEFAULT\", "
-                        + "\"--module\", \"sample/sample.Sample\"]");
+        assertThat(folder.resolve("jars/sample.jar")).isRegularFile();
+        assertThat(folder.resolve("jars/lib.jar")).isRegularFile();
+        assertThat(arguments(folder)).containsExactly(
+                "--class-path", "/app/jars/lib.jar",
+                "--module-path", "/app/jars/sample.jar",
+                "--add-modules", "ALL-MODULE-PATH,ALL-DEFAULT",
+                "--module", "sample/sample.Sample");
     }
 
     @Test
@@ -132,6 +139,12 @@ public class DockerTest {
 
     private static List<String> dockerfile(Path folder) throws IOException {
         return Files.readAllLines(folder.resolve("Dockerfile"));
+    }
+
+    private static List<String> arguments(Path folder) throws IOException {
+        return Files.readAllLines(folder.resolve("application.args")).stream()
+                .map(line -> line.substring(1, line.length() - 1))
+                .toList();
     }
 
     private static void writePlainJar(Path path) throws IOException {
