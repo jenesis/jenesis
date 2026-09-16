@@ -135,6 +135,10 @@ public interface Repository {
     }
 
     static InputStream open(URI uri, String token, Retry retry) throws IOException {
+        return open(uri, token, retry, Map.of());
+    }
+
+    static InputStream open(URI uri, String token, Retry retry, Map<String, String> headers) throws IOException {
         boolean insecure = SequencedProperties.systemFlag("jenesis.repository.insecure");
         int connectTimeout = Integer.getInteger("jenesis.repository.connect.timeout", 10_000);
         int readTimeout = Integer.getInteger("jenesis.repository.read.timeout", 30_000);
@@ -159,8 +163,13 @@ public interface Repository {
                     }
                     http.setInstanceFollowRedirects(false);
                     http.setRequestProperty("User-Agent", "Jenesis");
-                    if (token != null && sameOrigin(uri, current)) {
-                        http.setRequestProperty("Authorization", token);
+                    if (sameOrigin(uri, current)) {
+                        if (token != null) {
+                            http.setRequestProperty("Authorization", token);
+                        }
+                        for (Map.Entry<String, String> header : headers.entrySet()) {
+                            http.setRequestProperty(header.getKey(), header.getValue());
+                        }
                     }
                     int status = http.getResponseCode();
                     if (status >= 300 && status < 400) {
