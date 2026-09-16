@@ -1,22 +1,20 @@
 package build;
 
 import module java.base;
-import build.jenesis.Project;
+import build.jenesis.Make;
 
 public class Demo {
 
-    static void main(String[] args) throws IOException {
-        expectFailure("a GPL dependency under a permissive-only license policy",
-                () -> new Project(Path.of(".")).build());
+    static void main(String[] args) throws Exception {
+        expectFailure("a GPL dependency under a permissive-only license policy");
         System.out.println();
         System.out.println("The license check blocked the build, as expected.");
     }
 
-    private static void expectFailure(String description, Build build) throws IOException {
+    private static void expectFailure(String description) throws Exception {
         wipe();
-        try {
-            build.run();
-        } catch (Throwable _) {
+        // The tool as the command line runs it, so what is asserted is the status a shell would see.
+        if (new Make("build.jenesis.Project").build().code() != 0) {
             System.out.println("[blocked] " + description);
             return;
         }
@@ -37,10 +35,5 @@ public class Demo {
                 }
             });
         }
-    }
-
-    @FunctionalInterface
-    private interface Build {
-        void run() throws Exception;
     }
 }

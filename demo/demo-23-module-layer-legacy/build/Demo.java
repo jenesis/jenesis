@@ -1,8 +1,7 @@
 package build;
 
 import module java.base;
-import build.jenesis.Project;
-import build.jenesis.project.InferredMultiProjectAssembler;
+import build.jenesis.Make;
 
 /**
  * Builds this project, unpacks the produced {@code bundle.zip}, and launches the app out of it on
@@ -20,9 +19,7 @@ import build.jenesis.project.InferredMultiProjectAssembler;
 public class Demo {
 
     static void main(String[] args) throws Exception {
-        Project project = new Project(Path.of("."))
-                .assembler(new InferredMultiProjectAssembler());
-        project.build();
+        build();
 
         Path zip;
         try (Stream<Path> walk = Files.walk(Path.of("target"))) {
@@ -64,5 +61,13 @@ public class Demo {
         command.add("@application." + (File.pathSeparatorChar == ';' ? "windows" : "unix") + ".args");
         command.addAll(List.of(args));
         System.exit(new ProcessBuilder(command).directory(unpacked.toFile()).inheritIO().start().waitFor());
+    }
+
+    private static void build(String... selectors) throws Exception {
+        // The tool as the command line runs it: jenesis.properties, the profiles it names and the
+        // user-global defaults are all read, and a non-zero status is the same failure a shell would see.
+        if (new Make("build.jenesis.Project").build(selectors).code() != 0) {
+            throw new IllegalStateException("The build exited with a non-zero status");
+        }
     }
 }
