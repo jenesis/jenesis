@@ -142,7 +142,9 @@ Continuous integration
 
 - **`.github/workflows/build.yml`** ("Test Jenesis Tool") runs on every push to `main` and every pull request,
   across Linux, macOS and Windows:
-  - `demos` - every demo, each with a verification command asserting what it should have produced;
+  - `demos-ubuntu`, `demos-macos`, `demos-windows` - every demo, each with a verification command
+    asserting what it should have produced. The demo list lives in `.github/workflows/demos.yml`,
+    which each of the three jobs calls once, because one job's matrix may hold only 256 configurations;
   - `project` - this project itself, under each of the four layouts, with `stage`;
   - `native-image` - the GraalVM demo, on a GraalVM runner, executing the produced binary;
   - `sdk` - stages the jar, populates the SDKMAN layout and runs the `sdk/jenesis` and `sdk/jpx` script tests.
