@@ -1,8 +1,7 @@
 package build;
 
 import module java.base;
-import build.jenesis.Project;
-import build.jenesis.project.InferredMultiProjectAssembler;
+
 
 /**
  * Builds this project with the launcher target enabled, then runs the produced
@@ -25,10 +24,7 @@ public class DemoLauncher {
         // build.jenesis/launcher/packaging.properties (launcher=true) outranks the plain
         // packaging.properties (jpackage), so the same project builds an app image by
         // default and the executable jar under this profile.
-        Project project = new Project(Path.of("."))
-                .profiles(Path.of("launcher"))
-                .assembler(new InferredMultiProjectAssembler());
-        project.build();
+        make("-Djenesis.make.profiles=launcher");
 
         // The launcher step writes the executable jar under
         // <module>/launcher/bundle/output/launcher/<name>.jar; locate it in the build tree.
@@ -48,5 +44,22 @@ public class DemoLauncher {
         command.add(jar.toString());
         command.addAll(List.of(args));
         System.exit(new ProcessBuilder(command).inheritIO().start().waitFor());
+    }
+
+    private static void make(String flag, String... selectors) throws IOException, InterruptedException {
+        // The tool as the command line runs it. A setting that only this run needs is a -D on that
+        // command line, the same flag a person or a pipeline would pass, rather than a value wired
+        // into a Project this file assembles by hand.
+        String java = ProcessHandle.current().info().command().orElseGet(() -> Path.of(
+                System.getProperty("java.home"),
+                "bin",
+                System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")
+                        ? "java.exe"
+                        : "java").toString());
+        List<String> command = new ArrayList<>(List.of(java, flag, "build/jenesis/Make.java"));
+        command.addAll(List.of(selectors));
+        if (new ProcessBuilder(command).inheritIO().start().waitFor() != 0) {
+            throw new IllegalStateException("The build exited with a non-zero status");
+        }
     }
 }

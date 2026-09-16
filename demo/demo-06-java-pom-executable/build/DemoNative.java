@@ -1,8 +1,7 @@
 package build;
 
 import module java.base;
-import build.jenesis.Project;
-import build.jenesis.project.InferredMultiProjectAssembler;
+
 
 /**
  * Sibling of {@link Demo} that builds a <em>fully bundled native installer</em>
@@ -43,15 +42,12 @@ public class DemoNative {
         }
         Path configuration = Files.createTempDirectory("packaging-");
         Files.writeString(configuration.resolve("packaging.properties"), "jpackage=" + type + "\n");
-        Project project = new Project(Path.of("."))
-                .configuration(configuration)
-                .assembler(new InferredMultiProjectAssembler());
+        make("-Djenesis.project.configuration=" + configuration, "stage");
 
         // Same fixed target as Demo: building `stage` returns a map keyed by the steps that
         // ran, and `stage/packages` holds whatever jpackage produced - here a single native
         // installer file rather than an app-image directory.
-        SequencedMap<String, Path> outputs = project.build("stage");
-        Path output = outputs.get("stage/packages");
+        Path output = Path.of("target", "stage", "packages", "output");
 
         System.out.println("Built a fully bundled " + type + " installer under " + output + ":");
         try (Stream<Path> files = Files.walk(output)) {
@@ -68,6 +64,23 @@ public class DemoNative {
             return bytes < 1024 * 1024 ? bytes / 1024 + " KiB" : bytes / (1024 * 1024) + " MiB";
         } catch (IOException e) {
             return "unknown size";
+        }
+    }
+
+    private static void make(String flag, String... selectors) throws IOException, InterruptedException {
+        // The tool as the command line runs it. A setting that only this run needs is a -D on that
+        // command line, the same flag a person or a pipeline would pass, rather than a value wired
+        // into a Project this file assembles by hand.
+        String java = ProcessHandle.current().info().command().orElseGet(() -> Path.of(
+                System.getProperty("java.home"),
+                "bin",
+                System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win")
+                        ? "java.exe"
+                        : "java").toString());
+        List<String> command = new ArrayList<>(List.of(java, flag, "build/jenesis/Make.java"));
+        command.addAll(List.of(selectors));
+        if (new ProcessBuilder(command).inheritIO().start().waitFor() != 0) {
+            throw new IllegalStateException("The build exited with a non-zero status");
         }
     }
 }
