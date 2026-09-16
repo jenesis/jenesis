@@ -2,8 +2,8 @@ Bundle demo
 ===========
 
 Ship a modular Java app as a single `bundle.zip`: its runtime launch closure (the
-app jar plus its dependencies) split into a `modulepath/` (and, for a non-modular
-app, a `classpath/`), with an `application.properties` naming the entry point. It is
+app jar plus its dependencies) in one `jars/` store, with an argument file that *is* the
+launch - a form every JVM already understands. It is
 the lightweight counterpart of the jpackage app-image in
 `../demo-07-java-modular-executable`: where jpackage bundles a `jlink`-trimmed Java
 runtime into a self-contained launcher, the bundle carries *only your jars*, meant to
@@ -35,27 +35,39 @@ What the bundle contains
 The `bundle` step writes one `bundle.zip` per module that declares a main class:
 
     bundle.zip
-    |-- application.properties     mainClass=sample.Sample, mainModule=demo.bundle
-    |-- modulepath/                jars that are modules (here the app jar and slf4j-api)
-    `-- classpath/                 any non-modular (plain) jars
+    |-- application.unix.args      the launch, as a Java argument file
+    |-- application.windows.args   the same launch, with Windows path separators
+    `-- jars/                      every jar of the closure, stored once
 
-It carries exactly the runtime closure the `Execute` launcher would run, split the
-same way: real and automatic modules under `modulepath/`, plain jars under
-`classpath/`. `application.properties` is plain `key=value` lines describing the
-launch:
+It carries exactly the runtime closure the `Execute` launcher would run, and the
+descriptor is not a description of the launch but the launch itself:
 
-- `mainClass` - the entry point, always present;
-- `mainModule` - present only when the launcher is modular;
-- `javaOptions` - space-separated JVM options the consumer splices in verbatim, present
-  only when this module graph does not resolve on its own:
-  `--add-modules=ALL-MODULE-PATH,ALL-DEFAULT` when an automatic module or a `classpath/` jar
-  keeps the main module's `requires` from rooting the whole module path and the platform
-  modules such a jar expects. This demo's closure is `demo.bundle` + `org.slf4j`, both
-  explicit modules, so the key is absent and the bundle launches as-is.
+    "--module-path"
+    "jars/classes.jar:jars/org.slf4j-2.0.16.jar"
+    "--module"
+    "demo.bundle/sample.Sample"
 
-`Demo.java` reads those three fields and reconstructs the launch command -
-`java --module-path modulepath -m demo.bundle/sample.Sample` here - the same command
-the `Dockerfile` below bakes in.
+So a deployment runs it with no reader and no parser of its own:
+
+    cd <unpacked> && java @application.unix.args
+
+Every path is spelled out rather than handed over as a folder, so a jar is read because
+the argument file names it and never because of where it sits - and because every path
+lives in a file rather than on the command line, no closure is too large to launch. The
+graph's own options are in there too: an automatic module or a class-path jar adds
+`--add-modules ALL-MODULE-PATH,ALL-DEFAULT`, which roots the whole module path and the
+platform modules such a jar expects. This demo's closure is `demo.bundle` + `org.slf4j`,
+both explicit modules, so those two lines are absent.
+
+The paths inside are relative to the unpacked folder, which is why `Demo.java` starts the
+process there - and why the `Dockerfile` below sets `WORKDIR`.
+
+There are two files because the path separator is the one part of a launch that cannot be
+written down until you know where it runs, and a bundle is built once and unpacked
+wherever. Carrying both costs a few hundred bytes and keeps the bundle portable; the
+separator of whoever built it would not be. A deployment picks by platform -
+`application.unix.args` or `application.windows.args` - which `Demo.java` does with
+`File.pathSeparatorChar`.
 
 How it is wired
 ---------------
@@ -97,7 +109,8 @@ no jpackage:
 
     FROM eclipse-temurin:25-jre
     COPY bundle/ /opt/app/
-    ENTRYPOINT ["java", "--module-path", "/opt/app/modulepath", "-m", "demo.bundle/sample.Sample"]
+    WORKDIR /opt/app
+    ENTRYPOINT ["java", "@application.unix.args"]
 
 The trade against the self-contained app-image (`../demo-07-java-modular-executable`)
 is the classic shared-base one: an app-image bundles its own `jlink`-trimmed runtime

@@ -67,6 +67,7 @@ public class Javadoc extends JdkProcessBuildStep {
                 "-tag", "jenesis.attach:a:Attached agents:",
                 "-tag", "jenesis.bom:a:Imported bills of materials:",
                 "-tag", "jenesis.plugin:a:Compiler plugins:",
+                "-tag", "jenesis.layer:a:Isolated layers:",
                 "-tag", "jenesis.signature:a:Signing keys:"));
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {

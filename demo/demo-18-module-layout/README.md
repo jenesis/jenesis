@@ -29,7 +29,7 @@ Selecting the layout
 
 A `module-info.java` with no `pom.xml` auto-detects MODULAR_TO_MAVEN; the pure
 MODULAR layout is never chosen automatically, so you ask for it. This demo asks for
-it in a `jenesis.properties` at the project root - the same file `../demo-28-java-quality`
+it in a `jenesis.properties` at the project root - the same file `../demo-30-java-quality`
 uses to select its formatter - which the launcher loads into system properties
 before the build:
 

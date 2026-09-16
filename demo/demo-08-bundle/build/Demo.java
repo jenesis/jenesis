@@ -40,8 +40,8 @@ public class Demo {
                     .orElseThrow(() -> new IllegalStateException("No bundle.zip was produced"));
         }
 
-        // Unpack the bundle the way a deployment would: an application.properties plus a
-        // modulepath/ (and, for a non-modular app, a classpath/) holding the launch closure.
+        // Unpack the bundle the way a deployment would: an argument file per platform plus a jars/
+        // folder holding the launch closure, with each path named by that argument file.
         Path unpacked = Files.createTempDirectory("bundle-");
         try (ZipFile archive = new ZipFile(zip.toFile())) {
             Enumeration<? extends ZipEntry> entries = archive.entries();
@@ -62,42 +62,14 @@ public class Demo {
             }
         }
 
-        // application.properties describes the launch: mainClass, mainModule (modular
-        // launchers only), and javaOptions - the JVM options this module graph needs to
-        // resolve, absent when it resolves from the main module's requires alone.
-        Properties application = new Properties();
-        try (InputStream in = Files.newInputStream(unpacked.resolve("application.properties"))) {
-            application.load(in);
-        }
-        String mainClass = application.getProperty("mainClass");
-        String mainModule = application.getProperty("mainModule");
-        String javaOptions = application.getProperty("javaOptions", "");
-
-        // Reconstruct the launch command a JRE-based deployment would run.
+        // The argument file is the launch itself: everything the JVM needs is in it, so a deployment
+        // runs `java @application.<platform>.args` from the folder it unpacked into and reads nothing.
+        // There is one file per path separator, the only part of a launch a bundle cannot know in
+        // advance; the paths inside are relative to the unpacked folder, so the process starts there.
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
-        Path modulepath = unpacked.resolve("modulepath");
-        Path classpath = unpacked.resolve("classpath");
-        if (Files.isDirectory(modulepath)) {
-            command.add("--module-path");
-            command.add(modulepath.toString());
-        }
-        if (Files.isDirectory(classpath)) {
-            command.add("-classpath");
-            command.add(classpath.resolve("*").toString());
-        }
-        for (String option : javaOptions.split(" ")) {
-            if (!option.isEmpty()) {
-                command.add(option);
-            }
-        }
-        if (mainModule != null) {
-            command.add("-m");
-            command.add(mainModule + "/" + mainClass);
-        } else {
-            command.add(mainClass);
-        }
+        command.add("@application." + (File.pathSeparatorChar == ';' ? "windows" : "unix") + ".args");
         command.addAll(List.of(args));
-        System.exit(new ProcessBuilder(command).inheritIO().start().waitFor());
+        System.exit(new ProcessBuilder(command).directory(unpacked.toFile()).inheritIO().start().waitFor());
     }
 }

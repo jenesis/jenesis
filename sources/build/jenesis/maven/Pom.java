@@ -14,28 +14,34 @@ public class Pom implements BuildStep {
     private final Set<String> prefixes;
     private final Map<String, String> shared;
     private final boolean resolved;
+    private final String group;
     private final transient MavenPomEmitter emitter = new MavenPomEmitter();
 
     public Pom() {
-        this(Set.of("maven"), Map.of(), false);
+        this(Set.of("maven"), Map.of(), false, "main");
     }
 
-    private Pom(Set<String> prefixes, Map<String, String> shared, boolean resolved) {
+    private Pom(Set<String> prefixes, Map<String, String> shared, boolean resolved, String group) {
         this.prefixes = Set.copyOf(prefixes);
         this.shared = Map.copyOf(shared);
         this.resolved = resolved;
+        this.group = group;
     }
 
     public Pom prefixes(Set<String> prefixes) {
-        return new Pom(prefixes, shared, resolved);
+        return new Pom(prefixes, shared, resolved, group);
     }
 
     public Pom shared(Map<String, String> shared) {
-        return new Pom(prefixes, shared, resolved);
+        return new Pom(prefixes, shared, resolved, group);
     }
 
     public Pom resolved(boolean resolved) {
-        return new Pom(prefixes, shared, resolved);
+        return new Pom(prefixes, shared, resolved, group);
+    }
+
+    public Pom group(String group) {
+        return new Pom(prefixes, shared, resolved, group);
     }
 
     @Override
@@ -58,11 +64,32 @@ public class Pom implements BuildStep {
         SequencedProperties requires = SequencedProperties.ofFolders(folders, resolved ? DEPENDENCIES : REQUIRES);
         SequencedProperties exclusions = SequencedProperties.ofFolders(folders, EXCLUSIONS);
         SequencedProperties metadata = SequencedProperties.ofFolders(folders, METADATA);
+        SequencedSet<String> isolated = new LinkedHashSet<>(), declared = new LinkedHashSet<>();
+        for (Path folder : folders) {
+            Path file = folder.resolve(resolved ? DEPENDENCIES : REQUIRES);
+            if (!Files.isRegularFile(file)) {
+                continue;
+            }
+            SequencedSet<String> foreign = new LinkedHashSet<>(), own = new LinkedHashSet<>();
+            for (String key : SequencedProperties.ofFiles(file).stringPropertyNames()) {
+                int second = key.indexOf('/', key.indexOf('/') + 1);
+                (key.startsWith(group + "/") ? own : foreign).add(key.substring(second + 1));
+            }
+            if (!foreign.isEmpty()) {
+                isolated.addAll(foreign);
+                declared.addAll(own);
+            }
+        }
+        isolated.removeAll(declared);
         SequencedMap<String, SequencedSet<String>> coordinateScopes = new LinkedHashMap<>();
         for (String key : requires.stringPropertyNames()) {
             int first = key.indexOf('/');
             int second = key.indexOf('/', first + 1);
-            coordinateScopes.computeIfAbsent(key.substring(second + 1), _ -> new LinkedHashSet<>())
+            String coordinate = key.substring(second + 1);
+            if (!key.startsWith(group + "/") || isolated.contains(coordinate)) {
+                continue;
+            }
+            coordinateScopes.computeIfAbsent(coordinate, _ -> new LinkedHashSet<>())
                     .add(key.substring(first + 1, second));
         }
         SequencedMap<String, String> coordinateExclusions = new LinkedHashMap<>();

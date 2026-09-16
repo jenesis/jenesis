@@ -86,9 +86,10 @@ public class JavaTest {
                                 Path.of("artifacts/plain.jar"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
 
         assertThat(result.next()).isTrue();
-        assertThat(captured.get())
+        assertThat(supplement.resolve("java.args"))
                 .as("a jar without a module name lands on the class path, expecting the whole platform")
-                .containsSubsequence("--add-modules", "ALL-MODULE-PATH,ALL-DEFAULT")
+                .content()
+                .contains("\"--add-modules\"\n\"ALL-MODULE-PATH,ALL-DEFAULT\"")
                 .doesNotContain("--add-reads");
     }
 
@@ -118,7 +119,7 @@ public class JavaTest {
         assertThat(supplement.resolve("java.args"))
                 .as("the class path is in the file, and a run without a module path names no module path at all")
                 .content()
-                .contains("--class-path")
+                .contains("\"--class-path\"")
                 .doesNotContain("--module-path");
     }
 
@@ -159,7 +160,7 @@ public class JavaTest {
                 .anySatisfy(argument -> assertThat(argument).startsWith("@").endsWith("java.args"));
         assertThat(supplement.resolve("java.args"))
                 .content()
-                .startsWith("--class-path\n\"")
+                .startsWith("\"--class-path\"\n\"")
                 .contains("a-jar-with-a-name-long-enough-to-add-up-119.jar");
         assertThat(supplement.resolve("output")).content().isEqualTo("Hello world!");
     }

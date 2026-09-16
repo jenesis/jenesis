@@ -44,7 +44,7 @@ public class DependenciesModuleClaimTest {
                         + " shows that the module path could resolve either of them")
                 .hasStackTraceContaining(IllegalArgumentException.class.getName())
                 .hasStackTraceContaining("maven/org.example/one-lib/1.0 and maven/org.example/two-lib/2.0"
-                        + " both carry module lib.shared"
+                        + " both carry module lib.shared in group main"
                         + " - a module path resolves whichever of the two comes first,"
                         + " so drop one with @jenesis.exclude");
     }

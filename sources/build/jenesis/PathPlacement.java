@@ -35,6 +35,8 @@ public enum PathPlacement {
 
     public static final String OVERRIDES = "Jenesis-Overrides";
 
+    public static final String LAYERS = "Jenesis-Layer";
+
     private static final Pattern DERIVED_VERSION = Pattern.compile("\\d+(\\..*)?");
 
     private final boolean modular;
@@ -144,6 +146,20 @@ public enum PathPlacement {
         return declarations(path).aliases();
     }
 
+    public static SequencedMap<String, SequencedSet<String>> layers(Path path) throws IOException {
+        if (Files.isDirectory(path)) {
+            return Collections.emptyNavigableMap();
+        }
+        String declaration;
+        try (JarFile jar = new JarFile(path.toFile(), true, ZipFile.OPEN_READ, JarFile.runtimeVersion())) {
+            Manifest manifest = jar.getManifest();
+            declaration = manifest == null ? null : manifest.getMainAttributes().getValue(LAYERS);
+        } catch (ZipException _) {
+            return Collections.emptyNavigableMap();
+        }
+        return layers(declaration, path.toString());
+    }
+
     public static SequencedMap<String, SequencedSet<String>> overrides(String declaration, String origin) {
         SequencedMap<String, SequencedSet<String>> overrides = new LinkedHashMap<>();
         if (declaration == null || declaration.isBlank()) {
@@ -183,6 +199,42 @@ public enum PathPlacement {
             }
         }
         return overrides;
+    }
+
+    public static SequencedMap<String, SequencedSet<String>> layers(String declaration, String origin) {
+        SequencedMap<String, SequencedSet<String>> layers = new LinkedHashMap<>();
+        if (declaration == null || declaration.isBlank()) {
+            return layers;
+        }
+        for (String entry : declaration.split(",")) {
+            String pair = entry.trim();
+            if (pair.isEmpty()) {
+                continue;
+            }
+            int equals = pair.indexOf('=');
+            String name = equals < 0 ? "" : pair.substring(0, equals).trim();
+            String tokens = equals < 0 ? "" : pair.substring(equals + 1).trim();
+            if (name.isEmpty() || tokens.isEmpty()) {
+                throw new IllegalArgumentException("Malformed " + LAYERS + " entry '"
+                        + pair
+                        + "' in "
+                        + origin
+                        + ": expected <name>=<api-module> <coordinate>...");
+            }
+            SequencedSet<String> declared = new LinkedHashSet<>(List.of(tokens.split(" ")));
+            SequencedSet<String> previous = layers.putIfAbsent(name, declared);
+            if (previous != null && !previous.equals(declared)) {
+                throw new IllegalArgumentException("Conflicting " + LAYERS + " entries for "
+                        + name
+                        + " in "
+                        + origin
+                        + ": "
+                        + previous
+                        + " and "
+                        + declared);
+            }
+        }
+        return layers;
     }
 
     public static SequencedMap<String, String> aliases(String declaration, String origin) {

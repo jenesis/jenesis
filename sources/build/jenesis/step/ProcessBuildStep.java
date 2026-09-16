@@ -220,23 +220,31 @@ public abstract class ProcessBuildStep implements BuildStep {
     }
 
     public static List<String> argumentFile(Path file, SequencedMap<String, String> options) throws IOException {
-        StringBuilder args = new StringBuilder();
+        List<String> arguments = new ArrayList<>();
         options.forEach((option, value) -> {
             if (value != null && !value.isEmpty()) {
-                args.append(option)
-                        .append("\n\"")
-                        .append(value.replace("\\", "\\\\").replace("\"", "\\\""))
-                        .append("\"\n");
+                arguments.add(option);
+                arguments.add(value);
             }
         });
-        if (args.isEmpty()) {
+        if (arguments.isEmpty()) {
             return List.of();
+        }
+        return List.of("@" + argumentFile(file, arguments));
+    }
+
+    public static Path argumentFile(Path file, List<String> arguments) throws IOException {
+        StringBuilder args = new StringBuilder();
+        for (String argument : arguments) {
+            args.append('"')
+                    .append(argument.replace("\\", "\\\\").replace("\"", "\\\""))
+                    .append("\"\n");
         }
         Path parent = file.getParent();
         if (parent != null) {
             Files.createDirectories(parent);
         }
         Files.writeString(file, args.toString());
-        return List.of("@" + file);
+        return file;
     }
 }

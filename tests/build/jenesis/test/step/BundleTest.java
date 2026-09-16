@@ -52,11 +52,15 @@ public class BundleTest {
         Path zip = next.resolve(Bundle.BUNDLE).resolve("bundle.zip");
         assertThat(zip).isRegularFile();
         SequencedSet<String> entries = entries(zip);
-        assertThat(entries).contains("application.properties", "classpath/app.jar", "classpath/lib.jar");
-        assertThat(entries).noneMatch(name -> name.startsWith("modulepath/"));
-        Properties application = application(zip);
-        assertThat(application.getProperty("mainClass")).isEqualTo("sample.Sample");
-        assertThat(application.getProperty("mainModule")).isNull();
+        assertThat(entries).contains(
+                "application.unix.args", "application.windows.args", "jars/app.jar", "jars/lib.jar");
+        assertThat(application(zip))
+                .as("the descriptor is the launch itself, run as `java @application.unix.args`")
+                .containsExactly("--class-path", path("app.jar", "lib.jar"), "sample.Sample");
+        assertThat(application(zip, "windows"))
+                .as("a bundle is unpacked wherever, so it carries a file per path separator"
+                        + " rather than the separator of whoever built it")
+                .containsExactly("--class-path", "jars/app.jar;jars/lib.jar", "sample.Sample");
     }
 
     @Test
@@ -90,11 +94,10 @@ public class BundleTest {
         assertThat(result.next()).isTrue();
         Path zip = next.resolve(Bundle.BUNDLE).resolve("bundle.zip");
         SequencedSet<String> entries = entries(zip);
-        assertThat(entries).contains("application.properties", "modulepath/sample.jar");
-        assertThat(entries).noneMatch(name -> name.startsWith("classpath/"));
-        Properties application = application(zip);
-        assertThat(application.getProperty("mainClass")).isEqualTo("sample.Sample");
-        assertThat(application.getProperty("mainModule")).isEqualTo("sample");
+        assertThat(entries).contains("application.unix.args", "jars/sample.jar");
+        assertThat(application(zip)).containsExactly(
+                "--module-path", path("sample.jar"),
+                "--module", "sample/sample.Sample");
     }
 
     @Test
@@ -129,10 +132,14 @@ public class BundleTest {
 
         assertThat(result.next()).isTrue();
         Path zip = next.resolve(Bundle.BUNDLE).resolve("bundle.zip");
-        assertThat(entries(zip)).contains("modulepath/sample.jar", "classpath/lib.jar");
-        assertThat(application(zip).getProperty("javaOptions"))
-                .as("a consumer splices the options rather than deriving them from the layout")
-                .isEqualTo("--add-modules=ALL-MODULE-PATH,ALL-DEFAULT");
+        assertThat(entries(zip)).contains("jars/sample.jar", "jars/lib.jar");
+        assertThat(application(zip))
+                .as("a class-path jar beside a module roots the whole module path")
+                .containsExactly(
+                        "--class-path", path("lib.jar"),
+                        "--module-path", path("sample.jar"),
+                        "--add-modules", "ALL-MODULE-PATH,ALL-DEFAULT",
+                        "--module", "sample/sample.Sample");
     }
 
     @Test
@@ -180,10 +187,11 @@ public class BundleTest {
         SequencedSet<String> entries = entries(zip);
         assertThat(entries)
                 .as("a jar named for its alias derives that module name wherever it is unpacked")
-                .contains("modulepath/sample.jar", "modulepath/alias.lib.jar");
-        assertThat(entries).noneMatch(name -> name.startsWith("classpath/"));
-        assertThat(application(zip).getProperty("javaOptions"))
-                .isEqualTo("--add-modules=ALL-MODULE-PATH,ALL-DEFAULT");
+                .contains("jars/sample.jar", "jars/alias.lib.jar");
+        assertThat(application(zip)).containsExactly(
+                "--module-path", path("alias.lib.jar", "sample.jar"),
+                "--add-modules", "ALL-MODULE-PATH,ALL-DEFAULT",
+                "--module", "sample/sample.Sample");
     }
 
     @Test
@@ -228,13 +236,22 @@ public class BundleTest {
         return names;
     }
 
-    private static Properties application(Path zip) throws IOException {
+    private static List<String> application(Path zip) throws IOException {
+        return application(zip, "unix");
+    }
+
+    private static List<String> application(Path zip, String platform) throws IOException {
         try (ZipFile file = new ZipFile(zip.toFile())) {
-            Properties properties = new Properties();
-            try (InputStream in = file.getInputStream(file.getEntry("application.properties"))) {
-                properties.load(in);
+            try (InputStream in = file.getInputStream(
+                    file.getEntry("application." + platform + ".args"))) {
+                return new String(in.readAllBytes(), StandardCharsets.UTF_8).lines()
+                        .map(line -> line.substring(1, line.length() - 1))
+                        .toList();
             }
-            return properties;
         }
+    }
+
+    private static String path(String... names) {
+        return Stream.of(names).map(name -> "jars/" + name).collect(Collectors.joining(":"));
     }
 }
