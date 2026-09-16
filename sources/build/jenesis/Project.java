@@ -945,7 +945,8 @@ public record Project(
                                          20, 21 platform-guard (per-platform variants)
                       Trusting them      22 pinning (versions and checksums), 23 openpgp (a declared
                                          key), 24 sigstore (a declared identity, no key at all),
-                                         25 sbom, 26 compliance (licenses), 27 vulnerabilities (OSV)
+                                         25 sbom, 26 compliance (licenses), 27 vulnerabilities (OSV),
+                                         59 code-signing (jarsigner)
                       Quality gates      28 java-quality, 33 api-compatibility (japicmp),
                                          35 kotlin-quality, 38 scala-quality, 40 groovy-quality
                       Tests              29 code-coverage (JaCoCo), 30 test-selection (incremental),
@@ -2060,6 +2061,13 @@ public record Project(
                 observe.native|true|native-image reachability agent, activated by a graal.properties
                 mutate.pitest|true|PIT mutation testing, activated by a pitest.properties
                 artifact.japicmp|true|japicmp API comparison, activated by a japicmp.properties
+                jarsigner.keystore||Key store jarsigner signs the produced jar with, in place of the unsigned one; a release machine supplies it, and a build that names any jarsigner setting without it fails rather than shipping unsigned
+                jarsigner.alias||Name of the key within that store
+                jarsigner.storepass||Where that store's password is read from: env <variable>, or file <path>
+                jarsigner.keypass||The same for the key's own password, where it has one of its own
+                jarsigner.storetype||Type of the store, as jarsigner names it: PKCS12, JKS, ...
+                jarsigner.tsa||Timestamp authority to stamp the signature with, so it outlives the certificate
+                jarsigner.arguments||Further jarsigner arguments, whitespace separated
                 jreleaser.executable|jreleaser|The JReleaser executable a release runs
                 jreleaser.command|full-release|The JReleaser command a release runs
                 jreleaser.config||JReleaser configuration file
