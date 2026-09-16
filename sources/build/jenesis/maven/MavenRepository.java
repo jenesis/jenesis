@@ -1,6 +1,7 @@
 package build.jenesis.maven;
 
 import module java.base;
+import build.jenesis.BuildExecutorModule;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 
@@ -22,15 +23,15 @@ public interface MavenRepository extends Repository {
 
     @Override
     default MavenRepository cached(Path folder) {
-        return folder == null ? this : caching(Repository.super.cached(folder));
+        return folder == null ? this : caching(Repository.super.cached(folder), folder);
     }
 
     @Override
     default MavenRepository materialized(Path folder) {
-        return folder == null ? this : caching(Repository.super.materialized(folder));
+        return folder == null ? this : caching(Repository.super.materialized(folder), folder);
     }
 
-    private MavenRepository caching(Repository cached) {
+    private MavenRepository caching(Repository cached, Path folder) {
         return new MavenRepository() {
             @Override
             public Optional<RepositoryItem> fetch(Executor executor,
@@ -56,7 +57,35 @@ public interface MavenRepository extends Repository {
                                                           String groupId,
                                                           String artifactId,
                                                           String checksum) throws IOException {
-                return MavenRepository.this.fetchMetadata(executor, groupId, artifactId, checksum);
+                Path target = folder.resolve(BuildExecutorModule.encode(groupId
+                        + "/" + artifactId
+                        + "/maven-metadata.xml" + (checksum == null ? "" : "." + checksum)));
+                Optional<RepositoryItem> candidate;
+                try {
+                    candidate = MavenRepository.this.fetchMetadata(executor, groupId, artifactId, checksum);
+                } catch (IOException e) {
+                    if (!Files.exists(target)) {
+                        throw e;
+                    }
+                    return Optional.of(RepositoryItem.ofFile(target));
+                }
+                if (candidate.isEmpty()) {
+                    return Files.exists(target) ? Optional.of(RepositoryItem.ofFile(target)) : candidate;
+                }
+                Files.createDirectories(folder);
+                Path temporary = Files.createTempFile(folder, "maven-metadata", ".xml");
+                try (InputStream inputStream = candidate.orElseThrow().toInputStream()) {
+                    Files.copy(inputStream, temporary, StandardCopyOption.REPLACE_EXISTING);
+                } catch (Throwable t) {
+                    Files.deleteIfExists(temporary);
+                    throw t;
+                }
+                try {
+                    Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
+                } catch (AtomicMoveNotSupportedException _) {
+                    Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+                return Optional.of(RepositoryItem.ofFile(target));
             }
         };
     }
