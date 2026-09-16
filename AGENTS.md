@@ -20,7 +20,8 @@ and `java build/jenesis/Make.java skill` prints an onboarding briefing from the 
 - When the tool cannot build itself, `mvn test` (the root `pom.xml`) compiles and tests the sources without
   Jenesis. It validates only; it stages and pins nothing.
 - Every feature ships a demo under `demo/` with a README and a verification command in
-  `.github/workflows/build.yml`; the demos are the end-to-end suite and the documentation's examples.
+  `.github/workflows/demos.yml`, which `build.yml` calls once per operating system; the demos are the
+  end-to-end suite and the documentation's examples.
 
 ## How the code is written
 
