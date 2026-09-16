@@ -5,31 +5,23 @@ import build.jenesis.Project;
 import build.jenesis.project.InferredMultiProjectAssembler;
 
 /**
- * Builds this modular app with the {@code bundle} target enabled, unpacks the
- * produced {@code bundle.zip}, and launches the app out of it on this JDK's own
- * {@code java} - exactly the way a consumer would run the bundle on a stock JRE
- * base image. Run it from this directory, passing whatever arguments you want the
- * app to receive:
+ * Builds this project, unpacks the produced {@code bundle.zip}, and launches the app out of it on
+ * this JDK's own {@code java}. Run it from this directory:
  *
- *     java build/Demo.java Ada Lovelace
+ *     java build/Demo.java
  *
- * which builds the bundle, unpacks it, and prints (from the launched app):
+ * which prints two versions of one library, in one JVM, with no package relocated:
  *
- *     Hello, Ada Lovelace, from a Jenesis bundle.zip on a stock JRE!
+ *     the application's jackson-core 2.18.2, loaded by jdk.internal.loader.ClassLoaders$AppClassLoader@...
+ *     the library's private jackson-core 2.15.4, loaded by jdk.internal.loader.Loader@...
  */
 public class Demo {
 
     static void main(String[] args) throws Exception {
-        // The bundle target is selected by the committed packaging.properties in this
-        // directory (bundle=true), which Jenesis reads from the configuration location, so
-        // the default build writes a bundle/bundle.zip for every module with a main class.
         Project project = new Project(Path.of("."))
                 .assembler(new InferredMultiProjectAssembler());
         project.build();
 
-        // The bundle step writes the archive under .../package/bundle/output/bundle/bundle.zip.
-        // It is not collected into stage/, so locate it in the build tree the same way the
-        // launcher demo locates its jar.
         Path zip;
         try (Stream<Path> walk = Files.walk(Path.of("target"))) {
             zip = walk.filter(Files::isRegularFile)
@@ -40,9 +32,7 @@ public class Demo {
                     .orElseThrow(() -> new IllegalStateException("No bundle.zip was produced"));
         }
 
-        // Unpack the bundle the way a deployment would: an argument file per platform plus a jars/
-        // folder holding the launch closure, with each path named by that argument file.
-        Path unpacked = Files.createTempDirectory("bundle-");
+        Path unpacked = Files.createTempDirectory("layers-");
         try (ZipFile archive = new ZipFile(zip.toFile())) {
             Enumeration<? extends ZipEntry> entries = archive.entries();
             while (entries.hasMoreElements()) {
@@ -62,10 +52,11 @@ public class Demo {
             }
         }
 
-        // The argument file is the launch itself: everything the JVM needs is in it, so a deployment
-        // runs `java @application.<platform>.args` from the folder it unpacked into and reads nothing.
-        // There is one file per path separator, the only part of a launch a bundle cannot know in
-        // advance; the paths inside are relative to the unpacked folder, so the process starts there.
+        // The argument file is the launch itself: the module path, the layer properties and the entry
+        // point are all in it, so a deployment runs `java @application.<platform>.args` from the folder
+        // it unpacked into. Each layer travels as -Djlayer.<path>.<name>, the property the
+        // library's own code reads; inside an executable jar no such option is needed, because the
+        // launcher reads the layer out of the jar it is already holding open.
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
         command.add("@application." + (File.pathSeparatorChar == ';' ? "windows" : "unix") + ".args");
