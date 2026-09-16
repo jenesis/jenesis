@@ -1,8 +1,7 @@
 package build;
 
 import module java.base;
-import build.jenesis.Project;
-import build.jenesis.project.InferredMultiProjectAssembler;
+import build.jenesis.Make;
 
 /**
  * Builds this modular app with the {@code bundle} target enabled, unpacks the
@@ -23,9 +22,7 @@ public class Demo {
         // The bundle target is selected by the committed packaging.properties in this
         // directory (bundle=true), which Jenesis reads from the configuration location, so
         // the default build writes a bundle/bundle.zip for every module with a main class.
-        Project project = new Project(Path.of("."))
-                .assembler(new InferredMultiProjectAssembler());
-        project.build();
+        build();
 
         // The bundle step writes the archive under .../package/bundle/output/bundle/bundle.zip.
         // It is not collected into stage/, so locate it in the build tree the same way the
@@ -71,5 +68,13 @@ public class Demo {
         command.add("@application." + (File.pathSeparatorChar == ';' ? "windows" : "unix") + ".args");
         command.addAll(List.of(args));
         System.exit(new ProcessBuilder(command).directory(unpacked.toFile()).inheritIO().start().waitFor());
+    }
+
+    private static void build(String... selectors) throws Exception {
+        // The tool as the command line runs it: jenesis.properties, the profiles it names and the
+        // user-global defaults are all read, and a non-zero status is the same failure a shell would see.
+        if (new Make("build.jenesis.Project").build(selectors).code() != 0) {
+            throw new IllegalStateException("The build exited with a non-zero status");
+        }
     }
 }
