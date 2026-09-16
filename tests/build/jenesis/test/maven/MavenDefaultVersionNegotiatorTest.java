@@ -211,12 +211,67 @@ public class MavenDefaultVersionNegotiatorTest {
     }
 
     @Test
+    public void fail_rejects_a_coordinate_required_at_two_versions() {
+        assertThatThrownBy(() -> fail().resolve(Runnable::run,
+                null,
+                "group",
+                "artifact",
+                "jar",
+                null,
+                "1.0",
+                new LinkedHashSet<>(List.of("1.0", "2.0"))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Diverging versions [1.0, 2.0] required for group:artifact")
+                .hasMessageContaining("dependencyManagement");
+    }
+
+    @Test
+    public void fail_accepts_a_version_no_other_dependency_disagrees_with() throws IOException {
+        assertThat(fail().resolve(Runnable::run, null, "group", "artifact", "jar", null, "1.0"))
+                .isEqualTo("1.0");
+        fail().discovered("group", "artifact", "jar", null, "1.0", false);
+    }
+
+    @Test
+    public void managed_rejects_a_version_only_a_dependency_names() {
+        assertThatThrownBy(() -> managed().discovered("group", "artifact", "jar", "sources", "1.0", false))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No managed version for group:artifact:sources")
+                .hasMessageContaining("which resolved to 1.0")
+                .hasMessageContaining("dependencyManagement");
+    }
+
+    @Test
+    public void managed_accepts_a_version_dependency_management_names() {
+        managed().discovered("group", "artifact", "jar", null, "1.0", true);
+    }
+
+    @Test
+    public void managed_rejects_a_coordinate_required_at_two_versions_like_fail_does() {
+        assertThatThrownBy(() -> managed().resolve(Runnable::run,
+                null,
+                "group",
+                "artifact",
+                "jar",
+                null,
+                "1.0",
+                new LinkedHashSet<>(List.of("1.0", "2.0"))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Diverging versions [1.0, 2.0] required for group:artifact");
+    }
+
+    @Test
+    public void a_negotiator_that_states_no_policy_accepts_what_it_is_told() {
+        maven().discovered("group", "artifact", "jar", null, "1.0", false);
+    }
+
+    @Test
     public void no_two_factories_supply_the_same_negotiator() throws IOException {
         Set<String> distinct = new HashSet<>();
         for (Supplier<MavenVersionNegotiator> supplier : factories()) {
             distinct.add(HexFormat.of().formatHex(serialize(supplier)));
         }
-        assertThat(distinct).hasSize(4);
+        assertThat(distinct).hasSize(6);
     }
 
     @Test
@@ -235,7 +290,9 @@ public class MavenDefaultVersionNegotiatorTest {
         return List.of(MavenDefaultVersionNegotiator.maven(),
                 MavenDefaultVersionNegotiator.latest(),
                 MavenDefaultVersionNegotiator.release(),
-                MavenDefaultVersionNegotiator.closest());
+                MavenDefaultVersionNegotiator.closest(),
+                MavenDefaultVersionNegotiator.fail(),
+                MavenDefaultVersionNegotiator.managed());
     }
 
     private static byte[] serialize(Object value) throws IOException {
@@ -264,6 +321,14 @@ public class MavenDefaultVersionNegotiatorTest {
 
     private static MavenVersionNegotiator stable() {
         return MavenDefaultVersionNegotiator.stable().get();
+    }
+
+    private static MavenVersionNegotiator fail() {
+        return MavenDefaultVersionNegotiator.fail().get();
+    }
+
+    private static MavenVersionNegotiator managed() {
+        return MavenDefaultVersionNegotiator.managed().get();
     }
 
     @Test

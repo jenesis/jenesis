@@ -30,7 +30,8 @@ public class ModularJarResolverTest {
         Map<String, ModularJarResolver> cases = Map.of(
                 "first", new ModularJarResolver(false, null, ModuleVersionNegotiator.first()),
                 "ignore", new ModularJarResolver(false, null, ModuleVersionNegotiator.ignore()),
-                "fail", new ModularJarResolver(false, null, ModuleVersionNegotiator.fail()));
+                "fail", new ModularJarResolver(false, null, ModuleVersionNegotiator.fail()),
+                "managed", new ModularJarResolver(false, null, ModuleVersionNegotiator.managed()));
         for (Map.Entry<String, ModularJarResolver> entry : cases.entrySet()) {
             System.setProperty("jenesis.resolver.module", entry.getKey());
             assertThat(serialize(new ModularJarResolver(false)))
@@ -52,7 +53,7 @@ public class ModularJarResolverTest {
         assertThatThrownBy(() -> new ModularJarResolver(false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Unknown jenesis.resolver.module 'nonsense',"
-                        + " expected one of: first, ignore, fail");
+                        + " expected one of: first, ignore, fail, managed");
     }
 
     @Test
@@ -68,6 +69,51 @@ public class ModularJarResolverTest {
                 .as("the resolver travels in the step's serialized form, which is its cache key,"
                         + " so a resolution decided differently cannot be served from the cache")
                 .isNotEqualTo(serialize(new ModularJarResolver(false)));
+    }
+
+    @Test
+    public void managed_rejects_a_module_only_another_module_names() {
+        assertThatThrownBy(() -> managed().dependencies(
+                Runnable::run,
+                "foo",
+                Map.of("foo", (_, coordinate, _) -> {
+                    RepositoryItem item = switch (coordinate) {
+                        case "root" -> toJar("root", "1.0", require("plain", 0));
+                        case "plain" -> toJar("plain", "2.0");
+                        default -> null;
+                    };
+                    return Optional.ofNullable(item);
+                }),
+                new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No version pinned for module plain");
+    }
+
+    @Test
+    public void managed_accepts_a_module_a_pin_names() throws IOException {
+        SequencedMap<String, Resolver.Resolved> dependencies = managed().dependencies(
+                Runnable::run,
+                "foo",
+                Map.of("foo", (_, coordinate, _) -> {
+                    RepositoryItem item = switch (coordinate) {
+                        case "root" -> toJar("root", "1.0", require("plain", 0));
+                        case "plain/2.0" -> toJar("plain", "2.0");
+                        default -> null;
+                    };
+                    return Optional.ofNullable(item);
+                }),
+                new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(Map.of("plain", "2.0")),
+                DependencyScope.COMPILE).artifacts();
+        assertThat(dependencies.sequencedKeySet())
+                .as("the root module is a declaration of the project, the pin names what it reaches")
+                .containsExactly("foo/root/1.0", "foo/plain/2.0");
+    }
+
+    private static ModularJarResolver managed() {
+        return new ModularJarResolver(false, null, ModuleVersionNegotiator.managed());
     }
 
     private static byte[] serialize(Object value) throws IOException {

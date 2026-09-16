@@ -42,12 +42,36 @@ public class ModuleVersionNegotiatorTest {
     }
 
     @Test
+    public void managed_rejects_a_module_no_pin_names() {
+        ModuleVersionNegotiator negotiator = ModuleVersionNegotiator.managed().get();
+        negotiator.discovered("shared", "1.0", true);
+        assertThatThrownBy(() -> negotiator.discovered("shared", "1.0", false))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No version pinned for module shared")
+                .hasMessageContaining("@jenesis.pin");
+    }
+
+    @Test
+    public void managed_rejects_a_disagreeing_version_like_fail_does() {
+        ModuleVersionNegotiator negotiator = ModuleVersionNegotiator.managed().get();
+        assertThat(negotiator.negotiate("shared", null, DECLARED)).isEqualTo(DECLARED);
+        assertThatThrownBy(() -> negotiator.negotiate("shared", RECORDED, DECLARED))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Conflicting compiled versions for module shared");
+    }
+
+    @Test
+    public void a_negotiator_that_states_no_policy_accepts_what_it_is_told() {
+        ModuleVersionNegotiator.first().get().discovered("shared", null, false);
+    }
+
+    @Test
     public void no_two_factories_supply_the_same_negotiator() throws IOException {
         Set<String> distinct = new HashSet<>();
         for (Supplier<ModuleVersionNegotiator> supplier : factories()) {
             distinct.add(HexFormat.of().formatHex(serialize(supplier)));
         }
-        assertThat(distinct).hasSize(3);
+        assertThat(distinct).hasSize(4);
     }
 
     @Test
@@ -65,7 +89,8 @@ public class ModuleVersionNegotiatorTest {
     private static List<Supplier<ModuleVersionNegotiator>> factories() {
         return List.of(ModuleVersionNegotiator.first(),
                 ModuleVersionNegotiator.ignore(),
-                ModuleVersionNegotiator.fail());
+                ModuleVersionNegotiator.fail(),
+                ModuleVersionNegotiator.managed());
     }
 
     private static byte[] serialize(Object value) throws IOException {
