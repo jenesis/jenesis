@@ -464,7 +464,16 @@ public class Dependencies implements BuildExecutorModule {
             SequencedProperties graph = new SequencedProperties();
             SequencedProperties licenses = new SequencedProperties();
             int edge = 0;
-            for (Map.Entry<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>> groupEntry : requires.entrySet()) {
+            SequencedProperties layers = new SequencedProperties();
+            SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>>
+                    pending = new LinkedHashMap<>(requires);
+            SequencedMap<String, String> discovered = new LinkedHashMap<>();
+            while (!pending.isEmpty()) {
+            SequencedMap<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>>
+                    round = pending;
+            pending = new LinkedHashMap<>();
+            SequencedSet<String> before = new LinkedHashSet<>(materialized.sequencedKeySet());
+            for (Map.Entry<String, SequencedMap<String, SequencedMap<String, SequencedMap<String, String>>>> groupEntry : round.entrySet()) {
                 String group = groupEntry.getKey();
                 for (String scope : groupEntry.getValue().sequencedKeySet()) {
                     DependencyScope intent = scope.equals("compile") ? DependencyScope.COMPILE : DependencyScope.RUNTIME;
@@ -646,7 +655,47 @@ public class Dependencies implements BuildExecutorModule {
                     }
                 }
             }
+            for (String key : materialized.sequencedKeySet()) {
+                if (before.contains(key)) {
+                    continue;
+                }
+                for (Map.Entry<String, SequencedSet<String>> layer
+                        : PathPlacement.layers(materialized.get(key).file()).entrySet()) {
+                    String coordinate = key.substring(key.indexOf('/', key.indexOf('/') + 1) + 1);
+                    String previous = discovered.put(layer.getKey(), coordinate);
+                    if (previous != null) {
+                        if (previous.equals(coordinate)) {
+                            continue;
+                        }
+                        throw new IllegalStateException(previous + " and " + coordinate
+                                + " both declare a layer called " + layer.getKey()
+                                + " - a layer is named on its own, so rename one of them or keep one out");
+                    }
+                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(materialized.get(key).file());
+                    Iterator<String> tokens = layer.getValue().iterator();
+                    layers.setProperty(layer.getKey(),
+                            (descriptor == null ? key : descriptor.name()) + " " + tokens.next());
+                    while (tokens.hasNext()) {
+                        String token = tokens.next();
+                        int slash = token.indexOf('/');
+                        if (slash < 1) {
+                            throw new IllegalArgumentException("Malformed " + PathPlacement.LAYERS
+                                    + " coordinate '" + token + "' in " + key
+                                    + ": expected <repository>/<coordinate>");
+                        }
+                        pending.computeIfAbsent("layer:" + layer.getKey(), _ -> new LinkedHashMap<>())
+                                .computeIfAbsent("runtime", _ -> new LinkedHashMap<>())
+                                .computeIfAbsent(token.substring(0, slash), _ -> new LinkedHashMap<>())
+                                .putIfAbsent(token.substring(slash + 1), "");
+                    }
+                }
+            }
+            }
+            if (!layers.isEmpty()) {
+                layers.store(context.next().resolve(BuildStep.LAYERS));
+            }
             SequencedMap<String, Path> placed = new LinkedHashMap<>();
+            SequencedMap<String, SequencedSet<String>> grouped = new LinkedHashMap<>();
             SequencedMap<String, String> checksums = new LinkedHashMap<>();
             SequencedMap<String, Boolean> internals = new LinkedHashMap<>();
             for (Map.Entry<String, Resolver.Resolved> entry : materialized.entrySet()) {
@@ -656,6 +705,7 @@ public class Dependencies implements BuildExecutorModule {
                     continue;
                 }
                 String dependency = key.substring(second + 1);
+                grouped.computeIfAbsent(dependency, _ -> new LinkedHashSet<>()).add(key.substring(0, first));
                 Resolver.Resolved artifact = entry.getValue();
                 String value = resolved.getProperty(key);
                 Path file = placed.get(dependency);
@@ -682,7 +732,7 @@ public class Dependencies implements BuildExecutorModule {
                     return left.isEmpty() ? right : left;
                 });
             }
-            SequencedMap<String, String> aliased = rename(placed, aliasTargets, modules, explicit, libs, printing);
+            SequencedMap<String, String> aliased = rename(placed, grouped, aliasTargets, modules, explicit, libs, printing);
             for (Map.Entry<String, Overridden> entry : overrideTargets.entrySet()) {
                 for (String carrier : entry.getValue().carriers()) {
                     if (!modules.containsKey(carrier)) {
@@ -839,6 +889,7 @@ public class Dependencies implements BuildExecutorModule {
     }
 
     private static SequencedMap<String, String> rename(SequencedMap<String, Path> placed,
+                                                       SequencedMap<String, SequencedSet<String>> grouped,
                                                        SequencedMap<String, Alias> declared,
                                                        SequencedMap<String, String> modules,
                                                        SequencedMap<String, Boolean> explicit,
@@ -953,15 +1004,19 @@ public class Dependencies implements BuildExecutorModule {
                     ? PathPlacement.fileName(coordinate)
                     : PathPlacement.fileName(coordinate, module, alias == null);
             if (module != null) {
-                Claim carrier = carriers.putIfAbsent(module, new Claim(dependency, source));
-                if (carrier != null && !carrier.file().equals(source)) {
-                    throw new IllegalArgumentException(carrier.dependency()
-                            + " and "
-                            + dependency
-                            + " both carry module "
-                            + module
-                            + " - a module path resolves whichever of the two comes first,"
-                            + " so drop one with @jenesis.exclude");
+                for (String group : grouped.getOrDefault(dependency, Collections.emptyNavigableSet())) {
+                    Claim carrier = carriers.putIfAbsent(group + "/" + module, new Claim(dependency, source));
+                    if (carrier != null && !carrier.file().equals(source)) {
+                        throw new IllegalArgumentException(carrier.dependency()
+                                + " and "
+                                + dependency
+                                + " both carry module "
+                                + module
+                                + " in group "
+                                + group
+                                + " - a module path resolves whichever of the two comes first,"
+                                + " so drop one with @jenesis.exclude");
+                    }
                 }
             }
             Claim previous = claims.putIfAbsent(name, new Claim(dependency, source));

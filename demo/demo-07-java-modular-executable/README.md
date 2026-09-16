@@ -189,29 +189,33 @@ module with a main class:
     java build/jenesis/Make.java
 
     bundle.zip
-    |-- application.properties     mainClass=sample.Sample, mainModule=demo.modular.executable
-    |-- modulepath/                jars that are modules (here the app jar and slf4j-api)
-    `-- classpath/                 any non-modular jars
+    |-- application.unix.args      the launch, as a Java argument file
+    |-- application.windows.args   the same launch, with Windows path separators
+    `-- jars/                      every jar of the closure, stored once
 
-The zip carries exactly the runtime closure `Execute` would launch, split the same
-way: real and automatic modules under `modulepath/`, the rest under `classpath/`.
-`application.properties` is plain `key=value` lines describing the launch: `mainClass`,
-`mainModule` (only when the launcher is modular), and a `javaOptions` entry holding the
-JVM options the graph needs, written only when it needs any. An automatic module or a
-`classpath/` jar means `--add-modules=ALL-MODULE-PATH,ALL-DEFAULT` to root the whole
+The zip carries exactly the runtime closure `Execute` would launch, in one store, and the
+argument file is not a description of the launch but the launch itself - naming the module
+path, the class path, the graph's options and the entry point, run as
+`java @application.unix.args` from the folder it was unpacked into. There are two of them
+because the path separator is the only part of a launch a bundle cannot know in advance. Every path
+is spelled out rather than handed over as a folder, so a jar is read because the
+argument file names it and never because of where it sits; and because the whole command
+lives in a file, no closure is too large to launch. An automatic module or a class-path
+jar adds `--add-modules ALL-MODULE-PATH,ALL-DEFAULT` to root the whole
 module path and the default platform set,
-exactly as the jpackage section above describes; the consumer splices the options in
-verbatim rather than interpreting them. Here the closure is `demo.modular.executable` +
-`org.slf4j`, both explicit modules, so the key is absent and the image below needs no
-`--add-modules`. Unzipped onto a JRE base, the bundle needs no JDK and no jpackage:
+exactly as the jpackage section above describes. Here the closure is
+`demo.modular.executable` + `org.slf4j`, both explicit modules, so those lines are absent.
+Unzipped onto a JRE base, the bundle needs no JDK and no jpackage:
 
     FROM eclipse-temurin:25-jre
     COPY bundle/ /opt/app/
-    ENTRYPOINT ["java", "--module-path", "/opt/app/modulepath", "-m", "demo.modular.executable/sample.Sample"]
+    WORKDIR /opt/app
+    ENTRYPOINT ["java", "@application.unix.args"]
 
-For a non-modular project the zip holds only `classpath/` and an `application.properties`
-with just `mainClass`, launched with `java -cp 'classpath/*' sample.Sample` (see
-`../demo-06-java-pom-executable`).
+For a non-modular project the argument file names a `--class-path` and the main class
+instead of a module (see `../demo-06-java-pom-executable`); the launch command is the
+same either way, which is the point of shipping the command rather than a description
+of it.
 
 A generated Dockerfile
 ----------------------
@@ -225,15 +229,19 @@ That Dockerfile does not have to be written by hand either: a `docker` key in
 
     target/stage/docker/output/module-sources/
     |-- Dockerfile
-    `-- modulepath/                the app jar and slf4j-api
+    |-- application.args           the launch, as a Java argument file
+    `-- jars/                      the app jar and slf4j-api
 
-Because the module declares `mainModule`, the jars carrying a module descriptor land
-under `modulepath/` and the entry point launches the module, not a class:
+Because the module declares `mainModule`, the jars carrying a module descriptor are named
+on the module path and the entry point launches the module, not a class - and the whole
+command travels in the argument file, so the `ENTRYPOINT` is the same three words however
+large the closure grows:
 
     FROM eclipse-temurin:25-jre
     WORKDIR /app
-    COPY modulepath/ /app/modulepath/
-    ENTRYPOINT ["java", "--module-path", "/app/modulepath", "--module", "demo.modular.executable/sample.Sample"]
+    COPY jars/ /app/jars/
+    COPY application.args /app/
+    ENTRYPOINT ["java", "@/app/application.args"]
 
 The build never runs a container tool, so no Docker installation is involved in
 producing this. The staged folder is a complete build context:
@@ -254,12 +262,11 @@ jar, so modularity survives. The target resolves the published
     demo.modular.executable.jar
     |-- META-INF/MANIFEST.MF                  Main-Class: build.jenesis.launcher.Launcher
     |-- build/jenesis/launcher/*.class        the launcher (the jar's own unnamed module at run time)
-    |-- application.properties                mainClass, mainModule, classpath order
-    |-- modulepath/<dep>.jar/...              each modular/automatic dependency, exploded
-    `-- classpath/<dep>.jar/...               each plain dependency, exploded
+    |-- application.properties                mainClass, mainModule, modulepath, classpath
+    `-- jars/<dep>.jar/...                    each dependency, exploded
 
-The launcher's `Main-Class` reads `application.properties`, resolves the `modulepath/`
-subfolders into a fresh `ModuleLayer` and the `classpath/` ones into the unnamed module
+The launcher's `Main-Class` reads `application.properties`, resolves the jars `modulepath`
+names into a fresh `ModuleLayer` and the ones `classpath` names into the unnamed module
 of the same loader, and invokes the entry point - reconstructing what
 `java -p modulepath -cp classpath -m demo.modular.executable/sample.Sample` would do,
 all in process. Because each dependency keeps its own subfolder nothing is merged, so

@@ -55,6 +55,8 @@ public class Docker implements BuildStep {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         SequencedMap<String, Path> jars = new TreeMap<>();
+        SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
+        SequencedMap<String, String> agents = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -70,6 +72,8 @@ public class Docker implements BuildStep {
             for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
                 jars.putIfAbsent(file.getFileName().toString(), file);
             }
+            layers.putAll(Layers.membership(argument.folder()));
+            agents.putAll(Inventory.agents(argument.folder()));
         }
         if (jars.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
@@ -84,55 +88,70 @@ public class Docker implements BuildStep {
                 classpath.put(entry.getKey(), entry.getValue());
             }
         }
-        Path folder = Files.createDirectory(context.next().resolve(DOCKER));
-        copy(folder.resolve("classpath"), classpath);
-        copy(folder.resolve("modulepath"), modulepath);
-        Files.writeString(folder.resolve("Dockerfile"), dockerfile(mainClass,
-                modulepath.isEmpty() ? null : mainModule,
-                graph.arguments(),
-                classpath.sequencedKeySet(),
-                modulepath.sequencedKeySet()));
-        return CompletableFuture.completedStage(new BuildStepResult(true));
-    }
-
-    private static void copy(Path folder, SequencedMap<String, Path> jars) throws IOException {
-        if (jars.isEmpty()) {
-            return;
+        if (layers.values().stream().anyMatch(membership -> !membership.classpath().isEmpty())) {
+            graph.unnamed();
         }
-        Files.createDirectory(folder);
-        for (Map.Entry<String, Path> entry : jars.entrySet()) {
-            BuildStep.linkOrCopy(folder.resolve(entry.getKey()), entry.getValue());
+        SequencedMap<String, Path> stored = new TreeMap<>(classpath);
+        stored.putAll(modulepath);
+        SequencedMap<String, Path> resolved = new TreeMap<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            for (Path jar : Dependencies.all(argument.folder())) {
+                resolved.putIfAbsent(jar.getFileName().toString(), jar);
+            }
         }
-    }
-
-    private String dockerfile(String mainClass,
-                              String mainModule,
-                              List<String> relaxations,
-                              SequencedSet<String> classpath,
-                              SequencedSet<String> modulepath) {
-        StringBuilder builder = new StringBuilder("FROM ").append(from).append("\nWORKDIR /app\n");
-        if (!modulepath.isEmpty()) {
-            builder.append("COPY modulepath/ /app/modulepath/\n");
+        for (Map.Entry<String, Layers.Membership> layer : layers.entrySet()) {
+            for (String name : layer.getValue().all()) {
+                Path jar = resolved.get(name);
+                if (jar == null) {
+                    throw new IllegalStateException("Layer " + layer.getKey() + " names " + name
+                            + ", which was not resolved for this application");
+                }
+                stored.putIfAbsent(name, jar);
+            }
         }
-        if (!classpath.isEmpty()) {
-            builder.append("COPY classpath/ /app/classpath/\n");
+        agents.keySet().retainAll(stored.sequencedKeySet());
+        Path folder = Files.createDirectory(context.next().resolve(DOCKER)), store = folder.resolve("jars");
+        Files.createDirectories(store);
+        for (Map.Entry<String, Path> entry : stored.entrySet()) {
+            BuildStep.linkOrCopy(store.resolve(entry.getKey()), entry.getValue());
         }
         List<String> command = new ArrayList<>();
-        command.add("java");
+        agents.forEach((jar, options) -> command.add("-javaagent:/app/jars/" + jar
+                + (options.isEmpty() ? "" : "=" + options)));
+        layers.forEach((layer, membership) -> {
+            command.add("-Djlayer.modulepath." + layer + "=" + path(membership.modulepath()));
+            if (!membership.classpath().isEmpty()) {
+                command.add("-Djlayer.classpath." + layer + "=" + path(membership.classpath()));
+            }
+        });
         if (!classpath.isEmpty()) {
             command.add("--class-path");
-            command.add("/app/classpath/*");
+            command.add(path(classpath.sequencedKeySet()));
         }
-        if (mainModule == null) {
+        if (modulepath.isEmpty()) {
             command.add(mainClass);
         } else {
             command.add("--module-path");
-            command.add("/app/modulepath");
-            command.addAll(relaxations);
+            command.add(path(modulepath.sequencedKeySet()));
+            command.addAll(graph.arguments());
             command.add("--module");
             command.add(mainModule + "/" + mainClass);
         }
-        return builder.append("ENTRYPOINT [").append(quoted(command)).append("]\n").toString();
+        ProcessBuildStep.argumentFile(folder.resolve("application.args"), command);
+        Files.writeString(folder.resolve("Dockerfile"), new StringBuilder("FROM ").append(from)
+                .append("\nWORKDIR /app\nCOPY jars/ /app/jars/\nCOPY application.args /app/\n")
+                .append("ENTRYPOINT [")
+                .append(quoted(List.of("java", "@/app/application.args")))
+                .append("]\n")
+                .toString());
+        return CompletableFuture.completedStage(new BuildStepResult(true));
+    }
+
+    private static String path(SequencedSet<String> names) {
+        return names.stream().map(name -> "/app/jars/" + name).collect(Collectors.joining(":"));
     }
 
     private static String quoted(List<String> values) {
