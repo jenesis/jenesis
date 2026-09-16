@@ -71,14 +71,8 @@ class JenesisClassLoaderBridge implements AutoCloseable {
                 MethodType.methodType(CompletionStage.class, Executor.class, foreignBuildStepContext, SequencedMap.class));
         foreignShouldRun = lookup.findVirtual(foreignBuildStep, "shouldRun",
                 MethodType.methodType(boolean.class, SequencedMap.class));
-        MethodHandle shouldCacheRemotely;
-        try {
-            shouldCacheRemotely = lookup.findVirtual(foreignBuildStep, "shouldCacheRemotely",
-                    MethodType.methodType(boolean.class));
-        } catch (NoSuchMethodException _) {
-            shouldCacheRemotely = null;
-        }
-        foreignShouldCacheRemotely = shouldCacheRemotely;
+        foreignShouldCacheRemotely = lookup.findVirtual(foreignBuildStep, "shouldCacheRemotely",
+                MethodType.methodType(boolean.class));
         foreignContextCtor = lookup.findConstructor(foreignBuildStepContext,
                 MethodType.methodType(void.class, Path.class, Path.class, Path.class));
         foreignArgumentCtor = lookup.findConstructor(foreignBuildStepArgument,
@@ -232,9 +226,6 @@ class JenesisClassLoaderBridge implements AutoCloseable {
 
         @Override
         public boolean shouldCacheRemotely() {
-            if (bridge.foreignShouldCacheRemotely == null) {
-                return true;
-            }
             try {
                 return (boolean) bridge.foreignShouldCacheRemotely.invoke(foreignStep);
             } catch (RuntimeException | Error e) {
