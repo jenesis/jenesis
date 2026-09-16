@@ -930,34 +930,35 @@ public record Project(
                     https://github.com/jenesis/jenesis/tree/main/demo.
 
                       Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
-                                         04 java-modular-multi, 18 module-layout (forcing MODULAR)
+                                         04 java-modular-multi, 20 module-layout (forcing MODULAR)
                       Starting a build   05 startup (what launching costs, and the daemon)
                       Runnable output    06, 07 java-*-executable (jpackage), 08 bundle (jars for a
-                                         stock JRE), 09 java-multi-release, 53 native-image (GraalVM)
+                                         stock JRE), 09 java-multi-release, 58 native-image (GraalVM)
                       Compiler control   10 javac-arguments (process-javac.properties),
                                          11 annotations (an annotation processor via @jenesis.plugin),
-                                         58 error-prone (a javac plugin)
-                      Generated sources  12 data-formats (xjc, protoc, avro),
-                                         13 service-contracts (wsimport, OpenAPI),
-                                         57 antlr (a grammar)
-                      Dependencies       14 maven-exclusions, 15 bom, 16 module-alias,
-                                         17 module-classifier, 19 module-override,
-                                         20, 21 platform-guard (per-platform variants)
-                      Trusting them      22 pinning (versions and checksums), 23 openpgp (a declared
-                                         key), 24 sigstore (a declared identity, no key at all),
-                                         25 sbom, 26 compliance (licenses), 27 vulnerabilities (OSV),
-                                         59 code-signing (jarsigner)
-                      Quality gates      28 java-quality, 33 api-compatibility (japicmp),
-                                         35 kotlin-quality, 38 scala-quality, 40 groovy-quality
-                      Tests              29 code-coverage (JaCoCo), 30 test-selection (incremental),
-                                         31 pitest (mutation), 32 jmh (benchmark harness)
-                      Other languages    34 kotlin, 36 kotlin-plugin, 37 scala, 39 groovy
-                      Operating it       41 profiles, 42 build-cache, 43 docker-isolation,
-                                         44 agents (@jenesis.attach), 52 publishing (Maven Central),
-                                         54 jpx (run a released program without building)
-                      Extending it       45 custom-assembler, 46 custom-jmod, 47 internal-module,
-                                         48 external-module, 49 custom-maven, 50 custom-modular,
-                                         51 custom-build (no Project at all)
+                                         12 error-prone (a javac plugin)
+                      Generated sources  13 data-formats (xjc, protoc, avro),
+                                         14 service-contracts (wsimport, OpenAPI),
+                                         15 antlr (a grammar)
+                      Dependencies       16 maven-exclusions, 17 bom, 18 module-alias,
+                                         19 module-classifier, 21 module-override,
+                                         22, 23 module-layers (a private dependency),
+                                         24, 25 platform-guard (per-platform variants)
+                      Trusting them      26 pinning (versions and checksums), 27 openpgp (a declared
+                                         key), 28 sigstore (a declared identity, no key at all),
+                                         29 sbom, 30 compliance (licenses), 31 vulnerabilities (OSV)
+                      Quality gates      32 java-quality, 37 api-compatibility (japicmp),
+                                         39 kotlin-quality, 42 scala-quality, 44 groovy-quality
+                      Tests              33 code-coverage (JaCoCo), 34 test-selection (incremental),
+                                         35 pitest (mutation), 36 jmh (benchmark harness)
+                      Other languages    38 kotlin, 40 kotlin-plugin, 41 scala, 43 groovy
+                      Operating it       45 profiles, 46 build-cache, 47 docker-isolation,
+                                         48 agents (@jenesis.attach)
+                      Shipping it        56 code-signing (jarsigner), 57 publishing (Maven Central),
+                                         59 jpx (run a released program without building)
+                      Extending it       49 custom-assembler, 50 custom-jmod, 51 internal-module,
+                                         52 external-module, 53 custom-maven, 54 custom-modular,
+                                         55 custom-build (no Project at all)
 
                     ## 14. When stuck, read the source
 
