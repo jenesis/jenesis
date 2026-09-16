@@ -120,14 +120,13 @@ public class JenesisModuleRepositoryTest {
 
     @Test
     public void states_no_preference_when_no_property_is_set() throws IOException {
-        Assumptions.assumeTrue(System.getenv("MAVEN_REPOSITORY_URI") == null,
-                "an environment naming a repository is a repository being configured");
         System.setProperty("jenesis.repository.insecure", "true");
         List<Map<String, String>> requests = new ArrayList<>();
         HttpServer server = serving(requests);
         server.start();
         try {
             new JenesisModuleRepository(URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+                    .maven(null)
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
             assertThat(requests)
@@ -189,9 +188,12 @@ public class JenesisModuleRepositoryTest {
         server.start();
         try {
             new JenesisModuleRepository(URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+                    .maven(null)
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
-            assertThat(requests).containsExactly(Map.of("Jenesis-Prerelease", "true"));
+            assertThat(requests)
+                    .as("a build that names no Maven repository sends only what the prerelease property asked for")
+                    .containsExactly(Map.of("Jenesis-Prerelease", "true"));
         } finally {
             server.stop(0);
             System.clearProperty("jenesis.repository.insecure");
@@ -208,9 +210,12 @@ public class JenesisModuleRepositoryTest {
         server.start();
         try {
             new JenesisModuleRepository(URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+                    .maven(null)
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
-            assertThat(requests).containsExactly(Map.of("Jenesis-BestEffort", "false"));
+            assertThat(requests)
+                    .as("a build that names no Maven repository sends only what the speculative property asked for")
+                    .containsExactly(Map.of("Jenesis-BestEffort", "false"));
         } finally {
             server.stop(0);
             System.clearProperty("jenesis.repository.insecure");
