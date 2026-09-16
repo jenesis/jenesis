@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SafeSegment;
+import build.jenesis.SequencedProperties;
 
 public class JenesisModuleRepository implements JenesisRepository {
 
@@ -12,6 +13,9 @@ public class JenesisModuleRepository implements JenesisRepository {
     private final URI root;
     private final String token;
     private final Repository.Retry retry;
+    private final URI maven;
+    private final Boolean prerelease;
+    private final Boolean speculative;
 
     public static JenesisRepository of(Scope scope) {
         String token = System.getProperty("jenesis.module.token", System.getenv("JENESIS_REPOSITORY_TOKEN"));
@@ -114,18 +118,81 @@ public class JenesisModuleRepository implements JenesisRepository {
     }
 
     public JenesisModuleRepository(URI root, String token) {
-        this(root, token, new Repository.Retry());
+        this(root,
+                token,
+                new Repository.Retry(),
+                toMavenRepository(System.getProperty("jenesis.maven.uri", System.getenv("MAVEN_REPOSITORY_URI"))),
+                SequencedProperties.systemFlagOrNull("jenesis.module.prerelease"),
+                SequencedProperties.systemFlagOrNull("jenesis.module.speculative"));
     }
 
-    private JenesisModuleRepository(URI root, String token, Repository.Retry retry) {
+    private JenesisModuleRepository(URI root,
+                                    String token,
+                                    Repository.Retry retry,
+                                    URI maven,
+                                    Boolean prerelease,
+                                    Boolean speculative) {
         String text = root.toString();
         this.root = text.endsWith("/") ? root : URI.create(text + "/");
         this.token = token;
         this.retry = retry;
+        this.maven = maven;
+        this.prerelease = prerelease;
+        this.speculative = speculative;
     }
 
     public JenesisModuleRepository retry(Repository.Retry retry) {
-        return new JenesisModuleRepository(root, token, retry);
+        return new JenesisModuleRepository(root, token, retry, maven, prerelease, speculative);
+    }
+
+    public JenesisModuleRepository maven(URI maven) {
+        return new JenesisModuleRepository(root, token, retry, maven, prerelease, speculative);
+    }
+
+    public JenesisModuleRepository prerelease(Boolean prerelease) {
+        return new JenesisModuleRepository(root, token, retry, maven, prerelease, speculative);
+    }
+
+    public JenesisModuleRepository speculative(Boolean speculative) {
+        return new JenesisModuleRepository(root, token, retry, maven, prerelease, speculative);
+    }
+
+    private static URI toMavenRepository(String declaration) {
+        if (declaration == null) {
+            return null;
+        }
+        for (String entry : declaration.split(",")) {
+            String candidate = entry.strip();
+            if (candidate.isEmpty() || candidate.indexOf('|') >= 0 || candidate.startsWith("@")) {
+                continue;
+            }
+            URI uri = URI.create(candidate.endsWith("/") ? candidate : candidate + "/");
+            if (!"https".equals(uri.getScheme()) && !"http".equals(uri.getScheme())) {
+                continue;
+            }
+            if (uri.getUserInfo() != null || uri.getQuery() != null || uri.getFragment() != null) {
+                continue;
+            }
+            return uri;
+        }
+        return null;
+    }
+
+    private Map<String, String> toHeaders(URI uri) {
+        if (!"https".equals(uri.getScheme()) && !"http".equals(uri.getScheme())) {
+            return Map.of();
+        }
+        SequencedMap<String, String> headers = new LinkedHashMap<>();
+        if (maven != null) {
+            headers.put("Jenesis-Repository", maven.toString());
+        }
+        if (prerelease != null) {
+            headers.put("Jenesis-Prerelease", prerelease.toString());
+        }
+        if (speculative != null) {
+            headers.put("Jenesis-BestEffort", speculative.toString());
+        }
+        return headers;
     }
 
     public static JenesisModuleRepository ofLocal() {
@@ -165,16 +232,17 @@ public class JenesisModuleRepository implements JenesisRepository {
                     ? Optional.of(RepositoryItem.ofFile(file, true))
                     : Optional.empty();
         }
+        Map<String, String> headers = toHeaders(uri);
         InputStream stream;
         try {
-            stream = Repository.open(uri, token, retry);
+            stream = Repository.open(uri, token, retry, headers);
         } catch (FileNotFoundException _) {
             return Optional.empty();
         }
         AtomicReference<InputStream> first = new AtomicReference<>(stream);
         return Optional.of(() -> {
             InputStream reopened = first.getAndSet(null);
-            return reopened != null ? reopened : Repository.open(uri, token, retry);
+            return reopened != null ? reopened : Repository.open(uri, token, retry, headers);
         });
     }
 

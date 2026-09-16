@@ -98,6 +98,227 @@ public class JenesisModuleRepositoryTest {
     }
 
     @Test
+    public void names_the_configured_maven_repository_to_the_module_index() throws IOException {
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.maven.uri", "https://repo.example.com/maven2/");
+        List<Map<String, String>> requests = new ArrayList<>();
+        HttpServer server = serving(requests);
+        server.start();
+        try {
+            RepositoryItem item = new JenesisModuleRepository(
+                    URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+                    .fetch(Runnable::run, "build.jenesis")
+                    .orElseThrow();
+            assertThat(read(item)).isEqualTo("classes");
+            assertThat(requests).containsExactly(Map.of("Jenesis-Repository", "https://repo.example.com/maven2/"));
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.maven.uri");
+        }
+    }
+
+    @Test
+    public void states_no_preference_when_no_property_is_set() throws IOException {
+        Assumptions.assumeTrue(System.getenv("MAVEN_REPOSITORY_URI") == null,
+                "an environment naming a repository is a repository being configured");
+        System.setProperty("jenesis.repository.insecure", "true");
+        List<Map<String, String>> requests = new ArrayList<>();
+        HttpServer server = serving(requests);
+        server.start();
+        try {
+            new JenesisModuleRepository(URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+                    .fetch(Runnable::run, "build.jenesis")
+                    .orElseThrow();
+            assertThat(requests)
+                    .as("an unconfigured build leaves every choice to the module index")
+                    .containsExactly(Map.of());
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+        }
+    }
+
+    @Test
+    public void names_the_first_repository_that_serves_every_module() throws IOException {
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.maven.uri", "https://internal.example.com/maven2/|com.example,"
+                + "https://repo.example.com/maven2/");
+        List<Map<String, String>> requests = new ArrayList<>();
+        HttpServer server = serving(requests);
+        server.start();
+        try {
+            new JenesisModuleRepository(URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+                    .fetch(Runnable::run, "build.jenesis")
+                    .orElseThrow();
+            assertThat(requests)
+                    .as("a repository restricted to some modules cannot stand for the redirect of any")
+                    .containsExactly(Map.of("Jenesis-Repository", "https://repo.example.com/maven2/"));
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.maven.uri");
+        }
+    }
+
+    @Test
+    public void names_no_repository_that_the_module_index_could_not_reach() throws IOException {
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.maven.uri", root.resolve("maven").toUri().toString());
+        List<Map<String, String>> requests = new ArrayList<>();
+        HttpServer server = serving(requests);
+        server.start();
+        try {
+            new JenesisModuleRepository(URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+                    .fetch(Runnable::run, "build.jenesis")
+                    .orElseThrow();
+            assertThat(requests).containsExactly(Map.of());
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.maven.uri");
+        }
+    }
+
+    @Test
+    public void accepts_a_prerelease_when_the_property_says_so() throws IOException {
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.module.prerelease", "true");
+        List<Map<String, String>> requests = new ArrayList<>();
+        HttpServer server = serving(requests);
+        server.start();
+        try {
+            new JenesisModuleRepository(URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+                    .fetch(Runnable::run, "build.jenesis")
+                    .orElseThrow();
+            assertThat(requests).containsExactly(Map.of("Jenesis-Prerelease", "true"));
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.module.prerelease");
+        }
+    }
+
+    @Test
+    public void refuses_a_speculative_version_when_the_property_says_so() throws IOException {
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.module.speculative", "false");
+        List<Map<String, String>> requests = new ArrayList<>();
+        HttpServer server = serving(requests);
+        server.start();
+        try {
+            new JenesisModuleRepository(URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+                    .fetch(Runnable::run, "build.jenesis")
+                    .orElseThrow();
+            assertThat(requests).containsExactly(Map.of("Jenesis-BestEffort", "false"));
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.module.speculative");
+        }
+    }
+
+    @Test
+    public void a_wither_states_what_no_property_did() throws IOException {
+        System.setProperty("jenesis.repository.insecure", "true");
+        List<Map<String, String>> requests = new ArrayList<>();
+        HttpServer server = serving(requests);
+        server.start();
+        try {
+            new JenesisModuleRepository(URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+                    .maven(URI.create("https://repo.example.com/maven2/"))
+                    .prerelease(true)
+                    .speculative(false)
+                    .fetch(Runnable::run, "build.jenesis")
+                    .orElseThrow();
+            assertThat(requests).containsExactly(Map.of(
+                    "Jenesis-Repository", "https://repo.example.com/maven2/",
+                    "Jenesis-Prerelease", "true",
+                    "Jenesis-BestEffort", "false"));
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+        }
+    }
+
+    @Test
+    public void a_wither_takes_back_what_a_property_stated() throws IOException {
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.maven.uri", "https://repo.example.com/maven2/");
+        System.setProperty("jenesis.module.prerelease", "true");
+        List<Map<String, String>> requests = new ArrayList<>();
+        HttpServer server = serving(requests);
+        server.start();
+        try {
+            new JenesisModuleRepository(URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+                    .maven(null)
+                    .prerelease(null)
+                    .fetch(Runnable::run, "build.jenesis")
+                    .orElseThrow();
+            assertThat(requests).containsExactly(Map.of());
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.maven.uri");
+            System.clearProperty("jenesis.module.prerelease");
+        }
+    }
+
+    @Test
+    public void states_nothing_to_a_redirect_target() throws IOException {
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.maven.uri", "https://repo.example.com/maven2/");
+        List<Map<String, String>> requests = new ArrayList<>();
+        HttpServer target = serving(requests);
+        HttpServer index = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        target.start();
+        index.createContext("/", exchange -> {
+            requests.add(Map.of("Jenesis-Repository",
+                    exchange.getRequestHeaders().getFirst("Jenesis-Repository")));
+            exchange.getResponseHeaders().add("Location",
+                    "http://localhost:" + target.getAddress().getPort() + "/build.jenesis.jar");
+            exchange.sendResponseHeaders(302, -1);
+            exchange.close();
+        });
+        index.start();
+        try {
+            RepositoryItem item = new JenesisModuleRepository(
+                    URI.create("http://localhost:" + index.getAddress().getPort() + "/"))
+                    .fetch(Runnable::run, "build.jenesis")
+                    .orElseThrow();
+            assertThat(read(item)).isEqualTo("classes");
+            assertThat(requests)
+                    .as("only the index decides the redirect, so only the index is told")
+                    .containsExactly(Map.of("Jenesis-Repository", "https://repo.example.com/maven2/"), Map.of());
+        } finally {
+            index.stop(0);
+            target.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.maven.uri");
+        }
+    }
+
+    private static HttpServer serving(List<Map<String, String>> requests) throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            SequencedMap<String, String> headers = new LinkedHashMap<>();
+            for (String name : List.of("Jenesis-Repository", "Jenesis-Prerelease", "Jenesis-BestEffort")) {
+                String value = exchange.getRequestHeaders().getFirst(name);
+                if (value != null) {
+                    headers.put(name, value);
+                }
+            }
+            requests.add(headers);
+            byte[] bytes = "classes".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(bytes);
+            }
+        });
+        return server;
+    }
+
+    @Test
     public void local_repository_is_consulted_before_the_remote() throws IOException {
         Files.writeString(Files
                 .createDirectories(root.resolve("home/build.jenesis/1.0"))
