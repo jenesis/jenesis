@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
 
+# A run is 280 jobs, so a second push to the same pull request would queue a second one behind the
+# first and delay the only one whose answer matters. A push to a branch supersedes the run before it;
+# a push to main never does, because every commit there is tested on its own.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 # Route Maven Central through the repository variable MAVEN_REPOSITORY_URI when set
 # (the Google Cloud mirror of Central, to avoid Central rate-limiting the runners),
 # falling back to Central itself so an unset variable never becomes an empty URI.
