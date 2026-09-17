@@ -43,6 +43,7 @@ public class ProjectTest {
         System.clearProperty("jenesis.project.tree");
         System.clearProperty("jenesis.make.profiles");
         System.clearProperty("jenesis.make.global");
+        System.clearProperty("jenesis.toolchain.searchpath");
         System.clearProperty("jenesis.test.sample.key");
         System.clearProperty("jenesis.test.sample.a");
         System.clearProperty("jenesis.test.sample.b");
@@ -690,6 +691,46 @@ public class ProjectTest {
                 "jenesis.make.global=" + root.resolve("home").toString().replace('\\', '/') + "\n");
         Make.loadProperties(root);
         assertThat(System.getProperty("jenesis.test.sample.key")).isEqualTo("fromGlobal");
+    }
+
+    @Test
+    public void load_jenesis_properties_rejects_toolchain_searchpath_in_the_project_file() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=/opt/jdks/*\n");
+        assertThatThrownBy(() -> Make.loadProperties(root))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.toolchain.searchpath cannot be set in");
+    }
+
+    @Test
+    public void load_jenesis_properties_rejects_toolchain_searchpath_in_a_profile() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
+        Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.toolchain.searchpath=\n");
+        assertThatThrownBy(() -> Make.loadProperties(root))
+                .as("even an empty search path is the user's to set, so a project file never names one")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.toolchain.searchpath cannot be set in");
+    }
+
+    @Test
+    public void load_jenesis_properties_rejects_toolchain_searchpath_in_a_user_global_file_the_project_locates()
+            throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=/opt/jdks/*\n");
+        Files.writeString(root.resolve("jenesis.properties"),
+                "jenesis.make.global=" + root.resolve("home").toString().replace('\\', '/') + "\n");
+        assertThatThrownBy(() -> Make.loadProperties(root))
+                .as("a project that names the user-global folder could otherwise supply that file itself")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.toolchain.searchpath cannot be set in");
+    }
+
+    @Test
+    public void load_jenesis_properties_accepts_toolchain_searchpath_in_the_user_global_file() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=/opt/jdks/*\n");
+        System.setProperty("jenesis.make.global", root.resolve("home").toString());
+        Make.loadProperties(root);
+        assertThat(System.getProperty("jenesis.toolchain.searchpath")).isEqualTo("/opt/jdks/*");
     }
 
     @Test
