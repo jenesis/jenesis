@@ -75,6 +75,31 @@ public class JModTest {
     }
 
     @Test
+    public void passes_no_date_when_the_archive_timestamp_is_empty() throws IOException {
+        Path sources = Files.createDirectory(root.resolve("sources"));
+        Files.writeString(sources.resolve("module-info.java"), "module sample { }\n");
+        Path classes = Files.createDirectory(bundle.resolve(BuildStep.CLASSES));
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
+                "-d", classes.toString(),
+                sources.resolve("module-info.java").toString())).isZero();
+        JMod jmod;
+        System.setProperty("jenesis.archive.timestamp", "");
+        try {
+            jmod = new JMod(ProcessHandler.Factory.TOOL);
+        } finally {
+            System.clearProperty("jenesis.archive.timestamp");
+        }
+        BuildStepResult result = jmod.apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(
+                        bundle,
+                        Map.of(Path.of("classes/module-info.class"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(supplement.resolve("command")).content().doesNotContain("--date");
+    }
+
+    @Test
     public void config_directory_is_packaged_and_reaches_a_jlinked_runtime() throws IOException {
         Path sources = Files.createDirectory(root.resolve("sources"));
         Files.writeString(sources.resolve("module-info.java"), "module sample { }\n");

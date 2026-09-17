@@ -39,6 +39,13 @@ public class BuildStepTest {
                 .hasMessageEndingWith(value);
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"", " "})
+    public void archive_timestamp_set_empty_turns_the_fixed_time_off(String value) {
+        System.setProperty("jenesis.archive.timestamp", value);
+        assertThat(BuildStep.timestamp()).isNull();
+    }
+
     @Test
     public void archive_timestamp_without_an_offset_is_rejected() {
         System.setProperty("jenesis.archive.timestamp", "2026-09-17T09:30:00");

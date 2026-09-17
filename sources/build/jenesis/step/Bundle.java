@@ -185,7 +185,11 @@ public class Bundle implements BuildStep {
 
     private void writeEntry(ZipOutputStream out, String name, Path file) throws IOException {
         ZipEntry entry = new ZipEntry(name);
-        entry.setTimeLocal(timestamp.toLocalDateTime());
+        if (timestamp == null) {
+            entry.setTime(Files.getLastModifiedTime(file).toMillis());
+        } else {
+            entry.setTimeLocal(timestamp.toLocalDateTime());
+        }
         out.putNextEntry(entry);
         Files.copy(file, out);
         out.closeEntry();

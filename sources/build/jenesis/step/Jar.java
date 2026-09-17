@@ -41,8 +41,10 @@ public class Jar extends ProcessBuildStep {
                 "--file",
                 Files.createDirectory(context.next().resolve(sort.folder))
                         .resolve(sort.file)
-                        .toString(),
-                "--date=" + timestamp));
+                        .toString()));
+        if (timestamp != null) {
+            commands.add("--date=" + timestamp);
+        }
         List<Path> manifestFiles = new ArrayList<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {

@@ -164,6 +164,24 @@ public class ModularizeModuleTest {
     }
 
     @Test
+    public void keeps_the_entry_times_of_a_rewritten_jar_when_the_archive_timestamp_is_empty() throws IOException {
+        named();
+        Path source = automatic();
+        Path modularized;
+        System.setProperty("jenesis.archive.timestamp", "");
+        try {
+            modularized = modularize(false);
+        } finally {
+            System.clearProperty("jenesis.archive.timestamp");
+        }
+        try (ZipFile original = new ZipFile(source.toFile());
+             ZipFile rewritten = new ZipFile(modularized.resolve(Dependencies.MODULAR_PATH + "demo.automatic.jar").toFile())) {
+            assertThat(rewritten.getEntry("demo/automatic/Provider.class").getTime())
+                    .isEqualTo(original.getEntry("demo/automatic/Provider.class").getTime());
+        }
+    }
+
+    @Test
     public void links_a_runtime_image_from_modularized_jars() throws IOException {
         named();
         automatic();

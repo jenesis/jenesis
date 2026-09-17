@@ -122,6 +122,9 @@ public interface BuildStep extends Serializable {
 
     static OffsetDateTime timestamp() {
         String value = System.getProperty("jenesis.archive.timestamp", "1980-02-01T00:00:00Z");
+        if (value.isBlank()) {
+            return null;
+        }
         OffsetDateTime timestamp;
         try {
             timestamp = ZonedDateTime.parse(value, DateTimeFormatter.ISO_ZONED_DATE_TIME)
