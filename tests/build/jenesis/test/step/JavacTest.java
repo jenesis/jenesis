@@ -61,12 +61,38 @@ public class JavacTest {
         assertThat(properties).containsEntry("--release", "21");
     }
 
-    @Test
-    public void writeRelease_null_or_empty_writes_nothing() throws IOException {
-        Path folder = Files.createDirectory(root.resolve("write-release-empty"));
-        Javac.writeRelease(folder, null);
-        Javac.writeRelease(folder, "");
-        assertThat(folder.resolve("process")).doesNotExist();
+    @ParameterizedTest
+    @NullAndEmptySource
+    public void writeRelease_without_a_release_writes_the_running_one(String release) throws IOException {
+        Path folder = Files.createDirectory(root.resolve("write-release-running"));
+        Javac.writeRelease(folder, release);
+        assertThat(SequencedProperties.ofFiles(folder.resolve("process/javac.properties")))
+                .containsEntry("--release", Integer.toString(Runtime.version().feature()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void compiles_a_module_that_declares_no_release_for_the_running_one(boolean process) throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES)).resolve("module-info.java"),
+                "module sample { }\n");
+        Javac.writeRelease(sources, null);
+        BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/module-info.java"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("process/javac.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        ModuleDescriptor descriptor;
+        try (InputStream in = Files.newInputStream(next.resolve(Javac.CLASSES + "module-info.class"))) {
+            descriptor = ModuleDescriptor.read(in);
+        }
+        assertThat(descriptor.requires())
+                .filteredOn(requires -> requires.name().equals("java.base"))
+                .singleElement()
+                .satisfies(requires -> assertThat(requires.rawCompiledVersion())
+                        .as("the release records the feature version, so another update or vendor of the same JDK compiles the same bytes")
+                        .contains(Integer.toString(Runtime.version().feature())));
     }
 
     @Test

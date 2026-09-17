@@ -12,7 +12,7 @@ import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.module.ModuleInfoParser;
 
-public class Javac extends JdkProcessBuildStep {
+public class Javac extends ProcessBuildStep {
 
     private static final Pattern VERSIONED = Pattern.compile("META-INF/versions/(\\d+)/.+");
 
@@ -36,12 +36,11 @@ public class Javac extends JdkProcessBuildStep {
     }
 
     public static void writeRelease(Path folder, String release) throws IOException {
-        if (release == null || release.isEmpty()) {
-            return;
-        }
         Path target = Files.createDirectories(folder.resolve(ProcessBuildStep.PROCESS));
         SequencedProperties properties = new SequencedProperties();
-        properties.setProperty("--release", release);
+        properties.setProperty("--release", release == null || release.isEmpty()
+                ? Integer.toString(Runtime.version().feature())
+                : release);
         properties.store(target.resolve("javac.properties"));
     }
 
