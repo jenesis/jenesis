@@ -157,9 +157,9 @@ public class ModularizeModuleTest {
         Path modularized = modularize(false);
         try (ZipFile jar = new ZipFile(
                 modularized.resolve(Dependencies.MODULAR_PATH + "demo.automatic.jar").toFile())) {
-            assertThat(jar.stream().map(ZipEntry::getTime))
+            assertThat(jar.stream().map(ZipEntry::getTimeLocal))
                     .as("the time the dependency was packed at is dropped, as it would be converted to local time")
-                    .containsOnly(0L);
+                    .containsOnly(BuildStep.timestamp().toLocalDateTime());
         }
     }
 

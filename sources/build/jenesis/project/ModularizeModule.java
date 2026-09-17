@@ -213,6 +213,8 @@ public class ModularizeModule implements BuildExecutorModule {
 
     private static class Modularize implements BuildStep {
 
+        private final OffsetDateTime timestamp = BuildStep.timestamp();
+
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
                                                       BuildStepContext context,
@@ -447,7 +449,7 @@ public class ModularizeModule implements BuildExecutorModule {
             return services;
         }
 
-        private static void inject(Path source, Path target, byte[] descriptor) throws IOException {
+        private void inject(Path source, Path target, byte[] descriptor) throws IOException {
             try (JarFile jar = new JarFile(source.toFile(), false, ZipFile.OPEN_READ)) {
                 boolean signed = jar.stream().map(JarEntry::getName).anyMatch(Modularize::signature);
                 try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(target))) {
@@ -471,7 +473,7 @@ public class ModularizeModule implements BuildExecutorModule {
                             replacement = buffer.toByteArray();
                         }
                         JarEntry copy = new JarEntry(name);
-                        copy.setTime(0L);
+                        copy.setTimeLocal(timestamp.toLocalDateTime());
                         out.putNextEntry(copy);
                         if (replacement != null) {
                             out.write(replacement);
@@ -483,7 +485,7 @@ public class ModularizeModule implements BuildExecutorModule {
                         out.closeEntry();
                     }
                     JarEntry entry = new JarEntry("module-info.class");
-                    entry.setTime(0L);
+                    entry.setTimeLocal(timestamp.toLocalDateTime());
                     out.putNextEntry(entry);
                     out.write(descriptor);
                     out.closeEntry();

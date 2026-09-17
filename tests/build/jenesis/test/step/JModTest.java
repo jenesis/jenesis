@@ -70,7 +70,7 @@ public class JModTest {
         try (ZipFile jmod = new ZipFile(next.resolve(JMod.JMODS + "sample.jmod").toFile())) {
             assertThat(jmod.stream().map(ZipEntry::getTimeLocal))
                     .as("a jmod created at another moment carries the same bytes")
-                    .containsOnly(LocalDateTime.of(1980, 1, 1, 0, 0, 2));
+                    .containsOnly(BuildStep.timestamp().toLocalDateTime());
         }
     }
 

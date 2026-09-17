@@ -119,4 +119,23 @@ public interface BuildStep extends Serializable {
         }
         return null;
     }
+
+    static OffsetDateTime timestamp() {
+        String value = System.getProperty("jenesis.archive.timestamp", "1980-02-01T00:00:00Z");
+        OffsetDateTime timestamp;
+        try {
+            timestamp = ZonedDateTime.parse(value, DateTimeFormatter.ISO_ZONED_DATE_TIME)
+                    .withZoneSameInstant(ZoneOffset.UTC)
+                    .toOffsetDateTime();
+        } catch (DateTimeParseException _) {
+            throw new IllegalArgumentException("jenesis.archive.timestamp is not an ISO-8601 date-time with an offset,"
+                    + " such as 2026-01-01T00:00:00Z: " + value);
+        }
+        if (timestamp.isBefore(OffsetDateTime.parse("1980-01-01T00:00:02Z"))
+                || timestamp.isAfter(OffsetDateTime.parse("2099-12-31T23:59:59Z"))) {
+            throw new IllegalArgumentException("jenesis.archive.timestamp must lie between 1980-01-01T00:00:02Z and"
+                    + " 2099-12-31T23:59:59Z, the range an archive entry records without a time zone: " + value);
+        }
+        return timestamp;
+    }
 }

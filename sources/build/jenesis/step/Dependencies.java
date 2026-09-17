@@ -95,6 +95,7 @@ public class Dependencies implements BuildExecutorModule {
         private final Map<String, Resolver> resolvers;
         private final Pinning pinning;
         private final String group;
+        private final OffsetDateTime timestamp;
         private final transient Consumer<String> printing;
 
         private Resolve(Map<String, Repository> repositories,
@@ -106,6 +107,7 @@ public class Dependencies implements BuildExecutorModule {
             this.resolvers = new LinkedHashMap<>(resolvers);
             this.pinning = pinning;
             this.group = group;
+            this.timestamp = BuildStep.timestamp();
             this.printing = printing;
         }
 
@@ -757,7 +759,7 @@ public class Dependencies implements BuildExecutorModule {
                         if (!Files.exists(file)) {
                             try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(file))) {
                                 JarEntry entry = new JarEntry("module-info.class");
-                                entry.setTime(0L);
+                                entry.setTimeLocal(timestamp.toLocalDateTime());
                                 output.putNextEntry(entry);
                                 output.write(carrying(module, overrideTargets.get(module).carriers()));
                                 output.closeEntry();
