@@ -114,6 +114,30 @@ public class SbomTest {
     }
 
     @Test
+    public void records_the_scm_tag_as_a_property_and_on_the_vcs_reference() throws Exception {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "demo");
+        metadata.setProperty("version", "1.0.0");
+        metadata.setProperty("scm.url", "https://example.com/demo");
+        metadata.setProperty("scm.tag", "v1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+
+        BuildStepResult result = new Sbom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+
+        assertThat(next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("demo.cdx.json")).content()
+                .contains("{ \"type\": \"vcs\", \"url\": \"https://example.com/demo\", \"comment\": \"tag v1.0.0\" }")
+                .contains("{ \"name\": \"jenesis:scm:tag\", \"value\": \"v1.0.0\" }");
+    }
+
+    @Test
     public void omits_the_placeholder_snapshot_version_but_still_emits() throws Exception {
         SequencedProperties metadata = new SequencedProperties();
         metadata.setProperty("project", "build.jenesis");

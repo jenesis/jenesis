@@ -6,10 +6,12 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildExecutorFileCache;
+import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Make;
 import build.jenesis.Project;
+import build.jenesis.SequencedProperties;
 import build.jenesis.module.JenesisModuleRepositoryExport;
 import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.InferredMultiProjectAssembler;
@@ -35,6 +37,8 @@ public class ProjectTest {
         System.clearProperty("jenesis.project.artifacts");
         System.clearProperty("jenesis.project.cache");
         System.clearProperty("jenesis.project.digest");
+        System.clearProperty("jenesis.project.version");
+        System.clearProperty("jenesis.project.tag");
         System.clearProperty("jenesis.make.profiles");
         System.clearProperty("jenesis.make.global");
         System.clearProperty("jenesis.test.sample.key");
@@ -42,6 +46,55 @@ public class ProjectTest {
         System.clearProperty("jenesis.test.sample.b");
         System.clearProperty("jenesis.test.sample.c");
         System.clearProperty("jenesis.test.sample.d");
+    }
+
+    @Test
+    public void reads_the_tag_from_its_property_and_keeps_an_empty_one() {
+        assertThat(new Project(root).tag()).isNull();
+        System.setProperty("jenesis.project.tag", "v1.2.3");
+        assertThat(new Project(root).tag()).isEqualTo("v1.2.3");
+        System.setProperty("jenesis.project.tag", "");
+        assertThat(new Project(root).tag()).isEmpty();
+    }
+
+    @Test
+    public void records_the_version_as_the_scm_tag_when_no_tag_is_set() throws IOException {
+        assertThat(metadataValues(new Project(Path.of(".")).version("1.2.3")))
+                .containsEntry("version", "1.2.3")
+                .containsEntry("scm.tag", "1.2.3");
+    }
+
+    @Test
+    public void records_a_set_tag_as_the_scm_tag_rather_than_the_version() throws IOException {
+        assertThat(metadataValues(new Project(Path.of(".")).version("1.2.3").tag("v1.2.3")))
+                .containsEntry("scm.tag", "v1.2.3");
+    }
+
+    @Test
+    public void records_an_empty_scm_tag_to_replace_a_declared_one() throws IOException {
+        assertThat(metadataValues(new Project(Path.of(".")).version("1.2.3").tag("")))
+                .as("an empty value overrides a tag declared in a metadata file or a pom.xml")
+                .containsEntry("scm.tag", "");
+    }
+
+    @Test
+    public void records_no_scm_tag_without_a_version_or_a_tag() throws IOException {
+        assertThat(metadataValues(new Project(Path.of("."))))
+                .as("a tag declared in a metadata file or a pom.xml stays in force")
+                .doesNotContainKey("scm.tag");
+    }
+
+    private SequencedProperties metadataValues(Project project) throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        Path target = root.resolve("target");
+        project.root(root).target(target).build(Project.METADATA);
+        SequencedProperties values = new SequencedProperties();
+        try (Stream<Path> walk = Files.walk(target)) {
+            for (Path file : walk.filter(path -> path.getFileName().toString().equals(BuildStep.METADATA)).toList()) {
+                values.putAll(SequencedProperties.ofFiles(file));
+            }
+        }
+        return values;
     }
 
     @Test

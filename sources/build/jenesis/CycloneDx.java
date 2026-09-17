@@ -49,17 +49,20 @@ public class CycloneDx {
 
     public record Component(String bomRef, String group, String name, String version, String purl, String sha256,
                             List<License> licenses, String description, List<Author> authors,
-                            List<ExternalReference> externalReferences) {
+                            List<ExternalReference> externalReferences, List<Property> properties) {
 
         public Component(String bomRef, String group, String name, String version, String purl, String sha256, List<License> licenses) {
-            this(bomRef, group, name, version, purl, sha256, licenses, null, List.of(), List.of());
+            this(bomRef, group, name, version, purl, sha256, licenses, null, List.of(), List.of(), List.of());
         }
     }
 
     public record Author(String name, String email) {
     }
 
-    public record ExternalReference(String type, String url) {
+    public record ExternalReference(String type, String url, String comment) {
+    }
+
+    public record Property(String name, String value) {
     }
 
     public record Dependency(String ref, List<String> dependsOn) {
@@ -204,8 +207,21 @@ public class CycloneDx {
             for (int index = 0; index < component.externalReferences().size(); index++) {
                 ExternalReference reference = component.externalReferences().get(index);
                 builder.append(pad).append("    { \"type\": \"").append(escapeJson(reference.type()))
-                        .append("\", \"url\": \"").append(escapeJson(reference.url())).append("\" }")
-                        .append(index + 1 < component.externalReferences().size() ? ",\n" : "\n");
+                        .append("\", \"url\": \"").append(escapeJson(reference.url())).append("\"");
+                if (reference.comment() != null) {
+                    builder.append(", \"comment\": \"").append(escapeJson(reference.comment())).append("\"");
+                }
+                builder.append(" }").append(index + 1 < component.externalReferences().size() ? ",\n" : "\n");
+            }
+            builder.append(pad).append("  ]");
+        }
+        if (component.properties() != null && !component.properties().isEmpty()) {
+            builder.append(",\n").append(pad).append("  \"properties\": [\n");
+            for (int index = 0; index < component.properties().size(); index++) {
+                Property property = component.properties().get(index);
+                builder.append(pad).append("    { \"name\": \"").append(escapeJson(property.name()))
+                        .append("\", \"value\": \"").append(escapeJson(property.value())).append("\" }")
+                        .append(index + 1 < component.properties().size() ? ",\n" : "\n");
             }
             builder.append(pad).append("  ]");
         }
@@ -328,6 +344,17 @@ public class CycloneDx {
                 Element entry = (Element) references.appendChild(document.createElementNS(NAMESPACE, "reference"));
                 entry.setAttribute("type", reference.type());
                 appendXmlText(document, entry, "url", reference.url());
+                if (reference.comment() != null) {
+                    appendXmlText(document, entry, "comment", reference.comment());
+                }
+            }
+        }
+        if (component.properties() != null && !component.properties().isEmpty()) {
+            Element properties = (Element) node.appendChild(document.createElementNS(NAMESPACE, "properties"));
+            for (Property property : component.properties()) {
+                Element entry = (Element) properties.appendChild(document.createElementNS(NAMESPACE, "property"));
+                entry.setAttribute("name", property.name());
+                entry.setTextContent(property.value());
             }
         }
     }
