@@ -89,6 +89,9 @@ public class MavenPomEmitter {
                 if (developerConnection != null) {
                     appendText(document, node, "developerConnection", developerConnection);
                 }
+                if (scm.tag() != null) {
+                    appendText(document, node, "tag", scm.tag());
+                }
                 if (scm.url() != null) {
                     appendText(document, node, "url", scm.url());
                 }
@@ -187,7 +190,7 @@ public class MavenPomEmitter {
         public record Developer(String id, String name, String email) implements Serializable {
         }
 
-        public record Scm(String connection, String developerConnection, String url) implements Serializable {
+        public record Scm(String connection, String developerConnection, String url, String tag) implements Serializable {
         }
     }
 }

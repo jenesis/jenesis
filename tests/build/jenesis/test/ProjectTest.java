@@ -6,10 +6,12 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildExecutorFileCache;
+import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Make;
 import build.jenesis.Project;
+import build.jenesis.SequencedProperties;
 import build.jenesis.module.JenesisModuleRepositoryExport;
 import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.InferredMultiProjectAssembler;
@@ -35,6 +37,10 @@ public class ProjectTest {
         System.clearProperty("jenesis.project.artifacts");
         System.clearProperty("jenesis.project.cache");
         System.clearProperty("jenesis.project.digest");
+        System.clearProperty("jenesis.project.version");
+        System.clearProperty("jenesis.project.tag");
+        System.clearProperty("jenesis.project.revision");
+        System.clearProperty("jenesis.project.tree");
         System.clearProperty("jenesis.make.profiles");
         System.clearProperty("jenesis.make.global");
         System.clearProperty("jenesis.test.sample.key");
@@ -42,6 +48,70 @@ public class ProjectTest {
         System.clearProperty("jenesis.test.sample.b");
         System.clearProperty("jenesis.test.sample.c");
         System.clearProperty("jenesis.test.sample.d");
+    }
+
+    @Test
+    public void reads_the_tag_revision_and_tree_from_their_properties_and_keeps_empty_ones() {
+        assertThat(new Project(root).tag()).isNull();
+        assertThat(new Project(root).revision()).isNull();
+        assertThat(new Project(root).tree()).isNull();
+        System.setProperty("jenesis.project.tag", "v1.2.3");
+        System.setProperty("jenesis.project.revision", "0123abcd");
+        System.setProperty("jenesis.project.tree", "4b825dc642cb6eb9a060e54bf8d69288fbee4904");
+        assertThat(new Project(root).tag()).isEqualTo("v1.2.3");
+        assertThat(new Project(root).revision()).isEqualTo("0123abcd");
+        assertThat(new Project(root).tree()).isEqualTo("4b825dc642cb6eb9a060e54bf8d69288fbee4904");
+        System.setProperty("jenesis.project.tag", "");
+        System.setProperty("jenesis.project.revision", "");
+        System.setProperty("jenesis.project.tree", "");
+        assertThat(new Project(root).tag()).isEmpty();
+        assertThat(new Project(root).revision()).isEmpty();
+        assertThat(new Project(root).tree()).isEmpty();
+    }
+
+    @Test
+    public void records_no_scm_tag_for_a_version_alone() throws IOException {
+        assertThat(metadataValues(new Project(Path.of(".")).version("1.2.3")))
+                .as("how a project names its release tags is not derived from its version")
+                .containsEntry("version", "1.2.3")
+                .doesNotContainKey("scm.tag");
+    }
+
+    @Test
+    public void records_a_set_tag_and_revision() throws IOException {
+        assertThat(metadataValues(new Project(Path.of(".")).tag("v1.2.3").revision("0123abcd")
+                .tree("4b825dc642cb6eb9a060e54bf8d69288fbee4904")))
+                .containsEntry("scm.tag", "v1.2.3")
+                .containsEntry("scm.revision", "0123abcd")
+                .containsEntry("scm.tree", "4b825dc642cb6eb9a060e54bf8d69288fbee4904");
+    }
+
+    @Test
+    public void records_an_empty_tag_and_revision_to_replace_declared_ones() throws IOException {
+        assertThat(metadataValues(new Project(Path.of(".")).tag("").revision("")))
+                .as("an empty value overrides what a metadata file or a pom.xml declares")
+                .containsEntry("scm.tag", "")
+                .containsEntry("scm.revision", "");
+    }
+
+    @Test
+    public void records_no_scm_tag_or_revision_unless_set() throws IOException {
+        assertThat(metadataValues(new Project(Path.of("."))))
+                .as("what a metadata file or a pom.xml declares stays in force")
+                .doesNotContainKeys("scm.tag", "scm.revision", "scm.tree");
+    }
+
+    private SequencedProperties metadataValues(Project project) throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        Path target = root.resolve("target");
+        project.root(root).target(target).build(Project.METADATA);
+        SequencedProperties values = new SequencedProperties();
+        try (Stream<Path> walk = Files.walk(target)) {
+            for (Path file : walk.filter(path -> path.getFileName().toString().equals(BuildStep.METADATA)).toList()) {
+                values.putAll(SequencedProperties.ofFiles(file));
+            }
+        }
+        return values;
     }
 
     @Test

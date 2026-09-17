@@ -120,7 +120,8 @@ public class CycloneDxTest {
                 List.of(),
                 "A demo project",
                 List.of(new CycloneDx.Author("Rafael Winterhalter", "rafael.wth@gmail.com")),
-                List.of(new CycloneDx.ExternalReference("website", "https://example.com/demo")));
+                List.of(new CycloneDx.ExternalReference("website", "https://example.com/demo")),
+                List.of());
 
         String json = emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of());
         assertThat(json)
@@ -137,6 +138,23 @@ public class CycloneDxTest {
                 .contains("<email>rafael.wth@gmail.com</email>")
                 .contains("<reference type=\"website\">")
                 .contains("<url>https://example.com/demo</url>");
+    }
+
+    @Test
+    public void emits_the_properties_of_a_component() {
+        CycloneDx.Component subject = new CycloneDx.Component(
+                "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", null,
+                List.of(),
+                null,
+                List.of(),
+                List.of(),
+                List.of(new CycloneDx.Property("jenesis:scm:tag", "v1.0.0")));
+
+        assertThat(emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of()))
+                .contains("\"properties\": [")
+                .contains("{ \"name\": \"jenesis:scm:tag\", \"value\": \"v1.0.0\" }");
+        assertThat(emitter.emit(CycloneDx.Format.XML, subject, List.of(), List.of()))
+                .contains("<property name=\"jenesis:scm:tag\">v1.0.0</property>");
     }
 
     @Test

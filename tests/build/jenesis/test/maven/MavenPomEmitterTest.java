@@ -64,7 +64,8 @@ public class MavenPomEmitterTest {
                         new MavenPomEmitter.Metadata.Scm(
                                 "scm:git:https://example.com/project.git",
                                 "scm:git:git@example.com:project.git",
-                                "https://example.com/project"))).accept(writer);
+                                "https://example.com/project",
+                                null))).accept(writer);
         assertThat(writer.toString()).isEqualTo("""
                 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
                 <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0">
@@ -155,6 +156,7 @@ public class MavenPomEmitterTest {
                         new MavenPomEmitter.Metadata.Scm(
                                 "scm:git:https://example.com/project.git",
                                 null,
+                                null,
                                 null))).accept(writer);
         assertThat(writer.toString()).isEqualTo("""
                 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
@@ -168,6 +170,32 @@ public class MavenPomEmitterTest {
                         <developerConnection>scm:git:https://example.com/project.git</developerConnection>
                     </scm>
                 </project>
+                """);
+    }
+
+    @Test
+    public void emits_the_scm_tag_before_the_url() throws IOException {
+        StringWriter writer = new StringWriter();
+        new MavenPomEmitter().emit("group",
+                "artifact",
+                "version",
+                new LinkedHashMap<>(),
+                new MavenPomEmitter.Metadata(
+                        null,
+                        null,
+                        null,
+                        List.of(),
+                        List.of(),
+                        new MavenPomEmitter.Metadata.Scm(
+                                null,
+                                null,
+                                "https://example.com/project",
+                                "v1.0.0"))).accept(writer);
+        assertThat(writer.toString()).contains("""
+                    <scm>
+                        <tag>v1.0.0</tag>
+                        <url>https://example.com/project</url>
+                    </scm>
                 """);
     }
 }

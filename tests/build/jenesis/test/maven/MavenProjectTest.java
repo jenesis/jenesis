@@ -1072,6 +1072,7 @@ public class MavenProjectTest {
                     <scm>
                         <connection>scm:git:https://example.com/project.git</connection>
                         <developerConnection>scm:git:git@example.com:project.git</developerConnection>
+                        <tag>v1</tag>
                         <url>https://example.com/project</url>
                     </scm>
                 </project>
@@ -1110,6 +1111,7 @@ public class MavenProjectTest {
                 Map.entry("developer.bob.email", "bob@example.com"),
                 Map.entry("scm.connection", "scm:git:https://example.com/project.git"),
                 Map.entry("scm.developerConnection", "scm:git:git@example.com:project.git"),
+                Map.entry("scm.tag", "v1"),
                 Map.entry("scm.url", "https://example.com/project"));
     }
 
