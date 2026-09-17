@@ -7,8 +7,8 @@ each on whatever update of JDK 25 its runner provides, so a match on every runne
 shows that nothing about the machine that builds the jar - its operating system,
 its time zone, its umask or its clock - reaches the jar.
 
-The module resolves nothing and configures nothing: the same bytes are the
-default, not a setting.
+The module resolves nothing, and nothing in it is there for the sake of the check:
+the same bytes are the default, not a setting.
 
 Run it
 ------
@@ -19,7 +19,7 @@ From this directory:
 
 which builds the module and prints
 
-    classes.jar has the recorded SHA-256 e0be85154f2ddea0e0ce464cd3a548c12a4b5ed154c8a1ad08db8d6925f96186
+    classes.jar has the recorded SHA-256 85b7b4d4a7130c582141aa4764419ba5c98b550f6c2e4b6304d14a272ffc5559
 
 Layout
 ------
@@ -28,7 +28,7 @@ Layout
     |-- build/Demo.java            builds, then compares the jar's SHA-256 with the recorded one
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
     `-- sources
-        |-- module-info.java       demo.reproducible, declaring no release
+        |-- module-info.java       demo.reproducible, compiled for release 25
         `-- demo/reproducible
             `-- Greeting.java
 
@@ -43,9 +43,10 @@ What keeps the bytes the same
 - **Permissions.** No entry records Unix permissions, so the umask of the machine
   does not matter.
 - **The compiled module declaration.** Without `--release`, `javac` writes the
-  JDK's update, such as `25.0.3`, into `module-info.class` for `java.base`. A
-  module that declares no release compiles for the release of the JDK running the
-  build, so it records `25` on every update and vendor of JDK 25.
+  JDK's update, such as `25.0.3`, into `module-info.class` for `java.base`. The
+  module declares `@jenesis.release 25`, so it records `25` on every update and
+  vendor of JDK 25; a module that declares no release compiles for the release of
+  the JDK running the build, with the same effect.
 - **Generated entries.** The manifest, `META-INF/NOTICE` and the embedded SBOM
   carry no time and no machine name, and are written with the same line endings
   on every operating system.
@@ -65,8 +66,8 @@ When the digest does not match
 ------------------------------
 
 A deliberate change changes the digest: to the sources, to the module's
-documentation comment (it becomes the NOTICE and the SBOM's description), or to
-what Jenesis writes into a jar. Record the new digest in `build/Demo.java`. A
+documentation comment (its first sentence becomes the NOTICE, the rest the SBOM's
+description), or to what Jenesis writes into a jar. Record the new digest in `build/Demo.java`. A
 mismatch on only one runner means something about that runner reached the jar;
 `unzip -Z -v` of the jar from two machines, side by side, shows which entry
 differs.

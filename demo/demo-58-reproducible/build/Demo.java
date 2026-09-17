@@ -21,7 +21,7 @@ public class Demo {
 
     // The jar's digest as recorded when the demo was written. A deliberate change to the
     // sources, or to what Jenesis writes into a jar, changes it, and this line with it.
-    private static final String EXPECTED = "e0be85154f2ddea0e0ce464cd3a548c12a4b5ed154c8a1ad08db8d6925f96186";
+    private static final String EXPECTED = "85b7b4d4a7130c582141aa4764419ba5c98b550f6c2e4b6304d14a272ffc5559";
 
     static void main(String[] args) throws Exception {
         // The tool as the command line runs it: a non-zero status is the failure a shell would see.
