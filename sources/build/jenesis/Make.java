@@ -132,7 +132,7 @@ public final class Make {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
-        digest.update(salt.getBytes(StandardCharsets.UTF_8));
+        digest.update((Runtime.version().feature() + "\n" + salt).getBytes(StandardCharsets.UTF_8));
         ByteBuffer buffer = ByteBuffer.allocate(1 << 16);
         for (Path file : files) {
             digest.update(folder.relativize(file).toString().getBytes(StandardCharsets.UTF_8));
