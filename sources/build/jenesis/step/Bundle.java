@@ -14,17 +14,19 @@ public class Bundle implements BuildStep {
     public static final String BUNDLE = "bundle/";
 
     private final String group;
+    private final OffsetDateTime timestamp;
 
     public Bundle() {
-        this("main");
+        this("main", BuildStep.timestamp());
     }
 
-    private Bundle(String group) {
+    private Bundle(String group, OffsetDateTime timestamp) {
         this.group = group;
+        this.timestamp = timestamp;
     }
 
     public Bundle group(String group) {
-        return new Bundle(group);
+        return new Bundle(group, timestamp);
     }
 
     @Override
@@ -181,9 +183,9 @@ public class Bundle implements BuildStep {
         return names.stream().map(name -> "jars/" + name).collect(Collectors.joining(separator));
     }
 
-    private static void writeEntry(ZipOutputStream out, String name, Path file) throws IOException {
+    private void writeEntry(ZipOutputStream out, String name, Path file) throws IOException {
         ZipEntry entry = new ZipEntry(name);
-        entry.setTime(0L);
+        entry.setTimeLocal(timestamp.toLocalDateTime());
         out.putNextEntry(entry);
         Files.copy(file, out);
         out.closeEntry();

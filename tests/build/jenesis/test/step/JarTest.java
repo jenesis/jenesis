@@ -233,6 +233,29 @@ public class JarTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void stamps_every_entry_with_the_archive_timestamp(boolean process) throws IOException {
+        Path folder = Files.createDirectory(classes.resolve(Javac.CLASSES));
+        try (InputStream inputStream = Sample.class.getResourceAsStream(Sample.class.getSimpleName() + ".class")) {
+            Files.copy(requireNonNull(inputStream), Files
+                    .createDirectory(folder.resolve("sample"))
+                    .resolve("Sample.class"));
+        }
+        new Jar(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        classes,
+                        Map.of(Path.of("classes/sample/Sample.class"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+        try (ZipFile jar = new ZipFile(next.resolve(BuildStep.ARTIFACTS + "classes.jar").toFile())) {
+            assertThat(jar.stream().map(ZipEntry::getTimeLocal))
+                    .as("the jar tool records the same time the build's own archive writers use")
+                    .containsOnly(BuildStep.timestamp().toLocalDateTime());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void records_the_tool_rather_than_the_jdk_that_ran_it(boolean process) throws IOException {
         Files.createDirectory(classes.resolve(Javac.CLASSES));
         new Jar(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES).apply(

@@ -2,14 +2,51 @@ package build.jenesis.test;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import module org.junit.jupiter.params;
 import build.jenesis.BuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class BuildStepTest {
 
     @TempDir
     private Path root;
+
+    @AfterEach
+    public void tearDown() {
+        System.clearProperty("jenesis.archive.timestamp");
+    }
+
+    @Test
+    public void archive_timestamp_defaults_to_a_date_no_time_zone_reads_as_1979() {
+        assertThat(BuildStep.timestamp()).isEqualTo(OffsetDateTime.parse("1980-02-01T00:00:00Z"));
+    }
+
+    @Test
+    public void archive_timestamp_is_read_from_its_property_as_utc() {
+        System.setProperty("jenesis.archive.timestamp", "2026-09-17T09:30:00+02:00");
+        assertThat(BuildStep.timestamp()).isEqualTo(OffsetDateTime.parse("2026-09-17T07:30:00Z"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"1980-01-01T00:00:00Z", "2100-01-01T00:00:00Z"})
+    public void archive_timestamp_outside_what_an_entry_records_without_a_zone_is_rejected(String value) {
+        System.setProperty("jenesis.archive.timestamp", value);
+        assertThatThrownBy(BuildStep::timestamp)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("between 1980-01-01T00:00:02Z and 2099-12-31T23:59:59Z")
+                .hasMessageEndingWith(value);
+    }
+
+    @Test
+    public void archive_timestamp_without_an_offset_is_rejected() {
+        System.setProperty("jenesis.archive.timestamp", "2026-09-17T09:30:00");
+        assertThatThrownBy(BuildStep::timestamp)
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ISO-8601 date-time with an offset")
+                .hasMessageEndingWith("2026-09-17T09:30:00");
+    }
 
     @Test
     public void recognises_the_meta_inf_versions_overlay() {

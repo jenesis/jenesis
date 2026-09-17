@@ -11,18 +11,23 @@ public class Jar extends JdkProcessBuildStep {
     private static final Attributes.Name CREATED_BY = new Attributes.Name("Created-By");
 
     private final Sort sort;
+    private final OffsetDateTime timestamp;
 
     public Jar(ProcessHandler.Factory factory, Sort sort) {
-        this(factory.apply("jar", "bin/jar"), sort, printing("jar"));
+        this(factory.apply("jar", "bin/jar"), sort, BuildStep.timestamp(), printing("jar"));
     }
 
-    private Jar(Function<List<String>, ? extends ProcessHandler> factory, Sort sort, BiConsumer<Boolean, String> printing) {
+    private Jar(Function<List<String>, ? extends ProcessHandler> factory,
+                Sort sort,
+                OffsetDateTime timestamp,
+                BiConsumer<Boolean, String> printing) {
         super("jar", factory, printing);
         this.sort = sort;
+        this.timestamp = timestamp;
     }
 
     public Jar verbose(BiConsumer<Boolean, String> printing) {
-        return new Jar(factory, sort, printing);
+        return new Jar(factory, sort, timestamp, printing);
     }
 
     @Override
@@ -37,7 +42,7 @@ public class Jar extends JdkProcessBuildStep {
                 Files.createDirectory(context.next().resolve(sort.folder))
                         .resolve(sort.file)
                         .toString(),
-                "--date=1980-01-01T00:00:02Z"));
+                "--date=" + timestamp));
         List<Path> manifestFiles = new ArrayList<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {

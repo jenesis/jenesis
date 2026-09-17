@@ -10,16 +10,21 @@ public class JMod extends JdkProcessBuildStep {
     public static final String JMODS = "jmods/";
     public static final String CONFIG = "jmodconfig/", LIBRARIES = "jmodlibs/", COMMANDS = "jmodcmds/";
 
+    private final OffsetDateTime timestamp;
+
     public JMod(ProcessHandler.Factory factory) {
-        this(factory.apply("jmod", "bin/jmod"), printing("jmod"));
+        this(factory.apply("jmod", "bin/jmod"), BuildStep.timestamp(), printing("jmod"));
     }
 
-    private JMod(Function<List<String>, ? extends ProcessHandler> factory, BiConsumer<Boolean, String> printing) {
+    private JMod(Function<List<String>, ? extends ProcessHandler> factory,
+                 OffsetDateTime timestamp,
+                 BiConsumer<Boolean, String> printing) {
         super("jmod", factory, printing);
+        this.timestamp = timestamp;
     }
 
     public JMod verbose(BiConsumer<Boolean, String> printing) {
-        return new JMod(factory, printing);
+        return new JMod(factory, timestamp, printing);
     }
 
     @Override
@@ -51,7 +56,7 @@ public class JMod extends JdkProcessBuildStep {
         if (moduleName == null) {
             return CompletableFuture.completedStage(null);
         }
-        List<String> commands = new ArrayList<>(List.of("create"));
+        List<String> commands = new ArrayList<>(List.of("create", "--date=" + timestamp));
         option(commands, "--class-path", classPath);
         option(commands, "--config", config);
         option(commands, "--libs", libs);
