@@ -73,9 +73,9 @@ public class DependenciesOverrideTest {
         resolve(Map.of("lib.shaded", "lib.carrier"), "lib.carrier", "lib.shaded");
 
         try (ZipFile jar = new ZipFile(next.resolve(Dependencies.RESOLVED + "lib.shaded.jar").toFile())) {
-            assertThat(jar.stream().map(ZipEntry::getTime))
+            assertThat(jar.stream().map(ZipEntry::getTimeLocal))
                     .as("a module placed at another moment carries the same bytes")
-                    .containsOnly(0L);
+                    .containsOnly(BuildStep.timestamp().toLocalDateTime());
         }
     }
 

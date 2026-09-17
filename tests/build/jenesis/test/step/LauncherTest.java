@@ -159,9 +159,9 @@ public class LauncherTest {
 
         assertThat(result.next()).isTrue();
         try (ZipFile jar = new ZipFile(next.resolve(Launcher.LAUNCHER).resolve("application.jar").toFile())) {
-            assertThat(jar.stream().map(ZipEntry::getTime))
+            assertThat(jar.stream().map(ZipEntry::getTimeLocal))
                     .as("a launcher created at another moment carries the same bytes")
-                    .containsOnly(0L);
+                    .containsOnly(BuildStep.timestamp().toLocalDateTime());
         }
     }
 

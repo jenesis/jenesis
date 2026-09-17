@@ -19,19 +19,21 @@ public class Launcher implements BuildStep {
     private final String tool;
     private final String group;
     private final PathPlacement pathPlacement;
+    private final OffsetDateTime timestamp;
 
     public Launcher(String tool, PathPlacement pathPlacement) {
-        this(tool, "main", pathPlacement);
+        this(tool, "main", pathPlacement, BuildStep.timestamp());
     }
 
-    private Launcher(String tool, String group, PathPlacement pathPlacement) {
+    private Launcher(String tool, String group, PathPlacement pathPlacement, OffsetDateTime timestamp) {
         this.tool = tool;
         this.group = group;
         this.pathPlacement = pathPlacement;
+        this.timestamp = timestamp;
     }
 
     public Launcher group(String group) {
-        return new Launcher(tool, group, pathPlacement);
+        return new Launcher(tool, group, pathPlacement, timestamp);
     }
 
     @Override
@@ -147,7 +149,7 @@ public class Launcher implements BuildStep {
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
-    private static void explode(JarOutputStream out, Path file, String prefix, Predicate<String> include)
+    private void explode(JarOutputStream out, Path file, String prefix, Predicate<String> include)
             throws IOException {
         try (JarFile jar = new JarFile(file.toFile())) {
             for (JarEntry entry : (Iterable<JarEntry>) jar.stream()::iterator) {
@@ -155,7 +157,7 @@ public class Launcher implements BuildStep {
                     continue;
                 }
                 JarEntry copy = new JarEntry(prefix + entry.getName());
-                copy.setTime(0L);
+                copy.setTimeLocal(timestamp.toLocalDateTime());
                 out.putNextEntry(copy);
                 try (InputStream in = jar.getInputStream(entry)) {
                     in.transferTo(out);
@@ -165,17 +167,17 @@ public class Launcher implements BuildStep {
         }
     }
 
-    private static void writeManifest(JarOutputStream out, Manifest manifest) throws IOException {
+    private void writeManifest(JarOutputStream out, Manifest manifest) throws IOException {
         JarEntry entry = new JarEntry(JarFile.MANIFEST_NAME);
-        entry.setTime(0L);
+        entry.setTimeLocal(timestamp.toLocalDateTime());
         out.putNextEntry(entry);
         manifest.write(out);
         out.closeEntry();
     }
 
-    private static void writeEntry(JarOutputStream out, String name, Path file) throws IOException {
+    private void writeEntry(JarOutputStream out, String name, Path file) throws IOException {
         JarEntry entry = new JarEntry(name);
-        entry.setTime(0L);
+        entry.setTimeLocal(timestamp.toLocalDateTime());
         out.putNextEntry(entry);
         Files.copy(file, out);
         out.closeEntry();
