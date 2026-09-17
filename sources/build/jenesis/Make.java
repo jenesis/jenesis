@@ -70,7 +70,41 @@ public final class Make {
     }
 
     public static void main(String... selectors) throws Exception {
-        System.exit(new Make("build.jenesis.Project").run(selectors));
+        List<String> options = options();
+        Make make = new Make("build.jenesis.Project");
+        Integer code = relaunched(Make.class, options, selectors);
+        System.exit(code == null ? make.run(selectors) : code);
+    }
+
+    static List<String> options() {
+        List<String> options = new ArrayList<>();
+        for (String name : new TreeSet<>(System.getProperties().stringPropertyNames())) {
+            if (name.startsWith("jenesis.") && !name.startsWith("jenesis.toolchain.")) {
+                options.add("-D" + name + "=" + System.getProperty(name));
+            }
+        }
+        return options;
+    }
+
+    static Integer relaunched(Class<?> main, List<String> options, String... arguments) throws Exception {
+        String version = System.getProperty("jenesis.toolchain.version");
+        if (version == null || version.isBlank()) {
+            return null;
+        }
+        Class<?> type = Class.forName("build.jenesis.Toolchain", true, Make.class.getClassLoader());
+        try {
+            Object toolchain = type.getConstructor().newInstance();
+            if (type.getMethod("home").invoke(toolchain).equals(Path.of(System.getProperty("java.home")))) {
+                return null;
+            }
+            return (Integer) type.getMethod("launch", Class.class, List.class, List.class)
+                    .invoke(toolchain, main, options, List.of(arguments));
+        } catch (InvocationTargetException e) {
+            if (e.getCause() instanceof Exception cause) {
+                throw cause;
+            }
+            throw e;
+        }
     }
 
     public Result build(String... selectors) throws Exception {
@@ -132,7 +166,7 @@ public final class Make {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
-        digest.update(salt.getBytes(StandardCharsets.UTF_8));
+        digest.update((Runtime.version().feature() + "\n" + salt).getBytes(StandardCharsets.UTF_8));
         ByteBuffer buffer = ByteBuffer.allocate(1 << 16);
         for (Path file : files) {
             digest.update(folder.relativize(file).toString().getBytes(StandardCharsets.UTF_8));
@@ -209,9 +243,10 @@ public final class Make {
         Path base = path.resolve("jenesis.properties");
         Properties project = read(base);
         if (project != null) {
-            requireApplicable(base, project, false);
+            requireApplicable(base, project, false, false);
         }
         String location = System.getProperty("jenesis.make.global");
+        boolean trusted = location != null || project == null || project.getProperty("jenesis.make.global") == null;
         if (location == null && project != null) {
             location = project.getProperty("jenesis.make.global");
         }
@@ -225,7 +260,7 @@ public final class Make {
             Path file = home.resolve("jenesis.properties");
             user = read(file);
             if (user != null) {
-                requireApplicable(file, user, true);
+                requireApplicable(file, user, true, trusted);
             }
         }
         Set<Path> loaded = new LinkedHashSet<>();
@@ -234,10 +269,10 @@ public final class Make {
         if (project != null) {
             addProfiles(pending, path, project.getProperty("jenesis.make.profiles"));
         }
-        loadProfiles(loaded, pending, path);
+        loadProfiles(loaded, pending, path, false);
         if (user != null) {
             addProfiles(pending, home, user.getProperty("jenesis.make.profiles"));
-            loadProfiles(loaded, pending, home);
+            loadProfiles(loaded, pending, home, trusted);
         }
         if (project != null) {
             apply(project);
@@ -268,14 +303,15 @@ public final class Make {
         }
     }
 
-    private static void loadProfiles(Set<Path> loaded, Deque<Path> pending, Path base) throws IOException {
+    private static void loadProfiles(Set<Path> loaded, Deque<Path> pending, Path base, boolean trusted)
+            throws IOException {
         while (!pending.isEmpty()) {
             Path file = pending.removeFirst().normalize();
             if (!loaded.add(file) || !Files.isRegularFile(file)) {
                 continue;
             }
             Properties properties = read(file);
-            requireApplicable(file, properties, true);
+            requireApplicable(file, properties, true, trusted);
             addProfiles(pending, base, properties.getProperty("jenesis.make.profiles"));
             apply(properties);
         }
@@ -287,7 +323,7 @@ public final class Make {
         }
     }
 
-    private static void requireApplicable(Path file, Properties properties, boolean located) {
+    private static void requireApplicable(Path file, Properties properties, boolean located, boolean trusted) {
         if (properties.getProperty("jenesis.make.root") != null) {
             throw new IllegalStateException("jenesis.make.root cannot be set in " + file
                     + ": the project root locates this file, so it is resolved before the file is read"
@@ -297,6 +333,12 @@ public final class Make {
             throw new IllegalStateException("jenesis.make.global cannot be set in " + file
                     + ": the user-global location is resolved from the command line or the project's"
                     + " jenesis.properties before this file is read");
+        }
+        if (!trusted && properties.getProperty("jenesis.toolchain.searchpath") != null) {
+            throw new IllegalStateException("jenesis.toolchain.searchpath cannot be set in " + file
+                    + ": the folders searched for a JDK decide what the build executes, so only the command line"
+                    + " or your own ~/.jenesis/jenesis.properties may name them, never a file the project provides"
+                    + " or locates (pass -Djenesis.toolchain.searchpath instead)");
         }
     }
 

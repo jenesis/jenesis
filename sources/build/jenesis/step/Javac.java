@@ -35,11 +35,11 @@ public class Javac extends ProcessBuildStep {
         this.group = group;
     }
 
-    public static void writeRelease(Path folder, String release) throws IOException {
+    public static void writeRelease(Path folder, String release, int feature) throws IOException {
         Path target = Files.createDirectories(folder.resolve(ProcessBuildStep.PROCESS));
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("--release", release == null || release.isEmpty()
-                ? Integer.toString(Runtime.version().feature())
+                ? Integer.toString(feature)
                 : release);
         properties.store(target.resolve("javac.properties"));
     }

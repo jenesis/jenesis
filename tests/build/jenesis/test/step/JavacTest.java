@@ -54,7 +54,7 @@ public class JavacTest {
     @Test
     public void writeRelease_writes_process_javac_properties_with_release_flag() throws IOException {
         Path folder = Files.createDirectory(root.resolve("write-release"));
-        Javac.writeRelease(folder, "21");
+        Javac.writeRelease(folder, "21", 25);
         Path file = folder.resolve("process/javac.properties");
         assertThat(file).exists();
         SequencedProperties properties = SequencedProperties.ofFiles(file);
@@ -63,11 +63,11 @@ public class JavacTest {
 
     @ParameterizedTest
     @NullAndEmptySource
-    public void writeRelease_without_a_release_writes_the_running_one(String release) throws IOException {
+    public void writeRelease_without_a_release_writes_the_feature_of_the_jdk(String release) throws IOException {
         Path folder = Files.createDirectory(root.resolve("write-release-running"));
-        Javac.writeRelease(folder, release);
+        Javac.writeRelease(folder, release, 26);
         assertThat(SequencedProperties.ofFiles(folder.resolve("process/javac.properties")))
-                .containsEntry("--release", Integer.toString(Runtime.version().feature()));
+                .containsEntry("--release", "26");
     }
 
     @ParameterizedTest
@@ -75,7 +75,7 @@ public class JavacTest {
     public void compiles_a_module_that_declares_no_release_for_the_running_one(boolean process) throws IOException {
         Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES)).resolve("module-info.java"),
                 "module sample { }\n");
-        Javac.writeRelease(sources, null);
+        Javac.writeRelease(sources, null, Runtime.version().feature());
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
@@ -203,7 +203,7 @@ public class JavacTest {
             writer.append("public class Sample { }");
             writer.newLine();
         }
-        Javac.writeRelease(sources, "21");
+        Javac.writeRelease(sources, "21", Runtime.version().feature());
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
@@ -328,7 +328,7 @@ public class JavacTest {
         Files.writeString(main.resolve("Sample.java"), "package sample; public class Sample { }\n");
         Path versioned = Files.createDirectories(sources.resolve(BuildStep.SOURCES + "META-INF/versions/21/sample"));
         Files.writeString(versioned.resolve("Sample.java"), "package sample; public class Sample { }\n");
-        Javac.writeRelease(sources, "17");
+        Javac.writeRelease(sources, "17", Runtime.version().feature());
         BuildStepResult result = new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
