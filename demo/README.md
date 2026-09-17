@@ -1281,11 +1281,11 @@ update of JDK 25 its runner provides, so a match on every runner shows that
 nothing about the machine reaches the jar.
 
 Nothing is configured for it. The `jar` tool sorts the entries of every folder it
-adds, no entry records Unix permissions, every entry records the same time, and a
-module that declares no release compiles for the release of the running JDK, which
-keeps that JDK's update out of `module-info.class`. The time is the one setting
-involved: `jenesis.archive.timestamp` names another, such as the time of the
-release commit, and the recorded digest changes with it.
+adds, no entry records Unix permissions, every entry records the same time, and the
+module compiles for release 25, which keeps the update of the JDK out of
+`module-info.class`. The time is the one setting involved:
+`jenesis.archive.timestamp` names another, such as the time of the release commit,
+and the recorded digest changes with it.
 
 ## 41. Ahead-of-time native image - [`native-image`](demo-59-native-image/README.md)
 
