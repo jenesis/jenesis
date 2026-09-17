@@ -471,7 +471,7 @@ public class ModularizeModule implements BuildExecutorModule {
                             replacement = buffer.toByteArray();
                         }
                         JarEntry copy = new JarEntry(name);
-                        copy.setTime(entry.getTime());
+                        copy.setTime(0L);
                         out.putNextEntry(copy);
                         if (replacement != null) {
                             out.write(replacement);

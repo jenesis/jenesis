@@ -756,7 +756,9 @@ public class Dependencies implements BuildExecutorModule {
                         Path file = libs.resolve(BuildExecutorModule.encode(module) + ".jar");
                         if (!Files.exists(file)) {
                             try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(file))) {
-                                output.putNextEntry(new JarEntry("module-info.class"));
+                                JarEntry entry = new JarEntry("module-info.class");
+                                entry.setTime(0L);
+                                output.putNextEntry(entry);
                                 output.write(carrying(module, overrideTargets.get(module).carriers()));
                                 output.closeEntry();
                             }
