@@ -6,7 +6,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.PathPlacement;
 
-public class JLink extends JdkProcessBuildStep {
+public class JLink extends ProcessBuildStep {
 
     public static final String RUNTIME = "runtime/";
 

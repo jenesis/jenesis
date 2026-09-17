@@ -15,7 +15,6 @@ import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Javac;
 import build.jenesis.step.Javadoc;
-import build.jenesis.step.JdkProcessBuildStep;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -148,7 +147,7 @@ public class ScalaDocumentationModule implements BuildExecutorModule {
         }
     }
 
-    private static class Document extends JdkProcessBuildStep {
+    private static class Document extends ProcessBuildStep {
 
         private final String within;
         private final String tool;
