@@ -121,9 +121,9 @@ Quick index
 | 56 | [`code-signing`](demo-56-code-signing/README.md)             | Sign the produced jar with `jarsigner`: the key is named by the environment rather than by anything beside the code, and the signed jar replaces the unsigned one before the inventory, the staged repositories or a publication ever see it | `java build/Demo.java`             |
 | 57 | [`publishing`](demo-57-publishing/README.md)                 | Assemble a Maven Central ready bundle (POM metadata + sources/javadoc jars) and resolve it back | `java build/Demo.java`             |
 | 58 | [`reproducible`](demo-58-reproducible/README.md)             | Build a jar and compare it with a SHA-256 recorded in the demo: CI runs the check on Linux, macOS and Windows, each on its own update of JDK 25 | `java build/Demo.java`             |
-| 59 | [`native-image`](demo-59-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
-| 60 | [`jpx`](demo-60-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
-| 61 | [`toolchain`](demo-61-toolchain/README.md)                 | Name the JDK a build runs on with `jenesis.toolchain.version`: `Make` and `Execute` check the running JVM and otherwise relaunch on a matching JDK already installed, found by its `release` file in folders only you name; CI relaunches the demo on JDK 26 on Linux, macOS and Windows | `java build/jenesis/Execute.java`  |
+| 59 | [`toolchain`](demo-59-toolchain/README.md)                 | Name the JDK a build runs on with `jenesis.toolchain.version`: `Make` and `Execute` check the running JVM and otherwise relaunch on a matching JDK already installed, found by its `release` file in folders only you name; CI relaunches the demo on JDK 26 on Linux, macOS and Windows | `java build/jenesis/Execute.java`  |
+| 60 | [`native-image`](demo-60-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
+| 61 | [`jpx`](demo-61-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1288,7 +1288,26 @@ module compiles for release 25, which keeps the update of the JDK out of
 `jenesis.archive.timestamp` names another, such as the time of the release commit,
 and the recorded digest changes with it.
 
-## 41. Ahead-of-time native image - [`native-image`](demo-59-native-image/README.md)
+## 41. The JDK a build runs on - [`toolchain`](demo-59-toolchain/README.md)
+
+`reproducible` promised the same bytes for the same JDK; `toolchain` makes the JDK part
+of the project. Its `jenesis.properties` names one, `jenesis.toolchain.version=25`,
+and `Make` and `Execute` check the JVM they were started on before anything else.
+When it matches, nothing changes. When it does not, they look for a matching JDK among
+those already installed and run themselves again on it, with the same selectors and
+`-Djenesis.*` properties; the module declares no release, so it compiles for that JDK,
+and its main class prints the feature version it runs on. CI starts the demo on JDK 25
+and asks for 26, on Linux, macOS and Windows, and checks that the program reports 26.
+
+A version names numbers matched as a prefix and words the JDK has to answer to, taken
+from the vendor and version its `release` file records: `25-temurin`, `25-zulu`,
+`26-ea`. Jenesis reads that file and never runs a JDK to learn what it is, and it never
+installs one. Where it looks is `jenesis.toolchain.searchpath`, the operating system's
+usual JDK folders unless set, and that list is the user's alone: the command line and
+`~/.jenesis/jenesis.properties` may set it, while a project's own files are refused, so
+a project can choose among the JDKs you installed but not name a program of its own.
+
+## 42. Ahead-of-time native image - [`native-image`](demo-60-native-image/README.md)
 
 `native-image` revisits the runnable-artifact idea from section 5 from the other
 end. There, `jpackage` bundled your bytecode with a `jlink`-trimmed JVM; here
@@ -1326,7 +1345,7 @@ successor: jpackage for a faithful bundle of the JVM you tested against, native-
 when startup latency and footprint dominate. Like `docker-isolation`, it needs tooling
 the CI runners lack (GraalVM), so it is a local exercise.
 
-## 42. Running a released program - [`jpx`](demo-60-jpx/README.md)
+## 43. Running a released program - [`jpx`](demo-61-jpx/README.md)
 
 Every demo so far built something. `jpx` builds nothing: it resolves a *published*
 module (or Maven artifact), installs its runtime closure once into
@@ -1366,25 +1385,6 @@ module names, Maven Central for coordinates - each fronted by the local
 `~/.jenesis/` exports and `~/.m2/`, and each redirectable at a mirror through
 `JENESIS_REPOSITORY_URI` and `MAVEN_REPOSITORY_URI`.
 
-## 43. The JDK a build runs on - [`toolchain`](demo-61-toolchain/README.md)
-
-`reproducible` promised the same bytes for the same JDK; `toolchain` makes the JDK part
-of the project. Its `jenesis.properties` names one, `jenesis.toolchain.version=25`,
-and `Make` and `Execute` check the JVM they were started on before anything else.
-When it matches, nothing changes. When it does not, they look for a matching JDK among
-those already installed and run themselves again on it, with the same selectors and
-`-Djenesis.*` properties; the module declares no release, so it compiles for that JDK,
-and its main class prints the feature version it runs on. CI starts the demo on JDK 25
-and asks for 26, on Linux, macOS and Windows, and checks that the program reports 26.
-
-A version names numbers matched as a prefix and words the JDK has to answer to, taken
-from the vendor and version its `release` file records: `25-temurin`, `25-zulu`,
-`26-ea`. Jenesis reads that file and never runs a JDK to learn what it is, and it never
-installs one. Where it looks is `jenesis.toolchain.searchpath`, the operating system's
-usual JDK folders unless set, and that list is the user's alone: the command line and
-`~/.jenesis/jenesis.properties` may set it, while a project's own files are refused, so
-a project can choose among the JDKs you installed but not name a program of its own.
-
 Cross-cutting concepts
 ----------------------
 
@@ -1414,7 +1414,7 @@ a native application image (collected under `stage/packages/` next to `stage/mav
 into a trimmed `jlink` runtime image (staged under `stage/runtime`), `bundle=true` zips
 jars-only for a JRE base, `launcher=true` shades the `build.jenesis.launcher` into a
 single `java -jar`-able executable jar that keeps the module graph, `native=true`
-compiles ahead of time into a standalone GraalVM native binary (see section 41), and
+compiles ahead of time into a standalone GraalVM native binary (see section 42), and
 and a `modules.properties` file beside it (per module, `mode=declared|synthetic|none`,
 absent by default) rewrites the resolved closure into explicit named modules - replacing it for compile, test and packaging
 alike - so a non-modular dependency tree becomes linkable and a broken module graph fails

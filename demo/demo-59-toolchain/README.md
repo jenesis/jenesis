@@ -87,7 +87,7 @@ check is refused with the file named, rather than exchanged for another match.
 Layout
 ------
 
-    demo/demo-61-toolchain
+    demo/demo-59-toolchain
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
     |-- jenesis.properties         jenesis.toolchain.version=25
     `-- sources
