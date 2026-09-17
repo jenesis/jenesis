@@ -39,13 +39,13 @@ public class ToolchainTest {
     }
 
     @Test
-    public void answers_the_running_jvm_when_no_version_is_required() throws IOException {
+    public void answers_the_running_jvm_when_no_version_is_required() throws IOException, InterruptedException {
         assertThat(new Toolchain().version("").searchpath("").home())
                 .isEqualTo(Path.of(System.getProperty("java.home")));
     }
 
     @Test
-    public void answers_the_running_jvm_when_it_matches_even_if_a_newer_jdk_does_too() throws IOException {
+    public void answers_the_running_jvm_when_it_matches_even_if_a_newer_jdk_does_too() throws IOException, InterruptedException {
         Assumptions.assumeTrue(Runtime.version().pre().isEmpty(), "the running JVM is not a pre-release");
         jdk(folder.resolve("jdks/newer"), Runtime.version().feature() + ".99.99", "Acme Labs", null);
 
@@ -67,7 +67,7 @@ public class ToolchainTest {
     }
 
     @Test
-    public void selects_the_highest_matching_version_across_the_search_path() throws IOException {
+    public void selects_the_highest_matching_version_across_the_search_path() throws IOException, InterruptedException {
         jdk(folder.resolve("first/older"), "25.0.1+3", "Acme Labs", null);
         Path newer = jdk(folder.resolve("second/newer"), "25.0.2+7", "Acme Labs", null);
         jdk(folder.resolve("second/other"), "25.0.9+1", "Other Labs", null);
@@ -79,7 +79,7 @@ public class ToolchainTest {
     }
 
     @Test
-    public void prefers_the_earlier_search_path_entry_between_equal_versions() throws IOException {
+    public void prefers_the_earlier_search_path_entry_between_equal_versions() throws IOException, InterruptedException {
         Path first = jdk(folder.resolve("first/jdk"), "25.0.2+7", "Acme Labs", null);
         Path second = jdk(folder.resolve("second/jdk"), "25.0.2+7", "Acme Labs", null);
 
@@ -89,7 +89,7 @@ public class ToolchainTest {
 
     @Test
     public void matches_the_words_of_the_vendor_its_version_and_the_runtime_version_ignoring_case()
-            throws IOException {
+            throws IOException, InterruptedException {
         Path home = jdk(folder.resolve("jdk"), "25.0.1+3-LTS", "Acme Labs, Inc.", "Roadrunner-25.0.1+3");
 
         assertThat(new Toolchain().version("25.0-ACME-roadrunner-lts").searchpath(home.toString()).home())
@@ -101,7 +101,7 @@ public class ToolchainTest {
     }
 
     @Test
-    public void selects_a_pre_release_only_when_the_version_names_it() throws IOException {
+    public void selects_a_pre_release_only_when_the_version_names_it() throws IOException, InterruptedException {
         Path home = jdk(folder.resolve("jdk"), "26-ea+17-1764", "Acme Labs", null);
 
         assertThatThrownBy(() -> new Toolchain().version("26-acme").searchpath(home.toString()).home())
@@ -111,7 +111,7 @@ public class ToolchainTest {
     }
 
     @Test
-    public void lists_what_it_found_and_skipped_when_nothing_matches() throws IOException {
+    public void lists_what_it_found_and_skipped_when_nothing_matches() throws IOException, InterruptedException {
         Path found = jdk(folder.resolve("jdks/found"), "25.0.4+2", "Acme Labs", null);
         Path malformed = jdk(folder.resolve("jdks/malformed"), "banana", "Acme Labs", null);
         Path executable = jdk(folder.resolve("jdks/executable"), "25.0.4+2", "Acme Labs", null);
@@ -128,7 +128,7 @@ public class ToolchainTest {
     }
 
     @Test
-    public void counts_a_jdk_reached_through_a_link_once() throws IOException {
+    public void counts_a_jdk_reached_through_a_link_once() throws IOException, InterruptedException {
         Path home = jdk(folder.resolve("jdks/25.0.7"), "25.0.7+1", "Acme Labs", null);
         try {
             Files.createSymbolicLink(folder.resolve("jdks/current"), home);
@@ -142,7 +142,7 @@ public class ToolchainTest {
     }
 
     @Test
-    public void replaces_control_characters_in_the_paths_it_reports() throws IOException {
+    public void replaces_control_characters_in_the_paths_it_reports() throws IOException, InterruptedException {
         Path home;
         try {
             home = jdk(folder.resolve("jdks/escape[31m"), "banana", "Acme Labs", null);
@@ -158,7 +158,7 @@ public class ToolchainTest {
     }
 
     @Test
-    public void refuses_a_matching_jdk_with_a_file_every_user_can_write() throws IOException {
+    public void refuses_a_matching_jdk_with_a_file_every_user_can_write() throws IOException, InterruptedException {
         Path home = jdk(folder.resolve("jdk"), "25.0.1+3", "Acme Labs", null);
         Assumptions.assumeTrue(posix(home), "POSIX permissions");
         Files.setPosixFilePermissions(home.resolve("release"), PosixFilePermissions.fromString("rw-r--rw-"));
@@ -170,7 +170,7 @@ public class ToolchainTest {
     }
 
     @Test
-    public void accepts_a_jdk_writable_by_the_private_group_of_its_owner() throws IOException {
+    public void accepts_a_jdk_writable_by_the_private_group_of_its_owner() throws IOException, InterruptedException {
         Path home = jdk(folder.resolve("jdk"), "25.0.1+3", "Acme Labs", null);
         Assumptions.assumeTrue(posix(home), "POSIX permissions");
         PosixFileAttributes attributes = Files.readAttributes(home, PosixFileAttributes.class);
@@ -182,7 +182,7 @@ public class ToolchainTest {
     }
 
     @Test
-    public void refuses_a_jdk_writable_by_a_group_shared_with_other_users() throws IOException {
+    public void refuses_a_jdk_writable_by_a_group_shared_with_other_users() throws IOException, InterruptedException {
         Path home = jdk(folder.resolve("jdk"), "25.0.1+3", "Acme Labs", null);
         Assumptions.assumeTrue(posix(home), "POSIX permissions");
         PosixFileAttributes attributes = Files.readAttributes(home, PosixFileAttributes.class);
@@ -197,7 +197,7 @@ public class ToolchainTest {
     }
 
     @Test
-    public void pins_the_toolchain_in_the_command_that_repeats_the_program() throws IOException {
+    public void pins_the_toolchain_in_the_command_that_repeats_the_program() throws IOException, InterruptedException {
         Path home = jdk(folder.resolve("jdk"), "25.0.1+3", "Acme Labs", null);
 
         List<String> command = new Toolchain()
@@ -232,6 +232,118 @@ public class ToolchainTest {
         assertThat(code)
                 .as("the child sees the forwarded option, the arguments and an empty search path")
                 .isZero();
+    }
+
+    @Test
+    public void runs_the_installer_when_no_jdk_matches_and_selects_the_jdk_it_installed() throws Exception {
+        Path jdks = Files.createDirectories(folder.resolve("jdks"));
+        Path installer = installer(folder.resolve("install"), "printf '%s\\n' \"$@\" > '" + folder.resolve("arguments") + "'\n"
+                + "mkdir -p '" + jdks.resolve("installed/bin") + "'\n"
+                + "printf 'JAVA_RUNTIME_VERSION=\"25.0.9+1\"\\nIMPLEMENTOR=\"Acme Labs\"\\n' > '" + jdks.resolve("installed/release") + "'\n"
+                + ": > '" + jdks.resolve("installed/bin/java") + "'\n"
+                + "chmod -R go-w '" + jdks.resolve("installed") + "'\n");
+
+        Path home = new Toolchain()
+                .version("25-acme")
+                .searchpath(jdks + "/*")
+                .installer(installer + " --quiet")
+                .home();
+
+        assertThat(home).isEqualTo(jdks.resolve("installed"));
+        assertThat(Files.readAllLines(folder.resolve("arguments")))
+                .as("the installer gets its own words, then the version as its last argument")
+                .containsExactly("--quiet", "25-acme");
+    }
+
+    @Test
+    public void runs_no_installer_when_a_jdk_matches() throws Exception {
+        Path home = jdk(folder.resolve("jdks/found"), "25.0.1+3", "Acme Labs", null);
+        Path installer = installer(folder.resolve("install"), ": > '" + folder.resolve("ran") + "'\n");
+
+        assertThat(new Toolchain().version("25-acme").searchpath(folder.resolve("jdks") + "/*").installer(installer.toString()).home())
+                .isEqualTo(home);
+        assertThat(folder.resolve("ran")).doesNotExist();
+    }
+
+    @Test
+    public void runs_no_installer_when_nothing_is_searched() throws Exception {
+        Path installer = installer(folder.resolve("install"), ": > '" + folder.resolve("ran") + "'\n");
+
+        assertThatThrownBy(() -> new Toolchain().version("25-acme").searchpath("").installer(installer.toString()).home())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.toolchain.searchpath is empty");
+        assertThat(folder.resolve("ran"))
+                .as("an empty search path only checks the running JVM, so nothing could find what is installed")
+                .doesNotExist();
+    }
+
+    @Test
+    public void fails_naming_the_installer_and_its_exit_code() throws Exception {
+        Path installer = installer(folder.resolve("install"), "exit 3\n");
+
+        assertThatThrownBy(() -> new Toolchain()
+                .version("25-acme")
+                .searchpath(Files.createDirectories(folder.resolve("jdks")) + "/*")
+                .installer(installer.toString())
+                .home())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("The installer " + installer + " failed with exit code 3");
+    }
+
+    @Test
+    public void fails_when_the_installer_puts_no_matching_jdk_into_the_search_path() throws Exception {
+        Path installer = installer(folder.resolve("install"), "exit 0\n");
+
+        assertThatThrownBy(() -> new Toolchain()
+                .version("25-acme")
+                .searchpath(Files.createDirectories(folder.resolve("jdks")) + "/*")
+                .installer(installer.toString())
+                .home())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ran for jenesis.toolchain.version=25-acme")
+                .hasMessageContaining("and still no JDK matches it");
+    }
+
+    @Test
+    public void runs_the_installer_in_the_home_folder_rather_than_the_project() throws Exception {
+        Path installer = installer(folder.resolve("install"), "pwd -P > '" + folder.resolve("directory") + "'\n");
+
+        assertThatThrownBy(() -> new Toolchain()
+                .version("25-acme")
+                .searchpath(Files.createDirectories(folder.resolve("jdks")) + "/*")
+                .installer(installer.toString())
+                .home())
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(Files.readString(folder.resolve("directory")).strip())
+                .as("a tool that reads configuration from its working directory never sees the project's")
+                .isEqualTo(Path.of(System.getProperty("user.home")).toRealPath().toString());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"tools/install-jdk", "./install-jdk", "C:install-jdk", "~user/install-jdk"})
+    public void rejects_an_installer_named_by_a_relative_path(String installer) {
+        assertThatThrownBy(() -> new Toolchain().installer(installer))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed jenesis.toolchain.installer");
+    }
+
+    @Test
+    public void fails_when_the_installer_name_is_on_no_folder_of_the_path() throws IOException, InterruptedException {
+        assertThatThrownBy(() -> new Toolchain()
+                .version("25-acme")
+                .searchpath(Files.createDirectories(folder.resolve("jdks")) + "/*")
+                .installer("jenesis-no-such-installer")
+                .home())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis-no-such-installer")
+                .hasMessageContaining("on no absolute folder of the PATH");
+    }
+
+    private static Path installer(Path script, String body) throws IOException {
+        Assumptions.assumeTrue(posix(script.getParent()), "an installer written as a shell script");
+        Files.writeString(script, "#!/bin/sh\n" + body);
+        Files.setPosixFilePermissions(script, PosixFilePermissions.fromString("rwxr-xr-x"));
+        return script;
     }
 
     private static Path jdk(Path home, String runtime, String implementor, String implementorVersion)

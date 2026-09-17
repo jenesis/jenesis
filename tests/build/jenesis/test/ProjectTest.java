@@ -44,6 +44,7 @@ public class ProjectTest {
         System.clearProperty("jenesis.make.profiles");
         System.clearProperty("jenesis.make.global");
         System.clearProperty("jenesis.toolchain.searchpath");
+        System.clearProperty("jenesis.toolchain.installer");
         System.clearProperty("jenesis.test.sample.key");
         System.clearProperty("jenesis.test.sample.a");
         System.clearProperty("jenesis.test.sample.b");
@@ -718,6 +719,24 @@ public class ProjectTest {
                 .as("even an empty search path is the user's to set, so a project file never names one")
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.toolchain.searchpath cannot be set in");
+    }
+
+    @Test
+    public void load_jenesis_properties_rejects_toolchain_installer_in_the_project_file() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.toolchain.installer=/opt/tools/install-jdk\n");
+        assertThatThrownBy(() -> Make.loadProperties(root))
+                .as("a project that names the installer would choose a program the build runs")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.toolchain.installer cannot be set in");
+    }
+
+    @Test
+    public void load_jenesis_properties_accepts_toolchain_installer_in_the_user_global_file() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.toolchain.installer=jenesis-jdk\n");
+        System.setProperty("jenesis.make.global", root.resolve("home").toString());
+        Make.loadProperties(root);
+        assertThat(System.getProperty("jenesis.toolchain.installer")).isEqualTo("jenesis-jdk");
     }
 
     @Test

@@ -70,15 +70,35 @@ with folders of your own:
 An empty search path searches nothing: the build only checks that the JVM it was
 started on matches, which suits a CI job that sets its JDK up itself.
 
+Installing a missing JDK
+------------------------
+
+Jenesis installs nothing by itself, but it runs an installer you name when no JDK
+matches. The SDK ships one, `jenesis-jdk`, which turns a version into a request for
+the tool that installs JDKs on your machine: SDKMAN or mise, or Scoop on Windows.
+Enable it once, for every project:
+
+    jenesis-jdk --enable
+
+which adds `jenesis.toolchain.installer=jenesis-jdk` to your
+`~/.jenesis/jenesis.properties`. A build asking for a JDK you do not have then
+installs it and runs on it:
+
+    java -Djenesis.toolchain.version=25-zulu build/jenesis/Execute.java
+
+The installer runs in your home folder, gets the version as its last argument, and
+has to install into a folder on the search path; Jenesis searches again afterwards
+and checks what it finds like any other JDK.
+
 What a project cannot do
 ------------------------
 
-The search path decides what the build executes, so it is yours to set, never the
-project's. It is accepted on the command line and in your own
-`~/.jenesis/jenesis.properties`, and refused in the project's `jenesis.properties`,
-in its profiles, and in a user-global file whose location the project chose. A
-project can name the version it needs, and so choose among the JDKs you installed,
-but not point the build at a program of its own.
+The search path and the installer decide what the build executes, so they are
+yours to set, never the project's. Both are accepted on the command line and in
+your own `~/.jenesis/jenesis.properties`, and refused in the project's
+`jenesis.properties` and in its profiles. A project can name the version it needs,
+and so choose among the JDKs you installed or your installer provides, but not
+point the build at a program of its own.
 
 Before a JDK it found runs, Jenesis checks on POSIX systems that every file of it
 belongs to you or to root and is writable by no other user; a JDK that fails the
