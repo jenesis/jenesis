@@ -5,7 +5,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 
-public class JarSigner extends JdkProcessBuildStep {
+public class JarSigner extends ProcessBuildStep {
 
     private final String keystore;
     private final String alias;

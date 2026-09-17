@@ -12,7 +12,6 @@ import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Dependencies;
-import build.jenesis.step.JdkProcessBuildStep;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -109,7 +108,7 @@ public class AntlrModule implements BuildExecutorModule {
         }
     }
 
-    private static class Generate extends JdkProcessBuildStep {
+    private static class Generate extends ProcessBuildStep {
 
         private final String tool;
         private final String packageName;
