@@ -759,7 +759,9 @@ public class Dependencies implements BuildExecutorModule {
                         if (!Files.exists(file)) {
                             try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(file))) {
                                 JarEntry entry = new JarEntry("module-info.class");
-                                entry.setTimeLocal(timestamp.toLocalDateTime());
+                                if (timestamp != null) {
+                                    entry.setTimeLocal(timestamp.toLocalDateTime());
+                                }
                                 output.putNextEntry(entry);
                                 output.write(carrying(module, overrideTargets.get(module).carriers()));
                                 output.closeEntry();

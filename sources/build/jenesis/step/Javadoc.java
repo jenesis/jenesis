@@ -12,27 +12,33 @@ public class Javadoc extends ProcessBuildStep {
 
     private final String within;
     private final boolean classpath;
+    private final boolean timestamped;
 
     public Javadoc(ProcessHandler.Factory factory) {
-        this(factory.apply("javadoc", "bin/javadoc"), null, false, printing("javadoc"));
+        this(factory.apply("javadoc", "bin/javadoc"), null, false, BuildStep.timestamp() == null, printing("javadoc"));
     }
 
-    private Javadoc(Function<List<String>, ? extends ProcessHandler> factory, String within, boolean classpath, BiConsumer<Boolean, String> printing) {
+    private Javadoc(Function<List<String>, ? extends ProcessHandler> factory,
+                    String within,
+                    boolean classpath,
+                    boolean timestamped,
+                    BiConsumer<Boolean, String> printing) {
         super("javadoc", factory, printing);
         this.within = within;
         this.classpath = classpath;
+        this.timestamped = timestamped;
     }
 
     public Javadoc within(String within) {
-        return new Javadoc(factory, within, classpath, printing);
+        return new Javadoc(factory, within, classpath, timestamped, printing);
     }
 
     public Javadoc classpath(boolean classpath) {
-        return new Javadoc(factory, within, classpath, printing);
+        return new Javadoc(factory, within, classpath, timestamped, printing);
     }
 
     public Javadoc verbose(BiConsumer<Boolean, String> printing) {
-        return new Javadoc(factory, within, classpath, printing);
+        return new Javadoc(factory, within, classpath, timestamped, printing);
     }
 
     @Override
@@ -54,7 +60,6 @@ public class Javadoc extends ProcessBuildStep {
                 : Files.createDirectories(context.next().resolve(JAVADOC).resolve(within));
         List<String> files = new ArrayList<>(), path = new ArrayList<>(), commands = new ArrayList<>(List.of(
                 "-d", documentation.toString(),
-                "-notimestamp",
                 "-quiet",
                 "-Xdoclint:none",
                 "-tag", "jenesis.release:a:Release:",
@@ -69,6 +74,9 @@ public class Javadoc extends ProcessBuildStep {
                 "-tag", "jenesis.plugin:a:Compiler plugins:",
                 "-tag", "jenesis.layer:a:Isolated layers:",
                 "-tag", "jenesis.signature:a:Signing keys:"));
+        if (!timestamped) {
+            commands.add("-notimestamp");
+        }
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;

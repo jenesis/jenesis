@@ -1976,7 +1976,7 @@ public record Project(
                 executor.aggregate|false|Collect independent step failures into one report
                 process.concurrency|0|Run at most this many JDK tool runs at once; 0 is unbounded
                 process.factory|tool|tool|fork; fork runs a JDK tool in a process of its own
-                archive.timestamp|1980-02-01T00:00:00Z|ISO-8601 date-time with an offset recorded on every entry of the jars, jmods and zips the build writes
+                archive.timestamp|1980-02-01T00:00:00Z|ISO-8601 date-time with an offset recorded on every entry of the jars, jmods and zips the build writes; empty keeps the times the tools record and makes the archives unreproducible
                 print.progress|true|The build progress lines
                 print.process|false|Stream each external tool's command line and output as it runs
                 print.<command>||The same for one tool only, as print.javac or print.tests

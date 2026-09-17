@@ -55,6 +55,32 @@ public class JavadocTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void records_when_a_page_was_generated_only_when_the_archive_timestamp_is_empty(boolean empty)
+            throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"),
+                "package sample; /** Documented. */ public class Sample { }\n");
+        Javadoc javadoc;
+        if (empty) {
+            System.setProperty("jenesis.archive.timestamp", "");
+        }
+        try {
+            javadoc = new Javadoc(ProcessHandler.Factory.TOOL);
+        } finally {
+            System.clearProperty("jenesis.archive.timestamp");
+        }
+        javadoc.apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(Files.readString(next.resolve(Javadoc.JAVADOC + "sample/Sample.html")).contains("dc.created"))
+                .as("javadoc dates every page unless told -notimestamp")
+                .isEqualTo(empty);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void modular_documentation_splits_the_module_path_from_the_class_path(boolean process)
             throws IOException {
         Path library = Files.createDirectories(root.resolve("library"));
