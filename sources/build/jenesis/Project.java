@@ -933,7 +933,7 @@ public record Project(
                                          04 java-modular-multi, 20 module-layout (forcing MODULAR)
                       Starting a build   05 startup (what launching costs, and the daemon)
                       Runnable output    06, 07 java-*-executable (jpackage), 08 bundle (jars for a
-                                         stock JRE), 09 java-multi-release, 58 native-image (GraalVM)
+                                         stock JRE), 09 java-multi-release, 59 native-image (GraalVM)
                       Compiler control   10 javac-arguments (process-javac.properties),
                                          11 annotations (an annotation processor via @jenesis.plugin),
                                          12 error-prone (a javac plugin)
@@ -955,7 +955,8 @@ public record Project(
                       Operating it       45 profiles, 46 build-cache, 47 docker-isolation,
                                          48 agents (@jenesis.attach)
                       Shipping it        56 code-signing (jarsigner), 57 publishing (Maven Central),
-                                         59 jpx (run a released program without building)
+                                         58 reproducible (a jar checked against a recorded digest),
+                                         60 jpx (run a released program without building)
                       Extending it       49 custom-assembler, 50 custom-jmod, 51 internal-module,
                                          52 external-module, 53 custom-maven, 54 custom-modular,
                                          55 custom-build (no Project at all)
