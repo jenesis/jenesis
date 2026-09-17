@@ -106,7 +106,11 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     : null;
             if (sbom != null) {
                 sub.addStep("sbom", sbom,
-                        Stream.concat(descriptor.manifests().stream(), descriptor.artifacts().stream()));
+                        Stream.of(descriptor.manifests().stream(),
+                                        descriptor.artifacts().stream(),
+                                        descriptor.sources().stream(),
+                                        descriptor.resources().stream())
+                                .flatMap(Function.identity()));
             }
             sub.addModule("compliance", compliance.apply(new InferredComplianceModule(descriptor.configuration())),
                     Stream.concat(descriptor.manifests().stream(), descriptor.artifacts().stream()));

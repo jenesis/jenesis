@@ -40,6 +40,7 @@ public class ProjectTest {
         System.clearProperty("jenesis.project.version");
         System.clearProperty("jenesis.project.tag");
         System.clearProperty("jenesis.project.revision");
+        System.clearProperty("jenesis.project.tree");
         System.clearProperty("jenesis.make.profiles");
         System.clearProperty("jenesis.make.global");
         System.clearProperty("jenesis.test.sample.key");
@@ -50,17 +51,22 @@ public class ProjectTest {
     }
 
     @Test
-    public void reads_the_tag_and_the_revision_from_their_properties_and_keeps_empty_ones() {
+    public void reads_the_tag_revision_and_tree_from_their_properties_and_keeps_empty_ones() {
         assertThat(new Project(root).tag()).isNull();
         assertThat(new Project(root).revision()).isNull();
+        assertThat(new Project(root).tree()).isNull();
         System.setProperty("jenesis.project.tag", "v1.2.3");
         System.setProperty("jenesis.project.revision", "0123abcd");
+        System.setProperty("jenesis.project.tree", "4b825dc642cb6eb9a060e54bf8d69288fbee4904");
         assertThat(new Project(root).tag()).isEqualTo("v1.2.3");
         assertThat(new Project(root).revision()).isEqualTo("0123abcd");
+        assertThat(new Project(root).tree()).isEqualTo("4b825dc642cb6eb9a060e54bf8d69288fbee4904");
         System.setProperty("jenesis.project.tag", "");
         System.setProperty("jenesis.project.revision", "");
+        System.setProperty("jenesis.project.tree", "");
         assertThat(new Project(root).tag()).isEmpty();
         assertThat(new Project(root).revision()).isEmpty();
+        assertThat(new Project(root).tree()).isEmpty();
     }
 
     @Test
@@ -73,9 +79,11 @@ public class ProjectTest {
 
     @Test
     public void records_a_set_tag_and_revision() throws IOException {
-        assertThat(metadataValues(new Project(Path.of(".")).tag("v1.2.3").revision("0123abcd")))
+        assertThat(metadataValues(new Project(Path.of(".")).tag("v1.2.3").revision("0123abcd")
+                .tree("4b825dc642cb6eb9a060e54bf8d69288fbee4904")))
                 .containsEntry("scm.tag", "v1.2.3")
-                .containsEntry("scm.revision", "0123abcd");
+                .containsEntry("scm.revision", "0123abcd")
+                .containsEntry("scm.tree", "4b825dc642cb6eb9a060e54bf8d69288fbee4904");
     }
 
     @Test
@@ -90,7 +98,7 @@ public class ProjectTest {
     public void records_no_scm_tag_or_revision_unless_set() throws IOException {
         assertThat(metadataValues(new Project(Path.of("."))))
                 .as("what a metadata file or a pom.xml declares stays in force")
-                .doesNotContainKeys("scm.tag", "scm.revision");
+                .doesNotContainKeys("scm.tag", "scm.revision", "scm.tree");
     }
 
     private SequencedProperties metadataValues(Project project) throws IOException {
