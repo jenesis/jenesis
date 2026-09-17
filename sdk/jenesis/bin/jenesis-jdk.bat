@@ -34,7 +34,8 @@ if not "!NUMBERS!"=="!VERSION!" set "WORDS=!VERSION:*-=!"
 set "VENDOR="
 set "EA="
 set "JVMCI="
-if defined WORDS for %%w in (!WORDS:-= !) do (
+if defined WORDS set "WORDLIST=!WORDS:-= !"
+if defined WORDS for %%w in (!WORDLIST!) do (
     call :word %%w
     if errorlevel 1 exit /b 2
 )
