@@ -5,7 +5,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 
-public class JMod extends JdkProcessBuildStep {
+public class JMod extends ProcessBuildStep {
 
     public static final String JMODS = "jmods/";
     public static final String CONFIG = "jmodconfig/", LIBRARIES = "jmodlibs/", COMMANDS = "jmodcmds/";

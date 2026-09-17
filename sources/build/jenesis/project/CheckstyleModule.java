@@ -13,7 +13,6 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
-import build.jenesis.step.JdkProcessBuildStep;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -111,7 +110,7 @@ public class CheckstyleModule implements BuildExecutorModule {
         }
     }
 
-    private static class Check extends JdkProcessBuildStep {
+    private static class Check extends ProcessBuildStep {
 
         private final String tool;
         private final String configFile;
