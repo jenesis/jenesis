@@ -120,8 +120,9 @@ Quick index
 | 55 | [`custom-build`](demo-55-custom-build/README.md)             | No `Project` at all: wire a `BuildExecutor` by hand                   | `java build/Demo.java`             |
 | 56 | [`code-signing`](demo-56-code-signing/README.md)             | Sign the produced jar with `jarsigner`: the key is named by the environment rather than by anything beside the code, and the signed jar replaces the unsigned one before the inventory, the staged repositories or a publication ever see it | `java build/Demo.java`             |
 | 57 | [`publishing`](demo-57-publishing/README.md)                 | Assemble a Maven Central ready bundle (POM metadata + sources/javadoc jars) and resolve it back | `java build/Demo.java`             |
-| 58 | [`native-image`](demo-58-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
-| 59 | [`jpx`](demo-59-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
+| 58 | [`reproducible`](demo-58-reproducible/README.md)             | Build a jar and compare it with a SHA-256 recorded in the demo: CI runs the check on Linux, macOS and Windows, each on its own update of JDK 25 | `java build/Demo.java`             |
+| 59 | [`native-image`](demo-59-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
+| 60 | [`jpx`](demo-60-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1269,7 +1270,24 @@ to the `release` goal, a rehearsal by default, and its `environment` step hands 
 version this build stamped to the release tool so it is stated once rather than
 passed twice.
 
-## 40. Ahead-of-time native image - [`native-image`](demo-58-native-image/README.md)
+## 40. The same bytes on every machine - [`reproducible`](demo-58-reproducible/README.md)
+
+What `publishing` stages, anyone holding the sources should be able to build again
+and get the same bytes, so that the artifact can be checked against the code it
+claims to come from. `reproducible` turns that into a check: its `build/Demo.java`
+builds a module that resolves nothing and compares the jar's SHA-256 with a digest
+recorded in the demo. CI runs it on Linux, macOS and Windows, each on whatever
+update of JDK 25 its runner provides, so a match on every runner shows that
+nothing about the machine reaches the jar.
+
+Nothing is configured for it. The `jar` tool sorts the entries of every folder it
+adds, no entry records Unix permissions, every entry records the same time, and a
+module that declares no release compiles for the release of the running JDK, which
+keeps that JDK's update out of `module-info.class`. The time is the one setting
+involved: `jenesis.archive.timestamp` names another, such as the time of the
+release commit, and the recorded digest changes with it.
+
+## 41. Ahead-of-time native image - [`native-image`](demo-59-native-image/README.md)
 
 `native-image` revisits the runnable-artifact idea from section 5 from the other
 end. There, `jpackage` bundled your bytecode with a `jlink`-trimmed JVM; here
@@ -1307,7 +1325,7 @@ successor: jpackage for a faithful bundle of the JVM you tested against, native-
 when startup latency and footprint dominate. Like `docker-isolation`, it needs tooling
 the CI runners lack (GraalVM), so it is a local exercise.
 
-## 41. Running a released program - [`jpx`](demo-59-jpx/README.md)
+## 42. Running a released program - [`jpx`](demo-60-jpx/README.md)
 
 Every demo so far built something. `jpx` builds nothing: it resolves a *published*
 module (or Maven artifact), installs its runtime closure once into
@@ -1376,7 +1394,7 @@ a native application image (collected under `stage/packages/` next to `stage/mav
 into a trimmed `jlink` runtime image (staged under `stage/runtime`), `bundle=true` zips
 jars-only for a JRE base, `launcher=true` shades the `build.jenesis.launcher` into a
 single `java -jar`-able executable jar that keeps the module graph, `native=true`
-compiles ahead of time into a standalone GraalVM native binary (see section 40), and
+compiles ahead of time into a standalone GraalVM native binary (see section 41), and
 and a `modules.properties` file beside it (per module, `mode=declared|synthetic|none`,
 absent by default) rewrites the resolved closure into explicit named modules - replacing it for compile, test and packaging
 alike - so a non-modular dependency tree becomes linkable and a broken module graph fails

@@ -108,7 +108,8 @@ jobs:
           - { name: custom-build, dir: demo-55-custom-build, entry: build/Demo.java }
           - { name: code-signing, dir: demo-56-code-signing, entry: build/Demo.java, verify: 'jar tf "$(find target/stage -name "*.jar" | head -1)" | grep -q "META-INF/DEMO.SF"' }
           - { name: publishing, dir: demo-57-publishing, entry: build/Demo.java }
-          - { name: jpx, dir: demo-59-jpx, entry: build/Demo.java, verify: 'test "$(find target/jpx -name jpx.properties | wc -l)" -eq 2' }
+          - { name: reproducible, dir: demo-58-reproducible, entry: build/Demo.java }
+          - { name: jpx, dir: demo-60-jpx, entry: build/Demo.java, verify: 'test "$(find target/jpx -name jpx.properties | wc -l)" -eq 2' }
     runs-on: ${{ inputs.os }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
