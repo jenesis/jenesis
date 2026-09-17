@@ -51,6 +51,7 @@ public record Project(
         boolean documentation,
         Pinning pinning,
         String version,
+        String tag,
         SequencedSet<String> defaultTarget,
         MultiProjectAssembler<? super ProjectModuleDescriptor> assembler,
         Supplier<BuildExecutor.Configuration> configurator,
@@ -369,7 +370,8 @@ public record Project(
     }
 
     private record MetadataModule(SequencedMap<String, Path> files,
-                                  String version) implements BuildExecutorModule {
+                                  String version,
+                                  String tag) implements BuildExecutorModule {
 
         static BuildExecutorModule toMetadataModule(Project project) {
             Path root = project.root().toAbsolutePath().normalize();
@@ -379,15 +381,21 @@ public record Project(
                 Path relative = root.relativize(absolute);
                 files.put(METADATA + "-" + BuildExecutorModule.encode(relative.toString()), relative);
             }
-            return new MetadataModule(files, project.version());
+            return new MetadataModule(files, project.version(), project.tag());
         }
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
             files.forEach((name, file) -> buildExecutor.addSource("file-" + name, Bind.asMetadata(), file));
+            SequencedMap<String, String> values = new LinkedHashMap<>();
             if (version != null && !version.isEmpty()) {
-                SequencedMap<String, String> values = new LinkedHashMap<>();
                 values.put("version", version);
+            }
+            String scmTag = tag == null ? values.get("version") : tag;
+            if (scmTag != null) {
+                values.put("scm.tag", scmTag);
+            }
+            if (!values.isEmpty()) {
                 buildExecutor.addStep("command", new MetadataValues(values));
             }
         }
@@ -593,7 +601,7 @@ public record Project(
 
                       metadata.properties   project, artifact, version, name, description, url,
                                             license.<id>.{name,url}, developer.<id>.{name,email},
-                                            scm.{connection,developerConnection,url}. Project-level
+                                            scm.{connection,developerConnection,url,tag}. Project-level
                                             overrides live in the file that
                                             -Djenesis.project.metadata=<path> names, conventionally
                                             project.properties.
@@ -1364,6 +1372,7 @@ public record Project(
                 SequencedProperties.systemFlag("jenesis.project.documentation"),
                 Pinning.fromProperty(),
                 System.getProperty("jenesis.project.version"),
+                System.getProperty("jenesis.project.tag"),
                 Collections.unmodifiableSequencedSet(new LinkedHashSet<>(List.of(BUILD))),
                 new InferredMultiProjectAssembler(),
                 BuildExecutor.Configuration::new,
@@ -1419,6 +1428,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1443,6 +1453,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1467,6 +1478,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1491,6 +1503,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1515,6 +1528,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1539,6 +1553,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1563,6 +1578,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1587,6 +1603,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1611,6 +1628,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1635,6 +1653,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1659,6 +1678,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1683,6 +1703,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1707,6 +1728,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1731,6 +1753,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1755,6 +1778,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1779,6 +1803,32 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                defaultTarget,
+                assembler,
+                configurator,
+                repositories,
+                resolvers);
+    }
+
+    public Project tag(String tag) {
+        return new Project(root,
+                target,
+                artifacts,
+                metadata,
+                configuration,
+                boms,
+                signatures,
+                profiles,
+                cache,
+                hashFunction,
+                layout,
+                tests,
+                sources,
+                documentation,
+                pinning,
+                version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1803,6 +1853,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 Collections.unmodifiableSequencedSet(new LinkedHashSet<>(List.of(defaultTarget))),
                 assembler,
                 configurator,
@@ -1827,6 +1878,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1851,6 +1903,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1875,6 +1928,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1899,6 +1953,7 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1945,6 +2000,7 @@ public record Project(
                 project.sources|false|Assemble a sources jar for every module
                 project.documentation|false|Assemble a javadoc jar for every module
                 project.version||Version stamped onto every produced artifact
+                project.tag||SCM tag recorded in the generated POM and SBOM; default: the project version, empty for none
                 project.digest|SHA-256|Algorithm for pin and dependency checksums
                 dependency.signature|none|Signatures verified after download: none|declared|strict
                 openpgp.command|gpgv|Binary forked to verify detached OpenPGP signatures; a name is looked up on the PATH, a path is used as given

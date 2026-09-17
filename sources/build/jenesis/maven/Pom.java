@@ -221,11 +221,13 @@ public class Pom implements BuildStep {
         String scmConnection = metadata.getProperty("scm.connection");
         String scmDeveloperConnection = metadata.getProperty("scm.developerConnection");
         String scmUrl = metadata.getProperty("scm.url");
-        if (scmConnection != null || scmDeveloperConnection != null || scmUrl != null) {
+        String scmTag = metadata.value("scm.tag");
+        if (scmConnection != null || scmDeveloperConnection != null || scmUrl != null || scmTag != null) {
             scm = new MavenPomEmitter.Metadata.Scm(
                     scmConnection,
                     scmDeveloperConnection,
-                    scmUrl);
+                    scmUrl,
+                    scmTag);
         }
         return new MavenPomEmitter.Metadata(
                 metadata.getProperty("name"),
