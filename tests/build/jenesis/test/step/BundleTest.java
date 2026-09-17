@@ -232,6 +232,37 @@ public class BundleTest {
         }
     }
 
+    @Test
+    public void keeps_the_file_times_when_the_archive_timestamp_is_empty() throws IOException {
+        Path app = Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar");
+        writePlainJar(app);
+        Instant modified = Instant.parse("2001-02-03T04:05:06Z");
+        Files.setLastModifiedTime(app, FileTime.from(modified));
+        SequencedProperties launcher = new SequencedProperties();
+        launcher.setProperty("mainClass", "sample.Sample");
+        launcher.store(input.resolve("launcher.properties"));
+        Bundle bundle;
+        System.setProperty("jenesis.archive.timestamp", "");
+        try {
+            bundle = new Bundle();
+        } finally {
+            System.clearProperty("jenesis.archive.timestamp");
+        }
+
+        BuildStepResult result = bundle.apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        try (ZipFile zip = new ZipFile(next.resolve(Bundle.BUNDLE).resolve("bundle.zip").toFile())) {
+            assertThat(zip.getEntry("jars/app.jar").getTime()).isEqualTo(modified.toEpochMilli());
+        }
+    }
+
     private static void writeLibraryJar(Path path) throws IOException {
         try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(path))) {
             jar.putNextEntry(new JarEntry("alias/lib/Type.class"));

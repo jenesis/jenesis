@@ -56,7 +56,10 @@ public class JMod extends ProcessBuildStep {
         if (moduleName == null) {
             return CompletableFuture.completedStage(null);
         }
-        List<String> commands = new ArrayList<>(List.of("create", "--date=" + timestamp));
+        List<String> commands = new ArrayList<>(List.of("create"));
+        if (timestamp != null) {
+            commands.add("--date=" + timestamp);
+        }
         option(commands, "--class-path", classPath);
         option(commands, "--config", config);
         option(commands, "--libs", libs);

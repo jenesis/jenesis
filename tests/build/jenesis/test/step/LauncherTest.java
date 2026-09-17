@@ -165,6 +165,47 @@ public class LauncherTest {
         }
     }
 
+    @Test
+    public void keeps_the_entry_times_of_the_jars_it_explodes_when_the_archive_timestamp_is_empty() throws IOException {
+        writeLauncherJar(Files.createDirectory(input.resolve("resolved")).resolve("launcher.jar"));
+        Instant modified = Instant.parse("2001-02-03T04:05:06Z");
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(
+                Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar")))) {
+            JarEntry entry = new JarEntry("sample/Sample.class");
+            entry.setTime(modified.toEpochMilli());
+            jar.putNextEntry(entry);
+            jar.write(new byte[] {1, 2, 3});
+            jar.closeEntry();
+        }
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("launcher/runtime/maven/build.jenesis/build.jenesis.launcher", "resolved/launcher.jar");
+        index.store(input.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties application = new SequencedProperties();
+        application.setProperty("mainClass", "sample.Sample");
+        application.store(input.resolve("launcher.properties"));
+        Launcher launcher;
+        System.setProperty("jenesis.archive.timestamp", "");
+        try {
+            launcher = new Launcher("launcher", PathPlacement.INFERRED);
+        } finally {
+            System.clearProperty("jenesis.archive.timestamp");
+        }
+
+        BuildStepResult result = launcher.apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("resolved/launcher.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        try (ZipFile jar = new ZipFile(next.resolve(Launcher.LAUNCHER).resolve("application.jar").toFile())) {
+            assertThat(jar.getEntry("jars/app.jar/sample/Sample.class").getTime()).isEqualTo(modified.toEpochMilli());
+        }
+    }
+
     private static void writeLauncherJar(Path path) throws IOException {
         try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(path))) {
             entry(jar, "module-info.class");
