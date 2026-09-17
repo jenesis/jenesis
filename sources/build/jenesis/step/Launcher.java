@@ -136,7 +136,8 @@ public class Launcher implements BuildStep {
         manifest.getMainAttributes().put(Attributes.Name.MAIN_CLASS, MAIN_CLASS);
         Path jar = Files.createDirectory(context.next().resolve(LAUNCHER))
                 .resolve((name == null ? "application" : name) + ".jar");
-        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar), manifest)) {
+        try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
+            writeManifest(out, manifest);
             explode(out, shaded, "", entry -> entry.startsWith(LAUNCHER_PREFIX) && entry.endsWith(".class"));
             writeEntry(out, "application.properties", descriptor);
             for (Map.Entry<String, Path> entry : stored.entrySet()) {
@@ -162,6 +163,14 @@ public class Launcher implements BuildStep {
                 out.closeEntry();
             }
         }
+    }
+
+    private static void writeManifest(JarOutputStream out, Manifest manifest) throws IOException {
+        JarEntry entry = new JarEntry(JarFile.MANIFEST_NAME);
+        entry.setTime(0L);
+        out.putNextEntry(entry);
+        manifest.write(out);
+        out.closeEntry();
     }
 
     private static void writeEntry(JarOutputStream out, String name, Path file) throws IOException {
