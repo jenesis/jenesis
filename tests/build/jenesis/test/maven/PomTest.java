@@ -2,6 +2,7 @@ package build.jenesis.test.maven;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import module org.junit.jupiter.params;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -372,6 +373,36 @@ public class PomTest {
         assertThat(pom).contains("<id>bob</id>");
         assertThat(pom).contains("<email>bob@example.com</email>");
         assertThat(pom).contains("<connection>scm:git:https://example.com/jenesis.git</connection>");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"v1.0.0", ""})
+    public void emits_a_scm_tag_unless_it_is_empty(String tag) throws IOException {
+        SequencedProperties coordinates = new SequencedProperties();
+        coordinates.setProperty("maven/build.jenesis/jenesis/jar/1.0.0", "");
+        coordinates.store(argument.resolve(BuildStep.IDENTITY));
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.setProperty("scm.tag", tag);
+        metadata.store(argument.resolve(BuildStep.METADATA));
+        BuildStepResult result = new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(
+                                        Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+        assertThat(result.next()).isTrue();
+        String pom = Files.readString(next.resolve(Pom.POM));
+        if (tag.isEmpty()) {
+            assertThat(pom).as("an empty tag stands for none, so no scm element is written for it").doesNotContain("<scm>");
+        } else {
+            assertThat(pom).contains("<tag>v1.0.0</tag>");
+        }
     }
 
     @Test

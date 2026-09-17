@@ -51,6 +51,9 @@ public record Project(
         boolean documentation,
         Pinning pinning,
         String version,
+        String tag,
+        String revision,
+        String tree,
         SequencedSet<String> defaultTarget,
         MultiProjectAssembler<? super ProjectModuleDescriptor> assembler,
         Supplier<BuildExecutor.Configuration> configurator,
@@ -369,7 +372,10 @@ public record Project(
     }
 
     private record MetadataModule(SequencedMap<String, Path> files,
-                                  String version) implements BuildExecutorModule {
+                                  String version,
+                                  String tag,
+                                  String revision,
+                                  String tree) implements BuildExecutorModule {
 
         static BuildExecutorModule toMetadataModule(Project project) {
             Path root = project.root().toAbsolutePath().normalize();
@@ -379,15 +385,26 @@ public record Project(
                 Path relative = root.relativize(absolute);
                 files.put(METADATA + "-" + BuildExecutorModule.encode(relative.toString()), relative);
             }
-            return new MetadataModule(files, project.version());
+            return new MetadataModule(files, project.version(), project.tag(), project.revision(), project.tree());
         }
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
             files.forEach((name, file) -> buildExecutor.addSource("file-" + name, Bind.asMetadata(), file));
+            SequencedMap<String, String> values = new LinkedHashMap<>();
             if (version != null && !version.isEmpty()) {
-                SequencedMap<String, String> values = new LinkedHashMap<>();
                 values.put("version", version);
+            }
+            if (tag != null) {
+                values.put("scm.tag", tag);
+            }
+            if (revision != null) {
+                values.put("scm.revision", revision);
+            }
+            if (tree != null) {
+                values.put("scm.tree", tree);
+            }
+            if (!values.isEmpty()) {
                 buildExecutor.addStep("command", new MetadataValues(values));
             }
         }
@@ -593,7 +610,7 @@ public record Project(
 
                       metadata.properties   project, artifact, version, name, description, url,
                                             license.<id>.{name,url}, developer.<id>.{name,email},
-                                            scm.{connection,developerConnection,url}. Project-level
+                                            scm.{connection,developerConnection,url,tag,revision,tree}. Project-level
                                             overrides live in the file that
                                             -Djenesis.project.metadata=<path> names, conventionally
                                             project.properties.
@@ -1364,6 +1381,9 @@ public record Project(
                 SequencedProperties.systemFlag("jenesis.project.documentation"),
                 Pinning.fromProperty(),
                 System.getProperty("jenesis.project.version"),
+                System.getProperty("jenesis.project.tag"),
+                System.getProperty("jenesis.project.revision"),
+                System.getProperty("jenesis.project.tree"),
                 Collections.unmodifiableSequencedSet(new LinkedHashSet<>(List.of(BUILD))),
                 new InferredMultiProjectAssembler(),
                 BuildExecutor.Configuration::new,
@@ -1419,6 +1439,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1443,6 +1466,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1467,6 +1493,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1491,6 +1520,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1515,6 +1547,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1539,6 +1574,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1563,6 +1601,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1587,6 +1628,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1611,6 +1655,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1635,6 +1682,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1659,6 +1709,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1683,6 +1736,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1707,6 +1763,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1731,6 +1790,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1755,6 +1817,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1779,6 +1844,90 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
+                defaultTarget,
+                assembler,
+                configurator,
+                repositories,
+                resolvers);
+    }
+
+    public Project tag(String tag) {
+        return new Project(root,
+                target,
+                artifacts,
+                metadata,
+                configuration,
+                boms,
+                signatures,
+                profiles,
+                cache,
+                hashFunction,
+                layout,
+                tests,
+                sources,
+                documentation,
+                pinning,
+                version,
+                tag,
+                revision,
+                tree,
+                defaultTarget,
+                assembler,
+                configurator,
+                repositories,
+                resolvers);
+    }
+
+    public Project revision(String revision) {
+        return new Project(root,
+                target,
+                artifacts,
+                metadata,
+                configuration,
+                boms,
+                signatures,
+                profiles,
+                cache,
+                hashFunction,
+                layout,
+                tests,
+                sources,
+                documentation,
+                pinning,
+                version,
+                tag,
+                revision,
+                tree,
+                defaultTarget,
+                assembler,
+                configurator,
+                repositories,
+                resolvers);
+    }
+
+    public Project tree(String tree) {
+        return new Project(root,
+                target,
+                artifacts,
+                metadata,
+                configuration,
+                boms,
+                signatures,
+                profiles,
+                cache,
+                hashFunction,
+                layout,
+                tests,
+                sources,
+                documentation,
+                pinning,
+                version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1803,6 +1952,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 Collections.unmodifiableSequencedSet(new LinkedHashSet<>(List.of(defaultTarget))),
                 assembler,
                 configurator,
@@ -1827,6 +1979,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1851,6 +2006,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1875,6 +2033,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1899,6 +2060,9 @@ public record Project(
                 documentation,
                 pinning,
                 version,
+                tag,
+                revision,
+                tree,
                 defaultTarget,
                 assembler,
                 configurator,
@@ -1945,6 +2109,9 @@ public record Project(
                 project.sources|false|Assemble a sources jar for every module
                 project.documentation|false|Assemble a javadoc jar for every module
                 project.version||Version stamped onto every produced artifact
+                project.tag||SCM tag recorded in the generated POM and SBOM; empty for none
+                project.revision||Source revision, such as a commit id, recorded in the SBOM; empty for none
+                project.tree||Git tree id of the release, recorded in the SBOM as a SWHID; empty for none
                 project.digest|SHA-256|Algorithm for pin and dependency checksums
                 dependency.signature|none|Signatures verified after download: none|declared|strict
                 openpgp.command|gpgv|Binary forked to verify detached OpenPGP signatures; a name is looked up on the PATH, a path is used as given
