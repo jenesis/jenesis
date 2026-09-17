@@ -18,26 +18,32 @@ public class Sbom implements BuildStep {
     private static final Pattern CONNECTION = Pattern.compile("scm([:|])([a-z0-9]+)\\1([a-zA-Z][a-zA-Z0-9+.-]*://.+)");
 
     private final CycloneDx.Format format;
+    private final boolean swhid;
 
     public Sbom() {
-        this(CycloneDx.Format.JSON);
+        this(CycloneDx.Format.JSON, false);
     }
 
-    private Sbom(CycloneDx.Format format) {
+    private Sbom(CycloneDx.Format format, boolean swhid) {
         this.format = format;
+        this.swhid = swhid;
     }
 
     public Sbom format(CycloneDx.Format format) {
-        return new Sbom(format);
+        return new Sbom(format, swhid);
+    }
+
+    public Sbom swhid(boolean swhid) {
+        return new Sbom(format, swhid);
     }
 
     public static Sbom configured(Path properties) throws IOException {
-        String format = properties == null
-                ? "json"
-                : SequencedProperties.ofFiles(properties).value("format", "json");
+        SequencedProperties configuration = properties == null ? new SequencedProperties() : SequencedProperties.ofFiles(properties);
+        String format = configuration.value("format", "json");
+        boolean swhid = configuration.flag("swhid", false);
         return switch (format.toLowerCase(Locale.ROOT)) {
-            case "json" -> new Sbom().format(CycloneDx.Format.JSON);
-            case "xml" -> new Sbom().format(CycloneDx.Format.XML);
+            case "json" -> new Sbom().format(CycloneDx.Format.JSON).swhid(swhid);
+            case "xml" -> new Sbom().format(CycloneDx.Format.XML).swhid(swhid);
             case "none" -> null;
             default -> throw new IllegalArgumentException("Unknown SBOM format: " + format);
         };
@@ -50,7 +56,8 @@ public class Sbom implements BuildStep {
                 Path.of(METADATA),
                 Path.of(Dependencies.GRAPH),
                 Path.of(Dependencies.LICENSES),
-                Path.of(Dependencies.RESOLVED)));
+                Path.of(Dependencies.RESOLVED))
+                || swhid && argument.hasChanged(Path.of(SOURCES), Path.of(RESOURCES)));
     }
 
     @Override
@@ -121,6 +128,28 @@ public class Sbom implements BuildStep {
             }
             if (revision != null) {
                 properties.add(new CycloneDx.Property("jenesis:scm:revision", revision));
+            }
+            String tree = metadata.value("scm.tree");
+            if (tree != null) {
+                if (!tree.matches("[0-9a-f]{40}")) {
+                    throw new IllegalArgumentException("The tree of a release must be the 40-character id of a Git"
+                            + " tree, as `git rev-parse HEAD^{tree}` prints it: " + tree);
+                }
+                properties.add(new CycloneDx.Property("jenesis:scm:swhid", "swh:1:dir:" + tree));
+            }
+            if (swhid) {
+                List<Path> roots = new ArrayList<>();
+                for (Path folder : folders) {
+                    for (Path root : List.of(folder.resolve(SOURCES), folder.resolve(RESOURCES))) {
+                        if (Files.isDirectory(root)) {
+                            roots.add(root);
+                        }
+                    }
+                }
+                String identifier = swhid(roots);
+                if (identifier != null) {
+                    properties.add(new CycloneDx.Property("jenesis:source:swhid", identifier));
+                }
             }
             project = new CycloneDx.Component(projectRef, groupId, artifactId, version, purl, null,
                     ownLicenses(metadata), metadata.getProperty("description"), developers(metadata),
@@ -357,5 +386,85 @@ public class Sbom implements BuildStep {
             builder.append("\n");
         }
         return builder.toString();
+    }
+
+    private static String swhid(List<Path> roots) throws IOException {
+        Directory tree = new Directory();
+        SequencedMap<String, Path> origins = new TreeMap<>();
+        for (Path root : roots) {
+            List<Path> files;
+            try (Stream<Path> walk = Files.walk(root)) {
+                files = walk.filter(Files::isRegularFile).toList();
+            }
+            for (Path file : files) {
+                String name = root.relativize(file).toString().replace(File.separatorChar, '/');
+                Path origin = origins.putIfAbsent(name, file);
+                if (origin != null) {
+                    if (Files.mismatch(origin, file) != -1) {
+                        throw new IllegalStateException("Two source roots contain " + name + " with different content: "
+                                + origin + " and " + file);
+                    }
+                    continue;
+                }
+                Directory directory = tree;
+                String[] segments = name.split("/");
+                for (int index = 0; index < segments.length - 1; index++) {
+                    directory = directory.directories().computeIfAbsent(segments[index], _ -> new Directory());
+                }
+                directory.files().put(segments[segments.length - 1], file);
+            }
+        }
+        return origins.isEmpty() ? null : "swh:1:dir:" + HexFormat.of().formatHex(treeId(tree));
+    }
+
+    private static byte[] treeId(Directory directory) throws IOException {
+        List<String> names = new ArrayList<>(directory.files().keySet());
+        directory.directories().keySet().forEach(name -> names.add(name + "/"));
+        names.sort((left, right) -> Arrays.compareUnsigned(
+                left.getBytes(StandardCharsets.UTF_8),
+                right.getBytes(StandardCharsets.UTF_8)));
+        ByteArrayOutputStream content = new ByteArrayOutputStream();
+        for (String name : names) {
+            byte[] id;
+            if (name.endsWith("/")) {
+                name = name.substring(0, name.length() - 1);
+                content.write("40000 ".getBytes(StandardCharsets.US_ASCII));
+                id = treeId(directory.directories().get(name));
+            } else {
+                content.write("100644 ".getBytes(StandardCharsets.US_ASCII));
+                id = blobId(directory.files().get(name));
+            }
+            content.write(name.getBytes(StandardCharsets.UTF_8));
+            content.write(0);
+            content.write(id);
+        }
+        MessageDigest digest = sha1();
+        digest.update(("tree " + content.size() + "\0").getBytes(StandardCharsets.US_ASCII));
+        digest.update(content.toByteArray());
+        return digest.digest();
+    }
+
+    private static byte[] blobId(Path file) throws IOException {
+        MessageDigest digest = sha1();
+        digest.update(("blob " + Files.size(file) + "\0").getBytes(StandardCharsets.US_ASCII));
+        try (InputStream in = new DigestInputStream(Files.newInputStream(file), digest)) {
+            in.transferTo(OutputStream.nullOutputStream());
+        }
+        return digest.digest();
+    }
+
+    private static MessageDigest sha1() {
+        try {
+            return MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-1 is required to compute a SWHID", e);
+        }
+    }
+
+    private record Directory(SequencedMap<String, Directory> directories, SequencedMap<String, Path> files) {
+
+        private Directory() {
+            this(new TreeMap<>(), new TreeMap<>());
+        }
     }
 }

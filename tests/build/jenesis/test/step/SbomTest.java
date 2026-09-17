@@ -12,6 +12,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.step.Sbom;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class SbomTest {
 
@@ -148,14 +149,72 @@ public class SbomTest {
                 .doesNotContain("git+");
     }
 
+    @Test
+    public void records_the_tree_of_a_release_as_a_swhid() throws Exception {
+        assertThat(sbom(Map.of("scm.tree", "b293ceb1896f112828a70184317caf4f87f7d327")))
+                .contains("{ \"name\": \"jenesis:scm:swhid\", \"value\": \"swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327\" }");
+    }
+
+    @Test
+    public void rejects_a_tree_that_is_not_a_git_tree_id() {
+        assertThatThrownBy(() -> sbom(Map.of("scm.tree", "HEAD")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("git rev-parse HEAD^{tree}")
+                .hasMessageEndingWith("HEAD");
+    }
+
+    @Test
+    public void computes_one_swhid_over_all_source_roots() throws Exception {
+        Files.writeString(Files.createDirectories(argument.resolve(BuildStep.SOURCES + "demo")).resolve("Greeting.java"),
+                "package demo;\n");
+        Files.writeString(argument.resolve(BuildStep.SOURCES + "module-info.java"), "module demo {}\n");
+        Files.writeString(Files.createDirectories(argument.resolve(BuildStep.RESOURCES + "demo")).resolve("greeting.properties"),
+                "text=hello\n");
+        Files.writeString(argument.resolve(BuildStep.RESOURCES + "demo.txt"), "a text file beside the demo folder\n");
+        assertThat(sbom(new Sbom().swhid(true), Map.of()))
+                .as("git write-tree over the same four files names the tree b293ceb1, listing demo.txt before demo/")
+                .contains("{ \"name\": \"jenesis:source:swhid\", \"value\": \"swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327\" }");
+    }
+
+    @Test
+    public void computes_no_swhid_unless_configured() throws Exception {
+        Files.writeString(Files.createDirectories(argument.resolve(BuildStep.SOURCES)).resolve("module-info.java"),
+                "module demo {}\n");
+        assertThat(sbom(Map.of())).doesNotContain("jenesis:source:swhid");
+    }
+
+    @Test
+    public void rejects_source_roots_that_disagree_on_a_file() throws Exception {
+        Files.writeString(Files.createDirectories(argument.resolve(BuildStep.SOURCES)).resolve("notes.txt"), "one\n");
+        Files.writeString(Files.createDirectories(argument.resolve(BuildStep.RESOURCES)).resolve("notes.txt"), "two\n");
+        assertThatThrownBy(() -> sbom(new Sbom().swhid(true), Map.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("notes.txt");
+    }
+
+    @Test
+    public void runs_again_for_a_changed_source_only_when_computing_the_swhid() throws Exception {
+        Path configuration = root.resolve("sbom.properties");
+        Files.writeString(configuration, "swhid=true\n");
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                argument,
+                Map.of(Path.of(BuildStep.SOURCES + "demo/Greeting.java"), Checksum.of(ChecksumStatus.ALTERED)))));
+        assertThat(Sbom.configured(configuration).shouldRun(arguments)).isTrue();
+        assertThat(Sbom.configured(null).shouldRun(arguments)).isFalse();
+    }
+
     private String sbom(Map<String, String> scm) throws Exception {
+        return sbom(new Sbom(), scm);
+    }
+
+    private String sbom(Sbom step, Map<String, String> scm) throws Exception {
         SequencedProperties metadata = new SequencedProperties();
         metadata.setProperty("project", "build.jenesis");
         metadata.setProperty("artifact", "demo");
         metadata.setProperty("version", "1.0.0");
         scm.forEach(metadata::setProperty);
         metadata.store(argument.resolve(BuildStep.METADATA));
-        BuildStepResult result = new Sbom().apply(Runnable::run,
+        BuildStepResult result = step.apply(Runnable::run,
                         new BuildStepContext(previous, next, supplement),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
