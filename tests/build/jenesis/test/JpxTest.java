@@ -568,6 +568,35 @@ public class JpxTest {
     }
 
     @Test
+    public void command_runs_the_java_of_the_jdk_the_installation_names() throws IOException {
+        Path folder = Files.createDirectories(work.resolve("crafted@1.0"));
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("mainClass", "toolmain.Main");
+        properties.store(folder.resolve(Jpx.PROPERTIES));
+        Path home = work.resolve("jdk");
+
+        List<String> command = new Jpx.Installation(folder, new HashDigestFunction("SHA-256"))
+                .home(home)
+                .command(List.of("run"));
+
+        assertThat(command.getFirst())
+                .as("--java selects the JDK a program runs on, in place of the one running jpx")
+                .isEqualTo(home.resolve("bin").resolve(File.separatorChar == '\\' ? "java.exe" : "java").toString());
+    }
+
+    @Test
+    public void docker_command_mounts_the_jdk_the_installation_names() throws IOException, InterruptedException {
+        addMavenTool();
+        Path home = work.resolve("jdk");
+        Jpx.Installation installation = jpx().install("org.example:tool-main@1.0").home(home);
+        RecordingDocker docker = new RecordingDocker(work);
+
+        installation.command(null, List.of("argument"), docker);
+
+        assertThat(docker.home).isEqualTo(home);
+    }
+
+    @Test
     public void docker_command_mounts_the_installation_and_spells_out_the_paths()
             throws IOException, InterruptedException {
         addMavenTool();
@@ -761,9 +790,16 @@ public class JpxTest {
         private String container;
         private boolean readOnly;
         private List<String> javaArgs;
+        private Path home;
 
         private RecordingDocker(Path workingDirectory) {
             super(workingDirectory, "recording-image");
+        }
+
+        @Override
+        public DockerizedJava home(Path home) {
+            this.home = home;
+            return this;
         }
 
         @Override

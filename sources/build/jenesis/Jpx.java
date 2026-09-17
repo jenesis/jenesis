@@ -75,7 +75,15 @@ public record Jpx(Path storage,
         }
     }
 
-    public record Installation(Path folder, HashDigestFunction hashFunction) {
+    public record Installation(Path folder, HashDigestFunction hashFunction, Path home) {
+
+        public Installation(Path folder, HashDigestFunction hashFunction) {
+            this(folder, hashFunction, Path.of(System.getProperty("java.home")));
+        }
+
+        public Installation home(Path home) {
+            return new Installation(folder, hashFunction, home);
+        }
 
         public SequencedProperties properties() throws IOException {
             return SequencedProperties.ofFiles(folder.resolve(PROPERTIES));
@@ -106,7 +114,7 @@ public record Jpx(Path storage,
             Path argumentFile = Files.createTempFile(folder, "jpx.", ".args");
             try {
                 List<String> command = new ArrayList<>();
-                command.add(Path.of(System.getProperty("java.home"), "bin", File.separatorChar == '\\' ? "java.exe" : "java").toString());
+                command.add(home.resolve("bin").resolve(File.separatorChar == '\\' ? "java.exe" : "java").toString());
                 command.addAll(javaArguments(mainClass, arguments, argumentFile));
                 return new ProcessBuilder(command).inheritIO().start().waitFor();
             } finally {
@@ -118,7 +126,8 @@ public record Jpx(Path storage,
                 throws IOException, InterruptedException {
             Path argumentFile = Files.createTempFile(folder, "jpx.", ".args");
             try {
-                return docker.mount(folder, folder.toString(), true)
+                return docker.home(home)
+                        .mount(folder, folder.toString(), true)
                         .execute(javaArguments(mainClass, arguments, argumentFile));
             } finally {
                 Files.deleteIfExists(argumentFile);
@@ -131,14 +140,15 @@ public record Jpx(Path storage,
 
         public List<String> command(String mainClass, List<String> arguments) throws IOException {
             List<String> command = new ArrayList<>();
-            command.add(Path.of(System.getProperty("java.home"), "bin", File.separatorChar == '\\' ? "java.exe" : "java").toString());
+            command.add(home.resolve("bin").resolve(File.separatorChar == '\\' ? "java.exe" : "java").toString());
             command.addAll(javaArguments(mainClass, arguments, null));
             return command;
         }
 
         public List<String> command(String mainClass, List<String> arguments, DockerizedJava docker)
                 throws IOException, InterruptedException {
-            return docker.mount(folder, folder.toString(), true)
+            return docker.home(home)
+                    .mount(folder, folder.toString(), true)
                     .command(javaArguments(mainClass, arguments, null));
         }
 
@@ -224,7 +234,8 @@ public record Jpx(Path storage,
     }
 
     public static final String HELP = """
-            Usage: jpx [--modular] [--docker[=<image>]] [--hash=<checksum>] [--pin] <target> [argument...]
+            Usage: jpx [--modular] [--java=<version>] [--docker[=<image>]] [--hash=<checksum>] [--pin]
+                       <target> [argument...]
 
             Runs the main entry point of a published module, resolving and installing
             it on first use.
@@ -250,6 +261,11 @@ public record Jpx(Path storage,
               --modular           resolve purely over module descriptors, walking requires
                                   clauses, and place every jar on the module path; every
                                   module must then be explicitly named
+              --java=<version>    run the program on an installed JDK matching the version,
+                                  as 25, 25.0.3 or 25-temurin: the running one when it
+                                  matches, otherwise the newest match in the folders
+                                  -Djenesis.toolchain.searchpath names, by default this
+                                  system's usual JDK locations. Nothing is installed
               --docker[=<image>]  run the program in a Docker container; resolution and
                                   installation still happen on the host, the installation
                                   and the host's Java home are mounted read-only. Without
@@ -269,7 +285,7 @@ public record Jpx(Path storage,
     public static void main(String... arguments) throws IOException, InterruptedException {
         PathPlacement placement = PathPlacement.INFERRED;
         boolean dockerized = false, pin = false;
-        String image = null, checksum = null;
+        String image = null, checksum = null, java = null;
         int target = 0;
         while (target < arguments.length && arguments[target].startsWith("--")) {
             switch (arguments[target]) {
@@ -285,6 +301,9 @@ public record Jpx(Path storage,
                         dockerized = true;
                         String value = arguments[target].substring("--docker=".length());
                         image = value.isBlank() ? null : value;
+                    } else if (arguments[target].startsWith("--java=")) {
+                        String value = arguments[target].substring("--java=".length());
+                        java = value.isBlank() ? null : value;
                     } else if (arguments[target].startsWith("--hash=")) {
                         checksum = requireValidChecksum(arguments[target].substring("--hash=".length()));
                     } else {
@@ -305,7 +324,11 @@ public record Jpx(Path storage,
             throw new IllegalArgumentException("Pure module resolution requires a module name, "
                     + "not Maven coordinates: " + command.name());
         }
+        Toolchain toolchain = java == null ? null : new Toolchain().version(java);
         Installation installation = new Jpx(placement).install(command);
+        if (toolchain != null) {
+            installation = installation.home(toolchain.home());
+        }
         if (checksum == null && pin) {
             checksum = installation.properties().getProperty("checksum");
         }
@@ -316,6 +339,9 @@ public record Jpx(Path storage,
         List<String> options = new ArrayList<>();
         if (placement == PathPlacement.MODULE_PATH) {
             options.add("--modular");
+        }
+        if (java != null) {
+            options.add("--java=" + java);
         }
         DockerizedJava docker = null;
         if (dockerized) {
