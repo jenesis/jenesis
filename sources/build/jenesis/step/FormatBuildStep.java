@@ -7,7 +7,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.HashFunction;
 
-public abstract class FormatBuildStep extends JdkProcessBuildStep {
+public abstract class FormatBuildStep extends ProcessBuildStep {
 
     private static final String FORMATTED = "formatted.properties";
 

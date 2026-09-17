@@ -8,7 +8,7 @@ import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 
-public class NativeImage extends JdkProcessBuildStep {
+public class NativeImage extends ProcessBuildStep {
 
     public static final String NATIVE = "native/";
 

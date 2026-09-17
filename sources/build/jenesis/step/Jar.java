@@ -6,7 +6,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 
-public class Jar extends JdkProcessBuildStep {
+public class Jar extends ProcessBuildStep {
 
     private static final Attributes.Name CREATED_BY = new Attributes.Name("Created-By");
 
