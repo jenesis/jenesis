@@ -114,15 +114,47 @@ public class SbomTest {
     }
 
     @Test
-    public void records_the_scm_tag_as_a_property_and_on_the_vcs_reference() throws Exception {
+    public void records_the_tag_and_the_revision_and_locates_the_source_at_the_revision() throws Exception {
+        String sbom = sbom(Map.of(
+                "scm.url", "https://example.com/demo",
+                "scm.connection", "scm:git:https://example.com/demo.git",
+                "scm.tag", "v1.0.0",
+                "scm.revision", "0123abcd"));
+        assertThat(sbom)
+                .contains("{ \"type\": \"vcs\", \"url\": \"https://example.com/demo\" }")
+                .contains("{ \"type\": \"vcs\", \"url\": \"git+https://example.com/demo.git@0123abcd\" }")
+                .contains("{ \"name\": \"jenesis:scm:tag\", \"value\": \"v1.0.0\" }")
+                .contains("{ \"name\": \"jenesis:scm:revision\", \"value\": \"0123abcd\" }");
+    }
+
+    @Test
+    public void locates_the_source_at_the_tag_without_a_revision() throws Exception {
+        assertThat(sbom(Map.of("scm.connection", "scm|git|https://example.com/demo.git", "scm.tag", "v1.0.0")))
+                .contains("{ \"type\": \"vcs\", \"url\": \"git+https://example.com/demo.git@v1.0.0\" }");
+    }
+
+    @Test
+    public void takes_the_maven_head_tag_for_no_tag() throws Exception {
+        assertThat(sbom(Map.of("scm.connection", "scm:git:https://example.com/demo.git", "scm.tag", "HEAD")))
+                .as("a pom.xml declares HEAD for the root of the repository rather than for a tag")
+                .doesNotContain("git+https://")
+                .doesNotContain("jenesis:scm:tag");
+    }
+
+    @Test
+    public void locates_no_source_for_a_connection_without_a_url() throws Exception {
+        assertThat(sbom(Map.of("scm.connection", "scm:git:git@example.com:demo.git", "scm.revision", "0123abcd")))
+                .contains("{ \"name\": \"jenesis:scm:revision\", \"value\": \"0123abcd\" }")
+                .doesNotContain("git+");
+    }
+
+    private String sbom(Map<String, String> scm) throws Exception {
         SequencedProperties metadata = new SequencedProperties();
         metadata.setProperty("project", "build.jenesis");
         metadata.setProperty("artifact", "demo");
         metadata.setProperty("version", "1.0.0");
-        metadata.setProperty("scm.url", "https://example.com/demo");
-        metadata.setProperty("scm.tag", "v1.0.0");
+        scm.forEach(metadata::setProperty);
         metadata.store(argument.resolve(BuildStep.METADATA));
-
         BuildStepResult result = new Sbom().apply(Runnable::run,
                         new BuildStepContext(previous, next, supplement),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
@@ -131,10 +163,7 @@ public class SbomTest {
                 .toCompletableFuture()
                 .join();
         assertThat(result.next()).isTrue();
-
-        assertThat(next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("demo.cdx.json")).content()
-                .contains("{ \"type\": \"vcs\", \"url\": \"https://example.com/demo\", \"comment\": \"tag v1.0.0\" }")
-                .contains("{ \"name\": \"jenesis:scm:tag\", \"value\": \"v1.0.0\" }");
+        return Files.readString(next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("demo.cdx.json"));
     }
 
     @Test

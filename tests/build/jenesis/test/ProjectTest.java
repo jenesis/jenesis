@@ -39,6 +39,7 @@ public class ProjectTest {
         System.clearProperty("jenesis.project.digest");
         System.clearProperty("jenesis.project.version");
         System.clearProperty("jenesis.project.tag");
+        System.clearProperty("jenesis.project.revision");
         System.clearProperty("jenesis.make.profiles");
         System.clearProperty("jenesis.make.global");
         System.clearProperty("jenesis.test.sample.key");
@@ -49,39 +50,47 @@ public class ProjectTest {
     }
 
     @Test
-    public void reads_the_tag_from_its_property_and_keeps_an_empty_one() {
+    public void reads_the_tag_and_the_revision_from_their_properties_and_keeps_empty_ones() {
         assertThat(new Project(root).tag()).isNull();
+        assertThat(new Project(root).revision()).isNull();
         System.setProperty("jenesis.project.tag", "v1.2.3");
+        System.setProperty("jenesis.project.revision", "0123abcd");
         assertThat(new Project(root).tag()).isEqualTo("v1.2.3");
+        assertThat(new Project(root).revision()).isEqualTo("0123abcd");
         System.setProperty("jenesis.project.tag", "");
+        System.setProperty("jenesis.project.revision", "");
         assertThat(new Project(root).tag()).isEmpty();
+        assertThat(new Project(root).revision()).isEmpty();
     }
 
     @Test
-    public void records_the_version_as_the_scm_tag_when_no_tag_is_set() throws IOException {
+    public void records_no_scm_tag_for_a_version_alone() throws IOException {
         assertThat(metadataValues(new Project(Path.of(".")).version("1.2.3")))
+                .as("how a project names its release tags is not derived from its version")
                 .containsEntry("version", "1.2.3")
-                .containsEntry("scm.tag", "1.2.3");
-    }
-
-    @Test
-    public void records_a_set_tag_as_the_scm_tag_rather_than_the_version() throws IOException {
-        assertThat(metadataValues(new Project(Path.of(".")).version("1.2.3").tag("v1.2.3")))
-                .containsEntry("scm.tag", "v1.2.3");
-    }
-
-    @Test
-    public void records_an_empty_scm_tag_to_replace_a_declared_one() throws IOException {
-        assertThat(metadataValues(new Project(Path.of(".")).version("1.2.3").tag("")))
-                .as("an empty value overrides a tag declared in a metadata file or a pom.xml")
-                .containsEntry("scm.tag", "");
-    }
-
-    @Test
-    public void records_no_scm_tag_without_a_version_or_a_tag() throws IOException {
-        assertThat(metadataValues(new Project(Path.of("."))))
-                .as("a tag declared in a metadata file or a pom.xml stays in force")
                 .doesNotContainKey("scm.tag");
+    }
+
+    @Test
+    public void records_a_set_tag_and_revision() throws IOException {
+        assertThat(metadataValues(new Project(Path.of(".")).tag("v1.2.3").revision("0123abcd")))
+                .containsEntry("scm.tag", "v1.2.3")
+                .containsEntry("scm.revision", "0123abcd");
+    }
+
+    @Test
+    public void records_an_empty_tag_and_revision_to_replace_declared_ones() throws IOException {
+        assertThat(metadataValues(new Project(Path.of(".")).tag("").revision("")))
+                .as("an empty value overrides what a metadata file or a pom.xml declares")
+                .containsEntry("scm.tag", "")
+                .containsEntry("scm.revision", "");
+    }
+
+    @Test
+    public void records_no_scm_tag_or_revision_unless_set() throws IOException {
+        assertThat(metadataValues(new Project(Path.of("."))))
+                .as("what a metadata file or a pom.xml declares stays in force")
+                .doesNotContainKeys("scm.tag", "scm.revision");
     }
 
     private SequencedProperties metadataValues(Project project) throws IOException {

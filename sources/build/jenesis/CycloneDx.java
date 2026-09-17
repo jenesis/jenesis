@@ -59,7 +59,7 @@ public class CycloneDx {
     public record Author(String name, String email) {
     }
 
-    public record ExternalReference(String type, String url, String comment) {
+    public record ExternalReference(String type, String url) {
     }
 
     public record Property(String name, String value) {
@@ -207,11 +207,8 @@ public class CycloneDx {
             for (int index = 0; index < component.externalReferences().size(); index++) {
                 ExternalReference reference = component.externalReferences().get(index);
                 builder.append(pad).append("    { \"type\": \"").append(escapeJson(reference.type()))
-                        .append("\", \"url\": \"").append(escapeJson(reference.url())).append("\"");
-                if (reference.comment() != null) {
-                    builder.append(", \"comment\": \"").append(escapeJson(reference.comment())).append("\"");
-                }
-                builder.append(" }").append(index + 1 < component.externalReferences().size() ? ",\n" : "\n");
+                        .append("\", \"url\": \"").append(escapeJson(reference.url())).append("\" }")
+                        .append(index + 1 < component.externalReferences().size() ? ",\n" : "\n");
             }
             builder.append(pad).append("  ]");
         }
@@ -344,9 +341,6 @@ public class CycloneDx {
                 Element entry = (Element) references.appendChild(document.createElementNS(NAMESPACE, "reference"));
                 entry.setAttribute("type", reference.type());
                 appendXmlText(document, entry, "url", reference.url());
-                if (reference.comment() != null) {
-                    appendXmlText(document, entry, "comment", reference.comment());
-                }
             }
         }
         if (component.properties() != null && !component.properties().isEmpty()) {

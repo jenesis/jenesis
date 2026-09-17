@@ -15,6 +15,8 @@ import build.jenesis.maven.MavenDependencyKey;
 
 public class Sbom implements BuildStep {
 
+    private static final Pattern CONNECTION = Pattern.compile("scm([:|])([a-z0-9]+)\\1([a-zA-Z][a-zA-Z0-9+.-]*://.+)");
+
     private final CycloneDx.Format format;
 
     public Sbom() {
@@ -109,10 +111,20 @@ public class Sbom implements BuildStep {
             String purl = groupId == null
                     ? null
                     : "pkg:maven/" + groupId + "/" + artifactId + (version == null ? "" : "@" + version);
-            String tag = metadata.value("scm.tag");
+            String tag = metadata.value("scm.tag"), revision = metadata.value("scm.revision");
+            if ("HEAD".equals(tag)) {
+                tag = null;
+            }
+            List<CycloneDx.Property> properties = new ArrayList<>();
+            if (tag != null) {
+                properties.add(new CycloneDx.Property("jenesis:scm:tag", tag));
+            }
+            if (revision != null) {
+                properties.add(new CycloneDx.Property("jenesis:scm:revision", revision));
+            }
             project = new CycloneDx.Component(projectRef, groupId, artifactId, version, purl, null,
-                    ownLicenses(metadata), metadata.getProperty("description"), developers(metadata), references(metadata),
-                    tag == null ? List.of() : List.of(new CycloneDx.Property("jenesis:scm:tag", tag)));
+                    ownLicenses(metadata), metadata.getProperty("description"), developers(metadata),
+                    references(metadata, revision == null ? tag : revision), properties);
         }
         List<CycloneDx.Dependency> dependencies = relationships(projectRef, components.keySet(), graphFiles);
         String document = new CycloneDx().emit(format, project, new ArrayList<>(components.values()), dependencies);
@@ -306,16 +318,23 @@ public class Sbom implements BuildStep {
                 .toList();
     }
 
-    private static List<CycloneDx.ExternalReference> references(SequencedProperties metadata) {
+    private static List<CycloneDx.ExternalReference> references(SequencedProperties metadata, String reference) {
         List<CycloneDx.ExternalReference> references = new ArrayList<>();
         String url = metadata.getProperty("url");
         if (url != null) {
-            references.add(new CycloneDx.ExternalReference("website", url, null));
+            references.add(new CycloneDx.ExternalReference("website", url));
         }
         String scm = metadata.getProperty("scm.url");
         if (scm != null) {
-            String tag = metadata.value("scm.tag");
-            references.add(new CycloneDx.ExternalReference("vcs", scm, tag == null ? null : "tag " + tag));
+            references.add(new CycloneDx.ExternalReference("vcs", scm));
+        }
+        String connection = metadata.value("scm.connection");
+        if (reference != null && connection != null) {
+            Matcher matcher = CONNECTION.matcher(connection);
+            if (matcher.matches()) {
+                references.add(new CycloneDx.ExternalReference("vcs",
+                        matcher.group(2) + "+" + matcher.group(3) + "@" + reference));
+            }
         }
         return references;
     }
