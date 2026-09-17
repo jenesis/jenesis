@@ -254,6 +254,7 @@ public class MavenProject implements BuildExecutorModule {
                                 coordinates.store(context.next().resolve(IDENTITY));
                                 return CompletableFuture.completedStage(new BuildStepResult(true));
                             });
+                            int feature = Runtime.version().feature();
                             module.addStep(MANIFESTS, (_, context, manifestArgs) -> {
                                 Path pomFile = paths.get(PREVIOUS + SCAN)
                                         .resolve(POM)
@@ -380,7 +381,7 @@ public class MavenProject implements BuildExecutorModule {
                                 if (!versions.isEmpty()) {
                                     versions.store(context.next().resolve(BuildStep.VERSIONS));
                                 }
-                                Javac.writeRelease(context.next(), properties.getProperty("release"));
+                                Javac.writeRelease(context.next(), properties.getProperty("release"), feature);
                                 SequencedProperties descriptor = new SequencedProperties();
                                 descriptor.setProperty("path", properties.getProperty("path"));
                                 descriptor.setProperty("modular", "false");
