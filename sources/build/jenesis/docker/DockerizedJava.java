@@ -15,6 +15,7 @@ public class DockerizedJava {
     private final Map<String, String> environment;
     private final Boolean windowsDaemon;
     private final boolean hardened;
+    private final Path home;
 
     public DockerizedJava(Path workingDirectory) throws IOException, InterruptedException {
         boolean windows = isWindowsDaemon();
@@ -54,10 +55,11 @@ public class DockerizedJava {
         this.mounts = Map.of();
         this.environment = Map.of();
         this.hardened = true;
+        this.home = javaHome();
     }
 
     public DockerizedJava(Path workingDirectory, String image) {
-        this(workingDirectory, image, null, Map.of(), Map.of(), false);
+        this(workingDirectory, image, null, Map.of(), Map.of(), false, javaHome());
     }
 
     private DockerizedJava(Path workingDirectory,
@@ -65,13 +67,23 @@ public class DockerizedJava {
                            Boolean windowsDaemon,
                            Map<Path, String> mounts,
                            Map<String, String> environment,
-                           boolean hardened) {
+                           boolean hardened,
+                           Path home) {
         this.image = image;
         this.workingDirectory = workingDirectory;
         this.windowsDaemon = windowsDaemon;
         this.mounts = mounts;
         this.environment = environment;
         this.hardened = hardened;
+        this.home = home;
+    }
+
+    private static Path javaHome() {
+        String home = System.getProperty("java.home");
+        if (home == null) {
+            home = System.getenv("JAVA_HOME");
+        }
+        return home == null ? null : Path.of(home);
     }
 
     public String image() {
@@ -82,14 +94,22 @@ public class DockerizedJava {
         return hardened;
     }
 
+    public Path home() {
+        return home;
+    }
+
+    public DockerizedJava home(Path home) {
+        return new DockerizedJava(workingDirectory, image, windowsDaemon, mounts, environment, hardened, home);
+    }
+
     public DockerizedJava harden(boolean hardened) {
-        return new DockerizedJava(workingDirectory, image, windowsDaemon, mounts, environment, hardened);
+        return new DockerizedJava(workingDirectory, image, windowsDaemon, mounts, environment, hardened, home);
     }
 
     public DockerizedJava mount(Path host, String container, boolean readOnly) {
         SequencedMap<Path, String> copy = new LinkedHashMap<>(mounts);
         copy.put(host.toAbsolutePath(), container + (readOnly ? ":ro" : ""));
-        return new DockerizedJava(workingDirectory, image, windowsDaemon, copy, environment, hardened);
+        return new DockerizedJava(workingDirectory, image, windowsDaemon, copy, environment, hardened, home);
     }
 
     public DockerizedJava mounts(String specification, Path base, boolean readOnly) {
@@ -114,7 +134,7 @@ public class DockerizedJava {
     public DockerizedJava env(String name, String value) {
         SequencedMap<String, String> copy = new LinkedHashMap<>(environment);
         copy.put(name, value);
-        return new DockerizedJava(workingDirectory, image, windowsDaemon, mounts, copy, hardened);
+        return new DockerizedJava(workingDirectory, image, windowsDaemon, mounts, copy, hardened, home);
     }
 
     public int execute(String main, Map<String, String> properties, String... args) throws IOException, InterruptedException {
@@ -132,14 +152,10 @@ public class DockerizedJava {
     }
 
     public List<String> command(List<String> javaArgs) throws IOException, InterruptedException {
-        String home = System.getProperty("java.home");
-        if (home == null) {
-            home = System.getenv("JAVA_HOME");
-        }
         if (home == null) {
             throw new IllegalStateException("Neither JAVA_HOME environment or java.home property set");
         }
-        Path javaHome = Path.of(home).toAbsolutePath();
+        Path javaHome = home.toAbsolutePath();
         boolean windows = windowsDaemon != null ? windowsDaemon : isWindowsDaemon();
         String javaHomeMount = windows ? JAVA_HOME_MOUNT_WINDOWS : JAVA_HOME_MOUNT_LINUX;
         List<String> docker = new ArrayList<>();

@@ -51,6 +51,15 @@ public class DockerizedJavaTest {
     }
 
     @Test
+    public void home_defaults_to_the_running_jdk_and_is_replaced_in_a_new_instance() {
+        DockerizedJava original = new DockerizedJava(tmp, "dummy");
+        DockerizedJava replaced = original.home(tmp);
+        assertThat(original.home()).isEqualTo(Path.of(System.getProperty("java.home")));
+        assertThat(replaced).isNotSameAs(original);
+        assertThat(replaced.home()).isEqualTo(tmp);
+    }
+
+    @Test
     public void explicit_image_is_not_hardened_by_default() {
         assertThat(new DockerizedJava(tmp, "dummy").hardened()).isFalse();
     }
