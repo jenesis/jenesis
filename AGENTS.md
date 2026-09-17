@@ -82,6 +82,14 @@ to the project. Everything the `Project` record reads for itself is `jenesis.pro
 takes its root as a required constructor argument and its profiles as a value handed in by the entry point -
 neither is a property it reads, and no `jenesis.project.*` key is read outside it.
 
+**`jenesis.toolchain.*` picks the JVM, and only the user says where to look.** `Toolchain` reads
+`jenesis.toolchain.version` and `jenesis.toolchain.searchpath`. `Make.main` and `Execute.main` reach it by
+reflection, and only when a version is set, so source mode compiles it only then; it depends on `java.base`
+alone, which `MakeClosureTest` holds it to. A JDK is identified by its `release` file and never executed
+before it is chosen. The search path decides what the build executes, so `Make.loadProperties` refuses it in
+every file a project provides or locates: a new way to read properties keeps that rule, and the relaunch
+never takes a JVM option that configuration could supply.
+
 **Configuration files are read through `SequencedProperties`.** A file is read with the type's own accessors -
 `value`, `value(key, default)`, `flag`, `flag(key, default)`, `entries` for a comma-separated list, `words`
 for a whitespace-separated command line - which trim and treat a blank value as an absent one, so no reader

@@ -550,6 +550,13 @@ public record Project(
                       javac -d .jenesis/classes build/jenesis/Project.java
                       java -cp .jenesis/classes build.jenesis.Make [selectors...]
 
+                    Pin the JDK a build runs on with -Djenesis.toolchain.version or the same key in
+                    jenesis.properties, as 25, 25.0.3 or 25-temurin, its words matched against the
+                    vendor and version in each JDK's release file. Make and Execute check the running
+                    JVM first and otherwise relaunch on the newest match found under
+                    jenesis.toolchain.searchpath, this system's usual JDK folders unless set, and only
+                    the command line or ~/.jenesis/jenesis.properties may set it. Nothing is installed.
+
                     A project with its own entry point calls `new Make("build.Demo").run(selectors)`,
                     which returns the status to exit with. For a GraalVM native launcher, read the
                     documentation: it needs reachability metadata captured from a real build, a JDK
@@ -882,7 +889,8 @@ public record Project(
                     Two namespaces, split by who reads them. `jenesis.make.*` belongs to the entry
                     point: where the project is (root), which profiles to layer (profiles), where
                     the user-global file lives (global), and how the engine is compiled and reused
-                    (compile, classes, daemon). `jenesis.project.*` belongs to the build itself.
+                    (compile, classes, daemon). `jenesis.toolchain.*` is read there too, to pick the
+                    JDK the build runs on. `jenesis.project.*` belongs to the build itself.
                     Only -Djenesis.make.root can say where the project is - a properties file cannot,
                     because the root is what locates that file.
 
@@ -2137,6 +2145,8 @@ public record Project(
                 make.daemon|false|Hand the build to a reused JVM; --stop as the only selector shuts it down
                 daemon.idle|10800|Seconds an idle daemon waits before exiting
                 daemon.options|-Xmx2g|JVM options for the daemon process itself, whitespace separated
+                toolchain.version||JDK the build runs on, as 25, 25.0.3 or 25-temurin: the numbers match as a prefix, every word must be one of the vendor and version words in the JDK's release file, and a pre-release matches only when its word is named; Make and Execute relaunch on a match when the running JVM is none
+                toolchain.searchpath|@|Comma-separated JDK folders searched for toolchain.version, absolute or under ~, * standing for any one folder name; @ splices this system's usual JDK locations and empty only checks the running JVM; settable only on the command line or in ~/.jenesis/jenesis.properties
                 executor.concurrency|0|Run at most this many build steps at once; 0 is unbounded
                 executor.timeout|PT0S|ISO-8601 timeout per step; PT0S is no timeout
                 executor.digest|MD5|Algorithm behind the content and step hashes that drive the cache

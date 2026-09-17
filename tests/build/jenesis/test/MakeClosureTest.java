@@ -2,6 +2,7 @@ package build.jenesis.test;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import module org.junit.jupiter.params;
 
 import javax.tools.DiagnosticCollector;
 import javax.tools.JavaCompiler;
@@ -17,12 +18,13 @@ public class MakeClosureTest {
     @TempDir
     private Path folder;
 
-    @Test
-    public void make_compiles_without_any_other_source_of_this_project() throws IOException {
-        Path source = Path.of("sources/build/jenesis/Make.java");
+    @ParameterizedTest
+    @ValueSource(strings = {"Make.java", "Toolchain.java"})
+    public void compiles_without_any_other_source_of_this_project(String name) throws IOException {
+        Path source = Path.of("sources/build/jenesis").resolve(name);
         Assumptions.assumeTrue(Files.isRegularFile(source), "runs from a source checkout");
         Path isolated = Files.createDirectories(folder.resolve("sources/build/jenesis"));
-        Files.copy(source, isolated.resolve("Make.java"));
+        Files.copy(source, isolated.resolve(name));
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
         try (StandardJavaFileManager files = compiler.getStandardFileManager(diagnostics, null, null)) {
@@ -34,11 +36,12 @@ public class MakeClosureTest {
                     diagnostics,
                     null,
                     null,
-                    files.getJavaFileObjects(isolated.resolve("Make.java"))).call();
+                    files.getJavaFileObjects(isolated.resolve(name))).call();
             assertThat(compiled)
                     .as("Make is what a project vendors to bootstrap the tool, and java Make.java compiles"
-                            + " whatever it names: a reference to any other class of this project drags"
-                            + " that class and its own closure into every build's first step. "
+                            + " whatever it names, as it compiles Toolchain when a version is required:"
+                            + " a reference to any other class of this project drags that class and its own"
+                            + " closure into every build's first step. "
                             + diagnostics.getDiagnostics())
                     .isTrue();
         }
