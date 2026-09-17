@@ -109,10 +109,10 @@ jobs:
           - { name: code-signing, dir: demo-56-code-signing, entry: build/Demo.java, verify: 'jar tf "$(find target/stage -name "*.jar" | head -1)" | grep -q "META-INF/DEMO.SF"' }
           - { name: publishing, dir: demo-57-publishing, entry: build/Demo.java }
           - { name: reproducible, dir: demo-58-reproducible, entry: build/Demo.java }
-          - { name: jpx, dir: demo-60-jpx, entry: build/Demo.java, verify: 'test "$(find target/jpx -name jpx.properties | wc -l)" -eq 2' }
-          - { name: jpx-java, dir: demo-60-jpx, jdk: '26', entry: build/jenesis/Jpx.java --java=26 org.junit.platform.console@6.1.3 --version, flags: '"-Djenesis.toolchain.searchpath=$TOOLCHAIN_HOME"', verify: 'java "-Djenesis.toolchain.searchpath=$TOOLCHAIN_HOME" build/jenesis/Jpx.java --java=26 org.junit.platform.console@6.1.3 --version | grep -q "^JVM: 26"' }
-          - { name: toolchain, dir: demo-61-toolchain, entry: build/jenesis/Execute.java, verify: '! java -Djenesis.toolchain.version=25-nosuchvendor -Djenesis.toolchain.searchpath= build/jenesis/Make.java 2> target/refused.txt && grep -q "jenesis.toolchain.version=25-nosuchvendor" target/refused.txt' }
-          - { name: toolchain-relaunch, dir: demo-61-toolchain, jdk: '26', entry: build/jenesis/Make.java, flags: '-Djenesis.toolchain.version=26 "-Djenesis.toolchain.searchpath=$TOOLCHAIN_HOME"', verify: 'java -Djenesis.print.progress=false -Djenesis.toolchain.version=26 "-Djenesis.toolchain.searchpath=$TOOLCHAIN_HOME" build/jenesis/Execute.java | tr -d "\r" | grep -qx 26' }
+          - { name: toolchain, dir: demo-59-toolchain, entry: build/jenesis/Execute.java, verify: '! java -Djenesis.toolchain.version=25-nosuchvendor -Djenesis.toolchain.searchpath= build/jenesis/Make.java 2> target/refused.txt && grep -q "jenesis.toolchain.version=25-nosuchvendor" target/refused.txt' }
+          - { name: toolchain-relaunch, dir: demo-59-toolchain, jdk: '26', entry: build/jenesis/Make.java, flags: '-Djenesis.toolchain.version=26 "-Djenesis.toolchain.searchpath=$TOOLCHAIN_HOME"', verify: 'java -Djenesis.print.progress=false -Djenesis.toolchain.version=26 "-Djenesis.toolchain.searchpath=$TOOLCHAIN_HOME" build/jenesis/Execute.java | tr -d "\r" | grep -qx 26' }
+          - { name: jpx, dir: demo-61-jpx, entry: build/Demo.java, verify: 'test "$(find target/jpx -name jpx.properties | wc -l)" -eq 2' }
+          - { name: jpx-java, dir: demo-61-jpx, jdk: '26', entry: build/jenesis/Jpx.java --java=26 org.junit.platform.console@6.1.3 --version, flags: '"-Djenesis.toolchain.searchpath=$TOOLCHAIN_HOME"', verify: 'java "-Djenesis.toolchain.searchpath=$TOOLCHAIN_HOME" build/jenesis/Jpx.java --java=26 org.junit.platform.console@6.1.3 --version | grep -q "^JVM: 26"' }
     runs-on: ${{ inputs.os }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
