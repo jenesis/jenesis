@@ -13,7 +13,6 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Jar;
-import build.jenesis.step.JdkProcessBuildStep;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -140,7 +139,7 @@ public class JApiCmpModule implements BuildExecutorModule {
         }
     }
 
-    private static class Compare extends JdkProcessBuildStep {
+    private static class Compare extends ProcessBuildStep {
 
         private final String tool;
         private final String group;

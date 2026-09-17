@@ -638,7 +638,7 @@ public record Project(
                     on one it cannot resolve. alias, exclude and override are MODULAR_TO_MAVEN
                     only.
 
-                      @jenesis.release <V>   Java release target
+                      @jenesis.release <V>   Java release target (default: the running JDK's)
                       @jenesis.main <class>  main class
                       @jenesis.test [<module>|abstract]
                           Test variant of <module>. `abstract` supplies infrastructure only: declares
