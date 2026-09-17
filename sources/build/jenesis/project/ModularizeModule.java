@@ -473,7 +473,11 @@ public class ModularizeModule implements BuildExecutorModule {
                             replacement = buffer.toByteArray();
                         }
                         JarEntry copy = new JarEntry(name);
-                        copy.setTimeLocal(timestamp.toLocalDateTime());
+                        if (timestamp == null) {
+                            copy.setTime(entry.getTime());
+                        } else {
+                            copy.setTimeLocal(timestamp.toLocalDateTime());
+                        }
                         out.putNextEntry(copy);
                         if (replacement != null) {
                             out.write(replacement);
@@ -485,7 +489,9 @@ public class ModularizeModule implements BuildExecutorModule {
                         out.closeEntry();
                     }
                     JarEntry entry = new JarEntry("module-info.class");
-                    entry.setTimeLocal(timestamp.toLocalDateTime());
+                    if (timestamp != null) {
+                        entry.setTimeLocal(timestamp.toLocalDateTime());
+                    }
                     out.putNextEntry(entry);
                     out.write(descriptor);
                     out.closeEntry();

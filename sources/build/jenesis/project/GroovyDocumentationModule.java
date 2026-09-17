@@ -157,6 +157,7 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
         private final boolean includeJava;
         private final String tool;
         private final String group;
+        private final boolean timestamped = BuildStep.timestamp() == null;
 
         private Document(String within, boolean includeJava, String tool, String group, BiConsumer<Boolean, String> printing) {
             this(within, includeJava, tool, group, ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
@@ -256,9 +257,11 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
                     "-cp", String.join(File.pathSeparator, launch),
                     "org.codehaus.groovy.tools.groovydoc.Main",
                     "-d", output.toString(),
-                    "-notimestamp",
                     "-javaVersion", languageLevel(release),
                     "-sourcepath", String.join(File.pathSeparator, roots)));
+            if (!timestamped) {
+                commands.add("-notimestamp");
+            }
             commands.addAll(packages);
             commands.addAll(rootFiles);
             return CompletableFuture.completedStage(commands);

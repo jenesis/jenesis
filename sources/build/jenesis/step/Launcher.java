@@ -157,7 +157,11 @@ public class Launcher implements BuildStep {
                     continue;
                 }
                 JarEntry copy = new JarEntry(prefix + entry.getName());
-                copy.setTimeLocal(timestamp.toLocalDateTime());
+                if (timestamp == null) {
+                    copy.setTime(entry.getTime());
+                } else {
+                    copy.setTimeLocal(timestamp.toLocalDateTime());
+                }
                 out.putNextEntry(copy);
                 try (InputStream in = jar.getInputStream(entry)) {
                     in.transferTo(out);
@@ -169,7 +173,9 @@ public class Launcher implements BuildStep {
 
     private void writeManifest(JarOutputStream out, Manifest manifest) throws IOException {
         JarEntry entry = new JarEntry(JarFile.MANIFEST_NAME);
-        entry.setTimeLocal(timestamp.toLocalDateTime());
+        if (timestamp != null) {
+            entry.setTimeLocal(timestamp.toLocalDateTime());
+        }
         out.putNextEntry(entry);
         manifest.write(out);
         out.closeEntry();
@@ -177,7 +183,11 @@ public class Launcher implements BuildStep {
 
     private void writeEntry(JarOutputStream out, String name, Path file) throws IOException {
         JarEntry entry = new JarEntry(name);
-        entry.setTimeLocal(timestamp.toLocalDateTime());
+        if (timestamp == null) {
+            entry.setTime(Files.getLastModifiedTime(file).toMillis());
+        } else {
+            entry.setTimeLocal(timestamp.toLocalDateTime());
+        }
         out.putNextEntry(entry);
         Files.copy(file, out);
         out.closeEntry();
