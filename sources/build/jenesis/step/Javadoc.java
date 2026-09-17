@@ -6,7 +6,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.PathPlacement;
 
-public class Javadoc extends JdkProcessBuildStep {
+public class Javadoc extends ProcessBuildStep {
 
     public static final String JAVADOC = "javadoc/";
 

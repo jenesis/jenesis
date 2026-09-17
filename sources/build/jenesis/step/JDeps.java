@@ -4,7 +4,7 @@ import module java.base;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 
-public class JDeps extends JdkProcessBuildStep {
+public class JDeps extends ProcessBuildStep {
 
     public static final String ANALYZED = "analyzed/", MODULES = "modules/", DESCRIPTORS = "descriptors/";
 

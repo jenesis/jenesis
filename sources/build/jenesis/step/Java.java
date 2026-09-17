@@ -6,7 +6,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 
-public abstract class Java extends JdkProcessBuildStep {
+public abstract class Java extends ProcessBuildStep {
 
     private static final String MODULE_PATH = "--module-path", CLASS_PATH = "--class-path";
 

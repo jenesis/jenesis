@@ -6,7 +6,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.ModuleGraph;
 
-public class JPackage extends JdkProcessBuildStep {
+public class JPackage extends ProcessBuildStep {
 
     public static final String PACKAGES = "packages/";
 
