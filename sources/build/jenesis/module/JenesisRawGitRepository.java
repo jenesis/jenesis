@@ -51,6 +51,9 @@ public class JenesisRawGitRepository implements JenesisRepository {
 
     public static JenesisRepository of(Scope scope) {
         String token = System.getProperty("jenesis.maven.token", System.getenv("MAVEN_REPOSITORY_TOKEN"));
+        if (token != null && token.isBlank()) {
+            token = null;
+        }
         String property = System.getProperty("jenesis.maven.uri");
         String environment = System.getenv("MAVEN_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();

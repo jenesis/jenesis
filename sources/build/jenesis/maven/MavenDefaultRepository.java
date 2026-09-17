@@ -30,6 +30,9 @@ public class MavenDefaultRepository implements MavenRepository {
             }
         }
         String token = System.getProperty("jenesis.maven.token", System.getenv("MAVEN_REPOSITORY_TOKEN"));
+        if (token != null && token.isBlank()) {
+            token = null;
+        }
         boolean verbose = SequencedProperties.systemFlag("jenesis.print.fetch");
         String property = System.getProperty("jenesis.maven.uri");
         String environment = System.getenv("MAVEN_REPOSITORY_URI");

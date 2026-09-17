@@ -23,8 +23,9 @@ From this directory:
     jar verified.
 
 `build/Demo.java` first generates a throwaway RSA key with `keytool` under
-`target/`, because no repository should carry a signing key. Then it builds and
-stages, and checks that the jar the staging laid out is the signed one.
+`target/`, because no repository should carry a signing key. Then it names that key
+to the build, builds and stages, and checks that the jar the staging laid out is the
+signed one.
 
 How signing is wired
 --------------------
@@ -44,24 +45,22 @@ the key store, the alias or the password location unnamed fails the build - a
 release that shipped unsigned because a runner forgot a flag is the one outcome
 worth refusing.
 
-They split between the project and the machine. The alias is usually the
-project's own ("release"), while the store's path and password differ between a
-laptop, a release machine and a CI runner, so the project commits what it knows
-and the machine supplies the rest on the command line, where a `-D` wins over a
-committed entry:
-
-    jenesis.jarsigner.alias=release                       # committed
+They belong to the machine that signs, never to the project: a `jenesis.properties`
+that named them would decide which key a build reaches for and which file a password
+is read from, so a project file that sets any of them fails the build. The machine
+names them on the command line, or your own `~/.jenesis/jenesis.properties` does:
 
     java -Djenesis.jarsigner.keystore=/etc/jenesis/release.p12 \
+         -Djenesis.jarsigner.alias=release \
          -Djenesis.jarsigner.storepass=env JENESIS_KEYSTORE_PASSWORD \
          build/jenesis/Make.java
 
-This demo commits all three, because the key it signs with is one it generates
-into `target/` as it runs:
+This demo is that machine. It generates a throwaway key into `target/` and names
+all three itself, in `build/Demo.java`, before it builds:
 
-    jenesis.jarsigner.keystore=target/keystore/demo.p12
-    jenesis.jarsigner.alias=demo
-    jenesis.jarsigner.storepass=file target/keystore/demo.pass
+    System.setProperty("jenesis.jarsigner.keystore", KEYSTORE.toString());
+    System.setProperty("jenesis.jarsigner.alias", "demo");
+    System.setProperty("jenesis.jarsigner.storepass", "file " + PASSWORD);
 
 It names no `storetype` because the JDK's own default is already `pkcs12`; a JKS
 store would need the line.
@@ -71,28 +70,19 @@ only generates the key before handing over to it exactly as `Make.java` would:
 
     Project.perform(Path.of("."), Make.loadProperties(Path.of(".")), "stage");
 
-A project that signs only on release puts the same lines in a release profile,
-beside the other things only a release does - see `profiles`:
-
-    # jenesis-release.properties
-    jenesis.project.sources=true
-    jenesis.jarsigner.alias=release
-
-    java -Djenesis.make.profiles=release build/jenesis/Make.java
-
-A developer's own key belongs in neither, but in the user-global
-`~/.jenesis/jenesis.properties`, which every project on that machine reads and
-none of them commits:
+A developer's own key belongs in the user-global `~/.jenesis/jenesis.properties`,
+which every project on that machine reads and none of them commits:
 
     # ~/.jenesis/jenesis.properties
     jenesis.jarsigner.keystore=/home/me/.keys/signing.p12
+    jenesis.jarsigner.alias=me
     jenesis.jarsigner.storepass=file /home/me/.keys/signing.pass
 
-The three layers settle in the order you would expect: a `-D` on the command
-line wins over the project's `jenesis.properties`, which wins over the
-user-global file. So a project can commit its alias, a machine can hold the key
-once for every project on it, and a runner can override either. A build that
-names nothing at all does not sign.
+A release runner names the same three on the command line, where a `-D` wins over
+that file. A project's own `jenesis.properties` or profile names none of them: a
+file that travels with the sources would decide which key a build reaches for and
+which file a password is read from, so setting any `jenesis.jarsigner.*` there
+fails the build. A build that names nothing at all does not sign.
 
 Passwords are never values
 --------------------------

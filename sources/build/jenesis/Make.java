@@ -243,7 +243,7 @@ public final class Make {
         Path base = path.resolve("jenesis.properties");
         Properties project = read(base);
         if (project != null) {
-            requireApplicable(base, project, false);
+            requireApplicable(path, base, project, false);
         }
         String location = System.getProperty("jenesis.make.global", System.getProperty("user.home"));
         Properties user = null;
@@ -253,7 +253,7 @@ public final class Make {
             Path file = home.resolve("jenesis.properties");
             user = read(file);
             if (user != null) {
-                requireApplicable(file, user, true);
+                requireApplicable(path, file, user, true);
             }
         }
         Set<Path> loaded = new LinkedHashSet<>();
@@ -262,16 +262,23 @@ public final class Make {
         if (project != null) {
             addProfiles(pending, path, project.getProperty("jenesis.make.profiles"));
         }
-        loadProfiles(loaded, pending, path, false);
+        SequencedSet<String> named = new LinkedHashSet<>();
+        List<Properties> local = loadProfiles(loaded, pending, path, path, false);
+        List<Properties> global = new ArrayList<>();
         if (user != null) {
             addProfiles(pending, home, user.getProperty("jenesis.make.profiles"));
-            loadProfiles(loaded, pending, home, true);
+            global.addAll(loadProfiles(loaded, pending, home, path, true));
+            global.add(user);
         }
+        global.forEach(Make::apply);
+        local.forEach(properties -> named.addAll(apply(properties)));
         if (project != null) {
-            apply(project);
+            named.addAll(apply(project));
         }
-        if (user != null) {
-            apply(user);
+        for (String repository : List.of("maven", "module")) {
+            if (named.contains("jenesis." + repository + ".uri")) {
+                System.setProperty("jenesis." + repository + ".token", "");
+            }
         }
         SequencedSet<Path> profiles = new LinkedHashSet<>();
         for (Path file : loaded) {
@@ -296,27 +303,79 @@ public final class Make {
         }
     }
 
-    private static void loadProfiles(Set<Path> loaded, Deque<Path> pending, Path base, boolean trusted)
-            throws IOException {
+    private static List<Properties> loadProfiles(Set<Path> loaded,
+                                                 Deque<Path> pending,
+                                                 Path base,
+                                                 Path root,
+                                                 boolean trusted) throws IOException {
+        List<Properties> layers = new ArrayList<>();
         while (!pending.isEmpty()) {
             Path file = pending.removeFirst().normalize();
             if (!loaded.add(file) || !Files.isRegularFile(file)) {
                 continue;
             }
             Properties properties = read(file);
-            requireApplicable(file, properties, trusted);
+            requireApplicable(root, file, properties, trusted);
             addProfiles(pending, base, properties.getProperty("jenesis.make.profiles"));
-            apply(properties);
+            layers.add(properties);
         }
+        return layers;
     }
 
-    private static void apply(Properties properties) {
+    private static SequencedSet<String> apply(Properties properties) {
+        SequencedSet<String> applied = new LinkedHashSet<>();
         for (String name : properties.stringPropertyNames()) {
-            System.getProperties().putIfAbsent(name, properties.getProperty(name));
+            if (System.getProperties().putIfAbsent(name, properties.getProperty(name)) == null) {
+                applied.add(name);
+            }
         }
+        return applied;
     }
 
-    private static void requireApplicable(Path file, Properties properties, boolean trusted) {
+    private static String restriction(String key) {
+        if (key.startsWith("jenesis.jarsigner.")) {
+            return "names the signing key, a password or the arguments jarsigner runs with, which the machine"
+                    + " that signs a release supplies";
+        }
+        if (key.startsWith("jenesis.project.docker.") || key.startsWith("jenesis.execute.docker.")) {
+            return "decides what a containerized build or run reaches on this machine, which is the point of"
+                    + " containing it";
+        }
+        return switch (key) {
+            case "jenesis.daemon.options",
+                 "jenesis.openpgp.command",
+                 "jenesis.jreleaser.executable",
+                 "jenesis.toolchain.searchpath",
+                 "jenesis.toolchain.installer" -> "names a program the build runs, or the options a JVM runs"
+                    + " it with";
+            case "jenesis.cache.uri",
+                 "jenesis.maven.local",
+                 "jenesis.module.local",
+                 "jenesis.repository.insecure",
+                 "jenesis.cache.insecure",
+                 "jenesis.sigstore.uri",
+                 "jenesis.sigstore.issuers" -> "names a cache whose outputs the build runs, a folder this"
+                    + " machine shares between projects, or what the build trusts";
+            case "jenesis.maven.token",
+                 "jenesis.module.token",
+                 "jenesis.cache.key" -> "names a credential, which the machine that holds it supplies";
+            default -> null;
+        };
+    }
+
+    private static boolean confined(String key) {
+        return switch (key) {
+            case "jenesis.project.target",
+                 "jenesis.project.artifacts",
+                 "jenesis.project.cache",
+                 "jenesis.openpgp.local",
+                 "jenesis.make.classes",
+                 "jenesis.pin.file" -> true;
+            default -> false;
+        };
+    }
+
+    private static void requireApplicable(Path root, Path file, Properties properties, boolean trusted) {
         if (properties.getProperty("jenesis.make.root") != null) {
             throw new IllegalStateException("jenesis.make.root cannot be set in " + file
                     + ": the project root locates this file, so it is resolved before the file is read"
@@ -327,14 +386,39 @@ public final class Make {
                     + ": it locates your own user-global settings, which no file may move, least of all one a"
                     + " project provides (pass -Djenesis.make.global on the command line instead)");
         }
-        for (String key : List.of("jenesis.toolchain.searchpath", "jenesis.toolchain.installer")) {
-            if (!trusted && properties.getProperty(key) != null) {
-                throw new IllegalStateException(key + " cannot be set in " + file
-                        + ": it decides which programs the build executes, so only the command line or your own"
-                        + " ~/.jenesis/jenesis.properties may set it, never a file the project provides"
+        if (trusted) {
+            return;
+        }
+        for (String key : properties.stringPropertyNames()) {
+            if (!key.startsWith("jenesis.")) {
+                throw new IllegalStateException(key + " cannot be set in " + file + ": a project's file sets only"
+                        + " jenesis.* properties, where " + key + " would configure the JVM that runs the whole"
+                        + " build (pass -D" + key + " on the command line instead)");
+            }
+            String restriction = restriction(key);
+            if (restriction != null) {
+                throw new IllegalStateException(key + " cannot be set in " + file + ": it " + restriction
+                        + ", so only the command line or your own ~/.jenesis/jenesis.properties may set it"
                         + " (pass -D" + key + " instead)");
             }
+            String value = properties.getProperty(key).trim();
+            if (confined(key) && !value.isEmpty() && escapes(root, value)) {
+                throw new IllegalStateException(key + " cannot name '" + value + "' in " + file + ": a project's"
+                        + " file names only a folder inside the project, which the build writes to and may"
+                        + " delete (pass -D" + key + " on the command line for one outside it)");
+            }
         }
+    }
+
+    private static boolean escapes(Path root, String value) {
+        Path target;
+        try {
+            target = Path.of(value);
+        } catch (InvalidPathException _) {
+            return true;
+        }
+        Path base = root.toAbsolutePath().normalize();
+        return target.isAbsolute() || !base.resolve(target).normalize().startsWith(base);
     }
 
     private static Properties read(Path file) throws IOException {
