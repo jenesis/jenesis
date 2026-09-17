@@ -229,7 +229,8 @@ public class ModularProject implements BuildExecutorModule {
                              String prefix,
                              String path,
                              boolean modular,
-                             Platform platform) implements BuildStep {
+                             Platform platform,
+                             int feature) implements BuildStep {
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
@@ -533,7 +534,7 @@ public class ModularProject implements BuildExecutorModule {
                 }
                 boms.store(context.next().resolve(BuildStep.BOMS));
             }
-            Javac.writeRelease(context.next(), info.release());
+            Javac.writeRelease(context.next(), info.release(), feature);
             SequencedProperties module = new SequencedProperties();
             module.setProperty("path", path);
             module.setProperty("module", info.coordinate());
@@ -662,7 +663,12 @@ public class ModularProject implements BuildExecutorModule {
                         manifestDeps.add(source);
                     }
                     manifestDeps.addAll(modInherited.sequencedKeySet());
-                    module.addStep(MANIFESTS, new Manifests(group, prefix, relative, modular, platform), manifestDeps);
+                    module.addStep(MANIFESTS, new Manifests(group,
+                            prefix,
+                            relative,
+                            modular,
+                            platform,
+                            Runtime.version().feature()), manifestDeps);
                     module.addStep(COORDINATES, new Coordinates(prefix), MANIFESTS);
                 }, inherited.sequencedKeySet().stream());
             }
