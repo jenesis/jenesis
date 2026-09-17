@@ -151,6 +151,19 @@ public class ModularizeModuleTest {
     }
 
     @Test
+    public void stamps_every_entry_of_a_rewritten_jar_with_a_fixed_time() throws IOException {
+        named();
+        automatic();
+        Path modularized = modularize(false);
+        try (ZipFile jar = new ZipFile(
+                modularized.resolve(Dependencies.MODULAR_PATH + "demo.automatic.jar").toFile())) {
+            assertThat(jar.stream().map(ZipEntry::getTimeLocal))
+                    .as("the time the dependency was packed at is dropped, as it would be converted to local time")
+                    .containsOnly(BuildStep.timestamp().toLocalDateTime());
+        }
+    }
+
+    @Test
     public void links_a_runtime_image_from_modularized_jars() throws IOException {
         named();
         automatic();

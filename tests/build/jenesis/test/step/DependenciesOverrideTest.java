@@ -66,6 +66,20 @@ public class DependenciesOverrideTest {
     }
 
     @Test
+    public void stamps_the_placed_module_with_a_fixed_time() throws IOException {
+        modularLib("carrier-lib", "1.0", "lib.carrier", "shaded.api");
+        module("lib.carrier", "org.example/carrier-lib");
+
+        resolve(Map.of("lib.shaded", "lib.carrier"), "lib.carrier", "lib.shaded");
+
+        try (ZipFile jar = new ZipFile(next.resolve(Dependencies.RESOLVED + "lib.shaded.jar").toFile())) {
+            assertThat(jar.stream().map(ZipEntry::getTimeLocal))
+                    .as("a module placed at another moment carries the same bytes")
+                    .containsOnly(BuildStep.timestamp().toLocalDateTime());
+        }
+    }
+
+    @Test
     public void drops_the_artifact_that_declares_the_overridden_module() throws IOException {
         modularLib("carrier-lib", "1.0", "lib.carrier", "shaded.api");
         modularLib("shaded-lib", "1.0", "lib.shaded", "shaded.api");

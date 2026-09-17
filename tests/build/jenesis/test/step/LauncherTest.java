@@ -137,6 +137,34 @@ public class LauncherTest {
         assertThat(application(jar).getProperty("modulepath")).isEmpty();
     }
 
+    @Test
+    public void stamps_every_entry_with_a_fixed_time_including_the_manifest() throws IOException {
+        writeLauncherJar(Files.createDirectory(input.resolve("resolved")).resolve("launcher.jar"));
+        writeJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"), "sample/Sample.class");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("launcher/runtime/maven/build.jenesis/build.jenesis.launcher", "resolved/launcher.jar");
+        index.store(input.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties application = new SequencedProperties();
+        application.setProperty("mainClass", "sample.Sample");
+        application.store(input.resolve("launcher.properties"));
+
+        BuildStepResult result = new Launcher("launcher", PathPlacement.INFERRED).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("resolved/launcher.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        try (ZipFile jar = new ZipFile(next.resolve(Launcher.LAUNCHER).resolve("application.jar").toFile())) {
+            assertThat(jar.stream().map(ZipEntry::getTimeLocal))
+                    .as("a launcher created at another moment carries the same bytes")
+                    .containsOnly(BuildStep.timestamp().toLocalDateTime());
+        }
+    }
+
     private static void writeLauncherJar(Path path) throws IOException {
         try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(path))) {
             entry(jar, "module-info.class");
