@@ -892,7 +892,8 @@ public record Project(
                     (compile, classes, daemon). `jenesis.toolchain.*` is read there too, to pick the
                     JDK the build runs on. `jenesis.project.*` belongs to the build itself.
                     Only -Djenesis.make.root can say where the project is - a properties file cannot,
-                    because the root is what locates that file.
+                    because the root is what locates that file. Likewise only -Djenesis.make.global
+                    moves the user-global file, so a project never chooses your own settings.
 
                     Reach for these without looking them up:
 
@@ -2139,7 +2140,7 @@ public record Project(
                 project.docker.env||Host environment variables to forward, name[=value],...
                 make.root|.|Folder Make looks for the project in; only settable on the command line
                 make.profiles||Comma-separated profiles layered over jenesis.properties
-                make.global||Folder holding the user-global .jenesis/jenesis.properties; default: the home folder
+                make.global||Folder holding the user-global .jenesis/jenesis.properties; default: the home folder; only settable on the command line
                 make.compile|true|Compile the build sources once and run from those classes
                 make.classes|.jenesis/classes|Where those classes land, relative to the root
                 make.daemon|false|Hand the build to a reused JVM; --stop as the only selector shuts it down
