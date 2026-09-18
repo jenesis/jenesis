@@ -676,19 +676,28 @@ public class ProjectTest {
     public void load_jenesis_properties_rejects_global_in_the_user_global_file() throws IOException {
         Path home = Files.createDirectories(root.resolve("home/.jenesis"));
         Files.writeString(home.resolve("jenesis.properties"), "jenesis.make.global=elsewhere\n");
-        Files.writeString(root.resolve("jenesis.properties"),
-                "jenesis.make.global=" + root.resolve("home").toString().replace('\\', '/') + "\n");
+        System.setProperty("jenesis.make.global", root.resolve("home").toString());
         assertThatThrownBy(() -> Make.loadProperties(root))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.make.global cannot be set in");
     }
 
     @Test
-    public void load_jenesis_properties_accepts_global_in_the_project_file() throws IOException {
-        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
-        Files.writeString(home.resolve("jenesis.properties"), "jenesis.test.sample.key=fromGlobal\n");
+    public void load_jenesis_properties_rejects_global_in_the_project_file() throws IOException {
+        Files.createDirectories(root.resolve("home/.jenesis"));
         Files.writeString(root.resolve("jenesis.properties"),
                 "jenesis.make.global=" + root.resolve("home").toString().replace('\\', '/') + "\n");
+        assertThatThrownBy(() -> Make.loadProperties(root))
+                .as("a project that could move the user-global folder could supply that file itself")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.make.global cannot be set in");
+    }
+
+    @Test
+    public void load_jenesis_properties_accepts_global_from_the_command_line() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.test.sample.key=fromGlobal\n");
+        System.setProperty("jenesis.make.global", root.resolve("home").toString());
         Make.loadProperties(root);
         assertThat(System.getProperty("jenesis.test.sample.key")).isEqualTo("fromGlobal");
     }
@@ -707,19 +716,6 @@ public class ProjectTest {
         Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.toolchain.searchpath=\n");
         assertThatThrownBy(() -> Make.loadProperties(root))
                 .as("even an empty search path is the user's to set, so a project file never names one")
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.toolchain.searchpath cannot be set in");
-    }
-
-    @Test
-    public void load_jenesis_properties_rejects_toolchain_searchpath_in_a_user_global_file_the_project_locates()
-            throws IOException {
-        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
-        Files.writeString(home.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=/opt/jdks/*\n");
-        Files.writeString(root.resolve("jenesis.properties"),
-                "jenesis.make.global=" + root.resolve("home").toString().replace('\\', '/') + "\n");
-        assertThatThrownBy(() -> Make.loadProperties(root))
-                .as("a project that names the user-global folder could otherwise supply that file itself")
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.toolchain.searchpath cannot be set in");
     }

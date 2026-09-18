@@ -87,7 +87,7 @@ neither is a property it reads, and no `jenesis.project.*` key is read outside i
 reflection, and only when a version is set, so source mode compiles it only then; it depends on `java.base`
 alone, which `MakeClosureTest` holds it to. A JDK is identified by its `release` file and never executed
 before it is chosen. The search path decides what the build executes, so `Make.loadProperties` refuses it in
-every file a project provides or locates: a new way to read properties keeps that rule, and the relaunch
+every file a project provides: a new way to read properties keeps that rule, and the relaunch
 never takes a JVM option that configuration could supply.
 
 **Configuration files are read through `SequencedProperties`.** A file is read with the type's own accessors -

@@ -68,8 +68,9 @@ the build is configured, by the `main` launcher:
   so selecting `release` also applies `supply-chain`.
 - A user-global `jenesis.properties` is loaded for **every** project as the
   weakest layer - shared personal defaults. It lives in `~/.jenesis/`;
-  `jenesis.make.global` moves that folder (default `$HOME`) or, set to an empty
-  string, switches it off, and a missing file is ignored. It may declare its own
+  `-Djenesis.make.global` moves that folder (default `$HOME`) or, set to an empty
+  string, switches it off, and a missing file is ignored. Only the command line
+  sets it, so a project can never choose which file holds your own defaults. It may declare its own
   profiles too, relative to its `.jenesis` folder.
 - **Precedence**, highest first: an explicit `-D` on the command line, then the
   profiles, then the project `jenesis.properties`, then the user-global
