@@ -12,6 +12,12 @@ public class Demo {
 
     static void main(String[] args) throws Exception {
         generateKey();
+
+        // The key, its password and the store are the signing machine's, so no project file may name
+        // them. This demo is that machine, and hands them to the build the way a release job would.
+        System.setProperty("jenesis.jarsigner.keystore", KEYSTORE.toString());
+        System.setProperty("jenesis.jarsigner.alias", "demo");
+        System.setProperty("jenesis.jarsigner.storepass", "file " + PASSWORD);
         if (Project.perform(Path.of("."), Make.loadProperties(Path.of(".")), "stage") == null) {
             throw new IllegalStateException("The build did not stage the signed jar");
         }

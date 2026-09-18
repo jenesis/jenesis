@@ -2,6 +2,7 @@ package build.jenesis.test;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import module org.junit.jupiter.params;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
@@ -45,6 +46,11 @@ public class ProjectTest {
         System.clearProperty("jenesis.make.global");
         System.clearProperty("jenesis.toolchain.searchpath");
         System.clearProperty("jenesis.toolchain.installer");
+        System.clearProperty("jenesis.dependency.signature");
+        System.clearProperty("jenesis.project.docker");
+        System.clearProperty("jenesis.project.sources");
+        System.clearProperty("jenesis.maven.uri");
+        System.clearProperty("jenesis.maven.token");
         System.clearProperty("jenesis.test.sample.key");
         System.clearProperty("jenesis.test.sample.a");
         System.clearProperty("jenesis.test.sample.b");
@@ -746,6 +752,119 @@ public class ProjectTest {
         System.setProperty("jenesis.make.global", root.resolve("home").toString());
         Make.loadProperties(root);
         assertThat(System.getProperty("jenesis.toolchain.searchpath")).isEqualTo("/opt/jdks/*");
+    }
+
+    @Test
+    public void load_jenesis_properties_rejects_a_property_of_another_namespace_in_the_project_file()
+            throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "https.proxyHost=proxy.example.com\n");
+        assertThatThrownBy(() -> Make.loadProperties(root))
+                .as("a project that could set any JVM property would route this machine's traffic")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("https.proxyHost cannot be set in")
+                .hasMessageContaining("sets only jenesis.* properties");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"jenesis.daemon.options=-javaagent:agent.jar",
+            "jenesis.openpgp.command=tools/gpgv",
+            "jenesis.jreleaser.executable=tools/jreleaser",
+            "jenesis.jarsigner.arguments=-J-javaagent:agent.jar",
+            "jenesis.project.docker.mount=/home/user/.ssh",
+            "jenesis.execute.docker.env=AWS_SECRET_ACCESS_KEY",
+            "jenesis.module.token=secret",
+            "jenesis.cache.uri=https://cache.example.com/",
+            "jenesis.repository.insecure=true",
+            "jenesis.sigstore.uri=https://trust.example.com/"})
+    public void load_jenesis_properties_rejects_what_only_this_machine_decides(String entry) throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), entry + "\n");
+        assertThatThrownBy(() -> Make.loadProperties(root))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(entry.substring(0, entry.indexOf('=')) + " cannot be set in")
+                .hasMessageContaining("only the command line or your own ~/.jenesis/jenesis.properties");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"jenesis.project.target=/tmp/elsewhere",
+            "jenesis.project.target=../elsewhere",
+            "jenesis.project.cache=../../cache",
+            "jenesis.pin.file=../pins.properties",
+            "jenesis.make.classes=../classes"})
+    public void load_jenesis_properties_rejects_a_folder_outside_the_project(String entry) throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), entry + "\n");
+        assertThatThrownBy(() -> Make.loadProperties(root))
+                .as("the build writes to these folders and wipes some of them")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("names only a folder inside the project");
+    }
+
+    @Test
+    public void load_jenesis_properties_accepts_a_folder_inside_the_project() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.target=build/output\n");
+        Make.loadProperties(root);
+        assertThat(System.getProperty("jenesis.project.target")).isEqualTo("build/output");
+    }
+
+    @Test
+    public void load_jenesis_properties_sends_no_token_to_a_repository_the_project_names() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.maven.token=secret\n");
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.maven.uri=https://repo.example.com/\n");
+        System.setProperty("jenesis.make.global", root.resolve("home").toString());
+        Make.loadProperties(root);
+        assertThat(System.getProperty("jenesis.maven.uri")).isEqualTo("https://repo.example.com/");
+        assertThat(System.getProperty("jenesis.maven.token"))
+                .as("a project names the repositories it resolves from, and this machine's token stays behind")
+                .isEmpty();
+    }
+
+    @Test
+    public void load_jenesis_properties_keeps_the_token_for_a_repository_this_machine_names() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"),
+                "jenesis.maven.uri=https://repo.example.com/\njenesis.maven.token=secret\n");
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.sources=true\n");
+        System.setProperty("jenesis.make.global", root.resolve("home").toString());
+        Make.loadProperties(root);
+        assertThat(System.getProperty("jenesis.maven.token")).isEqualTo("secret");
+    }
+
+    @Test
+    public void load_jenesis_properties_prefers_the_user_global_file_over_the_project() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.dependency.signature=strict\n");
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.dependency.signature=none\n");
+        System.setProperty("jenesis.make.global", root.resolve("home").toString());
+        Make.loadProperties(root);
+        assertThat(System.getProperty("jenesis.dependency.signature"))
+                .as("what this machine settles applies to every project it builds, and a project cannot undo it")
+                .isEqualTo("strict");
+    }
+
+    @Test
+    public void load_jenesis_properties_prefers_a_user_global_profile_over_the_project() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.make.profiles=mine\n");
+        Files.writeString(home.resolve("jenesis-mine.properties"), "jenesis.test.sample.key=fromGlobalProfile\n");
+        Files.writeString(root.resolve("jenesis.properties"),
+                "jenesis.make.profiles=theirs\njenesis.test.sample.key=fromProject\n");
+        Files.writeString(root.resolve("jenesis-theirs.properties"), "jenesis.test.sample.key=fromProjectProfile\n");
+        System.setProperty("jenesis.make.global", root.resolve("home").toString());
+        Make.loadProperties(root);
+        assertThat(System.getProperty("jenesis.test.sample.key")).isEqualTo("fromGlobalProfile");
+    }
+
+    @Test
+    public void load_jenesis_properties_keeps_the_command_line_over_every_file() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.dependency.signature=strict\n");
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.dependency.signature=declared\n");
+        System.setProperty("jenesis.make.global", root.resolve("home").toString());
+        System.setProperty("jenesis.dependency.signature", "none");
+        Make.loadProperties(root);
+        assertThat(System.getProperty("jenesis.dependency.signature"))
+                .as("the command line is this machine's own decision for one run")
+                .isEqualTo("none");
     }
 
     @Test

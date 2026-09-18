@@ -19,6 +19,9 @@ public class JenesisModuleRepository implements JenesisRepository {
 
     public static JenesisRepository of(Scope scope) {
         String token = System.getProperty("jenesis.module.token", System.getenv("JENESIS_REPOSITORY_TOKEN"));
+        if (token != null && token.isBlank()) {
+            token = null;
+        }
         String property = System.getProperty("jenesis.module.uri");
         String environment = System.getenv("JENESIS_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();
