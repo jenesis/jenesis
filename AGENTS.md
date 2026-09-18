@@ -83,12 +83,14 @@ takes its root as a required constructor argument and its profiles as a value ha
 neither is a property it reads, and no `jenesis.project.*` key is read outside it.
 
 **`jenesis.toolchain.*` picks the JVM, and only the user says where to look.** `Toolchain` reads
-`jenesis.toolchain.version` and `jenesis.toolchain.searchpath`. `Make.main` and `Execute.main` reach it by
-reflection, and only when a version is set, so source mode compiles it only then; it depends on `java.base`
-alone, which `MakeClosureTest` holds it to. A JDK is identified by its `release` file and never executed
-before it is chosen. The search path decides what the build executes, so `Make.loadProperties` refuses it in
-every file a project provides: a new way to read properties keeps that rule, and the relaunch
-never takes a JVM option that configuration could supply.
+`jenesis.toolchain.version`, `jenesis.toolchain.searchpath` and `jenesis.toolchain.installer`. `Make.main`
+and `Execute.main` reach it by reflection, and only when a version is set, so source mode compiles it only
+then; it depends on `java.base` alone, which `MakeClosureTest` holds it to. A JDK is identified by its
+`release` file and never executed before it is chosen. The search path and the installer decide what the
+build executes, so `Make.loadProperties` refuses both in every file a project provides: a new way to read
+properties keeps that rule, and the relaunch never takes a JVM option that configuration could supply.
+Jenesis itself installs nothing; the installer is a program the user names, such as the SDK's
+`jenesis-jdk`, which translates a version for the tool that installs JDKs on that machine.
 
 **Configuration files are read through `SequencedProperties`.** A file is read with the type's own accessors -
 `value`, `value(key, default)`, `flag`, `flag(key, default)`, `entries` for a comma-separated list, `words`

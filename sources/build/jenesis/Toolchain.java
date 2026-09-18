@@ -8,19 +8,26 @@ public final class Toolchain {
 
     private static final Pattern WORD = Pattern.compile("[A-Za-z]+");
 
+    private static final Pattern NAME = Pattern.compile("[A-Za-z0-9._+-]+");
+
     private final String version;
     private final String searchpath;
+    private final String installer;
     private final List<Integer> numbers;
     private final SequencedSet<String> words;
     private final List<Entry> entries;
+    private final List<String> invocation;
 
     public Toolchain() {
-        this(System.getProperty("jenesis.toolchain.version"), System.getProperty("jenesis.toolchain.searchpath", "@"));
+        this(System.getProperty("jenesis.toolchain.version"),
+                System.getProperty("jenesis.toolchain.searchpath", "@"),
+                System.getProperty("jenesis.toolchain.installer"));
     }
 
-    private Toolchain(String version, String searchpath) {
+    private Toolchain(String version, String searchpath, String installer) {
         this.version = version == null || version.isBlank() ? null : version.trim();
         this.searchpath = searchpath;
+        this.installer = installer == null || installer.isBlank() ? null : installer.trim();
         List<Integer> numbers = new ArrayList<>();
         SequencedSet<String> words = new LinkedHashSet<>();
         if (this.version != null) {
@@ -62,21 +69,54 @@ public final class Toolchain {
             }
         }
         this.entries = List.copyOf(entries);
+        if (this.installer == null) {
+            invocation = null;
+        } else {
+            List<String> invocation = new ArrayList<>(List.of(this.installer.split("\\s+")));
+            String program = invocation.getFirst();
+            String home = System.getProperty("user.home");
+            if (program.equals("~")
+                    || program.startsWith("~/")
+                    || File.separatorChar == '\\' && program.startsWith("~\\")) {
+                program = home + program.substring(1);
+            }
+            if (!NAME.matcher(program).matches()) {
+                Path path;
+                try {
+                    path = Path.of(program);
+                } catch (InvalidPathException _) {
+                    path = null;
+                }
+                if (path == null || !path.isAbsolute()) {
+                    throw new IllegalArgumentException("Malformed jenesis.toolchain.installer: '"
+                            + printable(this.installer) + "' (its program is a name looked up on the PATH, of"
+                            + " letters, digits, dots, dashes, underscores and pluses, or an absolute path or one"
+                            + " starting with ~, as jenesis-jdk or ~/bin/install-jdk)");
+                }
+            }
+            invocation.set(0, program);
+            this.invocation = List.copyOf(invocation);
+        }
     }
 
     public Toolchain version(String version) {
-        return new Toolchain(version, searchpath);
+        return new Toolchain(version, searchpath, installer);
     }
 
     public Toolchain searchpath(String searchpath) {
-        return new Toolchain(version, searchpath);
+        return new Toolchain(version, searchpath, installer);
     }
 
-    public Path home() throws IOException {
+    public Toolchain installer(String installer) {
+        return new Toolchain(version, searchpath, installer);
+    }
+
+    public Path home() throws IOException, InterruptedException {
         return select().home();
     }
 
-    public List<String> command(Class<?> main, List<String> options, List<String> arguments) throws IOException {
+    public List<String> command(Class<?> main, List<String> options, List<String> arguments)
+            throws IOException, InterruptedException {
         return command(select().home(), main, options, arguments);
     }
 
@@ -133,7 +173,7 @@ public final class Toolchain {
         return command;
     }
 
-    private Candidate select() throws IOException {
+    private Candidate select() throws IOException, InterruptedException {
         Path running = Path.of(System.getProperty("java.home"));
         if (version == null) {
             return new Candidate(running, Runtime.version(), System.getProperty("java.vendor", ""), words(
@@ -166,6 +206,43 @@ public final class Toolchain {
                     + running + ", and jenesis.toolchain.searchpath is empty - run it on a matching JDK, or name"
                     + " the folders to search for one in jenesis.toolchain.searchpath");
         }
+        List<Candidate> found = search(running, skipped);
+        Candidate selected = best(found);
+        if (selected == null && invocation != null) {
+            install();
+            skipped.clear();
+            found = search(running, skipped);
+            selected = best(found);
+            if (selected == null) {
+                throw new IllegalStateException(listing(new StringBuilder("The installer ")
+                        .append(printable(installer)).append(" ran for jenesis.toolchain.version=").append(version)
+                        .append(", and still no JDK matches it: jenesis.toolchain.searchpath=")
+                        .append(printable(searchpath)), found, skipped)
+                        .append("\nMake the installer put the JDK into one of the searched folders, or add the"
+                                + " folder it installs into to jenesis.toolchain.searchpath").toString());
+            }
+        }
+        if (selected == null) {
+            throw new IllegalStateException(listing(new StringBuilder("No JDK matches jenesis.toolchain.version=")
+                    .append(version).append(". The running JVM is ").append(current.version())
+                    .append(" (").append(String.join(" ", current.words())).append(") at ").append(running)
+                    .append(", and jenesis.toolchain.searchpath=").append(printable(searchpath)), found, skipped)
+                    .append("\nInstall a matching JDK into one of the searched folders, or add the folder that"
+                            + " holds one to jenesis.toolchain.searchpath, on the command line or in"
+                            + " ~/.jenesis/jenesis.properties; jenesis.toolchain.installer names a program that"
+                            + " installs one when none matches").toString());
+        }
+        String unsafe = unsafe(selected.home());
+        if (unsafe != null) {
+            throw new IllegalStateException("The JDK at " + printable(selected.home()) + " matches"
+                    + " jenesis.toolchain.version=" + version + " but is not safe to run: " + unsafe
+                    + " - make the JDK writable by its owner alone, as with chmod -R go-w "
+                    + printable(selected.home()) + ", or remove it from jenesis.toolchain.searchpath");
+        }
+        return selected;
+    }
+
+    private List<Candidate> search(Path running, SequencedMap<Path, String> skipped) throws IOException {
         Set<Path> seen = new HashSet<>();
         seen.add(running.toRealPath());
         List<Candidate> found = new ArrayList<>();
@@ -183,37 +260,88 @@ public final class Toolchain {
                 }
             }
         }
+        return found;
+    }
+
+    private Candidate best(List<Candidate> found) {
         Comparator<Candidate> order = Comparator.comparing(Candidate::version, Runtime.Version::compareToIgnoreOptional);
-        Candidate selected = found.stream().filter(this::matches).sorted(order.reversed()).findFirst().orElse(null);
-        if (selected == null) {
-            StringBuilder message = new StringBuilder("No JDK matches jenesis.toolchain.version=").append(version)
-                    .append(". The running JVM is ").append(current.version())
-                    .append(" (").append(String.join(" ", current.words())).append(") at ").append(running)
-                    .append(", and jenesis.toolchain.searchpath=").append(printable(searchpath)).append(" found");
-            if (found.isEmpty() && skipped.isEmpty()) {
-                message.append(" no JDK.");
-            } else {
-                message.append(':');
-                for (Candidate candidate : found) {
-                    message.append("\n  ").append(printable(candidate.home())).append("  ")
-                            .append(candidate.version()).append(" (").append(String.join(" ", candidate.words()))
-                            .append(')');
-                }
-                skipped.forEach((home, reason) -> message.append("\n  ").append(printable(home))
-                        .append("  skipped, as ").append(reason));
+        return found.stream().filter(this::matches).sorted(order.reversed()).findFirst().orElse(null);
+    }
+
+    private static StringBuilder listing(StringBuilder message,
+                                         List<Candidate> found,
+                                         SequencedMap<Path, String> skipped) {
+        message.append(" found");
+        if (found.isEmpty() && skipped.isEmpty()) {
+            return message.append(" no JDK.");
+        }
+        message.append(':');
+        for (Candidate candidate : found) {
+            message.append("\n  ").append(printable(candidate.home())).append("  ")
+                    .append(candidate.version()).append(" (").append(String.join(" ", candidate.words()))
+                    .append(')');
+        }
+        skipped.forEach((home, reason) -> message.append("\n  ").append(printable(home))
+                .append("  skipped, as ").append(reason));
+        return message;
+    }
+
+    private void install() throws IOException, InterruptedException {
+        List<String> command = new ArrayList<>(invocation);
+        command.set(0, program(command.getFirst()));
+        command.add(version);
+        System.err.println("Installing a JDK for jenesis.toolchain.version=" + version + " with "
+                + printable(String.join(" ", command)));
+        Process process = new ProcessBuilder(command)
+                .directory(new File(System.getProperty("user.home")))
+                .redirectInput(ProcessBuilder.Redirect.INHERIT)
+                .redirectErrorStream(true)
+                .start();
+        try (InputStream in = process.getInputStream()) {
+            in.transferTo(System.err);
+        }
+        int code;
+        try {
+            code = process.waitFor();
+        } catch (InterruptedException e) {
+            process.destroy();
+            throw e;
+        }
+        if (code != 0) {
+            throw new IllegalStateException("The installer " + printable(installer) + " failed with exit code "
+                    + code + " for jenesis.toolchain.version=" + version + " - see its output above");
+        }
+    }
+
+    private String program(String program) {
+        if (!NAME.matcher(program).matches()) {
+            return program;
+        }
+        List<String> extensions = new ArrayList<>(List.of(""));
+        if (File.separatorChar == '\\') {
+            String pathext = System.getenv("PATHEXT");
+            extensions.addAll(List.of((pathext == null ? ".COM;.EXE;.BAT;.CMD" : pathext).split(";")));
+        }
+        String path = System.getenv("PATH");
+        for (String entry : path == null ? new String[0] : path.split(File.pathSeparator)) {
+            Path folder;
+            try {
+                folder = Path.of(entry);
+            } catch (InvalidPathException _) {
+                continue;
             }
-            throw new IllegalStateException(message.append("\nInstall a matching JDK into one of the searched"
-                    + " folders, or add the folder that holds one to jenesis.toolchain.searchpath, on the command"
-                    + " line or in ~/.jenesis/jenesis.properties").toString());
+            if (!folder.isAbsolute()) {
+                continue;
+            }
+            for (String extension : extensions) {
+                Path candidate = folder.resolve(program + extension);
+                if (Files.isRegularFile(candidate) && Files.isExecutable(candidate)) {
+                    return candidate.toString();
+                }
+            }
         }
-        String unsafe = unsafe(selected.home());
-        if (unsafe != null) {
-            throw new IllegalStateException("The JDK at " + printable(selected.home()) + " matches"
-                    + " jenesis.toolchain.version=" + version + " but is not safe to run: " + unsafe
-                    + " - make the JDK writable by its owner alone, as with chmod -R go-w "
-                    + printable(selected.home()) + ", or remove it from jenesis.toolchain.searchpath");
-        }
-        return selected;
+        throw new IllegalStateException("The installer " + printable(program) + " that jenesis.toolchain.installer"
+                + " names is on no absolute folder of the PATH - install it, or name it by its absolute path");
     }
 
     private boolean matches(Candidate candidate) {

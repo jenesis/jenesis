@@ -327,11 +327,13 @@ public final class Make {
                     + ": it locates your own user-global settings, which no file may move, least of all one a"
                     + " project provides (pass -Djenesis.make.global on the command line instead)");
         }
-        if (!trusted && properties.getProperty("jenesis.toolchain.searchpath") != null) {
-            throw new IllegalStateException("jenesis.toolchain.searchpath cannot be set in " + file
-                    + ": the folders searched for a JDK decide what the build executes, so only the command line"
-                    + " or your own ~/.jenesis/jenesis.properties may name them, never a file the project provides"
-                    + " (pass -Djenesis.toolchain.searchpath instead)");
+        for (String key : List.of("jenesis.toolchain.searchpath", "jenesis.toolchain.installer")) {
+            if (!trusted && properties.getProperty(key) != null) {
+                throw new IllegalStateException(key + " cannot be set in " + file
+                        + ": it decides which programs the build executes, so only the command line or your own"
+                        + " ~/.jenesis/jenesis.properties may set it, never a file the project provides"
+                        + " (pass -D" + key + " instead)");
+            }
         }
     }
 
