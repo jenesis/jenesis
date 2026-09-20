@@ -118,13 +118,14 @@ public class Demo {
                 + module + "-1.0.0.jar");
 
         // The chain as configuration rather than code: an entry prefixed with
-        // maven: is read by the publishing convention, a plain entry speaks the
-        // Jenesis module protocol, and the |demo.convention suffix decides which
-        // names reach which remote - the company repository for the company's
-        // own modules, the regular module repository for everything else.
+        // maven: is read by the publishing convention, the 2 spelling out how
+        // many segments of a module name its group takes, a plain entry speaks
+        // the Jenesis module protocol, and the |demo.convention suffix decides
+        // which names reach which remote - the company repository for the
+        // company's own modules, the regular module repository for the rest.
         Path modules = Files.createDirectories(Path.of("target", "modules", "module", "demo.other", "1.0.0"));
         Files.copy(jar, modules.resolve("demo.other.jar"), StandardCopyOption.REPLACE_EXISTING);
-        System.setProperty("jenesis.module.uri", "maven:" + published.toUri() + "|demo.convention,"
+        System.setProperty("jenesis.module.uri", "maven:2:" + published.toUri() + "|demo.convention,"
                 + Path.of("target", "modules").toUri());
         try {
             JenesisRepository chain = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE);

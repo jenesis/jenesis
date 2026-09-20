@@ -117,13 +117,24 @@ an entry without one answers for every name that reaches it. The last section of
 the demo run above is exactly this chain, with the staged tree standing in for the
 company repository.
 
+Each `maven:` entry may also name the convention it is read by, because two
+prefixes need not agree on one. The count goes between the type and the URI, and
+it is the number of leading segments of a module name that form the groupId:
+
+    -Djenesis.module.uri=maven:3:https://deep.example.com/|com.example.platform,maven:https://nexus.example.com/|com.example,https://repo.jenesis.build/
+
+`com.example.platform.store` is then resolved as
+`com.example.platform:com.example.platform.store` from the first remote, while
+`com.example.service` keeps two segments on the second. An entry that names no
+count follows `jenesis.maven.segments`, which itself defaults to two, so the
+common case stays a URI and a prefix. A count below one is rejected, and so is a
+count on a `module:` entry, where no groupId is derived at all.
+
 A `maven:` entry authenticates with the Maven credentials, `jenesis.maven.token`
 or `MAVEN_REPOSITORY_TOKEN`, because it is a Maven repository, and it fronts the
-local `~/.m2` cache like any other. It derives the coordinate with
-`jenesis.maven.segments`, so a company that publishes three segments deep
-configures that once and both directions follow. A type also carries into a
-spliced reference, so `maven:@CORP_MODULES` reads every remote that variable
-names as a Maven repository, and an unknown type is rejected by name.
+local `~/.m2` cache like any other. A type also carries into a spliced reference,
+so `maven:@CORP_MODULES` reads every remote that variable names as a Maven
+repository, and an unknown type is rejected by name.
 
 Why the demo wires two repositories
 -----------------------------------

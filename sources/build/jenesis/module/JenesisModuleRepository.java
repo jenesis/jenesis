@@ -59,19 +59,27 @@ public class JenesisModuleRepository implements JenesisRepository {
                 throw new IllegalStateException("No URI in Jenesis module repository entry: " + candidate);
             }
             String type = kind;
+            Integer segments = null;
             int colon = location.indexOf(':');
-            if (colon > 1 && isType(location.substring(0, colon))) {
-                String remainder = location.substring(colon + 1).strip();
-                if (!remainder.startsWith("/")
-                        && (remainder.isEmpty() || remainder.startsWith("@") || remainder.indexOf(':') > 0)) {
-                    type = location.substring(0, colon);
-                    location = remainder;
+            if (colon > 1 && isType(location.substring(0, colon)) && isArgument(location.substring(colon + 1))) {
+                type = location.substring(0, colon);
+                location = location.substring(colon + 1).strip();
+                int next = location.indexOf(':');
+                if (next > 0 && isCount(location.substring(0, next)) && isArgument(location.substring(next + 1))) {
+                    segments = toSegments(location.substring(0, next), candidate);
+                    location = location.substring(next + 1).strip();
                 }
             }
             if (!type.equals(MODULE) && !type.equals(MAVEN)) {
                 throw new IllegalArgumentException("Unknown repository type in Jenesis module repository entry: "
                         + candidate
                         + " (expected '" + MODULE + "' or '" + MAVEN + "')");
+            }
+            if (segments != null && !type.equals(MAVEN)) {
+                throw new IllegalArgumentException("A group id segment count applies only to a '"
+                        + MAVEN
+                        + "' entry: "
+                        + candidate);
             }
             if (location.isEmpty()) {
                 throw new IllegalStateException("No URI in Jenesis module repository entry: " + candidate);
@@ -107,9 +115,10 @@ public class JenesisModuleRepository implements JenesisRepository {
                     throw new IllegalStateException("No Jenesis module repository is configured by: " + value);
                 }
             } else if (type.equals(MAVEN)) {
-                current = new MavenModuleRepository(MavenDefaultRepository.of(
+                MavenModuleRepository convention = new MavenModuleRepository(MavenDefaultRepository.of(
                         URI.create(location.endsWith("/") ? location : location + "/"),
                         System.getProperty("jenesis.maven.token", System.getenv("MAVEN_REPOSITORY_TOKEN"))));
+                current = segments == null ? convention : convention.segments(segments);
             } else {
                 current = new JenesisModuleRepository(
                         URI.create((location.endsWith("/") ? location : location + "/")
@@ -148,6 +157,38 @@ public class JenesisModuleRepository implements JenesisRepository {
             }
         }
         return true;
+    }
+
+    private static boolean isCount(String value) {
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (character < '0' || character > '9') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isArgument(String value) {
+        String remainder = value.strip();
+        return !remainder.startsWith("/")
+                && (remainder.isEmpty() || remainder.startsWith("@") || remainder.indexOf(':') > 0);
+    }
+
+    private static int toSegments(String value, String candidate) {
+        int segments;
+        try {
+            segments = Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid group id segment count in Jenesis module repository entry: "
+                    + candidate, e);
+        }
+        if (segments < 1) {
+            throw new IllegalArgumentException("Expected at least one group id segment in "
+                    + "Jenesis module repository entry: "
+                    + candidate);
+        }
+        return segments;
     }
 
     public JenesisModuleRepository(URI root) {
