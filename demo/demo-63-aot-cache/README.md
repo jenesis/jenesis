@@ -65,6 +65,14 @@ A JDK upgrade, a changed engine, or a cache older than the lifetime is trained a
 rather than silently ignored; the JVM would otherwise fall back to loading everything,
 which costs a little more than having no cache at all.
 
+That identity is the daemon's, deliberately. Both hash the engine the same way - the
+build sources in source mode, the engine jar otherwise - and both record the JVM version
+in full, so a patch upgrade retires a daemon and retrains a cache alike. The daemon
+hashes the environment and the JVM options as well, because it executes the build and
+those decide what a build produces; a cache only holds classes a JVM loaded, and the JVM
+validates those against its own flags, which is why changing the heap size or the
+collector keeps a cache valid.
+
 Where the saving lands
 ----------------------
 

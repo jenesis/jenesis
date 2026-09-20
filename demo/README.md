@@ -230,7 +230,10 @@ already compiled a few modules runs faster - so it is worth nothing on a build
 that compiles little and about a third on a five-module one. The daemon serves one project, one request at a time; only `-Djenesis.*`
 flags travel with a call, cleared and set again around every build, while
 anything a running JVM cannot change - the build sources, the environment, the
-JVM arguments - replaces the daemon instead. `--stop` shuts it down.
+JVM arguments, the JVM version down to its patch - replaces the daemon instead.
+`--stop` shuts it down. The ahead-of-time cache of section 45 is keyed the same
+way, by the same hash of the engine and the same JVM version, so the two agree on
+when what they hold has gone stale.
 
 ## 5. Packaging a runnable application - [`java-pom-executable`](demo-06-java-pom-executable/README.md), [`java-modular-executable`](demo-07-java-modular-executable/README.md), [`bundle`](demo-08-bundle/README.md)
 
@@ -1489,6 +1492,11 @@ cache of the engine, and every later build starts from it with those classes alr
 loaded and linked. `jenesis.aot.file` says where it lives, `.jenesis/engine.aot` by
 default, and an optional `jenesis.aot.lifetime` trains it again once it reaches that age;
 a changed engine or a new JDK does the same, which a `.digest` beside the cache records.
+That identity is the daemon's: the same hash of the engine the daemon is keyed by, and
+the JVM version in full, so neither outlives a patch upgrade. The daemon hashes the
+environment and the JVM options on top, because it runs the build and those change what
+a build produces, where a cache only holds loaded classes and the JVM checks those
+itself.
 Turning it on beside `jenesis.make.daemon`, which keeps that engine in a JVM instead, or
 beside `jenesis.make.compile=false`, which leaves nothing compiled to cache, stops the
 build rather than quietly ignoring one of the two.

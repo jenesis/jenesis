@@ -202,18 +202,15 @@ public final class Make {
         if (location == null || !location.getFileName().toString().endsWith(".java")) {
             if (!daemon) {
                 if (aotApplies(collected, selectors) && location != null) {
-                    return relaunched(location, identity(location), selectors);
+                    return relaunched(location, engineFingerprint(location), selectors);
                 }
                 return invoke(Make.class.getClassLoader(), collected, selectors);
             }
             String modules = System.getProperty("jdk.module.path");
             String classPath = location == null ? System.getProperty("java.class.path") : location.toString();
-            Path engine = location == null || Files.isRegularFile(location)
-                    ? location
-                    : location.resolve("build").resolve("jenesis");
             return dispatched(Make.class.getClassLoader(),
                     modules != null ? List.of("-p", modules) : List.of("-cp", classPath),
-                    engine == null ? "" : fingerprint(engine, files(engine, ""), ""),
+                    engineFingerprint(location),
                     collected,
                     selectors);
         }
@@ -294,24 +291,6 @@ public final class Make {
         return code;
     }
 
-    private static String identity(Path engine) throws IOException {
-        if (Files.isRegularFile(engine)) {
-            BasicFileAttributes attributes = Files.readAttributes(engine, BasicFileAttributes.class);
-            return engine + ":" + attributes.size() + ":" + attributes.lastModifiedTime().toMillis();
-        }
-        long[] observed = new long[3];
-        Files.walkFileTree(engine, new SimpleFileVisitor<>() {
-            @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
-                observed[0]++;
-                observed[1] += attributes.size();
-                observed[2] = Math.max(observed[2], attributes.lastModifiedTime().toMillis());
-                return FileVisitResult.CONTINUE;
-            }
-        });
-        return engine + ":" + observed[0] + ":" + observed[1] + ":" + observed[2];
-    }
-
     private boolean aged(Path file) throws IOException {
         return !aotLifetime.isZero()
                 && Files.getLastModifiedTime(file).toInstant().isBefore(Instant.now().minus(aotLifetime));
@@ -327,6 +306,13 @@ public final class Make {
             }
         }
         Files.move(temporary, jar, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    private static String engineFingerprint(Path location) throws IOException {
+        Path engine = location == null || Files.isRegularFile(location)
+                ? location
+                : location.resolve("build").resolve("jenesis");
+        return engine == null ? "" : fingerprint(engine, files(engine, ""), "");
     }
 
     private static String fingerprint(Path folder, List<Path> files, String salt) throws IOException {

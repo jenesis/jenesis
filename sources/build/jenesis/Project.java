@@ -2144,7 +2144,7 @@ public record Project(
                 make.provided||Settings that the files a project provides supplied, comma-separated; derived by Make and settable in no file, so that a repository or cache URL a project named is never sent a credential
                 make.compile|true|Compile the build sources once and run from those classes
                 make.classes|.jenesis/classes|Where those classes land, relative to the root
-                make.daemon|false|Hand the build to a reused JVM; --stop as the only selector shuts it down
+                make.daemon|false|Hand the build to a reused JVM; --stop as the only selector shuts it down; a daemon serves only requests whose engine, JVM version, JVM options and environment hash to what it was started for, and retires itself where they do not
                 daemon.idle|10800|Seconds an idle daemon waits before exiting
                 daemon.options|-Xmx2g|JVM options for the daemon process itself, whitespace separated
                 aot.enabled|false|Run the build in a JVM that loads the engine from an ahead-of-time cache, trained on the first build that finds none and reused by every later one; refused beside make.daemon, which keeps that engine in a JVM instead, and beside make.compile=false, which leaves nothing compiled to cache
