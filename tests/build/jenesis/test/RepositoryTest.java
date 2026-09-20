@@ -23,6 +23,58 @@ public class RepositoryTest {
         System.clearProperty("jenesis.repository.read.timeout");
     }
 
+    @Test
+    public void a_token_of_the_environment_is_withheld_from_a_url_a_property_names() {
+        Repository.Credential credential = new Repository.Credential("Bearer secret",
+                Repository.Origin.ENVIRONMENT);
+
+        assertThat(credential.grant(Repository.Origin.PROPERTY))
+                .as("a command line or a project file must not receive an ambient credential")
+                .isNull();
+        assertThat(credential.grant(Repository.Origin.ENVIRONMENT)).isEqualTo("Bearer secret");
+    }
+
+    @Test
+    public void a_token_of_a_property_reaches_the_urls_the_same_configuration_names() {
+        Repository.Credential credential = new Repository.Credential("Bearer secret",
+                Repository.Origin.PROPERTY);
+
+        assertThat(credential.grant(Repository.Origin.PROPERTY)).isEqualTo("Bearer secret");
+        assertThat(credential.grant(Repository.Origin.ENVIRONMENT)).isEqualTo("Bearer secret");
+    }
+
+    @Test
+    public void no_token_reaches_a_repository_that_no_configuration_named() {
+        assertThat(new Repository.Credential("Bearer secret", Repository.Origin.PROPERTY)
+                .grant(Repository.Origin.DEFAULT))
+                .as("the built-in public repository is never handed a credential")
+                .isNull();
+        assertThat(new Repository.Credential("Bearer secret", Repository.Origin.ENVIRONMENT)
+                .grant(Repository.Origin.DEFAULT))
+                .isNull();
+    }
+
+    @Test
+    public void a_credential_without_a_token_grants_nothing() {
+        assertThat(new Repository.Credential("Bearer secret", Repository.Origin.PROPERTY).token(null)
+                .grant(Repository.Origin.PROPERTY))
+                .isNull();
+    }
+
+    @Test
+    public void a_credential_reads_a_property_before_the_environment() {
+        System.setProperty("jenesis.test.credential", "Bearer property");
+        try {
+            Repository.Credential credential = Repository.Credential.of("jenesis.test.credential",
+                    "JENESIS_TEST_CREDENTIAL_THAT_IS_NOT_SET");
+
+            assertThat(credential.token()).isEqualTo("Bearer property");
+            assertThat(credential.origin()).isEqualTo(Repository.Origin.PROPERTY);
+        } finally {
+            System.clearProperty("jenesis.test.credential");
+        }
+    }
+
     private HttpServer serve(IntFunction<Integer> statusOfHit, Map<String, String> headers, AtomicInteger hits) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         server.createContext("/", exchange -> {

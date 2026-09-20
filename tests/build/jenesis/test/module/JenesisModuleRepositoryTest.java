@@ -837,6 +837,78 @@ public class JenesisModuleRepositoryTest {
         }
     }
 
+    @Test
+    public void factory_maven_type_authenticates_the_first_remote_of_the_chain() throws IOException {
+        List<String> authorizations = new ArrayList<>();
+        HttpServer server = mavenServer(authorizations);
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.maven.local", Files.createDirectories(root.resolve("m2")).toString());
+        System.setProperty("jenesis.maven.token", "Bearer secret");
+        System.setProperty("jenesis.module.uri", "maven:http://localhost:" + server.getAddress().getPort() + "/");
+        try {
+            RepositoryItem item = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)
+                    .fetch(Runnable::run, "com.corp.mod/1.0.0")
+                    .orElseThrow();
+
+            assertThat(read(item)).isEqualTo("classes");
+            assertThat(authorizations).contains("Bearer secret");
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.maven.local");
+            System.clearProperty("jenesis.maven.token");
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
+    public void factory_maven_type_is_not_handed_the_credential_of_an_earlier_remote() throws IOException {
+        List<String> authorizations = new ArrayList<>();
+        HttpServer server = mavenServer(authorizations);
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.maven.local", Files.createDirectories(root.resolve("m2")).toString());
+        System.setProperty("jenesis.maven.token", "Bearer secret");
+        System.setProperty("jenesis.module.token", "Bearer other");
+        System.setProperty("jenesis.module.uri", Files.createDirectories(root.resolve("empty")).toUri()
+                + ",maven:http://localhost:" + server.getAddress().getPort() + "/");
+        try {
+            RepositoryItem item = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)
+                    .fetch(Runnable::run, "com.corp.mod/1.0.0")
+                    .orElseThrow();
+
+            assertThat(read(item)).isEqualTo("classes");
+            assertThat(authorizations)
+                    .as("a fallback remote is never handed the credential of the chain")
+                    .containsOnlyNulls();
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.maven.local");
+            System.clearProperty("jenesis.maven.token");
+            System.clearProperty("jenesis.module.token");
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    private HttpServer mavenServer(List<String> authorizations) throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            authorizations.add(exchange.getRequestHeaders().getFirst("Authorization"));
+            if (exchange.getRequestURI().getPath().equals("/com/corp/com.corp.mod/1.0.0/com.corp.mod-1.0.0.jar")) {
+                byte[] body = "classes".getBytes(StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(200, body.length);
+                try (OutputStream out = exchange.getResponseBody()) {
+                    out.write(body);
+                }
+            } else {
+                exchange.sendResponseHeaders(404, -1);
+            }
+            exchange.close();
+        });
+        server.start();
+        return server;
+    }
+
     private void writeMavenArtifact(String groupId, String artifactId, String content) throws IOException {
         writeMavenArtifact("company", groupId, artifactId, content);
     }
