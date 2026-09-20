@@ -22,20 +22,26 @@ public class JenesisModuleRepository implements JenesisRepository {
     private final Boolean speculative;
 
     public static JenesisRepository of(Scope scope) {
-        String token = System.getProperty("jenesis.module.token", System.getenv("JENESIS_REPOSITORY_TOKEN"));
+        Repository.Credential credential = Repository.Credential.of("jenesis.module.token",
+                "JENESIS_REPOSITORY_TOKEN");
+        Repository.Credential maven = Repository.Credential.of("jenesis.maven.token", "MAVEN_REPOSITORY_TOKEN");
         String property = System.getProperty("jenesis.module.uri");
         String environment = System.getenv("JENESIS_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();
         String text;
+        Repository.Origin origin;
         if (property != null) {
             text = property;
+            origin = Repository.Origin.PROPERTY;
         } else if (environment != null) {
             text = environment;
             visited.add("JENESIS_REPOSITORY_URI");
+            origin = Repository.Origin.ENVIRONMENT;
         } else {
             text = "https://repo.jenesis.build/";
+            origin = Repository.Origin.DEFAULT;
         }
-        JenesisRepository repository = chain(text, visited, scope, token, MODULE, null);
+        JenesisRepository repository = chain(text, visited, scope, credential, maven, origin, MODULE, null);
         if (repository == null) {
             throw new IllegalStateException("No Jenesis module repository is configured by: " + text);
         }
@@ -45,7 +51,9 @@ public class JenesisModuleRepository implements JenesisRepository {
     private static JenesisRepository chain(String text,
                                            Set<String> visited,
                                            Scope scope,
-                                           String token,
+                                           Repository.Credential credential,
+                                           Repository.Credential maven,
+                                           Repository.Origin origin,
                                            String kind,
                                            JenesisRepository repository) {
         for (String entry : text.split(",")) {
@@ -84,22 +92,28 @@ public class JenesisModuleRepository implements JenesisRepository {
             if (location.isEmpty()) {
                 throw new IllegalStateException("No URI in Jenesis module repository entry: " + candidate);
             }
-            String entryToken = repository == null ? token : null;
+            Repository.Credential granted = repository == null ? credential : credential.token(null);
+            Repository.Credential grantedMaven = repository == null ? maven : maven.token(null);
             JenesisRepository current;
             if (location.startsWith("@")) {
                 String name = location.substring(1);
                 String value;
+                Repository.Origin spliced;
                 if (name.isEmpty()) {
                     String environment = System.getenv("JENESIS_REPOSITORY_URI");
                     if (environment != null && visited.add("JENESIS_REPOSITORY_URI")) {
                         name = "JENESIS_REPOSITORY_URI";
                         value = environment;
+                        spliced = Repository.Origin.ENVIRONMENT;
                     } else {
                         name = null;
                         value = "https://repo.jenesis.build/";
+                        spliced = Repository.Origin.DEFAULT;
                     }
                 } else {
-                    value = System.getProperty(name, System.getenv(name));
+                    String declared = System.getProperty(name);
+                    value = declared == null ? System.getenv(name) : declared;
+                    spliced = declared == null ? Repository.Origin.ENVIRONMENT : Repository.Origin.PROPERTY;
                     if (value == null) {
                         throw new IllegalStateException("Unresolved repository reference: @" + name);
                     }
@@ -107,7 +121,7 @@ public class JenesisModuleRepository implements JenesisRepository {
                         throw new IllegalStateException("Circular repository reference: @" + name);
                     }
                 }
-                current = chain(value, visited, scope, entryToken, type, null);
+                current = chain(value, visited, scope, granted, grantedMaven, spliced, type, null);
                 if (name != null) {
                     visited.remove(name);
                 }
@@ -117,13 +131,13 @@ public class JenesisModuleRepository implements JenesisRepository {
             } else if (type.equals(MAVEN)) {
                 MavenModuleRepository convention = new MavenModuleRepository(MavenDefaultRepository.of(
                         URI.create(location.endsWith("/") ? location : location + "/"),
-                        System.getProperty("jenesis.maven.token", System.getenv("MAVEN_REPOSITORY_TOKEN"))));
+                        grantedMaven.grant(origin)));
                 current = segments == null ? convention : convention.segments(segments);
             } else {
                 current = new JenesisModuleRepository(
                         URI.create((location.endsWith("/") ? location : location + "/")
                                 + (scope == Scope.MODULE ? "module/" : "artifact/")),
-                        entryToken);
+                        granted.grant(origin));
             }
             List<String> modules = new ArrayList<>();
             if (separator >= 0) {

@@ -241,6 +241,37 @@ public interface Repository {
         }
     }
 
+    enum Origin {
+        PROPERTY,
+        ENVIRONMENT,
+        DEFAULT
+    }
+
+    record Credential(String token, Origin origin) {
+
+        public static Credential of(String property, String variable) {
+            String value = System.getProperty(property);
+            if (value != null) {
+                return new Credential(value, Origin.PROPERTY);
+            }
+            String fallback = System.getenv(variable);
+            return fallback == null
+                    ? new Credential(null, Origin.PROPERTY)
+                    : new Credential(fallback, Origin.ENVIRONMENT);
+        }
+
+        public Credential token(String token) {
+            return new Credential(token, origin);
+        }
+
+        public String grant(Origin target) {
+            if (token == null || target == Origin.DEFAULT) {
+                return null;
+            }
+            return origin == Origin.ENVIRONMENT && target == Origin.PROPERTY ? null : token;
+        }
+    }
+
     record Retry(int retries, Duration backoff) {
 
         public Retry {

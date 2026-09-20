@@ -2185,11 +2185,11 @@ public record Project(
                 repository.read.timeout|30000|Read timeout for a repository fetch, in milliseconds
                 maven.uri||Maven remotes, comma-separated and queried left to right; a |<groupId> suffix, repeatable, asks a remote only for that group and the groups below it, and @<name> splices the chain another property or environment variable holds (env MAVEN_REPOSITORY_URI)
                 maven.local||Local Maven cache folder (env MAVEN_REPOSITORY_LOCAL)
-                maven.token||Bearer token for the Maven remote (env MAVEN_REPOSITORY_TOKEN)
+                maven.token||Bearer token for the Maven remotes (env MAVEN_REPOSITORY_TOKEN); a token the environment provides is sent only to the remotes the environment names, never to a URI a property or a project file names, and no token is ever sent to the built-in public repository
                 maven.segments|2|Leading dot-separated segments of a module name that form its Maven groupId, when a module is published or resolved by the coordinate convention; a shorter name becomes the groupId in full
                 module.uri||Jenesis module remotes, likewise, where a |<module> suffix asks a remote only for that module and the modules whose name it prefixes, and a maven:[<segments>:]<uri> entry reads a remote as a Maven repository by the publishing convention, taking that many leading segments of a module name as its groupId where it names a count and jenesis.maven.segments where it does not (env JENESIS_REPOSITORY_URI)
                 module.local||Local module cache folder (env JENESIS_REPOSITORY_LOCAL)
-                module.token||Bearer token for the module remote (env JENESIS_REPOSITORY_TOKEN)
+                module.token||Bearer token for the module remote (env JENESIS_REPOSITORY_TOKEN); likewise, and only the first remote of the chain is sent it, so a fallback mirror never sees it
                 module.prerelease||Accept a pre-release when asking the module index for a module's newest version
                 module.speculative||Accept a version the module index has not recorded but guesses exists
                 openpgp.uri|keyserver.ubuntu.com, keys.openpgp.org|HKP key server roots, likewise; a server speaking another protocol is another repository (env OPENPGP_REPOSITORY_URI)
