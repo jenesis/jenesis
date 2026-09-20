@@ -256,22 +256,18 @@ public final class Make {
             Files.createDirectories(folder);
         }
         Path jar = Files.isRegularFile(engine) ? engine : aotFile.resolveSibling("engine.jar");
-        Path stamp = aotFile.resolveSibling(aotFile.getFileName() + ".digest");
-        String identity = seed + "|" + Runtime.version() + "|" + jar;
-        boolean reusable = Files.isRegularFile(aotFile)
-                && Files.isRegularFile(stamp)
-                && Files.readString(stamp).equals(identity)
-                && !aged(aotFile);
+        Path cache = cache(seed + "|" + Runtime.version() + "|" + jar);
+        boolean reusable = Files.isRegularFile(cache) && !aged(cache);
         if (!reusable) {
-            Files.deleteIfExists(aotFile);
-            Files.deleteIfExists(stamp);
+            discard(cache);
+            Files.deleteIfExists(cache);
             if (!jar.equals(engine)) {
                 packaged(engine, jar);
             }
         }
         List<String> command = new ArrayList<>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
-        command.add((reusable ? "-XX:AOTCache=" : "-XX:AOTCacheOutput=") + aotFile);
+        command.add((reusable ? "-XX:AOTCache=" : "-XX:AOTCacheOutput=") + cache);
         command.add("-Xlog:aot=off");
         command.add("-Djenesis.aot.relaunched=true");
         command.add("-Djenesis.make.root=" + root);
@@ -281,11 +277,45 @@ public final class Make {
         command.add(jar.toString());
         command.add(Make.class.getName());
         command.addAll(List.of(selectors));
-        int code = new ProcessBuilder(command).inheritIO().start().waitFor();
-        if (!reusable && Files.isRegularFile(aotFile)) {
-            Files.writeString(stamp, identity);
+        return new ProcessBuilder(command).inheritIO().start().waitFor();
+    }
+
+    private Path cache(String identity) {
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
         }
-        return code;
+        return aotFile.resolveSibling(stem()
+                + HexFormat.of().formatHex(digest.digest(identity.getBytes(StandardCharsets.UTF_8))).substring(0, 12)
+                + extension());
+    }
+
+    private void discard(Path keep) throws IOException {
+        Path folder = keep.getParent();
+        if (folder == null || !Files.isDirectory(folder)) {
+            return;
+        }
+        try (DirectoryStream<Path> files = Files.newDirectoryStream(folder, stem() + "*" + extension())) {
+            for (Path file : files) {
+                if (!file.equals(keep)) {
+                    Files.deleteIfExists(file);
+                }
+            }
+        }
+    }
+
+    private String stem() {
+        String name = aotFile.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        return (dot < 0 ? name : name.substring(0, dot)) + "-";
+    }
+
+    private String extension() {
+        String name = aotFile.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        return dot < 0 ? "" : name.substring(dot);
     }
 
     private boolean aged(Path file) throws IOException {

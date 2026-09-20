@@ -1491,7 +1491,8 @@ thing with a file. `jenesis.aot.enabled` makes the first build train a JVM ahead
 cache of the engine, and every later build starts from it with those classes already
 loaded and linked. `jenesis.aot.file` says where it lives, `.jenesis/engine.aot` by
 default, and an optional `jenesis.aot.lifetime` trains it again once it reaches that age;
-a changed engine or a new JDK does the same, which a `.digest` beside the cache records.
+a changed engine or a new JDK does the same, because the engine and the JVM are hashed
+into the file's name and a build asks only for the name its own pair produces.
 A daemon is keyed by the same two things, the engine and the JVM version in full, so
 neither outlives a patch upgrade. The daemon hashes the engine's bytes, because its
 identity decides which code runs; the cache compares a size and a timestamp, because

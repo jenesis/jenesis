@@ -12,8 +12,6 @@ public class MakeAotTest {
     @TempDir
     private Path root;
 
-    private Path cache;
-
     @BeforeEach
     public void setUp() throws IOException {
         Path sources = Files.createDirectories(root.resolve("sources").resolve("sample").resolve("app"));
@@ -32,46 +30,59 @@ public class MakeAotTest {
                     }
                 }
                 """);
-        cache = root.resolve(".jenesis").resolve("engine.aot");
     }
 
     @Test
     public void trains_a_cache_on_the_first_build_and_reuses_it_on_the_next() throws Exception {
         assertThat(make("build")).isEqualTo(0);
-        assertThat(cache).isRegularFile();
-        Path digest = cache.resolveSibling("engine.aot.digest");
-        assertThat(digest).isRegularFile();
-        String trained = Files.readString(digest);
-        FileTime written = Files.getLastModifiedTime(cache);
+        Path trained = cache();
+        assertThat(trained.getFileName().toString())
+                .as("the engine and the JVM it was trained for are the name")
+                .matches("engine-[0-9a-f]{12}\\.aot");
+        FileTime written = Files.getLastModifiedTime(trained);
 
         assertThat(make("build")).isEqualTo(0);
 
-        assertThat(Files.readString(digest))
+        assertThat(cache())
                 .as("the second build reuses what the first one trained")
                 .isEqualTo(trained);
-        assertThat(Files.getLastModifiedTime(cache)).isEqualTo(written);
+        assertThat(Files.getLastModifiedTime(trained)).isEqualTo(written);
     }
 
     @Test
     public void trains_no_cache_for_a_selector_that_builds_nothing() throws Exception {
         assertThat(make("help")).isEqualTo(0);
 
-        assertThat(cache)
+        assertThat(caches())
                 .as("a selector that only prints loads none of the machinery worth caching")
-                .doesNotExist();
+                .isEmpty();
     }
 
     @Test
     public void retrains_a_cache_that_outlived_its_lifetime() throws Exception {
         assertThat(make("build")).isEqualTo(0);
-        FileTime written = Files.getLastModifiedTime(cache);
-        Files.setLastModifiedTime(cache, FileTime.from(Instant.now().minus(Duration.ofHours(2))));
+        Path trained = cache();
+        FileTime written = Files.getLastModifiedTime(trained);
+        Files.setLastModifiedTime(trained, FileTime.from(Instant.now().minus(Duration.ofHours(2))));
 
         assertThat(make(List.of("-Djenesis.aot.lifetime=PT1H"), "build")).isEqualTo(0);
 
-        assertThat(Files.getLastModifiedTime(cache))
+        assertThat(Files.getLastModifiedTime(cache()))
                 .as("a cache older than the lifetime is trained again")
                 .isNotEqualTo(written);
+    }
+
+    @Test
+    public void sweeps_a_cache_trained_for_another_engine() throws Exception {
+        Path stale = Files.createDirectories(root.resolve(".jenesis")).resolve("engine-0123456789ab.aot");
+        Files.writeString(stale, "trained for something else");
+
+        assertThat(make("build")).isEqualTo(0);
+
+        assertThat(stale)
+                .as("a cache no build can use is removed where the one that fits is trained")
+                .doesNotExist();
+        assertThat(caches()).hasSize(1);
     }
 
     @Test
@@ -126,6 +137,24 @@ public class MakeAotTest {
         }
     }
 
+    private Path cache() throws IOException {
+        List<Path> caches = caches();
+        if (caches.size() != 1) {
+            throw new IllegalStateException("Expected one cache under " + root.resolve(".jenesis") + ": " + caches);
+        }
+        return caches.getFirst();
+    }
+
+    private List<Path> caches() throws IOException {
+        Path folder = root.resolve(".jenesis");
+        if (!Files.isDirectory(folder)) {
+            return List.of();
+        }
+        try (Stream<Path> files = Files.list(folder)) {
+            return files.filter(file -> file.getFileName().toString().endsWith(".aot")).sorted().toList();
+        }
+    }
+
     private int make(String... selectors) throws Exception {
         return make(List.of(), selectors);
     }
@@ -134,8 +163,7 @@ public class MakeAotTest {
         Path engine = Path.of(Make.class.getProtectionDomain().getCodeSource().getLocation().toURI());
         List<String> command = new ArrayList<>(List.of(
                 Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                "-Djenesis.aot.enabled=true",
-                "-Djenesis.aot.file=" + cache));
+                "-Djenesis.aot.enabled=true"));
         command.addAll(options);
         command.addAll(List.of("-cp", engine.toString(), "build.jenesis.Make"));
         command.addAll(List.of(selectors));

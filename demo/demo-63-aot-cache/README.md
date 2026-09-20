@@ -21,7 +21,7 @@ way an installed launcher can:
     Training it:            2168 ms
     Reusing it:             305 ms
     Named by a launcher:    234 ms
-    Cache:                  20 MB at .jenesis/engine.aot
+    Cache:                  20 MB at .jenesis/engine-f95b8a73bb5f.aot
     Beside the daemon:      refused, naming jenesis.make.daemon
     Without compiling:      refused, naming jenesis.make.compile
     A cache for `help`:     never trained, as intended
@@ -45,11 +45,17 @@ Three properties, all off by default:
     jenesis.aot.file=.jenesis/engine.aot
     jenesis.aot.lifetime=P7D
 
-`enabled` turns it on, `file` says where the cache lives relative to the project root,
-and `lifetime` is an optional ISO-8601 age after which the cache is trained again. They
-are ordinary properties, so `jenesis.properties` or `~/.jenesis/jenesis.properties`
-carries them from build to build - which is the point, since a cache is a file rather
-than a process.
+`enabled` turns it on, `file` names the cache relative to the project root, and
+`lifetime` is an optional ISO-8601 age after which the cache is trained again. They are
+ordinary properties, so `jenesis.properties` or `~/.jenesis/jenesis.properties` carries
+them from build to build - which is the point, since a cache is a file rather than a
+process.
+
+The file on disk carries the engine and the JVM it was trained for, hashed into its
+name: `.jenesis/engine-f95b8a73bb5f.aot` for the default above. A build asks for the
+name its own engine and JVM produce, so a cache that fits neither is simply not there
+and the build trains one, sweeping the caches that no longer fit as it goes. There is
+nothing else to read and nothing to keep in step.
 
 Two settings contradict it and are refused rather than quietly ignored.
 `jenesis.make.daemon` keeps the engine loaded in a JVM of its own, which is the very
@@ -58,19 +64,18 @@ cache to serve. Either one beside `jenesis.aot.enabled` stops the build with a m
 naming both settings, because a build that silently ignored one of them would look
 configured and behave as if it were not.
 
-Beside the cache lives a `.digest` naming the engine and the JVM it was trained for.
-A JDK upgrade, a changed engine, or a cache older than the lifetime is trained again
-rather than silently ignored; the JVM would otherwise fall back to loading everything,
-which costs a little more than having no cache at all.
+A JDK upgrade, a changed engine, or a cache older than the lifetime is therefore trained
+again rather than silently ignored. The JVM would otherwise fall back to loading
+everything, which costs a little more than having no cache at all, and it never trains
+one itself.
 
 A daemon is keyed by the same two things, the engine and the JVM version in full, so a
 patch upgrade retires one and retrains the other alike. How carefully each is checked
 differs, because the two answer for different things. A daemon's identity decides which
-code runs, so it hashes the engine's bytes. This identity only decides when to train
-again: the JVM refuses a cache that does not match the jar it is handed or the build it
-was written by, and loads normally instead, so a size and a timestamp are enough here
-and cost a millisecond rather than fifteen. The daemon also hashes the environment and
-the JVM options, which a cache of loaded classes has no use for.
+code runs, so it hashes the engine's bytes. This one only decides when to train again,
+which is why it hashes a size and a timestamp: the JVM refuses a cache that does not
+match the jar it is handed or the build it was written by. The daemon also hashes the
+environment and the JVM options, which a cache of loaded classes has no use for.
 
 Where the saving lands
 ----------------------
