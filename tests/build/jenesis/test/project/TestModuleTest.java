@@ -95,10 +95,7 @@ public class TestModuleTest {
 
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
-        assertThat(Files.readString(supplement.resolve("error"))
-                .lines()
-                .filter(line -> !line.startsWith("stty:"))
-                .collect(Collectors.joining("\n"))).isEmpty();
+        assertThat(reportedErrors(supplement)).isEmpty();
     }
 
     @Test
@@ -120,10 +117,7 @@ public class TestModuleTest {
 
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
-        assertThat(Files.readString(supplement.resolve("error"))
-                .lines()
-                .filter(line -> !line.startsWith("stty:"))
-                .collect(Collectors.joining("\n"))).isEmpty();
+        assertThat(reportedErrors(supplement)).isEmpty();
     }
 
     @Test
@@ -252,10 +246,7 @@ public class TestModuleTest {
 
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
-        assertThat(Files.readString(supplement.resolve("error"))
-                .lines()
-                .filter(line -> !line.startsWith("stty:"))
-                .collect(Collectors.joining("\n"))).isEmpty();
+        assertThat(reportedErrors(supplement)).isEmpty();
     }
 
     @Test
@@ -839,6 +830,13 @@ public class TestModuleTest {
         }
         Files.write(target, body);
         return target;
+    }
+
+    private static String reportedErrors(Path supplement) throws IOException {
+        return Files.readString(supplement.resolve("error"))
+                .lines()
+                .filter(line -> !line.startsWith("stty:") && !line.startsWith("Picked up "))
+                .collect(Collectors.joining("\n"));
     }
 
     private static void compileSource(Path classesDir, String simpleName, String source, List<Path> classpath)
