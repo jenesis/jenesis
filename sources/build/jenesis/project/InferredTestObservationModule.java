@@ -15,6 +15,10 @@ public class InferredTestObservationModule implements BuildExecutorModule {
 
     public static final String TEST = "test", MUTATE = "mutate";
 
+    private static final String ENGINE = "engine";
+
+    private static final Set<String> TEST_KEYS = Set.of(ENGINE);
+
     private final SequencedSet<Path> configuration;
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
@@ -61,6 +65,20 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         this.jacoco = jacoco;
         this.nativeImage = nativeImage;
         this.pitest = pitest;
+    }
+
+    private static TestEngine declaredEngine(Path file) throws IOException {
+        if (file == null) {
+            return null;
+        }
+        SequencedProperties properties = SequencedProperties.ofFiles(file);
+        for (String key : properties.stringPropertyNames()) {
+            if (!TEST_KEYS.contains(key)) {
+                throw new IllegalArgumentException("Unknown test property: " + key);
+            }
+        }
+        String engine = properties.value(ENGINE);
+        return engine == null ? null : TestEngine.of(engine);
     }
 
     private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
@@ -123,11 +141,13 @@ public class InferredTestObservationModule implements BuildExecutorModule {
             }
         }
         if (test != null) {
-            BuildExecutorModule executed = test.apply(new TestModule(repositories, resolvers)
+            TestModule module = new TestModule(repositories, resolvers)
                     .observe(engines)
                     .pinning(pinning)
                     .pathPlacement(pathPlacement)
-                    .moduleName(moduleName));
+                    .moduleName(moduleName);
+            TestEngine declared = declaredEngine(BuildStep.locate(configuration, "test.properties"));
+            BuildExecutorModule executed = test.apply(declared == null ? module : module.engine(declared));
             if (executed != null) {
                 buildExecutor.addModule(TEST, executed, inherited.sequencedKeySet());
                 SequencedSet<String> reportInputs = new LinkedHashSet<>();

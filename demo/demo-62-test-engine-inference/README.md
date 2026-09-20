@@ -20,6 +20,7 @@ Layout
 
     demo/demo-62-test-engine-inference
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
+    |-- build.jenesis/explicit/test.properties   engine=junit-platform, under a profile
     |-- pom.xml              junit-jupiter-api and truth, test-scoped; ships pinned
     |-- sources/sample/Greeter.java
     `-- test/sample
@@ -120,12 +121,21 @@ behalf. `junit-jupiter-engine` works the same way: `demo-03-java-pom-multi`
 declares the `junit-jupiter` aggregate, which carries the engine, and has the
 console resolved for it - two of the three named, one inferred.
 
-Choosing a different framework is the other axis, and that is a property rather
-than a dependency, because it decides which of the three engines is asked at all:
+Choosing the framework is the other axis, and it is declared rather than
+depended on, because it decides which of the three engines is asked at all. A
+`test.properties` in the module's `build.jenesis/` location names it, next to
+`jacoco.properties` and the rest:
 
-    java -Djenesis.test.engine=junit-platform build/jenesis/Make.java
+    engine=junit-platform
 
-Its values are `junit-platform`, `junit4` and `testng`; unset, the table above
+Its values are `junit-platform`, `junit4` and `testng`; absent, the table above
 decides. It cannot name the vintage engine, which is not a framework of its own
 but an engine the platform runs JUnit 4 classes with - that one is a dependency,
-as above.
+as above. The demo ships the file under a profile so both paths stay runnable:
+
+    java -Djenesis.make.profiles=explicit build/jenesis/Make.java
+
+`build.jenesis/explicit/test.properties` layers over `build.jenesis/`, so the
+default build above infers the framework and this one is told. Being a file in
+the project rather than a command-line flag, the declaration is what every
+checkout and every CI run reads, which is the point of declaring it at all.
