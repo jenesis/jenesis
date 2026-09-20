@@ -682,6 +682,40 @@ public class JenesisModuleRepositoryTest {
     }
 
     @Test
+    public void factory_filter_argument_accepts_several_module_prefixes() throws IOException {
+        Files.writeString(Files
+                .createDirectories(root.resolve("first/module/corp.mod.inner"))
+                .resolve("corp.mod.inner.jar"), "first-inner");
+        Files.writeString(Files
+                .createDirectories(root.resolve("first/module/team.mod"))
+                .resolve("team.mod.jar"), "first-team");
+        Files.writeString(Files
+                .createDirectories(root.resolve("first/module/other.mod"))
+                .resolve("other.mod.jar"), "first-other");
+        Files.writeString(Files
+                .createDirectories(root.resolve("second/module/other.mod"))
+                .resolve("other.mod.jar"), "second-other");
+        System.setProperty("jenesis.module.uri",
+                root.resolve("first").toUri() + "|corp|team.mod," + root.resolve("second").toUri());
+        try {
+            Repository merged = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE);
+            try (InputStream stream = merged.fetch(Runnable::run, "corp.mod.inner").orElseThrow().toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("first-inner");
+            }
+            try (InputStream stream = merged.fetch(Runnable::run, "team.mod").orElseThrow().toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("first-team");
+            }
+            try (InputStream stream = merged.fetch(Runnable::run, "other.mod").orElseThrow().toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8))
+                        .as("a module no prefix covers is left to the next remote")
+                        .isEqualTo("second-other");
+            }
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
     public void factory_artifact_scope_reads_the_artifact_subtree() throws IOException {
         Files.writeString(Files
                 .createDirectories(root.resolve("first/artifact/build.jenesis"))

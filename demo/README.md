@@ -1397,7 +1397,10 @@ in whatever Maven repository you deploy to - a team that builds with Jenesis and
 publishes to its own Nexus, Artifactory or Central keeps no module registry and no
 coordinate mapping. Both directions share one method, so publisher and consumer
 cannot drift apart, and a project published under a group of its own is named once,
-with `.group("com.example.tools")`.
+with `.group("com.example.tools")`. How deep the group reaches into the name is
+configuration too: `jenesis.maven.segments` (or `.segments(3)` on the repository)
+moves both directions at once, and a module name shorter than the count keeps
+serving as its own groupId.
 
 It is the first repository Jenesis ships without wiring it anywhere: the Jenesis
 module repository remains the default, and a build opts in by naming this one as its

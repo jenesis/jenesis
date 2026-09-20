@@ -61,6 +61,20 @@ The artifactId stays the module name, because that is what Jenesis publishes;
 a project that also overrides `artifact=` has left the convention behind and
 needs an explicit `@jenesis.alias` instead.
 
+How many segments the groupId takes is itself configuration. `jenesis.maven.segments`
+sets it for the whole build - for the coordinate a module is published under as much
+as for the one it is resolved by, so the two sides still cannot drift apart:
+
+    -Djenesis.maven.segments=3
+
+A module named `demo.convention.deep.greeter` is then published and resolved as
+`demo.convention.deep:demo.convention.deep.greeter`, and `=1` flattens the group to
+`demo:demo.convention.greeter`. A name with fewer segments than the count keeps
+serving as its own groupId, as `greeter` does at the default of two. A repository
+wired in code names it without the property, and a value below one is rejected:
+
+    new MavenModuleRepository().segments(3)
+
 Wiring it
 ---------
 

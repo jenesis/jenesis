@@ -2183,10 +2183,11 @@ public record Project(
                 repository.backoff|125|Initial retry backoff in milliseconds, doubling per attempt
                 repository.connect.timeout|10000|Connect timeout for a repository fetch, in milliseconds
                 repository.read.timeout|30000|Read timeout for a repository fetch, in milliseconds
-                maven.uri||Maven remotes, comma-separated and queried left to right (env MAVEN_REPOSITORY_URI)
+                maven.uri||Maven remotes, comma-separated and queried left to right; a |<groupId> suffix, repeatable, asks a remote only for that group and the groups below it, and @<name> splices the chain another property or environment variable holds (env MAVEN_REPOSITORY_URI)
                 maven.local||Local Maven cache folder (env MAVEN_REPOSITORY_LOCAL)
                 maven.token||Bearer token for the Maven remote (env MAVEN_REPOSITORY_TOKEN)
-                module.uri||Jenesis module remotes, likewise (env JENESIS_REPOSITORY_URI)
+                maven.segments|2|Leading dot-separated segments of a module name that form its Maven groupId, when a module is published or resolved by the coordinate convention; a shorter name becomes the groupId in full
+                module.uri||Jenesis module remotes, likewise, where a |<module> suffix asks a remote only for that module and the modules whose name it prefixes (env JENESIS_REPOSITORY_URI)
                 module.local||Local module cache folder (env JENESIS_REPOSITORY_LOCAL)
                 module.token||Bearer token for the module remote (env JENESIS_REPOSITORY_TOKEN)
                 module.prerelease||Accept a pre-release when asking the module index for a module's newest version

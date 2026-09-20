@@ -10,8 +10,11 @@ public class MavenModuleRepository implements JenesisRepository {
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
 
+    private static final int DEFAULT_SEGMENTS = 2;
+
     private final MavenRepository repository;
     private final String group;
+    private final int segments;
     private final DocumentBuilderFactory documentBuilderFactory;
     private final Map<MavenDependencyName, Optional<Metadata>> metadata = new ConcurrentHashMap<>();
 
@@ -20,35 +23,60 @@ public class MavenModuleRepository implements JenesisRepository {
     }
 
     public MavenModuleRepository(MavenRepository repository) {
-        this(repository, null, MavenDefaultVersionNegotiator.toDocumentBuilderFactory());
+        this(repository, null, segments(), MavenDefaultVersionNegotiator.toDocumentBuilderFactory());
     }
 
     private MavenModuleRepository(MavenRepository repository,
                                   String group,
+                                  int segments,
                                   DocumentBuilderFactory documentBuilderFactory) {
         this.repository = repository;
         this.group = group;
+        this.segments = segments;
         this.documentBuilderFactory = documentBuilderFactory;
     }
 
     public MavenModuleRepository repository(MavenRepository repository) {
-        return new MavenModuleRepository(repository, group, documentBuilderFactory);
+        return new MavenModuleRepository(repository, group, segments, documentBuilderFactory);
     }
 
     public MavenModuleRepository group(String group) {
         if (group != null) {
             SAFE_SEGMENT.accept("group id", group);
         }
-        return new MavenModuleRepository(repository, group, documentBuilderFactory);
+        return new MavenModuleRepository(repository, group, segments, documentBuilderFactory);
+    }
+
+    public MavenModuleRepository segments(int segments) {
+        return new MavenModuleRepository(repository, group, checkedSegments(segments), documentBuilderFactory);
+    }
+
+    public static int segments() {
+        return checkedSegments(Integer.getInteger("jenesis.maven.segments", DEFAULT_SEGMENTS));
+    }
+
+    public static int checkedSegments(int segments) {
+        if (segments < 1) {
+            throw new IllegalArgumentException("Expected at least one leading segment of a module name to form "
+                    + "the group id but got " + segments);
+        }
+        return segments;
     }
 
     public static String groupId(String module) {
-        int first = module.indexOf('.');
-        if (first < 0) {
-            return module;
+        return groupId(module, segments());
+    }
+
+    public static String groupId(String module, int segments) {
+        int limit = checkedSegments(segments), index = -1;
+        for (int count = 0; count < limit; count++) {
+            int next = module.indexOf('.', index + 1);
+            if (next < 0) {
+                return module;
+            }
+            index = next;
         }
-        int second = module.indexOf('.', first + 1);
-        return second < 0 ? module : module.substring(0, second);
+        return module.substring(0, index);
     }
 
     @Override
@@ -64,7 +92,7 @@ public class MavenModuleRepository implements JenesisRepository {
         if (version != null) {
             SAFE_SEGMENT.accept("version", version);
         }
-        String groupId = group == null ? groupId(module) : group;
+        String groupId = group == null ? groupId(module, segments) : group;
         String suffix = type == null ? "jar" : type;
         int dot = suffix.indexOf('.');
         String resolved;
