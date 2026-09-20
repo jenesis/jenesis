@@ -24,40 +24,56 @@ public class RepositoryTest {
     }
 
     @Test
-    public void a_token_of_the_environment_is_withheld_from_a_url_a_property_names() {
+    public void a_token_of_the_environment_reaches_only_the_repositories_the_environment_names() {
         Repository.Credential credential = new Repository.Credential("Bearer secret",
                 Repository.Origin.ENVIRONMENT);
 
-        assertThat(credential.grant(Repository.Origin.PROPERTY))
-                .as("a command line or a project file must not receive an ambient credential")
+        assertThat(credential.grant(Repository.Origin.ENVIRONMENT)).isEqualTo("Bearer secret");
+        assertThat(credential.grant(Repository.Origin.USER))
+                .as("a url a property names does not receive an ambient credential")
                 .isNull();
+        assertThat(credential.grant(Repository.Origin.PROJECT)).isNull();
+        assertThat(credential.grant(Repository.Origin.DEFAULT)).isNull();
+    }
+
+    @Test
+    public void a_token_the_user_names_reaches_what_the_user_and_the_environment_name() {
+        Repository.Credential credential = new Repository.Credential("Bearer secret", Repository.Origin.USER);
+
+        assertThat(credential.grant(Repository.Origin.USER)).isEqualTo("Bearer secret");
         assertThat(credential.grant(Repository.Origin.ENVIRONMENT)).isEqualTo("Bearer secret");
     }
 
     @Test
-    public void a_token_of_a_property_reaches_the_urls_the_same_configuration_names() {
-        Repository.Credential credential = new Repository.Credential("Bearer secret",
-                Repository.Origin.PROPERTY);
-
-        assertThat(credential.grant(Repository.Origin.PROPERTY)).isEqualTo("Bearer secret");
-        assertThat(credential.grant(Repository.Origin.ENVIRONMENT)).isEqualTo("Bearer secret");
+    public void no_token_reaches_a_repository_that_a_project_named() {
+        assertThat(new Repository.Credential("Bearer secret", Repository.Origin.USER)
+                .grant(Repository.Origin.PROJECT))
+                .as("a url from a file the project provides is never handed a credential")
+                .isNull();
     }
 
     @Test
     public void no_token_reaches_a_repository_that_no_configuration_named() {
-        assertThat(new Repository.Credential("Bearer secret", Repository.Origin.PROPERTY)
+        assertThat(new Repository.Credential("Bearer secret", Repository.Origin.USER)
                 .grant(Repository.Origin.DEFAULT))
                 .as("the built-in public repository is never handed a credential")
-                .isNull();
-        assertThat(new Repository.Credential("Bearer secret", Repository.Origin.ENVIRONMENT)
-                .grant(Repository.Origin.DEFAULT))
                 .isNull();
     }
 
     @Test
+    public void a_token_a_project_named_is_never_handed_out() {
+        Repository.Credential credential = new Repository.Credential("Bearer secret",
+                Repository.Origin.PROJECT);
+
+        assertThat(credential.grant(Repository.Origin.USER)).isNull();
+        assertThat(credential.grant(Repository.Origin.ENVIRONMENT)).isNull();
+        assertThat(credential.grant(Repository.Origin.PROJECT)).isNull();
+    }
+
+    @Test
     public void a_credential_without_a_token_grants_nothing() {
-        assertThat(new Repository.Credential("Bearer secret", Repository.Origin.PROPERTY).token(null)
-                .grant(Repository.Origin.PROPERTY))
+        assertThat(new Repository.Credential("Bearer secret", Repository.Origin.USER).token(null)
+                .grant(Repository.Origin.USER))
                 .isNull();
     }
 
@@ -69,10 +85,27 @@ public class RepositoryTest {
                     "JENESIS_TEST_CREDENTIAL_THAT_IS_NOT_SET");
 
             assertThat(credential.token()).isEqualTo("Bearer property");
-            assertThat(credential.origin()).isEqualTo(Repository.Origin.PROPERTY);
+            assertThat(credential.origin()).isEqualTo(Repository.Origin.USER);
         } finally {
             System.clearProperty("jenesis.test.credential");
         }
+    }
+
+    @Test
+    public void an_origin_names_the_settings_a_project_supplied() {
+        System.setProperty("jenesis.make.provided", "jenesis.module.uri, jenesis.test.sample");
+        try {
+            assertThat(Repository.Origin.of("jenesis.module.uri")).isEqualTo(Repository.Origin.PROJECT);
+            assertThat(Repository.Origin.of("jenesis.test.sample")).isEqualTo(Repository.Origin.PROJECT);
+            assertThat(Repository.Origin.of("jenesis.maven.uri")).isEqualTo(Repository.Origin.USER);
+        } finally {
+            System.clearProperty("jenesis.make.provided");
+        }
+    }
+
+    @Test
+    public void an_origin_is_the_user_where_no_project_file_supplied_a_setting() {
+        assertThat(Repository.Origin.of("jenesis.maven.uri")).isEqualTo(Repository.Origin.USER);
     }
 
     private HttpServer serve(IntFunction<Integer> statusOfHit, Map<String, String> headers, AtomicInteger hits) throws IOException {

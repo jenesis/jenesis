@@ -242,9 +242,20 @@ public interface Repository {
     }
 
     enum Origin {
-        PROPERTY,
+
+        USER,
+        PROJECT,
         ENVIRONMENT,
-        DEFAULT
+        DEFAULT;
+
+        public static Origin of(String key) {
+            for (String provided : System.getProperty("jenesis.make.provided", "").split(",")) {
+                if (provided.strip().equals(key)) {
+                    return PROJECT;
+                }
+            }
+            return USER;
+        }
     }
 
     record Credential(String token, Origin origin) {
@@ -252,11 +263,11 @@ public interface Repository {
         public static Credential of(String property, String variable) {
             String value = System.getProperty(property);
             if (value != null) {
-                return new Credential(value, Origin.PROPERTY);
+                return new Credential(value, Origin.of(property));
             }
             String fallback = System.getenv(variable);
             return fallback == null
-                    ? new Credential(null, Origin.PROPERTY)
+                    ? new Credential(null, Origin.USER)
                     : new Credential(fallback, Origin.ENVIRONMENT);
         }
 
@@ -265,10 +276,13 @@ public interface Repository {
         }
 
         public String grant(Origin target) {
-            if (token == null || target == Origin.DEFAULT) {
+            if (token == null || origin == Origin.PROJECT) {
                 return null;
             }
-            return origin == Origin.ENVIRONMENT && target == Origin.PROPERTY ? null : token;
+            if (target == Origin.DEFAULT || target == Origin.PROJECT) {
+                return null;
+            }
+            return origin == Origin.ENVIRONMENT && target != Origin.ENVIRONMENT ? null : token;
         }
     }
 

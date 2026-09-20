@@ -838,6 +838,42 @@ public class JenesisModuleRepositoryTest {
     }
 
     @Test
+    public void factory_withholds_the_credential_from_a_remote_a_project_file_named() throws IOException {
+        List<String> authorizations = new ArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            authorizations.add(exchange.getRequestHeaders().getFirst("Authorization"));
+            byte[] body = "classes".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+            exchange.close();
+        });
+        server.start();
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.module.token", "Bearer secret");
+        System.setProperty("jenesis.module.uri", "http://localhost:" + server.getAddress().getPort() + "/");
+        System.setProperty("jenesis.make.provided", "jenesis.module.uri");
+        try {
+            RepositoryItem item = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)
+                    .fetch(Runnable::run, "build.jenesis")
+                    .orElseThrow();
+
+            assertThat(read(item)).isEqualTo("classes");
+            assertThat(authorizations)
+                    .as("a url a file the project provides named never receives the credential")
+                    .containsOnlyNulls();
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.module.token");
+            System.clearProperty("jenesis.module.uri");
+            System.clearProperty("jenesis.make.provided");
+        }
+    }
+
+    @Test
     public void factory_maven_type_authenticates_the_first_remote_of_the_chain() throws IOException {
         List<String> authorizations = new ArrayList<>();
         HttpServer server = mavenServer(authorizations);

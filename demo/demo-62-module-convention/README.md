@@ -135,13 +135,23 @@ or `MAVEN_REPOSITORY_TOKEN`, because it is a Maven repository, and it fronts the
 local `~/.m2` cache like any other. It is handed that credential only where the
 chain would hand over its own: to the first remote of the chain and never to a
 fallback behind it, and only when the credential is at least as private as the
-URI it would travel to. A token the environment provides therefore reaches the
-remotes the environment names and no others - a URL from the command line, from
-`jenesis.properties`, or from any other file a project carries never receives it,
-and neither does the built-in public repository. A build that keeps its remotes in
-the environment keeps its credential with them: name them in `MAVEN_REPOSITORY_URI`,
-or splice that variable into a longer chain as `@MAVEN_REPOSITORY_URI`, and the
-token travels to those remotes and stops at the rest. A type also carries into a
+URL it would travel to.
+
+Two rules decide that. A URL that a file the project provides supplied - its
+`jenesis.properties`, or a profile beside it - is never sent a credential at all,
+and such a file may not name one either: `jenesis.maven.token`,
+`jenesis.module.token` and `jenesis.cache.key` are refused there, the way
+`jenesis.toolchain.searchpath` already is, because a credential is yours to hand
+out and not a project's. A token the environment provides is sent only to the
+remotes the environment names, so a URL on the command line does not receive it,
+and the built-in public repository receives nothing in any case.
+
+A build that keeps its remotes in the environment keeps its credential with them:
+name them in `MAVEN_REPOSITORY_URI`, or splice that variable into a longer chain
+as `@MAVEN_REPOSITORY_URI`, and the token travels to those remotes and stops at
+the rest. A build that names its remotes on the command line names the token
+there too, with `-Djenesis.maven.token`, or keeps both in
+`~/.jenesis/jenesis.properties`. A type also carries into a
 spliced reference, so `maven:@CORP_MODULES` reads every remote that variable
 names as a Maven repository, and an unknown type is rejected by name.
 
