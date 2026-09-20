@@ -124,6 +124,7 @@ Quick index
 | 59 | [`toolchain`](demo-59-toolchain/README.md)                 | Name the JDK a build runs on with `jenesis.toolchain.version`: `Make` and `Execute` check the running JVM and otherwise relaunch on a matching JDK already installed, found by its `release` file in folders only you name; CI relaunches the demo on JDK 26 on Linux, macOS and Windows | `java build/jenesis/Execute.java`  |
 | 60 | [`native-image`](demo-60-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
 | 61 | [`jpx`](demo-61-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
+| 62 | [`module-convention`](demo-62-module-convention/README.md)   | Resolve your own modules from a plain Maven repository by the coordinate convention Jenesis publishes with: a `MavenModuleRepository`, wired by hand as the `module` repository, maps a `requires` onto `<first two segments>:<module name>` in the repository the library was published to | `java build/Demo.java`             |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1384,6 +1385,29 @@ Resolution reaches the default repositories - the Jenesis module repository for
 module names, Maven Central for coordinates - each fronted by the local
 `~/.jenesis/` exports and `~/.m2/`, and each redirectable at a mirror through
 `JENESIS_REPOSITORY_URI` and `MAVEN_REPOSITORY_URI`.
+
+## 44. Your own modules from your own Maven repository - [`module-convention`](demo-62-module-convention/README.md)
+
+`publishing` (section 39) showed the coordinate a module is published under:
+groupId from the first two dotted segments of its name, artifactId from the whole
+name. `module-convention` reads that convention in the other direction. A
+`MavenModuleRepository` derives the same pair when *resolving*, so a
+`requires demo.convention.greeter` is served by `demo.convention:demo.convention.greeter`
+in whatever Maven repository you deploy to - a team that builds with Jenesis and
+publishes to its own Nexus, Artifactory or Central keeps no module registry and no
+coordinate mapping. Both directions share one method, so publisher and consumer
+cannot drift apart, and a project published under a group of its own is named once,
+with `.group("com.example.tools")`.
+
+It is the first repository Jenesis ships without wiring it anywhere: the Jenesis
+module repository remains the default, and a build opts in by naming this one as its
+`module` repository. The no-argument form resolves through the configured
+`jenesis.maven.uri` chain, so the repository itself stays configuration. The demo
+publishes a library into a Maven repository under `target/`, builds a consumer
+against it, runs it, and then shows the floating half: an unpinned `requires`
+resolves from the `maven-metadata.xml` a repository manager publishes - its
+`<release>`, or the newest stable version it lists - while a pinned one, as the
+build itself uses, needs no lookup at all.
 
 Cross-cutting concepts
 ----------------------
