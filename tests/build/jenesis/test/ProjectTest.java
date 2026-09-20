@@ -44,6 +44,10 @@ public class ProjectTest {
         System.clearProperty("jenesis.make.profiles");
         System.clearProperty("jenesis.make.global");
         System.clearProperty("jenesis.toolchain.searchpath");
+        System.clearProperty("jenesis.make.provided");
+        System.clearProperty("jenesis.maven.token");
+        System.clearProperty("jenesis.module.token");
+        System.clearProperty("jenesis.repository.insecure");
         System.clearProperty("jenesis.test.sample.key");
         System.clearProperty("jenesis.test.sample.a");
         System.clearProperty("jenesis.test.sample.b");
@@ -727,6 +731,71 @@ public class ProjectTest {
         System.setProperty("jenesis.make.global", root.resolve("home").toString());
         Make.loadProperties(root);
         assertThat(System.getProperty("jenesis.toolchain.searchpath")).isEqualTo("/opt/jdks/*");
+    }
+
+    @Test
+    public void load_jenesis_properties_records_the_settings_a_project_file_supplied() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.test.sample.a=fromProject\n");
+        Make.loadProperties(root);
+        assertThat(System.getProperty("jenesis.make.provided"))
+                .as("a repository url a project supplies is never handed a credential, so its keys are recorded")
+                .isEqualTo("jenesis.test.sample.a");
+    }
+
+    @Test
+    public void load_jenesis_properties_records_nothing_a_project_file_only_repeated() throws IOException {
+        System.setProperty("jenesis.test.sample.a", "fromCommandLine");
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.test.sample.a=fromProject\n");
+        Make.loadProperties(root);
+        assertThat(System.getProperty("jenesis.test.sample.a")).isEqualTo("fromCommandLine");
+        assertThat(System.getProperty("jenesis.make.provided"))
+                .as("the value in force is the one the command line set, so nothing was supplied")
+                .isNull();
+    }
+
+    @Test
+    public void load_jenesis_properties_rejects_a_credential_in_the_project_file() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.maven.token=Bearer secret\n");
+        assertThatThrownBy(() -> Make.loadProperties(root))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.maven.token cannot be set in");
+    }
+
+    @Test
+    public void load_jenesis_properties_rejects_a_credential_in_a_profile() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
+        Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.module.token=Bearer secret\n");
+        assertThatThrownBy(() -> Make.loadProperties(root))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.module.token cannot be set in");
+    }
+
+    @Test
+    public void load_jenesis_properties_accepts_a_credential_in_the_user_global_file() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.maven.token=Bearer secret\n");
+        System.setProperty("jenesis.make.global", root.resolve("home").toString());
+        Make.loadProperties(root);
+        assertThat(System.getProperty("jenesis.maven.token")).isEqualTo("Bearer secret");
+    }
+
+    @Test
+    public void load_jenesis_properties_rejects_a_plaintext_permission_in_the_project_file() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.repository.insecure=true\n");
+        assertThatThrownBy(() -> Make.loadProperties(root))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.repository.insecure cannot be set in");
+    }
+
+    @Test
+    public void load_jenesis_properties_rejects_a_supplied_declaration_in_any_file() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.make.provided=jenesis.maven.uri\n");
+        System.setProperty("jenesis.make.global", root.resolve("home").toString());
+        assertThatThrownBy(() -> Make.loadProperties(root))
+                .as("what a project supplied is derived, never declared, least of all by a project")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.make.provided cannot be set in");
     }
 
     @Test

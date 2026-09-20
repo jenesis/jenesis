@@ -28,7 +28,7 @@ public class MavenDefaultRepository implements MavenRepository {
         Repository.Origin origin;
         if (property != null) {
             text = property;
-            origin = Repository.Origin.PROPERTY;
+            origin = Repository.Origin.of("jenesis.maven.uri");
         } else if (environment != null) {
             text = environment;
             visited.add("MAVEN_REPOSITORY_URI");
@@ -116,7 +116,7 @@ public class MavenDefaultRepository implements MavenRepository {
                 } else {
                     String declared = System.getProperty(name);
                     value = declared == null ? System.getenv(name) : declared;
-                    spliced = declared == null ? Repository.Origin.ENVIRONMENT : Repository.Origin.PROPERTY;
+                    spliced = declared == null ? Repository.Origin.ENVIRONMENT : Repository.Origin.of(name);
                     if (value == null) {
                         throw new IllegalStateException("Unresolved repository reference: @" + name);
                     }
