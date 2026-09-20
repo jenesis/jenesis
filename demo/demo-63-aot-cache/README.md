@@ -13,17 +13,15 @@ From this directory:
 
     java build/Demo.java
 
-which builds this project without the cache, trains one, reuses it, and then runs the
-same build off the compiled engine the way the installed CLI runs it:
+which compiles the engine, builds this project off it without the cache, trains one,
+reuses it, and then runs the same build with the cache named on the command line, the
+way an installed launcher can:
 
-    Without the cache:      1213 ms
-    Training it:            2978 ms
-    Reusing it:             1201 ms
+    Without the cache:      405 ms
+    Training it:            2168 ms
+    Reusing it:             305 ms
+    Named by a launcher:    234 ms
     Cache:                  20 MB at .jenesis/engine.aot
-
-    The same build off the compiled engine, as the installed CLI runs it:
-      without the cache:    431 ms
-      with the cache:       258 ms
     Beside the daemon:      refused, naming jenesis.make.daemon
     Without compiling:      refused, naming jenesis.make.compile
     A cache for `help`:     never trained, as intended
@@ -33,7 +31,7 @@ Layout
 
     demo/demo-63-aot-cache
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
-    |-- build/Demo.java      trains the cache, reuses it, and times both shapes
+    |-- build/Demo.java      trains the cache, reuses it, and times what each shape costs
     `-- sources              a one-class module, so that startup dominates the build
         |-- module-info.java
         `-- sample/app/App.java
@@ -65,27 +63,34 @@ A JDK upgrade, a changed engine, or a cache older than the lifetime is trained a
 rather than silently ignored; the JVM would otherwise fall back to loading everything,
 which costs a little more than having no cache at all.
 
-That identity is the daemon's, deliberately. Both hash the engine the same way - the
-build sources in source mode, the engine jar otherwise - and both record the JVM version
-in full, so a patch upgrade retires a daemon and retrains a cache alike. The daemon
-hashes the environment and the JVM options as well, because it executes the build and
-those decide what a build produces; a cache only holds classes a JVM loaded, and the JVM
-validates those against its own flags, which is why changing the heap size or the
-collector keeps a cache valid.
+A daemon is keyed by the same two things, the engine and the JVM version in full, so a
+patch upgrade retires one and retrains the other alike. How carefully each is checked
+differs, because the two answer for different things. A daemon's identity decides which
+code runs, so it hashes the engine's bytes. This identity only decides when to train
+again: the JVM refuses a cache that does not match the jar it is handed or the build it
+was written by, and loads normally instead, so a size and a timestamp are enough here
+and cost a millisecond rather than fifteen. The daemon also hashes the environment and
+the JVM options, which a cache of loaded classes has no use for.
 
 Where the saving lands
 ----------------------
 
 The cache holds the engine's classes, loaded and linked, so it removes a fixed block of
-startup and nothing else. Two shapes decide how much of that survives:
+startup and nothing else. Who hands it to the JVM decides how much of that block
+survives:
 
-- **A cheap entry point keeps it.** The installed CLI runs the engine from a jar, so
-  its launcher names the cache on the command line and the build starts straight from
-  it. That is the 410 ms against 227 ms above, and it holds for a build of any size.
-- **Source mode spends it again.** `java build/jenesis/Make.java` compiles `Make.java`
-  in memory before any of the tool's own code runs, and the JVM it is already in cannot
-  be given a cache. Make therefore relaunches into a JVM that can, which costs a fork
-  and recovers only part of what the cache saves.
+- **A launcher names it.** An installed CLI runs the engine from a jar, so its launcher
+  can put `-XX:AOTCache` on the command line and the build starts straight from the
+  cache. That is the 405 ms against 234 ms above, and it holds for a build of any size.
+- **Make relaunches for it.** Where nothing named the cache, Make starts a second JVM
+  that can use one, which costs a fork and keeps most of the rest: 405 ms against
+  305 ms.
+
+Source mode is out of reach either way. `java build/jenesis/Make.java` compiles
+`Make.java` in the JVM that is already running, long before any of this tool's code
+could ask for a cache, and that JVM cannot be handed one afterwards. The setting is
+therefore ignored there, and it applies once the engine is compiled - which is how the
+installed CLI runs, and how this demo measures.
 
 The setting is worth turning on where builds are frequent and small, and it is not
 worth turning on to speed up one long build, where startup is noise.

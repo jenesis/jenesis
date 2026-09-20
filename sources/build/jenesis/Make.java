@@ -202,7 +202,7 @@ public final class Make {
         if (location == null || !location.getFileName().toString().endsWith(".java")) {
             if (!daemon) {
                 if (aotApplies(collected, selectors) && location != null) {
-                    return relaunched(location, engineFingerprint(location), selectors);
+                    return relaunched(location, identity(location), selectors);
                 }
                 return invoke(Make.class.getClassLoader(), collected, selectors);
             }
@@ -220,9 +220,6 @@ public final class Make {
         Path build = location.getParent();
         String seed = fingerprint(build, files(build, ".java"), classes.toString());
         Path folder = precompiled(build, seed);
-        if (aotApplies(collected, selectors) && !stop) {
-            return relaunched(folder, seed, selectors);
-        }
         try (URLClassLoader loader = new URLClassLoader(
                 new URL[] { folder.toUri().toURL() },
                 ClassLoader.getPlatformClassLoader())) {
@@ -306,6 +303,24 @@ public final class Make {
             }
         }
         Files.move(temporary, jar, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    private static String identity(Path engine) throws IOException {
+        if (Files.isRegularFile(engine)) {
+            BasicFileAttributes attributes = Files.readAttributes(engine, BasicFileAttributes.class);
+            return engine + ":" + attributes.size() + ":" + attributes.lastModifiedTime().toMillis();
+        }
+        long[] observed = new long[3];
+        Files.walkFileTree(engine, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) {
+                observed[0]++;
+                observed[1] += attributes.size();
+                observed[2] = Math.max(observed[2], attributes.lastModifiedTime().toMillis());
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        return engine + ":" + observed[0] + ":" + observed[1] + ":" + observed[2];
     }
 
     private static String engineFingerprint(Path location) throws IOException {
