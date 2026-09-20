@@ -1407,7 +1407,9 @@ module repository remains the default, and a build opts in by naming this one as
 `module` repository, in code or in the module repository chain, where a `maven:`
 entry reads that one remote by the convention and a plain entry stays on the Jenesis
 protocol, so a company repository for the company's own prefix sits beside the public
-one as configuration. The no-argument form resolves through the configured
+one as configuration. Each `maven:` entry carries its own convention as well, as
+`maven:3:<uri>`, because two prefixes need not agree on how deep the group reaches;
+an entry that names no count follows `jenesis.maven.segments` and its default of two. The no-argument form resolves through the configured
 `jenesis.maven.uri` chain, so the repository itself stays configuration. The demo
 publishes a library into a Maven repository under `target/`, builds a consumer
 against it, runs it, and then shows the floating half: an unpinned `requires`

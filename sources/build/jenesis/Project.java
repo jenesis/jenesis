@@ -2187,7 +2187,7 @@ public record Project(
                 maven.local||Local Maven cache folder (env MAVEN_REPOSITORY_LOCAL)
                 maven.token||Bearer token for the Maven remote (env MAVEN_REPOSITORY_TOKEN)
                 maven.segments|2|Leading dot-separated segments of a module name that form its Maven groupId, when a module is published or resolved by the coordinate convention; a shorter name becomes the groupId in full
-                module.uri||Jenesis module remotes, likewise, where a |<module> suffix asks a remote only for that module and the modules whose name it prefixes, and a maven:<uri> entry reads a remote as a Maven repository by the publishing convention rather than by the Jenesis protocol (env JENESIS_REPOSITORY_URI)
+                module.uri||Jenesis module remotes, likewise, where a |<module> suffix asks a remote only for that module and the modules whose name it prefixes, and a maven:[<segments>:]<uri> entry reads a remote as a Maven repository by the publishing convention, taking that many leading segments of a module name as its groupId where it names a count and jenesis.maven.segments where it does not (env JENESIS_REPOSITORY_URI)
                 module.local||Local module cache folder (env JENESIS_REPOSITORY_LOCAL)
                 module.token||Bearer token for the module remote (env JENESIS_REPOSITORY_TOKEN)
                 module.prerelease||Accept a pre-release when asking the module index for a module's newest version

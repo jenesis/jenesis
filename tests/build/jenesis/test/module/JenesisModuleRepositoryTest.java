@@ -759,6 +759,60 @@ public class JenesisModuleRepositoryTest {
     }
 
     @Test
+    public void factory_maven_type_takes_a_group_id_segment_count_per_entry() throws IOException {
+        writeMavenArtifact("deep", "com.corp.deep", "com.corp.deep.mod", "deep-classes");
+        writeMavenArtifact("flat", "org.tools", "org.tools.mod", "flat-classes");
+        System.setProperty("jenesis.module.uri", "maven:3:"
+                + root.resolve("deep").toUri()
+                + "|com.corp,maven:"
+                + root.resolve("flat").toUri()
+                + "|org.tools");
+        try {
+            Repository merged = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE);
+            try (InputStream stream = merged.fetch(Runnable::run, "com.corp.deep.mod/1.0.0")
+                    .orElseThrow()
+                    .toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8))
+                        .as("three segments of the name form the group id of this remote")
+                        .isEqualTo("deep-classes");
+            }
+            try (InputStream stream = merged.fetch(Runnable::run, "org.tools.mod/1.0.0")
+                    .orElseThrow()
+                    .toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8))
+                        .as("a remote without a count keeps the default of two")
+                        .isEqualTo("flat-classes");
+            }
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
+    public void factory_rejects_a_segment_count_below_one() {
+        System.setProperty("jenesis.module.uri", "maven:0:https://repo.example.com/");
+        try {
+            assertThatThrownBy(() -> JenesisModuleRepository.of(JenesisRepository.Scope.MODULE))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("at least one group id segment");
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
+    public void factory_rejects_a_segment_count_on_a_module_entry() {
+        System.setProperty("jenesis.module.uri", "module:3:https://repo.example.com/");
+        try {
+            assertThatThrownBy(() -> JenesisModuleRepository.of(JenesisRepository.Scope.MODULE))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("applies only to a 'maven' entry");
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
     public void factory_rejects_an_unknown_repository_type() {
         System.setProperty("jenesis.module.uri", "nexus:https://repo.example.com/");
         try {
@@ -784,8 +838,13 @@ public class JenesisModuleRepositoryTest {
     }
 
     private void writeMavenArtifact(String groupId, String artifactId, String content) throws IOException {
+        writeMavenArtifact("company", groupId, artifactId, content);
+    }
+
+    private void writeMavenArtifact(String repository, String groupId, String artifactId, String content)
+            throws IOException {
         Files.writeString(Files
-                .createDirectories(root.resolve("company")
+                .createDirectories(root.resolve(repository)
                         .resolve(Path.of(groupId.replace('.', File.separatorChar)))
                         .resolve(artifactId)
                         .resolve("1.0.0"))
