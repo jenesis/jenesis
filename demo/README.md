@@ -1404,7 +1404,10 @@ serving as its own groupId.
 
 It is the first repository Jenesis ships without wiring it anywhere: the Jenesis
 module repository remains the default, and a build opts in by naming this one as its
-`module` repository. The no-argument form resolves through the configured
+`module` repository, in code or in the module repository chain, where a `maven:`
+entry reads that one remote by the convention and a plain entry stays on the Jenesis
+protocol, so a company repository for the company's own prefix sits beside the public
+one as configuration. The no-argument form resolves through the configured
 `jenesis.maven.uri` chain, so the repository itself stays configuration. The demo
 publishes a library into a Maven repository under `target/`, builds a consumer
 against it, runs it, and then shows the floating half: an unpinned `requires`

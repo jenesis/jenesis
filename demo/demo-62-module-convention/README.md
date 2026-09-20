@@ -27,6 +27,10 @@ builds the consumer at the project root against it, and runs the produced module
     Resolving demo.convention.greeter without a version, through that metadata:
       [resolved] demo.convention.greeter-1.0.0.jar
 
+    Resolving through the configured chain, with no repository in code:
+      [resolved] demo.convention.greeter-1.0.0.jar from the company repository, by the Maven convention
+      [resolved] demo.other-1.0.0.jar from the regular module repository
+
 Layout
 ------
 
@@ -80,7 +84,8 @@ Wiring it
 
 The repository is part of Jenesis but is **not wired anywhere by default** - the
 Jenesis module repository stays the default module repository. A build opts in by
-naming it, which is the one line this demo is about:
+naming it, which is the one line this demo is about, or by naming it in the module
+repository chain, which the section after this one shows:
 
     new Project(Path.of(".")).repositories(Map.of("module", new MavenModuleRepository()))
 
@@ -93,6 +98,32 @@ configuration, not code:
 
 This demo passes a repository explicitly instead, because the one it resolves from
 is the staging tree it produced seconds earlier.
+
+Wiring it as configuration
+--------------------------
+
+The module repository chain names the kind of each remote, so the same wiring is
+configuration as well as code. An entry prefixed with `maven:` is read by the
+publishing convention, a plain entry speaks the Jenesis module protocol, and the
+`|<module>` suffix decides which module names reach which remote:
+
+    -Djenesis.module.uri=maven:https://nexus.example.com/releases/|com.example,https://repo.jenesis.build/
+
+A `requires com.example.service` is then served by
+`com.example:com.example.service` in the company's own Nexus, and every other
+module name falls through to the public module repository. The prefix matches a
+module and the names below it, it may be repeated (`|com.example|org.tools`), and
+an entry without one answers for every name that reaches it. The last section of
+the demo run above is exactly this chain, with the staged tree standing in for the
+company repository.
+
+A `maven:` entry authenticates with the Maven credentials, `jenesis.maven.token`
+or `MAVEN_REPOSITORY_TOKEN`, because it is a Maven repository, and it fronts the
+local `~/.m2` cache like any other. It derives the coordinate with
+`jenesis.maven.segments`, so a company that publishes three segments deep
+configures that once and both directions follow. A type also carries into a
+spliced reference, so `maven:@CORP_MODULES` reads every remote that variable
+names as a Maven repository, and an unknown type is rejected by name.
 
 Why the demo wires two repositories
 -----------------------------------
