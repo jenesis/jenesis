@@ -716,6 +716,83 @@ public class JenesisModuleRepositoryTest {
     }
 
     @Test
+    public void factory_maven_type_resolves_a_module_by_the_publishing_convention() throws IOException {
+        writeMavenArtifact("com.corp", "com.corp.mod", "company-classes");
+        writeMavenArtifact("other.mod", "other.mod", "company-other");
+        Files.writeString(Files
+                .createDirectories(root.resolve("public/module/other.mod/1.0.0"))
+                .resolve("other.mod.jar"), "public-classes");
+        System.setProperty("jenesis.module.uri",
+                "maven:" + root.resolve("company").toUri() + "|com.corp," + root.resolve("public").toUri());
+        try {
+            Repository merged = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE);
+            try (InputStream stream = merged.fetch(Runnable::run, "com.corp.mod/1.0.0").orElseThrow().toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("company-classes");
+            }
+            try (InputStream stream = merged.fetch(Runnable::run, "other.mod/1.0.0").orElseThrow().toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8))
+                        .as("the Maven remote is asked only for the modules its prefix covers")
+                        .isEqualTo("public-classes");
+            }
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
+    public void factory_maven_type_carries_into_a_referenced_chain() throws IOException {
+        writeMavenArtifact("com.corp", "com.corp.mod", "company-classes");
+        System.setProperty("corp.test.modules", root.resolve("company").toUri().toString());
+        System.setProperty("jenesis.module.uri", "maven:@corp.test.modules");
+        try {
+            Optional<RepositoryItem> item = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)
+                    .fetch(Runnable::run, "com.corp.mod/1.0.0");
+
+            assertThat(item).isPresent();
+            try (InputStream stream = item.orElseThrow().toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("company-classes");
+            }
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+            System.clearProperty("corp.test.modules");
+        }
+    }
+
+    @Test
+    public void factory_rejects_an_unknown_repository_type() {
+        System.setProperty("jenesis.module.uri", "nexus:https://repo.example.com/");
+        try {
+            assertThatThrownBy(() -> JenesisModuleRepository.of(JenesisRepository.Scope.MODULE))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("nexus:https://repo.example.com/")
+                    .hasMessageContaining("expected 'module' or 'maven'");
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
+    public void factory_rejects_a_typed_entry_without_a_uri() {
+        System.setProperty("jenesis.module.uri", "maven:");
+        try {
+            assertThatThrownBy(() -> JenesisModuleRepository.of(JenesisRepository.Scope.MODULE))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("No URI in Jenesis module repository entry: maven:");
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    private void writeMavenArtifact(String groupId, String artifactId, String content) throws IOException {
+        Files.writeString(Files
+                .createDirectories(root.resolve("company")
+                        .resolve(Path.of(groupId.replace('.', File.separatorChar)))
+                        .resolve(artifactId)
+                        .resolve("1.0.0"))
+                .resolve(artifactId + "-1.0.0.jar"), content);
+    }
+
+    @Test
     public void factory_artifact_scope_reads_the_artifact_subtree() throws IOException {
         Files.writeString(Files
                 .createDirectories(root.resolve("first/artifact/build.jenesis"))

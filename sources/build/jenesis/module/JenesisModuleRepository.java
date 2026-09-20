@@ -5,10 +5,14 @@ import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SafeSegment;
 import build.jenesis.SequencedProperties;
+import build.jenesis.maven.MavenDefaultRepository;
+import build.jenesis.maven.MavenModuleRepository;
 
 public class JenesisModuleRepository implements JenesisRepository {
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
+
+    private static final String MODULE = "module", MAVEN = "maven";
 
     private final URI root;
     private final String token;
@@ -31,7 +35,7 @@ public class JenesisModuleRepository implements JenesisRepository {
         } else {
             text = "https://repo.jenesis.build/";
         }
-        JenesisRepository repository = chain(text, visited, scope, token, null);
+        JenesisRepository repository = chain(text, visited, scope, token, MODULE, null);
         if (repository == null) {
             throw new IllegalStateException("No Jenesis module repository is configured by: " + text);
         }
@@ -42,6 +46,7 @@ public class JenesisModuleRepository implements JenesisRepository {
                                            Set<String> visited,
                                            Scope scope,
                                            String token,
+                                           String kind,
                                            JenesisRepository repository) {
         for (String entry : text.split(",")) {
             String candidate = entry.strip();
@@ -50,6 +55,24 @@ public class JenesisModuleRepository implements JenesisRepository {
             }
             int separator = candidate.indexOf('|');
             String location = (separator < 0 ? candidate : candidate.substring(0, separator)).strip();
+            if (location.isEmpty()) {
+                throw new IllegalStateException("No URI in Jenesis module repository entry: " + candidate);
+            }
+            String type = kind;
+            int colon = location.indexOf(':');
+            if (colon > 1 && isType(location.substring(0, colon))) {
+                String remainder = location.substring(colon + 1).strip();
+                if (!remainder.startsWith("/")
+                        && (remainder.isEmpty() || remainder.startsWith("@") || remainder.indexOf(':') > 0)) {
+                    type = location.substring(0, colon);
+                    location = remainder;
+                }
+            }
+            if (!type.equals(MODULE) && !type.equals(MAVEN)) {
+                throw new IllegalArgumentException("Unknown repository type in Jenesis module repository entry: "
+                        + candidate
+                        + " (expected '" + MODULE + "' or '" + MAVEN + "')");
+            }
             if (location.isEmpty()) {
                 throw new IllegalStateException("No URI in Jenesis module repository entry: " + candidate);
             }
@@ -76,13 +99,17 @@ public class JenesisModuleRepository implements JenesisRepository {
                         throw new IllegalStateException("Circular repository reference: @" + name);
                     }
                 }
-                current = chain(value, visited, scope, entryToken, null);
+                current = chain(value, visited, scope, entryToken, type, null);
                 if (name != null) {
                     visited.remove(name);
                 }
                 if (current == null) {
                     throw new IllegalStateException("No Jenesis module repository is configured by: " + value);
                 }
+            } else if (type.equals(MAVEN)) {
+                current = new MavenModuleRepository(MavenDefaultRepository.of(
+                        URI.create(location.endsWith("/") ? location : location + "/"),
+                        System.getProperty("jenesis.maven.token", System.getenv("MAVEN_REPOSITORY_TOKEN"))));
             } else {
                 current = new JenesisModuleRepository(
                         URI.create((location.endsWith("/") ? location : location + "/")
@@ -111,6 +138,16 @@ public class JenesisModuleRepository implements JenesisRepository {
             repository = repository == null ? current : current.prepend(repository);
         }
         return repository;
+    }
+
+    private static boolean isType(String value) {
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (character < 'a' || character > 'z') {
+                return false;
+            }
+        }
+        return true;
     }
 
     public JenesisModuleRepository(URI root) {

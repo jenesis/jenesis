@@ -7,6 +7,8 @@ import build.jenesis.RepositoryItem;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenModuleRepository;
 import build.jenesis.maven.MavenRepository;
+import build.jenesis.module.JenesisModuleRepository;
+import build.jenesis.module.JenesisRepository;
 
 /**
  * Resolving a module from a plain Maven repository by the coordinate convention
@@ -114,6 +116,31 @@ public class Demo {
         System.out.println("Resolving " + module + " without a version, through that metadata:");
         System.out.println("  " + (floating.isPresent() ? "[resolved] " : "[MISSING]  ")
                 + module + "-1.0.0.jar");
+
+        // The chain as configuration rather than code: an entry prefixed with
+        // maven: is read by the publishing convention, a plain entry speaks the
+        // Jenesis module protocol, and the |demo.convention suffix decides which
+        // names reach which remote - the company repository for the company's
+        // own modules, the regular module repository for everything else.
+        Path modules = Files.createDirectories(Path.of("target", "modules", "module", "demo.other", "1.0.0"));
+        Files.copy(jar, modules.resolve("demo.other.jar"), StandardCopyOption.REPLACE_EXISTING);
+        System.setProperty("jenesis.module.uri", "maven:" + published.toUri() + "|demo.convention,"
+                + Path.of("target", "modules").toUri());
+        try {
+            JenesisRepository chain = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE);
+            System.out.println();
+            System.out.println("Resolving through the configured chain, with no repository in code:");
+            report(chain, module, "the company repository, by the Maven convention");
+            report(chain, "demo.other", "the regular module repository");
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    private static void report(JenesisRepository chain, String module, String source) throws IOException {
+        Optional<RepositoryItem> item = chain.fetch(Runnable::run, module + "/1.0.0");
+        System.out.println("  " + (item.isPresent() ? "[resolved] " : "[MISSING]  ")
+                + module + "-1.0.0.jar from " + source);
     }
 
     private static String sha256(Path file) throws IOException, NoSuchAlgorithmException {

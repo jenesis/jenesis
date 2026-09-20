@@ -18,17 +18,7 @@ public class MavenDefaultRepository implements MavenRepository {
     private final Repository.Retry retry;
 
     public static MavenRepository of() {
-        Path local;
-        String localOverride = System.getProperty("jenesis.maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
-        if (localOverride == null) {
-            Path candidate = Path.of(System.getProperty("user.home"), ".m2", "repository");
-            local = Files.isDirectory(candidate) ? candidate : null;
-        } else {
-            local = Path.of(localOverride);
-            if (!Files.isDirectory(local)) {
-                throw new IllegalStateException("Local Maven repository does not point at a directory: " + local);
-            }
-        }
+        Path local = localRepository();
         String token = System.getProperty("jenesis.maven.token", System.getenv("MAVEN_REPOSITORY_TOKEN"));
         boolean verbose = SequencedProperties.systemFlag("jenesis.print.fetch");
         String property = System.getProperty("jenesis.maven.uri");
@@ -48,6 +38,42 @@ public class MavenDefaultRepository implements MavenRepository {
             throw new IllegalStateException("No Maven repository is configured by: " + text);
         }
         return repository;
+    }
+
+    public static MavenRepository of(URI repository, String token) {
+        return single(repository.toString().endsWith("/") ? repository : URI.create(repository + "/"),
+                localRepository(),
+                token,
+                SequencedProperties.systemFlag("jenesis.print.fetch"));
+    }
+
+    private static Path localRepository() {
+        String override = System.getProperty("jenesis.maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
+        if (override == null) {
+            Path candidate = Path.of(System.getProperty("user.home"), ".m2", "repository");
+            return Files.isDirectory(candidate) ? candidate : null;
+        }
+        Path local = Path.of(override);
+        if (!Files.isDirectory(local)) {
+            throw new IllegalStateException("Local Maven repository does not point at a directory: " + local);
+        }
+        return local;
+    }
+
+    private static MavenRepository single(URI uri, Path local, String token, boolean verbose) {
+        SequencedMap<String, URI> validations = new LinkedHashMap<>();
+        validations.put("SHA512", uri);
+        validations.put("SHA256", uri);
+        validations.put("SHA1", uri);
+        return new MavenDefaultRepository(uri,
+                local,
+                Collections.unmodifiableMap(validations),
+                verbose ? path -> System.out.printf("%s%-11s%s %s%n",
+                        BuildExecutorCallback.YELLOW,
+                        "[FETCHED]",
+                        BuildExecutorCallback.RESET,
+                        uri.resolve(path)) : null,
+                token);
     }
 
     private static MavenRepository chain(String text,
@@ -96,20 +122,10 @@ public class MavenDefaultRepository implements MavenRepository {
                     throw new IllegalStateException("No Maven repository is configured by: " + value);
                 }
             } else {
-                URI uri = URI.create(location.endsWith("/") ? location : location + "/");
-                SequencedMap<String, URI> validations = new LinkedHashMap<>();
-                validations.put("SHA512", uri);
-                validations.put("SHA256", uri);
-                validations.put("SHA1", uri);
-                current = new MavenDefaultRepository(uri,
+                current = single(URI.create(location.endsWith("/") ? location : location + "/"),
                         local,
-                        Collections.unmodifiableMap(validations),
-                        verbose ? path -> System.out.printf("%s%-11s%s %s%n",
-                                BuildExecutorCallback.YELLOW,
-                                "[FETCHED]",
-                                BuildExecutorCallback.RESET,
-                                uri.resolve(path)) : null,
-                        token);
+                        token,
+                        verbose);
             }
             List<String> groups = new ArrayList<>();
             if (separator >= 0) {
