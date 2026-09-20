@@ -154,74 +154,62 @@ public class TestEngineAdapterTest {
     }
 
     @Test
-    public void jenesis_test_engine_property_rejects_unknown_value() {
-        System.setProperty("jenesis.test.engine", "does-not-exist");
-        try {
-            assertThatThrownBy(() -> new TestModule(Map.of(), Map.of()))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("Unknown test engine")
-                    .hasMessageContaining("expected junit-platform, junit4, or testng");
-        } finally {
-            System.clearProperty("jenesis.test.engine");
-        }
+    public void a_declared_engine_rejects_an_unknown_name() {
+        assertThatThrownBy(() -> TestEngine.of("does-not-exist"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown test engine")
+                .hasMessageContaining("expected junit-platform, junit4, or testng");
     }
 
     @Test
-    public void jenesis_test_engine_property_selects_junit_platform_case_insensitively() throws IOException {
-        Files.createDirectories(dependencies.resolve(BuildStep.ARTIFACTS));
-        System.setProperty("jenesis.test.engine", "JUnit-Platform");
-        try {
-            BuildExecutor executor = newExecutor(root);
-            executor.addSource("dependencies", dependencies);
-            executor.addModule("test",
-                    new TestModule(Map.of(),
-                            Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(
-                                    new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
-                            .jarsOnly(false),
-                    "dependencies");
-            executor.execute("test/resolved");
-
-            assertThat(readRequires(root).stringPropertyNames())
-                    .containsExactly("main/runtime/maven/org.junit.platform/junit-platform-console");
-        } finally {
-            System.clearProperty("jenesis.test.engine");
-        }
+    public void a_declared_engine_is_named_case_insensitively() {
+        assertThat(TestEngine.of("JUnit-Platform")).isInstanceOf(JUnitPlatform.class);
+        assertThat(TestEngine.of("JUnit4")).isInstanceOf(JUnit4.class);
+        assertThat(TestEngine.of("TestNG")).isInstanceOf(TestNG.class);
     }
 
     @Test
-    public void jenesis_test_engine_property_bypasses_dependency_detection_for_junit4() throws IOException {
+    public void a_declared_junit_platform_resolves_its_runner_without_any_dependency() throws IOException {
         Files.createDirectories(dependencies.resolve(BuildStep.ARTIFACTS));
-        System.setProperty("jenesis.test.engine", "junit4");
-        try {
-            BuildExecutor executor = newExecutor(root);
-            executor.addSource("dependencies", dependencies);
-            executor.addModule("test",
-                    new TestModule(Map.of(), Map.of()).jarsOnly(false),
-                    "dependencies");
-            executor.execute("test/resolved");
+        BuildExecutor executor = newExecutor(root);
+        executor.addSource("dependencies", dependencies);
+        executor.addModule("test",
+                new TestModule(Map.of(),
+                        Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(
+                                new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                        .engine(new JUnitPlatform())
+                        .jarsOnly(false),
+                "dependencies");
+        executor.execute("test/resolved");
 
-            assertThat(readRequires(root)).isEmpty();
-        } finally {
-            System.clearProperty("jenesis.test.engine");
-        }
+        assertThat(readRequires(root).stringPropertyNames())
+                .containsExactly("main/runtime/maven/org.junit.platform/junit-platform-console");
     }
 
     @Test
-    public void jenesis_test_engine_property_bypasses_dependency_detection_for_testng() throws IOException {
+    public void a_declared_junit4_bypasses_dependency_detection() throws IOException {
         Files.createDirectories(dependencies.resolve(BuildStep.ARTIFACTS));
-        System.setProperty("jenesis.test.engine", "testng");
-        try {
-            BuildExecutor executor = newExecutor(root);
-            executor.addSource("dependencies", dependencies);
-            executor.addModule("test",
-                    new TestModule(Map.of(), Map.of()).jarsOnly(false),
-                    "dependencies");
-            executor.execute("test/resolved");
+        BuildExecutor executor = newExecutor(root);
+        executor.addSource("dependencies", dependencies);
+        executor.addModule("test",
+                new TestModule(Map.of(), Map.of()).engine(new JUnit4()).jarsOnly(false),
+                "dependencies");
+        executor.execute("test/resolved");
 
-            assertThat(readRequires(root)).isEmpty();
-        } finally {
-            System.clearProperty("jenesis.test.engine");
-        }
+        assertThat(readRequires(root)).isEmpty();
+    }
+
+    @Test
+    public void a_declared_testng_bypasses_dependency_detection() throws IOException {
+        Files.createDirectories(dependencies.resolve(BuildStep.ARTIFACTS));
+        BuildExecutor executor = newExecutor(root);
+        executor.addSource("dependencies", dependencies);
+        executor.addModule("test",
+                new TestModule(Map.of(), Map.of()).engine(new TestNG()).jarsOnly(false),
+                "dependencies");
+        executor.execute("test/resolved");
+
+        assertThat(readRequires(root)).isEmpty();
     }
 
     private static BuildExecutor newExecutor(Path root) throws IOException {

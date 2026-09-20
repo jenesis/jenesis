@@ -822,6 +822,9 @@ public record Project(
                     names other folders; each reads only the file kinds it compiles.
 
                       packaging.properties      jmod/jlink/bundle/launcher/native booleans, jpackage=<type>
+                      test.properties           engine=junit-platform|junit4|testng, naming the engine
+                                                this module's tests run on; absent, it is inferred from
+                                                the resolved dependencies
                       sbom.properties           CycloneDX format=json|xml|none; the SBOM is on by
                                                 default, -Djenesis.sbom.cyclonedx=false disables it
                       bom.properties            publish the resolved closure as a repository BOM
@@ -2204,7 +2207,6 @@ public record Project(
                 cache.read|PT10S|Read timeout for a cache server
                 cache.insecure|false|Permit the cache key over plaintext http off loopback; likewise yours alone to allow
                 test.skip|false|Skip executing tests, still resolving what running them needs
-                test.engine||junit-platform|junit4|testng; unset detects it from the resolved dependencies
                 test.filter||Comma-separated <classRegex>[#<method>] entries restricting which tests run
                 test.tag||Comma-separated tag expressions; only tests carrying one of them run
                 test.force|false|Execute tests even where a previous run already covered them

@@ -8,11 +8,13 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.InferredTestObservationModule;
 import build.jenesis.project.TestModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class InferredTestObservationModuleTest {
 
@@ -124,6 +126,69 @@ public class InferredTestObservationModuleTest {
         executor.execute();
 
         assertThat(root.resolve("observed").resolve("mutate")).doesNotExist();
+    }
+
+    @Test
+    public void a_test_properties_file_declares_the_engine() throws IOException {
+        Files.writeString(project.resolve("test.properties"), "engine=junit-platform");
+        Files.createDirectories(project.resolve(BuildStep.ARTIFACTS));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", resolving().test(module -> module.jarsOnly(false)), "project");
+        executor.execute("observed/test/resolved");
+
+        Path output = root.resolve("observed").resolve("test").resolve("resolved").resolve("output");
+        assertThat(SequencedProperties.ofFiles(output.resolve(BuildStep.REQUIRES)).stringPropertyNames())
+                .as("a declared engine resolves its runner although nothing was detected")
+                .containsExactly("main/runtime/maven/org.junit.platform/junit-platform-console");
+    }
+
+    @Test
+    public void a_test_properties_file_rejects_an_unknown_property() throws IOException {
+        Files.writeString(project.resolve("test.properties"), "engines=junit-platform");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", observation(), "project");
+
+        assertThatThrownBy(executor::execute)
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining("Unknown test property: engines");
+    }
+
+    @Test
+    public void a_test_properties_file_rejects_an_unknown_engine() throws IOException {
+        Files.writeString(project.resolve("test.properties"), "engine=does-not-exist");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", observation(), "project");
+
+        assertThatThrownBy(executor::execute)
+                .hasRootCauseInstanceOf(IllegalArgumentException.class)
+                .rootCause()
+                .hasMessageContaining("Unknown test engine")
+                .hasMessageContaining("expected junit-platform, junit4, or testng");
+    }
+
+    @Test
+    public void an_empty_test_properties_file_leaves_the_engine_inferred() throws IOException {
+        Files.writeString(project.resolve("test.properties"), "");
+        Files.createDirectories(project.resolve(BuildStep.ARTIFACTS));
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", observation().test(module -> module.jarsOnly(false).requireEngine(false)), "project");
+        executor.execute();
+
+        assertThat(root.resolve("observed").resolve("test").resolve("resolved"))
+                .as("nothing is detected here, so no engine is wired")
+                .doesNotExist();
+    }
+
+    private InferredTestObservationModule resolving() {
+        return new InferredTestObservationModule(new LinkedHashSet<>(List.of(project)),
+                Map.of(),
+                Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(
+                        new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())));
     }
 
     private InferredTestObservationModule observation() {

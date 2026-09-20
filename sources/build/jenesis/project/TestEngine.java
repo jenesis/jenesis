@@ -67,6 +67,16 @@ public interface TestEngine extends Serializable {
         return false;
     }
 
+    static TestEngine of(String name) {
+        return switch (name.toLowerCase(Locale.ROOT)) {
+            case "junit-platform" -> new JUnitPlatform();
+            case "junit4" -> new JUnit4();
+            case "testng" -> new TestNG();
+            default -> throw new IllegalArgumentException("Unknown test engine: " + name
+                    + " (expected junit-platform, junit4, or testng)");
+        };
+    }
+
     static Optional<TestEngine> of(List<ModuleDescriptor> modules) {
         for (TestEngine engine : List.<TestEngine>of(new JUnitPlatform(), new JUnit4(), new TestNG())) {
             if (engine.hasFramework(modules)) {
