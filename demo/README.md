@@ -125,6 +125,7 @@ Quick index
 | 60 | [`native-image`](demo-60-native-image/README.md)             | Compile a modular app ahead of time into a standalone GraalVM native binary, selected by a `packaging.properties` with `native=true` (needs GraalVM `native-image`; local-only) | `java build/jenesis/Make.java`  |
 | 61 | [`jpx`](demo-61-jpx/README.md)                             | Run a released program without building anything: `jpx` installs the JUnit Platform Console Launcher and asks it for `--version`, named once by module name and once by Maven coordinate, both pinned to a version and verified against the installation's SHA-256 - then again against a 32-character prefix of that digest, and once against a digest that does not match and is blocked | `java build/Demo.java`             |
 | 62 | [`module-convention`](demo-62-module-convention/README.md)   | Resolve your own modules from a plain Maven repository by the coordinate convention Jenesis publishes with: a `MavenModuleRepository`, wired by hand as the `module` repository, maps a `requires` onto `<first two segments>:<module name>` in the repository the library was published to | `java build/Demo.java`             |
+| 63 | [`aot-cache`](demo-63-aot-cache/README.md)                     | Start a build from a JVM ahead-of-time cache rather than a daemon: `jenesis.aot.enabled` trains a cache on the first build and every later build starts from it, with `jenesis.aot.file` and an optional `jenesis.aot.lifetime` deciding where it lives and when it is trained again | `java build/Demo.java`             |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1479,3 +1480,24 @@ their compiler toolchain in its own group (`kotlinc`, `scalac`,
 `groovy` pins its `org.apache.groovy` library to the stable `5.0.6` and its
 `groovyc`-group compiler to `6.0.0-alpha-1`; `kotlin` and `scala` track whatever
 their compilers resolve (for `scala` that is often a release candidate).
+
+## 45. A cache instead of a process - [`aot-cache`](demo-63-aot-cache/README.md)
+
+The daemon buys a fast build by keeping a JVM alive. `aot-cache` buys most of the same
+thing with a file. `jenesis.aot.enabled` makes the first build train a JVM ahead-of-time
+cache of the engine, and every later build starts from it with those classes already
+loaded and linked. `jenesis.aot.file` says where it lives, `.jenesis/engine.aot` by
+default, and an optional `jenesis.aot.lifetime` trains it again once it reaches that age;
+a changed engine or a new JDK does the same, which a `.digest` beside the cache records.
+Both are ordinary properties, so a project file or your own `~/.jenesis/jenesis.properties`
+keeps the setting from build to build without anything staying resident.
+
+What it removes is startup, so it pays where builds are small and frequent rather than
+long: off the compiled engine the demo's build falls from 410 ms to 227 ms, while in
+source mode, where the JVM already running cannot be handed a cache and `Make.java` is
+compiled again on every invocation, the relaunch recovers only part of it. A selector
+that only prints, like `help` or `skill`, trains nothing, because a cache trained on it
+would serve no build. Against a warm daemon the cache gives up the warm JIT and keeps
+everything else: on a clean build of a 300-class project a plain run took 1904 ms, the
+cache 1218 ms and the daemon 635 ms, and only one of the three holds 70 MB of memory per
+project between builds.

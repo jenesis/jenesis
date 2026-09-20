@@ -2147,6 +2147,9 @@ public record Project(
                 make.daemon|false|Hand the build to a reused JVM; --stop as the only selector shuts it down
                 daemon.idle|10800|Seconds an idle daemon waits before exiting
                 daemon.options|-Xmx2g|JVM options for the daemon process itself, whitespace separated
+                aot.enabled|false|Run the build in a JVM that loads the engine from an ahead-of-time cache, trained on the first build that finds none and reused by every later one; the daemon takes precedence where both are on
+                aot.file|.jenesis/engine.aot|Where that cache lives, relative to the project root, beside a .digest naming the engine and the JVM it was trained for and, where the engine is a folder of classes, the engine.jar it was trained from
+                aot.lifetime||ISO-8601 age after which the cache is retrained, as PT12H or P7D; empty keeps it until the engine or the JVM changes
                 toolchain.version||JDK the build runs on, as 25, 25.0.3 or 25-temurin: the numbers match as a prefix, every word must be one of the vendor and version words in the JDK's release file, and a pre-release matches only when its word is named; Make and Execute relaunch on a match when the running JVM is none
                 toolchain.searchpath|@|Comma-separated JDK folders searched for toolchain.version, absolute or under ~, * standing for any one folder name; @ splices this system's usual JDK locations and empty only checks the running JVM; settable only on the command line or in ~/.jenesis/jenesis.properties
                 executor.concurrency|0|Run at most this many build steps at once; 0 is unbounded
