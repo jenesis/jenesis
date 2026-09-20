@@ -32,6 +32,37 @@ public class MavenModuleRepositoryTest {
     }
 
     @Test
+    public void derives_the_group_from_a_configured_number_of_segments() throws IOException {
+        writeArtifact("demo.convention.deep", "demo.convention.deep.greeter", "1.0.0", "jar", "deep");
+
+        assertThat(content(repository().segments(3).fetch(Runnable::run, "demo.convention.deep.greeter/1.0.0")))
+                .isEqualTo("deep");
+    }
+
+    @Test
+    public void derives_the_group_from_a_single_configured_segment() throws IOException {
+        writeArtifact("demo", "demo.convention.greeter", "1.0.0", "jar", "flat");
+
+        assertThat(content(repository().segments(1).fetch(Runnable::run, "demo.convention.greeter/1.0.0")))
+                .isEqualTo("flat");
+    }
+
+    @Test
+    public void derives_the_group_from_the_entire_name_of_a_module_with_fewer_segments() throws IOException {
+        writeArtifact("demo.convention.greeter", "demo.convention.greeter", "1.0.0", "jar", "short");
+
+        assertThat(content(repository().segments(4).fetch(Runnable::run, "demo.convention.greeter/1.0.0")))
+                .isEqualTo("short");
+    }
+
+    @Test
+    public void rejects_a_group_of_fewer_than_one_segment() {
+        assertThatThrownBy(() -> repository().segments(0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at least one leading segment");
+    }
+
+    @Test
     public void resolves_every_module_within_a_configured_group() throws IOException {
         writeArtifact("com.example.tools", "demo.convention.greeter", "1.0.0", "jar", "grouped");
 
