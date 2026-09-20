@@ -5,27 +5,59 @@ import build.jenesis.BuildStep;
 
 public record JUnitPlatform() implements TestEngine {
 
+    private static final String JUNIT4 = "junit";
+
+    private static final String JUPITER_API = "org.junit.jupiter.api";
+
+    private static final String JUPITER_ENGINE = "org.junit.jupiter.engine";
+
+    private static final String PLATFORM_COMMONS = "org.junit.platform.commons";
+
+    private static final String PLATFORM_CONSOLE = "org.junit.platform.console";
+
+    private static final String PLATFORM_ENGINE = "org.junit.platform.engine";
+
+    private static final String VINTAGE_ENGINE = "org.junit.vintage.engine";
+
     @Override
     public String runnerModule() {
-        return "org.junit.platform.console";
+        return PLATFORM_CONSOLE;
     }
 
     @Override
     public boolean isEngine(ModuleDescriptor module) {
-        return module.name().equals("org.junit.platform.engine");
+        return module.name().equals(PLATFORM_ENGINE);
+    }
+
+    @Override
+    public boolean isFramework(ModuleDescriptor module) {
+        return isEngine(module) || module.name().equals(JUPITER_API);
     }
 
     @Override
     public boolean isRunner(ModuleDescriptor module) {
-        return module.name().equals("org.junit.platform.console");
+        return module.name().equals(PLATFORM_CONSOLE);
     }
 
     @Override
     public SequencedMap<String, String> coordinates(ModuleDescriptor engine) {
-        String version = engine == null ? null : engine.rawVersion().orElse(null);
         SequencedMap<String, String> coordinates = new LinkedHashMap<>();
-        coordinates.put("module/org.junit.platform.console", version);
-        coordinates.put("maven/org.junit.platform/junit-platform-console", version == null ? "RELEASE" : version);
+        console(coordinates, engine == null ? null : engine.rawVersion().orElse(null));
+        return coordinates;
+    }
+
+    @Override
+    public SequencedMap<String, String> missingCoordinates(List<ModuleDescriptor> modules) {
+        SequencedMap<String, String> coordinates = new LinkedHashMap<>();
+        if (!hasRunner(modules)) {
+            console(coordinates, version(modules, PLATFORM_ENGINE, PLATFORM_COMMONS));
+        }
+        if (contains(modules, JUPITER_API) && !contains(modules, JUPITER_ENGINE)) {
+            engine(coordinates, JUPITER_ENGINE, "org.junit.jupiter/junit-jupiter-engine", version(modules, JUPITER_API));
+        }
+        if (contains(modules, JUPITER_API) && contains(modules, JUNIT4) && !contains(modules, VINTAGE_ENGINE)) {
+            engine(coordinates, VINTAGE_ENGINE, "org.junit.vintage/junit-vintage-engine", version(modules, JUPITER_API));
+        }
         return coordinates;
     }
 
@@ -70,5 +102,38 @@ public record JUnitPlatform() implements TestEngine {
             }
         }
         return commands;
+    }
+
+    private static void engine(SequencedMap<String, String> coordinates,
+                               String module,
+                               String artifact,
+                               String version) {
+        coordinates.put("module/" + module, version);
+        coordinates.put("maven/" + artifact, version == null ? "RELEASE" : version);
+    }
+
+    private static void console(SequencedMap<String, String> coordinates, String version) {
+        coordinates.put("module/" + PLATFORM_CONSOLE, version);
+        coordinates.put("maven/org.junit.platform/junit-platform-console", version == null ? "RELEASE" : version);
+    }
+
+    private static boolean contains(List<ModuleDescriptor> modules, String name) {
+        for (ModuleDescriptor module : modules) {
+            if (module.name().equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String version(List<ModuleDescriptor> modules, String... names) {
+        for (String name : names) {
+            for (ModuleDescriptor module : modules) {
+                if (module.name().equals(name) && module.rawVersion().isPresent()) {
+                    return module.rawVersion().get();
+                }
+            }
+        }
+        return null;
     }
 }

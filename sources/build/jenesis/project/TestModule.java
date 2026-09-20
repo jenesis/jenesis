@@ -566,11 +566,10 @@ public class TestModule implements BuildExecutorModule {
                     .toList();
             List<ModuleDescriptor> artifacts = TestEngine.scan(folders);
             TestEngine resolved = engine != null ? engine : TestEngine.of(artifacts).orElse(null);
-            ModuleDescriptor engineModule = resolved == null ? null : resolved.match(artifacts).orElse(null);
             SequencedProperties properties = new SequencedProperties();
             SequencedProperties versions = new SequencedProperties();
-            if (resolved != null && !resolved.hasRunner(artifacts)) {
-                SequencedMap<String, String> runners = resolved.coordinates(engineModule);
+            if (resolved != null) {
+                SequencedMap<String, String> runners = resolved.missingCoordinates(artifacts);
                 String selectedPrefix = null;
                 for (String coordinate : runners.sequencedKeySet()) {
                     int index = coordinate.indexOf('/');

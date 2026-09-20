@@ -25,6 +25,22 @@ public class TestEngineTest {
     }
 
     @Test
+    public void detects_junit_platform_from_jupiter_api_without_an_engine() throws IOException {
+        writeJar(root.resolve("artifacts"), "api.jar", "org.junit.jupiter.api");
+        assertThat(TestEngine.of(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
+    }
+
+    @Test
+    public void prefers_junit_platform_over_an_incidental_junit4_jar() throws IOException {
+        writeJar(root.resolve("artifacts"), "api.jar", "org.junit.jupiter.api");
+        writeJar(root.resolve("artifacts"), "junit.jar", "junit");
+        assertThat(TestEngine.of(List.of(root)))
+                .as("a transitive junit:junit must not outrank the Jupiter API of the tests themselves")
+                .get()
+                .isInstanceOf(JUnitPlatform.class);
+    }
+
+    @Test
     public void detects_junit4_from_module() throws IOException {
         writeJar(root.resolve("artifacts"), "junit.jar", "junit");
         assertThat(TestEngine.of(List.of(root))).get().isInstanceOf(JUnit4.class);
@@ -90,6 +106,99 @@ public class TestEngineTest {
         assertThat(coordinates).containsEntry("maven/org.junit.platform/junit-platform-console", "RELEASE");
         assertThat(coordinates).containsKey("module/org.junit.platform.console");
         assertThat(coordinates.get("module/org.junit.platform.console")).isNull();
+    }
+
+    @Test
+    public void resolves_a_jupiter_engine_aligned_to_the_jupiter_api_version() {
+        SequencedMap<String, String> coordinates = new JUnitPlatform().missingCoordinates(List.of(
+                automatic("org.junit.jupiter.api", "5.11.3"),
+                automatic("org.junit.platform.commons", "1.11.3")));
+        assertThat(coordinates)
+                .containsEntry("maven/org.junit.jupiter/junit-jupiter-engine", "5.11.3")
+                .containsEntry("module/org.junit.jupiter.engine", "5.11.3");
+    }
+
+    @Test
+    public void derives_the_console_version_from_platform_commons_without_an_engine_module() {
+        SequencedMap<String, String> coordinates = new JUnitPlatform().missingCoordinates(List.of(
+                automatic("org.junit.jupiter.api", "5.11.3"),
+                automatic("org.junit.platform.commons", "1.11.3")));
+        assertThat(coordinates)
+                .as("the console follows the platform version line, not the Jupiter one")
+                .containsEntry("maven/org.junit.platform/junit-platform-console", "1.11.3")
+                .containsEntry("module/org.junit.platform.console", "1.11.3");
+    }
+
+    @Test
+    public void resolves_a_vintage_engine_where_junit4_shares_the_path_with_jupiter() {
+        SequencedMap<String, String> coordinates = new JUnitPlatform().missingCoordinates(List.of(
+                automatic("junit", "4.13.2"),
+                automatic("org.junit.jupiter.api", "5.11.3"),
+                automatic("org.junit.platform.commons", "1.11.3")));
+        assertThat(coordinates)
+                .as("JUnit 4 classes in a module routed to the platform still need an engine")
+                .containsEntry("maven/org.junit.vintage/junit-vintage-engine", "5.11.3")
+                .containsEntry("module/org.junit.vintage.engine", "5.11.3");
+    }
+
+    @Test
+    public void resolves_no_vintage_engine_without_junit4_on_the_path() {
+        assertThat(new JUnitPlatform().missingCoordinates(List.of(
+                automatic("org.junit.jupiter.api", "5.11.3"),
+                automatic("org.junit.platform.commons", "1.11.3"))))
+                .doesNotContainKey("maven/org.junit.vintage/junit-vintage-engine");
+    }
+
+    @Test
+    public void resolves_no_vintage_engine_where_the_jupiter_version_line_is_unknown() {
+        assertThat(new JUnitPlatform().missingCoordinates(List.of(
+                automatic("junit", "4.13.2"),
+                automatic("org.junit.platform.engine", "1.11.3"))))
+                .as("vintage tracks the Jupiter version line, so it is not guessed without one")
+                .doesNotContainKey("maven/org.junit.vintage/junit-vintage-engine");
+    }
+
+    @Test
+    public void resolves_only_the_console_where_a_jupiter_engine_is_present() {
+        SequencedMap<String, String> coordinates = new JUnitPlatform().missingCoordinates(List.of(
+                automatic("org.junit.jupiter.api", "5.11.3"),
+                automatic("org.junit.jupiter.engine", "5.11.3"),
+                automatic("org.junit.platform.engine", "1.11.3")));
+        assertThat(coordinates)
+                .containsOnlyKeys("module/org.junit.platform.console",
+                        "maven/org.junit.platform/junit-platform-console");
+    }
+
+    @Test
+    public void resolves_only_the_jupiter_engine_where_the_console_is_present() {
+        SequencedMap<String, String> coordinates = new JUnitPlatform().missingCoordinates(List.of(
+                automatic("org.junit.jupiter.api", "5.11.3"),
+                automatic("org.junit.platform.console", "1.11.3")));
+        assertThat(coordinates)
+                .containsOnlyKeys("module/org.junit.jupiter.engine",
+                        "maven/org.junit.jupiter/junit-jupiter-engine");
+    }
+
+    @Test
+    public void resolves_nothing_where_the_runner_and_the_engine_are_both_present() {
+        assertThat(new JUnitPlatform().missingCoordinates(List.of(
+                automatic("org.junit.jupiter.api", "5.11.3"),
+                automatic("org.junit.jupiter.engine", "5.11.3"),
+                automatic("org.junit.platform.console", "1.11.3")))).isEmpty();
+    }
+
+    @Test
+    public void resolves_no_jupiter_engine_for_a_platform_project_without_jupiter() {
+        assertThat(new JUnitPlatform().missingCoordinates(List.of(automatic("org.junit.platform.engine", "1.11.3"))))
+                .as("a non-Jupiter engine on the platform must not pull Jupiter in")
+                .containsOnlyKeys("module/org.junit.platform.console",
+                        "maven/org.junit.platform/junit-platform-console");
+    }
+
+    @Test
+    public void resolves_nothing_for_junit4_and_testng() {
+        assertThat(new JUnit4().missingCoordinates(List.of(automatic("junit", "4.13.2")))).isEmpty();
+        assertThat(new TestNG().missingCoordinates(List.of(automatic("org.testng", "7.10.2")))).isEmpty();
     }
 
     @Test
@@ -244,6 +353,10 @@ public class TestEngineTest {
                 true,
                 false))
                 .containsExactly("sample.AlphaTest");
+    }
+
+    private static ModuleDescriptor automatic(String name, String version) {
+        return ModuleDescriptor.newAutomaticModule(name).version(version).build();
     }
 
     private static void writeJar(Path folder, String name, String moduleName) throws IOException {

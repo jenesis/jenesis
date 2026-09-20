@@ -17,6 +17,17 @@ public interface TestEngine extends Serializable {
 
     SequencedMap<String, String> coordinates(ModuleDescriptor engine);
 
+    default boolean isFramework(ModuleDescriptor module) {
+        return isEngine(module);
+    }
+
+    default SequencedMap<String, String> missingCoordinates(List<ModuleDescriptor> modules) {
+        if (hasRunner(modules)) {
+            return Collections.emptyNavigableMap();
+        }
+        return coordinates(match(modules).orElse(null));
+    }
+
     default Map<String, String> properties() {
         return Map.of();
     }
@@ -38,6 +49,15 @@ public interface TestEngine extends Serializable {
         return Optional.empty();
     }
 
+    default boolean hasFramework(List<ModuleDescriptor> modules) {
+        for (ModuleDescriptor module : modules) {
+            if (isFramework(module)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     default boolean hasRunner(List<ModuleDescriptor> modules) {
         for (ModuleDescriptor module : modules) {
             if (isRunner(module)) {
@@ -49,7 +69,7 @@ public interface TestEngine extends Serializable {
 
     static Optional<TestEngine> of(List<ModuleDescriptor> modules) {
         for (TestEngine engine : List.<TestEngine>of(new JUnitPlatform(), new JUnit4(), new TestNG())) {
-            if (engine.match(modules).isPresent()) {
+            if (engine.hasFramework(modules)) {
                 return Optional.of(engine);
             }
         }
