@@ -113,6 +113,7 @@ jobs:
           - { name: toolchain-relaunch, dir: demo-59-toolchain, jdk: '26', entry: build/jenesis/Make.java, flags: '-Djenesis.toolchain.version=26 "-Djenesis.toolchain.searchpath=$TOOLCHAIN_HOME"', verify: 'java -Djenesis.print.progress=false -Djenesis.toolchain.version=26 "-Djenesis.toolchain.searchpath=$TOOLCHAIN_HOME" build/jenesis/Execute.java | tr -d "\r" | grep -qx 26' }
           - { name: jpx, dir: demo-61-jpx, entry: build/Demo.java, verify: 'test "$(find target/jpx -name jpx.properties | wc -l)" -eq 2' }
           - { name: jpx-java, dir: demo-61-jpx, jdk: '26', entry: build/jenesis/Jpx.java --java=26 org.junit.platform.console@6.1.3 --version, flags: '"-Djenesis.toolchain.searchpath=$TOOLCHAIN_HOME"', verify: 'java "-Djenesis.toolchain.searchpath=$TOOLCHAIN_HOME" build/jenesis/Jpx.java --java=26 org.junit.platform.console@6.1.3 --version | grep -q "^JVM: 26"' }
+          - { name: module-convention, dir: demo-62-module-convention, entry: build/Demo.java, verify: 'test -f target/stage/modular/output/demo.convention.app/1.0.0/demo.convention.app.jar' }
     runs-on: ${{ inputs.os }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3

@@ -14,6 +14,7 @@ import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.maven.MavenModuleRepository;
 import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.ProjectModule;
 import build.jenesis.project.MultiProjectAssembler;
@@ -551,8 +552,7 @@ public class ModularProject implements BuildExecutorModule {
             module.store(context.next().resolve(BuildStep.MODULE));
             SequencedProperties metadata = new SequencedProperties();
             String moduleName = info.coordinate();
-            String[] segments = moduleName.split("\\.");
-            metadata.setProperty("project", segments.length >= 2 ? segments[0] + "." + segments[1] : moduleName);
+            metadata.setProperty("project", MavenModuleRepository.groupId(moduleName));
             metadata.setProperty("artifact", moduleName);
             metadata.setProperty("version", "1-SNAPSHOT");
             if (info.name() != null) {
