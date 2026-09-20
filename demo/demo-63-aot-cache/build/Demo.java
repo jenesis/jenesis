@@ -63,8 +63,32 @@ public class Demo {
         // loads, so a cache trained on it would serve no build.
         Path unused = Path.of(".jenesis", "help.aot");
         timed("-Djenesis.aot.enabled=true", "-Djenesis.aot.file=" + unused, "help");
+        // The two settings a cache contradicts are refused where they meet it.
+        System.out.println("Beside the daemon:      "
+                + refused("jenesis.make.daemon", "-Djenesis.aot.enabled=true", "-Djenesis.make.daemon=true"));
+        System.out.println("Without compiling:      "
+                + refused("jenesis.make.compile", "-Djenesis.aot.enabled=true", "-Djenesis.make.compile=false"));
         System.out.println("A cache for `help`:     "
                 + (Files.exists(unused) ? "trained, which it should not be" : "never trained, as intended"));
+    }
+
+    private static String refused(String setting, String... options) throws Exception {
+        List<String> command = new ArrayList<>();
+        command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
+        command.addAll(List.of(options));
+        command.addAll(List.of("build/jenesis/Make.java", "build"));
+        Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        if (process.waitFor() == 0) {
+            throw new IllegalStateException(String.join(" ", command)
+                    + " was accepted:"
+                    + System.lineSeparator()
+                    + output);
+        }
+        if (!output.contains(setting) || !output.contains("jenesis.aot.enabled")) {
+            throw new IllegalStateException("The refusal named neither setting:" + System.lineSeparator() + output);
+        }
+        return "refused, naming " + setting;
     }
 
     private static long engine(Path jar, Path cache) throws Exception {

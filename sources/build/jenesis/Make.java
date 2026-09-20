@@ -40,6 +40,7 @@ public final class Make {
         daemon = flag("jenesis.make.daemon", false);
         compile = flag("jenesis.make.compile", true);
         aot = flag("jenesis.aot.enabled", false);
+        requireCompatible(aot, daemon, compile);
         String cache = System.getProperty("jenesis.aot.file");
         aotFile = cache == null || cache.isBlank()
                 ? root.resolve(".jenesis").resolve("engine.aot")
@@ -57,6 +58,19 @@ public final class Make {
             throw new IllegalArgumentException("Malformed value for jenesis.aot.lifetime: '"
                     + value
                     + "' (expected an ISO-8601 duration, as PT12H or P7D, or no value to keep the cache)", e);
+        }
+    }
+
+    private static void requireCompatible(boolean aot, boolean daemon, boolean compile) {
+        if (aot && daemon) {
+            throw new IllegalArgumentException("jenesis.aot.enabled and jenesis.make.daemon are both on: a daemon"
+                    + " keeps the engine loaded in a JVM of its own, which is what a cache of that loading replaces"
+                    + " (turn one of them off)");
+        }
+        if (aot && !compile) {
+            throw new IllegalArgumentException("jenesis.aot.enabled is on and jenesis.make.compile is off: a cache"
+                    + " serves the engine a JVM loads from the compiled classes, and without them there is nothing"
+                    + " for it to serve (turn one of them off)");
         }
     }
 
@@ -84,6 +98,7 @@ public final class Make {
                  boolean aot,
                  Path aotFile,
                  Duration aotLifetime) {
+        requireCompatible(aot, daemon, compile);
         this.mainClass = mainClass;
         this.root = root;
         this.classes = classes;
@@ -223,7 +238,6 @@ public final class Make {
 
     private boolean aotApplies(SequencedMap<String, String> collected, String... selectors) {
         return aot
-                && !daemon
                 && collected == null
                 && mainClass.equals("build.jenesis.Project")
                 && !flag("jenesis.aot.relaunched", false)

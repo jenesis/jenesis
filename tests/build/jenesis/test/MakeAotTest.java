@@ -75,6 +75,45 @@ public class MakeAotTest {
     }
 
     @Test
+    public void refuses_a_cache_beside_a_daemon() {
+        System.setProperty("jenesis.aot.enabled", "true");
+        System.setProperty("jenesis.make.daemon", "true");
+        try {
+            assertThatThrownBy(() -> new Make("build.jenesis.Project"))
+                    .as("a daemon holds the engine a cache would hand to a starting JVM")
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("jenesis.aot.enabled")
+                    .hasMessageContaining("jenesis.make.daemon");
+        } finally {
+            System.clearProperty("jenesis.aot.enabled");
+            System.clearProperty("jenesis.make.daemon");
+        }
+    }
+
+    @Test
+    public void refuses_a_cache_without_the_compiled_engine() {
+        System.setProperty("jenesis.aot.enabled", "true");
+        System.setProperty("jenesis.make.compile", "false");
+        try {
+            assertThatThrownBy(() -> new Make("build.jenesis.Project"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("jenesis.aot.enabled")
+                    .hasMessageContaining("jenesis.make.compile");
+        } finally {
+            System.clearProperty("jenesis.aot.enabled");
+            System.clearProperty("jenesis.make.compile");
+        }
+    }
+
+    @Test
+    public void refuses_a_daemon_switched_on_beside_a_cache() {
+        assertThatThrownBy(() -> new Make("build.jenesis.Project").aot(true).daemon(true))
+                .as("the combination is refused wherever it is made, not only where a property names it")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.make.daemon");
+    }
+
+    @Test
     public void rejects_a_lifetime_that_is_not_a_duration() {
         System.setProperty("jenesis.aot.lifetime", "12h");
         try {

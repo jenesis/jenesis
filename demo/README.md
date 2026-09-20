@@ -1489,6 +1489,9 @@ cache of the engine, and every later build starts from it with those classes alr
 loaded and linked. `jenesis.aot.file` says where it lives, `.jenesis/engine.aot` by
 default, and an optional `jenesis.aot.lifetime` trains it again once it reaches that age;
 a changed engine or a new JDK does the same, which a `.digest` beside the cache records.
+Turning it on beside `jenesis.make.daemon`, which keeps that engine in a JVM instead, or
+beside `jenesis.make.compile=false`, which leaves nothing compiled to cache, stops the
+build rather than quietly ignoring one of the two.
 Both are ordinary properties, so a project file or your own `~/.jenesis/jenesis.properties`
 keeps the setting from build to build without anything staying resident.
 

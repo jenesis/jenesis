@@ -22,8 +22,10 @@ same build off the compiled engine the way the installed CLI runs it:
     Cache:                  20 MB at .jenesis/engine.aot
 
     The same build off the compiled engine, as the installed CLI runs it:
-      without the cache:    410 ms
-      with the cache:       227 ms
+      without the cache:    431 ms
+      with the cache:       258 ms
+    Beside the daemon:      refused, naming jenesis.make.daemon
+    Without compiling:      refused, naming jenesis.make.compile
     A cache for `help`:     never trained, as intended
 
 Layout
@@ -50,6 +52,13 @@ and `lifetime` is an optional ISO-8601 age after which the cache is trained agai
 are ordinary properties, so `jenesis.properties` or `~/.jenesis/jenesis.properties`
 carries them from build to build - which is the point, since a cache is a file rather
 than a process.
+
+Two settings contradict it and are refused rather than quietly ignored.
+`jenesis.make.daemon` keeps the engine loaded in a JVM of its own, which is the very
+thing a cache replaces, and `jenesis.make.compile=false` leaves nothing compiled for a
+cache to serve. Either one beside `jenesis.aot.enabled` stops the build with a message
+naming both settings, because a build that silently ignored one of them would look
+configured and behave as if it were not.
 
 Beside the cache lives a `.digest` naming the engine and the JVM it was trained for.
 A JDK upgrade, a changed engine, or a cache older than the lifetime is trained again
