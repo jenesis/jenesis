@@ -29,7 +29,7 @@ produced platform launcher with your arguments. The packaged app prints:
 (`commons-lang3`'s `StringUtils.capitalize` upper-cased the leading `a`, proving the
 bundled dependency is on the launched app's classpath.) With no arguments it greets
 `World`. Building the plain `java build/jenesis/Make.java` (the default `build`
-target, which stops before the package phase) compiles and jars the project exactly
+target) compiles and jars the project exactly
 as `../demo-01-java-pom` does, without producing an image.
 
 Declaring the entry point
@@ -72,9 +72,8 @@ module's `build.jenesis/` folder (or `META-INF/build.jenesis/` in a modular layo
 falling back to the project-wide configuration directory (`build.jenesis/` under
 the project root by default). The first match wins, so a module-local file selects packaging for one
 module while a project-wide one selects it for all modules at once. When its
-`jpackage` key is set, `InferredMultiProjectAssembler` wires a `jpackage` step into
-the package phase - the cross-module level that runs after every module's build -
-which produces an application image for every module declaring a main class (modules
+`jpackage` key is set, the build produces an application image after every
+module has been built, one for every module that declares a main class (modules
 without one are skipped). The `jpackage` value is the `jpackage --type` (`app-image`,
 `deb`, `rpm`, `dmg`, `pkg`, `exe`, `msi`); an absent or empty value means no jpackage
 step, so the type is always explicit - this demo commits a `build.jenesis/packaging.properties`
@@ -96,8 +95,8 @@ Bundle the jars for a JRE-based image
 
 `jpackage` bundles a whole runtime into the image. The lighter alternative is to ship
 only your jars onto an off-the-shelf JRE base. For that, a `bundle=true` line in
-`packaging.properties` wires a per-module `bundle` step that writes a single
-`bundle/bundle.zip` for every module with a main class:
+`packaging.properties` writes a single `bundle/bundle.zip` for every module with a
+main class:
 
     java build/jenesis/Make.java
 

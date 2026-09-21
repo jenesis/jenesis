@@ -2,7 +2,6 @@ package build;
 
 import module java.base;
 
-
 /**
  * Sibling of {@link Demo} that builds a <em>fully bundled native installer</em>
  * rather than a run-in-place app-image. Where {@code Demo} packages {@code app-image}
@@ -27,10 +26,6 @@ import module java.base;
 public class DemoNative {
 
     static void main(String[] args) throws Exception {
-        // Pick the native installer type jpackage produces for this platform - the
-        // counterpart to Demo's committed "jpackage=app-image". Because the value is
-        // computed at run time, write it into a packaging.properties of its own and point the
-        // build's configuration location there, instead of relying on a committed file.
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         String type;
         if (os.contains("win")) {
@@ -44,9 +39,6 @@ public class DemoNative {
         Files.writeString(configuration.resolve("packaging.properties"), "jpackage=" + type + "\n");
         make("-Djenesis.project.configuration=" + configuration, "stage");
 
-        // Same fixed target as Demo: building `stage` returns a map keyed by the steps that
-        // ran, and `stage/packages` holds whatever jpackage produced - here a single native
-        // installer file rather than an app-image directory.
         Path output = Path.of("target", "stage", "packages", "output");
 
         System.out.println("Built a fully bundled " + type + " installer under " + output + ":");
@@ -68,9 +60,6 @@ public class DemoNative {
     }
 
     private static void make(String flag, String... selectors) throws IOException, InterruptedException {
-        // The tool as the command line runs it. A setting that only this run needs is a -D on that
-        // command line, the same flag a person or a pipeline would pass, rather than a value wired
-        // into a Project this file assembles by hand.
         String java = ProcessHandle.current().info().command().orElseGet(() -> Path.of(
                 System.getProperty("java.home"),
                 "bin",

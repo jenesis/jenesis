@@ -39,12 +39,10 @@ itself:
 
     @jenesis.plugin javac maven/com.google.errorprone/error_prone_core
 
-`@jenesis.plugin <compiler> <coordinate>` resolves into the `plugin` scope of
-that compiler's own group, exactly as `@jenesis.plugin kotlinc ...` does for a
-Kotlin compiler plugin, and `javac` reads that group into its processor path.
-There is no second way to name it: an Error Prone plugin such as NullAway is
-another `@jenesis.plugin javac` line, and the `pin` goal pins the closure under
-the same group:
+It is the same tag that names an annotation processor, with the compiler named
+first, and there is no second way to name it: an Error Prone plugin such as
+NullAway is another `@jenesis.plugin javac` line. The `pin` goal pins the
+closure under the compiler's own group:
 
     @jenesis.pin javac/maven/com.google.errorprone/error_prone_core 2.50.0 SHA-256/40a88d3...
 
@@ -64,23 +62,10 @@ resolves and sits unused, because `javac` runs a plugin only when it is named;
 with the file but without the declaration the build fails saying which
 `@jenesis.plugin` line is missing.
 
-Why `javac` forks
------------------
-
-Error Prone reads `com.sun.tools.javac` internals that `jdk.compiler` does not
-export. A plugin can only be granted them by the JVM that runs the compiler,
-through `--add-exports` and `--add-opens` passed as `-J` options - and `-J`
-exists only when `javac` is a process of its own. So when Error Prone is
-active, the `javac` step forks rather than calling the in-process
-`ToolProvider`, whatever `jenesis.process.factory` says. The flags are written
-into a `process/javac.properties` that the compile step reads like any other
-javac configuration:
-
-    -XDcompilePolicy=simple
-    --should-stop=ifError=FLOW
-    -J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED
-    ...
-    -Xplugin:ErrorProne -Xep:ReferenceEquality:ERROR
+Error Prone needs compiler internals that only a forked `javac` can be granted,
+so the compiler runs as a process of its own while the plugin is active,
+whatever `jenesis.process.factory` asks for. Nothing has to be configured for
+that.
 
 Turning it off
 --------------

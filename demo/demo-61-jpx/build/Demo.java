@@ -16,12 +16,6 @@ import build.jenesis.module.JenesisRepository;
 public class Demo {
 
     static void main(String[] args) throws Exception {
-        // The wiring the jpx command carries, named out in full because this demo installs
-        // into its own target/ folder instead of ~/.jenesis/jpx: module names are looked up
-        // in the Jenesis module repository and resolved through their published POM, Maven
-        // coordinates come from Maven Central, and every jar is placed as it describes a
-        // module. So the demo resolves from scratch and leaves nothing behind outside this
-        // directory.
         Repository modules = JenesisModuleRepository.of(JenesisRepository.Scope.ARTIFACT);
         MavenPomResolver maven = new MavenPomResolver();
         Jpx jpx = new Jpx(Path.of("target", "jpx"),
@@ -30,29 +24,16 @@ public class Demo {
                 new HashDigestFunction("SHA-256"),
                 PathPlacement.INFERRED);
 
-        // The same console launcher named twice: once by its Java module name, whose
-        // Maven coordinates the module repository discovers, and once by the Maven
-        // coordinate itself. Both name a version and the installation's full digest.
-        // The name also decides how the program runs: as a module for the module name,
-        // on the class path for the coordinate.
         launch(jpx, "org.junit.platform.console@6.1.3",
                 "ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452aa1e2dd");
         launch(jpx, "org.junit.platform:junit-platform-console@6.1.3",
                 "ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452aa1e2dd");
 
-        // A leading fraction of that digest is enough: 32 hex characters is the
-        // shortest prefix accepted, and it is matched against the recomputed digest.
         launch(jpx, "org.junit.platform.console@6.1.3", "ed5600ef861c7e86cab68c134c6ca0cf");
 
-        // A pinning run stops short of the JVM: the program is resolved, installed and
-        // verified exactly as for a real run, and two commands are printed instead of
-        // launching it - the jpx command that repeats the run reproducibly, and the
-        // java command that one expands to.
         pin(jpx, "org.junit.platform.console@6.1.3",
                 "ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452aa1e2dd");
 
-        // A digest that does not match the installed jars refuses to launch, on the
-        // run that installed them and on every run after it.
         reject(jpx, "org.junit.platform.console@6.1.3",
                 "ed5600ef861c7e86cab68c134c6ca0cf3b5265e5f2697c16576281452ac0ffee");
     }
@@ -60,8 +41,6 @@ public class Demo {
     private static void launch(Jpx jpx, String target, String hash) throws Exception {
         Jpx.Installation installation = verify(jpx, target, hash);
         SequencedProperties properties = installation.properties();
-        // A module name is launched as a module, over a module path; a coordinate names an
-        // artifact rather than a module, and is launched from the class path in full.
         String mainModule = properties.getProperty("mainModule");
         String modulepath = properties.getProperty("modulepath");
         System.out.println("  [verified] " + installation.folder()

@@ -8,10 +8,10 @@ Jenesis
 > _Java-native config, plugin-free, with `module-info.java` treated as a feature, not an afterthought._
 
 **A build tool for Java, written in Java.** The engine ships *with* your project as plain source under
-`build/jenesis/` and is launched by the JDK directly, so there is no wrapper binary, no fetched plugin tree and
-no daemon. Modules declared with `module-info.java` drive the build, every step is content-hashed so unchanged
-work is reused, and every dependency can be pinned by version *and* by the checksum of the artifact. It needs a
-JDK 25 or newer, and nothing else. This repository also holds **jpx**, which runs an already-published module
+`build/jenesis/` and is launched by the JDK directly, so there is no wrapper binary and no fetched plugin tree,
+and nothing runs between builds unless you ask for it. Modules declared with `module-info.java` drive the
+build, every step is content-hashed so unchanged work is reused, and every dependency can be pinned by version
+*and* by the checksum of the artifact. It needs a JDK 25 or newer, and nothing else. This repository also holds **jpx**, which runs an already-published module
 or Maven artifact with one command - `npx` for Java.
 
 📖 **The user documentation lives at [jenesis.build](https://jenesis.build).** Everything about using the
@@ -51,7 +51,7 @@ What is in this repository
 |------|----------|
 | `sources/` | The build tool itself, module `build.jenesis` - `Make`, `Execute` and `Jpx` are the entry points, `Project` the configuration API they run and has no `main`. |
 | `tests/` | Its tests, module `build.jenesis.test`. |
-| `demo/` | ~52 self-contained example projects, one per feature, indexed by [`demo/README.md`](demo/README.md). |
+| `demo/` | 61 self-contained example projects, one per feature, indexed by [`demo/README.md`](demo/README.md). |
 | `sdk/` | The SDKMAN distribution layout and its shell-script tests (`sdk/jenesis`, `sdk/jpx`). `jenesis` reads the version recorded in a project's `build/jenesis/jenesis.version`, installs it where the package manager can, verifies the vendored sources against the published ones and runs the compiled engine - a tree that does not match is refused, so `jenesis` never executes unreviewed build code; `jenesis-make` runs the installed version as it stands, and `jenesis-switch` moves the shell to the recorded one. Both stay on the released engine, so a refused project still builds as a standard build; only running the vendored sources yourself - in source mode, or off classes compiled once with `javac` - executes the vendored engine. |
 | `distribution/` | Packager templates that override JReleaser's own, per distribution: the Homebrew formulae, which wrap each command rather than symlinking it so a script still finds its own installation, and the Scoop manifest that describes jpx rather than the build tool. JReleaser would look for these under `src/jreleaser/distributions/`, so each packager in `jreleaser.yml` names its `templateDirectory` here instead - this project has no `src/` tree. |
 | `build/jenesis` | A symlink to `sources/build/jenesis`, so the project builds itself with itself. |

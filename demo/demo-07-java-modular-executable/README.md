@@ -29,9 +29,8 @@ produced platform launcher with your arguments. The packaged app prints:
 (Because no SLF4J backend is bundled, SLF4J prints a one-time "no providers" notice
 and uses a no-op logger - the `slf4j-api` jar is still bundled and on the app's
 classpath.) With no arguments it greets `world`. Building the plain
-`java build/jenesis/Make.java` (the default `build` target, which stops before the
-package phase) compiles and jars the module exactly as `../demo-02-java-modular`
-does, without producing an image.
+`java build/jenesis/Make.java` compiles and jars the module exactly as
+`../demo-02-java-modular` does, without producing an image.
 
 Declaring the entry point with `@jenesis.main`
 ----------------------------------------------
@@ -48,12 +47,9 @@ the modular layout that is declared with a `@jenesis.main` Javadoc tag on
         exports sample;
     }
 
-The build parses that tag and records `main=sample.Sample` in the module's
-`module.properties`. That single field is what both the `Execute` launcher and
-the `package` step key off to treat the module as runnable. (A POM project has
-no `module-info.java`; its equivalent is a `<mainClass>` POM property, shown in
-`../demo-06-java-pom-executable`. Both layouts converge on the same `module.properties`
-`main` field.)
+That one tag is what marks the module as runnable, for launching it and for
+packaging it alike. A POM project has no `module-info.java`; its equivalent is a
+`<mainClass>` property, shown in `../demo-06-java-pom-executable`.
 
 Layout
 ------
@@ -83,9 +79,8 @@ module's `META-INF/build.jenesis/` folder (or `build.jenesis/` in a Maven layout
 falling back to the project-wide configuration directory (`build.jenesis/` under
 the project root by default). The first match wins, so a module-local file selects packaging for one
 module while a project-wide one selects it for all modules at once. When its
-`jpackage` key is set, `InferredMultiProjectAssembler` wires a `jpackage` step into
-the package phase - the cross-module level that runs after every module's build -
-which produces an application image for every module declaring a main class (modules
+`jpackage` key is set, the build produces an application image after every
+module has been built, one for every module that declares a main class (modules
 without one are skipped). The `jpackage` value is the `jpackage --type` (`app-image`,
 `deb`, `rpm`, `dmg`, `pkg`, `exe`, `msi`); an absent or empty value means no jpackage
 step, so the type is always explicit - this demo commits a `packaging.properties` at
@@ -137,8 +132,8 @@ self-contained graph launches without `--add-modules ALL-MODULE-PATH,ALL-DEFAULT
 Stage a `.jmod` and a `jlink` runtime image
 -------------------------------------------
 
-`jpackage` produces that app-image by running `jlink` internally over the module
-graph. You can also produce the lower-level artifacts on their own - the `.jmod`
+`jpackage` links a runtime into that app-image for you. You can also produce the
+lower-level artifacts on their own - the `.jmod`
 and the linked runtime image - with two boolean keys in `packaging.properties`. Both
 are modular-only: a `.jmod` and a custom runtime are built from *modules*, so a
 classpath project (`../demo-06-java-pom-executable`) has nothing to pack or link.
@@ -146,7 +141,7 @@ With `jmod=true` and `jlink=true` in `packaging.properties`, run:
 
     java build/jenesis/Make.java stage
 
-`jmod=true` wires a `jmod` step that packs the module into a `.jmod`,
+`jmod=true` packs the module into a `.jmod`,
 the modular-package format that - unlike a jar - can also carry native libraries,
 legal files, and `bin/`/`conf/` content. It is staged beside the modular jar in the
 module-repository layout:
@@ -155,9 +150,8 @@ module-repository layout:
     |-- demo.modular.executable.jar
     `-- demo.modular.executable.jmod
 
-`jlink=true` wires a `jlink` step that links a **custom runtime
-image** holding only the modules this app needs, staged under `stage/runtime` (the
-analogue of `stage/packages`):
+`jlink=true` links a **custom runtime image** holding only the modules this app
+needs, staged under `stage/runtime` (the analogue of `stage/packages`):
 
     target/stage/runtime/output/module-sources/
     |-- bin/java          the runtime's own launcher
@@ -183,8 +177,7 @@ Bundle the jars for a JRE-based image
 `jpackage` bundles a trimmed runtime into the image. The lighter alternative is to
 ship only your jars onto an off-the-shelf JRE base (the shared-base trade discussed
 at the end of this page). For that, a `bundle=true` line in `packaging.properties`
-wires a per-module `bundle` step that writes a single `bundle/bundle.zip` for every
-module with a main class:
+writes a single `bundle/bundle.zip` for every module with a main class:
 
     java build/jenesis/Make.java
 

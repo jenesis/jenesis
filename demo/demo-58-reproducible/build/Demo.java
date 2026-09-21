@@ -19,17 +19,13 @@ import build.jenesis.Make;
  */
 public class Demo {
 
-    // The jar's digest as recorded when the demo was written. A deliberate change to the
-    // sources, or to what Jenesis writes into a jar, changes it, and this line with it.
     private static final String EXPECTED = "85b7b4d4a7130c582141aa4764419ba5c98b550f6c2e4b6304d14a272ffc5559";
 
     static void main(String[] args) throws Exception {
-        // The tool as the command line runs it: a non-zero status is the failure a shell would see.
         if (new Make("build.jenesis.Project").build().code() != 0) {
             throw new IllegalStateException("The build exited with a non-zero status");
         }
 
-        // The archiver writes the module's jar under .../artifacts/jar/output/artifacts/classes.jar.
         Path jar;
         try (Stream<Path> walk = Files.walk(Path.of("target"))) {
             jar = walk.filter(path -> path.getFileName().toString().equals("classes.jar"))
@@ -37,8 +33,6 @@ public class Demo {
                     .orElseThrow(() -> new IllegalStateException("No classes.jar was produced"));
         }
 
-        // Every byte counts: the entry order, the time recorded on each entry, the manifest, the
-        // compiled declaration and the embedded SBOM all have to come out the same.
         String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(jar)));
         if (!digest.equals(EXPECTED)) {
             throw new IllegalStateException("classes.jar has SHA-256 " + digest + " where " + EXPECTED
