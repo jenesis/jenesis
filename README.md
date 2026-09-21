@@ -165,6 +165,13 @@ Eclipse has to be told what it reads as a module rather than from the classpath,
 declares a `module-info.java` its libraries and the JRE container carry `module="true"`; IntelliJ IDEA and
 VS Code infer that themselves.
 
+The Java version comes from `@jenesis.release`, not from the JDK that happened to run the build, so the
+editor rejects what `javac` would reject. IntelliJ IDEA takes the highest release in the project and marks
+any module below it with its own `LANGUAGE_LEVEL`; Eclipse binds the `JavaSE-<release>` execution
+environment, which names a release rather than one installed JRE. Which JDK answers for that release is a
+question only the reader's editor can settle: `project-jdk-name` has to match a name in their IDE, so `ide`
+writes the bare version the first time and then leaves alone whatever they picked.
+
 What reaches a module's classpath is what the module itself declares. A build tool resolves in its own
 dependency group - `checkstyle`, `pmd`, `spotbugs`, a formatter - and those groups are left out, as are
 POM-typed entries, which carry no classes. An `@jenesis.test abstract` fixture module is compiled and read

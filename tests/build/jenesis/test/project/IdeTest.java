@@ -76,6 +76,84 @@ public class IdeTest {
     }
 
     @Test
+    public void idea_takes_the_language_level_from_the_declared_release() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("sources"));
+        Path inventory = inventory("module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.release", "21");
+        });
+
+        run(Ide.IDEA, inventory);
+
+        Path misc = root.resolve(".idea").resolve("misc.xml");
+        assertThat(attributes(misc, "component", "languageLevel"))
+                .as("the release the build compiles against, not the JDK that runs it")
+                .containsExactly("JDK_21");
+        assertThat(attributes(misc, "component", "project-jdk-name")).containsExactly("21");
+    }
+
+    @Test
+    public void idea_marks_a_module_that_targets_an_older_release() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("sources"));
+        Files.createDirectories(root.resolve("app").resolve("sources"));
+        Path greeter = inventory("module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.release", "21");
+        });
+        Path app = inventory("module-app", properties -> {
+            properties.setProperty("module-app.path", "app");
+            properties.setProperty("module-app.release", "25");
+        });
+
+        run(Ide.IDEA, greeter, app);
+
+        assertThat(attributes(root.resolve(".idea").resolve("misc.xml"), "component", "languageLevel"))
+                .as("one project file cannot hold two levels, so it holds the highest")
+                .containsExactly("JDK_25");
+        assertThat(attributes(root.resolve("greeter").resolve("greeter.iml"), "component", "LANGUAGE_LEVEL"))
+                .containsExactly("JDK_21");
+        assertThat(attributes(root.resolve("app").resolve("app.iml"), "component", "LANGUAGE_LEVEL"))
+                .containsExactly("");
+    }
+
+    @Test
+    public void idea_keeps_a_project_jdk_chosen_in_the_ide() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("sources"));
+        Path inventory = inventory("module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.release", "21");
+        });
+        run(Ide.IDEA, inventory);
+        Path misc = root.resolve(".idea").resolve("misc.xml");
+        Files.writeString(misc, Files.readString(misc)
+                .replace("project-jdk-name=\"21\"", "project-jdk-name=\"temurin-21\""));
+
+        run(Ide.IDEA, inventory);
+
+        assertThat(attributes(misc, "component", "project-jdk-name"))
+                .as("only the reader knows what their IDE calls an installed JDK")
+                .containsExactly("temurin-21");
+        assertThat(attributes(misc, "component", "languageLevel")).containsExactly("JDK_21");
+    }
+
+    @Test
+    public void eclipse_binds_the_execution_environment_of_the_declared_release() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("sources"));
+        Path inventory = inventory("module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.release", "21");
+        });
+
+        run(Ide.ECLIPSE, inventory);
+
+        assertThat(classpathEntries(root.resolve("greeter").resolve(".classpath"), "con"))
+                .as("an execution environment names a release, not an installed JRE")
+                .containsExactly("org.eclipse.jdt.launching.JRE_CONTAINER"
+                        + "/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType"
+                        + "/JavaSE-21");
+    }
+
+    @Test
     public void idea_links_sibling_module_instead_of_jar() throws IOException {
         Files.createDirectories(root.resolve("greeter"));
         Files.createDirectories(root.resolve("app"));
