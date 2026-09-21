@@ -15,16 +15,6 @@ public record JUnit4() implements TestEngine {
     }
 
     @Override
-    public boolean isRunner(ModuleDescriptor module) {
-        return isEngine(module);
-    }
-
-    @Override
-    public SequencedMap<String, String> coordinates(ModuleDescriptor engine) {
-        return Collections.emptyNavigableMap();
-    }
-
-    @Override
     public String mainClass() {
         return "org.junit.runner.JUnitCore";
     }

@@ -13,19 +13,12 @@ public interface TestEngine extends Serializable {
 
     boolean isEngine(ModuleDescriptor module);
 
-    boolean isRunner(ModuleDescriptor module);
-
-    SequencedMap<String, String> coordinates(ModuleDescriptor engine);
-
     default boolean isFramework(ModuleDescriptor module) {
         return isEngine(module);
     }
 
     default SequencedMap<String, String> missingCoordinates(List<ModuleDescriptor> modules) {
-        if (hasRunner(modules)) {
-            return Collections.emptyNavigableMap();
-        }
-        return coordinates(match(modules).orElse(null));
+        return Collections.emptyNavigableMap();
     }
 
     default Map<String, String> properties() {
@@ -40,33 +33,6 @@ public interface TestEngine extends Serializable {
                           boolean parallel,
                           boolean reporting);
 
-    default Optional<ModuleDescriptor> match(List<ModuleDescriptor> modules) {
-        for (ModuleDescriptor module : modules) {
-            if (isEngine(module)) {
-                return Optional.of(module);
-            }
-        }
-        return Optional.empty();
-    }
-
-    default boolean hasFramework(List<ModuleDescriptor> modules) {
-        for (ModuleDescriptor module : modules) {
-            if (isFramework(module)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    default boolean hasRunner(List<ModuleDescriptor> modules) {
-        for (ModuleDescriptor module : modules) {
-            if (isRunner(module)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     static TestEngine of(String name) {
         return switch (name.toLowerCase(Locale.ROOT)) {
             case "junit-platform" -> new JUnitPlatform();
@@ -78,12 +44,9 @@ public interface TestEngine extends Serializable {
     }
 
     static Optional<TestEngine> of(List<ModuleDescriptor> modules) {
-        for (TestEngine engine : List.<TestEngine>of(new JUnitPlatform(), new JUnit4(), new TestNG())) {
-            if (engine.hasFramework(modules)) {
-                return Optional.of(engine);
-            }
-        }
-        return Optional.empty();
+        return Stream.<TestEngine>of(new JUnitPlatform(), new JUnit4(), new TestNG())
+                .filter(engine -> modules.stream().anyMatch(engine::isFramework))
+                .findFirst();
     }
 
     static Optional<TestEngine> of(Iterable<Path> folders) throws IOException {
