@@ -113,7 +113,7 @@ because it depends on the sibling, `greeter` too - but no unrelated module:
 
     java build/jenesis/Make.java +app
 
-Under the hood a selector is a slash-delimited path of graph steps, with two
+A selector is a slash-delimited path of build steps, with two
 wildcards: `:` matches a single path segment and `::` matches any depth. So
 `::/jar` runs the `jar` step of every module wherever it sits in the tree:
 

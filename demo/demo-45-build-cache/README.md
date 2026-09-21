@@ -1,0 +1,182 @@
+Build cache demo
+================
+
+Every build already has an *incremental* cache: Jenesis content-hashes each
+step's inputs and outputs under `target/`, so a warm rebuild only re-runs the
+steps whose inputs changed. This demo adds the second tier - a build cache
+*outside* `target/` that can hand a step the output of an earlier build (or a
+different checkout, machine, or CI) instead of re-running it at all.
+
+That cache can live in two places - a project-local folder, or a shared location
+you name - and the two compose.
+
+A project-local cache (the easy one)
+------------------------------------
+
+The simplest form needs nothing but a flag; Jenesis keeps a content-addressed
+cache under `.jenesis/cache`, rooted at the project root:
+
+    -Djenesis.project.cache
+
+The property is a filesystem path; an empty value (as above) resolves to
+`.jenesis/cache` under the project root, and a value relocates it. This is the
+main example below. Anything the cache already holds is linked into place instead
+of being built again, and because the cache sits outside `target/`, it survives a
+`target/` wipe.
+
+Build it
+--------
+
+This is the smallest possible project - a `pom.xml` and one dependency-free
+source - so the only thing of interest is *who* produced the output. Run it from
+this directory.
+
+**1. Bootstrap the cache.** A normal build populates `.jenesis/cache` while it
+compiles:
+
+    java -Djenesis.project.cache build/jenesis/Make.java
+
+    [EXECUTED]  .../compile/javac in 0.07 seconds
+    [EXECUTED]  .../binary/classes in 0.02 seconds
+    [EXECUTED]  .../binary/artifacts/jar in 0.02 seconds
+    [COMPLETED] Finished in ...
+
+**2. Force a full rebuild, served from the cache.** `-Djenesis.executor.rebuild=true`
+deletes `target/` first, so the incremental cache is gone and *every* step is a
+forced miss that would normally re-run from scratch. The build cache lives outside
+`target/`, so it survives - and serves them:
+
+    java -Djenesis.project.cache \
+         -Djenesis.executor.rebuild=true \
+         build/jenesis/Make.java
+
+    [EXECUTED]  .../compile/javac in 0.00 seconds
+    [EXECUTED]  .../binary/classes in 0.00 seconds
+    [EXECUTED]  .../binary/artifacts/jar in 0.00 seconds
+    [COMPLETED] Finished in ...
+
+The steps still print `[EXECUTED]` - their output *was* produced - but it came
+from the cache, not from `javac`, which is why each lands in ~0.00s. Add
+`-Djenesis.print.cache` to make it explicit: each step served from the cache then
+prints a `[LOADED]` line and each one written to it a `[STORED]` line. On this toy
+project the saving is tiny; on a real module the compile that took seconds returns
+instantly. Delete `.jenesis/cache` to start over.
+
+A shared cache (the `uri` one)
+------------------------------
+
+`.jenesis/cache` is private to one checkout. To share results across checkouts,
+machines, or CI, name an explicit location with `-Djenesis.cache.uri=`. The value
+is a URI: it typically points at a cache *server* over HTTP, but it can equally be
+a `file://` location on a local or shared (NFS, network drive) file system:
+
+    -Djenesis.cache.uri=https://cache.example.com      # a cache server
+    -Djenesis.cache.uri=file:///mnt/team/jenesis-cache # a shared (or local) folder
+
+A `file://` URI resolves a `BuildExecutorFileCache` (the same on-disk format as the
+local cache); an `http(s)://` URL selects `BuildExecutorHttpCache`, which GETs and
+PUTs the same zip entries to the server, naming the cache project with
+`-Djenesis.cache.project=<project>` and authenticating with
+`-Djenesis.cache.key=<key>` (both sent as headers, never in the URL). A non-URI
+value is rejected - use `file://` for an on-disk location.
+
+The shared cache can be used **two ways**.
+
+**As a replacement** - the shared cache only, no local tier (e.g. an ephemeral CI
+runner whose disk is thrown away anyway):
+
+    java -Djenesis.cache.uri=file:///mnt/team/jenesis-cache build/jenesis/Make.java
+
+**Layered behind the local cache** - set both `-Djenesis.project.cache` *and*
+`-Djenesis.cache.uri=...`, and the local cache sits in front of the shared one:
+every read tries `.jenesis/cache` first and only falls through to the shared cache
+on a miss; a shared hit is copied into `.jenesis/cache` on the way past, so the next
+read is local; and a store writes through to both. A second build on the same
+checkout never re-downloads what the first already fetched:
+
+    java -Djenesis.project.cache \
+         -Djenesis.cache.uri=https://cache.example.com \
+         -Djenesis.cache.project=acme -Djenesis.cache.key=alice \
+         build/jenesis/Make.java
+
+Serving a step from the local tier means no `GET` reaches the server - which would
+let that shared entry age toward eviction there even though it is in active use. So
+a local hit also sends the server a best-effort `HEAD` (it never transfers the
+body), and the server treats it as a read, bumping the entry's recency just as a
+`GET` would. Each tier keeps its own LRU and both stay warm.
+
+A step that stays local
+-----------------------
+
+Not every step is worth sending over a network. A step that copies a module's
+resolved dependencies into its own folder produces a large output from files the
+machine already has, so uploading it costs more than re-running it would. Such a
+step declines the shared tier:
+
+    public class Copy implements BuildStep {
+
+        @Override
+        public boolean shouldCacheRemotely() {
+            return false;
+        }
+
+        ...
+    }
+
+Nothing else changes: the step is still cached under `.jenesis/cache`, so a
+rebuild on this machine still skips the work, and it is neither fetched from,
+stored in nor announced to a cache server. The default is `true`, so a step that
+says nothing is cached in both tiers as before.
+
+Layout
+------
+
+    demo/demo-45-build-cache
+    |-- build/jenesis        symlink to ../../../sources/build/jenesis
+    |-- pom.xml              Maven coordinates and <sourceDirectory>, no dependencies
+    `-- sources/sample/Sample.java
+
+There is nothing build-cache-specific in the project itself: the cache is an
+engine capability you switch on from the command line, so any project gains it
+for free.
+
+Tuning with `cache.properties`
+------------------------------
+
+Drop an optional `cache.properties` at the cache root - `.jenesis/cache/cache.properties`
+for the project-local cache, or `<folder>/cache.properties` for a file-system
+shared one - to tune the writes; every key has a default, so the file may be
+omitted entirely:
+
+| key          | default   | effect                                                                 |
+| ------------ | --------- | ---------------------------------------------------------------------- |
+| `digest`     | `SHA-256` | algorithm folding the inputs into the entry-folder name                |
+| `steps`      | `250`     | maximum number of step folders kept                                    |
+| `versions`   | `10`      | maximum input-variants kept per step                                   |
+| `size`       | unset     | maximum total bytes kept; over it, whole entries are evicted by `lru` until under (unset = no size cap) |
+| `lru`        | `true`    | evict the least-recently-updated entry when over a limit (`false` = most-recently) |
+| `touch`      | `true`    | bump an entry's timestamp on read, so reads keep hot entries alive     |
+| `ttl`        | unset     | ISO-8601 duration (e.g. `P30D`); entries not touched within it are evicted on a background sweep (unset = no age eviction) |
+| `compressed` | `false`   | store each entry as a single zip file rather than a folder of files    |
+| `read`       | `true`    | serve cache reads; `read=false` makes every lookup a miss              |
+| `write`      | `true`    | populate the cache; `write=false` serves reads but never writes, evicts, or touches |
+
+Eviction is by file timestamp and happens as entries are written; `touch` keeps
+recently-read entries fresh, so the count caps (`steps`, `versions`) and the byte
+cap (`size`) behave like an LRU. `ttl` adds an age dimension: an entry whose last
+touch is older than the duration leaves even while the caps have room.
+`compressed` trades the hard-linked reads of the folder format
+for a packed, transport-friendly layout, approaching the shape a remote cache
+server would store. `read` and `write` are the typical CI split: a privileged job
+builds with the defaults (both `true`) to populate the cache, while everyone else
+sets `write=false` to consume it read-only without mutating it. Setting both to
+`false` turns the cache off entirely.
+
+Where this fits
+---------------
+
+A folder, a cache server, and one layered in front of another are the same cache
+as far as a build is concerned: `jenesis.cache.uri` names the shared one and
+`jenesis.project.cache` keeps a local one in front of it. A step
+compiled once is reused everywhere its inputs are identical, whether "everywhere"
+means the next build on your laptop or every job on the cluster.

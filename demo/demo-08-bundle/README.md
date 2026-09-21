@@ -76,9 +76,8 @@ Bundling is opt-in through a `bundle` key in a `packaging.properties` file, read
 the configuration location (a module's `META-INF/build.jenesis/` folder - or
 `build.jenesis/` in a Maven layout - falling back to the project-wide configuration
 directory, `build.jenesis/` under the project root by default; the first match wins, so a module-local file
-overrides a project-wide one). When `bundle=true`, `InferredMultiProjectAssembler`
-wires a `bundle` step into the package phase - the cross-module level that runs after
-every module's build - producing a `bundle.zip` for every module declaring a main
+overrides a project-wide one). When `bundle=true`, the build writes a
+`bundle.zip` after every module has been built, one for every module declaring a main
 class (a `@jenesis.main` Javadoc tag, or a `<mainClass>` POM property); modules
 without one are skipped. Like the `launcher` jar, the archive is a per-module
 artifact left in the build tree (`.../package/bundle/output/bundle/bundle.zip`)

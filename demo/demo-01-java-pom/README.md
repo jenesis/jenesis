@@ -32,8 +32,8 @@ Layout
     `-- sources/sample/Sample.java
 
 `Sample.java` uses `org.apache.commons.lang3.StringUtils`, which is what makes
-the build resolve the real dependency. Under the hood Jenesis drives plain
-`javac` through the default `InferredMultiProjectAssembler`.
+the build resolve the real dependency. Nothing else is configured: the build
+compiles with plain `javac`.
 
 Printing the dependency graph
 -----------------------------

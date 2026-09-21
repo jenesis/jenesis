@@ -20,12 +20,6 @@ import build.jenesis.Make;
 public class Demo {
 
     static void main(String[] args) throws Exception {
-        // Packaging is selected by the committed packaging.properties in this directory
-        // (jpackage=app-image), which Jenesis reads from the configuration location for every
-        // module, so this runs the tool exactly as the command line does and needs no wiring.
-        // `stage/packages` is a fixed build target: building `stage` returns a map keyed by the
-        // steps that ran, so the image folder is read straight from that map rather than
-        // reconstructed by hand.
         Make.Result staged = new Make("build.jenesis.Project").build("stage");
         if (staged.code() != 0) {
             throw new IllegalStateException("The build exited with a non-zero status");
@@ -33,10 +27,6 @@ public class Demo {
         SequencedMap<String, Path> outputs = staged.outputs();
         Path output = outputs.get("stage/packages");
 
-        // The image folder is fixed too: jpackage names it after --name, which the build
-        // derives from this project's coordinate (the POM artifactId). The launcher path
-        // within it is fixed per platform - Windows ships <name>/<name>.exe, macOS a
-        // <name>.app bundle, every other OS <name>/bin/<name> - so no scanning is needed.
         String name = "java-pom-executable";
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         Path launcher;

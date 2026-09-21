@@ -60,31 +60,15 @@ capture with `-Djenesis.observe.native=false` (so nothing records the reflection
 the binary fails at run time with `ClassNotFoundException: sample.Greeter`: the closed-world
 analysis dropped the class it never saw referenced.
 
-How the test capture reaches the image, in one build
-----------------------------------------------------
+Where the metadata comes from
+-----------------------------
 
-Where does that metadata come from? Jenesis runs GraalVM's tracing agent the same way
-it runs JaCoCo coverage (`../demo-33-code-coverage`): as a **test-observation engine**.
-The `demo.graal.image.test` module exercises exactly the reflective call `Sample`
-makes, so the `graal.properties` file's presence attaches `-agentlib:native-image-agent`
-to the test JVM, and the agent records every reflective, JNI, resource and proxy access
-the test triggers, into a `native-image/` directory in the test's own output.
-
-The reason this can feed the same build is the assembler's two-phase layout. An
-assembler returns an `AssemblyDescriptor` - a per-module *build* phase plus optional
-later phases - and the heavy packaging steps, `native-image` among them, run in a
-*package* phase wired as a second, cross-module level: it runs after every module has
-built. Each module's `inventory.properties` names its `artifact`; a test module's also
-records the artifact it tests (`test`) and its capture (`nativeimage`), recorded the same
-cross-module way as `package`/`image`/`jmod` - but under `nativeimage/`, not `reports/`,
-because the metadata is build-internal (fed back into the image) rather than a report
-meant for an external tool. The package phase reads its sibling modules' inventories,
-and a `reachability` step collects the capture of the test module whose `test` names
-this module's `artifact` - so each native image gets exactly its own test's metadata,
-never another module's - into a config directory `native-image` points
-`-H:ConfigurationFileDirectories` at, discovering it by content exactly as it would a
-committed file. The main module never has to depend on the test module that `requires`
-it - the cycle that would otherwise force a hand-off never arises.
+A `graal.properties` file runs GraalVM's tracing agent during the test run, the
+same way `../demo-32-code-coverage` runs JaCoCo. The `demo.graal.image.test`
+module exercises exactly the reflective call `Sample` makes, so the agent records
+that access, and the image built afterwards is handed what the test recorded -
+each image its own test's metadata, in one build, with nothing committed in
+between.
 
 For review, the capture is readable in the test module's build output:
 
@@ -97,24 +81,20 @@ file under `sources/META-INF/native-image/` and it is copied verbatim into the j
 any other tool that honours `META-INF/native-image/` - discovers it. This demo needs
 no such file; the single build feeds the metadata straight through.
 
-How the native-image step fits the build
------------------------------------------
+How the image is selected
+-------------------------
 
 Native compilation is opt-in through a single boolean `packaging.properties` key,
-`native=true`. When it is set, `InferredMultiProjectAssembler` wires a
-`native-image` step in the package phase that runs for every module declaring a main
-class - exactly the `@jenesis.main` field that `../demo-07-java-modular-executable`
-uses for `jpackage`, read from the same `module.properties`. Modules without a main
-class (the test module) produce no image. The step reuses the launcher coordinates the
-build already derived - the produced module path and `--module <module>/<main-class>` -
-adds the test-captured config directory, and invokes:
+`native=true`. When it is set, an image is built for every module that declares a
+main class with `@jenesis.main` - the same field `jpackage` reads - so the test
+module produces none. The module path and the entry point come from the build
+itself, the test-captured configuration directory is added, and the command run
+is:
 
     native-image --no-fallback -H:ConfigurationFileDirectories=<captured> -o <name> --module-path <jars> --module <module>/<main-class>
 
-The produced binary is recorded in the package phase's `inventory.properties` under
-this module's `native` key, and the `STAGE` module's `native` step collects it into
-`stage/native/output/` - the native-image analogue of `stage/packages` (jpackage) and
-`stage/runtime` (jlink).
+`stage` collects the produced binary into `stage/native/output/`, beside
+`stage/packages` for a `jpackage` image and `stage/runtime` for a `jlink` runtime.
 
 Layout
 ------
