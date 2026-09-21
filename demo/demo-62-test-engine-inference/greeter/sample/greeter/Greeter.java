@@ -1,4 +1,4 @@
-package sample;
+package sample.greeter;
 
 public class Greeter {
 

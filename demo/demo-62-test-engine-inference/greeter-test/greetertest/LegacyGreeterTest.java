@@ -1,6 +1,7 @@
-package sample;
+package greetertest;
 
 import org.junit.Test;
+import sample.greeter.Greeter;
 
 import static org.junit.Assert.assertEquals;
 
