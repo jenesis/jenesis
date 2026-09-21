@@ -5,19 +5,13 @@ import build.jenesis.BuildStep;
 
 public record JUnitPlatform() implements TestEngine {
 
-    private static final String JUNIT4 = "junit";
-
-    private static final String JUPITER_API = "org.junit.jupiter.api";
-
-    private static final String JUPITER_ENGINE = "org.junit.jupiter.engine";
-
-    private static final String PLATFORM_COMMONS = "org.junit.platform.commons";
-
-    private static final String PLATFORM_CONSOLE = "org.junit.platform.console";
-
-    private static final String PLATFORM_ENGINE = "org.junit.platform.engine";
-
-    private static final String VINTAGE_ENGINE = "org.junit.vintage.engine";
+    private static final String JUNIT4 = "junit",
+            JUPITER_API = "org.junit.jupiter.api",
+            JUPITER_ENGINE = "org.junit.jupiter.engine",
+            PLATFORM_COMMONS = "org.junit.platform.commons",
+            PLATFORM_CONSOLE = "org.junit.platform.console",
+            PLATFORM_ENGINE = "org.junit.platform.engine",
+            VINTAGE_ENGINE = "org.junit.vintage.engine";
 
     @Override
     public String runnerModule() {
@@ -42,7 +36,8 @@ public record JUnitPlatform() implements TestEngine {
     @Override
     public SequencedMap<String, String> coordinates(ModuleDescriptor engine) {
         SequencedMap<String, String> coordinates = new LinkedHashMap<>();
-        console(coordinates, engine == null ? null : engine.rawVersion().orElse(null));
+        artifact(coordinates, PLATFORM_CONSOLE, "org.junit.platform/junit-platform-console",
+                engine == null ? null : engine.rawVersion().orElse(null));
         return coordinates;
     }
 
@@ -50,13 +45,16 @@ public record JUnitPlatform() implements TestEngine {
     public SequencedMap<String, String> missingCoordinates(List<ModuleDescriptor> modules) {
         SequencedMap<String, String> coordinates = new LinkedHashMap<>();
         if (!hasRunner(modules)) {
-            console(coordinates, version(modules, PLATFORM_ENGINE, PLATFORM_COMMONS));
+            artifact(coordinates, PLATFORM_CONSOLE, "org.junit.platform/junit-platform-console",
+                    version(modules, PLATFORM_ENGINE, PLATFORM_COMMONS));
         }
         if (contains(modules, JUPITER_API) && !contains(modules, JUPITER_ENGINE)) {
-            engine(coordinates, JUPITER_ENGINE, "org.junit.jupiter/junit-jupiter-engine", version(modules, JUPITER_API));
+            artifact(coordinates, JUPITER_ENGINE, "org.junit.jupiter/junit-jupiter-engine",
+                    version(modules, JUPITER_API));
         }
         if (contains(modules, JUPITER_API) && contains(modules, JUNIT4) && !contains(modules, VINTAGE_ENGINE)) {
-            engine(coordinates, VINTAGE_ENGINE, "org.junit.vintage/junit-vintage-engine", version(modules, JUPITER_API));
+            artifact(coordinates, VINTAGE_ENGINE, "org.junit.vintage/junit-vintage-engine",
+                    version(modules, JUPITER_API));
         }
         return coordinates;
     }
@@ -104,17 +102,12 @@ public record JUnitPlatform() implements TestEngine {
         return commands;
     }
 
-    private static void engine(SequencedMap<String, String> coordinates,
-                               String module,
-                               String artifact,
-                               String version) {
+    private static void artifact(SequencedMap<String, String> coordinates,
+                                 String module,
+                                 String maven,
+                                 String version) {
         coordinates.put("module/" + module, version);
-        coordinates.put("maven/" + artifact, version == null ? "RELEASE" : version);
-    }
-
-    private static void console(SequencedMap<String, String> coordinates, String version) {
-        coordinates.put("module/" + PLATFORM_CONSOLE, version);
-        coordinates.put("maven/org.junit.platform/junit-platform-console", version == null ? "RELEASE" : version);
+        coordinates.put("maven/" + maven, version == null ? "RELEASE" : version);
     }
 
     private static boolean contains(List<ModuleDescriptor> modules, String name) {

@@ -14,9 +14,7 @@ import build.jenesis.SequencedProperties;
 public class InferredTestObservationModule implements BuildExecutorModule {
 
     public static final String TEST = "test", MUTATE = "mutate";
-
     private static final String ENGINE = "engine";
-
     private static final Set<String> TEST_KEYS = Set.of(ENGINE);
 
     private final SequencedSet<Path> configuration;
