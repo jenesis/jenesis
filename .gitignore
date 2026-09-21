@@ -14,7 +14,7 @@ target/
 /sdk/*.zip
 
 ### IntelliJ IDEA ###
-.idea/*
+.idea/
 *.iws
 *.iml
 *.ipr

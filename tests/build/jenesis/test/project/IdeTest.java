@@ -1,11 +1,14 @@
 package build.jenesis.test.project;
 
 import module java.base;
+import module java.xml;
 import module org.junit.jupiter.api;
+import module org.junit.jupiter.params;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Json;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.Ide;
 import build.jenesis.step.Inventory;
@@ -31,18 +34,45 @@ public class IdeTest {
             properties.setProperty("module-greeter.path", "greeter");
             properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
         });
-        Path jar = Files.createDirectories(inventory.resolve("lib")).resolve("lib.jar");
-        Files.writeString(jar, "library");
+        Path jar = library(inventory, "lib.jar");
 
         run(Ide.IDEA, inventory);
 
-        String iml = Files.readString(root.resolve("greeter").resolve("greeter.iml"));
-        assertThat(iml).contains("<sourceFolder url=\"file://$MODULE_DIR$/sources\" isTestSource=\"false\"/>");
-        assertThat(iml).contains("jar://$PROJECT_DIR$/"
-                + slash(root.toAbsolutePath().normalize().relativize(jar.toAbsolutePath().normalize())) + "!/");
-        String modules = Files.readString(root.resolve(".idea").resolve("modules.xml"));
-        assertThat(modules).contains("$PROJECT_DIR$/greeter/greeter.iml");
-        assertThat(root.resolve(".idea").resolve("misc.xml")).exists();
+        Path iml = root.resolve("greeter").resolve("greeter.iml");
+        assertThat(sourceFolders(iml)).containsExactly(Map.entry("file://$MODULE_DIR$/sources", false));
+        assertThat(libraryUrls(iml)).containsExactly("jar://$MODULE_DIR$/" + relative("greeter", jar) + "!/");
+        assertThat(modulePaths()).containsExactly("$PROJECT_DIR$/greeter/greeter.iml");
+    }
+
+    @Test
+    public void idea_resolves_libraries_below_the_module_directory() throws IOException {
+        Files.createDirectories(root.resolve("nested").resolve("greeter").resolve("sources"));
+        Path inventory = inventory("module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "nested/greeter");
+            properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
+        });
+        library(inventory, "lib.jar");
+
+        run(Ide.IDEA, inventory);
+
+        Path iml = root.resolve("nested").resolve("greeter").resolve("nested.greeter.iml");
+        assertThat(Files.readString(iml))
+                .as("IntelliJ expands only $MODULE_DIR$ within a module file")
+                .doesNotContain("$PROJECT_DIR$");
+        assertThat(libraryUrls(iml)).allSatisfy(url -> assertThat(url).startsWith("jar://$MODULE_DIR$/../../"));
+    }
+
+    @Test
+    public void idea_compiles_below_the_target_folder() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("sources"));
+        Path inventory = inventory("module-greeter", properties ->
+                properties.setProperty("module-greeter.path", "greeter"));
+
+        run(Ide.IDEA, inventory);
+
+        assertThat(attributes(root.resolve(".idea").resolve("misc.xml"), "output", "url"))
+                .as("the IDE compiles into the folder the build already owns")
+                .containsExactly("file://$PROJECT_DIR$/target/.idea");
     }
 
     @Test
@@ -60,9 +90,9 @@ public class IdeTest {
 
         run(Ide.IDEA, greeter, app);
 
-        String iml = Files.readString(root.resolve("app").resolve("app.iml"));
-        assertThat(iml).contains("<orderEntry type=\"module\" module-name=\"greeter\"/>");
-        assertThat(iml).doesNotContain("greeter.jar");
+        Path iml = root.resolve("app").resolve("app.iml");
+        assertThat(moduleDependencies(iml)).containsExactly("greeter");
+        assertThat(libraryUrls(iml)).isEmpty();
     }
 
     @Test
@@ -82,10 +112,9 @@ public class IdeTest {
         run(Ide.IDEA, greeter, app);
 
         assertThat(root.resolve("greeter").resolve("org.example.greeter.iml")).exists();
-        String modules = Files.readString(root.resolve(".idea").resolve("modules.xml"));
-        assertThat(modules).contains("$PROJECT_DIR$/greeter/org.example.greeter.iml");
-        String iml = Files.readString(root.resolve("app").resolve("app.iml"));
-        assertThat(iml).contains("<orderEntry type=\"module\" module-name=\"org.example.greeter\"/>");
+        assertThat(modulePaths()).contains("$PROJECT_DIR$/greeter/org.example.greeter.iml");
+        assertThat(moduleDependencies(root.resolve("app").resolve("app.iml")))
+                .containsExactly("org.example.greeter");
     }
 
     @Test
@@ -111,14 +140,95 @@ public class IdeTest {
 
         run(Ide.IDEA, store, format, app);
 
-        String iml = Files.readString(root.resolve("app").resolve("app.iml"));
-        assertThat(iml).contains("<orderEntry type=\"module\" module-name=\"app.store\"/>");
-        assertThat(iml).contains("<orderEntry type=\"module\" module-name=\"app.format\"/>");
+        assertThat(moduleDependencies(root.resolve("app").resolve("app.iml")))
+                .containsExactly("app.store", "app.format");
         assertThat(root.resolve("store").resolve("spi").resolve("app.store.iml")).exists();
         assertThat(root.resolve("format").resolve("spi").resolve("app.format.iml")).exists();
-        String modules = Files.readString(root.resolve(".idea").resolve("modules.xml"));
-        assertThat(modules).contains("$PROJECT_DIR$/store/spi/app.store.iml");
-        assertThat(modules).contains("$PROJECT_DIR$/format/spi/app.format.iml");
+        assertThat(modulePaths()).contains(
+                "$PROJECT_DIR$/store/spi/app.store.iml",
+                "$PROJECT_DIR$/format/spi/app.format.iml");
+    }
+
+    @Test
+    public void idea_marks_a_test_module_as_test_sources() throws IOException {
+        Files.createDirectories(root.resolve("greeter-test").resolve("sources"));
+        Path inventory = inventory("module-greeter-test", properties -> {
+            properties.setProperty("module-greeter-test.path", "greeter-test");
+            properties.setProperty("module-greeter-test.test", "demo.greeter");
+        });
+
+        run(Ide.IDEA, inventory);
+
+        assertThat(sourceFolders(root.resolve("greeter-test").resolve("greeter-test.iml")))
+                .containsExactly(Map.entry("file://$MODULE_DIR$/sources", true));
+    }
+
+    @Test
+    public void idea_treats_an_abstract_test_module_as_production_sources() throws IOException {
+        Files.createDirectories(root.resolve("greeter-testing").resolve("sources"));
+        Path inventory = inventory("module-greeter-testing", abstractTestModule());
+
+        run(Ide.IDEA, inventory);
+
+        assertThat(sourceFolders(root.resolve("greeter-testing").resolve("greeter-testing.iml")))
+                .as("a fixture module is read by other modules, so it is not a test source root")
+                .containsExactly(Map.entry("file://$MODULE_DIR$/sources", false));
+    }
+
+    @Test
+    public void eclipse_treats_an_abstract_test_module_as_production_sources() throws IOException {
+        Files.createDirectories(root.resolve("greeter-testing").resolve("sources"));
+        Path inventory = inventory("module-greeter-testing", abstractTestModule());
+
+        run(Ide.ECLIPSE, inventory);
+
+        Path classpath = root.resolve("greeter-testing").resolve(".classpath");
+        assertThat(classpathEntries(classpath, "src")).containsExactly("sources");
+        assertThat(Files.readString(classpath)).doesNotContain("<attribute name=\"test\" value=\"true\"/>");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {Ide.IDEA, Ide.VSCODE, Ide.ECLIPSE})
+    public void omits_a_build_tool_group_from_the_libraries(String tool) throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("sources"));
+        Path inventory = inventory("module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
+            properties.setProperty("module-greeter.dependency.0.group", "main");
+            properties.setProperty("module-greeter.dependency.1",
+                    "maven/com.puppycrawl.tools/checkstyle/13.5.0 lib/checkstyle.jar");
+            properties.setProperty("module-greeter.dependency.1.group", "checkstyle");
+        });
+        library(inventory, "lib.jar");
+        library(inventory, "checkstyle.jar");
+
+        run(tool, inventory);
+
+        assertThat(libraries(tool))
+                .as("a build tool resolves in its own group and never reaches the module's classpath")
+                .hasSize(1)
+                .allSatisfy(library -> assertThat(library).contains("lib.jar"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {Ide.IDEA, Ide.VSCODE, Ide.ECLIPSE})
+    public void omits_a_pom_typed_dependency_from_the_libraries(String tool) throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("sources"));
+        Path inventory = inventory("module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
+            properties.setProperty("module-greeter.dependency.1",
+                    "maven/org.example/parent/pom/1.0 lib/parent.jar");
+        });
+        library(inventory, "lib.jar");
+        library(inventory, "parent.jar");
+
+        run(tool, inventory);
+
+        assertThat(libraries(tool))
+                .as("a POM carries no classes, so it is not a library")
+                .hasSize(1)
+                .allSatisfy(library -> assertThat(library).contains("lib.jar"));
     }
 
     @Test
@@ -129,17 +239,17 @@ public class IdeTest {
             properties.setProperty("module-greeter.path", "greeter");
             properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
         });
+        Path jar = library(inventory, "lib.jar");
 
         run(Ide.ECLIPSE, inventory);
 
-        String project = Files.readString(root.resolve("greeter").resolve(".project"));
-        assertThat(project).contains("<name>greeter</name>");
-        assertThat(project).contains("org.eclipse.jdt.core.javanature");
-        String classpath = Files.readString(root.resolve("greeter").resolve(".classpath"));
-        assertThat(classpath).contains("<classpathentry kind=\"src\" path=\"sources\"/>");
-        assertThat(classpath).contains("<attribute name=\"test\" value=\"true\"/>");
-        assertThat(classpath).contains("kind=\"lib\" path=\"" + slash(inventory.resolve("lib/lib.jar").toAbsolutePath().normalize()));
-        assertThat(classpath).contains("org.eclipse.jdt.launching.JRE_CONTAINER");
+        assertThat(Files.readString(root.resolve("greeter").resolve(".project")))
+                .contains("<name>greeter</name>", "org.eclipse.jdt.core.javanature");
+        Path classpath = root.resolve("greeter").resolve(".classpath");
+        assertThat(classpathEntries(classpath, "src")).containsExactly("sources", "test");
+        assertThat(classpathEntries(classpath, "lib")).containsExactly(slash(jar.toAbsolutePath().normalize()));
+        assertThat(classpathEntries(classpath, "con")).containsExactly("org.eclipse.jdt.launching.JRE_CONTAINER");
+        assertThat(Files.readString(classpath)).contains("<attribute name=\"test\" value=\"true\"/>");
     }
 
     @Test
@@ -149,14 +259,12 @@ public class IdeTest {
             properties.setProperty("module-greeter.path", "greeter");
             properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
         });
+        library(inventory, "lib.jar");
 
         run(Ide.VSCODE, inventory);
 
-        String settings = Files.readString(root.resolve(".vscode").resolve("settings.json"));
-        assertThat(settings).contains("\"java.project.sourcePaths\"");
-        assertThat(settings).contains("\"greeter/sources\"");
-        assertThat(settings).contains("\"java.project.referencedLibraries\"");
-        assertThat(settings).contains("greeter/lib/lib.jar");
+        assertThat(sourcePaths()).containsExactly("greeter/sources");
+        assertThat(referencedLibraries()).containsExactly("out/module-greeter/lib/lib.jar");
     }
 
     @Test
@@ -167,12 +275,118 @@ public class IdeTest {
 
         run(Ide.IDEA, inventory);
 
-        String iml = Files.readString(root.resolve("greeter").resolve("greeter.iml"));
-        assertThat(iml).contains("<sourceFolder url=\"file://$MODULE_DIR$\" isTestSource=\"false\"/>");
+        assertThat(sourceFolders(root.resolve("greeter").resolve("greeter.iml")))
+                .containsExactly(Map.entry("file://$MODULE_DIR$", false));
+    }
+
+    private static Consumer<SequencedProperties> abstractTestModule() {
+        return properties -> {
+            properties.setProperty("module-greeter-testing.path", "greeter-testing");
+            properties.setProperty("module-greeter-testing.test", "");
+            properties.setProperty("module-greeter-testing.abstract", "true");
+        };
+    }
+
+    private List<String> libraries(String tool) throws IOException {
+        return switch (tool) {
+            case Ide.IDEA -> libraryUrls(root.resolve("greeter").resolve("greeter.iml"));
+            case Ide.VSCODE -> referencedLibraries();
+            case Ide.ECLIPSE -> classpathEntries(root.resolve("greeter").resolve(".classpath"), "lib");
+            default -> throw new IllegalArgumentException(tool);
+        };
+    }
+
+    private List<String> modulePaths() throws IOException {
+        return attributes(root.resolve(".idea").resolve("modules.xml"), "module", "filepath");
+    }
+
+    private List<String> sourcePaths() throws IOException {
+        return settings("java.project.sourcePaths");
+    }
+
+    private List<String> referencedLibraries() throws IOException {
+        return settings("java.project.referencedLibraries");
+    }
+
+    private List<String> settings(String key) throws IOException {
+        List<String> values = new ArrayList<>();
+        if (Json.parse(Files.readString(root.resolve(".vscode").resolve("settings.json")))
+                instanceof Map<?, ?> settings && settings.get(key) instanceof List<?> entries) {
+            for (Object entry : entries) {
+                values.add(entry.toString());
+            }
+        }
+        return values;
+    }
+
+    private String relative(String module, Path target) {
+        return slash(root.resolve(module).toAbsolutePath().normalize()
+                .relativize(target.toAbsolutePath().normalize()));
+    }
+
+    private static List<String> libraryUrls(Path file) throws IOException {
+        return attributes(file, "root", "url");
+    }
+
+    private static SequencedMap<String, Boolean> sourceFolders(Path file) throws IOException {
+        SequencedMap<String, Boolean> folders = new LinkedHashMap<>();
+        for (Element element : elements(file, "sourceFolder")) {
+            folders.put(element.getAttribute("url"), Boolean.parseBoolean(element.getAttribute("isTestSource")));
+        }
+        return folders;
+    }
+
+    private static List<String> moduleDependencies(Path file) throws IOException {
+        List<String> names = new ArrayList<>();
+        for (Element element : elements(file, "orderEntry")) {
+            if (element.getAttribute("type").equals("module")) {
+                names.add(element.getAttribute("module-name"));
+            }
+        }
+        return names;
+    }
+
+    private static List<String> classpathEntries(Path file, String kind) throws IOException {
+        List<String> paths = new ArrayList<>();
+        for (Element element : elements(file, "classpathentry")) {
+            if (element.getAttribute("kind").equals(kind)) {
+                paths.add(element.getAttribute("path"));
+            }
+        }
+        return paths;
+    }
+
+    private static List<String> attributes(Path file, String tag, String attribute) throws IOException {
+        List<String> values = new ArrayList<>();
+        for (Element element : elements(file, tag)) {
+            values.add(element.getAttribute(attribute));
+        }
+        return values;
+    }
+
+    private static List<Element> elements(Path file, String tag) throws IOException {
+        Document document;
+        try {
+            document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file.toFile());
+        } catch (ParserConfigurationException | SAXException e) {
+            throw new IllegalStateException(file + " is not well-formed XML", e);
+        }
+        NodeList nodes = document.getElementsByTagName(tag);
+        List<Element> elements = new ArrayList<>();
+        for (int index = 0; index < nodes.getLength(); index++) {
+            elements.add((Element) nodes.item(index));
+        }
+        return elements;
     }
 
     private static String slash(Path path) {
         return path.toString().replace(File.separatorChar, '/');
+    }
+
+    private static Path library(Path inventory, String name) throws IOException {
+        Path jar = Files.createDirectories(inventory.resolve("lib")).resolve(name);
+        Files.writeString(jar, "library");
+        return jar;
     }
 
     private Path inventory(String prefix, Consumer<SequencedProperties> values) throws IOException {
