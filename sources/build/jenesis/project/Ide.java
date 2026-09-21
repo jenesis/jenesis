@@ -108,7 +108,8 @@ public class Ide implements BuildExecutorModule {
             Path content = path.isEmpty() ? base : base.resolve(path).normalize();
             String module = inventory.getProperty(prefix + ".module");
             String name = module == null || module.isEmpty() ? name(path, base) : module;
-            boolean test = inventory.getProperty(prefix + ".test") != null;
+            boolean fixture = inventory.getProperty(prefix + ".abstract") != null;
+            boolean test = !fixture && inventory.getProperty(prefix + ".test") != null;
             List<String> coordinates = new ArrayList<>();
             List<Path> jars = new ArrayList<>();
             for (int index = 0; ; index++) {
@@ -116,7 +117,11 @@ public class Ide implements BuildExecutorModule {
                 if (value == null) {
                     break;
                 }
+                String group = inventory.getProperty(prefix + ".dependency." + index + ".group");
                 String[] parts = value.split(" ");
+                if (group != null && !group.equals("main") || parts[0].contains("/pom/")) {
+                    continue;
+                }
                 coordinates.add(parts[0]);
                 jars.add(argument.folder().resolve(parts[1]).toAbsolutePath().normalize());
             }
@@ -218,7 +223,7 @@ public class Ide implements BuildExecutorModule {
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project version="4">
                   <component name="ProjectRootManager" version="2" languageLevel="JDK_%1$d" project-jdk-name="%1$d" project-jdk-type="JavaSDK">
-                    <output url="file://$PROJECT_DIR$/out"/>
+                    <output url="file://$PROJECT_DIR$/target/.idea"/>
                   </component>
                 </project>
                 """.formatted(feature));
@@ -253,7 +258,9 @@ public class Ide implements BuildExecutorModule {
             content.append("    <orderEntry type=\"module-library\">\n");
             content.append("      <library>\n");
             content.append("        <CLASSES>\n");
-            content.append("          <root url=\"jar://").append(escape(libraryUrl(base, library))).append("!/\"/>\n");
+            content.append("          <root url=\"jar://")
+                    .append(escape(libraryUrl(module.content(), base, library)))
+                    .append("!/\"/>\n");
             content.append("        </CLASSES>\n");
             content.append("        <JAVADOC/>\n");
             content.append("        <SOURCES/>\n");
@@ -270,9 +277,9 @@ public class Ide implements BuildExecutorModule {
         return relative.isEmpty() ? "" : "/" + relative;
     }
 
-    private static String libraryUrl(Path base, Path library) {
+    private static String libraryUrl(Path content, Path base, Path library) {
         return library.startsWith(base)
-                ? "$PROJECT_DIR$/" + base.relativize(library).toString().replace(File.separatorChar, '/')
+                ? "$MODULE_DIR$/" + content.relativize(library).toString().replace(File.separatorChar, '/')
                 : library.toString().replace(File.separatorChar, '/');
     }
 
