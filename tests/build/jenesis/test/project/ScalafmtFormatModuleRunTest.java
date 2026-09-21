@@ -52,7 +52,6 @@ public class ScalafmtFormatModuleRunTest {
             scalafmt-format/maven/org.scalameta/trees_2.13 4.9.9 SHA-256/d016cde916b19d6c814ac296544a1882b96664ac03e5ef27019a518482c3db49
             scalafmt-format/maven/org.typelevel/paiges-core_2.13 0.4.3 SHA-256/4daa8b180b466634b66be040e1097c107981c0ba0b7c605e2f7c0b66ae1b99b5
             """;
-
     private static final String VERSION = "3.8.3";
 
     @TempDir

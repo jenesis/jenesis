@@ -111,21 +111,10 @@ public record Project(
             return Collections.unmodifiableSequencedSet(ordered);
         }
 
-        static SequencedSet<Path> licenseFiles(Project project, String file) {
-            SequencedSet<Path> located = new LinkedHashSet<>();
-            for (Path folder : configurations((Path) null, project.configuration(), project.profiles())) {
-                Path candidate = folder.resolve(file);
-                if (Files.isRegularFile(candidate)) {
-                    located.add(candidate);
-                }
-            }
-            return Collections.unmodifiableSequencedSet(located);
-        }
-
         Layout MAVEN = (executor, project, assembler) -> {
             executor.addModule(HELP, new HelpModule("maven", assembler.getClass().getName()));
             executor.addModule(SKILL, new SkillModule(project.target()));
-            executor.addModule(METADATA, MetadataModule.toMetadataModule(project));
+            executor.addModule(METADATA, project.metadataModule());
             MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler, null, null, false);
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
@@ -145,7 +134,7 @@ public record Project(
                                 Collections.unmodifiableMap(repositories),
                                 Collections.unmodifiableMap(resolvers),
                                 project.pinning(),
-                                Layout.licenseFiles(project, Dependencies.SPDX),
+                                project.licenseFiles(Dependencies.SPDX),
                                 (descriptor, mergedRepos, mergedResolvers) -> pomAware.apply(
                                         new ProjectModuleDescriptor(descriptor,
                                                 configurations(descriptor.configurations(), project.configuration(), project.profiles()),
@@ -187,7 +176,7 @@ public record Project(
         Layout MODULAR = (executor, project, assembler) -> {
             executor.addModule(HELP, new HelpModule("modular", assembler.getClass().getName()));
             executor.addModule(SKILL, new SkillModule(project.target()));
-            executor.addModule(METADATA, MetadataModule.toMetadataModule(project));
+            executor.addModule(METADATA, project.metadataModule());
             MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(assembler, project.hashFunction());
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
@@ -209,7 +198,7 @@ public record Project(
                                 Collections.unmodifiableMap(resolvers),
                                 project.pinning(),
                                 true,
-                                Layout.licenseFiles(project, Dependencies.SPDX),
+                                project.licenseFiles(Dependencies.SPDX),
                                 project.boms(),
                 project.signatures(),
                                 (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
@@ -257,7 +246,7 @@ public record Project(
         Layout MODULAR_TO_MAVEN = (executor, project, assembler) -> {
             executor.addModule(HELP, new HelpModule("modular_to_maven", assembler.getClass().getName()));
             executor.addModule(SKILL, new SkillModule(project.target()));
-            executor.addModule(METADATA, MetadataModule.toMetadataModule(project));
+            executor.addModule(METADATA, project.metadataModule());
             MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler,
                     BuildExecutorModule.PREVIOUS.repeat(2) + MultiProjectModule.MANIFESTS,
                     "module",
@@ -288,7 +277,7 @@ public record Project(
                                 Collections.unmodifiableMap(resolvers),
                                 project.pinning(),
                                 true,
-                                Layout.licenseFiles(project, Dependencies.SPDX),
+                                project.licenseFiles(Dependencies.SPDX),
                                 project.boms(),
                 project.signatures(),
                                 (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
@@ -371,22 +360,33 @@ public record Project(
         }
     }
 
+    private SequencedSet<Path> licenseFiles(String file) {
+        SequencedSet<Path> located = new LinkedHashSet<>();
+        for (Path folder : Layout.configurations((Path) null, configuration, profiles)) {
+            Path candidate = folder.resolve(file);
+            if (Files.isRegularFile(candidate)) {
+                located.add(candidate);
+            }
+        }
+        return Collections.unmodifiableSequencedSet(located);
+    }
+
+    private BuildExecutorModule metadataModule() {
+        Path base = root.toAbsolutePath().normalize();
+        SequencedMap<String, Path> files = new LinkedHashMap<>();
+        for (Path file : metadata) {
+            Path absolute = (file.isAbsolute() ? file : root.resolve(file)).toAbsolutePath().normalize();
+            Path relative = base.relativize(absolute);
+            files.put(METADATA + "-" + BuildExecutorModule.encode(relative.toString()), relative);
+        }
+        return new MetadataModule(files, version, tag, revision, tree);
+    }
+
     private record MetadataModule(SequencedMap<String, Path> files,
                                   String version,
                                   String tag,
                                   String revision,
                                   String tree) implements BuildExecutorModule {
-
-        static BuildExecutorModule toMetadataModule(Project project) {
-            Path root = project.root().toAbsolutePath().normalize();
-            SequencedMap<String, Path> files = new LinkedHashMap<>();
-            for (Path file : project.metadata()) {
-                Path absolute = (file.isAbsolute() ? file : project.root().resolve(file)).toAbsolutePath().normalize();
-                Path relative = root.relativize(absolute);
-                files.put(METADATA + "-" + BuildExecutorModule.encode(relative.toString()), relative);
-            }
-            return new MetadataModule(files, project.version(), project.tag(), project.revision(), project.tree());
-        }
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
@@ -946,7 +946,7 @@ public record Project(
 
                     ## 13. Copy a demo: they are the recipe book
 
-                    54 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    61 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -956,10 +956,11 @@ public record Project(
                     https://github.com/jenesis/jenesis/tree/main/demo.
 
                       Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
-                                         04 java-modular-multi, 20 module-layout (forcing MODULAR)
-                      Starting a build   05 startup (what launching costs, and the daemon)
+                                         04 java-modular-multi, 19 module-layout (forcing MODULAR)
+                      Starting a build   05 startup (what launching costs, and the daemon),
+                                         59 toolchain (the JDK the build runs on)
                       Runnable output    06, 07 java-*-executable (jpackage), 08 bundle (jars for a
-                                         stock JRE), 09 java-multi-release, 59 native-image (GraalVM)
+                                         stock JRE), 09 java-multi-release, 60 native-image (GraalVM)
                       Compiler control   10 javac-arguments (process-javac.properties),
                                          11 annotations (an annotation processor via @jenesis.plugin),
                                          12 error-prone (a javac plugin)
@@ -967,25 +968,26 @@ public record Project(
                                          14 service-contracts (wsimport, OpenAPI),
                                          15 antlr (a grammar)
                       Dependencies       16 maven-exclusions, 17 bom, 18 module-alias,
-                                         19 module-classifier, 21 module-override,
-                                         22, 23 module-layers (a private dependency),
-                                         24, 25 platform-guard (per-platform variants)
-                      Trusting them      26 pinning (versions and checksums), 27 openpgp (a declared
-                                         key), 28 sigstore (a declared identity, no key at all),
-                                         29 sbom, 30 compliance (licenses), 31 vulnerabilities (OSV)
-                      Quality gates      32 java-quality, 37 api-compatibility (japicmp),
-                                         39 kotlin-quality, 42 scala-quality, 44 groovy-quality
-                      Tests              33 code-coverage (JaCoCo), 34 test-selection (incremental),
-                                         35 pitest (mutation), 36 jmh (benchmark harness)
-                      Other languages    38 kotlin, 40 kotlin-plugin, 41 scala, 43 groovy
-                      Operating it       45 profiles, 46 build-cache, 47 docker-isolation,
-                                         48 agents (@jenesis.attach)
-                      Shipping it        56 code-signing (jarsigner), 57 publishing (Maven Central),
+                                         20 module-override, 21, 22 module-layers (a private
+                                         dependency), 23, 24 platform-guard (classified and
+                                         per-platform variants)
+                      Trusting them      25 pinning (versions and checksums), 26 openpgp (a declared
+                                         key), 27 sigstore (a declared identity, no key at all),
+                                         28 sbom, 29 compliance (licenses), 30 vulnerabilities (OSV)
+                      Quality gates      31 java-quality, 36 api-compatibility (japicmp),
+                                         38 kotlin-quality, 41 scala-quality, 43 groovy-quality
+                      Tests              32 code-coverage (JaCoCo), 33 test-selection (incremental),
+                                         34 pitest (mutation), 35 jmh (benchmark harness)
+                      Other languages    37 kotlin, 39 kotlin-plugin, 40 scala, 42 groovy
+                      Operating it       44 profiles, 45 build-cache, 46 docker-isolation,
+                                         47 agents (@jenesis.attach)
+                      Shipping it        55 code-signing (jarsigner), 56 publishing (Maven Central),
+                                         57 module-convention (resolving what you published),
                                          58 reproducible (a jar checked against a recorded digest),
-                                         60 jpx (run a released program without building)
-                      Extending it       49 custom-assembler, 50 custom-jmod, 51 internal-module,
-                                         52 external-module, 53 custom-maven, 54 custom-modular,
-                                         55 custom-build (no Project at all)
+                                         61 jpx (run a released program without building)
+                      Extending it       48 custom-assembler, 49 custom-jmod, 50 internal-module,
+                                         51 external-module, 52 custom-maven, 53 custom-modular,
+                                         54 custom-build (no Project at all)
 
                     ## 14. When stuck, read the source
 

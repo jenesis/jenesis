@@ -37,9 +37,7 @@ public class JApiCmpModuleRunTest {
             japicmp/maven/org.jspecify/jspecify 1.0.0 SHA-256/1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab
             japicmp/maven/org.jvnet.staxex/stax-ex 1.8.1 SHA-256/20522549056e9e50aa35ef0b445a2e47a53d06be0b0a9467d704e2483ffb049a
             """;
-
     private static final String BASELINE = "org.apiguardian/apiguardian-api/1.1.2";
-
     private static final String COMPATIBLE = """
             package org.apiguardian.api;
             public @interface API {

@@ -22,7 +22,9 @@ public record Execution(Project project, String mainClass, String module) {
     }
 
     public int execute(String... arguments) throws IOException, InterruptedException {
-        return execute(project.build(selector()), arguments);
+        return execute(project.build(module == null
+                ? Project.BUILD
+                : "+" + module.replace('/', '+')), arguments);
     }
 
     public int execute(SequencedMap<String, Path> outputs, String... arguments)
@@ -33,10 +35,6 @@ public record Execution(Project project, String mainClass, String module) {
         } finally {
             Files.deleteIfExists(argumentFile);
         }
-    }
-
-    private String selector() {
-        return module != null ? "+" + module.replace('/', '+') : Project.BUILD;
     }
 
     private int doExecute(SequencedMap<String, Path> outputs,

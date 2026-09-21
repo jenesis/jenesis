@@ -108,16 +108,12 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        toolchain(signing()).accept(buildExecutor, inherited);
+        toolchain(signer == null ? null : signer.apply(new JarSigner())).accept(buildExecutor, inherited);
     }
 
     @Override
     public Optional<String> resolve(String path) {
         return toolchain(null).resolve(path);
-    }
-
-    private BuildStep signing() {
-        return signer == null ? null : signer.apply(new JarSigner());
     }
 
     private JavaToolchainModule toolchain(BuildStep signing) {

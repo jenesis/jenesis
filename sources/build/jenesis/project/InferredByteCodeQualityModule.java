@@ -23,7 +23,7 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                                          Map<String, Repository> repositories,
                                          Map<String, Resolver> resolvers) {
         this(configuration, repositories, resolvers, null,
-                enabledBy("jenesis.validator.spotbugs"));
+                SequencedProperties.systemFlag("jenesis.validator.spotbugs", true) ? module -> module : null);
     }
 
     private InferredByteCodeQualityModule(SequencedSet<Path> configuration,
@@ -36,10 +36,6 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
         this.resolvers = resolvers;
         this.pinning = pinning;
         this.spotbugs = spotbugs;
-    }
-
-    private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
-        return SequencedProperties.systemFlag(property, true) ? module -> module : null;
     }
 
     public InferredByteCodeQualityModule pinning(Pinning pinning) {

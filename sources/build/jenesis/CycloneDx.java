@@ -20,9 +20,8 @@ public class CycloneDx {
         }
     }
 
-    private static final String SPEC_VERSION = "1.6";
-    private static final String NAMESPACE = "http://cyclonedx.org/schema/bom/" + SPEC_VERSION;
-
+    private static final String SPEC_VERSION = "1.6",
+            NAMESPACE = "http://cyclonedx.org/schema/bom/" + SPEC_VERSION;
     private static final Set<String> DEFAULT_IDENTIFIERS = Set.of(
             "Apache-2.0", "MIT", "MIT-0",
             "BSD-2-Clause", "BSD-3-Clause", "ISC", "BSL-1.0", "Zlib", "PSF-2.0",

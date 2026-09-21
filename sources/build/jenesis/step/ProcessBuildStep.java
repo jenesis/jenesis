@@ -11,9 +11,7 @@ import build.jenesis.SequencedProperties;
 public abstract class ProcessBuildStep implements BuildStep {
 
     public static final String PROCESS = "process/";
-
     protected static final Charset NATIVE_ENCODING = nativeEncoding();
-
     private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
 
     static {
@@ -74,7 +72,8 @@ public abstract class ProcessBuildStep implements BuildStep {
     public static BiConsumer<Boolean, String> printing(String command) {
         return SequencedProperties.systemFlag("jenesis.print." + command,
                 SequencedProperties.systemFlag("jenesis.print.process"))
-                ? (error, line) -> System.out.println(paint(error ? 131 : 244, command + " >>>> " + line))
+                ? (error, line) -> System.out.println("\033[38;5;" + (error ? 131 : 244) + "m"
+                        + command + " >>>> " + line + BuildExecutorCallback.RESET)
                 : null;
     }
 
@@ -103,10 +102,6 @@ public abstract class ProcessBuildStep implements BuildStep {
         return new ProcessHandler.Tee(executor,
                 line -> printing.accept(false, line),
                 line -> printing.accept(true, line));
-    }
-
-    private static String paint(int code, String text) {
-        return "\033[38;5;" + code + "m" + text + BuildExecutorCallback.RESET;
     }
 
     protected abstract CompletionStage<List<String>> process(Executor executor,

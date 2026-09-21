@@ -17,14 +17,10 @@ import build.jenesis.step.ProcessHandler;
 
 public class AntlrModule implements BuildExecutorModule {
 
-    public static final String FOLDER = "antlr/";
-    public static final String GRAMMAR = ".g4";
-
+    public static final String FOLDER = "antlr/", GRAMMAR = ".g4";
     public static final String GENERATE = "generate";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-
-    private static final String MAVEN_GROUP = "org.antlr";
-    private static final String MAVEN_ARTIFACT = "antlr4";
+    private static final String MAVEN_GROUP = "org.antlr", MAVEN_ARTIFACT = "antlr4";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

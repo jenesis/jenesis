@@ -128,9 +128,7 @@ public class PmdModuleRunTest {
             pmd/maven/org.xmlresolver/xmlresolver 5.2.2 SHA-256/efc92bd7ed32b3e57095e0b3e872051ccfbbdcc980831ef33e89e38161a85222
             pmd/maven/org.xmlresolver/xmlresolver/jar/data 5.2.2 SHA-256/173904bdbd783ba0fac92c5bcc05da5d09f0ce7eed24346666ea0a239461f9b4
             """;
-
     private static final String VERSION = "7.7.0";
-
     private static final String CONFIG = """
             <?xml version="1.0"?>
             <ruleset name="test"

@@ -30,10 +30,7 @@ public class ProtocModuleRunTest {
             protoc-grpc-java/maven/io.grpc/protoc-gen-grpc-java/exe/osx-aarch_64 1.83.1 SHA-256/372e13b25cb058ea6e3ab6cb54ba1458d5d2bbe1cfdcd37bc57e82b872656e21
             protoc-grpc-java/maven/io.grpc/protoc-gen-grpc-java/exe/windows-x86_64 1.83.1 SHA-256/f4654b0b8e1faedf897f4abcd754c5250cb48afe07d595e56efc9fb478736c73
             """;
-
-
     private static final String GRPC_VERSION = "1.83.1";
-
     private static final String DEFINITION = """
             syntax = "proto3";
             package test;

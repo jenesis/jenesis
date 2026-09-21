@@ -10,7 +10,6 @@ import build.jenesis.Repository;
 public class DownloadModuleUris implements BuildStep {
 
     public static final String URIS = "uris.properties";
-
     public static final URI DEFAULT = URI.create("https://raw.githubusercontent.com/" +
             "sormuras/modules/refs/heads/main/com.github.sormuras.modules/" +
             "com/github/sormuras/modules/modules.properties");

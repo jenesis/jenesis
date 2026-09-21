@@ -64,7 +64,6 @@ public class KtlintModuleRunTest {
             ktlint/maven/org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
             ktlint/maven/org.slf4j/slf4j-api 2.0.7 SHA-256/5d6298b93a1905c32cda6478808ac14c2d4a47e91535e53c41f7feeb85d946f4
             """;
-
     private static final String VERSION = "1.5.0";
 
     @TempDir

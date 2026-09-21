@@ -39,7 +39,6 @@ import static java.util.Objects.requireNonNull;
 public class MavenProject implements BuildExecutorModule {
 
     public static final String POM = "pom/", MAVEN = "maven/";
-
     private static final String SCAN = "scan";
     private static final String SIBLING_MODULE_PREFIX = MultiProjectModule.MODULE + "-";
 

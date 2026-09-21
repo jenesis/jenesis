@@ -27,7 +27,6 @@ public class InternalModule implements BuildExecutorModule {
     public static final String SOURCE = "source",
             JAVA = "java",
             DELEGATE = "delegate";
-
     private static final String DEPENDENCIES = "dependencies", REQUIRES = "requires";
     private static final String MAIN_ARTIFACTS = JAVA + "/" + JavaToolchainModule.ARTIFACTS;
 

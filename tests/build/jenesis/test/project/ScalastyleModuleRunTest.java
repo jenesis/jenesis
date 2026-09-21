@@ -27,9 +27,7 @@ public class ScalastyleModuleRunTest {
             scalastyle/maven/org.scala-lang/scala-library 2.13.6 SHA-256/f19ed732e150d3537794fd3fe42ee18470a3f707efd499ecd05a99e727ff6c8a
             scalastyle/maven/org.scalariform/scalariform_2.13 0.2.10 SHA-256/76b6266960750e560b5a3cbbaa58074e909d0da50adf138b6e83555781bb2596
             """;
-
     private static final String VERSION = "1.5.1";
-
     private static final String CONFIG = """
             <scalastyle>
                 <name>test</name>

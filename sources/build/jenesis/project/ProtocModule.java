@@ -17,14 +17,10 @@ import build.jenesis.step.ProcessHandler;
 
 public class ProtocModule implements BuildExecutorModule {
 
-    public static final String FOLDER = "protoc/";
-    public static final String DEFINITION = ".proto";
-
+    public static final String FOLDER = "protoc/", DEFINITION = ".proto";
     public static final String GENERATE = "generate";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-
-    private static final String MAVEN_GROUP = "com.google.protobuf";
-    private static final String MAVEN_ARTIFACT = "protoc";
+    private static final String MAVEN_GROUP = "com.google.protobuf", MAVEN_ARTIFACT = "protoc";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

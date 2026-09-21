@@ -17,13 +17,10 @@ import build.jenesis.step.ProcessHandler;
 
 public class AvroModule implements BuildExecutorModule {
 
-    public static final String FOLDER = "avro/";
-    public static final String SCHEMA = ".avsc", PROTOCOL = ".avpr";
+    public static final String FOLDER = "avro/", SCHEMA = ".avsc", PROTOCOL = ".avpr";
     public static final String GENERATE_SCHEMA = "generate-schema", GENERATE_PROTOCOL = "generate-protocol";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-
-    private static final String MAVEN_GROUP = "org.apache.avro";
-    private static final String MAVEN_ARTIFACT = "avro-tools";
+    private static final String MAVEN_GROUP = "org.apache.avro", MAVEN_ARTIFACT = "avro-tools";
     private static final String SHADED = "*/*";
 
     private final Map<String, Repository> repositories;

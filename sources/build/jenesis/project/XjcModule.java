@@ -17,14 +17,10 @@ import build.jenesis.step.ProcessHandler;
 
 public class XjcModule implements BuildExecutorModule {
 
-    public static final String FOLDER = "xjc/";
-    public static final String SCHEMA = ".xsd", BINDING = ".xjb", CATALOG = "catalog";
-
+    public static final String FOLDER = "xjc/", SCHEMA = ".xsd", BINDING = ".xjb", CATALOG = "catalog";
     public static final String GENERATE = "generate";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-
-    private static final String MAVEN_GROUP = "org.glassfish.jaxb";
-    private static final String MAVEN_ARTIFACT = "jaxb-xjc";
+    private static final String MAVEN_GROUP = "org.glassfish.jaxb", MAVEN_ARTIFACT = "jaxb-xjc";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

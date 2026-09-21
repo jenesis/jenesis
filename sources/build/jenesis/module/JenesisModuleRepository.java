@@ -11,7 +11,6 @@ import build.jenesis.maven.MavenModuleRepository;
 public class JenesisModuleRepository implements JenesisRepository {
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
-
     private static final String MODULE = "module", MAVEN = "maven";
 
     private final URI root;

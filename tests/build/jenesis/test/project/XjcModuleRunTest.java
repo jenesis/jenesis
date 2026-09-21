@@ -33,8 +33,6 @@ public class XjcModuleRunTest {
             xjc/maven/org.glassfish.jaxb/txw2 4.0.9 SHA-256/d6343e5945d87266ca4e8974a0a2a876e1bd147a00fb65ed3f2e1a3a00f3a82a
             xjc/maven/org.glassfish.jaxb/xsom 4.0.9 SHA-256/be584192033acb7424e0edb283e18f83ae681a46c9e3218fb4377f4df870ed07
             """;
-
-
     private static final String SCHEMA = """
             <?xml version="1.0" encoding="UTF-8"?>
             <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"

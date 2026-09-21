@@ -51,10 +51,12 @@ public class Bom implements BuildStep {
             }
             SequencedProperties dependencies = SequencedProperties.ofFiles(dependenciesFile);
             for (String key : dependencies.stringPropertyNames()) {
-                String rest = mainCoordinate(key);
-                if (rest == null) {
+                int first = key.indexOf('/');
+                int second = first < 1 ? -1 : key.indexOf('/', first + 1);
+                if (second < 0 || !key.substring(0, first).equals("main")) {
                     continue;
                 }
+                String rest = key.substring(second + 1);
                 int firstSlash = rest.indexOf('/');
                 int lastSlash = rest.lastIndexOf('/');
                 if (lastSlash <= 0 || lastSlash == firstSlash) {
@@ -97,11 +99,5 @@ public class Bom implements BuildStep {
                     .resolve("pin-" + module + ".properties"));
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
-    }
-
-    private static String mainCoordinate(String key) {
-        int first = key.indexOf('/');
-        int second = first < 1 ? -1 : key.indexOf('/', first + 1);
-        return second < 0 || !key.substring(0, first).equals("main") ? null : key.substring(second + 1);
     }
 }

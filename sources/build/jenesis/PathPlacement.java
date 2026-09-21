@@ -31,12 +31,8 @@ public enum PathPlacement {
         }
     };
 
-    public static final String ALIASES = "Jenesis-Aliases";
-
-    public static final String OVERRIDES = "Jenesis-Overrides";
-
-    public static final String LAYERS = "Jenesis-Layer";
-
+    public static final String ALIASES = "Jenesis-Aliases", OVERRIDES = "Jenesis-Overrides",
+            LAYERS = "Jenesis-Layer";
     private static final Pattern DERIVED_VERSION = Pattern.compile("\\d+(\\..*)?");
 
     private final boolean modular;

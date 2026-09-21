@@ -52,8 +52,6 @@ public class WsImportModuleRunTest {
             wsimport/maven/org.ow2.asm/asm-tree 9.9.1 SHA-256/0f3555096b720b820bbacab0b515589bee0200bee099bda14c561738ae837ba1
             wsimport/maven/org.ow2.asm/asm-util 9.9.1 SHA-256/c5ebbbeaf68126af094b42fa4800f59bc4413abd02d95b9aefad722cd257e207
             """;
-
-
     private static final String DESCRIPTION = """
             <?xml version="1.0" encoding="UTF-8"?>
             <definitions name="Greeter"

@@ -7,8 +7,8 @@ import build.jenesis.BuildStepContext;
 
 public class JMod extends ProcessBuildStep {
 
-    public static final String JMODS = "jmods/";
-    public static final String CONFIG = "jmodconfig/", LIBRARIES = "jmodlibs/", COMMANDS = "jmodcmds/";
+    public static final String JMODS = "jmods/", CONFIG = "jmodconfig/", LIBRARIES = "jmodlibs/",
+            COMMANDS = "jmodcmds/";
 
     private final OffsetDateTime timestamp;
 

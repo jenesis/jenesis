@@ -23,7 +23,6 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
     public static final String DOCUMENTED = "documented";
     private static final String REQUIRED = "required", ARTIFACTS = "artifacts",
             DEPENDENCIES = "dependencies";
-
     private static final String MAVEN_GROUP = "org.jetbrains.dokka";
     private static final List<String> CLI_ARTIFACTS = List.of(
             "dokka-cli", "dokka-base", "analysis-kotlin-descriptors");

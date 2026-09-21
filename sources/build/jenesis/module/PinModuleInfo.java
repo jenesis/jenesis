@@ -173,14 +173,6 @@ public class PinModuleInfo implements BuildStep {
         return suppliedVersion.equals(pinVersion) && (pinChecksum == null || pinChecksum.equals(suppliedChecksum));
     }
 
-    private static String computeChecksum(Inventory.Dependency dependency,
-                                          HashDigestFunction hashFunction) throws IOException {
-        if (dependency.jar() != null && Files.isRegularFile(dependency.jar())) {
-            return hashFunction.encodedHash(dependency.jar());
-        }
-        return dependency.checksum().isEmpty() ? null : dependency.checksum();
-    }
-
     private record Tag(String name, String token, String rest, int line) {
     }
 
@@ -319,7 +311,7 @@ public class PinModuleInfo implements BuildStep {
                     && mavenCoordinate.indexOf('/') == mavenCoordinate.lastIndexOf('/');
             String checksum = hashFunction == null
                     ? null
-                    : computeChecksum(dependency.getValue(), hashFunction);
+                    : dependency.getValue().checksum(hashFunction);
             String value = checksum == null ? version : version + " " + checksum;
             String entry;
             if (coordinate.startsWith("module/")) {

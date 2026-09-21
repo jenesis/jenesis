@@ -12,9 +12,8 @@ import build.jenesis.SequencedProperties;
 public class Launcher implements BuildStep {
 
     public static final String LAUNCHER = "launcher/";
-
-    private static final String MAIN_CLASS = "build.jenesis.launcher.Launcher";
-    private static final String LAUNCHER_PREFIX = "build/jenesis/launcher/";
+    private static final String MAIN_CLASS = "build.jenesis.launcher.Launcher",
+            LAUNCHER_PREFIX = "build/jenesis/launcher/";
 
     private final String tool;
     private final String group;

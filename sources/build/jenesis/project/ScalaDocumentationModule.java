@@ -23,11 +23,9 @@ public class ScalaDocumentationModule implements BuildExecutorModule {
     public static final String DOCUMENTED = "documented";
     private static final String REQUIRED = "required", ARTIFACTS = "artifacts",
             DEPENDENCIES = "dependencies";
-
     private static final List<String> PREFERRED_PREFIXES = List.of("maven", "module");
-    private static final String MODULE_NAME = "org.scala.lang.scaladoc";
-    private static final String MAVEN_GROUP = "org.scala-lang";
-    private static final String MAVEN_ARTIFACT = "scaladoc_3";
+    private static final String MODULE_NAME = "org.scala.lang.scaladoc", MAVEN_GROUP = "org.scala-lang",
+            MAVEN_ARTIFACT = "scaladoc_3";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

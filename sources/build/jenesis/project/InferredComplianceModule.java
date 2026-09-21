@@ -13,7 +13,6 @@ import build.jenesis.step.VulnerabilityCheck;
 public class InferredComplianceModule implements BuildExecutorModule {
 
     private static final String LICENSE = "license", VULNERABILITY = "vulnerability";
-
     private static final Set<String> LICENSING_KEYS = Set.of("allowed", "denied", "unknown");
     private static final Set<String> VULNERABILITY_KEYS = Set.of("severity", "warn", "osv.endpoint");
 
@@ -63,7 +62,11 @@ public class InferredComplianceModule implements BuildExecutorModule {
                         return null;
                     }
                     return (nested, nestedInherited) -> {
-                        nested.addStep("osv", osvDownload(properties), nestedInherited.sequencedKeySet().stream());
+                        String endpoint = properties.value("osv.endpoint");
+                        nested.addStep("osv", endpoint == null
+                                        ? new OsvDownload()
+                                        : new OsvDownload().endpoint(URI.create(endpoint)),
+                                nestedInherited.sequencedKeySet().stream());
                         nested.addStep("check", vulnerabilityCheck(properties),
                                 Stream.concat(nestedInherited.sequencedKeySet().stream(), Stream.of("osv")));
                     };
@@ -84,11 +87,6 @@ public class InferredComplianceModule implements BuildExecutorModule {
                 .denied(licenses(properties.entries("denied")))
                 .unknown(unknown(properties.value("unknown")))
                 .overrides(overrides);
-    }
-
-    private static OsvDownload osvDownload(SequencedProperties properties) {
-        String endpoint = properties.value("osv.endpoint");
-        return endpoint == null ? new OsvDownload() : new OsvDownload().endpoint(URI.create(endpoint));
     }
 
     private static VulnerabilityCheck vulnerabilityCheck(SequencedProperties properties) {

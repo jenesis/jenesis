@@ -19,9 +19,7 @@ public record Jpx(Path storage,
                   PathPlacement placement) {
 
     public static final String PROPERTIES = "jpx.properties";
-
     private static final int MINIMUM_CHECKSUM_LENGTH = 32;
-
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
 
     public Jpx(PathPlacement placement) {

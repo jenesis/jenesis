@@ -95,7 +95,7 @@ public class OsvDownload implements BuildStep {
 
     public static List<List<String>> identifiers(String response) {
         List<List<String>> result = new ArrayList<>();
-        Object results = navigate(response, "results");
+        Object results = parse(response) instanceof Map<?, ?> map ? map.get("results") : null;
         if (!(results instanceof List<?> list)) {
             return result;
         }
@@ -196,7 +196,8 @@ public class OsvDownload implements BuildStep {
             return 0.0;
         }
         double exploitability = 8.22 * av * ac * pr * ui;
-        return roundUp(Math.min((changed ? 1.08 : 1.0) * (impact + exploitability), 10));
+        long scaled = Math.round(Math.min((changed ? 1.08 : 1.0) * (impact + exploitability), 10) * 100_000);
+        return scaled % 10_000 == 0 ? scaled / 100_000.0 : (Math.floorDiv(scaled, 10_000) + 1) / 10.0;
     }
 
     private static double impact3(String value) {
@@ -234,11 +235,6 @@ public class OsvDownload implements BuildStep {
         };
     }
 
-    private static double roundUp(double input) {
-        long scaled = Math.round(input * 100_000);
-        return scaled % 10_000 == 0 ? scaled / 100_000.0 : (Math.floorDiv(scaled, 10_000) + 1) / 10.0;
-    }
-
     private static Map<String, String> metrics(String vector) {
         Map<String, String> metric = new HashMap<>();
         for (String part : vector.split("/")) {
@@ -256,10 +252,6 @@ public class OsvDownload implements BuildStep {
         } catch (RuntimeException _) {
             return null;
         }
-    }
-
-    private static Object navigate(String response, String field) {
-        return parse(response) instanceof Map<?, ?> map ? map.get(field) : null;
     }
 
     private static String mavenCoordinate(String key) {

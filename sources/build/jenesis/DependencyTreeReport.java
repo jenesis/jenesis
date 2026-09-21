@@ -80,16 +80,24 @@ public final class DependencyTreeReport {
                     .toList();
             Set<String> labels = new LinkedHashSet<>();
             for (License entry : declared) {
-                labels.add(licenseLabel(entry));
+                labels.add(entry.label());
             }
             implied.addAll(labels);
             if (labels.size() > 1) {
                 multiple++;
             }
             License primary = declared.stream()
-                    .max(Comparator.comparingInt(entry -> permissiveness(entry.category())))
+                    .max(Comparator.comparingInt(entry -> switch (entry.category()) {
+                        case null -> 0;
+                        case "public-domain" -> 6;
+                        case "permissive" -> 5;
+                        case "weak-copyleft" -> 4;
+                        case "strong-copyleft" -> 3;
+                        case "network-copyleft" -> 2;
+                        default -> 1;
+                    }))
                     .orElse(null);
-            String label = primary == null ? "unknown" : licenseLabel(primary);
+            String label = primary == null ? "unknown" : primary.label();
             String category = primary == null ? null : primary.category();
             licenses.merge(label, 1, Integer::sum);
             categories.putIfAbsent(label, category);
@@ -143,25 +151,6 @@ public final class DependencyTreeReport {
                 .sorted(Comparator.comparingInt(Map.Entry<String, Integer>::getValue).reversed()
                         .thenComparing(Map.Entry::getKey))
                 .toList();
-    }
-
-    private static String licenseLabel(License license) {
-        return license.id() != null ? license.id()
-                : license.name() != null ? license.name() : license.url();
-    }
-
-    private static int permissiveness(String category) {
-        if (category == null) {
-            return 0;
-        }
-        return switch (category) {
-            case "public-domain" -> 6;
-            case "permissive" -> 5;
-            case "weak-copyleft" -> 4;
-            case "strong-copyleft" -> 3;
-            case "network-copyleft" -> 2;
-            default -> 1;
-        };
     }
 
     private static int categoryColor(String category) {

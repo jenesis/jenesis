@@ -36,7 +36,6 @@ public class PalantirJavaFormatModuleRunTest {
             palantir-java-format/maven/org.functionaljava/functionaljava 5.0 SHA-256/377ad140e7d26ba04fadf219b09d7e1c74bc0232fa4010b20c1c79db11f9670e
             palantir-java-format/maven/org.jspecify/jspecify 1.0.0 SHA-256/1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab
             """;
-
     private static final String VERSION = "2.91.0";
 
     @TempDir

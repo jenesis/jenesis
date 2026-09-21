@@ -23,11 +23,9 @@ public class ScalaCompilerModule implements BuildExecutorModule {
     public static final String ARTIFACTS = "artifacts", CLASSES = "classes";
     private static final String REQUIRED = "required", COMPILED = "compiled",
             DEPENDENCIES = "dependencies";
-
     private static final List<String> PREFERRED_PREFIXES = List.of("maven", "module");
-    private static final String MODULE_NAME = "org.scala.lang.scala3.compiler";
-    private static final String MAVEN_GROUP = "org.scala-lang";
-    private static final String MAVEN_ARTIFACT = "scala3-compiler_3";
+    private static final String MODULE_NAME = "org.scala.lang.scala3.compiler", MAVEN_GROUP = "org.scala-lang",
+            MAVEN_ARTIFACT = "scala3-compiler_3";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

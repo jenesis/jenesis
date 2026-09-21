@@ -7,7 +7,6 @@ import build.jenesis.SafeSegment;
 public class JenesisRawGitRepository implements JenesisRepository {
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
-
     private static final String GITHUB_DATA =
             "https://raw.githubusercontent.com/jenesis/jenesis-modules/main/data/modules/";
 

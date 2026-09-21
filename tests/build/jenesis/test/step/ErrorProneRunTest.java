@@ -20,7 +20,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 public class ErrorProneRunTest {
 
     private static final String PLUGIN = "javac/plugin/maven/com.google.errorprone/error_prone_core/2.50.0";
-
     private static final String REFERENCE_EQUALITY = """
             package sample;
             public class Comparison {

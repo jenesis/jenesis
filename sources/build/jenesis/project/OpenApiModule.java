@@ -17,15 +17,11 @@ import build.jenesis.step.ProcessHandler;
 
 public class OpenApiModule implements BuildExecutorModule {
 
-    public static final String FOLDER = "openapi/";
-    public static final String SPECIFICATION = "openapi";
+    public static final String FOLDER = "openapi/", SPECIFICATION = "openapi";
     public static final Set<String> DOCUMENTS = Set.of(".yaml", ".yml", ".json");
-
     public static final String COLLECT = "collect";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies", GENERATE = "generate";
-
-    private static final String MAVEN_GROUP = "org.openapitools";
-    private static final String MAVEN_ARTIFACT = "openapi-generator-cli";
+    private static final String MAVEN_GROUP = "org.openapitools", MAVEN_ARTIFACT = "openapi-generator-cli";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

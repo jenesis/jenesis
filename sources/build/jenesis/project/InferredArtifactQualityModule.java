@@ -13,7 +13,6 @@ import build.jenesis.step.Bind;
 public class InferredArtifactQualityModule implements BuildExecutorModule {
 
     public static final String JAPICMP = "japicmp";
-
     private static final Set<String> JAPICMP_KEYS = Set.of("baseline",
             "access",
             "include",
@@ -38,7 +37,7 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
                                           Map<String, Repository> repositories,
                                           Map<String, Resolver> resolvers) {
         this(configuration, repositories, resolvers, null,
-                enabledBy("jenesis.artifact.japicmp"));
+                SequencedProperties.systemFlag("jenesis.artifact.japicmp", true) ? module -> module : null);
     }
 
     private InferredArtifactQualityModule(SequencedSet<Path> configuration,
@@ -51,10 +50,6 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
         this.resolvers = resolvers;
         this.pinning = pinning;
         this.japicmp = japicmp;
-    }
-
-    private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
-        return SequencedProperties.systemFlag(property, true) ? module -> module : null;
     }
 
     public InferredArtifactQualityModule pinning(Pinning pinning) {

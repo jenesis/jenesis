@@ -12,9 +12,7 @@ import build.jenesis.SequencedProperties;
 public class Layers implements BuildStep {
 
     public static final String MEMBERSHIP = "layered.properties";
-
     private static final String MODULE_PATH = "modulepath.", CLASS_PATH = "classpath.";
-
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
 
     private final String group;
@@ -93,7 +91,7 @@ public class Layers implements BuildStep {
         Deque<String> pending = new ArrayDeque<>(List.of(api, "build.jenesis.launcher"));
         while (!pending.isEmpty()) {
             String module = pending.removeFirst();
-            if (platform(module) || !shared.add(module)) {
+            if (module.startsWith("java.") || module.startsWith("jdk.") || !shared.add(module)) {
                 continue;
             }
             ModuleDescriptor descriptor = host.get(module);
@@ -247,10 +245,6 @@ public class Layers implements BuildStep {
             }
         }
         return null;
-    }
-
-    private static boolean platform(String module) {
-        return module.startsWith("java.") || module.startsWith("jdk.");
     }
 
     public record Declaration(String module, String api) {

@@ -23,8 +23,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class SignaturesTest {
 
-    private static final String PRIMARY = "B4D5C1E7000000000000000000000000000000AA";
-    private static final String SUBKEY = "00000000000000000000000000000000000000BB";
+    private static final String PRIMARY = "B4D5C1E7000000000000000000000000000000AA",
+            SUBKEY = "00000000000000000000000000000000000000BB";
 
     @TempDir
     private Path root;

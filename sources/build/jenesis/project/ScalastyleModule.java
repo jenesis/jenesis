@@ -20,9 +20,7 @@ public class ScalastyleModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-
-    private static final String MAVEN_GROUP = "com.beautiful-scala";
-    private static final String MAVEN_ARTIFACT = "scalastyle_2.13";
+    private static final String MAVEN_GROUP = "com.beautiful-scala", MAVEN_ARTIFACT = "scalastyle_2.13";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
