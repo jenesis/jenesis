@@ -31,6 +31,18 @@ construct seems to need a comment, restructure it or name it better. The one pla
 `module-info.java`, because the `@jenesis.*` tags there (`@jenesis.main`, `@jenesis.test`, `@jenesis.pin`,
 …) are configuration the tool reads, not commentary.
 
+**One caller, no method.** A private method with one caller is inlined at it. It survives only where
+inlining would hurt: a self-contained algorithm that has a name, a body with early returns that the caller
+would have to be restructured around, one holding an anonymous class, or a pattern switch over a sealed type.
+A static whose first argument is one of our own types belongs on that type as an instance method instead -
+without inventing a type to make the call virtual.
+
+**Static fields are one block.** No blank line separates them, and constants that belong together share one
+declaration, wrapped onto continuation lines where they are long
+(`private static final String MAVEN_GROUP = "org.antlr", MAVEN_ARTIFACT = "antlr4";`). A separate declaration
+is what marks a separate concept, so a `Set` or `Pattern` initializer keeps its own line, where a declarator
+comma would read as one of its own.
+
 **Zero dependencies.** The tool ships as source, vendored into every project that uses it, and runs with a
 JDK and nothing else - that is the promise, and it is not negotiable. `build.jenesis` `requires` only
 `jdk.compiler` and `java.xml`; there is no third-party library anywhere in `sources/`, and none is added for
@@ -152,6 +164,11 @@ every public type is API: renaming a method, a property or a selector is a break
 deliberately, with the demos, the `help`/`skill` text and the user documentation updated in the same pass.
 The documentation repository's `AGENTS.md` describes how a change is verified and where each setting is
 documented; a property that exists only in the code and not on jenesis.build is not finished.
+
+A demo's README is a user guide: what to declare, what to run and what comes out, never how the engine
+arrives there. The demos are read in order, so a page refers to the others by name and only backwards, and
+the launchers under `build/` carry no comments either. A demo that teaches what another one already shows is
+folded into it.
 
 ## Releasing and downstream
 
