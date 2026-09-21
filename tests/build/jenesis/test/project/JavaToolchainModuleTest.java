@@ -137,7 +137,7 @@ public class JavaToolchainModuleTest {
     }
 
     @Test
-    public void test_with_require_engine_throws_when_no_engine_resolves() throws IOException {
+    public void test_with_require_framework_throws_when_no_framework_resolves() throws IOException {
         Path sources = Files.createDirectories(input.resolve(BuildStep.SOURCES + "other"));
         try (BufferedWriter writer = Files.newBufferedWriter(sources.resolve("Sample.java"))) {
             writer.append("package other;");
@@ -147,15 +147,15 @@ public class JavaToolchainModuleTest {
         }
         buildExecutor.addSource("input", input);
         buildExecutor.addModule("output", new JavaToolchainModule(), "input");
-        buildExecutor.addModule("output-test", new TestModule(Map.of(), Map.of()).requireEngine(true), "output", "input");
+        buildExecutor.addModule("output-test", new TestModule(Map.of(), Map.of()).requireFramework(true), "output", "input");
         assertThatThrownBy(() -> buildExecutor.execute())
                 .hasRootCauseInstanceOf(IllegalStateException.class)
                 .rootCause()
-                .hasMessageContaining("No test engine could be resolved from inherited dependencies");
+                .hasMessageContaining("No test framework could be resolved from inherited dependencies");
     }
 
     @Test
-    public void test_without_require_engine_silently_skips_when_no_engine_resolves() throws IOException {
+    public void test_without_require_framework_silently_skips_when_no_framework_resolves() throws IOException {
         Path sources = Files.createDirectories(input.resolve(BuildStep.SOURCES + "other"));
         try (BufferedWriter writer = Files.newBufferedWriter(sources.resolve("Sample.java"))) {
             writer.append("package other;");
@@ -165,7 +165,7 @@ public class JavaToolchainModuleTest {
         }
         buildExecutor.addSource("input", input);
         buildExecutor.addModule("output", new JavaToolchainModule(), "input");
-        buildExecutor.addModule("output-test", new TestModule(Map.of(), Map.of()).requireEngine(false), "output", "input");
+        buildExecutor.addModule("output-test", new TestModule(Map.of(), Map.of()).requireFramework(false), "output", "input");
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps).containsKeys("output/classes", "output/artifacts");
         assertThat(steps).doesNotContainKey("output-test/executed");

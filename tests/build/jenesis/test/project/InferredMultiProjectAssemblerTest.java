@@ -255,14 +255,15 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
-    public void tests_flag_enabled_for_test_variant_without_engine_in_dependencies_fails_resolution() throws IOException {
+    public void tests_flag_enabled_for_test_variant_without_framework_in_dependencies_fails_resolution()
+            throws IOException {
         Fixture fixture = setUp("path=\ntest=main_artifact\n", true, false, false);
         Files.writeString(
                 Files.createDirectory(fixture.sources.resolve(BuildStep.SOURCES)).resolve("Sample.java"),
                 "public class Sample {}");
         assertThatThrownBy(() -> fixture.execute("sub/observed/test/resolved"))
                 .rootCause()
-                .hasMessageContaining("No test engine could be resolved");
+                .hasMessageContaining("No test framework could be resolved");
     }
 
     @Test

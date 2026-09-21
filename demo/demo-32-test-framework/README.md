@@ -1,5 +1,5 @@
-Test engine demo
-================
+Test framework demo
+===================
 
 The tests of this module are JUnit 5 Jupiter, and nothing in the module requires
 an engine to run them with - the shape of a module part-way through a migration
@@ -18,9 +18,9 @@ From this directory:
 Layout
 ------
 
-    demo/demo-32-test-engine
+    demo/demo-32-test-framework
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
-    |-- build.jenesis/explicit/test.properties   engine=junit-platform, under a profile
+    |-- build.jenesis/explicit/test.properties   framework=junit-platform, under a profile
     |-- greeter/
     |   |-- module-info.java     module demo.greeter; ships pinned
     |   `-- sample/greeter/Greeter.java
@@ -98,7 +98,7 @@ The framework itself is declared rather than required, because it decides which
 engine is asked for at all. A `test.properties` in the module's `build.jenesis/`
 location names it, next to `jacoco.properties` and the rest:
 
-    engine=junit-platform
+    framework=junit-platform
 
 The values are `junit-platform`, `junit4` and `testng`; absent, the table above
 decides. It cannot name the vintage engine, which is not a framework of its own

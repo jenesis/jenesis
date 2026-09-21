@@ -80,7 +80,7 @@ Quick index
 | 29 | [`compliance`](demo-29-compliance/README.md)                      | Fail the build on a dependency license the policy denies                     | `java build/Demo.java`            |
 | 30 | [`vulnerabilities`](demo-30-vulnerabilities/README.md)            | Fail the build on a known vulnerability, queried from OSV                    | `java build/Demo.java`            |
 | 31 | [`java-quality`](demo-31-java-quality/README.md)                  | Checkstyle, PMD, SpotBugs and a formatter, each on by its config file        | `java build/jenesis/Make.java`    |
-| 32 | [`test-engine`](demo-32-test-engine/README.md)                    | Run tests whose module names no engine, inferred or declared                 | `java build/jenesis/Make.java`    |
+| 32 | [`test-framework`](demo-32-test-framework/README.md)              | Run tests whose module names no engine, inferred or declared                 | `java build/jenesis/Make.java`    |
 | 33 | [`code-coverage`](demo-33-code-coverage/README.md)                | Record coverage with JaCoCo and render a report                              | `java build/jenesis/Make.java`    |
 | 34 | [`test-selection`](demo-34-test-selection/README.md)              | Re-run only the tests a change can reach                                     | `java build/Demo.java`            |
 | 35 | [`pitest`](demo-35-pitest/README.md)                              | Mutation testing with PIT                                                    | `java build/jenesis/Make.java`    |
@@ -557,7 +557,7 @@ formatted, and one switch flips it to rewriting in place:
 
     java -Djenesis.format.rewrite=true build/jenesis/Make.java
 
-## 24. The engine that runs the tests - [`test-engine`](demo-32-test-engine/README.md)
+## 24. The framework that runs the tests - [`test-framework`](demo-32-test-framework/README.md)
 
 Which framework a module's tests are written against follows from what it
 resolves - the Jupiter API marks the JUnit Platform, `junit` marks JUnit 4,
@@ -573,7 +573,7 @@ uses.
 Where a project would rather say it outright, a `test.properties` in the
 module's configuration location names the framework:
 
-    engine=junit-platform      # or junit4, or testng
+    framework=junit-platform      # or junit4, or testng
 
 The demo ships that file under a profile, so both paths stay runnable:
 
