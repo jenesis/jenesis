@@ -27,6 +27,7 @@ target/
 .settings
 .springBeans
 .sts4-cache
+.eclipse/
 
 ### VS Code ###
 .vscode/

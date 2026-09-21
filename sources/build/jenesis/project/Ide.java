@@ -107,7 +107,8 @@ public class Ide implements BuildExecutorModule {
             }
             Path content = path.isEmpty() ? base : base.resolve(path).normalize();
             String module = inventory.getProperty(prefix + ".module");
-            String name = module == null || module.isEmpty() ? name(path, base) : module;
+            boolean modular = module != null && !module.isEmpty();
+            String name = modular ? module : name(path, base);
             boolean fixture = inventory.getProperty(prefix + ".abstract") != null;
             boolean test = !fixture && inventory.getProperty(prefix + ".test") != null;
             List<String> coordinates = new ArrayList<>();
@@ -133,7 +134,7 @@ public class Ide implements BuildExecutorModule {
                     }
                 }
             }
-            raws.add(new Raw(name, content, test, coordinates, jars));
+            raws.add(new Raw(name, content, modular, test, coordinates, jars));
         }
         List<Module> modules = new ArrayList<>();
         for (Raw raw : raws) {
@@ -152,6 +153,7 @@ public class Ide implements BuildExecutorModule {
             sources(raw.content(), raw.test(), mainSources, testSources);
             modules.add(new Module(raw.name(),
                     raw.content(),
+                    raw.modular(),
                     mainSources,
                     testSources,
                     new ArrayList<>(libraries),
@@ -307,43 +309,58 @@ public class Ide implements BuildExecutorModule {
     }
 
     private static String classpath(Module module) {
+        List<String> onModulePath = module.modular() ? List.of("module") : List.of();
         StringBuilder content = new StringBuilder();
         content.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         content.append("<classpath>\n");
         for (Path source : module.mainSources()) {
-            content.append("  <classpathentry kind=\"src\" path=\"")
-                    .append(escape(module.content().relativize(source).toString().replace(File.separatorChar, '/')))
-                    .append("\"/>\n");
+            entry(content, "kind=\"src\"" + sourcePath(module, source), List.of());
         }
         for (Path source : module.testSources()) {
-            content.append("  <classpathentry kind=\"src\" output=\"bin/test\" path=\"")
-                    .append(escape(module.content().relativize(source).toString().replace(File.separatorChar, '/')))
-                    .append("\">\n");
-            content.append("    <attributes>\n");
-            content.append("      <attribute name=\"test\" value=\"true\"/>\n");
-            content.append("    </attributes>\n");
-            content.append("  </classpathentry>\n");
+            entry(content,
+                    "kind=\"src\" output=\".eclipse/test-classes\"" + sourcePath(module, source),
+                    List.of("test"));
         }
-        content.append("  <classpathentry kind=\"con\" path=\"org.eclipse.jdt.launching.JRE_CONTAINER\"/>\n");
+        entry(content, "kind=\"con\" path=\"org.eclipse.jdt.launching.JRE_CONTAINER\"", onModulePath);
         for (String dependency : module.moduleDependencies()) {
-            content.append("  <classpathentry combineaccessrules=\"false\" kind=\"src\" path=\"/")
-                    .append(escape(dependency))
-                    .append("\"/>\n");
+            entry(content, "combineaccessrules=\"false\" kind=\"src\" path=\"/" + escape(dependency) + "\"",
+                    List.of());
         }
         for (Path library : module.libraries()) {
-            content.append("  <classpathentry kind=\"lib\" path=\"")
-                    .append(escape(library.toString().replace(File.separatorChar, '/')))
-                    .append("\"/>\n");
+            entry(content,
+                    "kind=\"lib\" path=\"" + escape(library.toString().replace(File.separatorChar, '/')) + "\"",
+                    onModulePath);
         }
-        content.append("  <classpathentry kind=\"output\" path=\"bin\"/>\n");
+        content.append("  <classpathentry kind=\"output\" path=\".eclipse/classes\"/>\n");
         content.append("</classpath>\n");
         return content.toString();
+    }
+
+    private static String sourcePath(Module module, Path source) {
+        String relative = escape(module.content()
+                .relativize(source)
+                .toString()
+                .replace(File.separatorChar, '/'));
+        return (relative.isEmpty() ? " excluding=\".eclipse/\"" : "") + " path=\"" + relative + "\"";
+    }
+
+    private static void entry(StringBuilder content, String head, List<String> flags) {
+        content.append("  <classpathentry ").append(head);
+        if (flags.isEmpty()) {
+            content.append("/>\n");
+            return;
+        }
+        content.append(">\n").append("    <attributes>\n");
+        for (String flag : flags) {
+            content.append("      <attribute name=\"").append(flag).append("\" value=\"true\"/>\n");
+        }
+        content.append("    </attributes>\n").append("  </classpathentry>\n");
     }
 
     private static void vscode(List<Module> modules, Path base) throws IOException {
         Path folder = Files.createDirectories(base.resolve(".vscode"));
         SequencedSet<String> sourcePaths = new LinkedHashSet<>();
-        SequencedSet<String> libraries = new LinkedHashSet<>();
+        SequencedMap<String, String> libraries = new LinkedHashMap<>();
         for (Module module : modules) {
             for (Path source : module.mainSources()) {
                 sourcePaths.add(workspace(base, source));
@@ -352,7 +369,7 @@ public class Ide implements BuildExecutorModule {
                 sourcePaths.add(workspace(base, source));
             }
             for (Path library : module.libraries()) {
-                libraries.add(workspace(base, library));
+                libraries.putIfAbsent(library.getFileName().toString(), workspace(base, library));
             }
         }
         StringBuilder content = new StringBuilder();
@@ -360,8 +377,9 @@ public class Ide implements BuildExecutorModule {
         content.append("  \"java.project.sourcePaths\": [\n");
         content.append(array(sourcePaths));
         content.append("  ],\n");
+        content.append("  \"java.project.outputPath\": \"target/.vscode\",\n");
         content.append("  \"java.project.referencedLibraries\": [\n");
-        content.append(array(libraries));
+        content.append(array(libraries.values()));
         content.append("  ]\n");
         content.append("}\n");
         Files.writeString(folder.resolve("settings.json"), content.toString());
@@ -393,12 +411,18 @@ public class Ide implements BuildExecutorModule {
 
     private record Module(String name,
                           Path content,
+                          boolean modular,
                           List<Path> mainSources,
                           List<Path> testSources,
                           List<Path> libraries,
                           List<String> moduleDependencies) {
     }
 
-    private record Raw(String name, Path content, boolean test, List<String> coordinates, List<Path> jars) {
+    private record Raw(String name,
+                       Path content,
+                       boolean modular,
+                       boolean test,
+                       List<String> coordinates,
+                       List<Path> jars) {
     }
 }

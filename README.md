@@ -152,11 +152,18 @@ module plus `.idea/modules.xml` and `.idea/misc.xml`; Eclipse gets a `.project` 
 VS Code gets `.vscode/settings.json`. All of them are generated output, and the repository `.gitignore`
 already excludes them.
 
-Three conventions keep the result importable without hand-editing. A module file addresses its libraries
+A few conventions keep the result importable without hand-editing. A module file addresses its libraries
 below `$MODULE_DIR$`, the only macro IntelliJ expands inside an `.iml`, while the project files under
-`.idea/` use `$PROJECT_DIR$`. The IDE compiles into `target/.idea`, inside the tree the build already owns,
-so an import adds no new folder to ignore. A module that the build resolves locally is linked as a module
-dependency rather than as its jar, so navigation crosses module boundaries.
+`.idea/` use `$PROJECT_DIR$`. Each editor compiles into a folder nothing checks in: `target/.idea` and
+`target/.vscode`, inside the tree the build already owns, and `.eclipse/` beside each Eclipse project,
+because Eclipse requires an output folder inside the project it belongs to and every module is its own
+project there. Where a module directory is itself the source folder, that output folder is excluded from
+it, which Eclipse otherwise refuses as a nested output. A module that the build resolves locally is linked
+as a module dependency rather than as its jar, so navigation crosses module boundaries.
+
+Eclipse has to be told what it reads as a module rather than from the classpath, so for a module that
+declares a `module-info.java` its libraries and the JRE container carry `module="true"`; IntelliJ IDEA and
+VS Code infer that themselves.
 
 What reaches a module's classpath is what the module itself declares. A build tool resolves in its own
 dependency group - `checkstyle`, `pmd`, `spotbugs`, a formatter - and those groups are left out, as are
