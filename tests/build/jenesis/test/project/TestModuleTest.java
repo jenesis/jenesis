@@ -908,12 +908,7 @@ public class TestModuleTest {
         }
 
         @Override
-        public boolean isRunner(ModuleDescriptor module) {
-            return false;
-        }
-
-        @Override
-        public SequencedMap<String, String> coordinates(ModuleDescriptor engine) {
+        public SequencedMap<String, String> missingCoordinates(List<ModuleDescriptor> modules) {
             SequencedMap<String, String> coordinates = new LinkedHashMap<>();
             coordinates.put("maven/com.example/runner-core", "1.0");
             coordinates.put("maven/com.example/runner-cli", "1.0");

@@ -29,22 +29,9 @@ public record JUnitPlatform() implements TestEngine {
     }
 
     @Override
-    public boolean isRunner(ModuleDescriptor module) {
-        return module.name().equals(PLATFORM_CONSOLE);
-    }
-
-    @Override
-    public SequencedMap<String, String> coordinates(ModuleDescriptor engine) {
-        SequencedMap<String, String> coordinates = new LinkedHashMap<>();
-        artifact(coordinates, PLATFORM_CONSOLE, "org.junit.platform/junit-platform-console",
-                engine == null ? null : engine.rawVersion().orElse(null));
-        return coordinates;
-    }
-
-    @Override
     public SequencedMap<String, String> missingCoordinates(List<ModuleDescriptor> modules) {
         SequencedMap<String, String> coordinates = new LinkedHashMap<>();
-        if (!hasRunner(modules)) {
+        if (!contains(modules, PLATFORM_CONSOLE)) {
             artifact(coordinates, PLATFORM_CONSOLE, "org.junit.platform/junit-platform-console",
                     version(modules, PLATFORM_ENGINE, PLATFORM_COMMONS));
         }
@@ -111,22 +98,14 @@ public record JUnitPlatform() implements TestEngine {
     }
 
     private static boolean contains(List<ModuleDescriptor> modules, String name) {
-        for (ModuleDescriptor module : modules) {
-            if (module.name().equals(name)) {
-                return true;
-            }
-        }
-        return false;
+        return modules.stream().anyMatch(module -> module.name().equals(name));
     }
 
     private static String version(List<ModuleDescriptor> modules, String... names) {
-        for (String name : names) {
-            for (ModuleDescriptor module : modules) {
-                if (module.name().equals(name) && module.rawVersion().isPresent()) {
-                    return module.rawVersion().get();
-                }
-            }
-        }
-        return null;
+        return Stream.of(names)
+                .flatMap(name -> modules.stream().filter(module -> module.name().equals(name)))
+                .flatMap(module -> module.rawVersion().stream())
+                .findFirst()
+                .orElse(null);
     }
 }

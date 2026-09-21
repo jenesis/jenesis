@@ -79,30 +79,29 @@ public class TestEngineTest {
     }
 
     @Test
-    public void detects_runner_from_console_module() throws IOException {
+    public void resolves_nothing_where_the_console_jar_is_on_the_path() throws IOException {
         writeJar(root.resolve("artifacts"), "console.jar", "org.junit.platform.console");
-        assertThat(new JUnitPlatform().hasRunner(TestEngine.scan(List.of(root)))).isTrue();
+        assertThat(new JUnitPlatform().missingCoordinates(TestEngine.scan(List.of(root)))).isEmpty();
     }
 
     @Test
-    public void detects_no_runner_for_engine_only() throws IOException {
+    public void resolves_the_console_where_only_the_engine_jar_is_on_the_path() throws IOException {
         writeJar(root.resolve("artifacts"), "engine.jar", "org.junit.platform.engine");
-        assertThat(new JUnitPlatform().hasRunner(TestEngine.scan(List.of(root)))).isFalse();
+        assertThat(new JUnitPlatform().missingCoordinates(TestEngine.scan(List.of(root))))
+                .containsOnlyKeys("module/org.junit.platform.console",
+                        "maven/org.junit.platform/junit-platform-console");
     }
 
     @Test
     public void derives_console_default_version_from_engine_module() {
-        ModuleDescriptor engine = ModuleDescriptor.newModule("org.junit.platform.engine")
-                .version("1.11.3")
-                .build();
-        assertThat(new JUnitPlatform().coordinates(engine))
+        assertThat(new JUnitPlatform().missingCoordinates(List.of(automatic("org.junit.platform.engine", "1.11.3"))))
                 .containsEntry("maven/org.junit.platform/junit-platform-console", "1.11.3")
                 .containsEntry("module/org.junit.platform.console", "1.11.3");
     }
 
     @Test
     public void console_floats_without_a_derived_engine_version() {
-        SequencedMap<String, String> coordinates = new JUnitPlatform().coordinates(null);
+        SequencedMap<String, String> coordinates = new JUnitPlatform().missingCoordinates(List.of());
         assertThat(coordinates).containsEntry("maven/org.junit.platform/junit-platform-console", "RELEASE");
         assertThat(coordinates).containsKey("module/org.junit.platform.console");
         assertThat(coordinates.get("module/org.junit.platform.console")).isNull();

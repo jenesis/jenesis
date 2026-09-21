@@ -43,8 +43,6 @@ public class TestEngineAdapterTest {
         JUnitPlatform engine = new JUnitPlatform();
         assertThat(engine.isEngine(ModuleDescriptor.newAutomaticModule("org.junit.platform.engine").build())).isTrue();
         assertThat(engine.isEngine(ModuleDescriptor.newAutomaticModule("org.junit.platform.console").build())).isFalse();
-        assertThat(engine.isRunner(ModuleDescriptor.newAutomaticModule("org.junit.platform.console").build())).isTrue();
-        assertThat(engine.isRunner(ModuleDescriptor.newAutomaticModule("org.junit.platform.engine").build())).isFalse();
     }
 
     @Test
@@ -55,18 +53,16 @@ public class TestEngineAdapterTest {
     }
 
     @Test
-    public void junit4_treats_engine_module_as_its_own_runner() {
+    public void junit4_recognizes_the_junit_module_as_its_engine() {
         JUnit4 engine = new JUnit4();
-        ModuleDescriptor junit = ModuleDescriptor.newAutomaticModule("junit").build();
-        assertThat(engine.isEngine(junit)).isTrue();
-        assertThat(engine.isRunner(junit)).isTrue();
+        assertThat(engine.isEngine(ModuleDescriptor.newAutomaticModule("junit").build())).isTrue();
         assertThat(engine.isEngine(ModuleDescriptor.newAutomaticModule("org.testng").build())).isFalse();
     }
 
     @Test
     public void junit4_declares_no_runner_coordinates_or_system_properties() {
         JUnit4 engine = new JUnit4();
-        assertThat(engine.coordinates(ModuleDescriptor.newAutomaticModule("junit").build())).isEmpty();
+        assertThat(engine.missingCoordinates(List.of(ModuleDescriptor.newAutomaticModule("junit").build()))).isEmpty();
         assertThat(engine.properties()).isEmpty();
     }
 
@@ -90,18 +86,17 @@ public class TestEngineAdapterTest {
     }
 
     @Test
-    public void testng_treats_module_as_its_own_engine_and_runner() {
+    public void testng_recognizes_the_testng_module_as_its_engine() {
         TestNG engine = new TestNG();
-        ModuleDescriptor testng = ModuleDescriptor.newAutomaticModule("org.testng").build();
-        assertThat(engine.isEngine(testng)).isTrue();
-        assertThat(engine.isRunner(testng)).isTrue();
+        assertThat(engine.isEngine(ModuleDescriptor.newAutomaticModule("org.testng").build())).isTrue();
         assertThat(engine.isEngine(ModuleDescriptor.newAutomaticModule("junit").build())).isFalse();
     }
 
     @Test
     public void testng_declares_no_runner_coordinates_or_system_properties() {
         TestNG engine = new TestNG();
-        assertThat(engine.coordinates(ModuleDescriptor.newAutomaticModule("org.testng").build())).isEmpty();
+        assertThat(engine.missingCoordinates(List.of(
+                ModuleDescriptor.newAutomaticModule("org.testng").build()))).isEmpty();
         assertThat(engine.properties()).isEmpty();
     }
 
