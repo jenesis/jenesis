@@ -205,6 +205,34 @@ public class InventoryTest {
     }
 
     @Test
+    public void records_the_release_the_module_compiles_against() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        SequencedProperties javac = new SequencedProperties();
+        javac.setProperty("--release", "21");
+        javac.store(Files.createDirectories(manifests.resolve("process")).resolve("javac.properties"));
+
+        run(args("manifests", manifests));
+
+        assertThat(read(next.resolve(Inventory.INVENTORY)).getProperty("module-foo.release")).isEqualTo("21");
+    }
+
+    @Test
+    public void omits_release_when_no_compilation_declared_one() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.store(manifests.resolve(BuildStep.MODULE));
+
+        run(args("manifests", manifests));
+
+        assertThat(read(next.resolve(Inventory.INVENTORY)).stringPropertyNames())
+                .doesNotContain("module-foo.release");
+    }
+
+    @Test
     public void uses_bare_module_prefix_for_root_module() throws IOException {
         Path manifests = Files.createDirectory(root.resolve("manifests"));
         SequencedProperties module = new SequencedProperties();

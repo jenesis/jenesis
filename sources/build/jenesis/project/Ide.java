@@ -1,6 +1,7 @@
 package build.jenesis.project;
 
 import module java.base;
+import module java.xml;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
@@ -109,6 +110,8 @@ public class Ide implements BuildExecutorModule {
             String module = inventory.getProperty(prefix + ".module");
             boolean modular = module != null && !module.isEmpty();
             String name = modular ? module : name(path, base);
+            String declared = inventory.getProperty(prefix + ".release");
+            Integer release = declared == null || declared.isEmpty() ? null : Integer.valueOf(declared);
             boolean fixture = inventory.getProperty(prefix + ".abstract") != null;
             boolean test = !fixture && inventory.getProperty(prefix + ".test") != null;
             List<String> coordinates = new ArrayList<>();
@@ -134,7 +137,7 @@ public class Ide implements BuildExecutorModule {
                     }
                 }
             }
-            raws.add(new Raw(name, content, modular, test, coordinates, jars));
+            raws.add(new Raw(name, content, modular, test, release, coordinates, jars));
         }
         List<Module> modules = new ArrayList<>();
         for (Raw raw : raws) {
@@ -154,6 +157,7 @@ public class Ide implements BuildExecutorModule {
             modules.add(new Module(raw.name(),
                     raw.content(),
                     raw.modular(),
+                    raw.release(),
                     mainSources,
                     testSources,
                     new ArrayList<>(libraries),
@@ -202,10 +206,15 @@ public class Ide implements BuildExecutorModule {
 
     private static void idea(List<Module> modules, Path base) throws IOException {
         Path folder = Files.createDirectories(base.resolve(".idea"));
+        int feature = modules.stream()
+                .map(Module::release)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElseGet(() -> Runtime.version().feature());
         List<String> entries = new ArrayList<>();
         for (Module module : modules) {
             Path file = module.content().resolve(module.name() + ".iml");
-            Files.writeString(file, module(module, base));
+            Files.writeString(file, module(module, base, feature));
             String relative = base.relativize(file).toString().replace(File.separatorChar, '/');
             entries.add("      <module fileurl=\"file://$PROJECT_DIR$/" + relative
                     + "\" filepath=\"$PROJECT_DIR$/" + relative + "\"/>");
@@ -220,22 +229,56 @@ public class Ide implements BuildExecutorModule {
                   </component>
                 </project>
                 """.formatted(String.join("\n", entries)));
-        int feature = Runtime.version().feature();
-        Files.writeString(folder.resolve("misc.xml"), """
+        Path misc = folder.resolve("misc.xml");
+        String jdk = projectJdk(misc);
+        Files.writeString(misc, """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project version="4">
-                  <component name="ProjectRootManager" version="2" languageLevel="JDK_%1$d" project-jdk-name="%1$d" project-jdk-type="JavaSDK">
+                  <component name="ProjectRootManager" version="2" languageLevel="%s" project-jdk-name="%s" project-jdk-type="JavaSDK">
                     <output url="file://$PROJECT_DIR$/target/.idea"/>
                   </component>
                 </project>
-                """.formatted(feature));
+                """.formatted(languageLevel(feature), escape(jdk == null ? version(feature) : jdk)));
     }
 
-    private static String module(Module module, Path base) {
+    private static String projectJdk(Path file) throws IOException {
+        if (!Files.isRegularFile(file)) {
+            return null;
+        }
+        try {
+            NodeList nodes = DocumentBuilderFactory.newInstance()
+                    .newDocumentBuilder()
+                    .parse(file.toFile())
+                    .getElementsByTagName("component");
+            for (int index = 0; index < nodes.getLength(); index++) {
+                String name = ((Element) nodes.item(index)).getAttribute("project-jdk-name");
+                if (!name.isEmpty()) {
+                    return name;
+                }
+            }
+        } catch (ParserConfigurationException | SAXException _) {
+            return null;
+        }
+        return null;
+    }
+
+    private static String version(int release) {
+        return release < 9 ? "1." + release : Integer.toString(release);
+    }
+
+    private static String languageLevel(int release) {
+        return "JDK_" + version(release).replace('.', '_');
+    }
+
+    private static String module(Module module, Path base, int feature) {
         StringBuilder content = new StringBuilder();
         content.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         content.append("<module type=\"JAVA_MODULE\" version=\"4\">\n");
-        content.append("  <component name=\"NewModuleRootManager\" inherit-compiler-output=\"true\">\n");
+        content.append("  <component name=\"NewModuleRootManager\"");
+        if (module.release() != null && module.release() != feature) {
+            content.append(" LANGUAGE_LEVEL=\"").append(languageLevel(module.release())).append('"');
+        }
+        content.append(" inherit-compiler-output=\"true\">\n");
         content.append("    <exclude-output/>\n");
         content.append("    <content url=\"file://$MODULE_DIR$\">\n");
         for (Path source : module.mainSources()) {
@@ -321,7 +364,7 @@ public class Ide implements BuildExecutorModule {
                     "kind=\"src\" output=\".eclipse/test-classes\"" + sourcePath(module, source),
                     List.of("test"));
         }
-        entry(content, "kind=\"con\" path=\"org.eclipse.jdt.launching.JRE_CONTAINER\"", onModulePath);
+        entry(content, "kind=\"con\" path=\"" + container(module.release()) + "\"", onModulePath);
         for (String dependency : module.moduleDependencies()) {
             entry(content, "combineaccessrules=\"false\" kind=\"src\" path=\"/" + escape(dependency) + "\"",
                     List.of());
@@ -334,6 +377,13 @@ public class Ide implements BuildExecutorModule {
         content.append("  <classpathentry kind=\"output\" path=\".eclipse/classes\"/>\n");
         content.append("</classpath>\n");
         return content.toString();
+    }
+
+    private static String container(Integer release) {
+        return release == null ? "org.eclipse.jdt.launching.JRE_CONTAINER"
+                : "org.eclipse.jdt.launching.JRE_CONTAINER"
+                + "/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType"
+                + "/JavaSE-" + version(release);
     }
 
     private static String sourcePath(Module module, Path source) {
@@ -412,6 +462,7 @@ public class Ide implements BuildExecutorModule {
     private record Module(String name,
                           Path content,
                           boolean modular,
+                          Integer release,
                           List<Path> mainSources,
                           List<Path> testSources,
                           List<Path> libraries,
@@ -422,6 +473,7 @@ public class Ide implements BuildExecutorModule {
                        Path content,
                        boolean modular,
                        boolean test,
+                       Integer release,
                        List<String> coordinates,
                        List<Path> jars) {
     }

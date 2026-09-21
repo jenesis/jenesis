@@ -54,6 +54,7 @@ public class Inventory implements BuildStep {
     public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(MODULE),
+                Path.of(ProcessBuildStep.PROCESS + "javac.properties"),
                 Path.of(METADATA),
                 Path.of(IDENTITY),
                 Path.of(ATTACHMENTS),
@@ -84,6 +85,7 @@ public class Inventory implements BuildStep {
         String mainClass = null;
         String module = null;
         String tests = null;
+        String release = null;
         boolean abstractTest = false;
         String version = null;
         String artifact = null;
@@ -132,6 +134,10 @@ public class Inventory implements BuildStep {
                 }
                 abstractTest |= properties.flag("abstract");
                 modular |= properties.flag("modular");
+            }
+            Path javacProperties = folder.resolve(ProcessBuildStep.PROCESS + "javac.properties");
+            if (release == null && Files.isRegularFile(javacProperties)) {
+                release = SequencedProperties.ofFiles(javacProperties).value("--release");
             }
             Path metadataFile = folder.resolve(METADATA);
             if (Files.isRegularFile(metadataFile)) {
@@ -320,6 +326,9 @@ public class Inventory implements BuildStep {
         }
         if (tests != null) {
             inventory.setProperty(prefix + "test", tests);
+        }
+        if (release != null) {
+            inventory.setProperty(prefix + "release", release);
         }
         if (abstractTest) {
             inventory.setProperty(prefix + "abstract", "true");
