@@ -20,7 +20,9 @@ public interface BuildExecutor {
             } else {
                 URI uri = URI.create(location);
                 cache = switch (uri.getScheme() == null ? "" : uri.getScheme()) {
-                    case "http", "https" -> new BuildExecutorHttpCache(uri);
+                    case "http", "https" -> Repository.Origin.of("jenesis.cache.uri") == Repository.Origin.PROJECT
+                            ? new BuildExecutorHttpCache(uri).key(null)
+                            : new BuildExecutorHttpCache(uri);
                     case "file" -> new BuildExecutorFileCache(Path.of(uri));
                     default -> throw new IllegalArgumentException(
                             "Unsupported cache URI scheme (expected http, https, or file): " + location);

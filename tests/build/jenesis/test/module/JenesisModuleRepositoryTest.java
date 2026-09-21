@@ -682,6 +682,284 @@ public class JenesisModuleRepositoryTest {
     }
 
     @Test
+    public void factory_filter_argument_accepts_several_module_prefixes() throws IOException {
+        Files.writeString(Files
+                .createDirectories(root.resolve("first/module/corp.mod.inner"))
+                .resolve("corp.mod.inner.jar"), "first-inner");
+        Files.writeString(Files
+                .createDirectories(root.resolve("first/module/team.mod"))
+                .resolve("team.mod.jar"), "first-team");
+        Files.writeString(Files
+                .createDirectories(root.resolve("first/module/other.mod"))
+                .resolve("other.mod.jar"), "first-other");
+        Files.writeString(Files
+                .createDirectories(root.resolve("second/module/other.mod"))
+                .resolve("other.mod.jar"), "second-other");
+        System.setProperty("jenesis.module.uri",
+                root.resolve("first").toUri() + "|corp|team.mod," + root.resolve("second").toUri());
+        try {
+            Repository merged = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE);
+            try (InputStream stream = merged.fetch(Runnable::run, "corp.mod.inner").orElseThrow().toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("first-inner");
+            }
+            try (InputStream stream = merged.fetch(Runnable::run, "team.mod").orElseThrow().toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("first-team");
+            }
+            try (InputStream stream = merged.fetch(Runnable::run, "other.mod").orElseThrow().toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8))
+                        .as("a module no prefix covers is left to the next remote")
+                        .isEqualTo("second-other");
+            }
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
+    public void factory_maven_type_resolves_a_module_by_the_publishing_convention() throws IOException {
+        writeMavenArtifact("com.corp", "com.corp.mod", "company-classes");
+        writeMavenArtifact("other.mod", "other.mod", "company-other");
+        Files.writeString(Files
+                .createDirectories(root.resolve("public/module/other.mod/1.0.0"))
+                .resolve("other.mod.jar"), "public-classes");
+        System.setProperty("jenesis.module.uri",
+                "maven:" + root.resolve("company").toUri() + "|com.corp," + root.resolve("public").toUri());
+        try {
+            Repository merged = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE);
+            try (InputStream stream = merged.fetch(Runnable::run, "com.corp.mod/1.0.0").orElseThrow().toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("company-classes");
+            }
+            try (InputStream stream = merged.fetch(Runnable::run, "other.mod/1.0.0").orElseThrow().toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8))
+                        .as("the Maven remote is asked only for the modules its prefix covers")
+                        .isEqualTo("public-classes");
+            }
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
+    public void factory_maven_type_carries_into_a_referenced_chain() throws IOException {
+        writeMavenArtifact("com.corp", "com.corp.mod", "company-classes");
+        System.setProperty("corp.test.modules", root.resolve("company").toUri().toString());
+        System.setProperty("jenesis.module.uri", "maven:@corp.test.modules");
+        try {
+            Optional<RepositoryItem> item = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)
+                    .fetch(Runnable::run, "com.corp.mod/1.0.0");
+
+            assertThat(item).isPresent();
+            try (InputStream stream = item.orElseThrow().toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("company-classes");
+            }
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+            System.clearProperty("corp.test.modules");
+        }
+    }
+
+    @Test
+    public void factory_maven_type_takes_a_group_id_segment_count_per_entry() throws IOException {
+        writeMavenArtifact("deep", "com.corp.deep", "com.corp.deep.mod", "deep-classes");
+        writeMavenArtifact("flat", "org.tools", "org.tools.mod", "flat-classes");
+        System.setProperty("jenesis.module.uri", "maven:3:"
+                + root.resolve("deep").toUri()
+                + "|com.corp,maven:"
+                + root.resolve("flat").toUri()
+                + "|org.tools");
+        try {
+            Repository merged = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE);
+            try (InputStream stream = merged.fetch(Runnable::run, "com.corp.deep.mod/1.0.0")
+                    .orElseThrow()
+                    .toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8))
+                        .as("three segments of the name form the group id of this remote")
+                        .isEqualTo("deep-classes");
+            }
+            try (InputStream stream = merged.fetch(Runnable::run, "org.tools.mod/1.0.0")
+                    .orElseThrow()
+                    .toInputStream()) {
+                assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8))
+                        .as("a remote without a count keeps the default of two")
+                        .isEqualTo("flat-classes");
+            }
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
+    public void factory_rejects_a_segment_count_below_one() {
+        System.setProperty("jenesis.module.uri", "maven:0:https://repo.example.com/");
+        try {
+            assertThatThrownBy(() -> JenesisModuleRepository.of(JenesisRepository.Scope.MODULE))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("at least one group id segment");
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
+    public void factory_rejects_a_segment_count_on_a_module_entry() {
+        System.setProperty("jenesis.module.uri", "module:3:https://repo.example.com/");
+        try {
+            assertThatThrownBy(() -> JenesisModuleRepository.of(JenesisRepository.Scope.MODULE))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("applies only to a 'maven' entry");
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
+    public void factory_rejects_an_unknown_repository_type() {
+        System.setProperty("jenesis.module.uri", "nexus:https://repo.example.com/");
+        try {
+            assertThatThrownBy(() -> JenesisModuleRepository.of(JenesisRepository.Scope.MODULE))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("nexus:https://repo.example.com/")
+                    .hasMessageContaining("expected 'module' or 'maven'");
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
+    public void factory_rejects_a_typed_entry_without_a_uri() {
+        System.setProperty("jenesis.module.uri", "maven:");
+        try {
+            assertThatThrownBy(() -> JenesisModuleRepository.of(JenesisRepository.Scope.MODULE))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("No URI in Jenesis module repository entry: maven:");
+        } finally {
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
+    public void factory_withholds_the_credential_from_a_remote_a_project_file_named() throws IOException {
+        List<String> authorizations = new ArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            authorizations.add(exchange.getRequestHeaders().getFirst("Authorization"));
+            byte[] body = "classes".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(body);
+            }
+            exchange.close();
+        });
+        server.start();
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.module.token", "Bearer secret");
+        System.setProperty("jenesis.module.uri", "http://localhost:" + server.getAddress().getPort() + "/");
+        System.setProperty("jenesis.make.provided", "jenesis.module.uri");
+        try {
+            RepositoryItem item = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)
+                    .fetch(Runnable::run, "build.jenesis")
+                    .orElseThrow();
+
+            assertThat(read(item)).isEqualTo("classes");
+            assertThat(authorizations)
+                    .as("a url a file the project provides named never receives the credential")
+                    .containsOnlyNulls();
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.module.token");
+            System.clearProperty("jenesis.module.uri");
+            System.clearProperty("jenesis.make.provided");
+        }
+    }
+
+    @Test
+    public void factory_maven_type_authenticates_the_first_remote_of_the_chain() throws IOException {
+        List<String> authorizations = new ArrayList<>();
+        HttpServer server = mavenServer(authorizations);
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.maven.local", Files.createDirectories(root.resolve("m2")).toString());
+        System.setProperty("jenesis.maven.token", "Bearer secret");
+        System.setProperty("jenesis.module.uri", "maven:http://localhost:" + server.getAddress().getPort() + "/");
+        try {
+            RepositoryItem item = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)
+                    .fetch(Runnable::run, "com.corp.mod/1.0.0")
+                    .orElseThrow();
+
+            assertThat(read(item)).isEqualTo("classes");
+            assertThat(authorizations).contains("Bearer secret");
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.maven.local");
+            System.clearProperty("jenesis.maven.token");
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    @Test
+    public void factory_maven_type_is_not_handed_the_credential_of_an_earlier_remote() throws IOException {
+        List<String> authorizations = new ArrayList<>();
+        HttpServer server = mavenServer(authorizations);
+        System.setProperty("jenesis.repository.insecure", "true");
+        System.setProperty("jenesis.maven.local", Files.createDirectories(root.resolve("m2")).toString());
+        System.setProperty("jenesis.maven.token", "Bearer secret");
+        System.setProperty("jenesis.module.token", "Bearer other");
+        System.setProperty("jenesis.module.uri", Files.createDirectories(root.resolve("empty")).toUri()
+                + ",maven:http://localhost:" + server.getAddress().getPort() + "/");
+        try {
+            RepositoryItem item = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)
+                    .fetch(Runnable::run, "com.corp.mod/1.0.0")
+                    .orElseThrow();
+
+            assertThat(read(item)).isEqualTo("classes");
+            assertThat(authorizations)
+                    .as("a fallback remote is never handed the credential of the chain")
+                    .containsOnlyNulls();
+        } finally {
+            server.stop(0);
+            System.clearProperty("jenesis.repository.insecure");
+            System.clearProperty("jenesis.maven.local");
+            System.clearProperty("jenesis.maven.token");
+            System.clearProperty("jenesis.module.token");
+            System.clearProperty("jenesis.module.uri");
+        }
+    }
+
+    private HttpServer mavenServer(List<String> authorizations) throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            authorizations.add(exchange.getRequestHeaders().getFirst("Authorization"));
+            if (exchange.getRequestURI().getPath().equals("/com/corp/com.corp.mod/1.0.0/com.corp.mod-1.0.0.jar")) {
+                byte[] body = "classes".getBytes(StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(200, body.length);
+                try (OutputStream out = exchange.getResponseBody()) {
+                    out.write(body);
+                }
+            } else {
+                exchange.sendResponseHeaders(404, -1);
+            }
+            exchange.close();
+        });
+        server.start();
+        return server;
+    }
+
+    private void writeMavenArtifact(String groupId, String artifactId, String content) throws IOException {
+        writeMavenArtifact("company", groupId, artifactId, content);
+    }
+
+    private void writeMavenArtifact(String repository, String groupId, String artifactId, String content)
+            throws IOException {
+        Files.writeString(Files
+                .createDirectories(root.resolve(repository)
+                        .resolve(Path.of(groupId.replace('.', File.separatorChar)))
+                        .resolve(artifactId)
+                        .resolve("1.0.0"))
+                .resolve(artifactId + "-1.0.0.jar"), content);
+    }
+
+    @Test
     public void factory_artifact_scope_reads_the_artifact_subtree() throws IOException {
         Files.writeString(Files
                 .createDirectories(root.resolve("first/artifact/build.jenesis"))

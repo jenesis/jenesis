@@ -241,6 +241,51 @@ public interface Repository {
         }
     }
 
+    enum Origin {
+
+        USER,
+        PROJECT,
+        ENVIRONMENT,
+        DEFAULT;
+
+        public static Origin of(String key) {
+            for (String provided : System.getProperty("jenesis.make.provided", "").split(",")) {
+                if (provided.strip().equals(key)) {
+                    return PROJECT;
+                }
+            }
+            return USER;
+        }
+    }
+
+    record Credential(String token, Origin origin) {
+
+        public static Credential of(String property, String variable) {
+            String value = System.getProperty(property);
+            if (value != null) {
+                return new Credential(value, Origin.of(property));
+            }
+            String fallback = System.getenv(variable);
+            return fallback == null
+                    ? new Credential(null, Origin.USER)
+                    : new Credential(fallback, Origin.ENVIRONMENT);
+        }
+
+        public Credential token(String token) {
+            return new Credential(token, origin);
+        }
+
+        public String grant(Origin target) {
+            if (token == null || origin == Origin.PROJECT) {
+                return null;
+            }
+            if (target == Origin.DEFAULT || target == Origin.PROJECT) {
+                return null;
+            }
+            return origin == Origin.ENVIRONMENT && target != Origin.ENVIRONMENT ? null : token;
+        }
+    }
+
     record Retry(int retries, Duration backoff) {
 
         public Retry {
