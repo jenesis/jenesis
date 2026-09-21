@@ -19,13 +19,8 @@ public record JUnitPlatform() implements TestEngine {
     }
 
     @Override
-    public boolean isEngine(ModuleDescriptor module) {
-        return module.name().equals(PLATFORM_ENGINE);
-    }
-
-    @Override
     public boolean isFramework(ModuleDescriptor module) {
-        return isEngine(module) || module.name().equals(JUPITER_API);
+        return module.name().equals(PLATFORM_ENGINE) || module.name().equals(JUPITER_API);
     }
 
     @Override

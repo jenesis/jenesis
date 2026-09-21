@@ -11,7 +11,7 @@ public record TestNG() implements TestEngine {
     }
 
     @Override
-    public boolean isEngine(ModuleDescriptor module) {
+    public boolean isFramework(ModuleDescriptor module) {
         return module.name().equals("org.testng");
     }
 
