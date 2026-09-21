@@ -39,10 +39,13 @@ public class TestEngineAdapterTest {
     }
 
     @Test
-    public void junit_platform_recognizes_engine_module_but_not_console_as_engine() {
+    public void junit_platform_recognizes_the_engine_and_the_jupiter_api_but_not_the_console() {
         JUnitPlatform engine = new JUnitPlatform();
-        assertThat(engine.isEngine(ModuleDescriptor.newAutomaticModule("org.junit.platform.engine").build())).isTrue();
-        assertThat(engine.isEngine(ModuleDescriptor.newAutomaticModule("org.junit.platform.console").build())).isFalse();
+        assertThat(engine.isFramework(ModuleDescriptor.newAutomaticModule("org.junit.platform.engine").build()))
+                .isTrue();
+        assertThat(engine.isFramework(ModuleDescriptor.newAutomaticModule("org.junit.jupiter.api").build())).isTrue();
+        assertThat(engine.isFramework(ModuleDescriptor.newAutomaticModule("org.junit.platform.console").build()))
+                .isFalse();
     }
 
     @Test
@@ -53,10 +56,10 @@ public class TestEngineAdapterTest {
     }
 
     @Test
-    public void junit4_recognizes_the_junit_module_as_its_engine() {
+    public void junit4_recognizes_the_junit_module_as_its_framework() {
         JUnit4 engine = new JUnit4();
-        assertThat(engine.isEngine(ModuleDescriptor.newAutomaticModule("junit").build())).isTrue();
-        assertThat(engine.isEngine(ModuleDescriptor.newAutomaticModule("org.testng").build())).isFalse();
+        assertThat(engine.isFramework(ModuleDescriptor.newAutomaticModule("junit").build())).isTrue();
+        assertThat(engine.isFramework(ModuleDescriptor.newAutomaticModule("org.testng").build())).isFalse();
     }
 
     @Test
@@ -86,10 +89,10 @@ public class TestEngineAdapterTest {
     }
 
     @Test
-    public void testng_recognizes_the_testng_module_as_its_engine() {
+    public void testng_recognizes_the_testng_module_as_its_framework() {
         TestNG engine = new TestNG();
-        assertThat(engine.isEngine(ModuleDescriptor.newAutomaticModule("org.testng").build())).isTrue();
-        assertThat(engine.isEngine(ModuleDescriptor.newAutomaticModule("junit").build())).isFalse();
+        assertThat(engine.isFramework(ModuleDescriptor.newAutomaticModule("org.testng").build())).isTrue();
+        assertThat(engine.isFramework(ModuleDescriptor.newAutomaticModule("junit").build())).isFalse();
     }
 
     @Test

@@ -903,7 +903,7 @@ public class TestModuleTest {
         }
 
         @Override
-        public boolean isEngine(ModuleDescriptor module) {
+        public boolean isFramework(ModuleDescriptor module) {
             return false;
         }
 

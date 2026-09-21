@@ -11,11 +11,7 @@ public interface TestEngine extends Serializable {
 
     String mainClass();
 
-    boolean isEngine(ModuleDescriptor module);
-
-    default boolean isFramework(ModuleDescriptor module) {
-        return isEngine(module);
-    }
+    boolean isFramework(ModuleDescriptor module);
 
     default SequencedMap<String, String> missingCoordinates(List<ModuleDescriptor> modules) {
         return Collections.emptyNavigableMap();
