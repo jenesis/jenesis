@@ -137,6 +137,36 @@ Most are driven by the shipped `Make.java`; the ones that customise or drive the
 `build/Demo.java` instead. [`demo/README.md`](demo/README.md) is a guided tour and says which is which. A new
 feature is expected to arrive with a demo, because CI runs them all.
 
+Generating IDE metadata
+-----------------------
+
+The `ide` selector writes editor project files from the same inventory the build already produces, so an
+imported project sees exactly the modules, sources and jars the build resolved:
+
+```bash
+java build/jenesis/Make.java ide
+```
+
+`ide/idea`, `ide/vscode` and `ide/eclipse` drill into one editor. IntelliJ IDEA gets an `.iml` beside each
+module plus `.idea/modules.xml` and `.idea/misc.xml`; Eclipse gets a `.project` and `.classpath` per module;
+VS Code gets `.vscode/settings.json`. All of them are generated output, and the repository `.gitignore`
+already excludes them.
+
+Three conventions keep the result importable without hand-editing. A module file addresses its libraries
+below `$MODULE_DIR$`, the only macro IntelliJ expands inside an `.iml`, while the project files under
+`.idea/` use `$PROJECT_DIR$`. The IDE compiles into `target/.idea`, inside the tree the build already owns,
+so an import adds no new folder to ignore. A module that the build resolves locally is linked as a module
+dependency rather than as its jar, so navigation crosses module boundaries.
+
+What reaches a module's classpath is what the module itself declares. A build tool resolves in its own
+dependency group - `checkstyle`, `pmd`, `spotbugs`, a formatter - and those groups are left out, as are
+POM-typed entries, which carry no classes. An `@jenesis.test abstract` fixture module is compiled and read
+by other modules rather than executed, so its sources are offered as production sources; a concrete
+`@jenesis.test` module is marked as test sources.
+
+Regenerate after changing dependencies or adding a module: the files name resolved jars by path, and a
+stale file points at a jar the build no longer produces.
+
 Continuous integration
 ----------------------
 
