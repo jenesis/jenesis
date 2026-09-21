@@ -23,11 +23,9 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
     public static final String DOCUMENTED = "documented";
     private static final String REQUIRED = "required", ARTIFACTS = "artifacts",
             DEPENDENCIES = "dependencies";
-
     private static final List<String> PREFERRED_PREFIXES = List.of("maven", "module");
-    private static final String MODULE_NAME = "org.apache.groovy.groovydoc";
-    private static final String MAVEN_GROUP = "org.apache.groovy";
-    private static final String MAVEN_ARTIFACT = "groovy-groovydoc";
+    private static final String MODULE_NAME = "org.apache.groovy.groovydoc", MAVEN_GROUP = "org.apache.groovy",
+            MAVEN_ARTIFACT = "groovy-groovydoc";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

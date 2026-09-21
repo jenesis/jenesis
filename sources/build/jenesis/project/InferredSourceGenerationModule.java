@@ -18,11 +18,8 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
             WSIMPORT = "wsimport",
             OPENAPI = "openapi",
             ANTLR = "antlr";
-
     public static final String PREPARE = "prepare", TOOL = "tool";
-
     private static final String FOLDERS = "META-INF/build.jenesis";
-
     private static final Set<String> XJC_KEYS = Set.of("folders", "package", "catalog", "arguments");
     private static final Set<String> PROTOC_KEYS = Set.of("folders", "classifier", "plugins", "arguments");
     private static final Set<String> AVRO_KEYS = Set.of("folders", "arguments");
@@ -230,9 +227,11 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
         for (String source : folders == null ? List.of(FOLDERS) : folders) {
             for (String root : List.of(BuildStep.SOURCES, BuildStep.RESOURCES)) {
                 paths.put(Path.of(root + source), Path.of(folder));
-                named.forEach((file, customary) -> paths.put(
-                        Path.of(root + source + "/" + file),
-                        Path.of(folder + customary + extension(file))));
+                named.forEach((file, customary) -> {
+                    int dot = file.lastIndexOf('.');
+                    paths.put(Path.of(root + source + "/" + file),
+                            Path.of(folder + customary + (dot < 0 ? "" : file.substring(dot))));
+                });
             }
         }
         return new Bind(paths).extensions(extensions);
@@ -245,11 +244,6 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
             named.put(value, customary);
         }
         return named;
-    }
-
-    private static String extension(String file) {
-        int dot = file.lastIndexOf('.');
-        return dot < 0 ? "" : file.substring(dot);
     }
 
     private static SequencedMap<String, String> plugins(SequencedProperties properties) {

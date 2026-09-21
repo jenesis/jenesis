@@ -368,7 +368,7 @@ public class MavenPomResolver implements MavenResolver {
                     resolution.systemPath,
                     resolution.exclusions,
                     resolution.optional,
-                    selectChecksum(resolution)));
+                    resolution.selectChecksum()));
         });
         SequencedMap<String, List<License>> licenses = new LinkedHashMap<>();
         results.forEach((key, value) -> {
@@ -434,7 +434,7 @@ public class MavenPomResolver implements MavenResolver {
                     continue;
                 }
                 String version;
-                bindChecksum(entry.getKey(), resolution, value.version(), value.checksum());
+                resolution.bindChecksum(entry.getKey(), value.version(), value.checksum());
                 if (resolution.currentVersion == null) {
                     version = resolution.currentVersion = negotiator.resolve(executor,
                             repository,
@@ -513,35 +513,6 @@ public class MavenPomResolver implements MavenResolver {
             }
         });
         return pending;
-    }
-
-    private static void bindChecksum(MavenDependencyKey key,
-                                     DependencyResolution resolution,
-                                     String version,
-                                     String checksum) {
-        if (checksum == null) {
-            return;
-        }
-        String existing = resolution.checksums.putIfAbsent(version, checksum);
-        if (existing != null && !existing.equals(checksum)) {
-            throw new IllegalStateException("Conflicting checksums for "
-                    + key.groupId() + ":" + key.artifactId() + ":" + version
-                    + " (" + existing + " and " + checksum + ")");
-        }
-    }
-
-    private static String selectChecksum(DependencyResolution resolution) {
-        String checksum = resolution.checksums.get(resolution.currentVersion);
-        if (checksum != null) {
-            return checksum;
-        }
-        if (resolution.checksums.size() == 1) {
-            Map.Entry<String, String> only = resolution.checksums.entrySet().iterator().next();
-            if (isFloating(only.getKey())) {
-                return only.getValue();
-            }
-        }
-        return null;
     }
 
     public SequencedMap<Path, MavenLocalPom> local(Executor executor,
@@ -1479,6 +1450,7 @@ public class MavenPomResolver implements MavenResolver {
     }
 
     private static class DependencyResolution {
+
         private final SequencedSet<String> observedVersions = new LinkedHashSet<>();
         private final Map<String, String> checksums = new HashMap<>();
         private String currentVersion;
@@ -1486,5 +1458,32 @@ public class MavenPomResolver implements MavenResolver {
         private Path systemPath;
         private List<MavenDependencyName> exclusions;
         private Boolean optional;
+
+        private void bindChecksum(MavenDependencyKey key, String version, String checksum) {
+            if (checksum == null) {
+                return;
+            }
+            String existing = checksums.putIfAbsent(version, checksum);
+            if (existing != null && !existing.equals(checksum)) {
+                throw new IllegalStateException("Conflicting checksums for "
+                        + key.groupId() + ":" + key.artifactId() + ":" + version
+                        + " (" + existing + " and " + checksum + ")");
+            }
+        }
+
+        private String selectChecksum() {
+            String checksum = checksums.get(currentVersion);
+            if (checksum != null) {
+                return checksum;
+            }
+            if (checksums.size() == 1) {
+                Map.Entry<String, String> only = checksums.entrySet().iterator().next();
+                if (isFloating(only.getKey())) {
+                    return only.getValue();
+                }
+            }
+            return null;
+        }
+
     }
 }

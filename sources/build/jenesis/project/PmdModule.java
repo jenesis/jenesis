@@ -20,9 +20,7 @@ public class PmdModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-
-    private static final String MAVEN_GROUP = "net.sourceforge.pmd";
-    private static final String MAVEN_ARTIFACT = "pmd-dist";
+    private static final String MAVEN_GROUP = "net.sourceforge.pmd", MAVEN_ARTIFACT = "pmd-dist";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

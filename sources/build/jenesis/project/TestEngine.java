@@ -60,10 +60,6 @@ public interface TestEngine extends Serializable {
         return of(scan(folders));
     }
 
-    static boolean hasRunner(TestEngine engine, Iterable<Path> folders) throws IOException {
-        return engine.hasRunner(scan(folders));
-    }
-
     static List<ModuleDescriptor> scan(Iterable<Path> folders) throws IOException {
         List<ModuleDescriptor> modules = new ArrayList<>();
         for (Path folder : folders) {

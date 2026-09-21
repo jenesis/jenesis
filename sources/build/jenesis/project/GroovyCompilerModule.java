@@ -23,11 +23,9 @@ public class GroovyCompilerModule implements BuildExecutorModule {
     public static final String ARTIFACTS = "artifacts", CLASSES = "classes";
     private static final String REQUIRED = "required", COMPILED = "compiled",
             DEPENDENCIES = "dependencies";
-
     private static final List<String> PREFERRED_PREFIXES = List.of("maven", "module");
-    private static final String MODULE_NAME = "org.apache.groovy";
-    private static final String MAVEN_GROUP = "org.apache.groovy";
-    private static final String MAVEN_ARTIFACT = "groovy";
+    private static final String MODULE_NAME = "org.apache.groovy", MAVEN_GROUP = "org.apache.groovy",
+            MAVEN_ARTIFACT = "groovy";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

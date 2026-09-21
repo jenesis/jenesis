@@ -18,7 +18,6 @@ public record MultiProjectModule(BuildExecutorModule identifier,
             MODULE = "module",
             PACKAGE = "package",
             SELECTION = "selection";
-
     public static final String SOURCES = "sources",
             MANIFESTS = "manifests",
             COORDINATES = "coordinates",
@@ -30,9 +29,7 @@ public record MultiProjectModule(BuildExecutorModule identifier,
             ARTIFACTS = "artifacts",
             SIGNATURES = "signatures",
             SPDX = "spdx";
-
     private static final String GROUP = "group";
-
     public static final String IDENTIFIER_PATH = PREVIOUS.repeat(3) + IDENTIFIER + "/";
 
     public static Path location(Path root, SequencedMap<String, Path> arguments) throws IOException {

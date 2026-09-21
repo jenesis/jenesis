@@ -4,10 +4,10 @@ import module java.base;
 
 public class DockerizedJava {
 
-    public static final String IMPLICIT_DOCKERFILE_LINUX = "FROM debian:stable-slim\n";
-    public static final String IMPLICIT_DOCKERFILE_WINDOWS = "FROM mcr.microsoft.com/windows/servercore:ltsc2025\n";
-    public static final String JAVA_HOME_MOUNT_LINUX = "/opt/java-home";
-    public static final String JAVA_HOME_MOUNT_WINDOWS = "C:\\opt\\java-home";
+    public static final String IMPLICIT_DOCKERFILE_LINUX = "FROM debian:stable-slim\n",
+            IMPLICIT_DOCKERFILE_WINDOWS = "FROM mcr.microsoft.com/windows/servercore:ltsc2025\n";
+    public static final String JAVA_HOME_MOUNT_LINUX = "/opt/java-home",
+            JAVA_HOME_MOUNT_WINDOWS = "C:\\opt\\java-home";
 
     private final String image;
     private final Path workingDirectory;

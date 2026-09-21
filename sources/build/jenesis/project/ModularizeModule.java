@@ -22,9 +22,7 @@ import javax.tools.ToolProvider;
 public class ModularizeModule implements BuildExecutorModule {
 
     public static final String PSEUDO = "build.jenesis.pseudo.module";
-
     private static final String PREPARE = "prepare", DESCRIBE = "describe", MODULARIZE = "modularize";
-
     private static final String STAGED = "staged.properties", IDENTITY = "identity.properties";
 
     private final ProcessHandler.Factory factory;
@@ -140,7 +138,8 @@ public class ModularizeModule implements BuildExecutorModule {
                                         + PSEUDO
                                         + "<hash>");
                             }
-                            module = PSEUDO + pseudonym(jar);
+                            module = PSEUDO + HexFormat.of().formatHex(
+                                    new HashDigestFunction("SHA-256").hash(jar), 0, 16);
                         } else {
                             module = descriptor.name();
                         }
@@ -204,10 +203,6 @@ public class ModularizeModule implements BuildExecutorModule {
                     key.substring(first + 1, second),
                     key.substring(second + 1, third),
                     key.substring(third + 1)};
-        }
-
-        private static String pseudonym(Path jar) throws IOException {
-            return HexFormat.of().formatHex(new HashDigestFunction("SHA-256").hash(jar), 0, 16);
         }
     }
 

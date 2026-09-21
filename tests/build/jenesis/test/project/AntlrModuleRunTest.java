@@ -26,7 +26,6 @@ public class AntlrModuleRunTest {
             antlr/maven/org.antlr/antlr4 4.13.2 SHA-256/e6f0b10d2ad206f338afe16867fc47148b6729d6e3a260ea28379b91f03a3657
             antlr/maven/org.antlr/antlr4-runtime 4.13.2 SHA-256/dd3e8a13a2d669bf84fb8d834de35ce4875f27157698d206241ec8488aadcaf7
             """;
-
     private static final String GRAMMAR = """
             grammar Greeting;
 

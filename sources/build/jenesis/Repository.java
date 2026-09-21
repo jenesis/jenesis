@@ -163,7 +163,10 @@ public interface Repository {
                     }
                     http.setInstanceFollowRedirects(false);
                     http.setRequestProperty("User-Agent", "Jenesis");
-                    if (sameOrigin(uri, current)) {
+                    if (Objects.equals(uri.getScheme(), current.getScheme())
+                            && uri.getHost() != null
+                            && uri.getHost().equalsIgnoreCase(current.getHost())
+                            && uri.getPort() == current.getPort()) {
                         if (token != null) {
                             http.setRequestProperty("Authorization", token);
                         }
@@ -309,13 +312,6 @@ public interface Repository {
         public Retry backoff(Duration backoff) {
             return new Retry(retries, backoff);
         }
-    }
-
-    private static boolean sameOrigin(URI left, URI right) {
-        return Objects.equals(left.getScheme(), right.getScheme())
-                && left.getHost() != null
-                && left.getHost().equalsIgnoreCase(right.getHost())
-                && left.getPort() == right.getPort();
     }
 
     static Repository ofUris(Map<String, URI> uris) {

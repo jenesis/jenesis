@@ -18,8 +18,7 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
 
     public static final String JAVADOC = "javadoc", GROOVYDOC = "groovydoc", SCALADOC = "scaladoc", DOKKA = "dokka";
     public static final String DOCUMENT = "document", AGGREGATE = "aggregate";
-    private static final String SCAN = "scan";
-    private static final String SCAN_FILE = "scan.properties";
+    private static final String SCAN = "scan", SCAN_FILE = "scan.properties";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

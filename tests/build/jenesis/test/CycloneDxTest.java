@@ -14,13 +14,11 @@ public class CycloneDxTest {
     private static final CycloneDx.Component PROJECT = new CycloneDx.Component(
             "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", null,
             List.of(new License("Apache-2.0", "permissive", "Apache License 2.0", "https://www.apache.org/licenses/LICENSE-2.0.txt")));
-
     private static final List<CycloneDx.Component> COMPONENTS = List.of(
             new CycloneDx.Component("org.foo/bar/1.2.3", "org.foo", "bar", "1.2.3", "pkg:maven/org.foo/bar@1.2.3", "abc123",
                     List.of(new License("Apache-2.0", "permissive", "The Apache Software License, Version 2.0", "https://apache.org/"))),
             new CycloneDx.Component("org.baz/qux/4.5", "org.baz", "qux", "4.5", "pkg:maven/org.baz/qux@4.5", "def456",
                     List.of(new License(null, null, "Some Custom License", "https://example.com/license"))));
-
     private static final List<CycloneDx.Dependency> DEPENDENCIES = List.of(
             new CycloneDx.Dependency("build.jenesis/demo/1.0.0", List.of("org.foo/bar/1.2.3")),
             new CycloneDx.Dependency("org.foo/bar/1.2.3", List.of("org.baz/qux/4.5")),

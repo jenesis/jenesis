@@ -95,7 +95,10 @@ public final class Sigstore {
 
         byte[] logId = binary(entry, "logId", "keyId");
         Object log = log(anchors, logId);
-        PublicKey key = key(text(log, "publicKey", "rawBytes"), text(log, "publicKey", "keyDetails"));
+        PublicKey key = KeyFactory.getInstance(
+                        text(log, "publicKey", "keyDetails").contains("ED25519") ? "Ed25519" : "EC")
+                .generatePublic(new X509EncodedKeySpec(
+                        Base64.getDecoder().decode(text(log, "publicKey", "rawBytes"))));
         listener.accept("log " + text(log, "baseUrl") + " named by key " + hex(logId));
 
         byte[] body = binary(entry, "canonicalizedBody");
@@ -264,11 +267,6 @@ public final class Sigstore {
         throw new IllegalStateException("No transparency log of the trust root has key " + hex(logId)
                 + "; a log added since this trust root was published is accepted by a newer one,"
                 + " named with -Djenesis.sigstore.uri");
-    }
-
-    private static PublicKey key(String encoded, String details) throws GeneralSecurityException {
-        return KeyFactory.getInstance(details.contains("ED25519") ? "Ed25519" : "EC")
-                .generatePublic(new X509EncodedKeySpec(Base64.getDecoder().decode(encoded)));
     }
 
     private static boolean signed(PublicKey key, byte[] content, byte[] signature) throws GeneralSecurityException {

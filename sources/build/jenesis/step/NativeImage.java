@@ -10,9 +10,7 @@ import build.jenesis.SequencedProperties;
 
 public class NativeImage extends ProcessBuildStep {
 
-    public static final String NATIVE = "native/";
-
-    public static final String METADATA = "nativeimage/";
+    public static final String NATIVE = "native/", METADATA = "nativeimage/";
 
     private final PathPlacement pathPlacement;
     private final String group;

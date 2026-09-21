@@ -19,9 +19,7 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
 
     public static final String FORMAT = "format";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-
-    private static final String MAVEN_GROUP = "com.palantir.javaformat";
-    private static final String MAVEN_ARTIFACT = "palantir-java-format";
+    private static final String MAVEN_GROUP = "com.palantir.javaformat", MAVEN_ARTIFACT = "palantir-java-format";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

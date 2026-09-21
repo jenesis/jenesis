@@ -7,7 +7,6 @@ public class OpenPgpRepository implements Repository {
     public static final List<URI> DEFAULTS = List.of(
             URI.create("https://keyserver.ubuntu.com/"),
             URI.create("https://keys.openpgp.org/"));
-
     private static final ConcurrentMap<String, Object> FETCHING = new ConcurrentHashMap<>();
 
     private final URI server;

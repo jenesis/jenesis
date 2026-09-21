@@ -21,8 +21,6 @@ public class AvroModuleRunTest {
     private static final String PINS = """
             avro/maven/org.apache.avro/avro-tools 1.12.2 SHA-256/6220e8bc089aaf917cdad4cd358bd651fc0394c0e5ddb8b36da402012c294a68
             """;
-
-
     private static final String SCHEMA = """
             {
               "namespace": "test.avro",
@@ -31,7 +29,6 @@ public class AvroModuleRunTest {
               "fields": [{"name": "name", "type": "string"}]
             }
             """;
-
     private static final String PROTOCOL = """
             {"protocol": "Greeter",
              "namespace": "test.avro",

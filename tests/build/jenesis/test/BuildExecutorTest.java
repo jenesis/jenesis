@@ -24,9 +24,7 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 public class BuildExecutorTest implements Serializable {
 
     private static final AtomicInteger RUNS = new AtomicInteger();
-
     private static final AtomicReference<SequencedMap<String, BuildStepArgument>> APPLIED = new AtomicReference<>();
-
     private static final AtomicReference<SequencedSet<String>> REMOVED = new AtomicReference<>();
 
     private static SequencedSet<String> removed(SequencedMap<String, BuildStepArgument> arguments) {

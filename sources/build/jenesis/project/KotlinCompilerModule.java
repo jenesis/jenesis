@@ -23,11 +23,9 @@ public class KotlinCompilerModule implements BuildExecutorModule {
     public static final String ARTIFACTS = "artifacts", CLASSES = "classes";
     private static final String REQUIRED = "required", COMPILED = "compiled",
             DEPENDENCIES = "dependencies";
-
     private static final List<String> PREFERRED_PREFIXES = List.of("maven", "module");
-    private static final String MODULE_NAME = "kotlin.compiler.embeddable";
-    private static final String MAVEN_GROUP = "org.jetbrains.kotlin";
-    private static final String MAVEN_ARTIFACT = "kotlin-compiler-embeddable";
+    private static final String MODULE_NAME = "kotlin.compiler.embeddable", MAVEN_GROUP = "org.jetbrains.kotlin",
+            MAVEN_ARTIFACT = "kotlin-compiler-embeddable";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

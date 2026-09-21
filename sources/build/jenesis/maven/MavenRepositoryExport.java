@@ -11,7 +11,6 @@ import build.jenesis.SafeSegment;
 public class MavenRepositoryExport implements BuildStep {
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
-
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter
             .ofPattern("yyyyMMddHHmmss")
             .withZone(ZoneOffset.UTC);

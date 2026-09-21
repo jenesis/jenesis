@@ -42,7 +42,6 @@ public class SpotBugsModuleRunTest {
             spotbugs/maven/org.xmlresolver/xmlresolver 5.3.3 SHA-256/1fe4d5b92f708dcdb82dbce12919e0171e6b5ca62c6dca6220483625098feb5f
             spotbugs/maven/org.xmlresolver/xmlresolver/jar/data 5.3.3 SHA-256/b0c487ad2f3e558be8d829c916d2458d10aca6a5bafa7a4d0524b70845e48a5c
             """;
-
     private static final String VERSION = "4.9.6";
 
     @TempDir

@@ -29,7 +29,6 @@ public class GoogleJavaFormatModuleRunTest {
             google-java-format/maven/com.google.j2objc/j2objc-annotations 2.8 SHA-256/f02a95fa1a5e95edb3ed859fd0fb7df709d121a35290eff8b74dce2ab7f4d6ed
             google-java-format/maven/org.checkerframework/checker-qual 3.37.0 SHA-256/e4ce1376cc2735e1dde220b62ad0913f51297704daad155a33f386bc5db0d9f7
             """;
-
     private static final String VERSION = "1.35.0";
 
     @TempDir

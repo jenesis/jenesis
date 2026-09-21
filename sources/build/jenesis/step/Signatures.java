@@ -18,7 +18,6 @@ import build.jenesis.maven.MavenRepository;
 public class Signatures extends ProcessBuildStep {
 
     private static final String STATUS = "[GNUPG:] ";
-
     private static final List<String> VERIFY = List.of("--status-fd", "1");
 
     private final transient Map<String, Repository> repositories;

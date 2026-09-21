@@ -5,6 +5,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.HashDigestFunction;
 import build.jenesis.SequencedProperties;
 
 public class Inventory implements BuildStep {
@@ -365,6 +366,13 @@ public class Inventory implements BuildStep {
     }
 
     public record Dependency(Path jar, String checksum, String scope, String group) {
+
+        public String checksum(HashDigestFunction hashFunction) throws IOException {
+            if (jar != null && Files.isRegularFile(jar)) {
+                return hashFunction.encodedHash(jar);
+            }
+            return checksum.isEmpty() ? null : checksum;
+        }
     }
 
     public static SequencedMap<String, Dependency> closure(Iterable<BuildStepArgument> arguments, String path) throws IOException {

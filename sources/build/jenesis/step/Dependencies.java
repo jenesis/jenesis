@@ -22,16 +22,14 @@ import static java.util.Objects.requireNonNull;
 
 public class Dependencies implements BuildExecutorModule {
 
-    public static final String SPDX = "spdx.properties";
-    public static final String GRAPH = "graph.properties";
-    public static final String LICENSES = "licenses.properties";
-    public static final String ALIASED = "aliased.properties";
-    public static final String INTERNAL = "internal.properties";
-    public static final String RESOLVED = "resolved/";
-    public static final String MODULAR = "modular.properties";
-    public static final String MODULAR_PATH = "modular/";
-    public static final String RESOLVE = "resolve";
-    public static final String SIGNATURES = "signatures";
+    public static final String SPDX = "spdx.properties",
+            GRAPH = "graph.properties",
+            LICENSES = "licenses.properties",
+            ALIASED = "aliased.properties",
+            INTERNAL = "internal.properties",
+            MODULAR = "modular.properties";
+    public static final String RESOLVED = "resolved/", MODULAR_PATH = "modular/";
+    public static final String RESOLVE = "resolve", SIGNATURES = "signatures";
 
     private final transient Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
@@ -580,7 +578,10 @@ public class Dependencies implements BuildExecutorModule {
                             SequencedSet<String> overridden = new LinkedHashSet<>();
                             resolution.vertices().forEach((coordinate, node) -> {
                                 if (node.module() != null && overrideTargets.containsKey(node.module())) {
-                                    overridden.add(artifactName(coordinate.substring(coordinate.indexOf('/') + 1)));
+                                    String artifact = coordinate.substring(coordinate.indexOf('/') + 1);
+                                    int slash = artifact.indexOf('/');
+                                    int second = slash < 0 ? -1 : artifact.indexOf('/', slash + 1);
+                                    overridden.add(second < 0 ? artifact : artifact.substring(0, second));
                                 }
                             });
                             if (!overridden.isEmpty()) {
@@ -859,12 +860,6 @@ public class Dependencies implements BuildExecutorModule {
                     + " by "
                     + origin);
         }
-    }
-
-    private static String artifactName(String coordinate) {
-        int slash = coordinate.indexOf('/');
-        int second = slash < 0 ? -1 : coordinate.indexOf('/', slash + 1);
-        return second < 0 ? coordinate : coordinate.substring(0, second);
     }
 
     private static byte[] carrying(String module, SequencedSet<String> carriers) {
@@ -1236,7 +1231,6 @@ public class Dependencies implements BuildExecutorModule {
             Map.entry("zlib", "Zlib"),
             Map.entry("python software foundation license", "PSF-2.0"),
             Map.entry("wtfpl", "WTFPL"));
-
     private static final Map<String, String> DEFAULT_CATEGORIES = Map.ofEntries(
             Map.entry("Apache-2.0", "permissive"),
             Map.entry("MIT", "permissive"),

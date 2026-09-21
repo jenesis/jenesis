@@ -5,9 +5,7 @@ import module java.base;
 public class ModuleGraph {
 
     public static final String JAVA_OPTIONS = "javaOptions";
-
     private static final String SELF_CONTAINED = "selfContainedModuleGraph";
-
     private static final String ADD_MODULES = "--add-modules", ROOTS = "ALL-MODULE-PATH,ALL-DEFAULT";
 
     private boolean modular, automatic, unnamed;

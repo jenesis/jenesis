@@ -4,8 +4,7 @@ import module java.base;
 
 public final class BuildExecutorHttpCache implements BuildExecutorCache {
 
-    public static final String KEY = "Jenesis-Cache-Key";
-    public static final String PROJECT = "Jenesis-Cache-Project";
+    public static final String KEY = "Jenesis-Cache-Key", PROJECT = "Jenesis-Cache-Project";
 
     private final URI uri;
     private final String key;

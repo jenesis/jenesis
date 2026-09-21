@@ -14,7 +14,6 @@ import build.jenesis.step.Inventory;
 public class Ide implements BuildExecutorModule {
 
     public static final String IDEA = "idea", VSCODE = "vscode", ECLIPSE = "eclipse";
-
     private static final List<String> MAIN_SOURCES = List.of(
             "src/main/java", "src/main/kotlin", "src/main/scala", "src/main/groovy", "sources", "src");
     private static final List<String> TEST_SOURCES = List.of(
@@ -214,7 +213,7 @@ public class Ide implements BuildExecutorModule {
         List<String> entries = new ArrayList<>();
         for (Module module : modules) {
             Path file = module.content().resolve(module.name() + ".iml");
-            Files.writeString(file, module(module, base, feature));
+            Files.writeString(file, module.iml(base, feature));
             String relative = base.relativize(file).toString().replace(File.separatorChar, '/');
             entries.add("      <module fileurl=\"file://$PROJECT_DIR$/" + relative
                     + "\" filepath=\"$PROJECT_DIR$/" + relative + "\"/>");
@@ -270,64 +269,6 @@ public class Ide implements BuildExecutorModule {
         return "JDK_" + version(release).replace('.', '_');
     }
 
-    private static String module(Module module, Path base, int feature) {
-        StringBuilder content = new StringBuilder();
-        content.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        content.append("<module type=\"JAVA_MODULE\" version=\"4\">\n");
-        content.append("  <component name=\"NewModuleRootManager\"");
-        if (module.release() != null && module.release() != feature) {
-            content.append(" LANGUAGE_LEVEL=\"").append(languageLevel(module.release())).append('"');
-        }
-        content.append(" inherit-compiler-output=\"true\">\n");
-        content.append("    <exclude-output/>\n");
-        content.append("    <content url=\"file://$MODULE_DIR$\">\n");
-        for (Path source : module.mainSources()) {
-            content.append("      <sourceFolder url=\"file://$MODULE_DIR$")
-                    .append(relative(module.content(), source))
-                    .append("\" isTestSource=\"false\"/>\n");
-        }
-        for (Path source : module.testSources()) {
-            content.append("      <sourceFolder url=\"file://$MODULE_DIR$")
-                    .append(relative(module.content(), source))
-                    .append("\" isTestSource=\"true\"/>\n");
-        }
-        content.append("    </content>\n");
-        content.append("    <orderEntry type=\"inheritedJdk\"/>\n");
-        content.append("    <orderEntry type=\"sourceFolder\" forTests=\"false\"/>\n");
-        for (String dependency : module.moduleDependencies()) {
-            content.append("    <orderEntry type=\"module\" module-name=\"")
-                    .append(escape(dependency))
-                    .append("\"/>\n");
-        }
-        for (Path library : module.libraries()) {
-            content.append("    <orderEntry type=\"module-library\">\n");
-            content.append("      <library>\n");
-            content.append("        <CLASSES>\n");
-            content.append("          <root url=\"jar://")
-                    .append(escape(libraryUrl(module.content(), base, library)))
-                    .append("!/\"/>\n");
-            content.append("        </CLASSES>\n");
-            content.append("        <JAVADOC/>\n");
-            content.append("        <SOURCES/>\n");
-            content.append("      </library>\n");
-            content.append("    </orderEntry>\n");
-        }
-        content.append("  </component>\n");
-        content.append("</module>\n");
-        return content.toString();
-    }
-
-    private static String relative(Path content, Path source) {
-        String relative = content.relativize(source).toString().replace(File.separatorChar, '/');
-        return relative.isEmpty() ? "" : "/" + relative;
-    }
-
-    private static String libraryUrl(Path content, Path base, Path library) {
-        return library.startsWith(base)
-                ? "$MODULE_DIR$/" + content.relativize(library).toString().replace(File.separatorChar, '/')
-                : library.toString().replace(File.separatorChar, '/');
-    }
-
     private static void eclipse(List<Module> modules) throws IOException {
         for (Module module : modules) {
             Files.writeString(module.content().resolve(".project"), """
@@ -347,36 +288,8 @@ public class Ide implements BuildExecutorModule {
                       </natures>
                     </projectDescription>
                     """.formatted(escape(module.name())));
-            Files.writeString(module.content().resolve(".classpath"), classpath(module));
+            Files.writeString(module.content().resolve(".classpath"), module.classpath());
         }
-    }
-
-    private static String classpath(Module module) {
-        List<String> onModulePath = module.modular() ? List.of("module") : List.of();
-        StringBuilder content = new StringBuilder();
-        content.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-        content.append("<classpath>\n");
-        for (Path source : module.mainSources()) {
-            entry(content, "kind=\"src\"" + sourcePath(module, source), List.of());
-        }
-        for (Path source : module.testSources()) {
-            entry(content,
-                    "kind=\"src\" output=\".eclipse/test-classes\"" + sourcePath(module, source),
-                    List.of("test"));
-        }
-        entry(content, "kind=\"con\" path=\"" + container(module.release()) + "\"", onModulePath);
-        for (String dependency : module.moduleDependencies()) {
-            entry(content, "combineaccessrules=\"false\" kind=\"src\" path=\"/" + escape(dependency) + "\"",
-                    List.of());
-        }
-        for (Path library : module.libraries()) {
-            entry(content,
-                    "kind=\"lib\" path=\"" + escape(library.toString().replace(File.separatorChar, '/')) + "\"",
-                    onModulePath);
-        }
-        content.append("  <classpathentry kind=\"output\" path=\".eclipse/classes\"/>\n");
-        content.append("</classpath>\n");
-        return content.toString();
     }
 
     private static String container(Integer release) {
@@ -384,14 +297,6 @@ public class Ide implements BuildExecutorModule {
                 : "org.eclipse.jdt.launching.JRE_CONTAINER"
                 + "/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType"
                 + "/JavaSE-" + version(release);
-    }
-
-    private static String sourcePath(Module module, Path source) {
-        String relative = escape(module.content()
-                .relativize(source)
-                .toString()
-                .replace(File.separatorChar, '/'));
-        return (relative.isEmpty() ? " excluding=\".eclipse/\"" : "") + " path=\"" + relative + "\"";
     }
 
     private static void entry(StringBuilder content, String head, List<String> flags) {
@@ -467,6 +372,99 @@ public class Ide implements BuildExecutorModule {
                           List<Path> testSources,
                           List<Path> libraries,
                           List<String> moduleDependencies) {
+
+        private String iml(Path base, int feature) {
+            StringBuilder content = new StringBuilder();
+            content.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+            content.append("<module type=\"JAVA_MODULE\" version=\"4\">\n");
+            content.append("  <component name=\"NewModuleRootManager\"");
+            if (release() != null && release() != feature) {
+                content.append(" LANGUAGE_LEVEL=\"").append(languageLevel(release())).append('"');
+            }
+            content.append(" inherit-compiler-output=\"true\">\n");
+            content.append("    <exclude-output/>\n");
+            content.append("    <content url=\"file://$MODULE_DIR$\">\n");
+            for (Path source : mainSources()) {
+                content.append("      <sourceFolder url=\"file://$MODULE_DIR$")
+                        .append(relative(source))
+                        .append("\" isTestSource=\"false\"/>\n");
+            }
+            for (Path source : testSources()) {
+                content.append("      <sourceFolder url=\"file://$MODULE_DIR$")
+                        .append(relative(source))
+                        .append("\" isTestSource=\"true\"/>\n");
+            }
+            content.append("    </content>\n");
+            content.append("    <orderEntry type=\"inheritedJdk\"/>\n");
+            content.append("    <orderEntry type=\"sourceFolder\" forTests=\"false\"/>\n");
+            for (String dependency : moduleDependencies()) {
+                content.append("    <orderEntry type=\"module\" module-name=\"")
+                        .append(escape(dependency))
+                        .append("\"/>\n");
+            }
+            for (Path library : libraries()) {
+                content.append("    <orderEntry type=\"module-library\">\n");
+                content.append("      <library>\n");
+                content.append("        <CLASSES>\n");
+                content.append("          <root url=\"jar://")
+                        .append(escape(libraryUrl(base, library)))
+                        .append("!/\"/>\n");
+                content.append("        </CLASSES>\n");
+                content.append("        <JAVADOC/>\n");
+                content.append("        <SOURCES/>\n");
+                content.append("      </library>\n");
+                content.append("    </orderEntry>\n");
+            }
+            content.append("  </component>\n");
+            content.append("</module>\n");
+            return content.toString();
+        }
+
+        private String relative(Path source) {
+            String relative = content().relativize(source).toString().replace(File.separatorChar, '/');
+            return relative.isEmpty() ? "" : "/" + relative;
+        }
+
+        private String libraryUrl(Path base, Path library) {
+            return library.startsWith(base)
+                    ? "$MODULE_DIR$/" + content().relativize(library).toString().replace(File.separatorChar, '/')
+                    : library.toString().replace(File.separatorChar, '/');
+        }
+
+        private String classpath() {
+            List<String> onModulePath = modular() ? List.of("module") : List.of();
+            StringBuilder content = new StringBuilder();
+            content.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+            content.append("<classpath>\n");
+            for (Path source : mainSources()) {
+                entry(content, "kind=\"src\"" + sourcePath(source), List.of());
+            }
+            for (Path source : testSources()) {
+                entry(content,
+                        "kind=\"src\" output=\".eclipse/test-classes\"" + sourcePath(source),
+                        List.of("test"));
+            }
+            entry(content, "kind=\"con\" path=\"" + container(release()) + "\"", onModulePath);
+            for (String dependency : moduleDependencies()) {
+                entry(content, "combineaccessrules=\"false\" kind=\"src\" path=\"/" + escape(dependency) + "\"",
+                        List.of());
+            }
+            for (Path library : libraries()) {
+                entry(content,
+                        "kind=\"lib\" path=\"" + escape(library.toString().replace(File.separatorChar, '/')) + "\"",
+                        onModulePath);
+            }
+            content.append("  <classpathentry kind=\"output\" path=\".eclipse/classes\"/>\n");
+            content.append("</classpath>\n");
+            return content.toString();
+        }
+        private String sourcePath(Path source) {
+            String relative = escape(content()
+                    .relativize(source)
+                    .toString()
+                    .replace(File.separatorChar, '/'));
+            return (relative.isEmpty() ? " excluding=\".eclipse/\"" : "") + " path=\"" + relative + "\"";
+        }
     }
 
     private record Raw(String name,

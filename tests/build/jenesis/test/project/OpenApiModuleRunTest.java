@@ -21,8 +21,6 @@ public class OpenApiModuleRunTest {
     private static final String PINS = """
             openapi/maven/org.openapitools/openapi-generator-cli 7.25.0 SHA-256/41ce4f6b07f196676439d710759fa1ced7a08066d06ff1bf314681470289efae
             """;
-
-
     private static final String SPECIFICATION = """
             openapi: 3.0.3
             info:

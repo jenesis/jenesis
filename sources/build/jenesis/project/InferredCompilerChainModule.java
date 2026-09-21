@@ -21,9 +21,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
     public static final String JAVAC = "javac", KOTLINC = "kotlinc", SCALAC = "scalac", GROOVYC = "groovyc", RESOURCE = "resource";
     public static final String ERRORPRONE = "errorprone";
     public static final String COMPILE = "compile";
-    private static final String SCAN = "scan";
-    private static final String SCAN_FILE = "scan.properties";
-
+    private static final String SCAN = "scan", SCAN_FILE = "scan.properties";
     private static final Set<String> ERRORPRONE_KEYS = Set.of("arguments");
 
     private final SequencedSet<Path> configuration;

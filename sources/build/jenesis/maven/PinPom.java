@@ -174,7 +174,7 @@ public class PinPom implements BuildStep {
             }
             String coordinate = key.substring(0, lastSlash);
             String version = key.substring(lastSlash + 1);
-            String checksum = computeChecksum(dependency.getValue(), hashFunction);
+            String checksum = dependency.getValue().checksum(hashFunction);
             String value = checksum == null ? version : version + " " + checksum;
             entries.putIfAbsent(group + "/" + coordinate, value);
         }
@@ -269,14 +269,6 @@ public class PinPom implements BuildStep {
         }
         sb.append(indent).append("-->\n");
         return sb.toString();
-    }
-
-    private static String computeChecksum(Inventory.Dependency dependency,
-                                          HashDigestFunction hashFunction) throws IOException {
-        if (dependency.jar() != null && Files.isRegularFile(dependency.jar())) {
-            return hashFunction.encodedHash(dependency.jar());
-        }
-        return dependency.checksum().isEmpty() ? null : dependency.checksum();
     }
 
     static Set<String> collectInternal(Set<String> identities) {

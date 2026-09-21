@@ -19,9 +19,7 @@ public class SpotBugsModule implements BuildExecutorModule {
 
     public static final String CHECK = "check";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-
-    private static final String MAVEN_GROUP = "com.github.spotbugs";
-    private static final String MAVEN_ARTIFACT = "spotbugs";
+    private static final String MAVEN_GROUP = "com.github.spotbugs", MAVEN_ARTIFACT = "spotbugs";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

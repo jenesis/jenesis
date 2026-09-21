@@ -414,34 +414,7 @@ public class Sbom implements BuildStep {
                 directory.files().put(segments[segments.length - 1], file);
             }
         }
-        return origins.isEmpty() ? null : "swh:1:dir:" + HexFormat.of().formatHex(treeId(tree));
-    }
-
-    private static byte[] treeId(Directory directory) throws IOException {
-        List<String> names = new ArrayList<>(directory.files().keySet());
-        directory.directories().keySet().forEach(name -> names.add(name + "/"));
-        names.sort((left, right) -> Arrays.compareUnsigned(
-                left.getBytes(StandardCharsets.UTF_8),
-                right.getBytes(StandardCharsets.UTF_8)));
-        ByteArrayOutputStream content = new ByteArrayOutputStream();
-        for (String name : names) {
-            byte[] id;
-            if (name.endsWith("/")) {
-                name = name.substring(0, name.length() - 1);
-                content.write("40000 ".getBytes(StandardCharsets.US_ASCII));
-                id = treeId(directory.directories().get(name));
-            } else {
-                content.write("100644 ".getBytes(StandardCharsets.US_ASCII));
-                id = blobId(directory.files().get(name));
-            }
-            content.write(name.getBytes(StandardCharsets.UTF_8));
-            content.write(0);
-            content.write(id);
-        }
-        MessageDigest digest = sha1();
-        digest.update(("tree " + content.size() + "\0").getBytes(StandardCharsets.US_ASCII));
-        digest.update(content.toByteArray());
-        return digest.digest();
+        return origins.isEmpty() ? null : "swh:1:dir:" + HexFormat.of().formatHex(tree.id());
     }
 
     private static byte[] blobId(Path file) throws IOException {
@@ -465,6 +438,33 @@ public class Sbom implements BuildStep {
 
         private Directory() {
             this(new TreeMap<>(), new TreeMap<>());
+        }
+
+        private byte[] id() throws IOException {
+            List<String> names = new ArrayList<>(files.keySet());
+            directories.keySet().forEach(name -> names.add(name + "/"));
+            names.sort((left, right) -> Arrays.compareUnsigned(
+                    left.getBytes(StandardCharsets.UTF_8),
+                    right.getBytes(StandardCharsets.UTF_8)));
+            ByteArrayOutputStream content = new ByteArrayOutputStream();
+            for (String name : names) {
+                byte[] id;
+                if (name.endsWith("/")) {
+                    name = name.substring(0, name.length() - 1);
+                    content.write("40000 ".getBytes(StandardCharsets.US_ASCII));
+                    id = directories.get(name).id();
+                } else {
+                    content.write("100644 ".getBytes(StandardCharsets.US_ASCII));
+                    id = blobId(files.get(name));
+                }
+                content.write(name.getBytes(StandardCharsets.UTF_8));
+                content.write(0);
+                content.write(id);
+            }
+            MessageDigest digest = sha1();
+            digest.update(("tree " + content.size() + "\0").getBytes(StandardCharsets.US_ASCII));
+            digest.update(content.toByteArray());
+            return digest.digest();
         }
     }
 }

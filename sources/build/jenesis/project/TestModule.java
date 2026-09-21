@@ -623,7 +623,6 @@ public class TestModule implements BuildExecutorModule {
     public record Scope(String filter, String tag) {
 
         private static final String FILTER = "filter", TAG = "tag";
-
         private static final Pattern TAG_NAME = Pattern.compile("[A-Za-z0-9_.\\-]+");
         private static final Set<String> RESERVED = Set.of("any", "none");
 
@@ -649,11 +648,7 @@ public class TestModule implements BuildExecutorModule {
         }
 
         public boolean covers(Scope requested) {
-            return coversFilter(requested.filter()) && coversTag(requested.tag());
-        }
-
-        private boolean coversFilter(String requested) {
-            return entries(filter).equals(entries(requested));
+            return entries(filter).equals(entries(requested.filter())) && coversTag(requested.tag());
         }
 
         private boolean coversTag(String requested) {

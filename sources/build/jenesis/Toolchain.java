@@ -5,7 +5,6 @@ import module java.base;
 public final class Toolchain {
 
     private static final Pattern VERSION = Pattern.compile("[1-9][0-9]*(\\.(0|[1-9][0-9]*))*(-[A-Za-z]+)*");
-
     private static final Pattern WORD = Pattern.compile("[A-Za-z]+");
 
     private final String version;

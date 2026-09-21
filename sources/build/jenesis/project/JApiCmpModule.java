@@ -20,9 +20,7 @@ public class JApiCmpModule implements BuildExecutorModule {
 
     public static final String COMPARE = "compare";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-
-    private static final String MAVEN_GROUP = "com.github.siom79.japicmp";
-    private static final String MAVEN_ARTIFACT = "japicmp";
+    private static final String MAVEN_GROUP = "com.github.siom79.japicmp", MAVEN_ARTIFACT = "japicmp";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

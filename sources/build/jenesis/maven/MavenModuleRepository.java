@@ -9,7 +9,6 @@ import build.jenesis.module.JenesisRepository;
 public class MavenModuleRepository implements JenesisRepository {
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
-
     private static final int DEFAULT_SEGMENTS = 2;
 
     private final MavenRepository repository;

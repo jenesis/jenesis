@@ -17,14 +17,11 @@ import build.jenesis.step.ProcessHandler;
 
 public class WsImportModule implements BuildExecutorModule {
 
-    public static final String FOLDER = "wsimport/";
-    public static final String DESCRIPTION = ".wsdl", BINDING = ".xjb", CATALOG = "catalog";
-
+    public static final String FOLDER = "wsimport/", DESCRIPTION = ".wsdl", BINDING = ".xjb",
+            CATALOG = "catalog";
     public static final String GENERATE = "generate";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
-
-    private static final String MAVEN_GROUP = "com.sun.xml.ws";
-    private static final String MAVEN_ARTIFACT = "jaxws-tools";
+    private static final String MAVEN_GROUP = "com.sun.xml.ws", MAVEN_ARTIFACT = "jaxws-tools";
 
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;

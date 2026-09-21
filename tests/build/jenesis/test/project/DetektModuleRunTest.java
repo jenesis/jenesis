@@ -61,9 +61,7 @@ public class DetektModuleRunTest {
             detekt/maven/org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
             detekt/maven/org.snakeyaml/snakeyaml-engine 2.7 SHA-256/4053f878c171692aab8782f53a3974f43e55e2b6ed12c3682b36a46968c5ded1
             """;
-
     private static final String VERSION = "1.23.7";
-
     private static final String CONFIG = """
             style:
               active: true

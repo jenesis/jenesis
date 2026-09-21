@@ -20,8 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class InferredCompilerChainModuleTest {
 
-    private static final String KOTLIN_VERSION = "2.2.0";
-    private static final String SCALA_VERSION = "3.5.2";
+    private static final String KOTLIN_VERSION = "2.2.0", SCALA_VERSION = "3.5.2";
 
     @TempDir
     private Path root, project;

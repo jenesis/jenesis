@@ -38,7 +38,6 @@ public class CodeNarcModuleRunTest {
             codenarc/maven/org.slf4j/slf4j-api 1.7.35 SHA-256/84cbd60deaf9e18db8cb181e43db4e63f7de353cfcaf654a76d85b22da4d2762
             codenarc/maven/org.slf4j/slf4j-simple 2.0.16 SHA-256/effc32018658bea09d1e08c7d1060ccad46c086960f583d07dd7ffe9c1172a47
             """;
-
     private static final String CONFIG = """
             <ruleset xmlns="http://codenarc.org/ruleset/1.0">
                 <rule class="org.codenarc.rule.basic.EmptyIfStatementRule"/>
