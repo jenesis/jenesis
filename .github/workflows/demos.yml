@@ -80,8 +80,8 @@ jobs:
           - { name: vulnerabilities, dir: demo-30-vulnerabilities, entry: build/Demo.java }
           - { name: java-quality, dir: demo-31-java-quality, entry: build/jenesis/Make.java, verify: 'find target -type d -name checkstyle | grep -q . && find target -type d -name pmd | grep -q . && find target -type d -name spotbugs | grep -q .' }
           - { name: ide-quality-groups, dir: demo-31-java-quality, entry: build/jenesis/Make.java ide/idea, verify: '! grep -q PROJECT_DIR sources/demo.quality.iml && ! grep -q jar:// sources/demo.quality.iml' }
-          - { name: test-engine, dir: demo-32-test-engine, entry: build/jenesis/Make.java, verify: 'find target -name "org.junit.jupiter.engine-*.jar" | grep -q . && find target -name "org.junit.vintage.engine-*.jar" | grep -q . && grep -rqs ConsoleLauncher target' }
-          - { name: test-engine-declared, dir: demo-32-test-engine, entry: build/jenesis/Make.java, flags: -Djenesis.make.profiles=explicit, verify: 'find target -type d -path "*test/executed*" | grep -q . && grep -rqs ConsoleLauncher target' }
+          - { name: test-framework, dir: demo-32-test-framework, entry: build/jenesis/Make.java, verify: 'find target -name "org.junit.jupiter.engine-*.jar" | grep -q . && find target -name "org.junit.vintage.engine-*.jar" | grep -q . && grep -rqs ConsoleLauncher target' }
+          - { name: test-framework-declared, dir: demo-32-test-framework, entry: build/jenesis/Make.java, flags: -Djenesis.make.profiles=explicit, verify: 'find target -type d -path "*test/executed*" | grep -q . && grep -rqs ConsoleLauncher target' }
           - { name: code-coverage, dir: demo-33-code-coverage, entry: build/jenesis/Make.java, verify: 'find target -path "*reports/jacoco/coverage/Calculator.html" | grep -q .' }
           - { name: test-selection, dir: demo-34-test-selection, entry: build/Demo.java }
           - { name: pitest, dir: demo-35-pitest, entry: build/jenesis/Make.java, verify: 'find target -path "*reports/pitest/mutations.xml" -exec grep -l "calc.Calculator" {} + | grep -q .' }

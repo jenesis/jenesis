@@ -3,7 +3,7 @@ package build.jenesis.project;
 import module java.base;
 import build.jenesis.BuildStep;
 
-public record JUnitPlatform() implements TestEngine {
+public record JUnitPlatform() implements TestFramework {
 
     private static final String JUNIT4 = "junit",
             JUPITER_API = "org.junit.jupiter.api",
@@ -19,7 +19,7 @@ public record JUnitPlatform() implements TestEngine {
     }
 
     @Override
-    public boolean isFramework(ModuleDescriptor module) {
+    public boolean isMarkedBy(ModuleDescriptor module) {
         return module.name().equals(PLATFORM_ENGINE) || module.name().equals(JUPITER_API);
     }
 
@@ -42,23 +42,23 @@ public record JUnitPlatform() implements TestEngine {
     }
 
     @Override
-    public String mainClass() {
+    public String runnerClass() {
         return "org.junit.platform.console.ConsoleLauncher";
     }
 
     @Override
-    public Map<String, String> properties() {
+    public Map<String, String> systemProperties() {
         return Map.of("org.jline.terminal.dumb", "true");
     }
 
     @Override
-    public List<String> commands(Path supplement,
-                                 Path output,
-                                 SequencedSet<String> classes,
-                                 SequencedMap<String, SequencedSet<String>> methods,
-                                 SequencedSet<String> groups,
-                                 boolean parallel,
-                                 boolean reporting) {
+    public List<String> arguments(Path supplement,
+                                  Path output,
+                                  SequencedSet<String> classes,
+                                  SequencedMap<String, SequencedSet<String>> methods,
+                                  SequencedSet<String> groups,
+                                  boolean parallel,
+                                  boolean reporting) {
         List<String> commands = new ArrayList<>(List.of("execute", "--disable-banner", "--disable-ansi-colors"));
         for (String group : groups) {
             commands.add("--include-tag=" + group);

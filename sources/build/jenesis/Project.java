@@ -822,9 +822,9 @@ public record Project(
                     names other folders; each reads only the file kinds it compiles.
 
                       packaging.properties      jmod/jlink/bundle/launcher/native booleans, jpackage=<type>
-                      test.properties           engine=junit-platform|junit4|testng, naming the engine
-                                                this module's tests run on; absent, it is inferred from
-                                                the resolved dependencies
+                      test.properties           framework=junit-platform|junit4|testng, naming what
+                                                this module's tests are written against; absent, it is
+                                                inferred from the resolved dependencies
                       sbom.properties           CycloneDX format=json|xml|none; the SBOM is on by
                                                 default, -Djenesis.sbom.cyclonedx=false disables it
                       bom.properties            publish the resolved closure as a repository BOM
@@ -979,7 +979,7 @@ public record Project(
                                          28 sbom, 29 compliance (licenses), 30 vulnerabilities (OSV)
                       Quality gates      31 java-quality, 37 api-compatibility (japicmp),
                                          39 kotlin-quality, 42 scala-quality, 44 groovy-quality
-                      Tests              32 test-engine (which engine runs them),
+                      Tests              32 test-framework (what the tests are written against),
                                          33 code-coverage (JaCoCo), 34 test-selection (incremental),
                                          35 pitest (mutation), 36 jmh (benchmark harness)
                       Other languages    38 kotlin, 40 kotlin-plugin, 41 scala, 43 groovy

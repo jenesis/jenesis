@@ -22,13 +22,13 @@ public class TestModule implements BuildExecutorModule {
     public static final String REQUIRED = "required", ARTIFACTS = "artifacts", EXECUTED = "executed";
     private static final String RESOLVED = "resolved", DEPENDENCIES = "dependencies";
 
-    private final TestEngine engine;
+    private final TestFramework framework;
     private final Predicate<String> isTest;
     private final Function<List<String>, ProcessHandler.OfProcess> factory;
     private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
     private final boolean jarsOnly;
-    private final boolean requireEngine;
+    private final boolean requireFramework;
     private final Pinning pinning;
     private final PathPlacement pathPlacement;
     private final String moduleName;
@@ -70,13 +70,13 @@ public class TestModule implements BuildExecutorModule {
                 SequencedProperties.systemFlag("jenesis.test.skip"));
     }
 
-    private TestModule(TestEngine engine,
+    private TestModule(TestFramework framework,
                        Predicate<String> isTest,
                        Function<List<String>, ProcessHandler.OfProcess> factory,
                        Map<String, Repository> repositories,
                        Map<String, Resolver> resolvers,
                        boolean jarsOnly,
-                       boolean requireEngine,
+                       boolean requireFramework,
                        Pinning pinning,
                        PathPlacement pathPlacement,
                        String moduleName,
@@ -90,13 +90,13 @@ public class TestModule implements BuildExecutorModule {
                        BiConsumer<Boolean, String> printing,
                        boolean skip) {
         this.skip = skip;
-        this.engine = engine;
+        this.framework = framework;
         this.isTest = isTest;
         this.factory = factory;
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.jarsOnly = jarsOnly;
-        this.requireEngine = requireEngine;
+        this.requireFramework = requireFramework;
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
         this.moduleName = moduleName;
@@ -110,14 +110,14 @@ public class TestModule implements BuildExecutorModule {
         this.printing = printing;
     }
 
-    public TestModule engine(TestEngine engine) {
-        return new TestModule(engine,
+    public TestModule framework(TestFramework framework) {
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -133,13 +133,13 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public <P extends Predicate<String> & Serializable> TestModule isTest(P isTest) {
-        return new TestModule(engine,
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -155,13 +155,13 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public TestModule factory(Function<List<String>, ProcessHandler.OfProcess> factory) {
-        return new TestModule(engine,
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -177,13 +177,13 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public TestModule filter(String filter) {
-        return new TestModule(engine,
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -199,13 +199,13 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public TestModule jarsOnly(boolean jarsOnly) {
-        return new TestModule(engine,
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -220,14 +220,14 @@ public class TestModule implements BuildExecutorModule {
                 skip);
     }
 
-    public TestModule requireEngine(boolean requireEngine) {
-        return new TestModule(engine,
+    public TestModule requireFramework(boolean requireFramework) {
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -243,13 +243,13 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public TestModule pinning(Pinning pinning) {
-        return new TestModule(engine,
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -265,13 +265,13 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public TestModule pathPlacement(PathPlacement pathPlacement) {
-        return new TestModule(engine,
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -287,13 +287,13 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public TestModule moduleName(String moduleName) {
-        return new TestModule(engine,
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -309,13 +309,13 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public TestModule tag(String tag) {
-        return new TestModule(engine,
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -331,13 +331,13 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public TestModule force(boolean force) {
-        return new TestModule(engine,
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -353,13 +353,13 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public TestModule group(String group) {
-        return new TestModule(engine,
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -375,13 +375,13 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public TestModule parallel(boolean parallel) {
-        return new TestModule(engine,
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -397,13 +397,13 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public TestModule reporting(boolean reporting) {
-        return new TestModule(engine,
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -423,13 +423,13 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public TestModule observe(List<ObservabilityEngine> observers) {
-        return new TestModule(engine,
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -445,13 +445,13 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public TestModule printing(BiConsumer<Boolean, String> printing) {
-        return new TestModule(engine,
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -467,13 +467,13 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public TestModule skip(boolean skip) {
-        return new TestModule(engine,
+        return new TestModule(framework,
                 isTest,
                 factory,
                 repositories,
                 resolvers,
                 jarsOnly,
-                requireEngine,
+                requireFramework,
                 pinning,
                 pathPlacement,
                 moduleName,
@@ -490,13 +490,13 @@ public class TestModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-        TestEngine resolved = engine;
+        TestFramework resolved = framework;
         if (resolved == null) {
-            resolved = TestEngine.of(() -> inherited.values().stream().iterator()).orElse(null);
+            resolved = TestFramework.detect(() -> inherited.values().stream().iterator()).orElse(null);
             if (resolved == null) {
-                if (requireEngine && !skip) {
+                if (requireFramework && !skip) {
                     throw new IllegalStateException(
-                            "No test engine could be resolved from inherited dependencies: "
+                            "No test framework could be resolved from inherited dependencies: "
                                     + inherited.sequencedKeySet());
                 }
                 return;
@@ -544,7 +544,7 @@ public class TestModule implements BuildExecutorModule {
         return Optional.empty();
     }
 
-    private record Requires(String group, TestEngine engine, Set<String> prefixes, List<ObservabilityEngine> observers) implements BuildStep {
+    private record Requires(String group, TestFramework framework, Set<String> prefixes, List<ObservabilityEngine> observers) implements BuildStep {
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
@@ -555,8 +555,8 @@ public class TestModule implements BuildExecutorModule {
                     .filter(argument -> !argument.removed())
                     .map(BuildStepArgument::folder)
                     .toList();
-            List<ModuleDescriptor> artifacts = TestEngine.scan(folders);
-            TestEngine resolved = engine != null ? engine : TestEngine.of(artifacts).orElse(null);
+            List<ModuleDescriptor> artifacts = TestFramework.modules(folders);
+            TestFramework resolved = framework != null ? framework : TestFramework.detect(artifacts).orElse(null);
             SequencedProperties properties = new SequencedProperties();
             SequencedProperties versions = new SequencedProperties();
             if (resolved != null) {
@@ -699,7 +699,7 @@ public class TestModule implements BuildExecutorModule {
 
     private static class Run extends Java {
 
-        private final TestEngine engine;
+        private final TestFramework framework;
         private final Predicate<String> isTest;
         private final String moduleName;
         private final transient String filter;
@@ -712,7 +712,7 @@ public class TestModule implements BuildExecutorModule {
         private final transient String incrementalDigest;
 
         private Run(Function<List<String>, ProcessHandler.OfProcess> factory,
-                    TestEngine engine,
+                    TestFramework framework,
                     Predicate<String> isTest,
                     boolean jarsOnly,
                     PathPlacement pathPlacement,
@@ -731,7 +731,7 @@ public class TestModule implements BuildExecutorModule {
                     jarsOnly,
                     group,
                     printing);
-            this.engine = engine;
+            this.framework = framework;
             this.isTest = isTest;
             this.moduleName = moduleName;
             this.filter = filter;
@@ -772,16 +772,16 @@ public class TestModule implements BuildExecutorModule {
 
         @Override
         protected CompletionStage<List<String>> commands(Executor executor,
-                                                         BuildStepContext context,
-                                                         SequencedMap<String, BuildStepArgument> arguments)
+                                                        BuildStepContext context,
+                                                        SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            TestEngine resolved = engine != null
-                    ? engine
-                    : TestEngine.of(() -> arguments.values().stream()
+            TestFramework resolved = framework != null
+                    ? framework
+                    : TestFramework.detect(() -> arguments.values().stream()
                             .filter(argument -> !argument.removed())
                             .map(BuildStepArgument::folder)
                             .iterator())
-                    .orElseThrow(() -> new IllegalArgumentException("No test engine found"));
+                    .orElseThrow(() -> new IllegalArgumentException("No test framework found"));
             List<TestSpec> specs = TestSpec.parse(filter);
             SequencedSet<String> groups = groups(tag);
             List<String> commands = new ArrayList<>();
@@ -807,7 +807,7 @@ public class TestModule implements BuildExecutorModule {
                 commands.add("-javaagent:" + jar.toAbsolutePath()
                         + (attachment.getValue().isEmpty() ? "" : "=" + attachment.getValue()));
             }
-            for (Map.Entry<String, String> entry : resolved.properties().entrySet()) {
+            for (Map.Entry<String, String> entry : resolved.systemProperties().entrySet()) {
                 commands.add("-D" + entry.getKey() + "=" + entry.getValue());
             }
             if (pathPlacement.modular() && resolved.runnerModule() != null) {
@@ -816,9 +816,9 @@ public class TestModule implements BuildExecutorModule {
                     commands.add(moduleName);
                 }
                 commands.add("-m");
-                commands.add(resolved.runnerModule() + "/" + resolved.mainClass());
+                commands.add(resolved.runnerModule() + "/" + resolved.runnerClass());
             } else {
-                commands.add(resolved.mainClass());
+                commands.add(resolved.runnerClass());
             }
             SequencedSet<String> matchedClasses = new TreeSet<>();
             SequencedMap<String, SequencedSet<String>> matchedMethods = new TreeMap<>();
@@ -876,7 +876,7 @@ public class TestModule implements BuildExecutorModule {
                     selection = narrowed;
                 }
             }
-            commands.addAll(resolved.commands(
+            commands.addAll(resolved.arguments(
                     context.supplement(),
                     context.next(),
                     selection,

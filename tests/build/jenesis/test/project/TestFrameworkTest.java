@@ -7,13 +7,13 @@ import build.jenesis.BuildStep;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.JUnit4;
 import build.jenesis.project.JUnitPlatform;
-import build.jenesis.project.TestEngine;
+import build.jenesis.project.TestFramework;
 import build.jenesis.project.TestNG;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class TestEngineTest {
+public class TestFrameworkTest {
 
     @TempDir
     private Path root;
@@ -21,20 +21,20 @@ public class TestEngineTest {
     @Test
     public void detects_junit_platform_from_engine_module() throws IOException {
         writeJar(root.resolve("artifacts"), "engine.jar", "org.junit.platform.engine");
-        assertThat(TestEngine.of(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
+        assertThat(TestFramework.detect(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
     }
 
     @Test
     public void detects_junit_platform_from_jupiter_api_without_an_engine() throws IOException {
         writeJar(root.resolve("artifacts"), "api.jar", "org.junit.jupiter.api");
-        assertThat(TestEngine.of(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
+        assertThat(TestFramework.detect(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
     }
 
     @Test
     public void prefers_junit_platform_over_an_incidental_junit4_jar() throws IOException {
         writeJar(root.resolve("artifacts"), "api.jar", "org.junit.jupiter.api");
         writeJar(root.resolve("artifacts"), "junit.jar", "junit");
-        assertThat(TestEngine.of(List.of(root)))
+        assertThat(TestFramework.detect(List.of(root)))
                 .as("a transitive junit:junit must not outrank the Jupiter API of the tests themselves")
                 .get()
                 .isInstanceOf(JUnitPlatform.class);
@@ -43,51 +43,51 @@ public class TestEngineTest {
     @Test
     public void detects_junit4_from_module() throws IOException {
         writeJar(root.resolve("artifacts"), "junit.jar", "junit");
-        assertThat(TestEngine.of(List.of(root))).get().isInstanceOf(JUnit4.class);
+        assertThat(TestFramework.detect(List.of(root))).get().isInstanceOf(JUnit4.class);
     }
 
     @Test
     public void detects_testng_from_module() throws IOException {
         writeJar(root.resolve("artifacts"), "testng.jar", "org.testng");
-        assertThat(TestEngine.of(List.of(root))).get().isInstanceOf(TestNG.class);
+        assertThat(TestFramework.detect(List.of(root))).get().isInstanceOf(TestNG.class);
     }
 
     @Test
-    public void detects_engine_from_resolved_dependencies() throws IOException {
+    public void detects_the_framework_from_resolved_dependencies() throws IOException {
         writeJar(root.resolve("resolved"), "engine.jar", "org.junit.platform.engine");
         SequencedProperties index = new SequencedProperties();
         index.setProperty("runtime/maven/engine", "resolved/engine.jar");
         index.store(root.resolve(BuildStep.DEPENDENCIES));
-        assertThat(TestEngine.of(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
+        assertThat(TestFramework.detect(List.of(root))).get().isInstanceOf(JUnitPlatform.class);
     }
 
     @Test
-    public void detects_no_engine_for_unrelated_module() throws IOException {
+    public void detects_no_framework_for_unrelated_module() throws IOException {
         writeJar(root.resolve("artifacts"), "plain.jar", "com.example.something");
-        assertThat(TestEngine.of(List.of(root))).isEmpty();
+        assertThat(TestFramework.detect(List.of(root))).isEmpty();
     }
 
     @Test
-    public void detects_no_engine_from_file_name_alone() throws IOException {
+    public void detects_no_framework_from_file_name_alone() throws IOException {
         writeJar(root.resolve("artifacts"), "org.junit.platform.engine.jar", null);
-        assertThat(TestEngine.of(List.of(root))).isEmpty();
+        assertThat(TestFramework.detect(List.of(root))).isEmpty();
     }
 
     @Test
-    public void detects_no_engine_without_jars() throws IOException {
-        assertThat(TestEngine.of(List.of(root))).isEmpty();
+    public void detects_no_framework_without_jars() throws IOException {
+        assertThat(TestFramework.detect(List.of(root))).isEmpty();
     }
 
     @Test
     public void resolves_nothing_where_the_console_jar_is_on_the_path() throws IOException {
         writeJar(root.resolve("artifacts"), "console.jar", "org.junit.platform.console");
-        assertThat(new JUnitPlatform().missingCoordinates(TestEngine.scan(List.of(root)))).isEmpty();
+        assertThat(new JUnitPlatform().missingCoordinates(TestFramework.modules(List.of(root)))).isEmpty();
     }
 
     @Test
     public void resolves_the_console_where_only_the_engine_jar_is_on_the_path() throws IOException {
         writeJar(root.resolve("artifacts"), "engine.jar", "org.junit.platform.engine");
-        assertThat(new JUnitPlatform().missingCoordinates(TestEngine.scan(List.of(root))))
+        assertThat(new JUnitPlatform().missingCoordinates(TestFramework.modules(List.of(root))))
                 .containsOnlyKeys("module/org.junit.platform.console",
                         "maven/org.junit.platform/junit-platform-console");
     }
@@ -202,7 +202,7 @@ public class TestEngineTest {
 
     @Test
     public void junit4_emits_class_names_positionally() {
-        assertThat(new JUnit4().commands(root,
+        assertThat(new JUnit4().arguments(root,
                 root,
                 new LinkedHashSet<>(List.of("sample.AlphaTest", "sample.BetaTest")),
                 Collections.emptyNavigableMap(),
@@ -216,7 +216,7 @@ public class TestEngineTest {
     public void junit4_rejects_method_selectors() {
         SequencedMap<String, SequencedSet<String>> methods = new LinkedHashMap<>();
         methods.put("sample.AlphaTest", new LinkedHashSet<>(List.of("first")));
-        assertThatThrownBy(() -> new JUnit4().commands(root,
+        assertThatThrownBy(() -> new JUnit4().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
                 methods,
@@ -230,7 +230,7 @@ public class TestEngineTest {
     public void junit_platform_emits_select_class_and_method_arguments() {
         SequencedMap<String, SequencedSet<String>> methods = new LinkedHashMap<>();
         methods.put("sample.AlphaTest", new LinkedHashSet<>(List.of("first", "second")));
-        assertThat(new JUnitPlatform().commands(root,
+        assertThat(new JUnitPlatform().arguments(root,
                 root,
                 new LinkedHashSet<>(List.of("sample.BetaTest")),
                 methods,
@@ -247,7 +247,7 @@ public class TestEngineTest {
     public void testng_joins_classes_and_methods() {
         SequencedMap<String, SequencedSet<String>> methods = new LinkedHashMap<>();
         methods.put("sample.AlphaTest", new LinkedHashSet<>(List.of("first")));
-        assertThat(new TestNG().commands(root,
+        assertThat(new TestNG().arguments(root,
                 root,
                 new LinkedHashSet<>(List.of("sample.AlphaTest", "sample.BetaTest")),
                 methods,
@@ -260,7 +260,7 @@ public class TestEngineTest {
 
     @Test
     public void junit_platform_commands_add_one_tag_per_group_and_parallel_config() {
-        assertThat(new JUnitPlatform().commands(root,
+        assertThat(new JUnitPlatform().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
@@ -271,7 +271,7 @@ public class TestEngineTest {
                         "--include-tag=flaky",
                         "--config=junit.jupiter.execution.parallel.enabled=true",
                         "--config=junit.jupiter.execution.parallel.mode.default=concurrent");
-        assertThat(new JUnitPlatform().commands(root,
+        assertThat(new JUnitPlatform().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
@@ -284,7 +284,7 @@ public class TestEngineTest {
 
     @Test
     public void junit_platform_commands_add_both_report_formats_when_enabled() {
-        assertThat(new JUnitPlatform().commands(root,
+        assertThat(new JUnitPlatform().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
@@ -294,7 +294,7 @@ public class TestEngineTest {
                 .contains("--reports-dir=" + root.resolve(BuildStep.REPORTS + "tests"),
                         "--config=junit.platform.reporting.open.xml.enabled=true",
                         "--config=junit.platform.reporting.output.dir=" + root.resolve(BuildStep.REPORTS + "tests"));
-        assertThat(new JUnitPlatform().commands(root,
+        assertThat(new JUnitPlatform().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
@@ -307,7 +307,7 @@ public class TestEngineTest {
 
     @Test
     public void testng_writes_its_report_into_the_reports_folder_when_enabled() {
-        assertThat(new TestNG().commands(root,
+        assertThat(new TestNG().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
@@ -319,7 +319,7 @@ public class TestEngineTest {
 
     @Test
     public void testng_joins_groups_with_commas_and_adds_parallel() {
-        assertThat(new TestNG().commands(root,
+        assertThat(new TestNG().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
@@ -332,7 +332,7 @@ public class TestEngineTest {
 
     @Test
     public void junit4_rejects_groups() {
-        assertThatThrownBy(() -> new JUnit4().commands(root,
+        assertThatThrownBy(() -> new JUnit4().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
@@ -344,7 +344,7 @@ public class TestEngineTest {
 
     @Test
     public void junit4_ignores_parallel() {
-        assertThat(new JUnit4().commands(root,
+        assertThat(new JUnit4().arguments(root,
                 root,
                 new LinkedHashSet<>(List.of("sample.AlphaTest")),
                 Collections.emptyNavigableMap(),

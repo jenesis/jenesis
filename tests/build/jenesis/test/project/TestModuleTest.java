@@ -19,7 +19,7 @@ import build.jenesis.project.JUnit4;
 import build.jenesis.project.JUnitPlatform;
 import build.jenesis.project.JaCoCo;
 import build.jenesis.step.Javac;
-import build.jenesis.project.TestEngine;
+import build.jenesis.project.TestFramework;
 import build.jenesis.project.TestNG;
 import java.lang.classfile.ClassFile;
 import java.lang.classfile.attribute.ModuleAttribute;
@@ -158,7 +158,7 @@ public class TestModuleTest {
                                 Map.of(),
                                 null)),
                         Map.of("maven", new MavenPomResolver()))
-                        .engine(new JUnit4())
+                        .framework(new JUnit4())
                         .isTest(candidate -> candidate.endsWith("JUnit4TestSample")).jarsOnly(false).pathPlacement(PathPlacement.CLASS_PATH),
                 "dependencies", "classes");
         executor.execute();
@@ -217,7 +217,7 @@ public class TestModuleTest {
                                 Map.of(),
                                 null)),
                         Map.of("maven", new MavenPomResolver()))
-                        .engine(new TestNG())
+                        .framework(new TestNG())
                         .isTest(candidate -> candidate.endsWith("TestNGTestSample")).jarsOnly(false).pathPlacement(PathPlacement.CLASS_PATH),
                 "dependencies", "classes");
         executor.execute();
@@ -239,7 +239,7 @@ public class TestModuleTest {
                                 Map.of(),
                                 null)),
                         Map.of("maven", new MavenPomResolver()))
-                        .engine(new JUnitPlatform())
+                        .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
                 "dependencies", "classes");
         executor.execute();
@@ -262,7 +262,7 @@ public class TestModuleTest {
                                 Map.of(),
                                 null)),
                         Map.of("maven", new MavenPomResolver()))
-                        .engine(new JUnitPlatform()).jarsOnly(false),
+                        .framework(new JUnitPlatform()).jarsOnly(false),
                 "dependencies", "classes");
         executor.execute();
 
@@ -283,7 +283,7 @@ public class TestModuleTest {
                                 Map.of(),
                                 null)),
                         Map.of("maven", new MavenPomResolver()))
-                        .engine(new JUnitPlatform())
+                        .framework(new JUnitPlatform())
                         .isTest((Predicate<String> & Serializable) _ -> false)
                         .filter("sample\\.TestSample").jarsOnly(false),
                 "dependencies", "classes");
@@ -316,7 +316,7 @@ public class TestModuleTest {
                                 Map.of(),
                                 null)),
                         Map.of("maven", new MavenPomResolver()))
-                        .engine(new JUnitPlatform())
+                        .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
                 "dependencies", "classes");
         executor.execute();
@@ -340,7 +340,7 @@ public class TestModuleTest {
                                 Map.of(),
                                 null)),
                         Map.of("maven", new MavenPomResolver()))
-                        .engine(new JUnitPlatform())
+                        .framework(new JUnitPlatform())
                         .isTest((Predicate<String> & Serializable) _ -> false)
                         .filter("sample\\.TestSample#test").jarsOnly(false),
                 "dependencies", "classes");
@@ -364,7 +364,7 @@ public class TestModuleTest {
                                 Map.of(),
                                 null)),
                         Map.of("maven", new MavenPomResolver()))
-                        .engine(new JUnitPlatform())
+                        .framework(new JUnitPlatform())
                         .isTest((Predicate<String> & Serializable) _ -> false)
                         .filter("sample\\.DoesNotExist").jarsOnly(false),
                 "dependencies", "classes");
@@ -376,20 +376,20 @@ public class TestModuleTest {
     }
 
     @Test
-    public void throws_when_no_engine_found() throws IOException {
+    public void throws_when_no_framework_found() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", emptyDependencies);
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
                 new TestModule(Map.of(), Map.of())
-                        .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false).requireEngine(true),
+                        .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false).requireFramework(true),
                 "dependencies", "classes");
 
         assertThatThrownBy(executor::execute)
                 .hasRootCauseInstanceOf(IllegalStateException.class)
                 .rootCause()
-                .hasMessageContaining("No test engine could be resolved from inherited dependencies");
+                .hasMessageContaining("No test framework could be resolved from inherited dependencies");
     }
 
     @Test
@@ -402,7 +402,7 @@ public class TestModuleTest {
             executor.addModule(
                     "test",
                     new TestModule(Map.of(), Map.of())
-                            .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false).requireEngine(true),
+                            .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false).requireFramework(true),
                     "dependencies", "classes");
 
             SequencedMap<String, Path> outputs = executor.execute();
@@ -452,7 +452,7 @@ public class TestModuleTest {
         executor.addModule(
                 "test",
                 new TestModule(Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
-                        .engine(new JUnitPlatform())
+                        .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
                 "dependencies", "classes");
@@ -473,7 +473,7 @@ public class TestModuleTest {
         executor.addModule(
                 "test",
                 new TestModule(Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
-                        .engine(new JUnitPlatform())
+                        .framework(new JUnitPlatform())
                         .observe(new JaCoCo())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
@@ -494,7 +494,7 @@ public class TestModuleTest {
         executor.addModule(
                 "test",
                 new TestModule(Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
-                        .engine(new JUnitPlatform())
+                        .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
                 "dependencies", "classes");
@@ -513,7 +513,7 @@ public class TestModuleTest {
         executor.addModule(
                 "test",
                 new TestModule(Map.of(), Map.of())
-                        .engine(new JUnitPlatform())
+                        .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
                 "dependencies", "classes");
@@ -531,7 +531,7 @@ public class TestModuleTest {
         executor.addModule(
                 "test",
                 new TestModule(Map.of(), Map.of())
-                        .engine(new JUnitPlatform())
+                        .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
                 "dependencies", "classes");
         executor.execute("test/" + "resolved");
@@ -548,7 +548,7 @@ public class TestModuleTest {
         executor.addModule(
                 "test",
                 new TestModule(Map.of(), Map.of())
-                        .engine(new JUnit4())
+                        .framework(new JUnit4())
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
                 "dependencies", "classes");
         executor.execute("test/" + "resolved");
@@ -565,7 +565,7 @@ public class TestModuleTest {
         executor.addModule(
                 "test",
                 new TestModule(Map.of(), Map.of())
-                        .engine(new TestNG())
+                        .framework(new TestNG())
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
                 "dependencies", "classes");
         executor.execute("test/" + "resolved");
@@ -582,7 +582,7 @@ public class TestModuleTest {
         executor.addModule(
                 "test",
                 new TestModule(Map.of(), Map.of())
-                        .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false).requireEngine(false),
+                        .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false).requireFramework(false),
                 "dependencies", "classes");
         SequencedMap<String, Path> outputs = executor.execute();
 
@@ -599,7 +599,7 @@ public class TestModuleTest {
         executor.addModule(
                 "test",
                 new TestModule(Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
-                        .engine(new JUnitPlatform())
+                        .framework(new JUnitPlatform())
                         .jarsOnly(false),
                 "dependencies", "classes");
         executor.execute("test/" + "resolved");
@@ -624,7 +624,7 @@ public class TestModuleTest {
         executor.addModule(
                 "test",
                 new TestModule(Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
-                        .engine(new JUnitPlatform())
+                        .framework(new JUnitPlatform())
                         .jarsOnly(false),
                 "dependencies", "classes");
         executor.execute("test/" + "resolved");
@@ -642,7 +642,7 @@ public class TestModuleTest {
         executor.addModule(
                 "test",
                 new TestModule(Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
-                        .engine(new MultiRunnerEngine())
+                        .framework(new MultiRunnerEngine())
                         .jarsOnly(false),
                 "dependencies", "classes");
         executor.execute("test/" + "resolved");
@@ -890,7 +890,7 @@ public class TestModuleTest {
         }
     }
 
-    private record MultiRunnerEngine() implements TestEngine {
+    private record MultiRunnerEngine() implements TestFramework {
 
         @Override
         public String runnerModule() {
@@ -898,12 +898,12 @@ public class TestModuleTest {
         }
 
         @Override
-        public String mainClass() {
+        public String runnerClass() {
             return "example.Main";
         }
 
         @Override
-        public boolean isFramework(ModuleDescriptor module) {
+        public boolean isMarkedBy(ModuleDescriptor module) {
             return false;
         }
 
@@ -916,7 +916,7 @@ public class TestModuleTest {
         }
 
         @Override
-        public List<String> commands(Path supplement,
+        public List<String> arguments(Path supplement,
                                      Path output,
                                      SequencedSet<String> classes,
                                      SequencedMap<String, SequencedSet<String>> methods,

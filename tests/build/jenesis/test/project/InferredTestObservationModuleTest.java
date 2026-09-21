@@ -129,8 +129,8 @@ public class InferredTestObservationModuleTest {
     }
 
     @Test
-    public void a_test_properties_file_declares_the_engine() throws IOException {
-        Files.writeString(project.resolve("test.properties"), "engine=junit-platform");
+    public void a_test_properties_file_declares_the_framework() throws IOException {
+        Files.writeString(project.resolve("test.properties"), "framework=junit-platform");
         Files.createDirectories(project.resolve(BuildStep.ARTIFACTS));
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
@@ -139,7 +139,7 @@ public class InferredTestObservationModuleTest {
 
         Path output = root.resolve("observed").resolve("test").resolve("resolved").resolve("output");
         assertThat(SequencedProperties.ofFiles(output.resolve(BuildStep.REQUIRES)).stringPropertyNames())
-                .as("a declared engine resolves its runner although nothing was detected")
+                .as("a declared framework resolves its runner although nothing was detected")
                 .containsExactly("main/runtime/maven/org.junit.platform/junit-platform-console");
     }
 
@@ -157,8 +157,8 @@ public class InferredTestObservationModuleTest {
     }
 
     @Test
-    public void a_test_properties_file_rejects_an_unknown_engine() throws IOException {
-        Files.writeString(project.resolve("test.properties"), "engine=does-not-exist");
+    public void a_test_properties_file_rejects_an_unknown_framework() throws IOException {
+        Files.writeString(project.resolve("test.properties"), "framework=does-not-exist");
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
         executor.addModule("observed", observation(), "project");
@@ -166,7 +166,7 @@ public class InferredTestObservationModuleTest {
         assertThatThrownBy(executor::execute)
                 .hasRootCauseInstanceOf(IllegalArgumentException.class)
                 .rootCause()
-                .hasMessageContaining("Unknown test engine")
+                .hasMessageContaining("Unknown test framework")
                 .hasMessageContaining("expected junit-platform, junit4, or testng");
     }
 
@@ -176,7 +176,7 @@ public class InferredTestObservationModuleTest {
         Files.createDirectories(project.resolve(BuildStep.ARTIFACTS));
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("observed", observation().test(module -> module.jarsOnly(false).requireEngine(false)), "project");
+        executor.addModule("observed", observation().test(module -> module.jarsOnly(false).requireFramework(false)), "project");
         executor.execute();
 
         assertThat(root.resolve("observed").resolve("test").resolve("resolved"))

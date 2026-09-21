@@ -3,7 +3,7 @@ package build.jenesis.project;
 import module java.base;
 import build.jenesis.BuildStep;
 
-public record TestNG() implements TestEngine {
+public record TestNG() implements TestFramework {
 
     @Override
     public String runnerModule() {
@@ -11,23 +11,23 @@ public record TestNG() implements TestEngine {
     }
 
     @Override
-    public boolean isFramework(ModuleDescriptor module) {
+    public boolean isMarkedBy(ModuleDescriptor module) {
         return module.name().equals("org.testng");
     }
 
     @Override
-    public String mainClass() {
+    public String runnerClass() {
         return "org.testng.TestNG";
     }
 
     @Override
-    public List<String> commands(Path supplement,
-                                 Path output,
-                                 SequencedSet<String> classes,
-                                 SequencedMap<String, SequencedSet<String>> methods,
-                                 SequencedSet<String> groups,
-                                 boolean parallel,
-                                 boolean reporting) {
+    public List<String> arguments(Path supplement,
+                                  Path output,
+                                  SequencedSet<String> classes,
+                                  SequencedMap<String, SequencedSet<String>> methods,
+                                  SequencedSet<String> groups,
+                                  boolean parallel,
+                                  boolean reporting) {
         List<String> commands = new ArrayList<>(List.of("-d", (reporting
                 ? output.resolve(BuildStep.REPORTS + "tests")
                 : supplement.resolve("test-output")).toString()));
