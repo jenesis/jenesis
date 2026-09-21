@@ -80,36 +80,37 @@ Quick index
 | 29 | [`compliance`](demo-29-compliance/README.md)                      | Fail the build on a dependency license the policy denies                     | `java build/Demo.java`            |
 | 30 | [`vulnerabilities`](demo-30-vulnerabilities/README.md)            | Fail the build on a known vulnerability, queried from OSV                    | `java build/Demo.java`            |
 | 31 | [`java-quality`](demo-31-java-quality/README.md)                  | Checkstyle, PMD, SpotBugs and a formatter, each on by its config file        | `java build/jenesis/Make.java`    |
-| 32 | [`code-coverage`](demo-32-code-coverage/README.md)                | Record coverage with JaCoCo and render a report                              | `java build/jenesis/Make.java`    |
-| 33 | [`test-selection`](demo-33-test-selection/README.md)              | Re-run only the tests a change can reach                                     | `java build/Demo.java`            |
-| 34 | [`pitest`](demo-34-pitest/README.md)                              | Mutation testing with PIT                                                    | `java build/jenesis/Make.java`    |
-| 35 | [`jmh`](demo-35-jmh/README.md)                                    | Generate, compile and run a JMH benchmark                                    | `java build/jenesis/Execute.java` |
-| 36 | [`api-compatibility`](demo-36-api-compatibility/README.md)        | Compare the jar against the last release with japicmp                        | `java build/Demo.java`            |
-| 37 | [`kotlin`](demo-37-kotlin/README.md)                              | Java and Kotlin in one module                                                | `java build/jenesis/Make.java`    |
-| 38 | [`kotlin-quality`](demo-38-kotlin-quality/README.md)              | detekt and ktlint, inferred from their config files                          | `java build/jenesis/Make.java`    |
-| 39 | [`kotlin-plugin`](demo-39-kotlin-plugin/README.md)                | Run a Kotlin compiler plugin declared with `@jenesis.plugin`                 | `java build/jenesis/Make.java`    |
-| 40 | [`scala`](demo-40-scala/README.md)                                | Java and Scala 3 in one module                                               | `java build/jenesis/Make.java`    |
-| 41 | [`scala-quality`](demo-41-scala-quality/README.md)                | Scalastyle and scalafmt, inferred from their config files                    | `java build/jenesis/Make.java`    |
-| 42 | [`groovy`](demo-42-groovy/README.md)                              | Java and Groovy in one module                                                | `java build/jenesis/Make.java`    |
-| 43 | [`groovy-quality`](demo-43-groovy-quality/README.md)              | CodeNarc, inferred from its config file                                      | `java build/jenesis/Make.java`    |
-| 44 | [`profiles`](demo-44-profiles/README.md)                          | Switch a set of properties on together with a named profile                  | `java build/jenesis/Make.java`    |
-| 45 | [`build-cache`](demo-45-build-cache/README.md)                    | Serve step outputs from a cache shared across builds                         | `java build/jenesis/Make.java`    |
-| 46 | [`docker-isolation`](demo-46-docker-isolation/README.md)          | Confine the build and the program it produces to a container                 | `java build/jenesis/Make.java`    |
-| 47 | [`agents`](demo-47-agents/README.md)                              | Attach a library as a Java agent with `@jenesis.attach`                      | `java build/Demo.java`            |
-| 48 | [`custom-assembler`](demo-48-custom-assembler/README.md)          | Wrap the assembler to preprocess sources before the regular flow             | `java build/Demo.java`            |
-| 49 | [`custom-jmod`](demo-49-custom-jmod/README.md)                    | Pack extra content into a `.jmod` and carry it into a packaged app           | `java build/Demo.java`            |
-| 50 | [`internal-module`](demo-50-internal-module/README.md)            | Move that preprocessing into a build module loaded from local source         | `java build/Demo.java`            |
-| 51 | [`external-module`](demo-51-external-module/README.md)            | Resolve the same build module as a published coordinate                      | `java build/Demo.java`            |
-| 52 | [`custom-maven`](demo-52-custom-maven/README.md)                  | Drive a multi-module Maven build without `Project`                           | `java build/Demo.java`            |
-| 53 | [`custom-modular`](demo-53-custom-modular/README.md)              | The same for `module-info.java` modules                                      | `java build/Demo.java`            |
-| 54 | [`custom-build`](demo-54-custom-build/README.md)                  | No template at all: wire the build by hand                                   | `java build/Demo.java`            |
-| 55 | [`code-signing`](demo-55-code-signing/README.md)                  | Sign the produced jar with `jarsigner`, keyed by the environment             | `java build/Demo.java`            |
-| 56 | [`publishing`](demo-56-publishing/README.md)                      | Assemble a Maven Central ready bundle and resolve it back                    | `java build/Demo.java`            |
-| 57 | [`module-convention`](demo-57-module-convention/README.md)        | Resolve your own modules from your own Maven repository                      | `java build/Demo.java`            |
-| 58 | [`reproducible`](demo-58-reproducible/README.md)                  | Build the same bytes on every machine, checked against a recorded digest     | `java build/Demo.java`            |
-| 59 | [`toolchain`](demo-59-toolchain/README.md)                        | Name the JDK the build runs on, and relaunch on it                           | `java build/jenesis/Execute.java` |
-| 60 | [`native-image`](demo-60-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
-| 61 | [`jpx`](demo-61-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
+| 32 | [`test-engine`](demo-32-test-engine/README.md)                    | Run tests whose module names no engine, inferred or declared                 | `java build/jenesis/Make.java`    |
+| 33 | [`code-coverage`](demo-33-code-coverage/README.md)                | Record coverage with JaCoCo and render a report                              | `java build/jenesis/Make.java`    |
+| 34 | [`test-selection`](demo-34-test-selection/README.md)              | Re-run only the tests a change can reach                                     | `java build/Demo.java`            |
+| 35 | [`pitest`](demo-35-pitest/README.md)                              | Mutation testing with PIT                                                    | `java build/jenesis/Make.java`    |
+| 36 | [`jmh`](demo-36-jmh/README.md)                                    | Generate, compile and run a JMH benchmark                                    | `java build/jenesis/Execute.java` |
+| 37 | [`api-compatibility`](demo-37-api-compatibility/README.md)        | Compare the jar against the last release with japicmp                        | `java build/Demo.java`            |
+| 38 | [`kotlin`](demo-38-kotlin/README.md)                              | Java and Kotlin in one module                                                | `java build/jenesis/Make.java`    |
+| 39 | [`kotlin-quality`](demo-39-kotlin-quality/README.md)              | detekt and ktlint, inferred from their config files                          | `java build/jenesis/Make.java`    |
+| 40 | [`kotlin-plugin`](demo-40-kotlin-plugin/README.md)                | Run a Kotlin compiler plugin declared with `@jenesis.plugin`                 | `java build/jenesis/Make.java`    |
+| 41 | [`scala`](demo-41-scala/README.md)                                | Java and Scala 3 in one module                                               | `java build/jenesis/Make.java`    |
+| 42 | [`scala-quality`](demo-42-scala-quality/README.md)                | Scalastyle and scalafmt, inferred from their config files                    | `java build/jenesis/Make.java`    |
+| 43 | [`groovy`](demo-43-groovy/README.md)                              | Java and Groovy in one module                                                | `java build/jenesis/Make.java`    |
+| 44 | [`groovy-quality`](demo-44-groovy-quality/README.md)              | CodeNarc, inferred from its config file                                      | `java build/jenesis/Make.java`    |
+| 45 | [`profiles`](demo-45-profiles/README.md)                          | Switch a set of properties on together with a named profile                  | `java build/jenesis/Make.java`    |
+| 46 | [`build-cache`](demo-46-build-cache/README.md)                    | Serve step outputs from a cache shared across builds                         | `java build/jenesis/Make.java`    |
+| 47 | [`docker-isolation`](demo-47-docker-isolation/README.md)          | Confine the build and the program it produces to a container                 | `java build/jenesis/Make.java`    |
+| 48 | [`agents`](demo-48-agents/README.md)                              | Attach a library as a Java agent with `@jenesis.attach`                      | `java build/Demo.java`            |
+| 49 | [`custom-assembler`](demo-49-custom-assembler/README.md)          | Wrap the assembler to preprocess sources before the regular flow             | `java build/Demo.java`            |
+| 50 | [`custom-jmod`](demo-50-custom-jmod/README.md)                    | Pack extra content into a `.jmod` and carry it into a packaged app           | `java build/Demo.java`            |
+| 51 | [`internal-module`](demo-51-internal-module/README.md)            | Move that preprocessing into a build module loaded from local source         | `java build/Demo.java`            |
+| 52 | [`external-module`](demo-52-external-module/README.md)            | Resolve the same build module as a published coordinate                      | `java build/Demo.java`            |
+| 53 | [`custom-maven`](demo-53-custom-maven/README.md)                  | Drive a multi-module Maven build without `Project`                           | `java build/Demo.java`            |
+| 54 | [`custom-modular`](demo-54-custom-modular/README.md)              | The same for `module-info.java` modules                                      | `java build/Demo.java`            |
+| 55 | [`custom-build`](demo-55-custom-build/README.md)                  | No template at all: wire the build by hand                                   | `java build/Demo.java`            |
+| 56 | [`code-signing`](demo-56-code-signing/README.md)                  | Sign the produced jar with `jarsigner`, keyed by the environment             | `java build/Demo.java`            |
+| 57 | [`publishing`](demo-57-publishing/README.md)                      | Assemble a Maven Central ready bundle and resolve it back                    | `java build/Demo.java`            |
+| 58 | [`module-convention`](demo-58-module-convention/README.md)        | Resolve your own modules from your own Maven repository                      | `java build/Demo.java`            |
+| 59 | [`reproducible`](demo-59-reproducible/README.md)                  | Build the same bytes on every machine, checked against a recorded digest     | `java build/Demo.java`            |
+| 60 | [`toolchain`](demo-60-toolchain/README.md)                        | Name the JDK the build runs on, and relaunch on it                           | `java build/jenesis/Execute.java` |
+| 61 | [`native-image`](demo-61-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
+| 62 | [`jpx`](demo-62-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -556,7 +557,29 @@ formatted, and one switch flips it to rewriting in place:
 
     java -Djenesis.format.rewrite=true build/jenesis/Make.java
 
-## 24. Coverage, selection, mutation and benchmarks - [`code-coverage`](demo-32-code-coverage/README.md), [`test-selection`](demo-33-test-selection/README.md), [`pitest`](demo-34-pitest/README.md), [`jmh`](demo-35-jmh/README.md)
+## 24. The engine that runs the tests - [`test-engine`](demo-32-test-engine/README.md)
+
+Which framework a module's tests are written against follows from what it
+resolves - the Jupiter API marks the JUnit Platform, `junit` marks JUnit 4,
+`org.testng` marks TestNG - and whatever that framework needs but the module
+does not carry is resolved for it: the engine, the console runner, and the
+vintage engine where a JUnit 4 jar shares the path.
+
+The demo's test module requires one migration-support module and no engine at
+all, yet its Jupiter test and its JUnit 4 test both run. Nothing is resolved
+that the module already requires, so naming an engine yourself is what the build
+uses.
+
+Where a project would rather say it outright, a `test.properties` in the
+module's configuration location names the framework:
+
+    engine=junit-platform      # or junit4, or testng
+
+The demo ships that file under a profile, so both paths stay runnable:
+
+    java -Djenesis.make.profiles=explicit build/jenesis/Make.java
+
+## 25. Coverage, selection, mutation and benchmarks - [`code-coverage`](demo-33-code-coverage/README.md), [`test-selection`](demo-34-test-selection/README.md), [`pitest`](demo-35-pitest/README.md), [`jmh`](demo-36-jmh/README.md)
 
 `code-coverage` records which lines the tests exercise and renders an HTML and
 XML report, enabled by a `jacoco.properties` file. A `graal.properties` file
@@ -580,7 +603,7 @@ and `@jenesis.main` runs it:
 
     java build/jenesis/Execute.java
 
-## 25. Guarding a published API - [`api-compatibility`](demo-36-api-compatibility/README.md)
+## 26. Guarding a published API - [`api-compatibility`](demo-37-api-compatibility/README.md)
 
 An empty `japicmp.properties` makes the build compare the bytecode of the jar it
 produced against the bytecode of the last release of the same coordinate - which
@@ -597,7 +620,7 @@ four `error-on-*` keys turn a finding into a failure:
 The demo publishes its own previous release first, so it has something to compare
 against. `-Djenesis.artifact.japicmp=false` is the opt-out.
 
-## 26. Kotlin - [`kotlin`](demo-37-kotlin/README.md), [`kotlin-quality`](demo-38-kotlin-quality/README.md), [`kotlin-plugin`](demo-39-kotlin-plugin/README.md)
+## 27. Kotlin - [`kotlin`](demo-38-kotlin/README.md), [`kotlin-quality`](demo-39-kotlin-quality/README.md), [`kotlin-plugin`](demo-40-kotlin-plugin/README.md)
 
 Other JVM languages need no configuration beyond their sources. `kotlin` is a
 module that mixes Java and Kotlin, and exports a package holding only Kotlin. The
@@ -615,21 +638,21 @@ their configuration files, with ktlint doubling as the formatter and sharing the
 The kotlinx.serialization plugin then generates `Point.serializer()` for an
 `@Serializable` data class; delete the line and the build fails.
 
-## 27. Scala - [`scala`](demo-40-scala/README.md), [`scala-quality`](demo-41-scala-quality/README.md)
+## 28. Scala - [`scala`](demo-41-scala/README.md), [`scala-quality`](demo-42-scala-quality/README.md)
 
 Scala works the same way: a module that mixes Java and Scala exports a pure-Scala
 package, and the compiler is pinned in a `scalac` group. `scala-quality` infers
 Scalastyle (`scalastyle-config.xml`) and scalafmt (`.scalafmt.conf`), with
 scalafmt doubling as the formatter.
 
-## 28. Groovy - [`groovy`](demo-42-groovy/README.md), [`groovy-quality`](demo-43-groovy-quality/README.md)
+## 29. Groovy - [`groovy`](demo-43-groovy/README.md), [`groovy-quality`](demo-44-groovy-quality/README.md)
 
 Groovy follows the same pattern with one restriction: an exported package needs
 at least one Java type in it, which the demo's own README explains. The compiler
 is pinned in a `groovyc` group. `groovy-quality` lints with CodeNarc
 (`codenarc.xml`); there is no inferred Groovy formatter.
 
-## 29. Build profiles - [`profiles`](demo-44-profiles/README.md)
+## 30. Build profiles - [`profiles`](demo-45-profiles/README.md)
 
 A profile is a `*.properties` file at the project root that switches a set of
 properties on together:
@@ -642,7 +665,7 @@ publication build. Profiles compose, because a profile may name further profiles
 everything a profile sets is a default, so the command line always wins. The
 always-loaded base is an optional `jenesis.properties` beside it.
 
-## 30. A shared build cache - [`build-cache`](demo-45-build-cache/README.md)
+## 31. A shared build cache - [`build-cache`](demo-46-build-cache/README.md)
 
 Every build is already incremental under `target/`. A shared cache outside
 `target/` goes one step further and hands a step its finished output instead of
@@ -662,7 +685,7 @@ An optional `cache.properties` at the cache root caps and prunes it (`steps`,
 `versions`, `size` with `lru` eviction, `compressed`, and `read`/`write`
 toggles - `write=false` for a read-only consumer).
 
-## 31. Confining the build with Docker - [`docker-isolation`](demo-46-docker-isolation/README.md)
+## 32. Confining the build with Docker - [`docker-isolation`](demo-47-docker-isolation/README.md)
 
 A build runs your tests and whatever they pull in, and the artifact it produces
 has a `main` that runs later - all with your rights. This demo's test and its
@@ -677,7 +700,7 @@ The local repositories are mounted read-only, so dependencies have to be cached
 already and `export` does not work inside the container. It needs a Docker
 daemon, so it is a local exercise.
 
-## 32. Attaching Java agents - [`agents`](demo-47-agents/README.md)
+## 33. Attaching Java agents - [`agents`](demo-48-agents/README.md)
 
 Some libraries have to run as a `-javaagent` rather than be called through an
 API. `@jenesis.attach` declares one next to the execution it belongs to:
@@ -693,7 +716,7 @@ follows the pin grammar without a version, anything after it is the agent's own
 option string, and the jar must carry a `Premain-Class`. A `pom.xml` project
 declares the same in a `<!--jenesis.attach ... -->` comment block.
 
-## 33. Customizing the build - [`custom-assembler`](demo-48-custom-assembler/README.md), [`custom-jmod`](demo-49-custom-jmod/README.md)
+## 34. Customizing the build - [`custom-assembler`](demo-49-custom-assembler/README.md), [`custom-jmod`](demo-50-custom-jmod/README.md)
 
 The next demos open up the template, and each is launched with
 `java build/Demo.java`. `custom-assembler` keeps the standard flow but wraps the
@@ -712,7 +735,7 @@ and adds a step that emits a configuration directory, which travels with the jmo
 into the linked runtime and into the packaged application, where the program
 reads it back from its own `<java.home>/conf/` - content a jar cannot carry.
 
-## 34. Build logic as a module - [`internal-module`](demo-50-internal-module/README.md), [`external-module`](demo-51-external-module/README.md)
+## 35. Build logic as a module - [`internal-module`](demo-51-internal-module/README.md), [`external-module`](demo-52-external-module/README.md)
 
 `internal-module` does the same preprocessing, but from a build module in its own
 `plugin/` project, compiled from local source and loaded as a service - it even
@@ -723,7 +746,7 @@ out of the host project's module discovery.
 published coordinate instead of compiled from source. Build logic is just another
 module: written inline, loaded from source, or consumed as a versioned artifact.
 
-## 35. Driving the build without `Project` - [`custom-maven`](demo-52-custom-maven/README.md), [`custom-modular`](demo-53-custom-modular/README.md)
+## 36. Driving the build without `Project` - [`custom-maven`](demo-53-custom-maven/README.md), [`custom-modular`](demo-54-custom-modular/README.md)
 
 These two drive a multi-module build from a hand-written `build/Demo.java`, with
 no layout and no goals, while reusing the whole standard toolchain:
@@ -736,7 +759,7 @@ no layout and no goals, while reusing the whole standard toolchain:
 `module-info.java` modules. The two-argument `make` discovers the modules and
 supplies the defaults a normal build would configure.
 
-## 36. Dropping the template entirely - [`custom-build`](demo-54-custom-build/README.md)
+## 37. Dropping the template entirely - [`custom-build`](demo-55-custom-build/README.md)
 
 The last of the customization demos removes the template altogether and wires the
 build by hand in one `main` method - no `pom.xml`, no `module-info.java`, just
@@ -747,7 +770,7 @@ model:
     java build/Demo.java
     java -cp target/jar/output/artifacts/classes.jar sample.Sample
 
-## 37. Signing the jar you publish - [`code-signing`](demo-55-code-signing/README.md)
+## 38. Signing the jar you publish - [`code-signing`](demo-56-code-signing/README.md)
 
 Where `openpgp` and `sigstore` ask who produced the dependencies coming in,
 `code-signing` answers the same question about what goes out, and answers it
@@ -770,7 +793,7 @@ The password is never a value: `storepass` takes `env <variable>` or
 `file <path>`, and anything else is refused. The signed jar replaces the unsigned
 one before the inventory, the staged repositories or a publication ever see it.
 
-## 38. Publishing to Maven Central - [`publishing`](demo-56-publishing/README.md)
+## 39. Publishing to Maven Central - [`publishing`](demo-57-publishing/README.md)
 
 Publishing is two jobs - produce a correct bundle and upload it - and Jenesis
 does the first. A `module-info.java` plus a `project.properties` supply the
@@ -786,7 +809,7 @@ Jenesis itself releases - so the demo needs no credentials, no key and no
 network. A `jreleaser.yml` at the project root adds that step to the `release`
 goal, a rehearsal unless told otherwise.
 
-## 39. Your own modules from your own Maven repository - [`module-convention`](demo-57-module-convention/README.md)
+## 40. Your own modules from your own Maven repository - [`module-convention`](demo-58-module-convention/README.md)
 
 `publishing` showed the coordinate a module is published under: the groupId from
 the first two dotted segments of its name, the artifactId from the whole name.
@@ -803,7 +826,7 @@ group reaches into the name is configuration too:
 
     jenesis.maven.segments=3
 
-## 40. The same bytes on every machine - [`reproducible`](demo-58-reproducible/README.md)
+## 41. The same bytes on every machine - [`reproducible`](demo-59-reproducible/README.md)
 
 What you publish, anyone holding the sources should be able to build again and
 get the same bytes. `reproducible` turns that into a check: it builds a module
@@ -818,7 +841,7 @@ the time of the release commit - and the recorded digest moves with it:
 
     jenesis.archive.timestamp=2026-09-01T12:00:00Z
 
-## 41. The JDK a build runs on - [`toolchain`](demo-59-toolchain/README.md)
+## 42. The JDK a build runs on - [`toolchain`](demo-60-toolchain/README.md)
 
 `reproducible` promises the same bytes for the same JDK; `toolchain` makes the
 JDK part of the project. Its `jenesis.properties` names one:
@@ -835,7 +858,7 @@ look is yours alone to say - `jenesis.toolchain.searchpath` defaults to the
 operating system's usual JDK folders and is accepted only from the command line
 or `~/.jenesis/jenesis.properties`, never from a project's own files.
 
-## 42. Ahead-of-time native image - [`native-image`](demo-60-native-image/README.md)
+## 43. Ahead-of-time native image - [`native-image`](demo-61-native-image/README.md)
 
 Where `jpackage` bundles your bytecode with a trimmed JVM, GraalVM
 `native-image` compiles the program and the runtime it touches into a single
@@ -856,7 +879,7 @@ Native image is an alternative to `jpackage`, not a successor: `jpackage` for a
 faithful bundle of the JVM you tested against, native image when startup and
 footprint dominate. It needs GraalVM, so it is a local exercise.
 
-## 43. Running a released program - [`jpx`](demo-61-jpx/README.md)
+## 44. Running a released program - [`jpx`](demo-62-jpx/README.md)
 
 Every demo so far built something. `jpx` builds nothing: it resolves a published
 module or Maven artifact, installs its runtime closure once under

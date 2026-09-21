@@ -949,7 +949,7 @@ public record Project(
 
                     ## 13. Copy a demo: they are the recipe book
 
-                    61 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    62 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -961,9 +961,9 @@ public record Project(
                       Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
                                          04 java-modular-multi, 19 module-layout (forcing MODULAR)
                       Starting a build   05 startup (what launching costs, and the daemon),
-                                         59 toolchain (the JDK the build runs on)
+                                         60 toolchain (the JDK the build runs on)
                       Runnable output    06, 07 java-*-executable (jpackage), 08 bundle (jars for a
-                                         stock JRE), 09 java-multi-release, 60 native-image (GraalVM)
+                                         stock JRE), 09 java-multi-release, 61 native-image (GraalVM)
                       Compiler control   10 javac-arguments (process-javac.properties),
                                          11 annotations (an annotation processor via @jenesis.plugin),
                                          12 error-prone (a javac plugin)
@@ -977,20 +977,21 @@ public record Project(
                       Trusting them      25 pinning (versions and checksums), 26 openpgp (a declared
                                          key), 27 sigstore (a declared identity, no key at all),
                                          28 sbom, 29 compliance (licenses), 30 vulnerabilities (OSV)
-                      Quality gates      31 java-quality, 36 api-compatibility (japicmp),
-                                         38 kotlin-quality, 41 scala-quality, 43 groovy-quality
-                      Tests              32 code-coverage (JaCoCo), 33 test-selection (incremental),
-                                         34 pitest (mutation), 35 jmh (benchmark harness)
-                      Other languages    37 kotlin, 39 kotlin-plugin, 40 scala, 42 groovy
-                      Operating it       44 profiles, 45 build-cache, 46 docker-isolation,
-                                         47 agents (@jenesis.attach)
-                      Shipping it        55 code-signing (jarsigner), 56 publishing (Maven Central),
-                                         57 module-convention (resolving what you published),
-                                         58 reproducible (a jar checked against a recorded digest),
-                                         61 jpx (run a released program without building)
-                      Extending it       48 custom-assembler, 49 custom-jmod, 50 internal-module,
-                                         51 external-module, 52 custom-maven, 53 custom-modular,
-                                         54 custom-build (no Project at all)
+                      Quality gates      31 java-quality, 37 api-compatibility (japicmp),
+                                         39 kotlin-quality, 42 scala-quality, 44 groovy-quality
+                      Tests              32 test-engine (which engine runs them),
+                                         33 code-coverage (JaCoCo), 34 test-selection (incremental),
+                                         35 pitest (mutation), 36 jmh (benchmark harness)
+                      Other languages    38 kotlin, 40 kotlin-plugin, 41 scala, 43 groovy
+                      Operating it       45 profiles, 46 build-cache, 47 docker-isolation,
+                                         48 agents (@jenesis.attach)
+                      Shipping it        56 code-signing (jarsigner), 57 publishing (Maven Central),
+                                         58 module-convention (resolving what you published),
+                                         59 reproducible (a jar checked against a recorded digest),
+                                         62 jpx (run a released program without building)
+                      Extending it       49 custom-assembler, 50 custom-jmod, 51 internal-module,
+                                         52 external-module, 53 custom-maven, 54 custom-modular,
+                                         55 custom-build (no Project at all)
 
                     ## 14. When stuck, read the source
 
