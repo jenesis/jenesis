@@ -14,6 +14,7 @@ import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.maven.MavenModuleRepository;
 import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.ProjectModule;
 import build.jenesis.project.MultiProjectAssembler;
@@ -47,10 +48,12 @@ public class ModularProject implements BuildExecutorModule {
     private final Platform platform;
     private final SequencedSet<Path> boms;
     private final SequencedSet<Path> signatures;
+    private final int segments;
 
     public ModularProject(String prefix, Path root) {
         this("main", prefix, root, _ -> true, true, new Platform(),
-                Collections.emptyNavigableSet(), Collections.emptyNavigableSet());
+                Collections.emptyNavigableSet(), Collections.emptyNavigableSet(),
+                MavenModuleRepository.segments());
     }
 
     private ModularProject(String group,
@@ -60,7 +63,8 @@ public class ModularProject implements BuildExecutorModule {
                            boolean modular,
                            Platform platform,
                            SequencedSet<Path> boms,
-                           SequencedSet<Path> signatures) {
+                           SequencedSet<Path> signatures,
+                           int segments) {
         this.group = group;
         this.prefix = prefix;
         this.root = root;
@@ -69,30 +73,36 @@ public class ModularProject implements BuildExecutorModule {
         this.platform = platform;
         this.boms = boms;
         this.signatures = signatures;
+        this.segments = segments;
     }
 
     public ModularProject group(String group) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments);
     }
 
     public ModularProject filter(Predicate<Path> filter) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments);
     }
 
     public ModularProject modular(boolean modular) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments);
     }
 
     public ModularProject platform(Platform platform) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments);
     }
 
     public ModularProject boms(SequencedSet<Path> boms) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments);
     }
 
     public ModularProject signatures(SequencedSet<Path> signatures) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures);
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures, segments);
+    }
+
+    public ModularProject segments(int segments) {
+        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures,
+                MavenModuleRepository.checkedSegments(segments));
     }
 
     public static BuildExecutorModule make(Path root, MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
@@ -230,7 +240,8 @@ public class ModularProject implements BuildExecutorModule {
                              String path,
                              boolean modular,
                              Platform platform,
-                             int feature) implements BuildStep {
+                             int feature,
+                             int segments) implements BuildStep {
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
@@ -551,8 +562,7 @@ public class ModularProject implements BuildExecutorModule {
             module.store(context.next().resolve(BuildStep.MODULE));
             SequencedProperties metadata = new SequencedProperties();
             String moduleName = info.coordinate();
-            String[] segments = moduleName.split("\\.");
-            metadata.setProperty("project", segments.length >= 2 ? segments[0] + "." + segments[1] : moduleName);
+            metadata.setProperty("project", MavenModuleRepository.groupId(moduleName, segments));
             metadata.setProperty("artifact", moduleName);
             metadata.setProperty("version", "1-SNAPSHOT");
             if (info.name() != null) {
@@ -668,7 +678,8 @@ public class ModularProject implements BuildExecutorModule {
                             relative,
                             modular,
                             platform,
-                            Runtime.version().feature()), manifestDeps);
+                            Runtime.version().feature(),
+                            segments), manifestDeps);
                     module.addStep(COORDINATES, new Coordinates(prefix), MANIFESTS);
                 }, inherited.sequencedKeySet().stream());
             }

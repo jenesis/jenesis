@@ -2141,6 +2141,7 @@ public record Project(
                 make.root|.|Folder Make looks for the project in; only settable on the command line
                 make.profiles||Comma-separated profiles layered over jenesis.properties
                 make.global||Folder holding the user-global .jenesis/jenesis.properties; default: the home folder; only settable on the command line
+                make.provided||Settings that the files a project provides supplied, comma-separated; derived by Make and settable in no file, so that a repository or cache URL a project named is never sent a credential
                 make.compile|true|Compile the build sources once and run from those classes
                 make.classes|.jenesis/classes|Where those classes land, relative to the root
                 make.daemon|false|Hand the build to a reused JVM; --stop as the only selector shuts it down
@@ -2178,27 +2179,28 @@ public record Project(
                 pin.checksum|true|Record content checksums in the pins that the pin selector writes
                 pin.bom|keep|keep|flatten: whether pinning keeps BOM references or resolves them away
                 platform.<token>||true adds a platform token and false removes one, selecting guarded pins
-                repository.insecure|false|Allow plaintext http:// repository fetches
+                repository.insecure|false|Allow plaintext http:// repository fetches; only the command line or ~/.jenesis/jenesis.properties may allow it, never a file a project provides
                 repository.retries|2|Retries after a failed fetch; 0 disables
                 repository.backoff|125|Initial retry backoff in milliseconds, doubling per attempt
                 repository.connect.timeout|10000|Connect timeout for a repository fetch, in milliseconds
                 repository.read.timeout|30000|Read timeout for a repository fetch, in milliseconds
-                maven.uri||Maven remotes, comma-separated and queried left to right (env MAVEN_REPOSITORY_URI)
+                maven.uri||Maven remotes, comma-separated and queried left to right; a |<groupId> suffix, repeatable, asks a remote only for that group and the groups below it, and @<name> splices the chain another property or environment variable holds (env MAVEN_REPOSITORY_URI)
                 maven.local||Local Maven cache folder (env MAVEN_REPOSITORY_LOCAL)
-                maven.token||Bearer token for the Maven remote (env MAVEN_REPOSITORY_TOKEN)
-                module.uri||Jenesis module remotes, likewise (env JENESIS_REPOSITORY_URI)
+                maven.token||Bearer token for the Maven remotes (env MAVEN_REPOSITORY_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one; a token the environment provides is sent only to the remotes the environment names, a remote a project's own files named is never sent one, and neither is the built-in public repository
+                maven.segments|2|Leading dot-separated segments of a module name that form its Maven groupId, when a module is published or resolved by the coordinate convention; a shorter name becomes the groupId in full
+                module.uri||Jenesis module remotes, likewise, where a |<module> suffix asks a remote only for that module and the modules whose name it prefixes, and a maven:[<segments>:]<uri> entry reads a remote as a Maven repository by the publishing convention, taking that many leading segments of a module name as its groupId where it names a count and jenesis.maven.segments where it does not (env JENESIS_REPOSITORY_URI)
                 module.local||Local module cache folder (env JENESIS_REPOSITORY_LOCAL)
-                module.token||Bearer token for the module remote (env JENESIS_REPOSITORY_TOKEN)
+                module.token||Bearer token for the module remote (env JENESIS_REPOSITORY_TOKEN); likewise, and only the first remote of the chain is sent it, so a fallback mirror never sees it
                 module.prerelease||Accept a pre-release when asking the module index for a module's newest version
                 module.speculative||Accept a version the module index has not recorded but guesses exists
                 openpgp.uri|keyserver.ubuntu.com, keys.openpgp.org|HKP key server roots, likewise; a server speaking another protocol is another repository (env OPENPGP_REPOSITORY_URI)
                 openpgp.local|.jenesis/keys|Local key cache folder, one file per fingerprint (env OPENPGP_REPOSITORY_LOCAL)
                 cache.uri||Build cache: a file:// folder, or an http(s):// cache server
                 cache.project||Project name sent to a cache server (env JENESIS_CACHE_PROJECT)
-                cache.key||Access key sent to a cache server (env JENESIS_CACHE_KEY)
+                cache.key||Access key sent to a cache server (env JENESIS_CACHE_KEY); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and a cache server a project's own files named is not sent it
                 cache.connect|PT1S|Connect timeout for a cache server
                 cache.read|PT10S|Read timeout for a cache server
-                cache.insecure|false|Permit the cache key over plaintext http off loopback
+                cache.insecure|false|Permit the cache key over plaintext http off loopback; likewise yours alone to allow
                 test.skip|false|Skip executing tests, still resolving what running them needs
                 test.engine||junit-platform|junit4|testng; unset detects it from the resolved dependencies
                 test.filter||Comma-separated <classRegex>[#<method>] entries restricting which tests run

@@ -5,10 +5,14 @@ import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SafeSegment;
 import build.jenesis.SequencedProperties;
+import build.jenesis.maven.MavenDefaultRepository;
+import build.jenesis.maven.MavenModuleRepository;
 
 public class JenesisModuleRepository implements JenesisRepository {
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
+
+    private static final String MODULE = "module", MAVEN = "maven";
 
     private final URI root;
     private final String token;
@@ -18,20 +22,26 @@ public class JenesisModuleRepository implements JenesisRepository {
     private final Boolean speculative;
 
     public static JenesisRepository of(Scope scope) {
-        String token = System.getProperty("jenesis.module.token", System.getenv("JENESIS_REPOSITORY_TOKEN"));
+        Repository.Credential credential = Repository.Credential.of("jenesis.module.token",
+                "JENESIS_REPOSITORY_TOKEN");
+        Repository.Credential maven = Repository.Credential.of("jenesis.maven.token", "MAVEN_REPOSITORY_TOKEN");
         String property = System.getProperty("jenesis.module.uri");
         String environment = System.getenv("JENESIS_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();
         String text;
+        Repository.Origin origin;
         if (property != null) {
             text = property;
+            origin = Repository.Origin.of("jenesis.module.uri");
         } else if (environment != null) {
             text = environment;
             visited.add("JENESIS_REPOSITORY_URI");
+            origin = Repository.Origin.ENVIRONMENT;
         } else {
             text = "https://repo.jenesis.build/";
+            origin = Repository.Origin.DEFAULT;
         }
-        JenesisRepository repository = chain(text, visited, scope, token, null);
+        JenesisRepository repository = chain(text, visited, scope, credential, maven, origin, MODULE, null);
         if (repository == null) {
             throw new IllegalStateException("No Jenesis module repository is configured by: " + text);
         }
@@ -41,7 +51,10 @@ public class JenesisModuleRepository implements JenesisRepository {
     private static JenesisRepository chain(String text,
                                            Set<String> visited,
                                            Scope scope,
-                                           String token,
+                                           Repository.Credential credential,
+                                           Repository.Credential maven,
+                                           Repository.Origin origin,
+                                           String kind,
                                            JenesisRepository repository) {
         for (String entry : text.split(",")) {
             String candidate = entry.strip();
@@ -53,22 +66,54 @@ public class JenesisModuleRepository implements JenesisRepository {
             if (location.isEmpty()) {
                 throw new IllegalStateException("No URI in Jenesis module repository entry: " + candidate);
             }
-            String entryToken = repository == null ? token : null;
+            String type = kind;
+            Integer segments = null;
+            int colon = location.indexOf(':');
+            if (colon > 1 && isType(location.substring(0, colon)) && isArgument(location.substring(colon + 1))) {
+                type = location.substring(0, colon);
+                location = location.substring(colon + 1).strip();
+                int next = location.indexOf(':');
+                if (next > 0 && isCount(location.substring(0, next)) && isArgument(location.substring(next + 1))) {
+                    segments = toSegments(location.substring(0, next), candidate);
+                    location = location.substring(next + 1).strip();
+                }
+            }
+            if (!type.equals(MODULE) && !type.equals(MAVEN)) {
+                throw new IllegalArgumentException("Unknown repository type in Jenesis module repository entry: "
+                        + candidate
+                        + " (expected '" + MODULE + "' or '" + MAVEN + "')");
+            }
+            if (segments != null && !type.equals(MAVEN)) {
+                throw new IllegalArgumentException("A group id segment count applies only to a '"
+                        + MAVEN
+                        + "' entry: "
+                        + candidate);
+            }
+            if (location.isEmpty()) {
+                throw new IllegalStateException("No URI in Jenesis module repository entry: " + candidate);
+            }
+            Repository.Credential granted = repository == null ? credential : credential.token(null);
+            Repository.Credential grantedMaven = repository == null ? maven : maven.token(null);
             JenesisRepository current;
             if (location.startsWith("@")) {
                 String name = location.substring(1);
                 String value;
+                Repository.Origin spliced;
                 if (name.isEmpty()) {
                     String environment = System.getenv("JENESIS_REPOSITORY_URI");
                     if (environment != null && visited.add("JENESIS_REPOSITORY_URI")) {
                         name = "JENESIS_REPOSITORY_URI";
                         value = environment;
+                        spliced = Repository.Origin.ENVIRONMENT;
                     } else {
                         name = null;
                         value = "https://repo.jenesis.build/";
+                        spliced = Repository.Origin.DEFAULT;
                     }
                 } else {
-                    value = System.getProperty(name, System.getenv(name));
+                    String declared = System.getProperty(name);
+                    value = declared == null ? System.getenv(name) : declared;
+                    spliced = declared == null ? Repository.Origin.ENVIRONMENT : Repository.Origin.of(name);
                     if (value == null) {
                         throw new IllegalStateException("Unresolved repository reference: @" + name);
                     }
@@ -76,18 +121,23 @@ public class JenesisModuleRepository implements JenesisRepository {
                         throw new IllegalStateException("Circular repository reference: @" + name);
                     }
                 }
-                current = chain(value, visited, scope, entryToken, null);
+                current = chain(value, visited, scope, granted, grantedMaven, spliced, type, null);
                 if (name != null) {
                     visited.remove(name);
                 }
                 if (current == null) {
                     throw new IllegalStateException("No Jenesis module repository is configured by: " + value);
                 }
+            } else if (type.equals(MAVEN)) {
+                MavenModuleRepository convention = new MavenModuleRepository(MavenDefaultRepository.of(
+                        URI.create(location.endsWith("/") ? location : location + "/"),
+                        grantedMaven.grant(origin)));
+                current = segments == null ? convention : convention.segments(segments);
             } else {
                 current = new JenesisModuleRepository(
                         URI.create((location.endsWith("/") ? location : location + "/")
                                 + (scope == Scope.MODULE ? "module/" : "artifact/")),
-                        entryToken);
+                        granted.grant(origin));
             }
             List<String> modules = new ArrayList<>();
             if (separator >= 0) {
@@ -111,6 +161,48 @@ public class JenesisModuleRepository implements JenesisRepository {
             repository = repository == null ? current : current.prepend(repository);
         }
         return repository;
+    }
+
+    private static boolean isType(String value) {
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (character < 'a' || character > 'z') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isCount(String value) {
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (character < '0' || character > '9') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isArgument(String value) {
+        String remainder = value.strip();
+        return !remainder.startsWith("/")
+                && (remainder.isEmpty() || remainder.startsWith("@") || remainder.indexOf(':') > 0);
+    }
+
+    private static int toSegments(String value, String candidate) {
+        int segments;
+        try {
+            segments = Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid group id segment count in Jenesis module repository entry: "
+                    + candidate, e);
+        }
+        if (segments < 1) {
+            throw new IllegalArgumentException("Expected at least one group id segment in "
+                    + "Jenesis module repository entry: "
+                    + candidate);
+        }
+        return segments;
     }
 
     public JenesisModuleRepository(URI root) {

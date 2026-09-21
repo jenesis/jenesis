@@ -4,6 +4,14 @@ import module java.base;
 
 public final class Make {
 
+    private static final String PROVIDED = "jenesis.make.provided";
+
+    private static final List<String> CREDENTIALS = List.of("jenesis.maven.token",
+            "jenesis.module.token",
+            "jenesis.cache.key");
+
+    private static final List<String> PLAINTEXT = List.of("jenesis.repository.insecure", "jenesis.cache.insecure");
+
     private final String mainClass;
     private final Path root;
     private final Path classes;
@@ -240,6 +248,7 @@ public final class Make {
     }
 
     public static SequencedSet<Path> loadProperties(Path path) throws IOException {
+        SequencedSet<String> provided = new LinkedHashSet<>();
         Path base = path.resolve("jenesis.properties");
         Properties project = read(base);
         if (project != null) {
@@ -262,16 +271,21 @@ public final class Make {
         if (project != null) {
             addProfiles(pending, path, project.getProperty("jenesis.make.profiles"));
         }
-        loadProfiles(loaded, pending, path, false);
+        loadProfiles(loaded, pending, path, false, provided);
         if (user != null) {
             addProfiles(pending, home, user.getProperty("jenesis.make.profiles"));
-            loadProfiles(loaded, pending, home, true);
+            loadProfiles(loaded, pending, home, true, null);
         }
         if (project != null) {
-            apply(project);
+            apply(project, provided);
         }
         if (user != null) {
-            apply(user);
+            apply(user, null);
+        }
+        if (provided.isEmpty()) {
+            System.clearProperty(PROVIDED);
+        } else {
+            System.setProperty(PROVIDED, String.join(",", provided));
         }
         SequencedSet<Path> profiles = new LinkedHashSet<>();
         for (Path file : loaded) {
@@ -296,8 +310,11 @@ public final class Make {
         }
     }
 
-    private static void loadProfiles(Set<Path> loaded, Deque<Path> pending, Path base, boolean trusted)
-            throws IOException {
+    private static void loadProfiles(Set<Path> loaded,
+                                     Deque<Path> pending,
+                                     Path base,
+                                     boolean trusted,
+                                     Set<String> provided) throws IOException {
         while (!pending.isEmpty()) {
             Path file = pending.removeFirst().normalize();
             if (!loaded.add(file) || !Files.isRegularFile(file)) {
@@ -306,17 +323,41 @@ public final class Make {
             Properties properties = read(file);
             requireApplicable(file, properties, trusted);
             addProfiles(pending, base, properties.getProperty("jenesis.make.profiles"));
-            apply(properties);
+            apply(properties, provided);
         }
     }
 
-    private static void apply(Properties properties) {
+    private static void apply(Properties properties, Set<String> provided) {
         for (String name : properties.stringPropertyNames()) {
-            System.getProperties().putIfAbsent(name, properties.getProperty(name));
+            if (System.getProperties().putIfAbsent(name, properties.getProperty(name)) == null && provided != null) {
+                provided.add(name);
+            }
         }
     }
 
     private static void requireApplicable(Path file, Properties properties, boolean trusted) {
+        if (properties.getProperty(PROVIDED) != null) {
+            throw new IllegalStateException(PROVIDED + " cannot be set in " + file
+                    + ": it records which settings the files a project provides supplied, and Make derives it");
+        }
+        if (!trusted) {
+            for (String key : CREDENTIALS) {
+                if (properties.getProperty(key) != null) {
+                    throw new IllegalStateException(key + " cannot be set in " + file
+                            + ": a credential is yours to hand out, so only the command line, your own"
+                            + " ~/.jenesis/jenesis.properties or the environment may name one"
+                            + " (pass -D" + key + " instead)");
+                }
+            }
+            for (String key : PLAINTEXT) {
+                if (properties.getProperty(key) != null) {
+                    throw new IllegalStateException(key + " cannot be set in " + file
+                            + ": whether this build may talk plaintext http is yours to decide, so only the"
+                            + " command line or your own ~/.jenesis/jenesis.properties may allow it"
+                            + " (pass -D" + key + " instead)");
+                }
+            }
+        }
         if (properties.getProperty("jenesis.make.root") != null) {
             throw new IllegalStateException("jenesis.make.root cannot be set in " + file
                     + ": the project root locates this file, so it is resolved before the file is read"

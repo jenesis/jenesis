@@ -18,42 +18,73 @@ public class MavenDefaultRepository implements MavenRepository {
     private final Repository.Retry retry;
 
     public static MavenRepository of() {
-        Path local;
-        String localOverride = System.getProperty("jenesis.maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
-        if (localOverride == null) {
-            Path candidate = Path.of(System.getProperty("user.home"), ".m2", "repository");
-            local = Files.isDirectory(candidate) ? candidate : null;
-        } else {
-            local = Path.of(localOverride);
-            if (!Files.isDirectory(local)) {
-                throw new IllegalStateException("Local Maven repository does not point at a directory: " + local);
-            }
-        }
-        String token = System.getProperty("jenesis.maven.token", System.getenv("MAVEN_REPOSITORY_TOKEN"));
+        Path local = localRepository();
+        Repository.Credential credential = Repository.Credential.of("jenesis.maven.token", "MAVEN_REPOSITORY_TOKEN");
         boolean verbose = SequencedProperties.systemFlag("jenesis.print.fetch");
         String property = System.getProperty("jenesis.maven.uri");
         String environment = System.getenv("MAVEN_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();
         String text;
+        Repository.Origin origin;
         if (property != null) {
             text = property;
+            origin = Repository.Origin.of("jenesis.maven.uri");
         } else if (environment != null) {
             text = environment;
             visited.add("MAVEN_REPOSITORY_URI");
+            origin = Repository.Origin.ENVIRONMENT;
         } else {
             text = "https://repo1.maven.org/maven2/";
+            origin = Repository.Origin.DEFAULT;
         }
-        MavenRepository repository = chain(text, visited, local, token, verbose, null);
+        MavenRepository repository = chain(text, visited, local, credential, origin, verbose, null);
         if (repository == null) {
             throw new IllegalStateException("No Maven repository is configured by: " + text);
         }
         return repository;
     }
 
+    public static MavenRepository of(URI repository, String token) {
+        return single(repository.toString().endsWith("/") ? repository : URI.create(repository + "/"),
+                localRepository(),
+                token,
+                SequencedProperties.systemFlag("jenesis.print.fetch"));
+    }
+
+    private static Path localRepository() {
+        String override = System.getProperty("jenesis.maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
+        if (override == null) {
+            Path candidate = Path.of(System.getProperty("user.home"), ".m2", "repository");
+            return Files.isDirectory(candidate) ? candidate : null;
+        }
+        Path local = Path.of(override);
+        if (!Files.isDirectory(local)) {
+            throw new IllegalStateException("Local Maven repository does not point at a directory: " + local);
+        }
+        return local;
+    }
+
+    private static MavenRepository single(URI uri, Path local, String token, boolean verbose) {
+        SequencedMap<String, URI> validations = new LinkedHashMap<>();
+        validations.put("SHA512", uri);
+        validations.put("SHA256", uri);
+        validations.put("SHA1", uri);
+        return new MavenDefaultRepository(uri,
+                local,
+                Collections.unmodifiableMap(validations),
+                verbose ? path -> System.out.printf("%s%-11s%s %s%n",
+                        BuildExecutorCallback.YELLOW,
+                        "[FETCHED]",
+                        BuildExecutorCallback.RESET,
+                        uri.resolve(path)) : null,
+                token);
+    }
+
     private static MavenRepository chain(String text,
                                          Set<String> visited,
                                          Path local,
-                                         String token,
+                                         Repository.Credential credential,
+                                         Repository.Origin origin,
                                          boolean verbose,
                                          MavenRepository repository) {
         for (String entry : text.split(",")) {
@@ -70,17 +101,22 @@ public class MavenDefaultRepository implements MavenRepository {
             if (location.startsWith("@")) {
                 String name = location.substring(1);
                 String value;
+                Repository.Origin spliced;
                 if (name.isEmpty()) {
                     String environment = System.getenv("MAVEN_REPOSITORY_URI");
                     if (environment != null && visited.add("MAVEN_REPOSITORY_URI")) {
                         name = "MAVEN_REPOSITORY_URI";
                         value = environment;
+                        spliced = Repository.Origin.ENVIRONMENT;
                     } else {
                         name = null;
                         value = "https://repo1.maven.org/maven2/";
+                        spliced = Repository.Origin.DEFAULT;
                     }
                 } else {
-                    value = System.getProperty(name, System.getenv(name));
+                    String declared = System.getProperty(name);
+                    value = declared == null ? System.getenv(name) : declared;
+                    spliced = declared == null ? Repository.Origin.ENVIRONMENT : Repository.Origin.of(name);
                     if (value == null) {
                         throw new IllegalStateException("Unresolved repository reference: @" + name);
                     }
@@ -88,7 +124,7 @@ public class MavenDefaultRepository implements MavenRepository {
                         throw new IllegalStateException("Circular repository reference: @" + name);
                     }
                 }
-                current = chain(value, visited, local, token, verbose, null);
+                current = chain(value, visited, local, credential, spliced, verbose, null);
                 if (name != null) {
                     visited.remove(name);
                 }
@@ -96,20 +132,10 @@ public class MavenDefaultRepository implements MavenRepository {
                     throw new IllegalStateException("No Maven repository is configured by: " + value);
                 }
             } else {
-                URI uri = URI.create(location.endsWith("/") ? location : location + "/");
-                SequencedMap<String, URI> validations = new LinkedHashMap<>();
-                validations.put("SHA512", uri);
-                validations.put("SHA256", uri);
-                validations.put("SHA1", uri);
-                current = new MavenDefaultRepository(uri,
+                current = single(URI.create(location.endsWith("/") ? location : location + "/"),
                         local,
-                        Collections.unmodifiableMap(validations),
-                        verbose ? path -> System.out.printf("%s%-11s%s %s%n",
-                                BuildExecutorCallback.YELLOW,
-                                "[FETCHED]",
-                                BuildExecutorCallback.RESET,
-                                uri.resolve(path)) : null,
-                        token);
+                        credential.grant(origin),
+                        verbose);
             }
             List<String> groups = new ArrayList<>();
             if (separator >= 0) {
