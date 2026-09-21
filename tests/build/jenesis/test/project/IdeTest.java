@@ -253,6 +253,71 @@ public class IdeTest {
     }
 
     @Test
+    public void eclipse_compiles_below_a_generated_folder() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("sources"));
+        Files.createDirectories(root.resolve("greeter").resolve("test"));
+        Path inventory = inventory("module-greeter", properties ->
+                properties.setProperty("module-greeter.path", "greeter"));
+
+        run(Ide.ECLIPSE, inventory);
+
+        Path classpath = root.resolve("greeter").resolve(".classpath");
+        assertThat(classpathEntries(classpath, "output"))
+                .as("Eclipse requires an output folder inside the project it belongs to")
+                .containsExactly(".eclipse/classes");
+        assertThat(attributes(classpath, "classpathentry", "output"))
+                .as("test sources may not share the output folder of main sources")
+                .contains(".eclipse/test-classes");
+    }
+
+    @Test
+    public void eclipse_excludes_the_output_folder_from_a_root_source_folder() throws IOException {
+        Files.createDirectories(root.resolve("greeter"));
+        Path inventory = inventory("module-greeter", properties ->
+                properties.setProperty("module-greeter.path", "greeter"));
+
+        run(Ide.ECLIPSE, inventory);
+
+        Path classpath = root.resolve("greeter").resolve(".classpath");
+        assertThat(classpathEntries(classpath, "src")).containsExactly("");
+        assertThat(attributes(classpath, "classpathentry", "excluding"))
+                .as("Eclipse refuses an output folder nested in a source folder")
+                .contains(".eclipse/");
+    }
+
+    @Test
+    public void eclipse_puts_libraries_of_a_modular_module_on_the_module_path() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("sources"));
+        Path inventory = inventory("module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.module", "demo.greeter");
+            properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
+        });
+        library(inventory, "lib.jar");
+
+        run(Ide.ECLIPSE, inventory);
+
+        assertThat(Files.readString(root.resolve("greeter").resolve(".classpath")))
+                .as("a library of a modular module is read as a module, not from the classpath")
+                .contains("<attribute name=\"module\" value=\"true\"/>");
+    }
+
+    @Test
+    public void eclipse_keeps_libraries_of_a_plain_module_on_the_classpath() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("sources"));
+        Path inventory = inventory("module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
+        });
+        library(inventory, "lib.jar");
+
+        run(Ide.ECLIPSE, inventory);
+
+        assertThat(Files.readString(root.resolve("greeter").resolve(".classpath")))
+                .doesNotContain("<attribute name=\"module\" value=\"true\"/>");
+    }
+
+    @Test
     public void vscode_writes_settings() throws IOException {
         Files.createDirectories(root.resolve("greeter").resolve("sources"));
         Path inventory = inventory("module-greeter", properties -> {
@@ -265,6 +330,31 @@ public class IdeTest {
 
         assertThat(sourcePaths()).containsExactly("greeter/sources");
         assertThat(referencedLibraries()).containsExactly("out/module-greeter/lib/lib.jar");
+        assertThat(outputPath())
+                .as("the IDE compiles into the folder the build already owns")
+                .isEqualTo("target/.vscode");
+    }
+
+    @Test
+    public void vscode_lists_a_library_shared_by_two_modules_once() throws IOException {
+        Files.createDirectories(root.resolve("greeter").resolve("sources"));
+        Files.createDirectories(root.resolve("app").resolve("sources"));
+        Path greeter = inventory("module-greeter", properties -> {
+            properties.setProperty("module-greeter.path", "greeter");
+            properties.setProperty("module-greeter.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
+        });
+        Path app = inventory("module-app", properties -> {
+            properties.setProperty("module-app.path", "app");
+            properties.setProperty("module-app.dependency.0", "maven/org.example/lib/1.0 lib/lib.jar");
+        });
+        library(greeter, "lib.jar");
+        library(app, "lib.jar");
+
+        run(Ide.VSCODE, greeter, app);
+
+        assertThat(referencedLibraries())
+                .as("each module resolves into its own folder, but it is one artifact")
+                .hasSize(1);
     }
 
     @Test
@@ -308,15 +398,23 @@ public class IdeTest {
         return settings("java.project.referencedLibraries");
     }
 
+    private String outputPath() throws IOException {
+        return settings() instanceof Map<?, ?> settings
+                && settings.get("java.project.outputPath") instanceof String value ? value : null;
+    }
+
     private List<String> settings(String key) throws IOException {
         List<String> values = new ArrayList<>();
-        if (Json.parse(Files.readString(root.resolve(".vscode").resolve("settings.json")))
-                instanceof Map<?, ?> settings && settings.get(key) instanceof List<?> entries) {
+        if (settings() instanceof Map<?, ?> settings && settings.get(key) instanceof List<?> entries) {
             for (Object entry : entries) {
                 values.add(entry.toString());
             }
         }
         return values;
+    }
+
+    private Object settings() throws IOException {
+        return Json.parse(Files.readString(root.resolve(".vscode").resolve("settings.json")));
     }
 
     private String relative(String module, Path target) {
