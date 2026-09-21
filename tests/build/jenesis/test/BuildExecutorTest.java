@@ -130,7 +130,11 @@ public class BuildExecutorTest implements Serializable {
                 holder.toString(),
                 lockFile.toString()).redirectErrorStream(true).start();
         try (BufferedReader reader = process.inputReader()) {
-            assertThat(reader.readLine()).isEqualTo("locked");
+            String line = reader.readLine();
+            while (line != null && line.startsWith("Picked up ")) {
+                line = reader.readLine();
+            }
+            assertThat(line).isEqualTo("locked");
             BuildExecutor foreign = BuildExecutor.of(source2.resolve("target"),
                     Duration.ZERO,
                     hash,

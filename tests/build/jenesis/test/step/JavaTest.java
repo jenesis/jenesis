@@ -45,7 +45,7 @@ public class JavaTest {
                         Map.of(Path.of("sample/Sample.class"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         assertThat(supplement.resolve("output")).content().isEqualTo("Hello world!");
-        assertThat(supplement.resolve("error")).isEmptyFile();
+        assertThat(reportedErrors(supplement)).isEmpty();
     }
 
     @Test
@@ -165,4 +165,10 @@ public class JavaTest {
         assertThat(supplement.resolve("output")).content().isEqualTo("Hello world!");
     }
 
+    private static String reportedErrors(Path supplement) throws IOException {
+        return Files.readString(supplement.resolve("error"))
+                .lines()
+                .filter(line -> !line.startsWith("Picked up "))
+                .collect(Collectors.joining("\n"));
+    }
 }
