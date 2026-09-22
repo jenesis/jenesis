@@ -226,11 +226,10 @@ public class SbomTest {
     }
 
     @Test
-    public void omits_the_placeholder_snapshot_version_but_still_emits() throws Exception {
+    public void emits_without_a_version_where_a_project_names_none() throws Exception {
         SequencedProperties metadata = new SequencedProperties();
         metadata.setProperty("project", "build.jenesis");
         metadata.setProperty("artifact", "demo");
-        metadata.setProperty("version", "1-SNAPSHOT");
         metadata.store(argument.resolve(BuildStep.METADATA));
 
         BuildStepResult result = new Sbom().apply(Runnable::run,
@@ -245,8 +244,8 @@ public class SbomTest {
         Path embedded = next.resolve("resources").resolve("META-INF").resolve("sbom").resolve("demo.cdx.json");
         assertThat(embedded).isNotEmptyFile();
         assertThat(Files.readString(embedded))
-                .as("the unset 1-SNAPSHOT placeholder is not fabricated into the sbom")
-                .doesNotContain("1-SNAPSHOT")
+                .as("a module that declares no version reports none")
+                .doesNotContain("SNAPSHOT")
                 .doesNotContain("\"version\": \"")
                 .as("the subject purl carries no version when none is set")
                 .contains("\"purl\": \"pkg:maven/build.jenesis/demo\"");

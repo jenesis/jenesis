@@ -69,7 +69,7 @@ public class MavenModuleResolverTest {
 
     @Test
     public void rejects_a_jar_that_declares_a_different_module() throws IOException {
-        addModuleJarToMavenRepository("org.example", "example-core", "1.2.3", "evil.other");
+        addModuleJarToMavenRepository("org.example", "example-core", "1.2.3", "evil.other", null);
         Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", """
                 <project xmlns="http://maven.apache.org/POM/4.0.0">
                     <groupId>org.example</groupId>
@@ -91,7 +91,7 @@ public class MavenModuleResolverTest {
 
     @Test
     public void accepts_a_jar_that_declares_the_requested_module() throws IOException {
-        addModuleJarToMavenRepository("org.example", "example-core", "1.2.3", "foo.bar");
+        addModuleJarToMavenRepository("org.example", "example-core", "1.2.3", "foo.bar", "1.2.3");
         Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", """
                 <project xmlns="http://maven.apache.org/POM/4.0.0">
                     <groupId>org.example</groupId>
@@ -108,6 +108,30 @@ public class MavenModuleResolverTest {
                 DependencyScope.COMPILE).artifacts();
 
         assertThat(resolved).containsKey("module/foo.bar/1.2.3");
+    }
+
+    @Test
+    public void a_module_that_declares_no_version_resolves_without_one() throws IOException {
+        addModuleJarToMavenRepository("org.example", "example-core", "0-SNAPSHOT", "foo.bar", null);
+        Repository discovery = stubRepository(new LinkedHashMap<>(), Map.of("foo.bar:pom", """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <groupId>org.example</groupId>
+                    <artifactId>example-core</artifactId>
+                    <version>0-SNAPSHOT</version>
+                </project>"""));
+
+        SequencedMap<String, Resolver.Resolved> resolved = new MavenModuleResolver("maven", mavenPomResolver, discovery).dependencies(
+                Runnable::run,
+                "module",
+                Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
+                new LinkedHashMap<>(Map.of("foo.bar", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE).artifacts();
+
+        assertThat(resolved)
+                .as("a module repository serves an unversioned module below its name alone, so a version"
+                        + " taken from the POM would not address it")
+                .containsOnlyKeys("maven/org.example/example-core/0-SNAPSHOT", "module/foo.bar");
     }
 
     @Test
@@ -864,14 +888,23 @@ public class MavenModuleResolverTest {
                 .resolve(artifactId + "-" + version + ".pom"), pom);
     }
 
-    private void addModuleJarToMavenRepository(String groupId, String artifactId, String version, String module) throws IOException {
+    private void addModuleJarToMavenRepository(String groupId,
+                                               String artifactId,
+                                               String version,
+                                               String module,
+                                               String moduleVersion) throws IOException {
         Path jar = Files.createDirectories(mavenRepoFolder.resolve(groupId.replace('.', '/') + "/" + artifactId + "/" + version))
                 .resolve(artifactId + "-" + version + ".jar");
         try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
             out.putNextEntry(new JarEntry("module-info.class"));
             out.write(ClassFile.of().buildModule(ModuleAttribute.of(
                     ModuleDesc.of(module),
-                    builder -> builder.requires(ModuleRequireInfo.of(ModuleDesc.of("java.base"), 0, null)))));
+                    builder -> {
+                        if (moduleVersion != null) {
+                            builder.moduleVersion(moduleVersion);
+                        }
+                        builder.requires(ModuleRequireInfo.of(ModuleDesc.of("java.base"), 0, null));
+                    })));
             out.closeEntry();
         }
     }
