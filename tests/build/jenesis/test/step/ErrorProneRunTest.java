@@ -8,6 +8,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Output;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
@@ -126,13 +127,13 @@ public class ErrorProneRunTest {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
         executor.addModule("dependencies",
-                new Dependencies(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                new Dependencies(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
                         Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).group("javac"),
                 "project");
         executor.addModule("chain",
                 new InferredCompilerChainModule(
                         new LinkedHashSet<>(Set.of(configuration)),
-                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
                         Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
                 "project", "dependencies");
         executor.execute();

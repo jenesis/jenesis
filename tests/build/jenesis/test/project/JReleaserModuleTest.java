@@ -7,6 +7,7 @@ import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Output;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.JReleaserModule;
 import build.jenesis.project.ReleaseModule;
@@ -52,14 +53,12 @@ public class JReleaserModuleTest {
     public void honours_an_explicitly_configured_file() throws IOException {
         Files.writeString(root.resolve("jreleaser.yml"), "");
         Files.writeString(root.resolve("elsewhere.yml"), "");
-        System.setProperty("jenesis.jreleaser.config", "elsewhere.yml");
-        assertThat(JReleaserModule.configured(SYSTEM, root)).isEqualTo(root.resolve("elsewhere.yml"));
+        assertThat(JReleaserModule.configured(Map.of("jreleaser.config", "elsewhere.yml")::get, root)).isEqualTo(root.resolve("elsewhere.yml"));
     }
 
     @Test
     public void rejects_an_explicitly_configured_file_that_is_missing() {
-        System.setProperty("jenesis.jreleaser.config", "absent.yml");
-        assertThatThrownBy(() -> JReleaserModule.configured(SYSTEM, root))
+        assertThatThrownBy(() -> JReleaserModule.configured(Map.of("jreleaser.config", "absent.yml")::get, root))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("absent.yml");
     }
@@ -107,7 +106,7 @@ public class JReleaserModuleTest {
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         buildExecutor.addSource("source", source);
-        buildExecutor.addModule("release", ReleaseModule.ofKeys(SYSTEM, root, version), "source");
+        buildExecutor.addModule("release", ReleaseModule.ofKeys(SYSTEM, new Output(), root, version), "source");
         return buildExecutor.execute(selector);
     }
 }

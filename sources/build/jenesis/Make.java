@@ -243,14 +243,16 @@ public final class Make {
     private int invoke(ClassLoader loader, SequencedMap<String, String> collected, String... selectors)
             throws Exception {
         Class<?> project = Class.forName("build.jenesis.Project", true, loader);
+        Class<?> console = Class.forName("build.jenesis.Output", true, loader);
+        Object defaults = console.getConstructor().newInstance();
         if (collected == null || !mainClass.equals("build.jenesis.Project")) {
             return (int) project
-                    .getMethod("run", Function.class, String.class, Path.class, SequencedSet.class, String[].class)
-                    .invoke(null, settings.keys(), mainClass, root, settings.profiles(), selectors);
+                    .getMethod("run", Function.class, console, String.class, Path.class, SequencedSet.class, String[].class)
+                    .invoke(null, settings.keys(), defaults, mainClass, root, settings.profiles(), selectors);
         }
         Object produced = project
-                .getMethod("perform", Function.class, Path.class, SequencedSet.class, String[].class)
-                .invoke(null, settings.keys(), root, settings.profiles(), selectors);
+                .getMethod("perform", Function.class, console, Path.class, SequencedSet.class, String[].class)
+                .invoke(null, settings.keys(), defaults, root, settings.profiles(), selectors);
         if (produced == null) {
             return 1;
         }

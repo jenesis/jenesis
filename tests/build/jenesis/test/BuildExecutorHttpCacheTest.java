@@ -183,7 +183,6 @@ public class BuildExecutorHttpCacheTest {
 
     @Test
     public void a_cache_that_hangs_does_not_hang_the_build() throws IOException {
-        System.setProperty("jenesis.cache.read", "PT0.5S");
         try (ServerSocket hanging = new ServerSocket(0, 0, InetAddress.getLoopbackAddress())) {
             Thread accepting = Thread.ofVirtual().start(() -> {
                 try {
@@ -193,7 +192,7 @@ public class BuildExecutorHttpCacheTest {
                 } catch (IOException | InterruptedException _) {
                 }
             });
-            BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofKeys(SYSTEM, 
+            BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofKeys(Map.of("cache.read", "PT0.5S")::get, 
                     URI.create("http://localhost:" + hanging.getLocalPort() + "/cache"))
                     .key("team-alpha").project("demo");
             long started = System.nanoTime();
@@ -201,7 +200,6 @@ public class BuildExecutorHttpCacheTest {
             assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(20));
             accepting.interrupt();
         } finally {
-            System.clearProperty("jenesis.cache.read");
         }
     }
 

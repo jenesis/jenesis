@@ -1,6 +1,7 @@
 package build.jenesis.step;
 
 import module java.base;
+import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -21,7 +22,7 @@ public class Bundle implements BuildStep {
              BuildStep.timestamp());
     }
 
-    public static Bundle ofKeys(Function<String, String> keys) {
+    public static Bundle ofKeys(Function<String, String> keys, Output output) {
         return new Bundle()
                 .timestamp(BuildStep.timestamp(keys));
     }

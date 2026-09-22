@@ -3,6 +3,7 @@ package build.jenesis.test.step;
 import module java.base;
 import module jdk.httpserver;
 import module org.junit.jupiter.api;
+import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -29,7 +30,7 @@ public class OsvDownloadTest {
         SequencedProperties dependencies = new SequencedProperties();
         dependencies.setProperty("main/compile/maven/org.example/lib/1.2.3", "resolved/lib.jar");
         dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
-        OsvDownload step = OsvDownload.ofKeys(SYSTEM).endpoint(URI.create("http://osv.invalid"));
+        OsvDownload step = OsvDownload.ofKeys(SYSTEM, new Output()).endpoint(URI.create("http://osv.invalid"));
         assertThatThrownBy(() -> step.apply(Runnable::run,
                 new BuildStepContext(root.resolve("previous"), next, root.resolve("supplement")),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
@@ -41,7 +42,6 @@ public class OsvDownloadTest {
 
     @Test
     public void retries_a_transient_server_error_and_drains_the_error_stream() throws IOException {
-        System.setProperty("jenesis.repository.insecure", "true");
         AtomicInteger hits = new AtomicInteger();
         HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         server.createContext("/v1/querybatch", exchange -> {
@@ -68,7 +68,7 @@ public class OsvDownloadTest {
             dependencies.setProperty("main/compile/maven/org.example/lib/1.2.3", "resolved/lib.jar");
             dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
             URI endpoint = URI.create("http://localhost:" + server.getAddress().getPort());
-            BuildStepResult result = OsvDownload.ofKeys(SYSTEM).endpoint(endpoint).apply(Runnable::run,
+            BuildStepResult result = OsvDownload.ofKeys(Map.of("repository.insecure", "true")::get, new Output()).endpoint(endpoint).apply(Runnable::run,
                     new BuildStepContext(root.resolve("retry-previous"), next, root.resolve("retry-supplement")),
                     new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                             argument,
@@ -80,7 +80,6 @@ public class OsvDownloadTest {
             assertThat(next.resolve("advisories.properties")).exists();
         } finally {
             server.stop(0);
-            System.clearProperty("jenesis.repository.insecure");
         }
     }
 

@@ -8,6 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -40,14 +41,15 @@ public class JApiCmpModule implements BuildExecutorModule {
     }
 
     public static JApiCmpModule ofKeys(Function<String, String> keys,
+                                       Output output,
                                        Map<String, Repository> repositories,
                                        Map<String, Resolver> resolvers) {
-        return new JApiCmpModule(Dependencies.ofKeys(keys, repositories, resolvers),
+        return new JApiCmpModule(Dependencies.ofKeys(keys, output, repositories, resolvers),
                 null,
                 "japicmp",
                 "main",
                 new SequencedProperties(),
-                ProcessBuildStep.Terms.ofKeys(keys, "japicmp"));
+                ProcessBuildStep.Terms.ofKeys(keys, output, "japicmp"));
     }
 
     private JApiCmpModule(Dependencies dependencies,

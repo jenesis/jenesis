@@ -8,6 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -39,13 +40,14 @@ public class AvroModule implements BuildExecutorModule {
     }
 
     public static AvroModule ofKeys(Function<String, String> keys,
+                                    Output output,
                                     Map<String, Repository> repositories,
                                     Map<String, Resolver> resolvers) {
-        return new AvroModule(Dependencies.ofKeys(keys, repositories, resolvers),
+        return new AvroModule(Dependencies.ofKeys(keys, output, repositories, resolvers),
                 null,
                 "avro",
                 List.of(),
-                ProcessBuildStep.Terms.ofKeys(keys, "avro"));
+                ProcessBuildStep.Terms.ofKeys(keys, output, "avro"));
     }
 
     private AvroModule(Dependencies dependencies,

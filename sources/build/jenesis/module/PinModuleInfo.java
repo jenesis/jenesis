@@ -12,6 +12,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
+import build.jenesis.Output;
 import build.jenesis.Pinning;
 import build.jenesis.step.Inventory;
 import build.jenesis.SequencedProperties;
@@ -34,6 +35,7 @@ public class PinModuleInfo implements BuildStep {
     }
 
     public static PinModuleInfo ofKeys(Function<String, String> keys,
+                                       Output output,
                                        String prefix,
                                        String path,
                                        List<Path> moduleInfoFiles,
@@ -43,7 +45,7 @@ public class PinModuleInfo implements BuildStep {
                 .flatten(flattenFrom(keys))
                 .permits(Pinning.permits(keys));
         Boolean pins = SequencedProperties.flagOrNull(keys, "print.pins");
-        return pins == null || !pins ? pin : pin.printing(System.out::println);
+        return pins == null || !pins ? pin : pin.printing(output.out());
     }
 
     private PinModuleInfo(String prefix,

@@ -7,6 +7,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.PathPlacement;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -30,7 +31,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                             Function<InferredArtifactQualityModule, BuildExecutorModule> artifact,
                                             Function<InferredTestObservationModule, BuildExecutorModule> observe,
                                             Function<InferredDocumentationModule, BuildExecutorModule> documentation,
-                                            Function<String, String> keys) implements MultiProjectAssembler<ProjectModuleDescriptor> {
+                                            Function<String, String> keys,
+                                            Output output) implements MultiProjectAssembler<ProjectModuleDescriptor> {
 
     public InferredMultiProjectAssembler() {
         this(module -> module,
@@ -40,43 +42,48 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 module -> module,
                 module -> module,
                 module -> module,
-                SequencedProperties.NONE);
+                SequencedProperties.NONE,
+                new Output());
     }
 
-    public static InferredMultiProjectAssembler ofKeys(Function<String, String> keys) {
-        return new InferredMultiProjectAssembler().keys(keys);
+    public static InferredMultiProjectAssembler ofKeys(Function<String, String> keys, Output output) {
+        return new InferredMultiProjectAssembler().keys(keys).output(output);
     }
 
     public InferredMultiProjectAssembler check(Function<InferredSourceCodeQualityModule, BuildExecutorModule> check) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys, output);
     }
 
     public InferredMultiProjectAssembler format(Function<InferredSourceFormattingModule, BuildExecutorModule> format) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys, output);
     }
 
     public InferredMultiProjectAssembler compliance(Function<InferredComplianceModule, BuildExecutorModule> compliance) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys, output);
     }
 
     public InferredMultiProjectAssembler toolchain(Function<InferredJavaToolchainModule, BuildExecutorModule> toolchain) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys, output);
     }
 
     public InferredMultiProjectAssembler artifact(Function<InferredArtifactQualityModule, BuildExecutorModule> artifact) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys, output);
     }
 
     public InferredMultiProjectAssembler observe(Function<InferredTestObservationModule, BuildExecutorModule> observe) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys, output);
     }
 
     public InferredMultiProjectAssembler documentation(Function<InferredDocumentationModule, BuildExecutorModule> documentation) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys, output);
     }
 
     public InferredMultiProjectAssembler keys(Function<String, String> keys) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys, output);
+    }
+
+    public InferredMultiProjectAssembler output(Output output) {
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, keys, output);
     }
 
     @Override
@@ -94,7 +101,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             SequencedSet<String> closure = new LinkedHashSet<>(descriptor.artifacts());
             if (modules != null) {
                 sub.addModule("modules",
-                        ModularizeModule.ofKeys(keys, factory, modules),
+                        ModularizeModule.ofKeys(keys, output, factory, modules),
                         descriptor.artifacts().stream());
                 closure = new LinkedHashSet<>(Set.of("modules"));
             }
@@ -102,12 +109,12 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     new Prepare(descriptor.pathPlacement(), overrides),
                     outerInherited.sequencedKeySet().stream());
             sub.addModule("check",
-                    check.apply(InferredSourceCodeQualityModule.ofKeys(keys, descriptor.configuration(), repositories, resolvers)
+                    check.apply(InferredSourceCodeQualityModule.ofKeys(keys, output, descriptor.configuration(), repositories, resolvers)
                             .pinning(descriptor.pinning())),
                     Stream.of(descriptor.sources().stream(), descriptor.spdx().stream(), descriptor.manifests().stream())
                             .flatMap(Function.identity()));
             sub.addModule("format",
-                    format.apply(InferredSourceFormattingModule.ofKeys(keys, descriptor.configuration(), repositories, resolvers)
+                    format.apply(InferredSourceFormattingModule.ofKeys(keys, output, descriptor.configuration(), repositories, resolvers)
                             .pinning(descriptor.pinning())),
                     Stream.of(descriptor.sources().stream(), descriptor.spdx().stream(), descriptor.manifests().stream())
                             .flatMap(Function.identity()));
@@ -122,10 +129,10 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                         descriptor.resources().stream())
                                 .flatMap(Function.identity()));
             }
-            sub.addModule("compliance", compliance.apply(InferredComplianceModule.ofKeys(keys, descriptor.configuration())),
+            sub.addModule("compliance", compliance.apply(InferredComplianceModule.ofKeys(keys, output, descriptor.configuration())),
                     Stream.concat(descriptor.manifests().stream(), descriptor.artifacts().stream()));
             sub.addModule("binary", toolchain.apply(
-                            InferredJavaToolchainModule.ofKeys(keys, descriptor.configuration(), repositories, resolvers)
+                            InferredJavaToolchainModule.ofKeys(keys, output, descriptor.configuration(), repositories, resolvers)
                                     .pinning(descriptor.pinning())
                                     .pathPlacement(descriptor.pathPlacement())),
                     Stream.of(
@@ -136,7 +143,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             .flatMap(Function.identity()));
             sub.addModule("artifact",
                     artifact.apply(
-                            InferredArtifactQualityModule.ofKeys(keys, descriptor.configuration(), repositories, resolvers)
+                            InferredArtifactQualityModule.ofKeys(keys, output, descriptor.configuration(), repositories, resolvers)
                                     .pinning(descriptor.pinning())),
                     Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             sub.addStep("layers",
@@ -155,7 +162,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     SequencedProperties properties = SequencedProperties.ofFiles(module);
                     if (properties.getProperty("test") != null && !properties.flag("abstract")) {
                         sub.addModule("observed", observe.apply(
-                                InferredTestObservationModule.ofKeys(keys, descriptor.configuration(), repositories, resolvers)
+                                InferredTestObservationModule.ofKeys(keys, output, descriptor.configuration(), repositories, resolvers)
                                         .pinning(descriptor.pinning())
                                         .pathPlacement(descriptor.pathPlacement())
                                         .moduleName(properties.getProperty("module"))),
@@ -167,18 +174,18 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             if (descriptor.source()) {
                 sub.addModule("sources", (module, inherited) ->
                         module.addStep("archive",
-                                Jar.ofKeys(keys, factory, Jar.Sort.SOURCES),
+                                Jar.ofKeys(keys, output, factory, Jar.Sort.SOURCES),
                                 inherited.sequencedKeySet()), descriptor.sources());
             }
             if (descriptor.documentation()) {
                 sub.addModule("documentation",
-                        documentation.apply(InferredDocumentationModule.ofKeys(keys, repositories, resolvers)
+                        documentation.apply(InferredDocumentationModule.ofKeys(keys, output, repositories, resolvers)
                                 .pinning(descriptor.pinning())),
                         Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             }
             if (packaging.jmod()) {
                 sub.addStep("jmod",
-                        JMod.ofKeys(keys, factory),
+                        JMod.ofKeys(keys, output, factory),
                         Stream.concat(Stream.of("binary"), descriptor.content().stream()));
             }
         });
@@ -193,21 +200,21 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     inputs.removeIf(key -> replaced.contains(local(key)));
                 }
                 if (packaging.jlink()) {
-                    sub.addStep("jlink", JLink.ofKeys(keys, factory), inputs);
+                    sub.addStep("jlink", JLink.ofKeys(keys, output, factory), inputs);
                     images.add("jlink");
                 }
                 if (packaging.jpackage() != null) {
-                    sub.addStep("jpackage", JPackage.ofKeys(keys, factory).type(packaging.jpackage()), packaging.jlink()
+                    sub.addStep("jpackage", JPackage.ofKeys(keys, output, factory).type(packaging.jpackage()), packaging.jlink()
                             ? Stream.concat(Stream.of("jlink"), inputs.stream())
                             : inputs.stream());
                     images.add("jpackage");
                 }
                 if (packaging.bundle()) {
-                    sub.addStep("bundle", Bundle.ofKeys(keys), inputs);
+                    sub.addStep("bundle", Bundle.ofKeys(keys, output), inputs);
                 }
                 if (packaging.launcher()) {
                     sub.addModule("launcher",
-                            LauncherModule.ofKeys(keys, repositories, resolvers)
+                            LauncherModule.ofKeys(keys, output, repositories, resolvers)
                                     .pinning(descriptor.pinning())
                                     .pathPlacement(descriptor.pathPlacement()),
                             inputs.stream());
@@ -218,7 +225,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
                 if (packaging.nativeImage()) {
                     sub.addStep("reachability", new NativeImageMetadata(), inputs);
-                    sub.addStep("native-image", NativeImage.ofKeys(keys, descriptor.pathPlacement()),
+                    sub.addStep("native-image", NativeImage.ofKeys(keys, output, descriptor.pathPlacement()),
                             Stream.concat(inputs.stream(), Stream.of("reachability")));
                     images.add("native-image");
                 }

@@ -3,6 +3,7 @@ package build.jenesis.project;
 import module java.base;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
+import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
@@ -29,9 +30,10 @@ public class InferredComplianceModule implements BuildExecutorModule {
     }
 
     public static InferredComplianceModule ofKeys(Function<String, String> keys,
+                                                  Output output,
                                                   SequencedSet<Path> configuration) {
         InferredComplianceModule module = new InferredComplianceModule(configuration,
-                OsvDownload.ofKeys(keys),
+                OsvDownload.ofKeys(keys, output),
                 value -> value,
                 value -> value);
         Boolean license = SequencedProperties.flagOrNull(keys, "compliance");

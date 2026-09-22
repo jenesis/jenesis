@@ -5,6 +5,7 @@ import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.step.Bind;
@@ -40,13 +41,14 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     }
 
     public static InferredSourceFormattingModule ofKeys(Function<String, String> keys,
+                                                        Output output,
                                                         SequencedSet<Path> configuration,
                                                         Map<String, Repository> repositories,
                                                         Map<String, Resolver> resolvers) {
-        InferredSourceFormattingModule module = new InferredSourceFormattingModule(configuration, null, true, GoogleJavaFormatModule.ofKeys(keys, repositories, resolvers),
-                PalantirJavaFormatModule.ofKeys(keys, repositories, resolvers),
-                KtlintFormatModule.ofKeys(keys, repositories, resolvers),
-                ScalafmtFormatModule.ofKeys(keys, repositories, resolvers),
+        InferredSourceFormattingModule module = new InferredSourceFormattingModule(configuration, null, true, GoogleJavaFormatModule.ofKeys(keys, output, repositories, resolvers),
+                PalantirJavaFormatModule.ofKeys(keys, output, repositories, resolvers),
+                KtlintFormatModule.ofKeys(keys, output, repositories, resolvers),
+                ScalafmtFormatModule.ofKeys(keys, output, repositories, resolvers),
                 value -> value,
                 value -> value,
                 value -> value);

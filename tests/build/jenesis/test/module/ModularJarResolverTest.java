@@ -34,8 +34,7 @@ public class ModularJarResolverTest {
                 "fail", new ModularJarResolver(false, null, ModuleVersionNegotiator.fail()),
                 "managed", new ModularJarResolver(false, null, ModuleVersionNegotiator.managed()));
         for (Map.Entry<String, ModularJarResolver> entry : cases.entrySet()) {
-            System.setProperty("jenesis.resolver.module", entry.getKey());
-            assertThat(serialize(ModularJarResolver.ofKeys(SYSTEM, false)))
+            assertThat(serialize(ModularJarResolver.ofKeys(Map.of("resolver.module", entry.getKey())::get, false)))
                     .as("mode=%s", entry.getKey())
                     .isEqualTo(serialize(entry.getValue()));
         }
@@ -43,15 +42,13 @@ public class ModularJarResolverTest {
 
     @Test
     public void system_property_is_read_case_insensitively() throws IOException {
-        System.setProperty("jenesis.resolver.module", "IgNoRe");
-        assertThat(serialize(ModularJarResolver.ofKeys(SYSTEM, false)))
+        assertThat(serialize(ModularJarResolver.ofKeys(Map.of("resolver.module", "IgNoRe")::get, false)))
                 .isEqualTo(serialize(new ModularJarResolver(false, null, ModuleVersionNegotiator.ignore())));
     }
 
     @Test
     public void system_property_rejects_an_unknown_mode() {
-        System.setProperty("jenesis.resolver.module", "nonsense");
-        assertThatThrownBy(() -> ModularJarResolver.ofKeys(SYSTEM, false))
+        assertThatThrownBy(() -> ModularJarResolver.ofKeys(Map.of("resolver.module", "nonsense")::get, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Unknown jenesis.resolver.module 'nonsense',"
                         + " expected one of: first, ignore, fail, managed");

@@ -1,6 +1,7 @@
 package build.jenesis.step;
 
 import module java.base;
+import build.jenesis.Output;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 
@@ -13,8 +14,9 @@ public class JDeps extends ProcessBuildStep {
     }
 
     public static JDeps ofKeys(Function<String, String> keys,
+                               Output output,
                                ProcessHandler.Factory factory) {
-        return new JDeps(factory.apply("jdeps", "bin/jdeps"), Terms.ofKeys(keys, "jdeps"));
+        return new JDeps(factory.apply("jdeps", "bin/jdeps"), Terms.ofKeys(keys, output, "jdeps"));
     }
 
     private JDeps(Function<List<String>, ? extends ProcessHandler> factory, Terms terms) {

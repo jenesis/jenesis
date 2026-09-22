@@ -10,7 +10,7 @@ public final class ExecuteTool extends JenesisTool {
     }
 
     @Override
-    protected int run(Function<String, String> requested, List<String> arguments)
+    protected int run(Function<String, String> requested, Output output, List<String> arguments)
             throws IOException, InterruptedException {
         requireInProcess(requested);
         if (SequencedProperties.flag(requested, "execute.docker")) {
@@ -21,13 +21,14 @@ public final class ExecuteTool extends JenesisTool {
         Path root = root(requested);
         Make.Settings settings = Make.settings(root, requested);
         SequencedMap<String, Path> outputs = Project.perform(settings.keys(),
+                output,
                 root,
                 settings.profiles(),
                 Project.BUILD);
         if (outputs == null) {
             return 1;
         }
-        return Execution.ofKeys(settings.keys(), Project.ofKeys(settings.keys(), root))
+        return Execution.ofKeys(settings.keys(), Project.ofKeys(settings.keys(), output, root))
                 .execute(outputs, arguments.toArray(String[]::new));
     }
 }

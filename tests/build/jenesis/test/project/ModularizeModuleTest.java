@@ -5,6 +5,7 @@ import module org.junit.jupiter.api;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
+import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
@@ -206,7 +207,7 @@ public class ModularizeModuleTest {
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         buildExecutor.addSource("closure", closure);
         buildExecutor.addModule("modules",
-                ModularizeModule.ofKeys(SYSTEM, ProcessHandler.Factory.TOOL, synthetic),
+                ModularizeModule.ofKeys(SYSTEM, new Output(), ProcessHandler.Factory.TOOL, synthetic),
                 "closure");
         SequencedMap<String, Path> steps = buildExecutor.execute();
         return steps.get("modules");

@@ -9,6 +9,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.PathPlacement;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -67,13 +68,14 @@ public class TestModule implements BuildExecutorModule {
     }
 
     public static TestModule ofKeys(Function<String, String> keys,
+                                    Output output,
                                     Map<String, Repository> repositories,
                                     Map<String, Resolver> resolvers) {
         return new TestModule(null,
                 defaultIsTest(),
                 null,
                 resolvers,
-                Dependencies.ofKeys(keys, repositories, resolvers),
+                Dependencies.ofKeys(keys, output, repositories, resolvers),
                 true,
                 true,
                 null,
@@ -87,7 +89,7 @@ public class TestModule implements BuildExecutorModule {
                 "main",
                 List.of(),
                 incrementalDigest(SequencedProperties.getProperty(keys, "test.incremental")),
-                ProcessBuildStep.Terms.ofKeys(keys, "tests"),
+                ProcessBuildStep.Terms.ofKeys(keys, output, "tests"),
                 SequencedProperties.flag(keys, "test.skip"));
     }
 

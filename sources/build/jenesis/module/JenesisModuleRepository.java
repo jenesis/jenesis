@@ -1,6 +1,7 @@
 package build.jenesis.module;
 
 import module java.base;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SafeSegment;
@@ -21,10 +22,10 @@ public class JenesisModuleRepository implements JenesisRepository {
     private final Boolean speculative;
 
     public static JenesisRepository of(Scope scope) {
-        return ofKeys(SequencedProperties.NONE, scope);
+        return ofKeys(SequencedProperties.NONE, new Output(), scope);
     }
 
-    public static JenesisRepository ofKeys(Function<String, String> keys, Scope scope) {
+    public static JenesisRepository ofKeys(Function<String, String> keys, Output output, Scope scope) {
         Repository.Credential credential = Repository.Credential.of(keys,
                 "module.token",
                 "JENESIS_REPOSITORY_TOKEN");
@@ -45,7 +46,7 @@ public class JenesisModuleRepository implements JenesisRepository {
             text = "https://repo.jenesis.build/";
             origin = Repository.Origin.DEFAULT;
         }
-        JenesisRepository repository = chain(keys, text, visited, scope, credential, maven, origin, MODULE, null);
+        JenesisRepository repository = chain(keys, output, text, visited, scope, credential, maven, origin, MODULE, null);
         if (repository == null) {
             throw new IllegalStateException("No Jenesis module repository is configured by: " + text);
         }
@@ -53,6 +54,7 @@ public class JenesisModuleRepository implements JenesisRepository {
     }
 
     private static JenesisRepository chain(Function<String, String> keys,
+                                           Output output,
                                            String text,
                                            Set<String> visited,
                                            Scope scope,
@@ -126,7 +128,7 @@ public class JenesisModuleRepository implements JenesisRepository {
                         throw new IllegalStateException("Circular repository reference: @" + name);
                     }
                 }
-                current = chain(keys, value, visited, scope, granted, grantedMaven, spliced, type, null);
+                current = chain(keys, output, value, visited, scope, granted, grantedMaven, spliced, type, null);
                 if (name != null) {
                     visited.remove(name);
                 }
@@ -135,7 +137,7 @@ public class JenesisModuleRepository implements JenesisRepository {
                 }
             } else if (type.equals(MAVEN)) {
                 MavenModuleRepository convention = MavenModuleRepository.ofKeys(keys,
-                        MavenDefaultRepository.ofKeys(keys,
+                        MavenDefaultRepository.ofKeys(keys, output,
                                 URI.create(location.endsWith("/") ? location : location + "/"),
                                 grantedMaven.grant(origin)));
                 current = segments == null ? convention : convention.segments(segments);

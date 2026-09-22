@@ -8,19 +8,13 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
+import build.jenesis.Output;
+import build.jenesis.SequencedProperties;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class ProcessBuildStepTest {
-
-    @BeforeEach
-    @AfterEach
-    public void clear() {
-        System.clearProperty("jenesis.print.process");
-        System.clearProperty("jenesis.print.probe");
-        System.clearProperty("jenesis.process.concurrency");
-    }
 
     @TempDir
     private Path root;
@@ -81,33 +75,34 @@ public class ProcessBuildStepTest {
     }
 
     @Test
-    public void the_command_specific_property_enables_streaming() {
-        System.setProperty("jenesis.print.probe", "true");
-        assertThat(new Probe().streams()).isTrue();
+    public void the_command_specific_setting_enables_streaming() {
+        List<String> printed = new ArrayList<>();
+        assertThat(new Probe(Map.of("print.probe", "true")::get, new Output(printed::add, printed::add)).streams())
+                .isTrue();
+        assertThat(printed)
+                .as("the lines go to the output the run was given, never to the stream of the JVM")
+                .isNotEmpty();
     }
 
     @Test
-    public void the_generic_property_enables_streaming() {
-        System.setProperty("jenesis.print.process", "true");
-        assertThat(new Probe().streams()).isTrue();
+    public void the_generic_setting_enables_streaming() {
+        assertThat(new Probe(Map.of("print.process", "true")::get, new Output()).streams()).isTrue();
     }
 
     @Test
-    public void the_command_specific_property_takes_precedence_over_the_generic_one() {
-        System.setProperty("jenesis.print.process", "true");
-        System.setProperty("jenesis.print.probe", "false");
-        assertThat(new Probe().streams()).isFalse();
+    public void the_command_specific_setting_takes_precedence_over_the_generic_one() {
+        assertThat(new Probe(Map.of("print.process", "true", "print.probe", "false")::get, new Output()).streams())
+                .isFalse();
     }
 
     @Test
-    public void an_explicit_consumer_overrides_the_resolved_property() {
+    public void an_explicit_consumer_overrides_the_resolved_setting() {
         assertThat(new Probe((_, _) -> {
         }).streams())
                 .as("a consumer supplied by the caller is what the lines are handed to")
                 .isTrue();
-        System.setProperty("jenesis.print.process", "true");
-        assertThat(new Probe(null).streams())
-                .as("no consumer means the lines go nowhere, whatever the property says")
+        assertThat(new Probe((BiConsumer<Boolean, String>) null).streams())
+                .as("no consumer means the lines go nowhere, whatever the setting says")
                 .isFalse();
     }
 
@@ -120,10 +115,9 @@ public class ProcessBuildStepTest {
     }
 
     @Test
-    public void shares_the_limit_of_the_property_between_steps() throws Exception {
-        System.setProperty("jenesis.process.concurrency", "2");
+    public void shares_the_limit_of_the_setting_between_steps() throws Exception {
         AtomicInteger running = new AtomicInteger(), peak = new AtomicInteger();
-        run(() -> new Gated(counting(running, peak)));
+        run(() -> new Gated(counting(running, peak), Map.of("process.concurrency", "2")::get));
         assertThat(peak).hasValueLessThanOrEqualTo(2);
         assertThat(peak).hasValueGreaterThan(0);
     }
@@ -154,8 +148,7 @@ public class ProcessBuildStepTest {
 
     @Test
     public void rejects_a_negative_limit() {
-        System.setProperty("jenesis.process.concurrency", "-1");
-        assertThatThrownBy(Probe::new)
+        assertThatThrownBy(() -> new Probe(Map.of("process.concurrency", "-1")::get, new Output()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("-1");
     }
@@ -202,7 +195,11 @@ public class ProcessBuildStepTest {
     private static final class Gated extends ProcessBuildStep {
 
         private Gated(ToolProvider provider) {
-            super("gated", ProcessHandler.OfTool.of(provider), Terms.ofKeys(SYSTEM, "gated"));
+            this(provider, SequencedProperties.NONE);
+        }
+
+        private Gated(ToolProvider provider, Function<String, String> keys) {
+            super("gated", ProcessHandler.OfTool.of(provider), Terms.ofKeys(keys, new Output(), "gated"));
         }
 
         private Gated(ToolProvider provider, Semaphore permits) {
@@ -232,8 +229,8 @@ public class ProcessBuildStepTest {
             }
         }).apply(List.of());
 
-        private Probe() {
-            super("probe", arguments -> HANDLER, Terms.ofKeys(SYSTEM, "probe"));
+        private Probe(Function<String, String> keys, Output output) {
+            super("probe", arguments -> HANDLER, Terms.ofKeys(keys, output, "probe"));
         }
 
         private Probe(BiConsumer<Boolean, String> printing) {
@@ -241,13 +238,7 @@ public class ProcessBuildStepTest {
         }
 
         private boolean streams() {
-            PrintStream original = System.out;
-            System.setOut(new PrintStream(OutputStream.nullOutputStream()));
-            try {
-                return tee(Runnable::run, HANDLER) != null;
-            } finally {
-                System.setOut(original);
-            }
+            return tee(Runnable::run, HANDLER) != null;
         }
 
         @Override

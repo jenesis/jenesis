@@ -8,6 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -39,14 +40,15 @@ public class ScalafmtFormatModule implements BuildExecutorModule {
     }
 
     public static ScalafmtFormatModule ofKeys(Function<String, String> keys,
+                                              Output output,
                                               Map<String, Repository> repositories,
                                               Map<String, Resolver> resolvers) {
-        return new ScalafmtFormatModule(Dependencies.ofKeys(keys, repositories, resolvers),
+        return new ScalafmtFormatModule(Dependencies.ofKeys(keys, output, repositories, resolvers),
                 null,
                 "scalafmt-format",
                 ".scalafmt.conf",
                 false,
-                ProcessBuildStep.Terms.ofKeys(keys, "scalafmt-format"));
+                ProcessBuildStep.Terms.ofKeys(keys, output, "scalafmt-format"));
     }
 
     private ScalafmtFormatModule(Dependencies dependencies,

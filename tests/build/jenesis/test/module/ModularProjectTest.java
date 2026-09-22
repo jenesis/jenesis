@@ -8,6 +8,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Output;
 import build.jenesis.PathPlacement;
 import build.jenesis.Platform;
 import build.jenesis.SequencedProperties;
@@ -737,7 +738,7 @@ public class ModularProjectTest {
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
-        root.addModule("modules", ModularProject.make(SYSTEM, project,
+        root.addModule("modules", ModularProject.make(SYSTEM, new Output(), project,
                 "main",
                 "module",
                 _ -> true,

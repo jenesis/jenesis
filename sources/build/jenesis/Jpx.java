@@ -24,20 +24,20 @@ public record Jpx(Path storage,
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
 
     public Jpx(PathPlacement placement) {
-        this(SequencedProperties.NONE, placement);
+        this(SequencedProperties.NONE, new Output(), placement);
     }
 
-    public static Jpx ofKeys(Function<String, String> keys, PathPlacement placement) {
-        return new Jpx(keys, placement);
+    public static Jpx ofKeys(Function<String, String> keys, Output output, PathPlacement placement) {
+        return new Jpx(keys, output, placement);
     }
 
-    private Jpx(Function<String, String> keys, PathPlacement placement) {
+    private Jpx(Function<String, String> keys, Output output, PathPlacement placement) {
         boolean modular = placement == PathPlacement.MODULE_PATH;
-        Repository module = JenesisModuleRepository.ofKeys(keys, modular
+        Repository module = JenesisModuleRepository.ofKeys(keys, output, modular
                 ? JenesisRepository.Scope.MODULE
                 : JenesisRepository.Scope.ARTIFACT);
         Map<String, Repository> repositories = new LinkedHashMap<>();
-        repositories.put("maven", MavenDefaultRepository.ofKeys(keys));
+        repositories.put("maven", MavenDefaultRepository.ofKeys(keys, output));
         repositories.put("module", module);
         Map<String, Resolver> resolvers = new LinkedHashMap<>();
         MavenPomResolver maven = MavenPomResolver.ofKeys(keys);
@@ -290,10 +290,10 @@ public record Jpx(Path storage,
               --help              print this help""";
 
     public static void main(String... arguments) throws IOException, InterruptedException {
-        System.exit(run(SYSTEM, arguments));
+        System.exit(run(SYSTEM, new Output(), arguments));
     }
 
-    public static int run(Function<String, String> keys, String... arguments)
+    public static int run(Function<String, String> keys, Output output, String... arguments)
             throws IOException, InterruptedException {
         PathPlacement placement = PathPlacement.INFERRED;
         boolean dockerized = false, pin = false;
@@ -305,7 +305,7 @@ public record Jpx(Path storage,
                 case "--docker" -> dockerized = true;
                 case "--pin" -> pin = true;
                 case "--help" -> {
-                    System.out.println(HELP);
+                    output.out().accept(HELP);
                     return 0;
                 }
                 default -> {
@@ -319,8 +319,8 @@ public record Jpx(Path storage,
                     } else if (arguments[target].startsWith("--hash=")) {
                         checksum = requireValidChecksum(arguments[target].substring("--hash=".length()));
                     } else {
-                        System.err.println("Unknown option: " + arguments[target]);
-                        System.err.println(HELP);
+                        output.err().accept("Unknown option: " + arguments[target]);
+                        output.err().accept(HELP);
                         return 64;
                     }
                 }
@@ -328,7 +328,7 @@ public record Jpx(Path storage,
             target++;
         }
         if (arguments.length == target) {
-            System.err.println(HELP);
+            output.err().accept(HELP);
             return 64;
         }
         Command command = Command.parse(arguments[target]);
@@ -337,7 +337,7 @@ public record Jpx(Path storage,
                     + "not Maven coordinates: " + command.name());
         }
         Toolchain toolchain = java == null ? null : Toolchain.ofKeys(keys).version(java);
-        Installation installation = Jpx.ofKeys(keys, placement).install(command);
+        Installation installation = Jpx.ofKeys(keys, output, placement).install(command);
         if (toolchain != null) {
             installation = installation.home(toolchain.home());
         }
@@ -364,8 +364,8 @@ public record Jpx(Path storage,
             options.add(image == null ? "--docker" : "--docker=" + image);
         }
         if (pin) {
-            System.out.println(String.join(" ", installation.pinned(options, command.mainClass(), remaining)));
-            System.out.println(String.join(" ", docker == null
+            output.out().accept(String.join(" ", installation.pinned(options, command.mainClass(), remaining)));
+            output.out().accept(String.join(" ", docker == null
                     ? installation.command(command.mainClass(), remaining)
                     : installation.command(command.mainClass(), remaining, docker)));
             return 0;

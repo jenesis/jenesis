@@ -10,8 +10,8 @@ public final class JpxTool extends JenesisTool {
     }
 
     @Override
-    protected int run(Function<String, String> requested, List<String> arguments)
+    protected int run(Function<String, String> requested, Output output, List<String> arguments)
             throws IOException, InterruptedException {
-        return Jpx.run(requested, arguments.toArray(String[]::new));
+        return Jpx.run(requested, output, arguments.toArray(String[]::new));
     }
 }

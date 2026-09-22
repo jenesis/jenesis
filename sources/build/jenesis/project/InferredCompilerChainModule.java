@@ -9,6 +9,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.PathPlacement;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -59,6 +60,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
     }
 
     public static InferredCompilerChainModule ofKeys(Function<String, String> keys,
+                                                     Output output,
                                                      SequencedSet<Path> configuration,
                                                      Map<String, Repository> repositories,
                                                      Map<String, Resolver> resolvers) {
@@ -67,10 +69,10 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 resolvers,
                 null,
                 PathPlacement.INFERRED,
-                Javac.ofKeys(keys, ProcessHandler.Factory.of()),
-                KotlinCompilerModule.ofKeys(keys, repositories, resolvers),
-                ScalaCompilerModule.ofKeys(keys, repositories, resolvers),
-                GroovyCompilerModule.ofKeys(keys, repositories, resolvers),
+                Javac.ofKeys(keys, output, ProcessHandler.Factory.of()),
+                KotlinCompilerModule.ofKeys(keys, output, repositories, resolvers),
+                ScalaCompilerModule.ofKeys(keys, output, repositories, resolvers),
+                GroovyCompilerModule.ofKeys(keys, output, repositories, resolvers),
                 step -> step,
                 value -> value,
                 value -> value,

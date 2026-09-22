@@ -5,6 +5,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Pinning;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -40,10 +41,11 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
     }
 
     public static InferredArtifactQualityModule ofKeys(Function<String, String> keys,
+                                                       Output output,
                                                       SequencedSet<Path> configuration,
                                                       Map<String, Repository> repositories,
                                                       Map<String, Resolver> resolvers) {
-        InferredArtifactQualityModule module = new InferredArtifactQualityModule(configuration, null, JApiCmpModule.ofKeys(keys, repositories, resolvers),
+        InferredArtifactQualityModule module = new InferredArtifactQualityModule(configuration, null, JApiCmpModule.ofKeys(keys, output, repositories, resolvers),
                 value -> value);
         Boolean japicmp = SequencedProperties.flagOrNull(keys, "artifact.japicmp");
         if (japicmp != null) {

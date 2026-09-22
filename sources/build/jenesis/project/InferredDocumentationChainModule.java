@@ -8,6 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -48,15 +49,16 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
     }
 
     public static InferredDocumentationChainModule ofKeys(Function<String, String> keys,
+                                                          Output output,
                                                           Map<String, Repository> repositories,
                                                           Map<String, Resolver> resolvers) {
         return new InferredDocumentationChainModule(repositories,
                 resolvers,
                 null,
-                Javadoc.ofKeys(keys, ProcessHandler.Factory.ofKeys(keys)),
-                DokkaDocumentationModule.ofKeys(keys, repositories, resolvers),
-                ScalaDocumentationModule.ofKeys(keys, repositories, resolvers),
-                GroovyDocumentationModule.ofKeys(keys, repositories, resolvers),
+                Javadoc.ofKeys(keys, output, ProcessHandler.Factory.ofKeys(keys)),
+                DokkaDocumentationModule.ofKeys(keys, output, repositories, resolvers),
+                ScalaDocumentationModule.ofKeys(keys, output, repositories, resolvers),
+                GroovyDocumentationModule.ofKeys(keys, output, repositories, resolvers),
                 step -> step,
                 value -> value,
                 value -> value,

@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.Pinning;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.step.Bind;
@@ -56,16 +57,17 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
     }
 
     public static InferredSourceCodeQualityModule ofKeys(Function<String, String> keys,
+                                                         Output output,
                                                          SequencedSet<Path> configuration,
                                                          Map<String, Repository> repositories,
                                                          Map<String, Resolver> resolvers) {
-        InferredSourceCodeQualityModule module = new InferredSourceCodeQualityModule(configuration, null, CheckstyleModule.ofKeys(keys, repositories, resolvers),
-                PmdModule.ofKeys(keys, repositories, resolvers),
-                DetektModule.ofKeys(keys, repositories, resolvers),
-                KtlintModule.ofKeys(keys, repositories, resolvers),
-                ScalastyleModule.ofKeys(keys, repositories, resolvers),
-                ScalafmtModule.ofKeys(keys, repositories, resolvers),
-                CodeNarcModule.ofKeys(keys, repositories, resolvers),
+        InferredSourceCodeQualityModule module = new InferredSourceCodeQualityModule(configuration, null, CheckstyleModule.ofKeys(keys, output, repositories, resolvers),
+                PmdModule.ofKeys(keys, output, repositories, resolvers),
+                DetektModule.ofKeys(keys, output, repositories, resolvers),
+                KtlintModule.ofKeys(keys, output, repositories, resolvers),
+                ScalastyleModule.ofKeys(keys, output, repositories, resolvers),
+                ScalafmtModule.ofKeys(keys, output, repositories, resolvers),
+                CodeNarcModule.ofKeys(keys, output, repositories, resolvers),
                 value -> value,
                 value -> value,
                 value -> value,

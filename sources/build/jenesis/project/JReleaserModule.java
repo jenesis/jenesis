@@ -3,6 +3,7 @@ package build.jenesis.project;
 import module java.base;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
+import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -32,6 +33,7 @@ public class JReleaserModule implements BuildExecutorModule {
     }
 
     public static JReleaserModule ofKeys(Function<String, String> keys,
+                                         Output output,
                                          Path root,
                                          Path configuration,
                                          String version) {
@@ -41,7 +43,7 @@ public class JReleaserModule implements BuildExecutorModule {
                 SequencedProperties.getProperty(keys, "jreleaser.executable", "jreleaser"),
                 SequencedProperties.getProperty(keys, "jreleaser.command", "full-release"),
                 SequencedProperties.flag(keys, "jreleaser.dryRun", true),
-                ProcessBuildStep.Terms.ofKeys(keys, "jreleaser", true));
+                ProcessBuildStep.Terms.ofKeys(keys, output, "jreleaser", true));
     }
 
     private JReleaserModule(Path root,

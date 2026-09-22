@@ -1,6 +1,7 @@
 package build.jenesis.step;
 
 import module java.base;
+import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -19,7 +20,7 @@ public class OsvDownload implements BuildStep {
         this(URI.create("https://api.osv.dev"), false);
     }
 
-    public static OsvDownload ofKeys(Function<String, String> keys) {
+    public static OsvDownload ofKeys(Function<String, String> keys, Output output) {
         return new OsvDownload(URI.create("https://api.osv.dev"),
                 SequencedProperties.flag(keys, "repository.insecure"));
     }

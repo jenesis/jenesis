@@ -3,6 +3,7 @@ package build.jenesis.test.module;
 import module java.base;
 import module jdk.httpserver;
 import module org.junit.jupiter.api;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.module.JenesisModuleRepository;
@@ -54,7 +55,7 @@ public class JenesisModuleRepositoryTest {
             System.setProperty("jenesis.module.uri",
                     "http://localhost:" + first.getAddress().getPort() + "/,"
                             + "http://localhost:" + second.getAddress().getPort() + "/");
-            RepositoryItem item = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE)
+            RepositoryItem item = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
             assertThat(read(item)).isEqualTo("classes");
@@ -334,7 +335,7 @@ public class JenesisModuleRepositoryTest {
                 .resolve("build.jenesis.jar"), "remote");
         System.setProperty("jenesis.module.uri", root.resolve("remote").toUri().toString());
         try {
-            RepositoryItem item = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE)
+            RepositoryItem item = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "build.jenesis/1.0")
                     .orElseThrow();
 
@@ -353,7 +354,7 @@ public class JenesisModuleRepositoryTest {
                 .resolve("build.jenesis.jar"), "remote");
         System.setProperty("jenesis.module.uri", root.resolve("remote").toUri().toString());
         try {
-            RepositoryItem item = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE)
+            RepositoryItem item = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "build.jenesis/1.0")
                     .orElseThrow();
 
@@ -623,7 +624,7 @@ public class JenesisModuleRepositoryTest {
         System.setProperty("jenesis.module.uri",
                 root.resolve("first").toUri() + "," + root.resolve("second").toUri());
         try {
-            Optional<RepositoryItem> item = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE).fetch(Runnable::run, "build.jenesis");
+            Optional<RepositoryItem> item = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE).fetch(Runnable::run, "build.jenesis");
 
             assertThat(item).isPresent();
             try (InputStream stream = item.orElseThrow().toInputStream()) {
@@ -642,7 +643,7 @@ public class JenesisModuleRepositoryTest {
         System.setProperty("jenesis.module.uri",
                 root.resolve("first").toUri() + "," + root.resolve("second").toUri());
         try {
-            Optional<RepositoryItem> item = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE).fetch(Runnable::run, "build.jenesis");
+            Optional<RepositoryItem> item = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE).fetch(Runnable::run, "build.jenesis");
 
             assertThat(item).isPresent();
             try (InputStream stream = item.orElseThrow().toInputStream()) {
@@ -670,7 +671,7 @@ public class JenesisModuleRepositoryTest {
         System.setProperty("jenesis.module.uri",
                 root.resolve("first").toUri() + "|corp.mod," + root.resolve("second").toUri());
         try {
-            Repository merged = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE);
+            Repository merged = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE);
             try (InputStream stream = merged.fetch(Runnable::run, "corp.mod").orElseThrow().toInputStream()) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("first-corp");
             }
@@ -699,7 +700,7 @@ public class JenesisModuleRepositoryTest {
         System.setProperty("jenesis.module.uri",
                 root.resolve("first").toUri() + "|corp|team.mod," + root.resolve("second").toUri());
         try {
-            Repository merged = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE);
+            Repository merged = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE);
             try (InputStream stream = merged.fetch(Runnable::run, "corp.mod.inner").orElseThrow().toInputStream()) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("first-inner");
             }
@@ -726,7 +727,7 @@ public class JenesisModuleRepositoryTest {
         System.setProperty("jenesis.module.uri",
                 "maven:" + root.resolve("company").toUri() + "|com.corp," + root.resolve("public").toUri());
         try {
-            Repository merged = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE);
+            Repository merged = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE);
             try (InputStream stream = merged.fetch(Runnable::run, "com.corp.mod/1.0.0").orElseThrow().toInputStream()) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("company-classes");
             }
@@ -746,7 +747,7 @@ public class JenesisModuleRepositoryTest {
         System.setProperty("jenesis.corp.test.modules", root.resolve("company").toUri().toString());
         System.setProperty("jenesis.module.uri", "maven:@corp.test.modules");
         try {
-            Optional<RepositoryItem> item = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE)
+            Optional<RepositoryItem> item = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "com.corp.mod/1.0.0");
 
             assertThat(item).isPresent();
@@ -769,7 +770,7 @@ public class JenesisModuleRepositoryTest {
                 + root.resolve("flat").toUri()
                 + "|org.tools");
         try {
-            Repository merged = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE);
+            Repository merged = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE);
             try (InputStream stream = merged.fetch(Runnable::run, "com.corp.deep.mod/1.0.0")
                     .orElseThrow()
                     .toInputStream()) {
@@ -793,7 +794,7 @@ public class JenesisModuleRepositoryTest {
     public void factory_rejects_a_segment_count_below_one() {
         System.setProperty("jenesis.module.uri", "maven:0:https://repo.example.com/");
         try {
-            assertThatThrownBy(() -> JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE))
+            assertThatThrownBy(() -> JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("at least one group id segment");
         } finally {
@@ -805,7 +806,7 @@ public class JenesisModuleRepositoryTest {
     public void factory_rejects_a_segment_count_on_a_module_entry() {
         System.setProperty("jenesis.module.uri", "module:3:https://repo.example.com/");
         try {
-            assertThatThrownBy(() -> JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE))
+            assertThatThrownBy(() -> JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("applies only to a 'maven' entry");
         } finally {
@@ -817,7 +818,7 @@ public class JenesisModuleRepositoryTest {
     public void factory_rejects_an_unknown_repository_type() {
         System.setProperty("jenesis.module.uri", "nexus:https://repo.example.com/");
         try {
-            assertThatThrownBy(() -> JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE))
+            assertThatThrownBy(() -> JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("nexus:https://repo.example.com/")
                     .hasMessageContaining("expected 'module' or 'maven'");
@@ -830,7 +831,7 @@ public class JenesisModuleRepositoryTest {
     public void factory_rejects_a_typed_entry_without_a_uri() {
         System.setProperty("jenesis.module.uri", "maven:");
         try {
-            assertThatThrownBy(() -> JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE))
+            assertThatThrownBy(() -> JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("No URI in Jenesis module repository entry: maven:");
         } finally {
@@ -857,7 +858,7 @@ public class JenesisModuleRepositoryTest {
         System.setProperty("jenesis.module.uri", "http://localhost:" + server.getAddress().getPort() + "/");
         System.setProperty("jenesis.make.provided", "module.uri");
         try {
-            RepositoryItem item = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE)
+            RepositoryItem item = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
 
@@ -883,7 +884,7 @@ public class JenesisModuleRepositoryTest {
         System.setProperty("jenesis.maven.token", "Bearer secret");
         System.setProperty("jenesis.module.uri", "maven:http://localhost:" + server.getAddress().getPort() + "/");
         try {
-            RepositoryItem item = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE)
+            RepositoryItem item = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "com.corp.mod/1.0.0")
                     .orElseThrow();
 
@@ -909,7 +910,7 @@ public class JenesisModuleRepositoryTest {
         System.setProperty("jenesis.module.uri", Files.createDirectories(root.resolve("empty")).toUri()
                 + ",maven:http://localhost:" + server.getAddress().getPort() + "/");
         try {
-            RepositoryItem item = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE)
+            RepositoryItem item = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "com.corp.mod/1.0.0")
                     .orElseThrow();
 
@@ -967,7 +968,7 @@ public class JenesisModuleRepositoryTest {
                 .resolve("build.jenesis.jar"), "artifact-classes");
         System.setProperty("jenesis.module.uri", root.resolve("first").toUri().toString());
         try {
-            Optional<RepositoryItem> item = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.ARTIFACT)
+            Optional<RepositoryItem> item = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.ARTIFACT)
                     .fetch(Runnable::run, "build.jenesis");
 
             assertThat(item).isPresent();
@@ -987,7 +988,7 @@ public class JenesisModuleRepositoryTest {
         System.setProperty("jenesis.module.uri", "@corp.test.modules");
         System.setProperty("jenesis.corp.test.modules", root.resolve("first").toUri().toString());
         try {
-            Optional<RepositoryItem> item = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE)
+            Optional<RepositoryItem> item = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "build.jenesis");
 
             assertThat(item).isPresent();
@@ -1017,7 +1018,7 @@ public class JenesisModuleRepositoryTest {
         System.setProperty("jenesis.module.uri",
                 root.resolve("first").toUri() + "|corp," + root.resolve("second").toUri());
         try {
-            Repository merged = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE);
+            Repository merged = JenesisModuleRepository.ofKeys(SYSTEM, new Output(), JenesisRepository.Scope.MODULE);
             try (InputStream stream = merged.fetch(Runnable::run, "corp.mod/1.0").orElseThrow().toInputStream()) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("first-corp");
             }

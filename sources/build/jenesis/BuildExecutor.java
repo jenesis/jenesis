@@ -18,10 +18,11 @@ public interface BuildExecutor {
                          boolean rebuild,
                          boolean aggregate,
                          int concurrency,
-                         BuildExecutorCache cache) {
+                         BuildExecutorCache cache,
+                         Output output) {
 
         public Configuration() {
-            this(Duration.ZERO, "MD5", false, true, false, false, false, 0, null);
+            this(Duration.ZERO, "MD5", false, true, false, false, false, 0, null, new Output());
         }
 
         public static Configuration ofKeys(Function<String, String> keys) {
@@ -49,43 +50,48 @@ public interface BuildExecutor {
                     SequencedProperties.flag(keys, "executor.rebuild"),
                     SequencedProperties.flag(keys, "executor.aggregate"),
                     SequencedProperties.number(keys, "executor.concurrency", 0),
-                    cache);
+                    cache,
+                    new Output());
         }
 
         public Configuration timeout(Duration timeout) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, output);
         }
 
         public Configuration digest(String digest) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, output);
         }
 
         public Configuration verbose(boolean verbose) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, output);
         }
 
         public Configuration progress(boolean progress) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, output);
         }
 
         public Configuration cacheHits(boolean cacheHits) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, output);
         }
 
         public Configuration rebuild(boolean rebuild) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, output);
         }
 
         public Configuration aggregate(boolean aggregate) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, output);
         }
 
         public Configuration concurrency(int concurrency) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, output);
         }
 
         public Configuration cache(BuildExecutorCache cache) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, output);
+        }
+
+        public Configuration output(Output output) {
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, output);
         }
 
         public BuildExecutor of(Path target) throws IOException {
@@ -94,7 +100,7 @@ public interface BuildExecutor {
                     new HashDigestFunction(digest),
                     BuildStepHashFunction.ofSerializationDigest(digest),
                     progress
-                            ? BuildExecutorCallback.printing(System.out, verbose, cacheHits, target)
+                            ? BuildExecutorCallback.printing(output.out(), verbose, cacheHits, target)
                             : BuildExecutorCallback.nop(),
                     cache == null ? BuildExecutorCache.nop() : cache,
                     rebuild,

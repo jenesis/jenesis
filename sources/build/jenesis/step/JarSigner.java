@@ -1,6 +1,7 @@
 package build.jenesis.step;
 
 import module java.base;
+import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -20,9 +21,9 @@ public class JarSigner extends ProcessBuildStep {
         this(null, null, null, null, null, null, List.of(), Terms.of("jarsigner"));
     }
 
-    public static JarSigner ofKeys(Function<String, String> keys) {
+    public static JarSigner ofKeys(Function<String, String> keys, Output output) {
         JarSigner signer = new JarSigner(null, null, null, null, null, null, List.of(),
-                Terms.ofKeys(keys, "jarsigner"));
+                Terms.ofKeys(keys, output, "jarsigner"));
         String keystore = SequencedProperties.getProperty(keys, "jarsigner.keystore");
         if (keystore != null) {
             signer = signer.keystore(keystore);

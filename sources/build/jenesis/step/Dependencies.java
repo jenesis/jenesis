@@ -11,6 +11,7 @@ import build.jenesis.DependencyScope;
 import build.jenesis.License;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.BuildExecutor;
@@ -44,15 +45,16 @@ public class Dependencies implements BuildExecutorModule {
     }
 
     public static Dependencies ofKeys(Function<String, String> keys,
+                                      Output output,
                                       Map<String, Repository> repositories,
                                       Map<String, Resolver> resolvers) {
         return new Dependencies(repositories,
                 resolvers,
-                Signatures.ofKeys(keys, repositories),
+                Signatures.ofKeys(keys, output, repositories),
                 null,
                 null,
                 BuildStep.timestamp(keys),
-                SequencedProperties.flag(keys, "print.aliases") ? System.out::println : null);
+                SequencedProperties.flag(keys, "print.aliases") ? output.out() : null);
     }
 
     private Dependencies(Map<String, Repository> repositories,
