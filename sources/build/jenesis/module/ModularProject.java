@@ -123,7 +123,7 @@ public class ModularProject implements BuildExecutorModule {
                 "main",
                 "module",
                 _ -> true,
-                Map.of("module", JenesisModuleRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE)),
+                Map.of("module", JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE)),
                 Map.of("module", ModularJarResolver.ofEnvironment(environment, false)),
                 null,
                 true,
