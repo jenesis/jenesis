@@ -3,11 +3,16 @@ setlocal EnableDelayedExpansion
 set "SCRIPT_DIR=%~dp0"
 for %%i in ("%~dp0..") do set "JENESIS_HOME=%%~fi"
 
+rem Every Jenesis up to and including this version is refused: its engine is no longer
+rem considered safe to run, so a project that records one is sent to jenesis-unsafe rather
+rem than built. Raise it here and in jenesis together, in the release that supersedes the
+rem version it names.
+set "UNSAFE_THROUGH=0.14.0"
+
 set "VENDORED="
 set "DIR=%CD%"
 :findvendored
 if exist "!DIR!\build\jenesis\" (
-    set "ROOT=!DIR!"
     set "VENDORED=!DIR!\build\jenesis"
     goto :vendoreddone
 )
@@ -16,11 +21,6 @@ if "!PARENT!"=="!DIR!" goto :vendoreddone
 set "DIR=!PARENT!"
 goto :findvendored
 :vendoreddone
-
-if not defined VENDORED (
-    call "%SCRIPT_DIR%jenesis-make.bat" %*
-    exit /b !errorlevel!
-)
 
 set "VERSION="
 for %%f in ("%JENESIS_HOME%\sources\*-sources.jar") do (
@@ -32,115 +32,85 @@ for %%f in ("%JENESIS_HOME%\sources\*-sources.jar") do (
 )
 
 set "STAMP="
-if exist "!VENDORED!\jenesis.version" (
-    for /f "usebackq delims=" %%v in ("!VENDORED!\jenesis.version") do if not defined STAMP set "STAMP=%%v"
+if defined VENDORED (
+    if exist "!VENDORED!\jenesis.version" (
+        for /f "usebackq delims=" %%v in ("!VENDORED!\jenesis.version") do if not defined STAMP set "STAMP=%%v"
+    )
 )
 if defined STAMP set "STAMP=!STAMP:"=!"
 if not defined STAMP set "STAMP=!VERSION!"
-if not defined STAMP (
-    set "REASON=!VENDORED! records no version in jenesis.version and %JENESIS_HOME% ships no sources to assume one from"
-    goto :refuse
-)
+if not defined STAMP goto :handover
 
-set "TARGET_HOME="
-if "!STAMP!"=="!VERSION!" (
-    set "TARGET_HOME=%JENESIS_HOME%"
-) else (
-    call :find
-    if not defined TARGET_HOME (
-        where scoop >nul 2>&1
-        if not errorlevel 1 (
-            echo jenesis: build/jenesis records !STAMP!, installing that version via Scoop 1>&2
-            call scoop install jenesis@!STAMP! 1>&2
-            call :find
-        )
-    )
-)
+call :above "!STAMP!" "!UNSAFE_THROUGH!"
+if not defined ABOVE goto :refuse
+goto :handover
 
-if not defined TARGET_HOME (
-    set "REASON=no installed Jenesis matches the !STAMP! that !VENDORED! records, and it could not be installed - install it with 'scoop install jenesis@!STAMP!' or from https://jenesis.build"
-    goto :refuse
+rem A version is read as its leading numeric components, so that a pre-release of a version
+rem counts as that version: 0.14.0-rc1 is refused where 0.14.0 is, and a version that names
+rem no number at all reads as 0.0.0 and is refused as well.
+:above
+set "ABOVE="
+set "GIVEN="
+for /f "delims=-+_ " %%v in ("%~1") do set "GIVEN=%%v"
+set "G1=0" & set "G2=0" & set "G3=0"
+for /f "tokens=1-3 delims=." %%a in ("!GIVEN!") do (
+    if not "%%a"=="" set "G1=%%a"
+    if not "%%b"=="" set "G2=%%b"
+    if not "%%c"=="" set "G3=%%c"
 )
-
-set "REFERENCE="
-for %%f in ("!TARGET_HOME!\sources\*-sources.jar") do if not defined REFERENCE set "REFERENCE=%%~ff"
-if not defined REFERENCE (
-    set "REASON=Jenesis !STAMP! at !TARGET_HOME! ships no sources jar, so !VENDORED! cannot be verified against it"
-    goto :refuse
+call :numeric G1
+call :numeric G2
+call :numeric G3
+set "F1=0" & set "F2=0" & set "F3=0"
+for /f "tokens=1-3 delims=." %%a in ("%~2") do (
+    if not "%%a"=="" set "F1=%%a"
+    if not "%%b"=="" set "F2=%%b"
+    if not "%%c"=="" set "F3=%%c"
 )
-
-set "EXTRACTED=%TEMP%\jenesis-verify-%RANDOM%%RANDOM%"
-mkdir "!EXTRACTED!" 2>nul
-pushd "!EXTRACTED!"
-jar xf "!REFERENCE!" build/jenesis >nul 2>&1
-popd
-if not exist "!EXTRACTED!\build\jenesis\" (
-    rmdir /s /q "!EXTRACTED!" 2>nul
-    set "REASON=the sources of Jenesis !STAMP! in !REFERENCE! could not be read, so !VENDORED! cannot be verified against them"
-    goto :refuse
+if !G1! gtr !F1! (
+    set "ABOVE=1"
+    exit /b 0
 )
-
-set "DIGEST_A="
-set "DIGEST_B="
-for /f "usebackq delims=" %%d in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $r=(Resolve-Path -LiteralPath '!VENDORED!').Path; $t=(Get-ChildItem -LiteralPath $r -Recurse -Filter *.java | ForEach-Object { $rel=$_.FullName.Substring($r.Length).Replace('\','/'); $h=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash; \"$h $rel\" } | Sort-Object) -join \"`n\"; $s=[IO.MemoryStream]::new([Text.Encoding]::UTF8.GetBytes($t)); (Get-FileHash -InputStream $s -Algorithm SHA256).Hash" 2^>nul`) do set "DIGEST_A=%%d"
-for /f "usebackq delims=" %%d in (`powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $r=(Resolve-Path -LiteralPath '!EXTRACTED!\build\jenesis').Path; $t=(Get-ChildItem -LiteralPath $r -Recurse -Filter *.java | ForEach-Object { $rel=$_.FullName.Substring($r.Length).Replace('\','/'); $h=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash; \"$h $rel\" } | Sort-Object) -join \"`n\"; $s=[IO.MemoryStream]::new([Text.Encoding]::UTF8.GetBytes($t)); (Get-FileHash -InputStream $s -Algorithm SHA256).Hash" 2^>nul`) do set "DIGEST_B=%%d"
-rmdir /s /q "!EXTRACTED!" 2>nul
-
-if not defined DIGEST_A (
-    set "REASON=!VENDORED! could not be digested, so it cannot be verified"
-    goto :refuse
+if !G1! lss !F1! exit /b 0
+if !G2! gtr !F2! (
+    set "ABOVE=1"
+    exit /b 0
 )
-if not defined DIGEST_B (
-    set "REASON=the sources of Jenesis !STAMP! could not be digested, so !VENDORED! cannot be verified against them"
-    goto :refuse
-)
-if not "!DIGEST_A!"=="!DIGEST_B!" (
-    set "REASON=!VENDORED! does not match the sources of Jenesis !STAMP!"
-    goto :refuse
-)
-
-if not exist "!TARGET_HOME!\bin\jenesis-make.bat" (
-    set "REASON=Jenesis !STAMP! at !TARGET_HOME! ships no bin\jenesis-make.bat to dispatch to"
-    goto :refuse
-)
-call "!TARGET_HOME!\bin\jenesis-make.bat" %*
-exit /b !errorlevel!
-
-:find
-for %%h in (
-    "%USERPROFILE%\scoop\apps\jenesis\!STAMP!"
-    "%JENESIS_HOME%\..\!STAMP!"
-) do (
-    if not defined TARGET_HOME (
-        if exist "%%~h\bin\" set "TARGET_HOME=%%~fh"
-    )
-)
+if !G2! lss !F2! exit /b 0
+if !G3! gtr !F3! set "ABOVE=1"
 exit /b 0
 
+:numeric
+for /f "delims=0123456789" %%z in ("!%~1!") do set "%~1=0"
+if not defined %~1 set "%~1=0"
+exit /b 0
+
+:handover
+if not exist "%SCRIPT_DIR%jenesis-unsafe.bat" (
+    echo jenesis: %SCRIPT_DIR% ships no jenesis-unsafe.bat to hand the build over to 1>&2
+    exit /b 1
+)
+call "%SCRIPT_DIR%jenesis-unsafe.bat" %*
+exit /b !errorlevel!
+
 :refuse
-echo jenesis: !REASON! 1>&2
-echo jenesis: refusing to run - this launcher only executes a released Jenesis whose published 1>&2
-echo     sources match !VENDORED! exactly, so that no unreviewed build code ever runs under it. 1>&2
+set "WHERE=!VENDORED!"
+if not defined WHERE set "WHERE=%JENESIS_HOME%"
+echo jenesis: !WHERE! is at version !STAMP!, and every Jenesis up to !UNSAFE_THROUGH! is no longer considered safe 1>&2
+echo jenesis: refusing to run - this launcher executes a Jenesis newer than !UNSAFE_THROUGH! only, so 1>&2
+echo     that a project cannot pull an engine whose release is no longer trusted. 1>&2
 echo. 1>&2
-echo The released engine still builds this project as a standard build, which is often all a 1>&2
-echo project needs. Neither of these executes the vendored build code: 1>&2
+echo Move the project on, which is the fix this asks for: re-vendor build\jenesis from the 1>&2
+echo installed version and commit what changes. 1>&2
 echo. 1>&2
-echo     jenesis-make [selectors]         run the installed engine as it stands 1>&2
-echo     scoop install jenesis@!STAMP!   install and switch to the version the project records 1>&2
+echo     jenesis-init                 re-vendor build\jenesis from the installed version 1>&2
+echo     jenesis-validate             report how the vendored tree differs from it first 1>&2
 echo. 1>&2
-echo From cmd.exe, jenesis-switch switches this session to the recorded version in one step. 1>&2
+echo Where !STAMP! has to run all the same - reproducing an old build, a branch that is not 1>&2
+echo moving - the unguarded launcher still runs it, and still verifies the vendored sources 1>&2
+echo against the published ones before it does: 1>&2
 echo. 1>&2
-echo Only where the project truly needs its own engine, run the vendored sources yourself, from 1>&2
-echo the project root at !ROOT!. Read the project's build instructions first: Make.java is 1>&2
-echo the usual entry point, but a project that vendors a changed engine states why it does, and 1>&2
-echo may drive it from one of its own. 1>&2
+echo     jenesis-unsafe [selectors]   run the !STAMP! the project records 1>&2
 echo. 1>&2
-echo     java build\jenesis\Make.java [selectors] 1>&2
-echo. 1>&2
-echo The first such run compiles the engine into .jenesis\classes, and later runs reuse it 1>&2
-echo until the vendored sources change. 1>&2
-echo. 1>&2
-echo Warning: that command executes unreviewed code with the rights of your build and can 1>&2
-echo break the encapsulation the released engine gives you. Only run builds from sources you 1>&2
-echo trust. 1>&2
+echo Warning: that command runs an engine that is no longer considered safe. 1>&2
 exit /b 1

@@ -203,9 +203,12 @@ build code.)
 Where the project does vendor `build/jenesis/`, `jenesis` reads it only to hash
 it: it installs the version the tree records, compares the vendored sources
 against the published ones of that release, and refuses to run at all when they
-differ. The refusal separates the two ways forward. `jenesis-switch` and
-`jenesis-make` still execute the released engine, so the project builds as a
-standard build and no vendored code runs - often all it needs. Running the
+differ. It refuses the recorded version itself where that version is one no
+longer considered safe to run, naming `jenesis-unsafe` - the same launcher,
+hashing and all, without that floor - for a build that has to run it regardless.
+The refusal separates the two ways forward. `jenesis-switch` and `jenesis-make`
+still execute the released engine, so the project builds as a standard build and
+no vendored code runs - often all it needs. Running the
 vendored sources yourself, in source mode or off classes you compiled once with
 `javac`, executes the vendored engine itself, which is the untrusted part, and
 the refusal says so - along with the reminder that `Make.java` is only the

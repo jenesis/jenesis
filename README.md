@@ -52,7 +52,7 @@ What is in this repository
 | `sources/` | The build tool itself, module `build.jenesis` - `Make`, `Execute` and `Jpx` are the entry points, and the `jenesis-make`, `jenesis-exec` and `jpx` `ToolProvider`s are the same three inside another program's JVM; `Project` is the configuration API they run and has no `main`. |
 | `tests/` | Its tests, module `build.jenesis.test`. |
 | `demo/` | 63 self-contained example projects, one per feature, indexed by [`demo/README.md`](demo/README.md). |
-| `sdk/` | The SDKMAN distribution layout and its shell-script tests (`sdk/jenesis`, `sdk/jpx`). `jenesis` reads the version recorded in a project's `build/jenesis/jenesis.version`, installs it where the package manager can, verifies the vendored sources against the published ones and runs the compiled engine - a tree that does not match is refused, so `jenesis` never executes unreviewed build code; `jenesis-make` runs the installed version as it stands, and `jenesis-switch` moves the shell to the recorded one. Both stay on the released engine, so a refused project still builds as a standard build; only running the vendored sources yourself - in source mode, or off classes compiled once with `javac` - executes the vendored engine. |
+| `sdk/` | The SDKMAN distribution layout and its shell-script tests (`sdk/jenesis`, `sdk/jpx`). `jenesis-unsafe` reads the version recorded in a project's `build/jenesis/jenesis.version`, installs it where the package manager can, verifies the vendored sources against the published ones and runs the compiled engine - a tree that does not match is refused, so no unreviewed build code is ever executed. `jenesis` is that launcher behind a floor: a recorded version the floor covers is no longer considered safe, and is refused with `jenesis-unsafe` named for the builds that have to run it all the same. `jenesis-make` runs the installed version as it stands, and `jenesis-switch` moves the shell to the recorded one. Both stay on the released engine, so a refused project still builds as a standard build; only running the vendored sources yourself - in source mode, or off classes compiled once with `javac` - executes the vendored engine. |
 | `distribution/` | Packager templates that override JReleaser's own, per distribution: the Homebrew formulae, which wrap each command rather than symlinking it so a script still finds its own installation, and the Scoop manifest that describes jpx rather than the build tool. JReleaser would look for these under `src/jreleaser/distributions/`, so each packager in `jreleaser.yml` names its `templateDirectory` here instead - this project has no `src/` tree. |
 | `build/jenesis` | A symlink to `sources/build/jenesis`, so the project builds itself with itself. |
 | `benchmark/` | The performance harness and its methodology, see [`benchmark/README.md`](benchmark/README.md). |
@@ -211,6 +211,11 @@ are optional:
 - `sha` releases that commit; left empty, the head of the branch the workflow runs on is released.
 - `tag` releases under that tag (`v1.2.3` or `1.2.3`); left empty, the highest `vX.Y.Z` tag is taken and the
   minor bumped (`v0.9.0` → `0.10.0`). A tag that is not `vX.Y.Z` is rejected.
+
+The floor `jenesis` refuses through is the `UNSAFE_THROUGH` constant in `sdk/jenesis/bin/jenesis` and the
+same line in `sdk/jenesis/bin/jenesis.bat`: it names the newest version that is no longer considered safe to
+run, so every version up to and including it is refused and only a newer one is executed. Raising it is a
+deliberate step, taken in both scripts at once, in the release that supersedes the version it names.
 
 The workflow builds with `jenesis.project.version` set, then hands `target/stage/maven/output/` to
 [JReleaser](https://jreleaser.org) (`jreleaser.yml`), which signs and uploads to Maven Central, publishes the
