@@ -183,7 +183,7 @@ public record Project(
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
                 repositories.putIfAbsent("module",
-                        JenesisModuleRepository.ofEnvironment(project.environment(), JenesisRepository.Scope.MODULE)
+                        JenesisRepository.ofEnvironment(project.environment(), JenesisRepository.Scope.MODULE)
                                 .cached(project.environment(), project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
                 repositories.putIfAbsent("OpenPGP", OpenPgpRepository.ofEnvironment(project.environment()));
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
@@ -261,7 +261,7 @@ public record Project(
                         MavenDefaultRepository.ofEnvironment(project.environment())
                                 .cached(project.environment(), project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
                 repositories.putIfAbsent("module",
-                        JenesisModuleRepository.ofEnvironment(project.environment(), JenesisRepository.Scope.ARTIFACT)
+                        JenesisRepository.ofEnvironment(project.environment(), JenesisRepository.Scope.ARTIFACT)
                                 .cached(project.environment(), project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
                 repositories.putIfAbsent("OpenPGP", OpenPgpRepository.ofEnvironment(project.environment()));
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
@@ -2290,6 +2290,8 @@ public record Project(
                 module.uri||Jenesis module remotes, likewise, where a |<module> suffix asks a remote only for that module and the modules whose name it prefixes, and a maven:[<segments>:]<uri> entry reads a remote as a Maven repository by the publishing convention, taking that many leading segments of a module name as its groupId where it names a count and jenesis.maven.segments where it does not (env JENESIS_REPOSITORY_URI)
                 module.local||Local module cache folder (env JENESIS_REPOSITORY_LOCAL)
                 module.token||Bearer token for the module remote (env JENESIS_REPOSITORY_TOKEN); likewise, and only the first remote of the chain is sent it, so a fallback mirror never sees it
+                module.source|service|Who resolves a module's coordinates: service asks the repository at jenesis.module.uri, git reads the published index itself and fetches from jenesis.maven.uri
+                module.index||Location of that published index when git resolves it, a folder of per-module TSV files (env JENESIS_INDEX_URI); default: the jenesis-modules data on GitHub
                 module.prerelease||Accept a pre-release when asking the module index for a module's newest version
                 module.speculative||Accept a version the module index has not recorded but guesses exists
                 openpgp.uri|keyserver.ubuntu.com, keys.openpgp.org|HKP key server roots, likewise, and @<name> splices what jenesis.<name> or the environment variable <name> holds; a server speaking another protocol is another repository (env OPENPGP_REPOSITORY_URI)

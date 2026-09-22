@@ -8,7 +8,6 @@ import build.jenesis.maven.MavenDefaultVersionNegotiator;
 import build.jenesis.maven.MavenModuleResolver;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.maven.MavenRepository;
-import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisRepository;
 import build.jenesis.module.ModularJarResolver;
 
@@ -32,7 +31,7 @@ public record Jpx(Path storage,
 
     private Jpx(Environment environment, PathPlacement placement) {
         boolean modular = placement == PathPlacement.MODULE_PATH;
-        Repository module = JenesisModuleRepository.ofEnvironment(environment, modular
+        Repository module = JenesisRepository.ofEnvironment(environment, modular
                                                                   ? JenesisRepository.Scope.MODULE
                                                                   : JenesisRepository.Scope.ARTIFACT);
         Map<String, Repository> repositories = new LinkedHashMap<>();

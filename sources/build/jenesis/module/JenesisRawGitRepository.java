@@ -98,6 +98,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
 
     public static JenesisRepository ofEnvironment(Environment environment, Scope scope) {
         Repository.Credential credential = Repository.Credential.of(environment, "maven.token", "MAVEN_REPOSITORY_TOKEN");
+        String index = environment.getProperty("module.index", System.getenv("JENESIS_INDEX_URI"));
         String property = environment.getProperty("maven.uri");
         String variable = System.getenv("MAVEN_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();
@@ -114,7 +115,15 @@ public class JenesisRawGitRepository implements JenesisRepository {
             text = "https://repo1.maven.org/maven2/";
             origin = Repository.Origin.DEFAULT;
         }
-        JenesisRepository repository = chain(environment, text, visited, scope, credential, origin, null, null);
+        JenesisRepository repository = chain(environment,
+                                            text,
+                                            visited,
+                                            scope,
+                                            credential,
+                                            URI.create(index == null ? GITHUB_DATA : index),
+                                            origin,
+                                            null,
+                                            null);
         if (repository == null) {
             throw new IllegalStateException("No Maven repository is configured by: " + text);
         }
@@ -126,6 +135,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
                                            Set<String> visited,
                                            Scope scope,
                                            Repository.Credential credential,
+                                           URI index,
                                            Repository.Origin origin,
                                            Predicate<String> inherited,
                                            JenesisRepository repository) {
@@ -193,7 +203,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
                         throw new IllegalStateException("Circular repository reference: @" + name);
                     }
                 }
-                current = chain(environment, value, visited, scope, granted, spliced, effective, null);
+                current = chain(environment, value, visited, scope, granted, index, spliced, effective, null);
                 if (name != null) {
                     visited.remove(name);
                 }
@@ -203,7 +213,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
             } else {
                 JenesisRawGitRepository base = ofEnvironment(environment,
                                                              scope,
-                                                             URI.create(GITHUB_DATA),
+                                                             index,
                                                              URI.create(location),
                                                              granted.grant(origin));
                 current = effective == null ? base : base.groups(effective);
