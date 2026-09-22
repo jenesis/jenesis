@@ -1,6 +1,7 @@
 package build.jenesis.daemon;
 
 import module java.base;
+import build.jenesis.Environment;
 import build.jenesis.Make;
 import build.jenesis.Project;
 import build.jenesis.SequencedProperties;
@@ -15,7 +16,7 @@ public final class DaemonServer {
     private volatile ServerSocket retiring;
 
     public DaemonServer(Path root, String digest) {
-        this(root, digest, Duration.ofSeconds(Long.getLong("jenesis.daemon.idle", 10_800)));
+        this(root, digest, Duration.ofSeconds(Environment.SYSTEM.number("daemon.idle", 10_800L)));
     }
 
     private DaemonServer(Path root, String digest, Duration idle) {
@@ -165,9 +166,9 @@ public final class DaemonServer {
             }
             out.writeByte(6);
             out.writeInt(outputs.size());
-            for (Map.Entry<String, String> output : outputs.entrySet()) {
-                out.writeUTF(output.getKey());
-                out.writeUTF(output.getValue());
+            for (Map.Entry<String, String> environment : outputs.entrySet()) {
+                out.writeUTF(environment.getKey());
+                out.writeUTF(environment.getValue());
             }
             out.writeByte(0);
             out.writeInt(code);
@@ -187,24 +188,21 @@ public final class DaemonServer {
                       String... selectors) throws IOException {
         PrintStream systemOut = System.out, systemErr = System.err;
         try {
-            reset();
-            properties.forEach(System::setProperty);
-            System.setProperty("jenesis.make.root", root.toString());
-            System.setProperty("jenesis.make.daemon", "false");
-            anchor("jenesis.project.target", root.resolve("target"));
-            anchor("jenesis.project.artifacts", root.resolve(".jenesis").resolve("artifacts"));
+            Function<String, String> requested = requested(properties);
             System.setOut(new PrintStream(new Frames(out, 1), true));
             System.setErr(new PrintStream(new Frames(out, 2), true));
             try {
-                if (SequencedProperties.systemFlag("jenesis.project.docker")) {
+                if (new Environment(requested).flag("project.docker")) {
                     throw new IllegalStateException("A dockerized build cannot run in the daemon, because it replaces"
                             + " the running process - unset jenesis.project.docker or run build/jenesis/Make.java");
                 }
-                SequencedSet<Path> profiles = Make.loadProperties(root);
+                Make.Settings settings = Make.settings(root, requested);
+                Environment environment = new Environment(settings.keys());
+                SequencedSet<Path> profiles = settings.profiles();
                 if (!mainClass.equals(Project.class.getName())) {
-                    return Project.run(mainClass, root, profiles, selectors);
+                    return Project.run(environment, mainClass, root, profiles, selectors);
                 }
-                SequencedMap<String, Path> produced = Project.perform(root, profiles, selectors);
+                SequencedMap<String, Path> produced = Project.perform(environment, root, profiles, selectors);
                 if (produced == null) {
                     return 1;
                 }
@@ -218,22 +216,17 @@ public final class DaemonServer {
         } finally {
             System.setOut(systemOut);
             System.setErr(systemErr);
-            reset();
         }
     }
 
-    private static void anchor(String name, Path path) {
-        if (System.getProperty(name) == null) {
-            System.setProperty(name, path.toString());
-        }
-    }
-
-    private static void reset() {
-        for (String name : System.getProperties().stringPropertyNames()) {
-            if (name.startsWith("jenesis.")) {
-                System.clearProperty(name);
-            }
-        }
+    private Function<String, String> requested(SequencedMap<String, String> properties) {
+        Map<String, String> anchored = new LinkedHashMap<>(properties);
+        anchored.put("jenesis.make.root", root.toString());
+        anchored.put("jenesis.make.daemon", "false");
+        anchored.putIfAbsent("jenesis.project.target", root.resolve("target").toString());
+        anchored.putIfAbsent("jenesis.project.artifacts",
+                root.resolve(".jenesis").resolve("artifacts").toString());
+        return key -> anchored.get("jenesis." + key);
     }
 
     private static final class Frames extends OutputStream {

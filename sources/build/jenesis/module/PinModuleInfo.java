@@ -10,6 +10,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
 import build.jenesis.Pinning;
@@ -18,9 +19,7 @@ import build.jenesis.SequencedProperties;
 
 public class PinModuleInfo implements BuildStep {
 
-
-    private final transient Semaphore permits = Pinning.permits();
-
+    private final transient Semaphore permits;
     private final String prefix;
     private final String path;
     private final List<Path> moduleInfoFiles;
@@ -31,8 +30,21 @@ public class PinModuleInfo implements BuildStep {
     private final transient Consumer<String> printing;
 
     public PinModuleInfo(String prefix, String path, List<Path> moduleInfoFiles, HashDigestFunction hashFunction) {
-        this(prefix, path, moduleInfoFiles, hashFunction, new Platform(), checksumFromProperty(), flattenFromProperty(),
-                SequencedProperties.systemFlag("jenesis.print.pins") ? System.out::println : null);
+        this(prefix, path, moduleInfoFiles, hashFunction, new Platform(),
+                true, false, Pinning.permits(), null);
+    }
+
+    public static PinModuleInfo ofEnvironment(Environment environment,
+                                              String prefix,
+                                              String path,
+                                              List<Path> moduleInfoFiles,
+                                              HashDigestFunction hashFunction) {
+        PinModuleInfo pin = new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction)
+                .checksum(checksumFrom(environment))
+                .flatten(flattenFrom(environment))
+                .permits(Pinning.permits(environment));
+        Boolean pins = environment.flagOrNull("print.pins");
+        return pins == null || !pins ? pin : pin.printing(environment.out());
     }
 
     private PinModuleInfo(String prefix,
@@ -42,7 +54,9 @@ public class PinModuleInfo implements BuildStep {
                           Platform platform,
                           boolean checksum,
                           boolean flatten,
+                          Semaphore permits,
                           Consumer<String> printing) {
+        this.permits = permits;
         this.prefix = prefix;
         this.path = path;
         this.moduleInfoFiles = List.copyOf(moduleInfoFiles);
@@ -53,24 +67,28 @@ public class PinModuleInfo implements BuildStep {
         this.printing = printing;
     }
 
+    public PinModuleInfo permits(Semaphore permits) {
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, permits, printing);
+    }
+
     public PinModuleInfo platform(Platform platform) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, printing);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, permits, printing);
     }
 
     public PinModuleInfo checksum(boolean checksum) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, printing);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, permits, printing);
     }
 
     public PinModuleInfo flatten(boolean flatten) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, printing);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, permits, printing);
     }
 
     public PinModuleInfo printing(Consumer<String> printing) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, printing);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, permits, printing);
     }
 
-    private static boolean checksumFromProperty() {
-        String value = System.getProperty("jenesis.pin.checksum");
+    private static boolean checksumFrom(Environment environment) {
+        String value = environment.getProperty("pin.checksum");
         if (value == null || value.equals("true")) {
             return true;
         }
@@ -80,8 +98,8 @@ public class PinModuleInfo implements BuildStep {
         throw new IllegalArgumentException("Unknown pin checksum mode: " + value + " (expected true or false)");
     }
 
-    private static boolean flattenFromProperty() {
-        String value = System.getProperty("jenesis.pin.bom");
+    private static boolean flattenFrom(Environment environment) {
+        String value = environment.getProperty("pin.bom");
         if (value == null || value.equals("keep")) {
             return false;
         }

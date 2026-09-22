@@ -9,6 +9,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.PathPlacement;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -25,8 +26,8 @@ public class TestModule implements BuildExecutorModule {
     private final TestFramework framework;
     private final Predicate<String> isTest;
     private final Function<List<String>, ProcessHandler.OfProcess> factory;
-    private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final boolean jarsOnly;
     private final boolean requireFramework;
     private final Pinning pinning;
@@ -39,42 +40,77 @@ public class TestModule implements BuildExecutorModule {
     private final boolean reporting;
     private final String group;
     private final List<ObservabilityEngine> observers;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final String incrementalDigest;
+    private final ProcessBuildStep.Terms terms;
     private final boolean skip;
 
     public TestModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        List<Pattern> patterns = Stream.of(
-                        ".*\\.Test[a-zA-Z0-9$]*", ".*\\..*Test", ".*\\..*Tests", ".*\\..*TestCase",
-                        ".*\\.IT[a-zA-Z0-9$]*", ".*\\..*IT", ".*\\..*ITCase")
-                .map(Pattern::compile)
-                .toList();
         this(null,
-                (Predicate<String> & Serializable)
-                        (name -> patterns.stream().anyMatch(pattern -> pattern.matcher(name).matches())),
+                defaultIsTest(),
                 null,
-                repositories,
                 resolvers,
+                new Dependencies(repositories, resolvers),
                 true,
                 true,
                 null,
                 PathPlacement.CLASS_PATH,
                 null,
-                System.getProperty("jenesis.test.filter"),
-                System.getProperty("jenesis.test.tag"),
-                SequencedProperties.systemFlag("jenesis.test.force"),
-                SequencedProperties.systemFlag("jenesis.test.parallel"),
-                SequencedProperties.systemFlag("jenesis.test.reporting"),
+                null,
+                null,
+                false,
+                false,
+                false,
                 "main",
                 List.of(),
-                ProcessBuildStep.printing("tests"),
-                SequencedProperties.systemFlag("jenesis.test.skip"));
+                null,
+                ProcessBuildStep.Terms.of("tests"),
+                false);
+    }
+
+    public static TestModule ofEnvironment(Environment environment,
+                                    Map<String, Repository> repositories,
+                                    Map<String, Resolver> resolvers) {
+        return new TestModule(null,
+                defaultIsTest(),
+                null,
+                resolvers,
+                Dependencies.ofEnvironment(environment, repositories, resolvers),
+                true,
+                true,
+                null,
+                PathPlacement.CLASS_PATH,
+                null,
+                environment.getProperty("test.filter"),
+                environment.getProperty("test.tag"),
+                environment.flag("test.force"),
+                environment.flag("test.parallel"),
+                environment.flag("test.reporting"),
+                "main",
+                List.of(),
+                incrementalDigest(environment.getProperty("test.incremental")),
+                ProcessBuildStep.Terms.ofEnvironment(environment, "tests"),
+                environment.flag("test.skip"));
+    }
+
+    private static String incrementalDigest(String property) {
+        return property == null ? null : property.isEmpty() ? "MD5" : property;
+    }
+
+    private static Predicate<String> defaultIsTest() {
+        List<Pattern> patterns = Stream.of(
+                        ".*\\.Test[a-zA-Z0-9$]*", ".*\\..*Test", ".*\\..*Tests", ".*\\..*TestCase",
+                        ".*\\.IT[a-zA-Z0-9$]*", ".*\\..*IT", ".*\\..*ITCase")
+                .map(Pattern::compile)
+                .toList();
+        return (Predicate<String> & Serializable)
+                (name -> patterns.stream().anyMatch(pattern -> pattern.matcher(name).matches()));
     }
 
     private TestModule(TestFramework framework,
                        Predicate<String> isTest,
                        Function<List<String>, ProcessHandler.OfProcess> factory,
-                       Map<String, Repository> repositories,
                        Map<String, Resolver> resolvers,
+                       Dependencies dependencies,
                        boolean jarsOnly,
                        boolean requireFramework,
                        Pinning pinning,
@@ -87,14 +123,15 @@ public class TestModule implements BuildExecutorModule {
                        boolean reporting,
                        String group,
                        List<ObservabilityEngine> observers,
-                       BiConsumer<Boolean, String> printing,
+                       String incrementalDigest,
+                       ProcessBuildStep.Terms terms,
                        boolean skip) {
         this.skip = skip;
         this.framework = framework;
         this.isTest = isTest;
         this.factory = factory;
-        this.repositories = repositories;
         this.resolvers = resolvers;
+        this.dependencies = dependencies;
         this.jarsOnly = jarsOnly;
         this.requireFramework = requireFramework;
         this.pinning = pinning;
@@ -107,15 +144,16 @@ public class TestModule implements BuildExecutorModule {
         this.reporting = reporting;
         this.group = group;
         this.observers = observers;
-        this.printing = printing;
+        this.incrementalDigest = incrementalDigest;
+        this.terms = terms;
     }
 
     public TestModule framework(TestFramework framework) {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -128,7 +166,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -136,8 +175,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -150,7 +189,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -158,8 +198,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -172,7 +212,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -180,8 +221,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -194,7 +235,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -202,8 +244,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -216,7 +258,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -224,8 +267,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -238,7 +281,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -246,8 +290,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -260,7 +304,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -268,8 +313,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -282,7 +327,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -290,8 +336,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -304,7 +350,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -312,8 +359,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -326,7 +373,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -334,8 +382,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -348,7 +396,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -356,8 +405,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -370,7 +419,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -378,8 +428,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -392,7 +442,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -400,8 +451,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -414,7 +465,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -426,8 +478,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -440,7 +492,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -448,8 +501,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -462,7 +515,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -470,8 +524,8 @@ public class TestModule implements BuildExecutorModule {
         return new TestModule(framework,
                 isTest,
                 factory,
-                repositories,
                 resolvers,
+                dependencies,
                 jarsOnly,
                 requireFramework,
                 pinning,
@@ -484,7 +538,8 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                printing,
+                incrementalDigest,
+                terms,
                 skip);
     }
 
@@ -508,13 +563,12 @@ public class TestModule implements BuildExecutorModule {
         resolveInputs.add(RESOLVED);
         resolveInputs.addAll(upstream);
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning),
+                dependencies.pinning(pinning),
                 resolveInputs);
         if (skip) {
             return;
         }
-        String incrementalProperty = System.getProperty("jenesis.test.incremental");
-        buildExecutor.addStep(EXECUTED, new Run(
+        buildExecutor.addStep(EXECUTED, new Run(terms,
                         factory,
                         resolved,
                         isTest,
@@ -528,8 +582,7 @@ public class TestModule implements BuildExecutorModule {
                         reporting,
                         group,
                         observers,
-                        printing,
-                        incrementalProperty == null ? null : incrementalProperty.isEmpty() ? "MD5" : incrementalProperty),
+                        incrementalDigest),
                 Stream.concat(upstream.stream(), Stream.of(DEPENDENCIES)));
     }
 
@@ -711,7 +764,8 @@ public class TestModule implements BuildExecutorModule {
         private final List<ObservabilityEngine> observers;
         private final transient String incrementalDigest;
 
-        private Run(Function<List<String>, ProcessHandler.OfProcess> factory,
+        private Run(ProcessBuildStep.Terms terms,
+                    Function<List<String>, ProcessHandler.OfProcess> factory,
                     TestFramework framework,
                     Predicate<String> isTest,
                     boolean jarsOnly,
@@ -724,13 +778,12 @@ public class TestModule implements BuildExecutorModule {
                     boolean reporting,
                     String group,
                     List<ObservabilityEngine> observers,
-                    BiConsumer<Boolean, String> printing,
                     String incrementalDigest) {
             super(factory == null ? ProcessHandler.OfProcess.ofJavaHome("bin/java") : factory,
-                    pathPlacement,
-                    jarsOnly,
-                    group,
-                    printing);
+                  pathPlacement,
+                  jarsOnly,
+                  group,
+                  terms);
             this.framework = framework;
             this.isTest = isTest;
             this.moduleName = moduleName;

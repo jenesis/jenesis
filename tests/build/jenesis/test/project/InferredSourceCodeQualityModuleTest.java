@@ -2,6 +2,7 @@ package build.jenesis.test.project;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.Environment;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
@@ -59,6 +60,41 @@ public class InferredSourceCodeQualityModuleTest {
         assertThat(root.resolve("quality").resolve("checkstyle"))
                 .as("Checkstyle is not wired once its configurator is dropped, even with checkstyle.xml present")
                 .doesNotExist();
+    }
+
+    @Test
+    public void a_provider_switches_off_the_tool_it_names() throws IOException {
+        Files.writeString(project.resolve("checkstyle.xml"), "<module name=\"Checker\"/>");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("quality", InferredSourceCodeQualityModule.ofEnvironment(new Environment(Map.of("source.checkstyle", "false")::get),
+                new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+        executor.execute();
+
+        assertThat(root.resolve("quality").resolve("checkstyle"))
+                .as("a build is switched off through the provider it was handed, not through the JVM it runs in")
+                .doesNotExist();
+    }
+
+    @Test
+    public void wires_every_tool_when_it_is_given_no_provider() throws IOException {
+        Files.writeString(project.resolve("checkstyle.xml"), "<module name=\"Checker\"/>");
+        System.setProperty("jenesis.source.checkstyle", "false");
+        try {
+            BuildExecutor executor = newExecutor();
+            executor.addSource("project", project);
+            executor.addModule("quality",
+                    new InferredSourceCodeQualityModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()),
+                    "project");
+            executor.execute("quality/checkstyle/tool/required");
+
+            assertThat(root.resolve("quality").resolve("checkstyle"))
+                    .as("a module a caller builds itself takes its defaults, whatever the environment says")
+                    .exists();
+        } finally {
+            System.clearProperty("jenesis.source.checkstyle");
+        }
     }
 
     private BuildExecutor newExecutor() throws IOException {

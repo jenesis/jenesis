@@ -38,16 +38,25 @@ public interface Repository {
         };
     }
 
+    default Repository cached(Environment environment, Path folder) {
+        return cached(environment, folder, false);
+    }
+
     private Repository cached(Path folder, boolean snapshot) {
+        return cached(Environment.NONE, folder, snapshot);
+    }
+
+    private Repository cached(Environment environment, Path folder, boolean snapshot) {
         if (folder == null) {
             return this;
         }
-        boolean verbose = SequencedProperties.systemFlag("jenesis.print.fetch");
-        return cached(folder, snapshot, verbose ? target -> System.out.printf("%s%-11s%s %s%n",
-                BuildExecutorCallback.YELLOW,
-                "[FETCHED]",
-                BuildExecutorCallback.RESET,
-                target.toAbsolutePath().toUri()) : null);
+        return cached(folder, snapshot, environment.flag("print.fetch")
+                      ? target -> environment.out().accept("%s%-11s%s %s".formatted(
+                                                                                    BuildExecutorCallback.YELLOW,
+                                                                                    "[FETCHED]",
+                                                                                    BuildExecutorCallback.RESET,
+                                                                                    target.toAbsolutePath().toUri()))
+                      : null);
     }
 
     default Repository cached(Path folder, Consumer<Path> callback) {
@@ -131,24 +140,24 @@ public interface Repository {
     }
 
     static InputStream open(URI uri, String token) throws IOException {
-        return open(uri, token, new Retry());
+        return open(new Connection(), uri, token);
     }
 
-    static InputStream open(URI uri, String token, Retry retry) throws IOException {
-        return open(uri, token, retry, Map.of());
+    static InputStream open(Connection connection, URI uri, String token) throws IOException {
+        return open(connection, uri, token, Map.of());
     }
 
-    static InputStream open(URI uri, String token, Retry retry, Map<String, String> headers) throws IOException {
-        boolean insecure = SequencedProperties.systemFlag("jenesis.repository.insecure");
-        int connectTimeout = Integer.getInteger("jenesis.repository.connect.timeout", 10_000);
-        int readTimeout = Integer.getInteger("jenesis.repository.read.timeout", 30_000);
+    static InputStream open(Connection settings,
+                            URI uri,
+                            String token,
+                            Map<String, String> headers) throws IOException {
         attempts:
         for (int attempt = 0; ; attempt++) {
             URI current = uri;
             try {
                 for (int redirect = 0; redirect < 8; redirect++) {
                     String scheme = current.getScheme();
-                    if (scheme != null && !scheme.equals("https") && !scheme.equals("file") && !insecure) {
+                    if (scheme != null && !scheme.equals("https") && !scheme.equals("file") && !settings.insecure()) {
                         throw new IllegalStateException("Refusing to fetch over insecure scheme '"
                                 + scheme
                                 + "': "
@@ -156,8 +165,8 @@ public interface Repository {
                                 + " (set -Djenesis.repository.insecure=true to allow plaintext repositories)");
                     }
                     URLConnection connection = current.toURL().openConnection();
-                    connection.setConnectTimeout(connectTimeout);
-                    connection.setReadTimeout(readTimeout);
+                    connection.setConnectTimeout(settings.connectTimeout());
+                    connection.setReadTimeout(settings.readTimeout());
                     if (!(connection instanceof HttpURLConnection http)) {
                         return connection.getInputStream();
                     }
@@ -190,9 +199,9 @@ public interface Repository {
                             continue;
                         }
                     }
-                    if ((status == 429 || status >= 500) && attempt < retry.retries()) {
+                    if ((status == 429 || status >= 500) && attempt < settings.retries()) {
                         long delay = retryAfterMillis(http.getHeaderField("Retry-After"),
-                                retry.backoff().toMillis() << Math.min(attempt, 20));
+                                settings.backoff().toMillis() << Math.min(attempt, 20));
                         InputStream error = http.getErrorStream();
                         if (error != null) {
                             error.close();
@@ -204,7 +213,7 @@ public interface Repository {
                 }
                 throw new IOException("Exceeded redirect limit fetching " + uri);
             } catch (SocketException | SocketTimeoutException | SSLException | EOFException e) {
-                if (attempt >= retry.retries()) {
+                if (attempt >= settings.retries()) {
                     throw new IOException("Failed to fetch "
                             + uri
                             + " after "
@@ -212,7 +221,7 @@ public interface Repository {
                             + " attempt(s): "
                             + e, e);
                 }
-                pause(retry.backoff().toMillis() << attempt, uri);
+                pause(settings.backoff().toMillis() << attempt, uri);
             }
         }
     }
@@ -251,22 +260,18 @@ public interface Repository {
         ENVIRONMENT,
         DEFAULT;
 
-        public static Origin of(String key) {
-            for (String provided : System.getProperty("jenesis.make.provided", "").split(",")) {
-                if (provided.strip().equals(key)) {
-                    return PROJECT;
-                }
-            }
-            return USER;
+        public static Origin of(Environment environment, String key) {
+            List<String> provided = environment.entries("make.provided");
+            return provided != null && provided.contains(key) ? PROJECT : USER;
         }
     }
 
     record Credential(String token, Origin origin) {
 
-        public static Credential of(String property, String variable) {
-            String value = System.getProperty(property);
+        public static Credential of(Environment environment, String key, String variable) {
+            String value = environment.getProperty(key);
             if (value != null) {
-                return new Credential(value, Origin.of(property));
+                return new Credential(value, Origin.of(environment, key));
             }
             String fallback = System.getenv(variable);
             return fallback == null
@@ -289,28 +294,57 @@ public interface Repository {
         }
     }
 
-    record Retry(int retries, Duration backoff) {
+    record Connection(int retries, Duration backoff, boolean insecure, int connectTimeout, int readTimeout) {
 
-        public Retry {
+        public Connection {
             if (retries < 0) {
                 throw new IllegalArgumentException("Retries cannot be negative: " + retries);
             }
             if (backoff.isNegative()) {
                 throw new IllegalArgumentException("Backoff cannot be negative: " + backoff);
             }
+            if (connectTimeout < 0) {
+                throw new IllegalArgumentException("Connect timeout cannot be negative: " + connectTimeout);
+            }
+            if (readTimeout < 0) {
+                throw new IllegalArgumentException("Read timeout cannot be negative: " + readTimeout);
+            }
         }
 
-        public Retry() {
-            this(Integer.getInteger("jenesis.repository.retries", 2),
-                    Duration.ofMillis(Long.getLong("jenesis.repository.backoff", 125)));
+        public Connection() {
+            this(Environment.NONE);
         }
 
-        public Retry retries(int retries) {
-            return new Retry(retries, backoff);
+        public static Connection ofEnvironment(Environment environment) {
+            return new Connection(environment);
         }
 
-        public Retry backoff(Duration backoff) {
-            return new Retry(retries, backoff);
+        private Connection(Environment environment) {
+            this(environment.number("repository.retries", 2),
+                 Duration.ofMillis(environment.number("repository.backoff", 125)),
+                 environment.flag("repository.insecure"),
+                 environment.number("repository.connect.timeout", 10_000),
+                 environment.number("repository.read.timeout", 30_000));
+        }
+
+        public Connection retries(int retries) {
+            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout);
+        }
+
+        public Connection backoff(Duration backoff) {
+            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout);
+        }
+
+        public Connection insecure(boolean insecure) {
+            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout);
+        }
+
+        public Connection connectTimeout(int connectTimeout) {
+            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout);
+        }
+
+        public Connection readTimeout(int readTimeout) {
+            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout);
         }
     }
 
@@ -321,18 +355,27 @@ public interface Repository {
     static <F extends BiFunction<URI, String, Optional<URI>> & Serializable> Repository ofUris(
             Map<String, URI> uris,
             F versionResolver) {
-        boolean verbose = SequencedProperties.systemFlag("jenesis.print.fetch");
-        return ofUris(uris, versionResolver, new Retry(0, Duration.ZERO), verbose ? uri -> System.out.printf("%s%-11s%s %s%n",
-                BuildExecutorCallback.YELLOW,
-                "[FETCHED]",
-                BuildExecutorCallback.RESET,
-                uri) : null);
+        return ofUris(Environment.NONE, uris, versionResolver);
+    }
+
+    static <F extends BiFunction<URI, String, Optional<URI>> & Serializable> Repository ofUris(
+            Environment environment,
+            Map<String, URI> uris,
+            F versionResolver) {
+        return ofUris(uris, versionResolver, new Connection().retries(0).backoff(Duration.ZERO),
+                environment.flag("print.fetch")
+                        ? uri -> environment.out().accept("%s%-11s%s %s".formatted(
+                                                                                   BuildExecutorCallback.YELLOW,
+                                                                                   "[FETCHED]",
+                                                                                   BuildExecutorCallback.RESET,
+                                                                                   uri))
+                        : null);
     }
 
     static <F extends BiFunction<URI, String, Optional<URI>> & Serializable> Repository ofUris(
             Map<String, URI> uris,
             F versionResolver,
-            Retry retry,
+            Connection connection,
             Consumer<URI> callback) {
         return (_, coordinate, extension) -> {
             if (extension != null) {
@@ -358,7 +401,7 @@ public interface Repository {
             if (Objects.equals("file", uri.getScheme())) {
                 return Optional.of(RepositoryItem.ofFile(Path.of(uri), true));
             } else {
-                return Optional.of(() -> open(uri, null, retry));
+                return Optional.of(() -> open(connection, uri, null));
             }
         };
     }

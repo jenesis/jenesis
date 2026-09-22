@@ -3,6 +3,7 @@ package build.jenesis.test;
 import module java.base;
 import module org.junit.jupiter.api;
 import build.jenesis.SequencedProperties;
+import build.jenesis.Environment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -57,14 +58,37 @@ public class SequencedPropertiesTest {
     @Test
     public void reads_a_flag_with_its_default_when_absent() {
         SequencedProperties properties = new SequencedProperties();
-        properties.setProperty("on", " true ");
+        properties.setProperty("on", " TRUE ");
         properties.setProperty("off", "false");
         properties.setProperty("blank", "");
         assertThat(properties.flag("on")).isTrue();
         assertThat(properties.flag("off")).isFalse();
         assertThat(properties.flag("absent")).isFalse();
-        assertThat(properties.flag("blank", true)).as("a blank value falls back to the default").isTrue();
+        assertThat(properties.flag("absent", true)).isTrue();
+        assertThat(properties.flag("blank", false))
+                .as("a file names a flag with no value exactly as a command line does, and means the same by it")
+                .isTrue();
         assertThat(properties.flag("off", true)).isFalse();
+    }
+
+    @Test
+    public void refuses_a_flag_in_a_file_that_is_neither_true_nor_false() {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("maybe", "yes");
+        assertThatThrownBy(() -> properties.flag("maybe"))
+                .as("a file read its flags leniently while a system property refused them,"
+                        + " so the same word disabled a tool in one place and failed the build in the other")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Malformed value for maybe: 'yes'"
+                        + " (expected true, false, or the setting named with no value at all)");
+    }
+
+    @Test
+    public void tells_a_flag_that_is_not_set_in_a_file_from_one_set_to_false() {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("off", "false");
+        assertThat(properties.flagOrNull("absent")).isNull();
+        assertThat(properties.flagOrNull("off")).isFalse();
     }
 
     @Test
@@ -118,89 +142,63 @@ public class SequencedPropertiesTest {
     }
 
     @Test
-    public void a_system_flag_is_the_default_when_it_is_not_set() {
-        System.clearProperty("jenesis.test.sample.flag");
-        assertThat(SequencedProperties.systemFlag("jenesis.test.sample.flag")).isFalse();
-        assertThat(SequencedProperties.systemFlag("jenesis.test.sample.flag", true)).isTrue();
+    public void an_argument_file_is_the_arguments_it_holds(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("arguments.txt");
+        Files.writeString(file, """
+                # what this run is
+                -Djenesis.project.version=1.0.0
+                build "+a module" 'and another'
+                trailing # and what it is not
+                """);
+        assertThat(SequencedProperties.arguments("@" + file, "last"))
+                .as("a file of arguments reads as the command line it stands for")
+                .containsExactly("-Djenesis.project.version=1.0.0",
+                        "build",
+                        "+a module",
+                        "and another",
+                        "trailing",
+                        "last");
     }
 
     @Test
-    public void a_system_flag_named_with_no_value_is_true() {
-        System.setProperty("jenesis.test.sample.flag", "");
-        try {
-            assertThat(SequencedProperties.systemFlag("jenesis.test.sample.flag"))
-                    .as("naming a flag on the command line and nothing else is how it is switched on")
-                    .isTrue();
-        } finally {
-            System.clearProperty("jenesis.test.sample.flag");
-        }
+    public void an_argument_file_escapes_within_a_quote_and_nowhere_else(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("arguments.txt");
+        Files.writeString(file, "\"a\\tb\" \"quote\\\"inside\" c\\d");
+        assertThat(SequencedProperties.arguments("@" + file))
+                .as("a backslash escapes inside a quote, as it does for the JDK's own tools, and is a"
+                        + " character of its own outside one")
+                .containsExactly("a\tb", "quote\"inside", "c\\d");
     }
 
     @Test
-    public void a_system_flag_set_to_false_is_false() {
-        System.setProperty("jenesis.test.sample.flag", "false");
-        try {
-            assertThat(SequencedProperties.systemFlag("jenesis.test.sample.flag"))
-                    .as("=false once switched a presence-read flag on, which is the whole reason"
-                            + " every boolean is read the same way now")
-                    .isFalse();
-            assertThat(SequencedProperties.systemFlag("jenesis.test.sample.flag", true)).isFalse();
-        } finally {
-            System.clearProperty("jenesis.test.sample.flag");
-        }
+    public void an_argument_file_is_not_expanded_again(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("arguments.txt");
+        Files.writeString(file, "@nested.txt");
+        assertThat(SequencedProperties.arguments("@" + file))
+                .as("an @ within a file is an argument, not another file, as the JDK reads it")
+                .containsExactly("@nested.txt");
     }
 
     @Test
-    public void a_system_flag_set_to_anything_else_is_refused() {
-        System.setProperty("jenesis.test.sample.flag", "yes");
-        try {
-            assertThatThrownBy(() -> SequencedProperties.systemFlag("jenesis.test.sample.flag"))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Malformed value for jenesis.test.sample.flag: 'yes'"
-                            + " (expected true, false, or the property named with no value at all)");
-        } finally {
-            System.clearProperty("jenesis.test.sample.flag");
-        }
+    public void an_argument_starting_with_an_at_is_written_twice() throws IOException {
+        assertThat(SequencedProperties.arguments("@@literal", "plain"))
+                .containsExactly("@literal", "plain");
     }
 
     @Test
-    public void a_system_flag_ignores_case_and_surrounding_space() {
-        System.setProperty("jenesis.test.sample.flag", " TRUE ");
-        try {
-            assertThat(SequencedProperties.systemFlag("jenesis.test.sample.flag")).isTrue();
-        } finally {
-            System.clearProperty("jenesis.test.sample.flag");
-        }
+    public void an_argument_file_that_is_not_there_names_itself(@TempDir Path directory) {
+        Path file = directory.resolve("missing.txt");
+        assertThatThrownBy(() -> SequencedProperties.arguments("@" + file))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No argument file at " + file);
     }
 
     @Test
-    public void a_system_flag_that_is_not_set_can_be_told_from_one_set_to_false() {
-        System.clearProperty("jenesis.test.sample.flag");
-        assertThat(SequencedProperties.systemFlagOrNull("jenesis.test.sample.flag")).isNull();
-        System.setProperty("jenesis.test.sample.flag", "false");
-        try {
-            assertThat(SequencedProperties.systemFlagOrNull("jenesis.test.sample.flag")).isFalse();
-        } finally {
-            System.clearProperty("jenesis.test.sample.flag");
-        }
-    }
-
-    @Test
-    public void a_system_flag_read_for_its_absence_reads_a_value_like_every_other() {
-        System.setProperty("jenesis.test.sample.flag", "");
-        try {
-            assertThat(SequencedProperties.systemFlagOrNull("jenesis.test.sample.flag")).isTrue();
-        } finally {
-            System.clearProperty("jenesis.test.sample.flag");
-        }
-        System.setProperty("jenesis.test.sample.flag", "yes");
-        try {
-            assertThatThrownBy(() -> SequencedProperties.systemFlagOrNull("jenesis.test.sample.flag"))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Malformed value for jenesis.test.sample.flag: 'yes'"
-                            + " (expected true, false, or the property named with no value at all)");
-        } finally {
-            System.clearProperty("jenesis.test.sample.flag");
-        }
+    public void an_argument_file_refuses_a_quote_that_never_closes(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("arguments.txt");
+        Files.writeString(file, "\"never closed");
+        assertThatThrownBy(() -> SequencedProperties.arguments("@" + file))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unterminated \" in the argument file " + file);
     }
 }

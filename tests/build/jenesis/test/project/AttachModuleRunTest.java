@@ -9,6 +9,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -149,11 +150,11 @@ public class AttachModuleRunTest {
         executor.addSource("dependencies", dependencies);
         executor.addSource("classes", classes);
         Map<String, Repository> repositories = Map.of(
-                "maven", MavenDefaultRepository.of(),
+                "maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM),
                 "probes", new MavenDefaultRepository(repository.toUri(), null, Map.of(), null));
         Map<String, Resolver> resolvers = Map.of(
-                "maven", new MavenPomResolver(),
-                "probes", new MavenPomResolver());
+                "maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM),
+                "probes", MavenPomResolver.ofEnvironment(Environment.SYSTEM));
         executor.addModule(
                 "test",
                 new TestModule(repositories, resolvers)

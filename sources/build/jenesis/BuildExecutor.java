@@ -10,59 +10,88 @@ public interface BuildExecutor {
         return new Configuration().of(target);
     }
 
-    record Configuration(Duration timeout, String digest, boolean verbose, boolean rebuild, boolean aggregate, int concurrency, BuildExecutorCache cache) {
+    record Configuration(Duration timeout,
+                         String digest,
+                         boolean verbose,
+                         boolean progress,
+                         boolean cacheHits,
+                         boolean rebuild,
+                         boolean aggregate,
+                         int concurrency,
+                         BuildExecutorCache cache,
+                         Consumer<String> out) {
 
         public Configuration() {
-            String location = System.getProperty("jenesis.cache.uri");
+            this(Duration.ZERO, "MD5", false, true, false, false, false, 0, null, System.out::println);
+        }
+
+        public static Configuration ofEnvironment(Environment environment) {
+            String location = environment.getProperty("cache.uri");
             BuildExecutorCache cache;
             if (location == null || location.isEmpty()) {
                 cache = null;
             } else {
                 URI uri = URI.create(location);
                 cache = switch (uri.getScheme() == null ? "" : uri.getScheme()) {
-                    case "http", "https" -> Repository.Origin.of("jenesis.cache.uri") == Repository.Origin.PROJECT
-                            ? new BuildExecutorHttpCache(uri).key(null)
-                            : new BuildExecutorHttpCache(uri);
+                    case "http", "https" -> Repository.Origin.of(environment, "cache.uri") == Repository.Origin.PROJECT
+                            ? BuildExecutorHttpCache.ofEnvironment(environment, uri).key(null)
+                            : BuildExecutorHttpCache.ofEnvironment(environment, uri);
                     case "file" -> new BuildExecutorFileCache(Path.of(uri));
                     default -> throw new IllegalArgumentException(
                             "Unsupported cache URI scheme (expected http, https, or file): " + location);
                 };
             }
-            this(Duration.parse(System.getProperty("jenesis.executor.timeout", Duration.ZERO.toString())),
-                    System.getProperty("jenesis.executor.digest", "MD5"),
-                    SequencedProperties.systemFlag("jenesis.print.checksum"),
-                    SequencedProperties.systemFlag("jenesis.executor.rebuild"),
-                    SequencedProperties.systemFlag("jenesis.executor.aggregate"),
-                    Integer.getInteger("jenesis.executor.concurrency", 0),
-                    cache);
+            return new Configuration(
+                    Duration.parse(environment.getProperty("executor.timeout", Duration.ZERO.toString())),
+                    environment.getProperty("executor.digest", "MD5"),
+                    environment.flag("print.checksum"),
+                    environment.flag("print.progress", true),
+                    environment.flag("print.cache"),
+                    environment.flag("executor.rebuild"),
+                    environment.flag("executor.aggregate"),
+                    environment.number("executor.concurrency", 0),
+                    cache,
+                    environment.out());
         }
 
         public Configuration timeout(Duration timeout) {
-            return new Configuration(timeout, digest, verbose, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public Configuration digest(String digest) {
-            return new Configuration(timeout, digest, verbose, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public Configuration verbose(boolean verbose) {
-            return new Configuration(timeout, digest, verbose, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+        }
+
+        public Configuration progress(boolean progress) {
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+        }
+
+        public Configuration cacheHits(boolean cacheHits) {
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public Configuration rebuild(boolean rebuild) {
-            return new Configuration(timeout, digest, verbose, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public Configuration aggregate(boolean aggregate) {
-            return new Configuration(timeout, digest, verbose, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public Configuration concurrency(int concurrency) {
-            return new Configuration(timeout, digest, verbose, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public Configuration cache(BuildExecutorCache cache) {
-            return new Configuration(timeout, digest, verbose, rebuild, aggregate, concurrency, cache);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+        }
+
+        public Configuration out(Consumer<String> out) {
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public BuildExecutor of(Path target) throws IOException {
@@ -70,8 +99,8 @@ public interface BuildExecutor {
                     timeout,
                     new HashDigestFunction(digest),
                     BuildStepHashFunction.ofSerializationDigest(digest),
-                    SequencedProperties.systemFlag("jenesis.print.progress", true)
-                            ? BuildExecutorCallback.printing(System.out, verbose, SequencedProperties.systemFlag("jenesis.print.cache"), target)
+                    progress
+                            ? BuildExecutorCallback.printing(out, verbose, cacheHits, target)
                             : BuildExecutorCallback.nop(),
                     cache == null ? BuildExecutorCache.nop() : cache,
                     rebuild,

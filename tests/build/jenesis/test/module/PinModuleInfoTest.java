@@ -8,6 +8,7 @@ import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
+import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.module.PinModuleInfo;
 import build.jenesis.step.Inventory;
@@ -90,7 +91,7 @@ public class PinModuleInfoTest {
     }
 
     private String run(Path moduleInfo, Platform platform, UnaryOperator<PinModuleInfo> configurator) throws IOException {
-        configurator.apply(new PinModuleInfo("module", "", List.of(moduleInfo), new HashDigestFunction("SHA-256"))
+        configurator.apply(PinModuleInfo.ofEnvironment(Environment.SYSTEM, "module", "", List.of(moduleInfo), new HashDigestFunction("SHA-256"))
                         .platform(platform))
                 .apply(Runnable::run,
                         new BuildStepContext(previous, next, supplement),

@@ -6,6 +6,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.SafeSegment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
@@ -17,7 +18,11 @@ public class MavenRepositoryStaging implements BuildStep {
     private final boolean includeTests;
 
     public MavenRepositoryStaging() {
-        this(SequencedProperties.systemFlag("jenesis.stage.tests"));
+        this(false);
+    }
+
+    public static MavenRepositoryStaging ofEnvironment(Environment environment) {
+        return new MavenRepositoryStaging(environment.flag("stage.tests"));
     }
 
     public MavenRepositoryStaging(boolean includeTests) {

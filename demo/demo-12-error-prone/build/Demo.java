@@ -3,16 +3,17 @@ package build;
 import module java.base;
 import build.jenesis.Project;
 import build.jenesis.project.InferredMultiProjectAssembler;
+import build.jenesis.Environment;
 
 public class Demo {
 
     static void main(String[] args) throws Exception {
         expectFailure("a reference comparison of two strings, with ReferenceEquality promoted to an error",
-                () -> new Project(Path.of(".")).build());
+                () -> Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).build());
         System.out.println();
         wipe();
-        new Project(Path.of("."))
-                .assembler(new InferredMultiProjectAssembler().toolchain(toolchain ->
+        Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
+                .assembler(InferredMultiProjectAssembler.ofEnvironment(Environment.SYSTEM).toolchain(toolchain ->
                         toolchain.compiler(compiler -> compiler.errorprone(null))))
                 .build();
         System.out.println();

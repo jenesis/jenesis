@@ -9,6 +9,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
+import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenDefaultVersionNegotiator;
@@ -696,11 +697,11 @@ public class MavenProjectTest {
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
-        root.addModule("maven", MavenProject.make(project,
+        root.addModule("maven", MavenProject.make(Environment.SYSTEM, project,
                 "main",
                 "maven",
                 Map.of("maven", new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)),
-                Map.of("maven", new MavenPomResolver()),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM)),
                 null,
                 Collections.emptyNavigableSet(),
                 (descriptor, _, _) -> {

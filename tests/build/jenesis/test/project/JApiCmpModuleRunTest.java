@@ -2,6 +2,7 @@ package build.jenesis.test.project;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.Environment;
 import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
@@ -117,8 +118,8 @@ public class JApiCmpModuleRunTest {
     private JApiCmpModule module(SequencedProperties config) {
         config.setProperty("baseline", BASELINE);
         return new JApiCmpModule(
-                Map.of("maven", MavenDefaultRepository.of()),
-                Map.of("maven", new MavenPomResolver()))
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM)))
                 .pinning(Pinning.STRICT)
                 .config(config);
     }

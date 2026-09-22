@@ -49,9 +49,9 @@ What is in this repository
 
 | Path | Contents |
 |------|----------|
-| `sources/` | The build tool itself, module `build.jenesis` - `Make`, `Execute` and `Jpx` are the entry points, `Project` the configuration API they run and has no `main`. |
+| `sources/` | The build tool itself, module `build.jenesis` - `Make`, `Execute` and `Jpx` are the entry points, and the `jenesis-make`, `jenesis-exec` and `jpx` `ToolProvider`s are the same three inside another program's JVM; `Project` is the configuration API they run and has no `main`. |
 | `tests/` | Its tests, module `build.jenesis.test`. |
-| `demo/` | 62 self-contained example projects, one per feature, indexed by [`demo/README.md`](demo/README.md). |
+| `demo/` | 63 self-contained example projects, one per feature, indexed by [`demo/README.md`](demo/README.md). |
 | `sdk/` | The SDKMAN distribution layout and its shell-script tests (`sdk/jenesis`, `sdk/jpx`). `jenesis` reads the version recorded in a project's `build/jenesis/jenesis.version`, installs it where the package manager can, verifies the vendored sources against the published ones and runs the compiled engine - a tree that does not match is refused, so `jenesis` never executes unreviewed build code; `jenesis-make` runs the installed version as it stands, and `jenesis-switch` moves the shell to the recorded one. Both stay on the released engine, so a refused project still builds as a standard build; only running the vendored sources yourself - in source mode, or off classes compiled once with `javac` - executes the vendored engine. |
 | `distribution/` | Packager templates that override JReleaser's own, per distribution: the Homebrew formulae, which wrap each command rather than symlinking it so a script still finds its own installation, and the Scoop manifest that describes jpx rather than the build tool. JReleaser would look for these under `src/jreleaser/distributions/`, so each packager in `jreleaser.yml` names its `templateDirectory` here instead - this project has no `src/` tree. |
 | `build/jenesis` | A symlink to `sources/build/jenesis`, so the project builds itself with itself. |

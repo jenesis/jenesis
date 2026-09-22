@@ -8,6 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.PathPlacement;
 import build.jenesis.Resolver;
@@ -25,12 +26,32 @@ public class ModularizeModule implements BuildExecutorModule {
     private static final String PREPARE = "prepare", DESCRIBE = "describe", MODULARIZE = "modularize";
     private static final String STAGED = "staged.properties", IDENTITY = "identity.properties";
 
-    private final ProcessHandler.Factory factory;
     private final boolean synthetic;
+    private final OffsetDateTime timestamp;
+    private final JDeps describe;
 
     public ModularizeModule(ProcessHandler.Factory factory, boolean synthetic) {
-        this.factory = factory;
+        this(synthetic, BuildStep.timestamp(), new JDeps(factory));
+    }
+
+    public static ModularizeModule ofEnvironment(Environment environment,
+                                                 ProcessHandler.Factory factory,
+                                                 boolean synthetic) {
+        return new ModularizeModule(synthetic, BuildStep.timestamp(environment), JDeps.ofEnvironment(environment, factory));
+    }
+
+    private ModularizeModule(boolean synthetic, OffsetDateTime timestamp, JDeps describe) {
         this.synthetic = synthetic;
+        this.timestamp = timestamp;
+        this.describe = describe;
+    }
+
+    public ModularizeModule timestamp(OffsetDateTime timestamp) {
+        return new ModularizeModule(synthetic, timestamp, describe);
+    }
+
+    public ModularizeModule describe(JDeps describe) {
+        return new ModularizeModule(synthetic, timestamp, describe);
     }
 
     public static Boolean configured(Path properties) throws IOException {
@@ -49,8 +70,8 @@ public class ModularizeModule implements BuildExecutorModule {
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
         buildExecutor.addStep(PREPARE, new Prepare(synthetic), inherited.sequencedKeySet());
-        buildExecutor.addStep(DESCRIBE, new JDeps(factory), PREPARE);
-        buildExecutor.addStep(MODULARIZE, new Modularize(), PREPARE, DESCRIBE);
+        buildExecutor.addStep(DESCRIBE, describe, PREPARE);
+        buildExecutor.addStep(MODULARIZE, new Modularize(timestamp), PREPARE, DESCRIBE);
     }
 
     @Override
@@ -208,7 +229,11 @@ public class ModularizeModule implements BuildExecutorModule {
 
     private static class Modularize implements BuildStep {
 
-        private final OffsetDateTime timestamp = BuildStep.timestamp();
+        private final OffsetDateTime timestamp;
+
+        private Modularize(OffsetDateTime timestamp) {
+            this.timestamp = timestamp;
+        }
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,

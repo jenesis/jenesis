@@ -6,29 +6,39 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.DependencyTreeReport;
+import build.jenesis.Environment;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 
 public class Tree implements BuildStep {
 
-    private final transient PrintStream out;
+    private final transient Consumer<String> out;
     private final transient boolean compact, tests;
 
     public Tree() {
-        this(System.out);
+        this(System.out::println, false, true);
     }
 
-    public Tree(PrintStream out) {
-        String format = System.getProperty("jenesis.tree.format", "full");
-        this(out, switch (format) {
-            case "full" -> false;
-            case "compact" -> true;
-            default -> throw new IllegalArgumentException(
-                    "Unknown jenesis.tree.format '" + format + "', expected 'full' or 'compact'");
-        }, SequencedProperties.systemFlag("jenesis.tree.tests", true));
+    public Tree(Environment environment) {
+        this(environment.out(), false, true);
     }
 
-    private Tree(PrintStream out, boolean compact, boolean tests) {
+    public static Tree ofEnvironment(Environment environment) {
+        Tree tree = new Tree(environment);
+        String format = environment.getProperty("tree.format");
+        if (format != null) {
+            tree = tree.compact(switch (format) {
+                case "full" -> false;
+                case "compact" -> true;
+                default -> throw new IllegalArgumentException(
+                        "Unknown jenesis.tree.format '" + format + "', expected 'full' or 'compact'");
+            });
+        }
+        Boolean tests = environment.flagOrNull("tree.tests");
+        return tests == null ? tree : tree.tests(tests);
+    }
+
+    private Tree(Consumer<String> out, boolean compact, boolean tests) {
         this.out = out;
         this.compact = compact;
         this.tests = tests;

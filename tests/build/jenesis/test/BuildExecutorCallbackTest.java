@@ -10,42 +10,38 @@ public class BuildExecutorCallbackTest {
 
     @Test
     public void can_print_executed() {
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        try (PrintStream printStream = new PrintStream(outputStream)) {
-            BuildExecutorCallback.printing(printStream, false, false, null)
-                    .step("foo", new LinkedHashSet<>(Set.of("bar")))
-                    .accept(true, null);
-        }
-        assertThat(outputStream.toString(StandardCharsets.UTF_8))
+        List<String> printed = new ArrayList<>();
+        BuildExecutorCallback.printing(printed::add, false, false, null)
+                .step("foo", new LinkedHashSet<>(Set.of("bar")))
+                .accept(true, null);
+        assertThat(printed).hasSize(1);
+        assertThat(printed.getFirst())
                 .matches(Pattern.quote(BuildExecutorCallback.GREEN + "[EXECUTED] " + BuildExecutorCallback.RESET)
                         + " foo "
                         + Pattern.quote(BuildExecutorCallback.CYAN)
                         + "in [0-9]+.[0-9]{2} seconds"
-                        + Pattern.quote(BuildExecutorCallback.RESET)
-                        + "\n");
+                        + Pattern.quote(BuildExecutorCallback.RESET));
     }
 
     @Test
     public void can_print_skipped() {
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        try (PrintStream printStream = new PrintStream(outputStream)) {
-            BuildExecutorCallback.printing(printStream, false, false, null)
-                    .step("foo", new LinkedHashSet<>(Set.of("bar")))
-                    .accept(false, null);
-        }
-        assertThat(outputStream.toString(StandardCharsets.UTF_8))
-                .isEqualTo(BuildExecutorCallback.BLUE + "[SKIPPED]  " + BuildExecutorCallback.RESET + " foo\n");
+        List<String> printed = new ArrayList<>();
+        BuildExecutorCallback.printing(printed::add, false, false, null)
+                .step("foo", new LinkedHashSet<>(Set.of("bar")))
+                .accept(false, null);
+        assertThat(printed).containsExactly(
+                BuildExecutorCallback.BLUE + "[SKIPPED]  " + BuildExecutorCallback.RESET + " foo");
     }
 
     @Test
     public void can_print_failed() {
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        try (PrintStream printStream = new PrintStream(outputStream)) {
-            BuildExecutorCallback.printing(printStream, false, false, null)
-                    .step("foo", new LinkedHashSet<>(Set.of("bar")))
-                    .accept(null, new RuntimeException("message"));
-        }
-        assertThat(outputStream.toString(StandardCharsets.UTF_8))
-                .isEqualTo(BuildExecutorCallback.RED + "[FAILED]   " + BuildExecutorCallback.RESET + " foo: message\n");
+        List<String> printed = new ArrayList<>();
+        BuildExecutorCallback.printing(printed::add, false, false, null)
+                .step("foo", new LinkedHashSet<>(Set.of("bar")))
+                .accept(null, new RuntimeException("message"));
+        assertThat(printed)
+                .as("a line is handed to the consumer as it stands, so what ends it is the caller's business")
+                .containsExactly(BuildExecutorCallback.RED + "[FAILED]   " + BuildExecutorCallback.RESET
+                        + " foo: message");
     }
 }

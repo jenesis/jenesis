@@ -2,6 +2,7 @@ package build.jenesis.step;
 
 import module java.base;
 import java.util.jar.Attributes;
+import build.jenesis.Environment;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -13,21 +14,38 @@ public class Jar extends ProcessBuildStep {
     private final Sort sort;
     private final OffsetDateTime timestamp;
 
-    public Jar(ProcessHandler.Factory factory, Sort sort) {
-        this(factory.apply("jar", "bin/jar"), sort, BuildStep.timestamp(), printing("jar"));
+    public Jar(ProcessHandler.Factory factory,
+               Sort sort) {
+        this(factory.apply("jar", "bin/jar"),
+             sort,
+             BuildStep.timestamp(),
+             Terms.of("jar"));
+    }
+
+    public static Jar ofEnvironment(Environment environment,
+                             ProcessHandler.Factory factory,
+                             Sort sort) {
+        return new Jar(factory.apply("jar", "bin/jar"),
+                sort,
+                BuildStep.timestamp(environment),
+                Terms.ofEnvironment(environment, "jar"));
     }
 
     private Jar(Function<List<String>, ? extends ProcessHandler> factory,
                 Sort sort,
                 OffsetDateTime timestamp,
-                BiConsumer<Boolean, String> printing) {
-        super("jar", factory, printing);
+                Terms terms) {
+        super("jar", factory, terms);
         this.sort = sort;
         this.timestamp = timestamp;
     }
 
     public Jar verbose(BiConsumer<Boolean, String> printing) {
-        return new Jar(factory, sort, timestamp, printing);
+        return new Jar(factory, sort, timestamp, terms.printing(printing));
+    }
+
+    public Jar timestamp(OffsetDateTime timestamp) {
+        return new Jar(factory, sort, timestamp, terms);
     }
 
     @Override

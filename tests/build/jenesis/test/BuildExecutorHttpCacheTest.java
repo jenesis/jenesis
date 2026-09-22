@@ -6,6 +6,7 @@ import module org.junit.jupiter.api;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorHttpCache;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -67,7 +68,7 @@ public class BuildExecutorHttpCacheTest {
 
     @Test
     public void a_step_that_declines_a_remote_cache_reaches_no_server() throws IOException {
-        BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo");
+        BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(Environment.SYSTEM, uri).key("team-alpha").project("demo");
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
@@ -84,7 +85,7 @@ public class BuildExecutorHttpCacheTest {
 
     @Test
     public void stores_and_fetches_round_trip() throws IOException {
-        BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo");
+        BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(Environment.SYSTEM, uri).key("team-alpha").project("demo");
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
@@ -101,7 +102,7 @@ public class BuildExecutorHttpCacheTest {
 
     @Test
     public void fetch_returns_empty_on_miss() throws IOException {
-        BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo");
+        BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(Environment.SYSTEM, uri).key("team-alpha").project("demo");
         Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, target);
         assertThat(result).isEmpty();
     }
@@ -111,15 +112,15 @@ public class BuildExecutorHttpCacheTest {
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
-        new BuildExecutorHttpCache(uri).key("team-alpha").project("demo").write(false)
+        BuildExecutorHttpCache.ofEnvironment(Environment.SYSTEM, uri).key("team-alpha").project("demo").write(false)
                 .store(Runnable::run, "step", step, in, true, output, "", Map.of());
         assertThat(blobs).isEmpty();
-        assertThat(new BuildExecutorHttpCache(uri).key("team-alpha").project("demo").fetch(Runnable::run, "step", step, in, true, target)).isEmpty();
+        assertThat(BuildExecutorHttpCache.ofEnvironment(Environment.SYSTEM, uri).key("team-alpha").project("demo").fetch(Runnable::run, "step", step, in, true, target)).isEmpty();
     }
 
     @Test
     public void read_disabled_does_not_fetch() throws IOException {
-        BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo").read(false);
+        BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(Environment.SYSTEM, uri).key("team-alpha").project("demo").read(false);
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
@@ -132,7 +133,7 @@ public class BuildExecutorHttpCacheTest {
     public void zip_entries_use_forward_slashes() throws IOException {
         Files.createDirectory(output.resolve("nested"));
         Files.writeString(output.resolve("nested").resolve("inner"), "deep");
-        new BuildExecutorHttpCache(uri).key("team-alpha").project("demo")
+        BuildExecutorHttpCache.ofEnvironment(Environment.SYSTEM, uri).key("team-alpha").project("demo")
                 .store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, output, "", Map.of());
         List<String> names = new ArrayList<>();
         try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(blobs.values().iterator().next()))) {
@@ -149,7 +150,7 @@ public class BuildExecutorHttpCacheTest {
         Files.createDirectory(output.resolve("empty-dir"));
         Files.createDirectories(output.resolve("nested").resolve("deeper"));
         Files.writeString(output.resolve("nested").resolve("deeper").resolve("leaf"), "leaf");
-        BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo");
+        BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(Environment.SYSTEM, uri).key("team-alpha").project("demo");
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         cache.store(Runnable::run, "step", step, in, true, output, "", Map.of());
@@ -162,7 +163,7 @@ public class BuildExecutorHttpCacheTest {
 
     @Test
     public void a_directory_entry_may_not_escape_the_target() throws IOException {
-        BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo");
+        BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(Environment.SYSTEM, uri).key("team-alpha").project("demo");
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
@@ -182,7 +183,6 @@ public class BuildExecutorHttpCacheTest {
 
     @Test
     public void a_cache_that_hangs_does_not_hang_the_build() throws IOException {
-        System.setProperty("jenesis.cache.read", "PT0.5S");
         try (ServerSocket hanging = new ServerSocket(0, 0, InetAddress.getLoopbackAddress())) {
             Thread accepting = Thread.ofVirtual().start(() -> {
                 try {
@@ -192,7 +192,7 @@ public class BuildExecutorHttpCacheTest {
                 } catch (IOException | InterruptedException _) {
                 }
             });
-            BuildExecutorHttpCache cache = new BuildExecutorHttpCache(
+            BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(new Environment(Map.of("cache.read", "PT0.5S")::get), 
                     URI.create("http://localhost:" + hanging.getLocalPort() + "/cache"))
                     .key("team-alpha").project("demo");
             long started = System.nanoTime();
@@ -200,13 +200,12 @@ public class BuildExecutorHttpCacheTest {
             assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(20));
             accepting.interrupt();
         } finally {
-            System.clearProperty("jenesis.cache.read");
         }
     }
 
     @Test
     public void corrupt_cache_entry_leaves_the_target_empty() throws IOException {
-        BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo");
+        BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(Environment.SYSTEM, uri).key("team-alpha").project("demo");
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
@@ -228,7 +227,7 @@ public class BuildExecutorHttpCacheTest {
 
     @Test
     public void omits_headers_when_key_and_project_are_unset() throws IOException {
-        new BuildExecutorHttpCache(uri)
+        BuildExecutorHttpCache.ofEnvironment(Environment.SYSTEM, uri)
                 .fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, target);
         assertThat(keys).containsExactly("null");
         assertThat(projects).containsExactly("null");
@@ -262,7 +261,7 @@ public class BuildExecutorHttpCacheTest {
         responder.start();
 
         Files.writeString(output.resolve("file"), "x".repeat(100_000));
-        new BuildExecutorHttpCache(URI.create("http://localhost:" + rejecting.getLocalPort())).key("team-alpha").project("demo")
+        BuildExecutorHttpCache.ofEnvironment(Environment.SYSTEM, URI.create("http://localhost:" + rejecting.getLocalPort())).key("team-alpha").project("demo")
                 .store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, output, "", Map.of());
         responder.join(2_000);
         rejecting.close();
@@ -271,7 +270,7 @@ public class BuildExecutorHttpCacheTest {
 
     @Test
     public void touch_sends_a_head_request_for_the_entry() throws IOException {
-        BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri).key("team-alpha").project("demo");
+        BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(Environment.SYSTEM, uri).key("team-alpha").project("demo");
         byte[] step = {1};
         SequencedMap<String, Map<Path, byte[]>> in = inputs("source", "file", new byte[]{9});
         Files.writeString(output.resolve("file"), "result");
@@ -285,7 +284,7 @@ public class BuildExecutorHttpCacheTest {
 
     @Test
     public void touch_is_skipped_when_reading_is_disabled() throws IOException {
-        new BuildExecutorHttpCache(uri).key("team-alpha").project("demo").read(false)
+        BuildExecutorHttpCache.ofEnvironment(Environment.SYSTEM, uri).key("team-alpha").project("demo").read(false)
                 .touch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true);
         assertThat(heads).isEmpty();
     }

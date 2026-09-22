@@ -29,8 +29,11 @@ public class SequencedProperties extends Properties {
         return properties;
     }
 
-    public String value(String key) {
-        String value = getProperty(key);
+    public static List<String> arguments(String... arguments) throws IOException {
+        return Make.expanded(arguments);
+    }
+
+    private static String trimmed(String value) {
         if (value == null) {
             return null;
         }
@@ -38,47 +41,7 @@ public class SequencedProperties extends Properties {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    public String value(String key, String defaultValue) {
-        String value = value(key);
-        return value == null ? defaultValue : value;
-    }
-
-    public static boolean systemFlag(String key) {
-        return systemFlag(key, false);
-    }
-
-    public static boolean systemFlag(String key, boolean defaultValue) {
-        Boolean value = systemFlagOrNull(key);
-        return value == null ? defaultValue : value;
-    }
-
-    public static Boolean systemFlagOrNull(String key) {
-        String value = System.getProperty(key);
-        if (value == null) {
-            return null;
-        }
-        return switch (value.trim().toLowerCase(Locale.ROOT)) {
-            case "", "true" -> true;
-            case "false" -> false;
-            default -> throw new IllegalArgumentException("Malformed value for "
-                    + key
-                    + ": '"
-                    + value
-                    + "' (expected true, false, or the property named with no value at all)");
-        };
-    }
-
-    public boolean flag(String key) {
-        return flag(key, false);
-    }
-
-    public boolean flag(String key, boolean defaultValue) {
-        String value = value(key);
-        return value == null ? defaultValue : Boolean.parseBoolean(value);
-    }
-
-    public List<String> entries(String key) {
-        String value = value(key);
+    private static List<String> splitEntries(String value) {
         if (value == null) {
             return null;
         }
@@ -92,12 +55,41 @@ public class SequencedProperties extends Properties {
         return entries;
     }
 
-    public List<String> words(String key) {
-        String value = value(key);
+    private static List<String> splitWords(String value) {
         if (value == null) {
             return List.of();
         }
         return List.of(value.split("\\s+"));
+    }
+
+    public String value(String key) {
+        return trimmed(getProperty(key));
+    }
+
+    public String value(String key, String defaultValue) {
+        String value = value(key);
+        return value == null ? defaultValue : value;
+    }
+
+    public boolean flag(String key) {
+        return flag(key, false);
+    }
+
+    public boolean flag(String key, boolean defaultValue) {
+        Boolean value = flagOrNull(key);
+        return value == null ? defaultValue : value;
+    }
+
+    public Boolean flagOrNull(String key) {
+        return Make.parsed(key, getProperty(key));
+    }
+
+    public List<String> entries(String key) {
+        return splitEntries(value(key));
+    }
+
+    public List<String> words(String key) {
+        return splitWords(value(key));
     }
 
     public void store(Path file) throws IOException {

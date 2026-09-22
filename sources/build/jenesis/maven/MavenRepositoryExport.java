@@ -6,7 +6,9 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.SafeSegment;
+import build.jenesis.SequencedProperties;
 
 public class MavenRepositoryExport implements BuildStep {
 
@@ -18,10 +20,12 @@ public class MavenRepositoryExport implements BuildStep {
     private final Path target;
 
     public MavenRepositoryExport() {
-        String override = System.getProperty("jenesis.maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
-        target = override == null
-                ? Path.of(System.getProperty("user.home")).resolve(".m2").resolve("repository")
-                : Path.of(override);
+        this(Path.of(System.getProperty("user.home")).resolve(".m2").resolve("repository"));
+    }
+
+    public static MavenRepositoryExport ofEnvironment(Environment environment) {
+        String override = environment.getProperty("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
+        return override == null ? new MavenRepositoryExport() : new MavenRepositoryExport(Path.of(override));
     }
 
     public MavenRepositoryExport(Path target) {

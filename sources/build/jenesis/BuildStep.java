@@ -121,7 +121,11 @@ public interface BuildStep extends Serializable {
     }
 
     static OffsetDateTime timestamp() {
-        String value = System.getProperty("jenesis.archive.timestamp", "1980-02-01T00:00:00Z");
+        return timestamp(Environment.NONE);
+    }
+
+    static OffsetDateTime timestamp(Environment environment) {
+        String value = environment.getProperty("archive.timestamp", "1980-02-01T00:00:00Z");
         if (value.isBlank()) {
             return null;
         }

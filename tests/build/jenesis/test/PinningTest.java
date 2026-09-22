@@ -3,59 +3,49 @@ package build.jenesis.test;
 import module java.base;
 import module org.junit.jupiter.api;
 import build.jenesis.Pinning;
+import build.jenesis.SequencedProperties;
+import build.jenesis.Environment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class PinningTest {
 
-    @AfterEach
-    public void clear() {
-        System.clearProperty("jenesis.dependency.pin");
-        System.clearProperty("jenesis.pin.concurrency");
-    }
-
     @Test
     public void every_pin_writer_shares_one_ceiling() {
-        System.setProperty("jenesis.pin.concurrency", "3");
-        assertThat(Pinning.permits())
+        Function<String, String> keys = Map.of("pin.concurrency", "3")::get;
+        assertThat(Pinning.permits(new Environment(keys)))
                 .as("a pom writer and a module-info writer bound one fan-out between them, not one each")
-                .isSameAs(Pinning.permits());
-        assertThat(Pinning.permits().availablePermits()).isEqualTo(3);
+                .isSameAs(Pinning.permits(new Environment(keys)));
+        assertThat(Pinning.permits(new Environment(keys)).availablePermits()).isEqualTo(3);
     }
 
     @Test
     public void an_unbounded_fan_out_holds_no_permit_at_all() {
-        System.setProperty("jenesis.pin.concurrency", "0");
-        assertThat(Pinning.permits()).isNull();
+        assertThat(Pinning.permits(new Environment(Map.of("pin.concurrency", "0")::get))).isNull();
     }
 
     @Test
     public void refuses_a_ceiling_below_nothing() {
-        System.setProperty("jenesis.pin.concurrency", "-1");
-        assertThatThrownBy(Pinning::permits)
+        assertThatThrownBy(() -> Pinning.permits(new Environment(Map.of("pin.concurrency", "-1")::get)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Pin concurrency must not be negative: -1");
     }
 
     @Test
-    public void from_property_is_null_when_unset() {
-        System.clearProperty("jenesis.dependency.pin");
-        assertThat(Pinning.fromProperty()).isNull();
+    public void reading_the_pin_setting_is_null_when_unset() {
+        assertThat(Pinning.ofEnvironment(Environment.NONE)).isNull();
     }
 
     @Test
-    public void from_property_parses_case_insensitively() {
-        System.setProperty("jenesis.dependency.pin", "strict");
-        assertThat(Pinning.fromProperty()).isEqualTo(Pinning.STRICT);
-        System.setProperty("jenesis.dependency.pin", "VERSIONS");
-        assertThat(Pinning.fromProperty()).isEqualTo(Pinning.VERSIONS);
+    public void reading_the_pin_setting_parses_case_insensitively() {
+        assertThat(Pinning.ofEnvironment(new Environment(Map.of("dependency.pin", "strict")::get))).isEqualTo(Pinning.STRICT);
+        assertThat(Pinning.ofEnvironment(new Environment(Map.of("dependency.pin", "VERSIONS")::get))).isEqualTo(Pinning.VERSIONS);
     }
 
     @Test
-    public void from_property_rejects_an_unknown_value() {
-        System.setProperty("jenesis.dependency.pin", "bogus");
-        assertThatThrownBy(Pinning::fromProperty)
+    public void reading_the_pin_setting_rejects_an_unknown_value() {
+        assertThatThrownBy(() -> Pinning.ofEnvironment(new Environment(Map.of("dependency.pin", "bogus")::get)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown jenesis.dependency.pin 'bogus'");
     }

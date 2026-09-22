@@ -8,6 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -22,29 +23,41 @@ public class KtlintModule implements BuildExecutorModule {
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
     private static final String MAVEN_GROUP = "com.pinterest.ktlint", MAVEN_ARTIFACT = "ktlint-cli";
 
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
     private final boolean strict;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final ProcessBuildStep.Terms terms;
 
-    public KtlintModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "ktlint", false, ProcessBuildStep.printing("ktlint"));
+    public KtlintModule(Map<String, Repository> repositories,
+                        Map<String, Resolver> resolvers) {
+        this(new Dependencies(repositories, resolvers),
+             null,
+             "ktlint",
+             false,
+             ProcessBuildStep.Terms.of("ktlint"));
     }
 
-    private KtlintModule(Map<String, Repository> repositories,
-                         Map<String, Resolver> resolvers,
+    public static KtlintModule ofEnvironment(Environment environment,
+                                             Map<String, Repository> repositories,
+                                             Map<String, Resolver> resolvers) {
+        return new KtlintModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
+                null,
+                "ktlint",
+                false,
+                ProcessBuildStep.Terms.ofEnvironment(environment, "ktlint"));
+    }
+
+    private KtlintModule(Dependencies dependencies,
                          Pinning pinning,
                          String tool,
                          boolean strict,
-                         BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+                         ProcessBuildStep.Terms terms) {
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.strict = strict;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public static Path configurationFile(SequencedSet<Path> configuration) {
@@ -52,19 +65,19 @@ public class KtlintModule implements BuildExecutorModule {
     }
 
     public KtlintModule pinning(Pinning pinning) {
-        return new KtlintModule(repositories, resolvers, pinning, tool, strict, printing);
+        return new KtlintModule(dependencies, pinning, tool, strict, terms);
     }
 
     public KtlintModule tool(String tool) {
-        return new KtlintModule(repositories, resolvers, pinning, tool, strict, printing);
+        return new KtlintModule(dependencies, pinning, tool, strict, terms);
     }
 
     public KtlintModule strict(boolean strict) {
-        return new KtlintModule(repositories, resolvers, pinning, tool, strict, printing);
+        return new KtlintModule(dependencies, pinning, tool, strict, terms);
     }
 
     public KtlintModule printing(BiConsumer<Boolean, String> printing) {
-        return new KtlintModule(repositories, resolvers, pinning, tool, strict, printing);
+        return new KtlintModule(dependencies, pinning, tool, strict, terms.printing(printing));
     }
 
     @Override
@@ -74,12 +87,12 @@ public class KtlintModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
+                dependencies.pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> checkInputs = new LinkedHashSet<>();
         checkInputs.add(DEPENDENCIES);
         checkInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(CHECK, new Check(tool, strict, printing), checkInputs);
+        buildExecutor.addStep(CHECK, new Check(terms, tool, strict), checkInputs);
     }
 
     private record Requires(String tool) implements BuildStep {
@@ -106,8 +119,10 @@ public class KtlintModule implements BuildExecutorModule {
         private final String tool;
         private final boolean strict;
 
-        private Check(String tool, boolean strict, BiConsumer<Boolean, String> printing) {
-            super("ktlint", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
+        private Check(ProcessBuildStep.Terms terms,
+                      String tool,
+                      boolean strict) {
+            super("ktlint", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
             this.strict = strict;
         }

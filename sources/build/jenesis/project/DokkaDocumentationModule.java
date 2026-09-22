@@ -8,6 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -27,59 +28,78 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
     private static final List<String> CLI_ARTIFACTS = List.of(
             "dokka-cli", "dokka-base", "analysis-kotlin-descriptors");
 
-    private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
     private final String group;
     private final String within;
-    private final transient Function<List<String>, ? extends ProcessHandler> factory;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final Function<List<String>, ? extends ProcessHandler> factory;
+    private final ProcessBuildStep.Terms terms;
 
-    public DokkaDocumentationModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "dokka", "main", null, null, ProcessBuildStep.printing("dokka"));
+    public DokkaDocumentationModule(Map<String, Repository> repositories,
+                                    Map<String, Resolver> resolvers) {
+        this(resolvers, new Dependencies(repositories, resolvers),
+             null,
+             "dokka",
+             "main",
+             null,
+             null,
+             ProcessBuildStep.Terms.of("dokka"));
     }
 
-    private DokkaDocumentationModule(Map<String, Repository> repositories,
-                                     Map<String, Resolver> resolvers,
+    public static DokkaDocumentationModule ofEnvironment(Environment environment,
+                                                  Map<String, Repository> repositories,
+                                                  Map<String, Resolver> resolvers) {
+        return new DokkaDocumentationModule(resolvers, Dependencies.ofEnvironment(environment, repositories, resolvers),
+                null,
+                "dokka",
+                "main",
+                null,
+                null,
+                ProcessBuildStep.Terms.ofEnvironment(environment, "dokka"));
+    }
+
+    private DokkaDocumentationModule(Map<String, Resolver> resolvers,
+                                     Dependencies dependencies,
                                      Pinning pinning,
                                      String tool,
                                      String group,
                                      String within,
                                      Function<List<String>, ? extends ProcessHandler> factory,
-                                     BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
+                                     ProcessBuildStep.Terms terms) {
         this.resolvers = resolvers;
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.group = group;
         this.within = within;
         this.factory = factory;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public DokkaDocumentationModule factory(Function<List<String>, ? extends ProcessHandler> factory) {
-        return new DokkaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms);
     }
 
     public DokkaDocumentationModule pinning(Pinning pinning) {
-        return new DokkaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms);
     }
 
     public DokkaDocumentationModule tool(String tool) {
-        return new DokkaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms);
     }
 
     public DokkaDocumentationModule group(String group) {
-        return new DokkaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms);
     }
 
     public DokkaDocumentationModule within(String within) {
-        return new DokkaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms);
     }
 
     public DokkaDocumentationModule printing(BiConsumer<Boolean, String> printing) {
-        return new DokkaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
+        return new DokkaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms.printing(printing));
     }
 
     @Override
@@ -90,13 +110,13 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(upstream);
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
+                dependencies.pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> documentInputs = new LinkedHashSet<>();
         documentInputs.add(DEPENDENCIES);
         documentInputs.addAll(upstream);
         buildExecutor.addStep(DOCUMENTED,
-                factory == null ? new Document(within, tool, group, printing) : new Document(within, tool, group, factory, printing),
+                factory == null ? new Document(terms, within, tool, group) : new Document(terms, within, tool, group, factory),
                 documentInputs);
     }
 
@@ -135,12 +155,19 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
         private final String tool;
         private final String group;
 
-        private Document(String within, String tool, String group, BiConsumer<Boolean, String> printing) {
-            this(within, tool, group, ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
+        private Document(ProcessBuildStep.Terms terms,
+                         String within,
+                         String tool,
+                         String group) {
+            this(terms, within, tool, group, ProcessHandler.OfProcess.ofJavaHome("bin/java"));
         }
 
-        private Document(String within, String tool, String group, Function<List<String>, ? extends ProcessHandler> factory, BiConsumer<Boolean, String> printing) {
-            super("dokka", factory, printing);
+        private Document(ProcessBuildStep.Terms terms,
+                         String within,
+                         String tool,
+                         String group,
+                         Function<List<String>, ? extends ProcessHandler> factory) {
+            super("dokka", factory, terms);
             this.within = within;
             this.tool = tool;
             this.group = group;

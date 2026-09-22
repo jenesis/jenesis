@@ -18,15 +18,15 @@ public abstract class Java extends ProcessBuildStep {
                    PathPlacement pathPlacement,
                    boolean jarsOnly,
                    String group) {
-        this(factory, pathPlacement, jarsOnly, group, printing("java"));
+        this(factory, pathPlacement, jarsOnly, group, Terms.of("java"));
     }
 
     protected Java(Function<List<String>, ? extends ProcessHandler> factory,
                    PathPlacement pathPlacement,
                    boolean jarsOnly,
                    String group,
-                   BiConsumer<Boolean, String> printing) {
-        super("java", factory, printing);
+                   Terms terms) {
+        super("java", factory, terms);
         this.pathPlacement = pathPlacement;
         this.jarsOnly = jarsOnly;
         this.group = group;
@@ -86,7 +86,7 @@ public abstract class Java extends ProcessBuildStep {
 
     public Java group(String group) {
         Java self = this;
-        return new Java(factory, pathPlacement, jarsOnly, group, printing) {
+        return new Java(factory, pathPlacement, jarsOnly, group, terms) {
             @Override
             protected CompletionStage<List<String>> commands(Executor executor,
                                                              BuildStepContext context,
@@ -99,7 +99,7 @@ public abstract class Java extends ProcessBuildStep {
 
     public Java verbose(BiConsumer<Boolean, String> printing) {
         Java self = this;
-        return new Java(factory, pathPlacement, jarsOnly, group, printing) {
+        return new Java(factory, pathPlacement, jarsOnly, group, terms.printing(printing)) {
             @Override
             protected CompletionStage<List<String>> commands(Executor executor,
                                                              BuildStepContext context,

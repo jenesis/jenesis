@@ -5,20 +5,42 @@ import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.step.Inventory;
 
-public record Execution(Project project, String mainClass, String module) {
+public record Execution(Project project, String mainClass, String module, Container container) {
 
     public Execution(Project project) {
-        this(project,
-                System.getProperty("jenesis.execute.mainClass"),
-                System.getProperty("jenesis.execute.module"));
+        this(project, null, null, null);
+    }
+
+    public static Execution ofEnvironment(Environment environment, Project project) {
+        return new Execution(project,
+                environment.getProperty("execute.mainClass"),
+                environment.getProperty("execute.module"),
+                Container.ofEnvironment(environment));
+    }
+
+    public record Container(String image, String mount, String mountWritable, String env, boolean announcing) {
+
+        public static Container ofEnvironment(Environment environment) {
+            return environment.flag("execute.docker")
+                    ? new Container(environment.getProperty("execute.docker.image"),
+                                    environment.getProperty("execute.docker.mount"),
+                                    environment.getProperty("execute.docker.mountWritable"),
+                                    environment.getProperty("execute.docker.env"),
+                                    environment.flag("print.docker", true))
+                    : null;
+        }
     }
 
     public Execution mainClass(String mainClass) {
-        return new Execution(project, mainClass, module);
+        return new Execution(project, mainClass, module, container);
     }
 
     public Execution module(String module) {
-        return new Execution(project, mainClass, module);
+        return new Execution(project, mainClass, module, container);
+    }
+
+    public Execution container(Container container) {
+        return new Execution(project, mainClass, module, container);
     }
 
     public int execute(String... arguments) throws IOException, InterruptedException {
@@ -153,21 +175,22 @@ public record Execution(Project project, String mainClass, String module) {
             javaArgs.add(candidate.mainClass);
         }
         javaArgs.addAll(List.of(arguments));
-        if (SequencedProperties.systemFlag("jenesis.execute.docker")) {
-            String image = System.getProperty("jenesis.execute.docker.image");
+        if (container != null) {
             Path root = project.root().toAbsolutePath().normalize();
-            DockerizedJava docker = image == null ? new DockerizedJava(root) : new DockerizedJava(root, image);
+            DockerizedJava docker = container.image() == null
+                    ? new DockerizedJava(root)
+                    : new DockerizedJava(root, container.image());
             for (Path path : List.of(project.target(), project.artifacts())) {
                 Path absolute = (path.isAbsolute() ? path : root.resolve(path)).normalize();
                 if (!absolute.startsWith(root)) {
                     docker = docker.mount(absolute, absolute.toString(), false);
                 }
             }
-            docker = docker.mounts(System.getProperty("jenesis.execute.docker.mount"), root, true);
-            docker = docker.mounts(System.getProperty("jenesis.execute.docker.mountWritable"), root, false);
-            docker = docker.envs(System.getProperty("jenesis.execute.docker.env"));
-            if (SequencedProperties.systemFlag("jenesis.print.docker", true)) {
-                System.out.println("Launching Java execution within Docker image: " + docker.image());
+            docker = docker.mounts(container.mount(), root, true)
+                    .mounts(container.mountWritable(), root, false)
+                    .envs(container.env());
+            if (container.announcing()) {
+                project.environment().out().accept("Launching Java execution within Docker image: " + docker.image());
             }
             return docker.execute(javaArgs);
         }
@@ -191,14 +214,14 @@ public record Execution(Project project, String mainClass, String module) {
 
     public static void main(String... arguments) {
         try {
-            Path root = Path.of(System.getProperty("jenesis.make.root", "."));
-            Make.loadProperties(root);
+            Path root = Path.of(Environment.SYSTEM.getProperty("make.root", "."));
+            Environment environment = new Environment(Make.settings(root).keys());
             Make.Result result = new Make(Project.class.getName()).build(Project.BUILD);
             if (result.code() != 0) {
                 System.exit(result.code());
             }
-            Project project = new Project(root);
-            int code = new Execution(project).execute(result.outputs(), arguments);
+            Project project = Project.ofEnvironment(environment, root);
+            int code = Execution.ofEnvironment(environment, project).execute(result.outputs(), arguments);
             if (code != 0) {
                 System.exit(code);
             }

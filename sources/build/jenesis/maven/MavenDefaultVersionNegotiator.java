@@ -9,7 +9,7 @@ import static build.jenesis.maven.MavenPomResolver.toChildren;
 public class MavenDefaultVersionNegotiator implements MavenVersionNegotiator {
 
     private final transient DocumentBuilderFactory documentBuilderFactory;
-    private final Map<MavenDependencyName, Metadata> cache = new HashMap<>();
+    private final transient Map<MavenDependencyName, Metadata> cache = new HashMap<>();
 
     private MavenDefaultVersionNegotiator(DocumentBuilderFactory documentBuilderFactory) {
         this.documentBuilderFactory = documentBuilderFactory;

@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
@@ -15,10 +16,12 @@ import build.jenesis.step.ProcessHandler;
 public class InferredJavaToolchainModule implements BuildExecutorModule {
 
     private final SequencedSet<Path> configuration;
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
     private final PathPlacement pathPlacement;
+    private final InferredSourceGenerationModule generatorModule;
+    private final InferredCompilerChainModule compilerModule;
+    private final InferredByteCodeQualityModule validatorModule;
+    private final JarSigner signerStep;
     private final Function<InferredSourceGenerationModule, BuildExecutorModule> generator;
     private final Function<InferredCompilerChainModule, BuildExecutorModule> compiler;
     private final Function<InferredByteCodeQualityModule, BuildExecutorModule> validator;
@@ -29,24 +32,43 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
     public InferredJavaToolchainModule(SequencedSet<Path> configuration,
                                        Map<String, Repository> repositories,
                                        Map<String, Resolver> resolvers) {
-        this(configuration,
-                repositories,
-                resolvers,
+        this(configuration, null, PathPlacement.INFERRED,
+             new InferredSourceGenerationModule(configuration, repositories, resolvers),
+             new InferredCompilerChainModule(configuration, repositories, resolvers),
+             new InferredByteCodeQualityModule(configuration, repositories, resolvers),
+             new JarSigner(),
+             value -> value,
+             value -> value,
+             value -> value,
+             null,
+             new Jar(ProcessHandler.Factory.of(), Jar.Sort.CLASSES).asModule("jar"),
+             step -> step.configured() ? step : null);
+    }
+
+    public static InferredJavaToolchainModule ofEnvironment(Environment environment,
+                                                            SequencedSet<Path> configuration,
+                                                            Map<String, Repository> repositories,
+                                                            Map<String, Resolver> resolvers) {
+        return new InferredJavaToolchainModule(configuration, null, PathPlacement.INFERRED,
+                InferredSourceGenerationModule.ofEnvironment(environment, configuration, repositories, resolvers),
+                InferredCompilerChainModule.ofEnvironment(environment, configuration, repositories, resolvers),
+                InferredByteCodeQualityModule.ofEnvironment(environment, configuration, repositories, resolvers),
+                JarSigner.ofEnvironment(environment),
+                value -> value,
+                value -> value,
+                value -> value,
                 null,
-                PathPlacement.INFERRED,
-                module -> module,
-                module -> module,
-                module -> module,
-                null,
-                new Jar(ProcessHandler.Factory.of(), Jar.Sort.CLASSES).asModule("jar"),
+                Jar.ofEnvironment(environment, ProcessHandler.Factory.of(), Jar.Sort.CLASSES).asModule("jar"),
                 step -> step.configured() ? step : null);
     }
 
     private InferredJavaToolchainModule(SequencedSet<Path> configuration,
-                                        Map<String, Repository> repositories,
-                                        Map<String, Resolver> resolvers,
                                         Pinning pinning,
                                         PathPlacement pathPlacement,
+                                        InferredSourceGenerationModule generatorModule,
+                                        InferredCompilerChainModule compilerModule,
+                                        InferredByteCodeQualityModule validatorModule,
+                                        JarSigner signerStep,
                                         Function<InferredSourceGenerationModule, BuildExecutorModule> generator,
                                         Function<InferredCompilerChainModule, BuildExecutorModule> compiler,
                                         Function<InferredByteCodeQualityModule, BuildExecutorModule> validator,
@@ -54,10 +76,12 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                                         BuildExecutorModule archiver,
                                         Function<JarSigner, BuildStep> signer) {
         this.configuration = configuration;
-        this.repositories = repositories;
-        this.resolvers = resolvers;
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
+        this.generatorModule = generatorModule;
+        this.compilerModule = compilerModule;
+        this.validatorModule = validatorModule;
+        this.signerStep = signerStep;
         this.generator = generator;
         this.compiler = compiler;
         this.validator = validator;
@@ -67,48 +91,56 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
     }
 
     public InferredJavaToolchainModule pinning(Pinning pinning) {
-        return new InferredJavaToolchainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                generator, compiler, validator, transformer, archiver, signer);
+        return new InferredJavaToolchainModule(configuration, pinning, pathPlacement, generatorModule,
+                compilerModule, validatorModule, signerStep, generator, compiler, validator, transformer, archiver,
+                signer);
     }
 
     public InferredJavaToolchainModule pathPlacement(PathPlacement pathPlacement) {
-        return new InferredJavaToolchainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                generator, compiler, validator, transformer, archiver, signer);
+        return new InferredJavaToolchainModule(configuration, pinning, pathPlacement, generatorModule,
+                compilerModule, validatorModule, signerStep, generator, compiler, validator, transformer, archiver,
+                signer);
     }
 
     public InferredJavaToolchainModule generator(Function<InferredSourceGenerationModule, BuildExecutorModule> generator) {
-        return new InferredJavaToolchainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                generator, compiler, validator, transformer, archiver, signer);
+        return new InferredJavaToolchainModule(configuration, pinning, pathPlacement, generatorModule,
+                compilerModule, validatorModule, signerStep, generator, compiler, validator, transformer, archiver,
+                signer);
     }
 
     public InferredJavaToolchainModule compiler(Function<InferredCompilerChainModule, BuildExecutorModule> compiler) {
-        return new InferredJavaToolchainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                generator, compiler, validator, transformer, archiver, signer);
+        return new InferredJavaToolchainModule(configuration, pinning, pathPlacement, generatorModule,
+                compilerModule, validatorModule, signerStep, generator, compiler, validator, transformer, archiver,
+                signer);
     }
 
     public InferredJavaToolchainModule validator(Function<InferredByteCodeQualityModule, BuildExecutorModule> validator) {
-        return new InferredJavaToolchainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                generator, compiler, validator, transformer, archiver, signer);
+        return new InferredJavaToolchainModule(configuration, pinning, pathPlacement, generatorModule,
+                compilerModule, validatorModule, signerStep, generator, compiler, validator, transformer, archiver,
+                signer);
     }
 
     public InferredJavaToolchainModule transformer(BuildExecutorModule transformer) {
-        return new InferredJavaToolchainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                generator, compiler, validator, transformer, archiver, signer);
+        return new InferredJavaToolchainModule(configuration, pinning, pathPlacement, generatorModule,
+                compilerModule, validatorModule, signerStep, generator, compiler, validator, transformer, archiver,
+                signer);
     }
 
     public InferredJavaToolchainModule archiver(BuildExecutorModule archiver) {
-        return new InferredJavaToolchainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                generator, compiler, validator, transformer, archiver, signer);
+        return new InferredJavaToolchainModule(configuration, pinning, pathPlacement, generatorModule,
+                compilerModule, validatorModule, signerStep, generator, compiler, validator, transformer, archiver,
+                signer);
     }
 
     public InferredJavaToolchainModule signer(Function<JarSigner, BuildStep> signer) {
-        return new InferredJavaToolchainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                generator, compiler, validator, transformer, archiver, signer);
+        return new InferredJavaToolchainModule(configuration, pinning, pathPlacement, generatorModule,
+                compilerModule, validatorModule, signerStep, generator, compiler, validator, transformer, archiver,
+                signer);
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        toolchain(signer == null ? null : signer.apply(new JarSigner())).accept(buildExecutor, inherited);
+        toolchain(signer == null ? null : signer.apply(signerStep)).accept(buildExecutor, inherited);
     }
 
     @Override
@@ -117,20 +149,17 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
     }
 
     private JavaToolchainModule toolchain(BuildStep signing) {
-        BuildExecutorModule compiled = compiler == null ? null : compiler.apply(
-                new InferredCompilerChainModule(configuration, repositories, resolvers)
-                        .pinning(pinning)
-                        .pathPlacement(pathPlacement));
+        BuildExecutorModule compiled = compiler == null ? null : compiler.apply(compilerModule
+                .pinning(pinning)
+                .pathPlacement(pathPlacement));
         if (compiled == null) {
             throw new IllegalStateException("A Java toolchain requires a compiler but none is configured");
         }
         return new JavaToolchainModule(
-                generator == null ? null : generator.apply(
-                        new InferredSourceGenerationModule(configuration, repositories, resolvers).pinning(pinning)),
+                generator == null ? null : generator.apply(generatorModule.pinning(pinning)),
                 compiled,
                 transformer,
-                validator == null ? null : validator.apply(
-                        new InferredByteCodeQualityModule(configuration, repositories, resolvers).pinning(pinning)),
+                validator == null ? null : validator.apply(validatorModule.pinning(pinning)),
                 signing == null || archiver == null ? archiver : new SignedArchive(archiver, signing));
     }
 

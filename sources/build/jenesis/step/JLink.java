@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 
 public class JLink extends ProcessBuildStep {
@@ -13,20 +14,27 @@ public class JLink extends ProcessBuildStep {
     private final String group;
 
     public JLink(ProcessHandler.Factory factory) {
-        this(factory.apply("jlink", "bin/jlink"), "main", printing("jlink"));
+        this(factory.apply("jlink", "bin/jlink"),
+             "main",
+             Terms.of("jlink"));
     }
 
-    private JLink(Function<List<String>, ? extends ProcessHandler> factory, String group, BiConsumer<Boolean, String> printing) {
-        super("jlink", factory, printing);
+    public static JLink ofEnvironment(Environment environment,
+                                      ProcessHandler.Factory factory) {
+        return new JLink(factory.apply("jlink", "bin/jlink"), "main", Terms.ofEnvironment(environment, "jlink"));
+    }
+
+    private JLink(Function<List<String>, ? extends ProcessHandler> factory, String group, Terms terms) {
+        super("jlink", factory, terms);
         this.group = group;
     }
 
     public JLink group(String group) {
-        return new JLink(factory, group, printing);
+        return new JLink(factory, group, terms);
     }
 
     public JLink verbose(BiConsumer<Boolean, String> printing) {
-        return new JLink(factory, group, printing);
+        return new JLink(factory, group, terms.printing(printing));
     }
 
     @Override

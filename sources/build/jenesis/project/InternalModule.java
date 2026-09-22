@@ -9,6 +9,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -32,20 +33,45 @@ public class InternalModule implements BuildExecutorModule {
 
     private final String prefix;
     private final Path source;
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencyModule;
+    private final Javac javacStep;
     private final SequencedSet<String> additionalDependencies;
     private final String buildModuleName;
     private final Pinning pinning;
     private final String group;
 
-    public InternalModule(String prefix,
-                          String group,
-                          Path source) {
+    public InternalModule(String prefix, String group, Path source) {
         this(prefix,
                 source,
                 Map.of(prefix, JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)),
                 Map.of(prefix, new ModularJarResolver(true)),
+                group == null ? "main" : group);
+    }
+
+    private InternalModule(String prefix,
+                           Path source,
+                           Map<String, Repository> repositories,
+                           Map<String, Resolver> resolvers,
+                           String group) {
+        this(prefix,
+                source,
+                new Dependencies(repositories, resolvers),
+                new Javac(ProcessHandler.Factory.of()),
+                Collections.emptyNavigableSet(),
+                null,
+                null,
+                group);
+    }
+
+    public static InternalModule ofEnvironment(Environment environment,
+                                               String prefix, String group, Path source) {
+        Map<String, Repository> repositories = Map.of(prefix,
+                JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE));
+        Map<String, Resolver> resolvers = Map.of(prefix, ModularJarResolver.ofEnvironment(environment, true));
+        return new InternalModule(prefix,
+                source,
+                Dependencies.ofEnvironment(environment, repositories, resolvers),
+                Javac.ofEnvironment(environment, ProcessHandler.Factory.ofEnvironment(environment)),
                 Collections.emptyNavigableSet(),
                 null,
                 null,
@@ -53,29 +79,31 @@ public class InternalModule implements BuildExecutorModule {
     }
 
     public InternalModule repositories(Map<String, Repository> repositories) {
-        return new InternalModule(prefix, source, repositories, resolvers, additionalDependencies, buildModuleName, pinning, group);
+        return new InternalModule(prefix, source, dependencyModule.repositories(repositories),
+                javacStep, additionalDependencies, buildModuleName, pinning, group);
     }
 
     public InternalModule resolvers(Map<String, Resolver> resolvers) {
-        return new InternalModule(prefix, source, repositories, resolvers, additionalDependencies, buildModuleName, pinning, group);
+        return new InternalModule(prefix, source, dependencyModule.resolvers(resolvers),
+                javacStep, additionalDependencies, buildModuleName, pinning, group);
     }
 
     public InternalModule group(String group) {
-        return new InternalModule(prefix, source, repositories, resolvers, additionalDependencies, buildModuleName, pinning, group);
+        return new InternalModule(prefix, source, dependencyModule, javacStep, additionalDependencies, buildModuleName, pinning, group);
     }
 
     private InternalModule(String prefix,
                            Path source,
-                           Map<String, Repository> repositories,
-                           Map<String, Resolver> resolvers,
+                           Dependencies dependencyModule,
+                           Javac javacStep,
                            SequencedSet<String> additionalDependencies,
                            String buildModuleName,
                            Pinning pinning,
                            String group) {
         this.prefix = prefix;
         this.source = source;
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+        this.dependencyModule = dependencyModule;
+        this.javacStep = javacStep;
         this.additionalDependencies = additionalDependencies;
         this.buildModuleName = buildModuleName;
         this.pinning = pinning;
@@ -83,47 +111,25 @@ public class InternalModule implements BuildExecutorModule {
     }
 
     public InternalModule dependencies(String... dependencies) {
-        return new InternalModule(prefix,
-                source,
-                repositories,
-                resolvers,
-                new LinkedHashSet<>(List.of(dependencies)),
+        return new InternalModule(prefix, source, dependencyModule, javacStep, new LinkedHashSet<>(List.of(dependencies)),
                 buildModuleName,
                 pinning,
                 group);
     }
 
     public InternalModule dependencies(SequencedSet<String> dependencies) {
-        return new InternalModule(prefix,
-                source,
-                repositories,
-                resolvers,
-                new LinkedHashSet<>(dependencies),
+        return new InternalModule(prefix, source, dependencyModule, javacStep, new LinkedHashSet<>(dependencies),
                 buildModuleName,
                 pinning,
                 group);
     }
 
     public InternalModule buildModuleName(String name) {
-        return new InternalModule(prefix,
-                source,
-                repositories,
-                resolvers,
-                additionalDependencies,
-                name,
-                pinning,
-                group);
+        return new InternalModule(prefix, source, dependencyModule, javacStep, additionalDependencies, name, pinning, group);
     }
 
     public InternalModule pinning(Pinning pinning) {
-        return new InternalModule(prefix,
-                source,
-                repositories,
-                resolvers,
-                additionalDependencies,
-                buildModuleName,
-                pinning,
-                group);
+        return new InternalModule(prefix, source, dependencyModule, javacStep, additionalDependencies, buildModuleName, pinning, group);
     }
 
     @Override
@@ -147,10 +153,10 @@ public class InternalModule implements BuildExecutorModule {
                 new ParseModuleInfo(group, prefix, additionalDependencies, new Platform()),
                 Stream.concat(Stream.of(SOURCE), inherited.sequencedKeySet().stream()));
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning),
+                dependencyModule.pinning(pinning),
                 REQUIRES);
         buildExecutor.addModule(JAVA,
-                new JavaToolchainModule().compiler(new Javac(ProcessHandler.Factory.of()).group(group).asModule("javac")),
+                new JavaToolchainModule().compiler(javacStep.group(group).asModule("javac")),
                 SOURCE,
                 DEPENDENCIES);
         buildExecutor.addModule(DELEGATE, (delegateExecutor, delegated) -> {
