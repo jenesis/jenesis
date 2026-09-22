@@ -15,23 +15,28 @@ public class JenesisModuleRepository implements JenesisRepository {
 
     private final URI root;
     private final String token;
-    private final Repository.Retry retry;
+    private final Repository.Connection connection;
     private final URI maven;
     private final Boolean prerelease;
     private final Boolean speculative;
 
     public static JenesisRepository of(Scope scope) {
-        Repository.Credential credential = Repository.Credential.of("jenesis.module.token",
+        return ofKeys(SequencedProperties.NONE, scope);
+    }
+
+    public static JenesisRepository ofKeys(Function<String, String> keys, Scope scope) {
+        Repository.Credential credential = Repository.Credential.of(keys,
+                "module.token",
                 "JENESIS_REPOSITORY_TOKEN");
-        Repository.Credential maven = Repository.Credential.of("jenesis.maven.token", "MAVEN_REPOSITORY_TOKEN");
-        String property = System.getProperty("jenesis.module.uri");
+        Repository.Credential maven = Repository.Credential.of(keys, "maven.token", "MAVEN_REPOSITORY_TOKEN");
+        String property = SequencedProperties.getProperty(keys, "module.uri");
         String environment = System.getenv("JENESIS_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();
         String text;
         Repository.Origin origin;
         if (property != null) {
             text = property;
-            origin = Repository.Origin.of("jenesis.module.uri");
+            origin = Repository.Origin.of(keys, "module.uri");
         } else if (environment != null) {
             text = environment;
             visited.add("JENESIS_REPOSITORY_URI");
@@ -40,14 +45,15 @@ public class JenesisModuleRepository implements JenesisRepository {
             text = "https://repo.jenesis.build/";
             origin = Repository.Origin.DEFAULT;
         }
-        JenesisRepository repository = chain(text, visited, scope, credential, maven, origin, MODULE, null);
+        JenesisRepository repository = chain(keys, text, visited, scope, credential, maven, origin, MODULE, null);
         if (repository == null) {
             throw new IllegalStateException("No Jenesis module repository is configured by: " + text);
         }
-        return repository.prepend(ofLocal());
+        return repository.prepend(ofLocalKeys(keys));
     }
 
-    private static JenesisRepository chain(String text,
+    private static JenesisRepository chain(Function<String, String> keys,
+                                           String text,
                                            Set<String> visited,
                                            Scope scope,
                                            Repository.Credential credential,
@@ -110,9 +116,9 @@ public class JenesisModuleRepository implements JenesisRepository {
                         spliced = Repository.Origin.DEFAULT;
                     }
                 } else {
-                    String declared = System.getProperty(name);
+                    String declared = SequencedProperties.getProperty(keys, name);
                     value = declared == null ? System.getenv(name) : declared;
-                    spliced = declared == null ? Repository.Origin.ENVIRONMENT : Repository.Origin.of(name);
+                    spliced = declared == null ? Repository.Origin.ENVIRONMENT : Repository.Origin.of(keys, name);
                     if (value == null) {
                         throw new IllegalStateException("Unresolved repository reference: @" + name);
                     }
@@ -120,7 +126,7 @@ public class JenesisModuleRepository implements JenesisRepository {
                         throw new IllegalStateException("Circular repository reference: @" + name);
                     }
                 }
-                current = chain(value, visited, scope, granted, grantedMaven, spliced, type, null);
+                current = chain(keys, value, visited, scope, granted, grantedMaven, spliced, type, null);
                 if (name != null) {
                     visited.remove(name);
                 }
@@ -128,12 +134,13 @@ public class JenesisModuleRepository implements JenesisRepository {
                     throw new IllegalStateException("No Jenesis module repository is configured by: " + value);
                 }
             } else if (type.equals(MAVEN)) {
-                MavenModuleRepository convention = new MavenModuleRepository(MavenDefaultRepository.of(
-                        URI.create(location.endsWith("/") ? location : location + "/"),
-                        grantedMaven.grant(origin)));
+                MavenModuleRepository convention = MavenModuleRepository.ofKeys(keys,
+                        MavenDefaultRepository.ofKeys(keys,
+                                URI.create(location.endsWith("/") ? location : location + "/"),
+                                grantedMaven.grant(origin)));
                 current = segments == null ? convention : convention.segments(segments);
             } else {
-                current = new JenesisModuleRepository(
+                current = ofKeys(keys,
                         URI.create((location.endsWith("/") ? location : location + "/")
                                 + (scope == Scope.MODULE ? "module/" : "artifact/")),
                         granted.grant(origin));
@@ -209,43 +216,60 @@ public class JenesisModuleRepository implements JenesisRepository {
     }
 
     public JenesisModuleRepository(URI root, String token) {
+        this(SequencedProperties.NONE, root, token);
+    }
+
+    public static JenesisModuleRepository ofKeys(Function<String, String> keys, URI root) {
+        return new JenesisModuleRepository(keys, root, null);
+    }
+
+    public static JenesisModuleRepository ofKeys(Function<String, String> keys, URI root, String token) {
+        return new JenesisModuleRepository(keys, root, token);
+    }
+
+    private JenesisModuleRepository(Function<String, String> keys, URI root, String token) {
         this(root,
                 token,
-                new Repository.Retry(),
-                toMavenRepository(System.getProperty("jenesis.maven.uri", System.getenv("MAVEN_REPOSITORY_URI"))),
-                SequencedProperties.systemFlagOrNull("jenesis.module.prerelease"),
-                SequencedProperties.systemFlagOrNull("jenesis.module.speculative"));
+                Repository.Connection.ofKeys(keys),
+                toMavenRepository(SequencedProperties.getProperty(keys, "maven.uri",
+                        System.getenv("MAVEN_REPOSITORY_URI"))),
+                SequencedProperties.flagOrNull(keys, "module.prerelease"),
+                SequencedProperties.flagOrNull(keys, "module.speculative"));
     }
 
     private JenesisModuleRepository(URI root,
                                     String token,
-                                    Repository.Retry retry,
+                                    Repository.Connection connection,
                                     URI maven,
                                     Boolean prerelease,
                                     Boolean speculative) {
         String text = root.toString();
         this.root = text.endsWith("/") ? root : URI.create(text + "/");
         this.token = token;
-        this.retry = retry;
+        this.connection = connection;
         this.maven = maven;
         this.prerelease = prerelease;
         this.speculative = speculative;
     }
 
-    public JenesisModuleRepository retry(Repository.Retry retry) {
-        return new JenesisModuleRepository(root, token, retry, maven, prerelease, speculative);
+    public JenesisModuleRepository connection(Repository.Connection connection) {
+        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative);
     }
 
     public JenesisModuleRepository maven(URI maven) {
-        return new JenesisModuleRepository(root, token, retry, maven, prerelease, speculative);
+        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative);
     }
 
     public JenesisModuleRepository prerelease(Boolean prerelease) {
-        return new JenesisModuleRepository(root, token, retry, maven, prerelease, speculative);
+        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative);
     }
 
     public JenesisModuleRepository speculative(Boolean speculative) {
-        return new JenesisModuleRepository(root, token, retry, maven, prerelease, speculative);
+        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative);
+    }
+
+    public JenesisModuleRepository keys(Function<String, String> keys) {
+        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative);
     }
 
     private static URI toMavenRepository(String declaration) {
@@ -287,11 +311,15 @@ public class JenesisModuleRepository implements JenesisRepository {
     }
 
     public static JenesisModuleRepository ofLocal() {
-        String override = System.getProperty("jenesis.module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
+        return ofLocalKeys(SequencedProperties.NONE);
+    }
+
+    public static JenesisModuleRepository ofLocalKeys(Function<String, String> keys) {
+        String override = SequencedProperties.getProperty(keys, "module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
         Path path = override == null
                 ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
                 : Path.of(override);
-        return new JenesisModuleRepository(path.toUri());
+        return ofKeys(keys, path.toUri());
     }
 
     @Override
@@ -326,14 +354,14 @@ public class JenesisModuleRepository implements JenesisRepository {
         Map<String, String> headers = toHeaders(uri);
         InputStream stream;
         try {
-            stream = Repository.open(uri, token, retry, headers);
+            stream = Repository.open(connection, uri, token, headers);
         } catch (FileNotFoundException _) {
             return Optional.empty();
         }
         AtomicReference<InputStream> first = new AtomicReference<>(stream);
         return Optional.of(() -> {
             InputStream reopened = first.getAndSet(null);
-            return reopened != null ? reopened : Repository.open(uri, token, retry, headers);
+            return reopened != null ? reopened : Repository.open(connection, uri, token, headers);
         });
     }
 

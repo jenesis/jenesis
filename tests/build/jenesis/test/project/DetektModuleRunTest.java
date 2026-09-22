@@ -15,6 +15,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.DetektModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class DetektModuleRunTest {
 
@@ -89,7 +90,7 @@ public class DetektModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "detekt",
-                new DetektModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT),
+                new DetektModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT),
                 "project");
         executor.execute();
 

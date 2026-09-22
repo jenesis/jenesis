@@ -14,38 +14,46 @@ public class InferredDocumentationModule implements BuildExecutorModule {
 
     public static final String GENERATE = "generate", ARCHIVE = "archive";
 
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
+    private final InferredDocumentationChainModule generateModule;
     private final Function<InferredDocumentationChainModule, BuildExecutorModule> generate;
     private final BuildStep archiver;
 
-    public InferredDocumentationModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, module -> module, new Jar(ProcessHandler.Factory.of(), Jar.Sort.JAVADOC));
+    public InferredDocumentationModule(Map<String, Repository> repositories,
+                                       Map<String, Resolver> resolvers) {
+        this(null, new InferredDocumentationChainModule(repositories, resolvers),
+             value -> value,
+             new Jar(ProcessHandler.Factory.of(), Jar.Sort.JAVADOC));
     }
 
-    private InferredDocumentationModule(Map<String, Repository> repositories,
-                                        Map<String, Resolver> resolvers,
-                                        Pinning pinning,
+    public static InferredDocumentationModule ofKeys(Function<String, String> keys,
+                                                     Map<String, Repository> repositories,
+                                                     Map<String, Resolver> resolvers) {
+        return new InferredDocumentationModule(null, InferredDocumentationChainModule.ofKeys(keys, repositories, resolvers),
+                value -> value,
+                Jar.ofKeys(keys, ProcessHandler.Factory.of(), Jar.Sort.JAVADOC));
+    }
+
+    private InferredDocumentationModule(Pinning pinning,
+                                        InferredDocumentationChainModule generateModule,
                                         Function<InferredDocumentationChainModule, BuildExecutorModule> generate,
                                         BuildStep archiver) {
-        this.repositories = repositories;
-        this.resolvers = resolvers;
         this.pinning = pinning;
+        this.generateModule = generateModule;
         this.generate = generate;
         this.archiver = archiver;
     }
 
     public InferredDocumentationModule pinning(Pinning pinning) {
-        return new InferredDocumentationModule(repositories, resolvers, pinning, generate, archiver);
+        return new InferredDocumentationModule(pinning, generateModule, generate, archiver);
     }
 
     public InferredDocumentationModule generate(Function<InferredDocumentationChainModule, BuildExecutorModule> generate) {
-        return new InferredDocumentationModule(repositories, resolvers, pinning, generate, archiver);
+        return new InferredDocumentationModule(pinning, generateModule, generate, archiver);
     }
 
     public InferredDocumentationModule archiver(BuildStep archiver) {
-        return new InferredDocumentationModule(repositories, resolvers, pinning, generate, archiver);
+        return new InferredDocumentationModule(pinning, generateModule, generate, archiver);
     }
 
     @Override
@@ -53,8 +61,7 @@ public class InferredDocumentationModule implements BuildExecutorModule {
         if (generate == null) {
             return;
         }
-        BuildExecutorModule chain = generate.apply(new InferredDocumentationChainModule(repositories, resolvers)
-                .pinning(pinning));
+        BuildExecutorModule chain = generate.apply(generateModule.pinning(pinning));
         if (chain == null) {
             return;
         }

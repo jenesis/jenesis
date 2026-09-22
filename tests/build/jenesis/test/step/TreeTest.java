@@ -13,6 +13,7 @@ import build.jenesis.step.Tree;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class TreeTest {
 
@@ -33,7 +34,7 @@ public class TreeTest {
     public void rejects_an_unknown_tree_format() {
         System.setProperty("jenesis.tree.format", "fancy");
         try {
-            assertThatThrownBy(() -> new Tree(new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8)))
+            assertThatThrownBy(() -> Tree.ofKeys(SYSTEM, new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8)))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("Unknown jenesis.tree.format 'fancy'")
                     .hasMessageContaining("full")
@@ -58,7 +59,7 @@ public class TreeTest {
             inventory.store(argument.resolve(Inventory.INVENTORY));
 
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-            new Tree(new PrintStream(bytes, true, StandardCharsets.UTF_8)).apply(
+            Tree.ofKeys(SYSTEM, new PrintStream(bytes, true, StandardCharsets.UTF_8)).apply(
                     Runnable::run,
                     new BuildStepContext(previous, next, supplement),
                     new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
@@ -101,7 +102,7 @@ public class TreeTest {
             arguments.put("bar", new BuildStepArgument(testArgument,
                     Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))));
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-            new Tree(new PrintStream(bytes, true, StandardCharsets.UTF_8)).apply(
+            Tree.ofKeys(SYSTEM, new PrintStream(bytes, true, StandardCharsets.UTF_8)).apply(
                     Runnable::run,
                     new BuildStepContext(previous, next, supplement),
                     arguments)
@@ -131,7 +132,7 @@ public class TreeTest {
         inventory.store(argument.resolve(Inventory.INVENTORY));
 
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        BuildStepResult result = new Tree(new PrintStream(bytes, true, StandardCharsets.UTF_8)).apply(
+        BuildStepResult result = Tree.ofKeys(SYSTEM, new PrintStream(bytes, true, StandardCharsets.UTF_8)).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(

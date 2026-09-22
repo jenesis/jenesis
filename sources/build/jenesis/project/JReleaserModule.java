@@ -21,15 +21,67 @@ public class JReleaserModule implements BuildExecutorModule {
     private final Path root;
     private final Path configuration;
     private final String version;
+    private final String executable;
+    private final String command;
+    private final boolean dryRun;
+    private final ProcessBuildStep.Terms terms;
 
     public JReleaserModule(Path root, Path configuration, String version) {
+        this(root, configuration, version, "jreleaser", "full-release", true,
+                ProcessBuildStep.Terms.of("jreleaser", true));
+    }
+
+    public static JReleaserModule ofKeys(Function<String, String> keys,
+                                         Path root,
+                                         Path configuration,
+                                         String version) {
+        return new JReleaserModule(root,
+                configuration,
+                version,
+                SequencedProperties.getProperty(keys, "jreleaser.executable", "jreleaser"),
+                SequencedProperties.getProperty(keys, "jreleaser.command", "full-release"),
+                SequencedProperties.flag(keys, "jreleaser.dryRun", true),
+                ProcessBuildStep.Terms.ofKeys(keys, "jreleaser", true));
+    }
+
+    private JReleaserModule(Path root,
+                            Path configuration,
+                            String version,
+                            String executable,
+                            String command,
+                            boolean dryRun,
+                            ProcessBuildStep.Terms terms) {
         this.root = root;
         this.configuration = configuration;
         this.version = version;
+        this.executable = executable;
+        this.command = command;
+        this.dryRun = dryRun;
+        this.terms = terms;
     }
 
-    public static Path configured(Path root) {
-        String explicit = System.getProperty("jenesis.jreleaser.config");
+    public JReleaserModule configuration(Path configuration) {
+        return new JReleaserModule(root, configuration, version, executable, command, dryRun, terms);
+    }
+
+    public JReleaserModule executable(String executable) {
+        return new JReleaserModule(root, configuration, version, executable, command, dryRun, terms);
+    }
+
+    public JReleaserModule command(String command) {
+        return new JReleaserModule(root, configuration, version, executable, command, dryRun, terms);
+    }
+
+    public JReleaserModule dryRun(boolean dryRun) {
+        return new JReleaserModule(root, configuration, version, executable, command, dryRun, terms);
+    }
+
+    public JReleaserModule printing(BiConsumer<Boolean, String> printing) {
+        return new JReleaserModule(root, configuration, version, executable, command, dryRun, terms.printing(printing));
+    }
+
+    public static Path configured(Function<String, String> keys, Path root) {
+        String explicit = SequencedProperties.getProperty(keys, "jreleaser.config");
         if (explicit != null && !explicit.isBlank()) {
             Path candidate = root.resolve(explicit.trim());
             if (!Files.isRegularFile(candidate)) {
@@ -52,7 +104,14 @@ public class JReleaserModule implements BuildExecutorModule {
         SequencedSet<String> inputs = new LinkedHashSet<>();
         inputs.add(ENVIRONMENT);
         inputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(EXECUTE, new Execute(root, configuration), inputs);
+        buildExecutor.addStep(EXECUTE,
+                new Execute(ProcessHandler.OfProcess.ofCommand(executable),
+                        root,
+                        configuration,
+                        command,
+                        dryRun,
+                        terms),
+                inputs);
     }
 
     private record Environment(String version) implements BuildStep {
@@ -83,24 +142,13 @@ public class JReleaserModule implements BuildExecutorModule {
         private final String command;
         private final boolean dryRun;
 
-        private Execute(Path root, Path configuration) {
-            this(ProcessHandler.OfProcess.ofCommand(System.getProperty("jenesis.jreleaser.executable", "jreleaser")),
-                    root,
-                    configuration,
-                    System.getProperty("jenesis.jreleaser.command", "full-release"),
-                    SequencedProperties.systemFlag("jenesis.jreleaser.dryRun", true),
-                    SequencedProperties.systemFlag("jenesis.print.jreleaser", true)
-                            ? ProcessBuildStep.printing("jreleaser")
-                            : null);
-        }
-
         private Execute(Function<List<String>, ? extends ProcessHandler> factory,
                         Path root,
                         Path configuration,
                         String command,
                         boolean dryRun,
-                        BiConsumer<Boolean, String> printing) {
-            super("jreleaser", factory, printing);
+                        ProcessBuildStep.Terms terms) {
+            super("jreleaser", factory, terms);
             this.root = root;
             this.configuration = configuration;
             this.command = command;

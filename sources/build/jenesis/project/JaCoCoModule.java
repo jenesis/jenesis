@@ -20,38 +20,48 @@ public class JaCoCoModule implements BuildExecutorModule {
     public static final String REPORT = "report";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
 
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final ProcessBuildStep.Terms terms;
 
-    public JaCoCoModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "jacoco", ProcessBuildStep.printing("jacoco"));
+    public JaCoCoModule(Map<String, Repository> repositories,
+                        Map<String, Resolver> resolvers) {
+        this(new Dependencies(repositories, resolvers),
+             null,
+             "jacoco",
+             ProcessBuildStep.Terms.of("jacoco"));
     }
 
-    private JaCoCoModule(Map<String, Repository> repositories,
-                         Map<String, Resolver> resolvers,
+    public static JaCoCoModule ofKeys(Function<String, String> keys,
+                                      Map<String, Repository> repositories,
+                                      Map<String, Resolver> resolvers) {
+        return new JaCoCoModule(Dependencies.ofKeys(keys, repositories, resolvers),
+                null,
+                "jacoco",
+                ProcessBuildStep.Terms.ofKeys(keys, "jacoco"));
+    }
+
+    private JaCoCoModule(Dependencies dependencies,
                          Pinning pinning,
                          String tool,
-                         BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+                         ProcessBuildStep.Terms terms) {
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public JaCoCoModule pinning(Pinning pinning) {
-        return new JaCoCoModule(repositories, resolvers, pinning, tool, printing);
+        return new JaCoCoModule(dependencies, pinning, tool, terms);
     }
 
     public JaCoCoModule tool(String tool) {
-        return new JaCoCoModule(repositories, resolvers, pinning, tool, printing);
+        return new JaCoCoModule(dependencies, pinning, tool, terms);
     }
 
     public JaCoCoModule printing(BiConsumer<Boolean, String> printing) {
-        return new JaCoCoModule(repositories, resolvers, pinning, tool, printing);
+        return new JaCoCoModule(dependencies, pinning, tool, terms.printing(printing));
     }
 
     @Override
@@ -61,12 +71,12 @@ public class JaCoCoModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
+                dependencies.pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> reportInputs = new LinkedHashSet<>();
         reportInputs.add(DEPENDENCIES);
         reportInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(REPORT, new Report(tool, printing), reportInputs);
+        buildExecutor.addStep(REPORT, new Report(terms, tool), reportInputs);
     }
 
     private record Requires(String tool) implements BuildStep {
@@ -92,8 +102,8 @@ public class JaCoCoModule implements BuildExecutorModule {
 
         private final String tool;
 
-        private Report(String tool, BiConsumer<Boolean, String> printing) {
-            super("jacoco", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
+        private Report(ProcessBuildStep.Terms terms, String tool) {
+            super("jacoco", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
         }
 

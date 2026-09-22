@@ -14,6 +14,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.step.Launcher;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class LauncherTest {
 
@@ -43,7 +44,7 @@ public class LauncherTest {
         application.setProperty("name", "app");
         application.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = new Launcher("launcher", PathPlacement.INFERRED).apply(
+        BuildStepResult result = Launcher.ofKeys(SYSTEM, "launcher", PathPlacement.INFERRED).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -86,7 +87,7 @@ public class LauncherTest {
         application.setProperty("name", "sample");
         application.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = new Launcher("launcher", PathPlacement.INFERRED).apply(
+        BuildStepResult result = Launcher.ofKeys(SYSTEM, "launcher", PathPlacement.INFERRED).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -118,7 +119,7 @@ public class LauncherTest {
         application.setProperty("name", "sample");
         application.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = new Launcher("launcher", PathPlacement.CLASS_PATH).apply(
+        BuildStepResult result = Launcher.ofKeys(SYSTEM, "launcher", PathPlacement.CLASS_PATH).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -148,7 +149,7 @@ public class LauncherTest {
         application.setProperty("mainClass", "sample.Sample");
         application.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = new Launcher("launcher", PathPlacement.INFERRED).apply(
+        BuildStepResult result = Launcher.ofKeys(SYSTEM, "launcher", PathPlacement.INFERRED).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -161,7 +162,7 @@ public class LauncherTest {
         try (ZipFile jar = new ZipFile(next.resolve(Launcher.LAUNCHER).resolve("application.jar").toFile())) {
             assertThat(jar.stream().map(ZipEntry::getTimeLocal))
                     .as("a launcher created at another moment carries the same bytes")
-                    .containsOnly(BuildStep.timestamp().toLocalDateTime());
+                    .containsOnly(BuildStep.timestamp(SYSTEM).toLocalDateTime());
         }
     }
 
@@ -186,7 +187,7 @@ public class LauncherTest {
         Launcher launcher;
         System.setProperty("jenesis.archive.timestamp", "");
         try {
-            launcher = new Launcher("launcher", PathPlacement.INFERRED);
+            launcher = Launcher.ofKeys(SYSTEM, "launcher", PathPlacement.INFERRED);
         } finally {
             System.clearProperty("jenesis.archive.timestamp");
         }

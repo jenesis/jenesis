@@ -18,8 +18,7 @@ public class ExternalModule implements BuildExecutorModule {
     public static final String COORDINATE = "coordinate", DEPENDENCIES = "dependencies", DELEGATE = "delegate";
 
     private final String coordinate;
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencyModule;
     private final SequencedSet<String> additionalDependencies;
     private final String buildModuleName;
     private final Pinning pinning;
@@ -29,19 +28,33 @@ public class ExternalModule implements BuildExecutorModule {
                           String group,
                           Map<String, Repository> repositories,
                           Map<String, Resolver> resolvers) {
-        this(coordinate, repositories, resolvers, Collections.emptyNavigableSet(), null, null, group == null ? "main" : group);
+        this(coordinate, new Dependencies(repositories, resolvers),
+             Collections.emptyNavigableSet(),
+             null,
+             null,
+             group == null ? "main" : group);
+    }
+
+    public static ExternalModule ofKeys(Function<String, String> keys,
+                                        String coordinate,
+                                        String group,
+                                        Map<String, Repository> repositories,
+                                        Map<String, Resolver> resolvers) {
+        return new ExternalModule(coordinate, Dependencies.ofKeys(keys, repositories, resolvers),
+                Collections.emptyNavigableSet(),
+                null,
+                null,
+                group == null ? "main" : group);
     }
 
     private ExternalModule(String coordinate,
-                           Map<String, Repository> repositories,
-                           Map<String, Resolver> resolvers,
+                           Dependencies dependencyModule,
                            SequencedSet<String> additionalDependencies,
                            String buildModuleName,
                            Pinning pinning,
                            String group) {
         this.coordinate = coordinate;
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+        this.dependencyModule = dependencyModule;
         this.additionalDependencies = additionalDependencies;
         this.buildModuleName = buildModuleName;
         this.pinning = pinning;
@@ -53,43 +66,19 @@ public class ExternalModule implements BuildExecutorModule {
     }
 
     public ExternalModule dependencies(SequencedSet<String> dependencies) {
-        return new ExternalModule(coordinate,
-                repositories,
-                resolvers,
-                dependencies,
-                buildModuleName,
-                pinning,
-                group);
+        return new ExternalModule(coordinate, dependencyModule, dependencies, buildModuleName, pinning, group);
     }
 
     public ExternalModule buildModuleName(String name) {
-        return new ExternalModule(coordinate,
-                repositories,
-                resolvers,
-                additionalDependencies,
-                name,
-                pinning,
-                group);
+        return new ExternalModule(coordinate, dependencyModule, additionalDependencies, name, pinning, group);
     }
 
     public ExternalModule pinning(Pinning pinning) {
-        return new ExternalModule(coordinate,
-                repositories,
-                resolvers,
-                additionalDependencies,
-                buildModuleName,
-                pinning,
-                group);
+        return new ExternalModule(coordinate, dependencyModule, additionalDependencies, buildModuleName, pinning, group);
     }
 
     public ExternalModule group(String group) {
-        return new ExternalModule(coordinate,
-                repositories,
-                resolvers,
-                additionalDependencies,
-                buildModuleName,
-                pinning,
-                group);
+        return new ExternalModule(coordinate, dependencyModule, additionalDependencies, buildModuleName, pinning, group);
     }
 
     @Override
@@ -115,8 +104,7 @@ public class ExternalModule implements BuildExecutorModule {
                 new WriteCoordinates(group, coordinates),
                 inherited.sequencedKeySet().stream());
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers)
-                        .pinning(pinning),
+                dependencyModule.pinning(pinning),
                 COORDINATE);
         buildExecutor.addModule(DELEGATE, (delegateExecutor, delegated) -> {
             List<Path> artifacts = new ArrayList<>(

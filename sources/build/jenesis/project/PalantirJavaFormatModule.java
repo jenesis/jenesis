@@ -21,45 +21,57 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
     private static final String MAVEN_GROUP = "com.palantir.javaformat", MAVEN_ARTIFACT = "palantir-java-format";
 
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String group;
     private final boolean verify;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final ProcessBuildStep.Terms terms;
 
-    public PalantirJavaFormatModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "palantir-java-format", false, ProcessBuildStep.printing("palantir-java-format"));
+    public PalantirJavaFormatModule(Map<String, Repository> repositories,
+                                    Map<String, Resolver> resolvers) {
+        this(new Dependencies(repositories, resolvers),
+             null,
+             "palantir-java-format",
+             false,
+             ProcessBuildStep.Terms.of("palantir-java-format"));
     }
 
-    private PalantirJavaFormatModule(Map<String, Repository> repositories,
-                                     Map<String, Resolver> resolvers,
+    public static PalantirJavaFormatModule ofKeys(Function<String, String> keys,
+                                                  Map<String, Repository> repositories,
+                                                  Map<String, Resolver> resolvers) {
+        return new PalantirJavaFormatModule(Dependencies.ofKeys(keys, repositories, resolvers),
+                null,
+                "palantir-java-format",
+                false,
+                ProcessBuildStep.Terms.ofKeys(keys, "palantir-java-format"));
+    }
+
+    private PalantirJavaFormatModule(Dependencies dependencies,
                                      Pinning pinning,
                                      String group,
                                      boolean verify,
-                                     BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+                                     ProcessBuildStep.Terms terms) {
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.group = group;
         this.verify = verify;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public PalantirJavaFormatModule pinning(Pinning pinning) {
-        return new PalantirJavaFormatModule(repositories, resolvers, pinning, group, verify, printing);
+        return new PalantirJavaFormatModule(dependencies, pinning, group, verify, terms);
     }
 
     public PalantirJavaFormatModule group(String group) {
-        return new PalantirJavaFormatModule(repositories, resolvers, pinning, group, verify, printing);
+        return new PalantirJavaFormatModule(dependencies, pinning, group, verify, terms);
     }
 
     public PalantirJavaFormatModule verify(boolean verify) {
-        return new PalantirJavaFormatModule(repositories, resolvers, pinning, group, verify, printing);
+        return new PalantirJavaFormatModule(dependencies, pinning, group, verify, terms);
     }
 
     public PalantirJavaFormatModule printing(BiConsumer<Boolean, String> printing) {
-        return new PalantirJavaFormatModule(repositories, resolvers, pinning, group, verify, printing);
+        return new PalantirJavaFormatModule(dependencies, pinning, group, verify, terms.printing(printing));
     }
 
     @Override
@@ -69,12 +81,12 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(group),
+                dependencies.pinning(pinning).group(group),
                 resolveInputs);
         SequencedSet<String> formatInputs = new LinkedHashSet<>();
         formatInputs.add(DEPENDENCIES);
         formatInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(FORMAT, new Format(group, verify, printing), formatInputs);
+        buildExecutor.addStep(FORMAT, new Format(terms, group, verify), formatInputs);
     }
 
     private record Requires(String group) implements BuildStep {
@@ -98,8 +110,8 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
 
     private static class Format extends FormatBuildStep {
 
-        private Format(String group, boolean verify, BiConsumer<Boolean, String> printing) {
-            super("palantir-java-format", group, verify, printing);
+        private Format(ProcessBuildStep.Terms terms, String group, boolean verify) {
+            super("palantir-java-format", group, verify, terms);
         }
 
         @Override

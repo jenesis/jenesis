@@ -11,6 +11,7 @@ import build.jenesis.maven.MavenRepository;
 import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisRepository;
 import build.jenesis.module.ModularJarResolver;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public record Jpx(Path storage,
                   Map<String, Repository> repositories,
@@ -23,18 +24,26 @@ public record Jpx(Path storage,
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
 
     public Jpx(PathPlacement placement) {
+        this(SequencedProperties.NONE, placement);
+    }
+
+    public static Jpx ofKeys(Function<String, String> keys, PathPlacement placement) {
+        return new Jpx(keys, placement);
+    }
+
+    private Jpx(Function<String, String> keys, PathPlacement placement) {
         boolean modular = placement == PathPlacement.MODULE_PATH;
-        Repository module = JenesisModuleRepository.of(modular
+        Repository module = JenesisModuleRepository.ofKeys(keys, modular
                 ? JenesisRepository.Scope.MODULE
                 : JenesisRepository.Scope.ARTIFACT);
         Map<String, Repository> repositories = new LinkedHashMap<>();
-        repositories.put("maven", MavenDefaultRepository.of());
+        repositories.put("maven", MavenDefaultRepository.ofKeys(keys));
         repositories.put("module", module);
         Map<String, Resolver> resolvers = new LinkedHashMap<>();
-        MavenPomResolver maven = new MavenPomResolver();
+        MavenPomResolver maven = MavenPomResolver.ofKeys(keys);
         resolvers.put("maven", maven);
         resolvers.put("module", modular
-                ? new ModularJarResolver(false)
+                ? ModularJarResolver.ofKeys(keys, false)
                 : new MavenModuleResolver("maven", maven, module));
         this(Path.of(System.getProperty("user.home")).resolve(".jenesis").resolve("jpx"),
                 Collections.unmodifiableMap(repositories),
@@ -281,6 +290,11 @@ public record Jpx(Path storage,
               --help              print this help""";
 
     public static void main(String... arguments) throws IOException, InterruptedException {
+        System.exit(run(SYSTEM, arguments));
+    }
+
+    public static int run(Function<String, String> keys, String... arguments)
+            throws IOException, InterruptedException {
         PathPlacement placement = PathPlacement.INFERRED;
         boolean dockerized = false, pin = false;
         String image = null, checksum = null, java = null;
@@ -292,7 +306,7 @@ public record Jpx(Path storage,
                 case "--pin" -> pin = true;
                 case "--help" -> {
                     System.out.println(HELP);
-                    System.exit(0);
+                    return 0;
                 }
                 default -> {
                     if (arguments[target].startsWith("--docker=")) {
@@ -307,7 +321,7 @@ public record Jpx(Path storage,
                     } else {
                         System.err.println("Unknown option: " + arguments[target]);
                         System.err.println(HELP);
-                        System.exit(64);
+                        return 64;
                     }
                 }
             }
@@ -315,15 +329,15 @@ public record Jpx(Path storage,
         }
         if (arguments.length == target) {
             System.err.println(HELP);
-            System.exit(64);
+            return 64;
         }
         Command command = Command.parse(arguments[target]);
         if (placement == PathPlacement.MODULE_PATH && command.name().indexOf(':') >= 0) {
             throw new IllegalArgumentException("Pure module resolution requires a module name, "
                     + "not Maven coordinates: " + command.name());
         }
-        Toolchain toolchain = java == null ? null : new Toolchain().version(java);
-        Installation installation = new Jpx(placement).install(command);
+        Toolchain toolchain = java == null ? null : Toolchain.ofKeys(keys).version(java);
+        Installation installation = Jpx.ofKeys(keys, placement).install(command);
         if (toolchain != null) {
             installation = installation.home(toolchain.home());
         }
@@ -354,11 +368,11 @@ public record Jpx(Path storage,
             System.out.println(String.join(" ", docker == null
                     ? installation.command(command.mainClass(), remaining)
                     : installation.command(command.mainClass(), remaining, docker)));
-        } else if (docker == null) {
-            System.exit(installation.launch(command.mainClass(), remaining));
-        } else {
-            System.exit(installation.launch(command.mainClass(), remaining, docker));
+            return 0;
         }
+        return docker == null
+                ? installation.launch(command.mainClass(), remaining)
+                : installation.launch(command.mainClass(), remaining, docker);
     }
 
     public Installation install(String target) throws IOException {

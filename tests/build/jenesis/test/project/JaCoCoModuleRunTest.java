@@ -20,6 +20,7 @@ import build.jenesis.step.Javac;
 import javax.tools.ToolProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class JaCoCoModuleRunTest {
 
@@ -33,7 +34,6 @@ public class JaCoCoModuleRunTest {
             jacoco/maven/org.ow2.asm/asm-commons 9.9 SHA-256/db2f6f26150bbe7c126606b4a1151836bcc22a1e05a423b3585698bece995ff8
             jacoco/maven/org.ow2.asm/asm-tree 9.9 SHA-256/42178f3775c9c63f9e5e1446747d29b4eca4d91bd6e75e5c43cfa372a47d38c6
             """;
-
 
     @TempDir
     private Path root, dependencies, classes, sources;
@@ -103,14 +103,14 @@ public class JaCoCoModuleRunTest {
         executor.addSource("sources", sources);
         executor.addModule(
                 "test",
-                new TestModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver()))
+                new TestModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM)))
                         .observe(new JaCoCo())
                         .isTest(candidate -> candidate.endsWith("CoveredTest"))
                         .jarsOnly(false),
                 "dependencies", "classes");
         executor.addModule(
                 "coverage",
-                new JaCoCoModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT),
+                new JaCoCoModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT),
                 "test", "classes", "sources", "dependencies");
         executor.execute();
 

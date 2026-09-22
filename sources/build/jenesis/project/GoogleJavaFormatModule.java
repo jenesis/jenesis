@@ -21,45 +21,57 @@ public class GoogleJavaFormatModule implements BuildExecutorModule {
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
     private static final String MAVEN_GROUP = "com.google.googlejavaformat", MAVEN_ARTIFACT = "google-java-format";
 
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String group;
     private final boolean verify;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final ProcessBuildStep.Terms terms;
 
-    public GoogleJavaFormatModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "google-java-format", false, ProcessBuildStep.printing("google-java-format"));
+    public GoogleJavaFormatModule(Map<String, Repository> repositories,
+                                  Map<String, Resolver> resolvers) {
+        this(new Dependencies(repositories, resolvers),
+             null,
+             "google-java-format",
+             false,
+             ProcessBuildStep.Terms.of("google-java-format"));
     }
 
-    private GoogleJavaFormatModule(Map<String, Repository> repositories,
-                                   Map<String, Resolver> resolvers,
+    public static GoogleJavaFormatModule ofKeys(Function<String, String> keys,
+                                                Map<String, Repository> repositories,
+                                                Map<String, Resolver> resolvers) {
+        return new GoogleJavaFormatModule(Dependencies.ofKeys(keys, repositories, resolvers),
+                null,
+                "google-java-format",
+                false,
+                ProcessBuildStep.Terms.ofKeys(keys, "google-java-format"));
+    }
+
+    private GoogleJavaFormatModule(Dependencies dependencies,
                                    Pinning pinning,
                                    String group,
                                    boolean verify,
-                                   BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+                                   ProcessBuildStep.Terms terms) {
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.group = group;
         this.verify = verify;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public GoogleJavaFormatModule pinning(Pinning pinning) {
-        return new GoogleJavaFormatModule(repositories, resolvers, pinning, group, verify, printing);
+        return new GoogleJavaFormatModule(dependencies, pinning, group, verify, terms);
     }
 
     public GoogleJavaFormatModule group(String group) {
-        return new GoogleJavaFormatModule(repositories, resolvers, pinning, group, verify, printing);
+        return new GoogleJavaFormatModule(dependencies, pinning, group, verify, terms);
     }
 
     public GoogleJavaFormatModule verify(boolean verify) {
-        return new GoogleJavaFormatModule(repositories, resolvers, pinning, group, verify, printing);
+        return new GoogleJavaFormatModule(dependencies, pinning, group, verify, terms);
     }
 
     public GoogleJavaFormatModule printing(BiConsumer<Boolean, String> printing) {
-        return new GoogleJavaFormatModule(repositories, resolvers, pinning, group, verify, printing);
+        return new GoogleJavaFormatModule(dependencies, pinning, group, verify, terms.printing(printing));
     }
 
     @Override
@@ -69,12 +81,12 @@ public class GoogleJavaFormatModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(group),
+                dependencies.pinning(pinning).group(group),
                 resolveInputs);
         SequencedSet<String> formatInputs = new LinkedHashSet<>();
         formatInputs.add(DEPENDENCIES);
         formatInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(FORMAT, new Format(group, verify, printing), formatInputs);
+        buildExecutor.addStep(FORMAT, new Format(terms, group, verify), formatInputs);
     }
 
     private record Requires(String group) implements BuildStep {
@@ -98,8 +110,8 @@ public class GoogleJavaFormatModule implements BuildExecutorModule {
 
     private static class Format extends FormatBuildStep {
 
-        private Format(String group, boolean verify, BiConsumer<Boolean, String> printing) {
-            super("google-java-format", group, verify, printing);
+        private Format(ProcessBuildStep.Terms terms, String group, boolean verify) {
+            super("google-java-format", group, verify, terms);
         }
 
         @Override

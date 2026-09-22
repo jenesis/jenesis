@@ -31,16 +31,33 @@ public class Signatures extends ProcessBuildStep {
 
     public Signatures(Map<String, Repository> repositories) {
         this(repositories,
-                Verification.fromProperty(),
-                KeyExpiry.fromProperty(),
-                System.getProperty("jenesis.openpgp.command", "gpgv"),
-                System.getProperty("jenesis.sigstore.issuers",
-                        "github.com=token.actions.githubusercontent.com"),
-                System.getProperty("jenesis.sigstore.uri") == null
-                        ? null
-                        : URI.create(System.getProperty("jenesis.sigstore.uri")),
+                Verification.NONE,
+                KeyExpiry.SIGNING,
+                "gpgv",
+                "github.com=token.actions.githubusercontent.com",
                 null,
-                SequencedProperties.systemFlag("jenesis.print.signatures") ? System.out::println : null);
+                null,
+                null);
+    }
+
+    public static Signatures ofKeys(Function<String, String> keys, Map<String, Repository> repositories) {
+        Signatures signatures = new Signatures(repositories)
+                .verification(Verification.ofKeys(keys))
+                .expiry(KeyExpiry.ofKeys(keys));
+        String command = SequencedProperties.getProperty(keys, "openpgp.command");
+        if (command != null) {
+            signatures = signatures.command(command);
+        }
+        String issuers = SequencedProperties.getProperty(keys, "sigstore.issuers");
+        if (issuers != null) {
+            signatures = signatures.issuers(issuers);
+        }
+        String sigstore = SequencedProperties.getProperty(keys, "sigstore.uri");
+        if (sigstore != null) {
+            signatures = signatures.trustedRoot(URI.create(sigstore));
+        }
+        Boolean print = SequencedProperties.flagOrNull(keys, "print.signatures");
+        return print == null || !print ? signatures : signatures.printing(System.out::println);
     }
 
     private Signatures(Map<String, Repository> repositories,
@@ -60,6 +77,10 @@ public class Signatures extends ProcessBuildStep {
         this.trustedRoot = trustedRoot;
         this.supplied = supplied;
         this.printing = printing;
+    }
+
+    public Signatures repositories(Map<String, Repository> repositories) {
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing);
     }
 
     public Signatures verification(Verification verification) {

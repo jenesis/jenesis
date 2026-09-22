@@ -15,6 +15,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.KtlintModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class KtlintModuleRunTest {
 
@@ -91,7 +92,7 @@ public class KtlintModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "ktlint",
-                new KtlintModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT),
+                new KtlintModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT),
                 "project");
         executor.execute();
 
@@ -130,7 +131,7 @@ public class KtlintModuleRunTest {
         executor.addSource("configuration", configuration);
         executor.addModule(
                 "ktlint",
-                new KtlintModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT)
+                new KtlintModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT)
                         .strict(true),
                 "project",
                 "configuration");

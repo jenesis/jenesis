@@ -13,7 +13,11 @@ public enum Pinning {
     private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
 
     public static Semaphore permits() {
-        int concurrency = Integer.getInteger("jenesis.pin.concurrency",
+        return permits(SequencedProperties.NONE);
+    }
+
+    public static Semaphore permits(Function<String, String> keys) {
+        int concurrency = SequencedProperties.number(keys, "pin.concurrency",
                 Runtime.getRuntime().availableProcessors());
         if (concurrency < 0) {
             throw new IllegalArgumentException("Pin concurrency must not be negative: " + concurrency);
@@ -21,8 +25,8 @@ public enum Pinning {
         return concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Semaphore::new);
     }
 
-    public static Pinning fromProperty() {
-        String property = System.getProperty("jenesis.dependency.pin");
+    public static Pinning ofKeys(Function<String, String> keys) {
+        String property = SequencedProperties.getProperty(keys, "dependency.pin");
         if (property == null) {
             return null;
         }

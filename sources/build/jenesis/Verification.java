@@ -6,8 +6,8 @@ public enum Verification {
 
     NONE, DECLARED, STRICT;
 
-    public static Verification fromProperty() {
-        String property = System.getProperty("jenesis.dependency.signature", "none");
+    public static Verification ofKeys(Function<String, String> keys) {
+        String property = SequencedProperties.getProperty(keys, "dependency.signature", "none");
         try {
             return Verification.valueOf(property.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException _) {

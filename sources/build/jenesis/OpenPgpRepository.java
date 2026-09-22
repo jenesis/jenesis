@@ -11,37 +11,45 @@ public class OpenPgpRepository implements Repository {
 
     private final URI server;
     private final Path local;
-    private final Repository.Retry retry;
+    private final Repository.Connection connection;
 
     public OpenPgpRepository(URI server) {
-        this(server, null, new Repository.Retry());
+        this(server, null, new Repository.Connection());
     }
 
-    private OpenPgpRepository(URI server, Path local, Repository.Retry retry) {
+    public static OpenPgpRepository ofKeys(Function<String, String> keys, URI server) {
+        return new OpenPgpRepository(server, null, Repository.Connection.ofKeys(keys));
+    }
+
+    private OpenPgpRepository(URI server, Path local, Repository.Connection connection) {
         this.server = server;
         this.local = local;
-        this.retry = retry;
+        this.connection = connection;
     }
 
     public OpenPgpRepository local(Path local) {
-        return new OpenPgpRepository(server, local, retry);
+        return new OpenPgpRepository(server, local, connection);
     }
 
-    public OpenPgpRepository retry(Repository.Retry retry) {
-        return new OpenPgpRepository(server, local, retry);
+    public OpenPgpRepository connection(Repository.Connection connection) {
+        return new OpenPgpRepository(server, local, connection);
     }
 
     public static Repository of() {
-        String property = System.getProperty("jenesis.openpgp.uri");
+        return ofKeys(SequencedProperties.NONE);
+    }
+
+    public static Repository ofKeys(Function<String, String> keys) {
+        String property = SequencedProperties.getProperty(keys, "openpgp.uri");
         String text = property == null ? System.getenv("OPENPGP_REPOSITORY_URI") : property;
-        Path local = Path.of(System.getProperty("jenesis.openpgp.local",
+        Path local = Path.of(SequencedProperties.getProperty(keys, "openpgp.local",
                 System.getenv("OPENPGP_REPOSITORY_LOCAL") == null
                         ? ".jenesis/keys"
                         : System.getenv("OPENPGP_REPOSITORY_LOCAL")));
         List<URI> servers = new ArrayList<>();
         servers(text == null ? "@" : text, new HashSet<>(), servers);
         List<OpenPgpRepository> chain = servers.stream()
-                .map(server -> new OpenPgpRepository(server).local(local))
+                .map(server -> OpenPgpRepository.ofKeys(keys, server).local(local))
                 .toList();
         return (executor, coordinate, extension) -> {
             if (extension != null) {
@@ -135,7 +143,7 @@ public class OpenPgpRepository implements Repository {
     private Optional<RepositoryItem> served(String coordinate) throws IOException {
         URI uri = server.resolve("pks/lookup?op=get&options=mr&search=0x" + coordinate);
         byte[] key;
-        try (InputStream stream = Repository.open(uri, null, retry)) {
+        try (InputStream stream = Repository.open(connection, uri, null)) {
             key = stream.readAllBytes();
         } catch (FileNotFoundException _) {
             return Optional.empty();

@@ -15,30 +15,42 @@ public class Javadoc extends ProcessBuildStep {
     private final boolean timestamped;
 
     public Javadoc(ProcessHandler.Factory factory) {
-        this(factory.apply("javadoc", "bin/javadoc"), null, false, BuildStep.timestamp() == null, printing("javadoc"));
+        this(factory.apply("javadoc", "bin/javadoc"), null, false, false, Terms.of("javadoc"));
+    }
+
+    public static Javadoc ofKeys(Function<String, String> keys, ProcessHandler.Factory factory) {
+        return new Javadoc(factory.apply("javadoc", "bin/javadoc"),
+                null,
+                false,
+                BuildStep.timestamp(keys) == null,
+                Terms.ofKeys(keys, "javadoc"));
     }
 
     private Javadoc(Function<List<String>, ? extends ProcessHandler> factory,
                     String within,
                     boolean classpath,
                     boolean timestamped,
-                    BiConsumer<Boolean, String> printing) {
-        super("javadoc", factory, printing);
+                    Terms terms) {
+        super("javadoc", factory, terms);
         this.within = within;
         this.classpath = classpath;
         this.timestamped = timestamped;
     }
 
     public Javadoc within(String within) {
-        return new Javadoc(factory, within, classpath, timestamped, printing);
+        return new Javadoc(factory, within, classpath, timestamped, terms);
     }
 
     public Javadoc classpath(boolean classpath) {
-        return new Javadoc(factory, within, classpath, timestamped, printing);
+        return new Javadoc(factory, within, classpath, timestamped, terms);
+    }
+
+    public Javadoc timestamped(boolean timestamped) {
+        return new Javadoc(factory, within, classpath, timestamped, terms);
     }
 
     public Javadoc verbose(BiConsumer<Boolean, String> printing) {
-        return new Javadoc(factory, within, classpath, timestamped, printing);
+        return new Javadoc(factory, within, classpath, timestamped, terms.printing(printing));
     }
 
     @Override

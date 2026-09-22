@@ -14,25 +14,36 @@ public class JPackage extends ProcessBuildStep {
     private final String group;
 
     public JPackage(ProcessHandler.Factory factory) {
-        this(factory.apply("jpackage", "bin/jpackage"), null, "main", printing("jpackage"));
+        this(factory.apply("jpackage", "bin/jpackage"),
+             null,
+             "main",
+             Terms.of("jpackage"));
     }
 
-    private JPackage(Function<List<String>, ? extends ProcessHandler> factory, String type, String group, BiConsumer<Boolean, String> printing) {
-        super("jpackage", factory, printing);
+    public static JPackage ofKeys(Function<String, String> keys,
+                                  ProcessHandler.Factory factory) {
+        return new JPackage(factory.apply("jpackage", "bin/jpackage"),
+                null,
+                "main",
+                Terms.ofKeys(keys, "jpackage"));
+    }
+
+    private JPackage(Function<List<String>, ? extends ProcessHandler> factory, String type, String group, Terms terms) {
+        super("jpackage", factory, terms);
         this.type = type;
         this.group = group;
     }
 
     public JPackage type(String type) {
-        return new JPackage(factory, type, group, printing);
+        return new JPackage(factory, type, group, terms);
     }
 
     public JPackage group(String group) {
-        return new JPackage(factory, type, group, printing);
+        return new JPackage(factory, type, group, terms);
     }
 
     public JPackage verbose(BiConsumer<Boolean, String> printing) {
-        return new JPackage(factory, type, group, printing);
+        return new JPackage(factory, type, group, terms.printing(printing));
     }
 
     @Override

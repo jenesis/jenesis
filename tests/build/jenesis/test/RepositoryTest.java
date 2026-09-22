@@ -9,6 +9,7 @@ import build.jenesis.SequencedProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class RepositoryTest {
 
@@ -78,34 +79,32 @@ public class RepositoryTest {
     }
 
     @Test
-    public void a_credential_reads_a_property_before_the_environment() {
-        System.setProperty("jenesis.test.credential", "Bearer property");
-        try {
-            Repository.Credential credential = Repository.Credential.of("jenesis.test.credential",
-                    "JENESIS_TEST_CREDENTIAL_THAT_IS_NOT_SET");
+    public void a_credential_reads_a_setting_before_the_environment() {
+        Repository.Credential credential = Repository.Credential.of(
+                Map.of("test.credential", "Bearer property")::get,
+                "test.credential",
+                "JENESIS_TEST_CREDENTIAL_THAT_IS_NOT_SET");
 
-            assertThat(credential.token()).isEqualTo("Bearer property");
-            assertThat(credential.origin()).isEqualTo(Repository.Origin.USER);
-        } finally {
-            System.clearProperty("jenesis.test.credential");
-        }
+        assertThat(credential.token()).isEqualTo("Bearer property");
+        assertThat(credential.origin()).isEqualTo(Repository.Origin.USER);
     }
 
     @Test
     public void an_origin_names_the_settings_a_project_supplied() {
-        System.setProperty("jenesis.make.provided", "jenesis.module.uri, jenesis.test.sample");
-        try {
-            assertThat(Repository.Origin.of("jenesis.module.uri")).isEqualTo(Repository.Origin.PROJECT);
-            assertThat(Repository.Origin.of("jenesis.test.sample")).isEqualTo(Repository.Origin.PROJECT);
-            assertThat(Repository.Origin.of("jenesis.maven.uri")).isEqualTo(Repository.Origin.USER);
-        } finally {
-            System.clearProperty("jenesis.make.provided");
-        }
+        Function<String, String> keys = Map.of("make.provided", "module.uri, test.sample")::get;
+        assertThat(Repository.Origin.of(keys, "module.uri")).isEqualTo(Repository.Origin.PROJECT);
+        assertThat(Repository.Origin.of(keys, "test.sample")).isEqualTo(Repository.Origin.PROJECT);
+        assertThat(Repository.Origin.of(keys, "maven.uri")).isEqualTo(Repository.Origin.USER);
     }
 
     @Test
     public void an_origin_is_the_user_where_no_project_file_supplied_a_setting() {
-        assertThat(Repository.Origin.of("jenesis.maven.uri")).isEqualTo(Repository.Origin.USER);
+        assertThat(Repository.Origin.of(Map.<String, String>of()::get, "maven.uri"))
+                .isEqualTo(Repository.Origin.USER);
+    }
+
+    private static Repository.Connection connection() {
+        return Repository.Connection.ofKeys(SYSTEM);
     }
 
     private HttpServer serve(IntFunction<Integer> statusOfHit, Map<String, String> headers, AtomicInteger hits) throws IOException {
@@ -133,7 +132,7 @@ public class RepositoryTest {
         HttpServer server = serve(hit -> hit < 3 ? 502 : 200, Map.of(), hits);
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
-            try (InputStream stream = Repository.open(uri, null, new Repository.Retry(2, Duration.ofMillis(1)))) {
+            try (InputStream stream = Repository.open(connection().retries(2).backoff(Duration.ofMillis(1)), uri, null)) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("payload");
             }
             assertThat(hits.get()).isEqualTo(3);
@@ -149,7 +148,7 @@ public class RepositoryTest {
         HttpServer server = serve(_ -> 502, Map.of(), hits);
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
-            assertThatThrownBy(() -> Repository.open(uri, null, new Repository.Retry(1, Duration.ofMillis(1))).close())
+            assertThatThrownBy(() -> Repository.open(connection().retries(1).backoff(Duration.ofMillis(1)), uri, null).close())
                     .isInstanceOf(IOException.class)
                     .hasMessageContaining("502");
             assertThat(hits.get()).isEqualTo(2);
@@ -175,7 +174,7 @@ public class RepositoryTest {
         server.start();
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
-            assertThatThrownBy(() -> Repository.open(uri, null, new Repository.Retry(0, Duration.ofMillis(1))).close())
+            assertThatThrownBy(() -> Repository.open(connection().retries(0).backoff(Duration.ofMillis(1)), uri, null).close())
                     .isInstanceOf(IOException.class)
                     .hasMessageContaining("/artifact.jar")
                     .hasCauseInstanceOf(SocketTimeoutException.class);
@@ -198,7 +197,7 @@ public class RepositoryTest {
         server.start();
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
-            assertThatThrownBy(() -> Repository.open(uri, null, new Repository.Retry(0, Duration.ofMillis(1))).close())
+            assertThatThrownBy(() -> Repository.open(connection().retries(0).backoff(Duration.ofMillis(1)), uri, null).close())
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("file URI");
         } finally {
@@ -233,7 +232,7 @@ public class RepositoryTest {
         origin.start();
         try {
             URI uri = URI.create("http://localhost:" + origin.getAddress().getPort() + "/artifact.jar");
-            try (InputStream stream = Repository.open(uri, "Bearer secret", new Repository.Retry(0, Duration.ofMillis(1)))) {
+            try (InputStream stream = Repository.open(connection().retries(0).backoff(Duration.ofMillis(1)), uri, "Bearer secret")) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("payload");
             }
             assertThat(originToken.get()).isEqualTo("Bearer secret");
@@ -247,7 +246,7 @@ public class RepositoryTest {
     @Test
     public void open_refuses_an_insecure_scheme_without_the_opt_in() {
         URI uri = URI.create("http://localhost:1/artifact.jar");
-        assertThatThrownBy(() -> Repository.open(uri, null, new Repository.Retry(0, Duration.ofMillis(1))).close())
+        assertThatThrownBy(() -> Repository.open(connection().retries(0).backoff(Duration.ofMillis(1)), uri, null).close())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("insecure scheme");
     }
@@ -259,7 +258,7 @@ public class RepositoryTest {
         HttpServer server = serve(_ -> 404, Map.of(), hits);
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
-            assertThatThrownBy(() -> Repository.open(uri, null, new Repository.Retry(2, Duration.ofMillis(1))).close())
+            assertThatThrownBy(() -> Repository.open(connection().retries(2).backoff(Duration.ofMillis(1)), uri, null).close())
                     .isInstanceOf(FileNotFoundException.class);
             assertThat(hits.get()).isEqualTo(1);
         } finally {
@@ -274,7 +273,7 @@ public class RepositoryTest {
         HttpServer server = serve(hit -> hit < 2 ? 429 : 200, Map.of("Retry-After", "0"), hits);
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
-            try (InputStream stream = Repository.open(uri, null, new Repository.Retry(2, Duration.ofSeconds(30)))) {
+            try (InputStream stream = Repository.open(connection().retries(2).backoff(Duration.ofSeconds(30)), uri, null)) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("payload");
             }
             assertThat(hits.get()).isEqualTo(2);
@@ -292,7 +291,7 @@ public class RepositoryTest {
         try {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
             long start = System.nanoTime();
-            try (InputStream stream = Repository.open(uri, null, new Repository.Retry(2, Duration.ofSeconds(30)))) {
+            try (InputStream stream = Repository.open(connection().retries(2).backoff(Duration.ofSeconds(30)), uri, null)) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("payload");
             }
             long elapsedMillis = (System.nanoTime() - start) / 1_000_000;
@@ -306,12 +305,16 @@ public class RepositoryTest {
     }
 
     @Test
-    public void retry_defaults_read_the_system_properties() {
+    public void connection_defaults_read_the_keys_they_are_given() {
         System.setProperty("jenesis.repository.retries", "7");
         System.setProperty("jenesis.repository.backoff", "9");
-        assertThat(new Repository.Retry()).isEqualTo(new Repository.Retry(7, Duration.ofMillis(9)));
-        assertThat(new Repository.Retry().retries(1)).isEqualTo(new Repository.Retry(1, Duration.ofMillis(9)));
-        assertThat(new Repository.Retry().backoff(Duration.ofMillis(2))).isEqualTo(new Repository.Retry(7, Duration.ofMillis(2)));
+        System.setProperty("jenesis.repository.read.timeout", "5000");
+        assertThat(Repository.Connection.ofKeys(SYSTEM))
+                .isEqualTo(new Repository.Connection(7, Duration.ofMillis(9), false, 10_000, 5_000));
+        assertThat(Repository.Connection.ofKeys(SYSTEM).retries(1))
+                .isEqualTo(new Repository.Connection(1, Duration.ofMillis(9), false, 10_000, 5_000));
+        assertThat(Repository.Connection.ofKeys(SYSTEM).backoff(Duration.ofMillis(2)))
+                .isEqualTo(new Repository.Connection(7, Duration.ofMillis(2), false, 10_000, 5_000));
     }
 
     @Test
@@ -362,7 +365,7 @@ public class RepositoryTest {
     @Test
     public void ofUris_without_version_resolver_does_not_attempt_fallback() throws IOException {
         URI bare = URI.create("https://example.test/other/foo.jar");
-        Repository repository = Repository.ofUris(Map.of("foo", bare), null, new Repository.Retry(), null);
+        Repository repository = Repository.ofUris(Map.of("foo", bare), null, Repository.Connection.ofKeys(SYSTEM), null);
         assertThat(repository.fetch(Runnable::run, "foo/9.9")).isEmpty();
     }
 
@@ -371,7 +374,7 @@ public class RepositoryTest {
         URI bare = URI.create("https://example.test/other/foo.jar");
         Repository repository = Repository.ofUris(Map.of("foo", bare),
                 (BiFunction<URI, String, Optional<URI>> & Serializable) (uri, _) -> Optional.of(uri),
-                new Repository.Retry(),
+                Repository.Connection.ofKeys(SYSTEM),
                 null);
         Optional<RepositoryItem> item = repository.fetch(Runnable::run, "foo/9.9");
         assertThat(item).isPresent();
@@ -382,7 +385,7 @@ public class RepositoryTest {
         URI bare = URI.create("https://example.test/other/foo.jar");
         Repository repository = Repository.ofUris(Map.of("foo", bare),
                 (BiFunction<URI, String, Optional<URI>> & Serializable) (_, _) -> Optional.empty(),
-                new Repository.Retry(),
+                Repository.Connection.ofKeys(SYSTEM),
                 null);
         assertThat(repository.fetch(Runnable::run, "foo/9.9")).isEmpty();
     }

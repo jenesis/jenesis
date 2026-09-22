@@ -9,15 +9,20 @@ public class JDeps extends ProcessBuildStep {
     public static final String ANALYZED = "analyzed/", MODULES = "modules/", DESCRIPTORS = "descriptors/";
 
     public JDeps(ProcessHandler.Factory factory) {
-        this(factory.apply("jdeps", "bin/jdeps"), printing("jdeps"));
+        this(factory.apply("jdeps", "bin/jdeps"), Terms.of("jdeps"));
     }
 
-    private JDeps(Function<List<String>, ? extends ProcessHandler> factory, BiConsumer<Boolean, String> printing) {
-        super("jdeps", factory, printing);
+    public static JDeps ofKeys(Function<String, String> keys,
+                               ProcessHandler.Factory factory) {
+        return new JDeps(factory.apply("jdeps", "bin/jdeps"), Terms.ofKeys(keys, "jdeps"));
+    }
+
+    private JDeps(Function<List<String>, ? extends ProcessHandler> factory, Terms terms) {
+        super("jdeps", factory, terms);
     }
 
     public JDeps verbose(BiConsumer<Boolean, String> printing) {
-        return new JDeps(factory, printing);
+        return new JDeps(factory, terms.printing(printing));
     }
 
     @Override

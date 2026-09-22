@@ -15,6 +15,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.PalantirJavaFormatModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class PalantirJavaFormatModuleRunTest {
 
@@ -82,7 +83,7 @@ public class PalantirJavaFormatModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "palantir-java-format",
-                new PalantirJavaFormatModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT),
+                new PalantirJavaFormatModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT),
                 "project");
         return executor;
     }

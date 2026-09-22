@@ -23,66 +23,84 @@ public class OpenApiModule implements BuildExecutorModule {
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies", GENERATE = "generate";
     private static final String MAVEN_GROUP = "org.openapitools", MAVEN_ARTIFACT = "openapi-generator-cli";
 
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
     private final String generator;
     private final String packageName;
     private final String sourceFolder;
     private final List<String> arguments;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final ProcessBuildStep.Terms terms;
 
-    public OpenApiModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "openapi", "java", null, "src/main/java", List.of(), ProcessBuildStep.printing("openapi"));
+    public OpenApiModule(Map<String, Repository> repositories,
+                         Map<String, Resolver> resolvers) {
+        this(new Dependencies(repositories, resolvers),
+             null,
+             "openapi",
+             "java",
+             null,
+             "src/main/java",
+             List.of(),
+             ProcessBuildStep.Terms.of("openapi"));
     }
 
-    private OpenApiModule(Map<String, Repository> repositories,
-                          Map<String, Resolver> resolvers,
+    public static OpenApiModule ofKeys(Function<String, String> keys,
+                                       Map<String, Repository> repositories,
+                                       Map<String, Resolver> resolvers) {
+        return new OpenApiModule(Dependencies.ofKeys(keys, repositories, resolvers),
+                null,
+                "openapi",
+                "java",
+                null,
+                "src/main/java",
+                List.of(),
+                ProcessBuildStep.Terms.ofKeys(keys, "openapi"));
+    }
+
+    private OpenApiModule(Dependencies dependencies,
                           Pinning pinning,
                           String tool,
                           String generator,
                           String packageName,
                           String sourceFolder,
                           List<String> arguments,
-                          BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+                          ProcessBuildStep.Terms terms) {
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.generator = generator;
         this.packageName = packageName;
         this.sourceFolder = sourceFolder;
         this.arguments = arguments;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public OpenApiModule pinning(Pinning pinning) {
-        return new OpenApiModule(repositories, resolvers, pinning, tool, generator, packageName, sourceFolder, arguments, printing);
+        return new OpenApiModule(dependencies, pinning, tool, generator, packageName, sourceFolder, arguments, terms);
     }
 
     public OpenApiModule tool(String tool) {
-        return new OpenApiModule(repositories, resolvers, pinning, tool, generator, packageName, sourceFolder, arguments, printing);
+        return new OpenApiModule(dependencies, pinning, tool, generator, packageName, sourceFolder, arguments, terms);
     }
 
     public OpenApiModule generator(String generator) {
-        return new OpenApiModule(repositories, resolvers, pinning, tool, generator, packageName, sourceFolder, arguments, printing);
+        return new OpenApiModule(dependencies, pinning, tool, generator, packageName, sourceFolder, arguments, terms);
     }
 
     public OpenApiModule packageName(String packageName) {
-        return new OpenApiModule(repositories, resolvers, pinning, tool, generator, packageName, sourceFolder, arguments, printing);
+        return new OpenApiModule(dependencies, pinning, tool, generator, packageName, sourceFolder, arguments, terms);
     }
 
     public OpenApiModule sourceFolder(String sourceFolder) {
-        return new OpenApiModule(repositories, resolvers, pinning, tool, generator, packageName, sourceFolder, arguments, printing);
+        return new OpenApiModule(dependencies, pinning, tool, generator, packageName, sourceFolder, arguments, terms);
     }
 
     public OpenApiModule arguments(List<String> arguments) {
-        return new OpenApiModule(repositories, resolvers, pinning, tool, generator, packageName, sourceFolder, arguments, printing);
+        return new OpenApiModule(dependencies, pinning, tool, generator, packageName, sourceFolder, arguments, terms);
     }
 
     public OpenApiModule printing(BiConsumer<Boolean, String> printing) {
-        return new OpenApiModule(repositories, resolvers, pinning, tool, generator, packageName, sourceFolder, arguments, printing);
+        return new OpenApiModule(dependencies, pinning, tool, generator, packageName, sourceFolder, arguments, terms.printing(printing));
     }
 
     @Override
@@ -92,13 +110,13 @@ public class OpenApiModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
+                dependencies.pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> generateInputs = new LinkedHashSet<>();
         generateInputs.add(DEPENDENCIES);
         generateInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addStep(GENERATE,
-                new Generate(tool, generator, packageName, arguments, printing),
+                new Generate(terms, tool, generator, packageName, arguments),
                 generateInputs);
         buildExecutor.addStep(COLLECT, new Collect(sourceFolder), GENERATE);
     }
@@ -134,12 +152,12 @@ public class OpenApiModule implements BuildExecutorModule {
         private final String packageName;
         private final List<String> arguments;
 
-        private Generate(String tool,
+        private Generate(ProcessBuildStep.Terms terms,
+                         String tool,
                          String generator,
                          String packageName,
-                         List<String> arguments,
-                         BiConsumer<Boolean, String> printing) {
-            super("openapi", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
+                         List<String> arguments) {
+            super("openapi", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
             this.generator = generator;
             this.packageName = packageName;

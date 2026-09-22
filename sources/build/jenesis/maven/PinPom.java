@@ -20,7 +20,7 @@ public class PinPom implements BuildStep {
     private static final Pattern INDENT = Pattern.compile("\\n([ \\t]+)<");
     private static final Pattern PIN_COMMENT = Pattern.compile("(?s)([ \\t]*)<!--\\s*jenesis\\.pin\\b(.*?)-->\\s*\\n");
 
-    private final transient Semaphore permits = Pinning.permits();
+    private final transient Semaphore permits;
 
     private final String prefix;
     private final String path;
@@ -29,14 +29,24 @@ public class PinPom implements BuildStep {
     private final Platform platform;
 
     public PinPom(String prefix, String path, List<Path> pomFiles, HashDigestFunction hashFunction) {
-        this(prefix, path, pomFiles, hashFunction, new Platform());
+        this(prefix, path, pomFiles, hashFunction, new Platform(), Pinning.permits());
+    }
+
+    public static PinPom ofKeys(Function<String, String> keys,
+                                String prefix,
+                                String path,
+                                List<Path> pomFiles,
+                                HashDigestFunction hashFunction) {
+        return new PinPom(prefix, path, pomFiles, hashFunction).permits(Pinning.permits(keys));
     }
 
     private PinPom(String prefix,
                    String path,
                    List<Path> pomFiles,
                    HashDigestFunction hashFunction,
-                   Platform platform) {
+                   Platform platform,
+                   Semaphore permits) {
+        this.permits = permits;
         this.prefix = prefix;
         this.path = path;
         this.pomFiles = List.copyOf(pomFiles);
@@ -44,8 +54,12 @@ public class PinPom implements BuildStep {
         this.platform = platform;
     }
 
+    public PinPom permits(Semaphore permits) {
+        return new PinPom(prefix, path, pomFiles, hashFunction, platform, permits);
+    }
+
     public PinPom platform(Platform platform) {
-        return new PinPom(prefix, path, pomFiles, hashFunction, platform);
+        return new PinPom(prefix, path, pomFiles, hashFunction, platform, permits);
     }
 
     @Override

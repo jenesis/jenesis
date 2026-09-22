@@ -23,59 +23,75 @@ public class WsImportModule implements BuildExecutorModule {
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
     private static final String MAVEN_GROUP = "com.sun.xml.ws", MAVEN_ARTIFACT = "jaxws-tools";
 
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
     private final String packageName;
     private final String location;
     private final List<String> arguments;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final ProcessBuildStep.Terms terms;
 
-    public WsImportModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "wsimport", null, null, List.of(), ProcessBuildStep.printing("wsimport"));
+    public WsImportModule(Map<String, Repository> repositories,
+                          Map<String, Resolver> resolvers) {
+        this(new Dependencies(repositories, resolvers),
+             null,
+             "wsimport",
+             null,
+             null,
+             List.of(),
+             ProcessBuildStep.Terms.of("wsimport"));
     }
 
-    private WsImportModule(Map<String, Repository> repositories,
-                           Map<String, Resolver> resolvers,
+    public static WsImportModule ofKeys(Function<String, String> keys,
+                                        Map<String, Repository> repositories,
+                                        Map<String, Resolver> resolvers) {
+        return new WsImportModule(Dependencies.ofKeys(keys, repositories, resolvers),
+                null,
+                "wsimport",
+                null,
+                null,
+                List.of(),
+                ProcessBuildStep.Terms.ofKeys(keys, "wsimport"));
+    }
+
+    private WsImportModule(Dependencies dependencies,
                            Pinning pinning,
                            String tool,
                            String packageName,
                            String location,
                            List<String> arguments,
-                           BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+                           ProcessBuildStep.Terms terms) {
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.packageName = packageName;
         this.location = location;
         this.arguments = arguments;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public WsImportModule pinning(Pinning pinning) {
-        return new WsImportModule(repositories, resolvers, pinning, tool, packageName, location, arguments, printing);
+        return new WsImportModule(dependencies, pinning, tool, packageName, location, arguments, terms);
     }
 
     public WsImportModule tool(String tool) {
-        return new WsImportModule(repositories, resolvers, pinning, tool, packageName, location, arguments, printing);
+        return new WsImportModule(dependencies, pinning, tool, packageName, location, arguments, terms);
     }
 
     public WsImportModule packageName(String packageName) {
-        return new WsImportModule(repositories, resolvers, pinning, tool, packageName, location, arguments, printing);
+        return new WsImportModule(dependencies, pinning, tool, packageName, location, arguments, terms);
     }
 
     public WsImportModule location(String location) {
-        return new WsImportModule(repositories, resolvers, pinning, tool, packageName, location, arguments, printing);
+        return new WsImportModule(dependencies, pinning, tool, packageName, location, arguments, terms);
     }
 
     public WsImportModule arguments(List<String> arguments) {
-        return new WsImportModule(repositories, resolvers, pinning, tool, packageName, location, arguments, printing);
+        return new WsImportModule(dependencies, pinning, tool, packageName, location, arguments, terms);
     }
 
     public WsImportModule printing(BiConsumer<Boolean, String> printing) {
-        return new WsImportModule(repositories, resolvers, pinning, tool, packageName, location, arguments, printing);
+        return new WsImportModule(dependencies, pinning, tool, packageName, location, arguments, terms.printing(printing));
     }
 
     @Override
@@ -85,13 +101,13 @@ public class WsImportModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
+                dependencies.pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> generateInputs = new LinkedHashSet<>();
         generateInputs.add(DEPENDENCIES);
         generateInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addStep(GENERATE,
-                new Generate(tool, packageName, location, arguments, printing),
+                new Generate(terms, tool, packageName, location, arguments),
                 generateInputs);
     }
 
@@ -121,12 +137,12 @@ public class WsImportModule implements BuildExecutorModule {
         private final String location;
         private final List<String> arguments;
 
-        private Generate(String tool,
+        private Generate(ProcessBuildStep.Terms terms,
+                         String tool,
                          String packageName,
                          String location,
-                         List<String> arguments,
-                         BiConsumer<Boolean, String> printing) {
-            super("wsimport", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
+                         List<String> arguments) {
+            super("wsimport", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
             this.packageName = packageName;
             this.location = location;

@@ -14,6 +14,7 @@ import build.jenesis.HashDigestFunction;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class BuildExecutorFileCacheTest implements Serializable {
 
@@ -93,15 +94,15 @@ public class BuildExecutorFileCacheTest implements Serializable {
         String previousUri = System.getProperty("jenesis.cache.uri");
         try {
             System.clearProperty("jenesis.cache.uri");
-            assertThat(new BuildExecutor.Configuration().cache()).isNull();
+            assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).cache()).isNull();
             System.setProperty("jenesis.cache.uri", "");
-            assertThat(new BuildExecutor.Configuration().cache()).isNull();
+            assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).cache()).isNull();
             System.setProperty("jenesis.cache.uri", cacheRoot.toUri().toString());
-            assertThat(new BuildExecutor.Configuration().cache()).isInstanceOf(BuildExecutorFileCache.class);
+            assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).cache()).isInstanceOf(BuildExecutorFileCache.class);
             System.setProperty("jenesis.cache.uri", "https://cache.example.test/");
-            assertThat(new BuildExecutor.Configuration().cache()).isInstanceOf(BuildExecutorHttpCache.class);
+            assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).cache()).isInstanceOf(BuildExecutorHttpCache.class);
             System.setProperty("jenesis.cache.uri", cacheRoot.toString());
-            assertThatThrownBy(() -> new BuildExecutor.Configuration()).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> BuildExecutor.Configuration.ofKeys(SYSTEM)).isInstanceOf(IllegalArgumentException.class);
         } finally {
             restore("jenesis.cache.uri", previousUri);
         }
@@ -572,8 +573,6 @@ public class BuildExecutorFileCacheTest implements Serializable {
         assertThat(cache.fetch(Runnable::run, "step", step, in, false, target)).isPresent();
         assertThat(target.resolve("file")).content().isEqualTo("result");
     }
-
-
 
     private Path store(BuildExecutorFileCache cache, byte[] step, byte[] inputHash) throws IOException {
         Files.writeString(output.resolve("file"), "x");

@@ -6,6 +6,7 @@ import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
+import build.jenesis.SequencedProperties;
 
 public class ModularJarResolver implements Resolver {
 
@@ -20,10 +21,21 @@ public class ModularJarResolver implements Resolver {
     }
 
     public ModularJarResolver(boolean resolveAutomaticModules, Resolver fallback) {
-        this.resolveAutomaticModules = resolveAutomaticModules;
-        this.fallback = fallback;
-        String property = System.getProperty("jenesis.resolver.module", "first");
-        negotiatorSupplier = switch (property.toLowerCase(Locale.ROOT)) {
+        this(resolveAutomaticModules, fallback, ModuleVersionNegotiator.first());
+    }
+
+    public static ModularJarResolver ofKeys(Function<String, String> keys, boolean resolveAutomaticModules) {
+        return ofKeys(keys, resolveAutomaticModules, null);
+    }
+
+    public static ModularJarResolver ofKeys(Function<String, String> keys,
+                                            boolean resolveAutomaticModules,
+                                            Resolver fallback) {
+        String property = SequencedProperties.getProperty(keys, "resolver.module");
+        if (property == null) {
+            return new ModularJarResolver(resolveAutomaticModules, fallback);
+        }
+        return new ModularJarResolver(resolveAutomaticModules, fallback, switch (property.toLowerCase(Locale.ROOT)) {
             case "first" -> ModuleVersionNegotiator.first();
             case "ignore" -> ModuleVersionNegotiator.ignore();
             case "fail" -> ModuleVersionNegotiator.fail();
@@ -31,7 +43,7 @@ public class ModularJarResolver implements Resolver {
             default -> throw new IllegalArgumentException("Unknown jenesis.resolver.module '"
                     + property
                     + "', expected one of: first, ignore, fail, managed");
-        };
+        });
     }
 
     public <S extends Supplier<ModuleVersionNegotiator> & Serializable> ModularJarResolver(

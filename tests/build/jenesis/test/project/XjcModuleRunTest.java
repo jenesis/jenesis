@@ -15,6 +15,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.XjcModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class XjcModuleRunTest {
 
@@ -142,7 +143,7 @@ public class XjcModuleRunTest {
     }
 
     private XjcModule newModule() {
-        return new XjcModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver()))
+        return new XjcModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM)))
                 .pinning(Pinning.STRICT);
     }
 

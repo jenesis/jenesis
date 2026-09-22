@@ -14,7 +14,12 @@ public final class Toolchain {
     private final List<Entry> entries;
 
     public Toolchain() {
-        this(System.getProperty("jenesis.toolchain.version"), System.getProperty("jenesis.toolchain.searchpath", "@"));
+        this(null, "@");
+    }
+
+    public static Toolchain ofKeys(Function<String, String> keys) {
+        String searchpath = keys.apply("toolchain.searchpath");
+        return new Toolchain(keys.apply("toolchain.version"), searchpath == null ? "@" : searchpath);
     }
 
     private Toolchain(String version, String searchpath) {

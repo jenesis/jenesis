@@ -21,35 +21,51 @@ public class SpotBugsModule implements BuildExecutorModule {
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
     private static final String MAVEN_GROUP = "com.github.spotbugs", MAVEN_ARTIFACT = "spotbugs";
 
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
     private final String group;
     private final String configFile;
     private final boolean strict;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final ProcessBuildStep.Terms terms;
 
-    public SpotBugsModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "spotbugs", "main", "spotbugs-exclude.xml", false, ProcessBuildStep.printing("spotbugs"));
+    public SpotBugsModule(Map<String, Repository> repositories,
+                          Map<String, Resolver> resolvers) {
+        this(new Dependencies(repositories, resolvers),
+             null,
+             "spotbugs",
+             "main",
+             "spotbugs-exclude.xml",
+             false,
+             ProcessBuildStep.Terms.of("spotbugs"));
     }
 
-    private SpotBugsModule(Map<String, Repository> repositories,
-                           Map<String, Resolver> resolvers,
+    public static SpotBugsModule ofKeys(Function<String, String> keys,
+                                        Map<String, Repository> repositories,
+                                        Map<String, Resolver> resolvers) {
+        return new SpotBugsModule(Dependencies.ofKeys(keys, repositories, resolvers),
+                null,
+                "spotbugs",
+                "main",
+                "spotbugs-exclude.xml",
+                false,
+                ProcessBuildStep.Terms.ofKeys(keys, "spotbugs"));
+    }
+
+    private SpotBugsModule(Dependencies dependencies,
                            Pinning pinning,
                            String tool,
                            String group,
                            String configFile,
                            boolean strict,
-                           BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+                           ProcessBuildStep.Terms terms) {
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.group = group;
         this.configFile = configFile;
         this.strict = strict;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public static Path configurationFile(SequencedSet<Path> configuration) {
@@ -57,27 +73,27 @@ public class SpotBugsModule implements BuildExecutorModule {
     }
 
     public SpotBugsModule pinning(Pinning pinning) {
-        return new SpotBugsModule(repositories, resolvers, pinning, tool, group, configFile, strict, printing);
+        return new SpotBugsModule(dependencies, pinning, tool, group, configFile, strict, terms);
     }
 
     public SpotBugsModule tool(String tool) {
-        return new SpotBugsModule(repositories, resolvers, pinning, tool, group, configFile, strict, printing);
+        return new SpotBugsModule(dependencies, pinning, tool, group, configFile, strict, terms);
     }
 
     public SpotBugsModule group(String group) {
-        return new SpotBugsModule(repositories, resolvers, pinning, tool, group, configFile, strict, printing);
+        return new SpotBugsModule(dependencies, pinning, tool, group, configFile, strict, terms);
     }
 
     public SpotBugsModule configFile(String configFile) {
-        return new SpotBugsModule(repositories, resolvers, pinning, tool, group, configFile, strict, printing);
+        return new SpotBugsModule(dependencies, pinning, tool, group, configFile, strict, terms);
     }
 
     public SpotBugsModule strict(boolean strict) {
-        return new SpotBugsModule(repositories, resolvers, pinning, tool, group, configFile, strict, printing);
+        return new SpotBugsModule(dependencies, pinning, tool, group, configFile, strict, terms);
     }
 
     public SpotBugsModule printing(BiConsumer<Boolean, String> printing) {
-        return new SpotBugsModule(repositories, resolvers, pinning, tool, group, configFile, strict, printing);
+        return new SpotBugsModule(dependencies, pinning, tool, group, configFile, strict, terms.printing(printing));
     }
 
     @Override
@@ -87,12 +103,12 @@ public class SpotBugsModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
+                dependencies.pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> checkInputs = new LinkedHashSet<>();
         checkInputs.add(DEPENDENCIES);
         checkInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(CHECK, new Check(tool, group, configFile, strict, printing), checkInputs);
+        buildExecutor.addStep(CHECK, new Check(terms, tool, group, configFile, strict), checkInputs);
     }
 
     private record Requires(String tool) implements BuildStep {
@@ -121,8 +137,12 @@ public class SpotBugsModule implements BuildExecutorModule {
         private final String configFile;
         private final boolean strict;
 
-        private Check(String tool, String group, String configFile, boolean strict, BiConsumer<Boolean, String> printing) {
-            super("spotbugs", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
+        private Check(ProcessBuildStep.Terms terms,
+                      String tool,
+                      String group,
+                      String configFile,
+                      boolean strict) {
+            super("spotbugs", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
             this.group = group;
             this.configFile = configFile;

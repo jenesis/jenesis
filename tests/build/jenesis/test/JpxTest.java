@@ -21,6 +21,7 @@ import build.jenesis.module.ModularJarResolver;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class JpxTest {
 
@@ -258,7 +259,7 @@ public class JpxTest {
         };
         Jpx offlineJpx = new Jpx(storage,
                 Map.of("maven", offline, "module", offline),
-                Map.of("maven", new MavenPomResolver()),
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM)),
                 new HashDigestFunction("SHA-256"),
                 PathPlacement.INFERRED);
 
@@ -272,7 +273,7 @@ public class JpxTest {
         Repository streaming = new MavenDefaultRepository(mavenRepoFolder.toUri(), null, Map.of(), null);
         Jpx jpx = new Jpx(storage,
                 Map.of("maven", streaming),
-                Map.of("maven", new MavenPomResolver()),
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM)),
                 new HashDigestFunction("SHA-256"),
                 PathPlacement.INFERRED);
 
@@ -392,10 +393,10 @@ public class JpxTest {
     @Test
     public void installs_modular_without_materializing_repository() throws IOException, InterruptedException {
         addModularJars(true);
-        Repository streaming = streaming(new JenesisModuleRepository(jenesisRepoFolder.toUri()));
+        Repository streaming = streaming(JenesisModuleRepository.ofKeys(SYSTEM, jenesisRepoFolder.toUri()));
         Jpx jpx = new Jpx(storage,
                 Map.of("module", streaming),
-                Map.of("module", new ModularJarResolver(false)),
+                Map.of("module", ModularJarResolver.ofKeys(SYSTEM, false)),
                 new HashDigestFunction("SHA-256"),
                 PathPlacement.MODULE_PATH);
 
@@ -436,7 +437,7 @@ public class JpxTest {
         addMavenTool();
         Path folder = storage.resolve("maven").resolve("org.example--tool-main@1.0");
         Repository mavenRepository = new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null);
-        Resolver delegate = new MavenPomResolver();
+        Resolver delegate = MavenPomResolver.ofKeys(SYSTEM);
         Resolver racing = (executor, prefix, repositories, coordinates, versions, scope) -> {
             Files.createDirectories(folder);
             Files.writeString(folder.resolve(Jpx.PROPERTIES), "name=SENTINEL\n");
@@ -717,11 +718,11 @@ public class JpxTest {
             System.setProperty("jenesis.repository.insecure", "true");
             System.setProperty("jenesis.module.uri", "http://localhost:" + server.getAddress().getPort() + "/");
             System.setProperty("jenesis.module.local", jenesisRepoFolder.toString());
-            assertThat(read(new Jpx(PathPlacement.INFERRED).repositories()
+            assertThat(read(Jpx.ofKeys(SequencedProperties.SYSTEM, PathPlacement.INFERRED).repositories()
                     .get("module")
                     .fetch(Runnable::run, "tool.main:pom")
                     .orElseThrow())).isEqualTo("remote");
-            assertThat(read(new Jpx(PathPlacement.MODULE_PATH).repositories()
+            assertThat(read(Jpx.ofKeys(SequencedProperties.SYSTEM, PathPlacement.MODULE_PATH).repositories()
                     .get("module")
                     .fetch(Runnable::run, "tool.main/1.0")
                     .orElseThrow())).isEqualTo("remote");
@@ -753,7 +754,7 @@ public class JpxTest {
             Files.createDirectories(jenesisRepoFolder.resolve("tool.main").resolve("1.0"));
             Files.writeString(jenesisRepoFolder.resolve("tool.main").resolve("1.0").resolve("tool.main.jar"), "local");
 
-            assertThat(read(new Jpx(PathPlacement.MODULE_PATH).repositories()
+            assertThat(read(Jpx.ofKeys(SequencedProperties.SYSTEM, PathPlacement.MODULE_PATH).repositories()
                     .get("module")
                     .fetch(Runnable::run, "tool.main/1.0")
                     .orElseThrow())).isEqualTo("local");
@@ -830,9 +831,9 @@ public class JpxTest {
     }
 
     private Jpx jpx(PathPlacement placement) {
-        MavenPomResolver maven = new MavenPomResolver();
+        MavenPomResolver maven = MavenPomResolver.ofKeys(SYSTEM);
         Repository mavenRepository = new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null);
-        Repository jenesisRepository = new JenesisModuleRepository(jenesisRepoFolder.toUri());
+        Repository jenesisRepository = JenesisModuleRepository.ofKeys(SYSTEM, jenesisRepoFolder.toUri());
         return new Jpx(storage,
                 Map.of("maven", mavenRepository, "module", jenesisRepository),
                 Map.of("maven", maven, "module", new MavenModuleResolver("maven", maven, jenesisRepository)),
@@ -841,10 +842,10 @@ public class JpxTest {
     }
 
     private Jpx modularJpx() {
-        Repository jenesisRepository = new JenesisModuleRepository(jenesisRepoFolder.toUri());
+        Repository jenesisRepository = JenesisModuleRepository.ofKeys(SYSTEM, jenesisRepoFolder.toUri());
         return new Jpx(storage,
                 Map.of("module", jenesisRepository),
-                Map.of("module", new ModularJarResolver(false)),
+                Map.of("module", ModularJarResolver.ofKeys(SYSTEM, false)),
                 new HashDigestFunction("SHA-256"),
                 PathPlacement.MODULE_PATH);
     }

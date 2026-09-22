@@ -15,6 +15,7 @@ import build.jenesis.step.JarSigner;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class JarSignerTest {
 
@@ -93,7 +94,7 @@ public class JarSignerTest {
 
     @Test
     public void rejects_a_password_that_is_not_a_location() {
-        assertThatThrownBy(() -> new JarSigner().storepass("secret"))
+        assertThatThrownBy(() -> JarSigner.ofKeys(SYSTEM).storepass("secret"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("jenesis.jarsigner.storepass")
                 .hasMessageContaining("'env <variable>' or 'file <path>'");
@@ -108,7 +109,7 @@ public class JarSignerTest {
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addStep("sign", new JarSigner(), "project");
+        executor.addStep("sign", JarSigner.ofKeys(SYSTEM), "project");
         executor.execute();
 
         try (JarFile jar = new JarFile(signed().toFile())) {
@@ -122,7 +123,7 @@ public class JarSignerTest {
     public void refuses_to_ship_unsigned_when_no_key_store_was_supplied() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addStep("sign", new JarSigner().alias(ALIAS), "project");
+        executor.addStep("sign", JarSigner.ofKeys(SYSTEM).alias(ALIAS), "project");
 
         assertThatThrownBy(executor::execute).rootCause()
                 .as("a project that says it signs must not quietly produce an unsigned jar"
@@ -136,7 +137,7 @@ public class JarSignerTest {
     public void refuses_a_key_store_whose_password_nothing_locates() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addStep("sign", new JarSigner().keystore(keystore.toString()).alias(ALIAS), "project");
+        executor.addStep("sign", JarSigner.ofKeys(SYSTEM).keystore(keystore.toString()).alias(ALIAS), "project");
 
         assertThatThrownBy(executor::execute).rootCause()
                 .as("jarsigner would ask for the password, and a build that cannot answer hangs")
@@ -146,10 +147,10 @@ public class JarSignerTest {
 
     @Test
     public void says_nothing_about_signing_until_something_names_it() {
-        assertThat(new JarSigner().configured())
+        assertThat(JarSigner.ofKeys(SYSTEM).configured())
                 .as("nothing is set, so the archiver's jar is the artifact")
                 .isFalse();
-        assertThat(new JarSigner().alias(ALIAS).configured())
+        assertThat(JarSigner.ofKeys(SYSTEM).alias(ALIAS).configured())
                 .as("a project that names the key it signs with has said it signs")
                 .isTrue();
     }
@@ -172,7 +173,7 @@ public class JarSignerTest {
     }
 
     private JarSigner newSigner() {
-        return new JarSigner()
+        return JarSigner.ofKeys(SYSTEM)
                 .keystore(keystore.toString())
                 .storetype("PKCS12")
                 .alias(ALIAS)

@@ -17,10 +17,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
             SCALAFMT = "scalafmt";
 
     private final SequencedSet<Path> configuration;
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
     private final boolean verify;
+    private final GoogleJavaFormatModule googleModule;
+    private final PalantirJavaFormatModule palantirModule;
+    private final KtlintFormatModule ktlintModule;
+    private final ScalafmtFormatModule scalafmtModule;
     private final Function<BuildExecutorModule, BuildExecutorModule> java;
     private final Function<KtlintFormatModule, BuildExecutorModule> ktlint;
     private final Function<ScalafmtFormatModule, BuildExecutorModule> scalafmt;
@@ -28,53 +30,90 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     public InferredSourceFormattingModule(SequencedSet<Path> configuration,
                                           Map<String, Repository> repositories,
                                           Map<String, Resolver> resolvers) {
-        this(configuration, repositories, resolvers, null,
-                !SequencedProperties.systemFlag("jenesis.format.rewrite"),
-                enabledBy("jenesis.format.java"),
-                enabledBy("jenesis.format.ktlint"),
-                enabledBy("jenesis.format.scalafmt"));
+        this(configuration, null, true, new GoogleJavaFormatModule(repositories, resolvers),
+             new PalantirJavaFormatModule(repositories, resolvers),
+             new KtlintFormatModule(repositories, resolvers),
+             new ScalafmtFormatModule(repositories, resolvers),
+             value -> value,
+             value -> value,
+             value -> value);
+    }
+
+    public static InferredSourceFormattingModule ofKeys(Function<String, String> keys,
+                                                        SequencedSet<Path> configuration,
+                                                        Map<String, Repository> repositories,
+                                                        Map<String, Resolver> resolvers) {
+        InferredSourceFormattingModule module = new InferredSourceFormattingModule(configuration, null, true, GoogleJavaFormatModule.ofKeys(keys, repositories, resolvers),
+                PalantirJavaFormatModule.ofKeys(keys, repositories, resolvers),
+                KtlintFormatModule.ofKeys(keys, repositories, resolvers),
+                ScalafmtFormatModule.ofKeys(keys, repositories, resolvers),
+                value -> value,
+                value -> value,
+                value -> value);
+        Boolean rewrite = SequencedProperties.flagOrNull(keys, "format.rewrite");
+        if (rewrite != null) {
+            module = module.verify(!rewrite);
+        }
+        Boolean java = SequencedProperties.flagOrNull(keys, "format.java");
+        if (java != null) {
+            module = module.java(java ? value -> value : null);
+        }
+        Boolean ktlint = SequencedProperties.flagOrNull(keys, "format.ktlint");
+        if (ktlint != null) {
+            module = module.ktlint(ktlint ? value -> value : null);
+        }
+        Boolean scalafmt = SequencedProperties.flagOrNull(keys, "format.scalafmt");
+        if (scalafmt != null) {
+            module = module.scalafmt(scalafmt ? value -> value : null);
+        }
+        return module;
     }
 
     private InferredSourceFormattingModule(SequencedSet<Path> configuration,
-                                           Map<String, Repository> repositories,
-                                           Map<String, Resolver> resolvers,
                                            Pinning pinning,
                                            boolean verify,
+                                           GoogleJavaFormatModule googleModule,
+                                           PalantirJavaFormatModule palantirModule,
+                                           KtlintFormatModule ktlintModule,
+                                           ScalafmtFormatModule scalafmtModule,
                                            Function<BuildExecutorModule, BuildExecutorModule> java,
                                            Function<KtlintFormatModule, BuildExecutorModule> ktlint,
                                            Function<ScalafmtFormatModule, BuildExecutorModule> scalafmt) {
         this.configuration = configuration;
-        this.repositories = repositories;
-        this.resolvers = resolvers;
         this.pinning = pinning;
         this.verify = verify;
+        this.googleModule = googleModule;
+        this.palantirModule = palantirModule;
+        this.ktlintModule = ktlintModule;
+        this.scalafmtModule = scalafmtModule;
         this.java = java;
         this.ktlint = ktlint;
         this.scalafmt = scalafmt;
     }
 
-    private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
-        return SequencedProperties.systemFlag(property, true) ? module -> module : null;
-    }
-
     public InferredSourceFormattingModule pinning(Pinning pinning) {
-        return new InferredSourceFormattingModule(configuration, repositories, resolvers, pinning, verify, java, ktlint, scalafmt);
+        return new InferredSourceFormattingModule(configuration, pinning, verify, googleModule, palantirModule,
+                ktlintModule, scalafmtModule, java, ktlint, scalafmt);
     }
 
     public InferredSourceFormattingModule verify(boolean verify) {
-        return new InferredSourceFormattingModule(configuration, repositories, resolvers, pinning, verify, java, ktlint, scalafmt);
+        return new InferredSourceFormattingModule(configuration, pinning, verify, googleModule, palantirModule,
+                ktlintModule, scalafmtModule, java, ktlint, scalafmt);
     }
 
     public InferredSourceFormattingModule java(Function<BuildExecutorModule, BuildExecutorModule> java) {
-        return new InferredSourceFormattingModule(configuration, repositories, resolvers, pinning, verify, java, ktlint, scalafmt);
+        return new InferredSourceFormattingModule(configuration, pinning, verify, googleModule, palantirModule,
+                ktlintModule, scalafmtModule, java, ktlint, scalafmt);
     }
 
     public InferredSourceFormattingModule ktlint(Function<KtlintFormatModule, BuildExecutorModule> ktlint) {
-        return new InferredSourceFormattingModule(configuration, repositories, resolvers, pinning, verify, java, ktlint, scalafmt);
+        return new InferredSourceFormattingModule(configuration, pinning, verify, googleModule, palantirModule,
+                ktlintModule, scalafmtModule, java, ktlint, scalafmt);
     }
 
     public InferredSourceFormattingModule scalafmt(Function<ScalafmtFormatModule, BuildExecutorModule> scalafmt) {
-        return new InferredSourceFormattingModule(configuration, repositories, resolvers, pinning, verify, java, ktlint, scalafmt);
+        return new InferredSourceFormattingModule(configuration, pinning, verify, googleModule, palantirModule,
+                ktlintModule, scalafmtModule, java, ktlint, scalafmt);
     }
 
     @Override
@@ -82,16 +121,16 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         Bind.configuredByProperties(buildExecutor, inherited.sequencedKeySet(), JAVA, java,
                 BuildStep.locate(configuration, "javaformat.properties"),
                 properties -> switch (properties.value("formatter")) {
-                    case "google" -> new GoogleJavaFormatModule(repositories, resolvers).pinning(pinning).verify(verify);
-                    case "palantir" -> new PalantirJavaFormatModule(repositories, resolvers).pinning(pinning).verify(verify);
+                    case "google" -> googleModule.pinning(pinning).verify(verify);
+                    case "palantir" -> palantirModule.pinning(pinning).verify(verify);
                     case null -> null;
                     default -> throw new IllegalArgumentException("Unknown Java format: " + properties.value("formatter"));
                 });
         Bind.configured(buildExecutor, inherited.sequencedKeySet(), KTLINT, ktlint,
                 KtlintFormatModule.configurationFile(configuration),
-                () -> new KtlintFormatModule(repositories, resolvers).pinning(pinning).verify(verify));
+                () -> ktlintModule.pinning(pinning).verify(verify));
         Bind.configured(buildExecutor, inherited.sequencedKeySet(), SCALAFMT, scalafmt,
                 ScalafmtFormatModule.configurationFile(configuration),
-                () -> new ScalafmtFormatModule(repositories, resolvers).pinning(pinning).verify(verify));
+                () -> scalafmtModule.pinning(pinning).verify(verify));
     }
 }

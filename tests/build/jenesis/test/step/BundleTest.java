@@ -13,6 +13,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bundle;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class BundleTest {
 
@@ -39,7 +40,7 @@ public class BundleTest {
         launcher.setProperty("mainClass", "sample.Sample");
         launcher.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = new Bundle().apply(
+        BuildStepResult result = Bundle.ofKeys(SYSTEM).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -83,7 +84,7 @@ public class BundleTest {
         launcher.setProperty("mainModule", "sample");
         launcher.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = new Bundle().apply(
+        BuildStepResult result = Bundle.ofKeys(SYSTEM).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -121,7 +122,7 @@ public class BundleTest {
         launcher.setProperty("mainModule", "sample");
         launcher.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = new Bundle().apply(
+        BuildStepResult result = Bundle.ofKeys(SYSTEM).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -173,7 +174,7 @@ public class BundleTest {
         launcher.setProperty("mainModule", "sample");
         launcher.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = new Bundle().apply(
+        BuildStepResult result = Bundle.ofKeys(SYSTEM).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -198,7 +199,7 @@ public class BundleTest {
     public void skips_a_module_without_a_main() throws IOException {
         writePlainJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"));
 
-        BuildStepResult result = new Bundle().apply(
+        BuildStepResult result = Bundle.ofKeys(SYSTEM).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -216,7 +217,7 @@ public class BundleTest {
         launcher.setProperty("mainClass", "sample.Sample");
         launcher.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = new Bundle().apply(
+        BuildStepResult result = Bundle.ofKeys(SYSTEM).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -228,7 +229,7 @@ public class BundleTest {
         try (ZipFile zip = new ZipFile(next.resolve(Bundle.BUNDLE).resolve("bundle.zip").toFile())) {
             assertThat(zip.stream().map(ZipEntry::getTimeLocal))
                     .as("a bundle created at another moment carries the same bytes")
-                    .containsOnly(BuildStep.timestamp().toLocalDateTime());
+                    .containsOnly(BuildStep.timestamp(SYSTEM).toLocalDateTime());
         }
     }
 
@@ -244,7 +245,7 @@ public class BundleTest {
         Bundle bundle;
         System.setProperty("jenesis.archive.timestamp", "");
         try {
-            bundle = new Bundle();
+            bundle = Bundle.ofKeys(SYSTEM);
         } finally {
             System.clearProperty("jenesis.archive.timestamp");
         }

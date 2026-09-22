@@ -15,20 +15,24 @@ public class MavenDefaultRepository implements MavenRepository {
     private final Map<String, URI> validations;
     private final Consumer<String> callback;
     private final String token;
-    private final Repository.Retry retry;
+    private final Repository.Connection connection;
 
     public static MavenRepository of() {
-        Path local = localRepository();
-        Repository.Credential credential = Repository.Credential.of("jenesis.maven.token", "MAVEN_REPOSITORY_TOKEN");
-        boolean verbose = SequencedProperties.systemFlag("jenesis.print.fetch");
-        String property = System.getProperty("jenesis.maven.uri");
+        return ofKeys(SequencedProperties.NONE);
+    }
+
+    public static MavenRepository ofKeys(Function<String, String> keys) {
+        Path local = localRepository(keys);
+        Repository.Credential credential = Repository.Credential.of(keys, "maven.token", "MAVEN_REPOSITORY_TOKEN");
+        boolean verbose = SequencedProperties.flag(keys, "print.fetch");
+        String property = SequencedProperties.getProperty(keys, "maven.uri");
         String environment = System.getenv("MAVEN_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();
         String text;
         Repository.Origin origin;
         if (property != null) {
             text = property;
-            origin = Repository.Origin.of("jenesis.maven.uri");
+            origin = Repository.Origin.of(keys, "maven.uri");
         } else if (environment != null) {
             text = environment;
             visited.add("MAVEN_REPOSITORY_URI");
@@ -37,7 +41,7 @@ public class MavenDefaultRepository implements MavenRepository {
             text = "https://repo1.maven.org/maven2/";
             origin = Repository.Origin.DEFAULT;
         }
-        MavenRepository repository = chain(text, visited, local, credential, origin, verbose, null);
+        MavenRepository repository = chain(keys, text, visited, local, credential, origin, verbose, null);
         if (repository == null) {
             throw new IllegalStateException("No Maven repository is configured by: " + text);
         }
@@ -45,14 +49,19 @@ public class MavenDefaultRepository implements MavenRepository {
     }
 
     public static MavenRepository of(URI repository, String token) {
-        return single(repository.toString().endsWith("/") ? repository : URI.create(repository + "/"),
-                localRepository(),
-                token,
-                SequencedProperties.systemFlag("jenesis.print.fetch"));
+        return ofKeys(SequencedProperties.NONE, repository, token);
     }
 
-    private static Path localRepository() {
-        String override = System.getProperty("jenesis.maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
+    public static MavenRepository ofKeys(Function<String, String> keys, URI repository, String token) {
+        return single(keys,
+                repository.toString().endsWith("/") ? repository : URI.create(repository + "/"),
+                localRepository(keys),
+                token,
+                SequencedProperties.flag(keys, "print.fetch"));
+    }
+
+    private static Path localRepository(Function<String, String> keys) {
+        String override = SequencedProperties.getProperty(keys, "maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
         if (override == null) {
             Path candidate = Path.of(System.getProperty("user.home"), ".m2", "repository");
             return Files.isDirectory(candidate) ? candidate : null;
@@ -64,12 +73,17 @@ public class MavenDefaultRepository implements MavenRepository {
         return local;
     }
 
-    private static MavenRepository single(URI uri, Path local, String token, boolean verbose) {
+    private static MavenRepository single(Function<String, String> keys,
+                                          URI uri,
+                                          Path local,
+                                          String token,
+                                          boolean verbose) {
         SequencedMap<String, URI> validations = new LinkedHashMap<>();
         validations.put("SHA512", uri);
         validations.put("SHA256", uri);
         validations.put("SHA1", uri);
-        return new MavenDefaultRepository(uri,
+        return ofKeys(keys,
+                uri,
                 local,
                 Collections.unmodifiableMap(validations),
                 verbose ? path -> System.out.printf("%s%-11s%s %s%n",
@@ -80,7 +94,8 @@ public class MavenDefaultRepository implements MavenRepository {
                 token);
     }
 
-    private static MavenRepository chain(String text,
+    private static MavenRepository chain(Function<String, String> keys,
+                                         String text,
                                          Set<String> visited,
                                          Path local,
                                          Repository.Credential credential,
@@ -114,9 +129,9 @@ public class MavenDefaultRepository implements MavenRepository {
                         spliced = Repository.Origin.DEFAULT;
                     }
                 } else {
-                    String declared = System.getProperty(name);
+                    String declared = SequencedProperties.getProperty(keys, name);
                     value = declared == null ? System.getenv(name) : declared;
-                    spliced = declared == null ? Repository.Origin.ENVIRONMENT : Repository.Origin.of(name);
+                    spliced = declared == null ? Repository.Origin.ENVIRONMENT : Repository.Origin.of(keys, name);
                     if (value == null) {
                         throw new IllegalStateException("Unresolved repository reference: @" + name);
                     }
@@ -124,7 +139,7 @@ public class MavenDefaultRepository implements MavenRepository {
                         throw new IllegalStateException("Circular repository reference: @" + name);
                     }
                 }
-                current = chain(value, visited, local, credential, spliced, verbose, null);
+                current = chain(keys, value, visited, local, credential, spliced, verbose, null);
                 if (name != null) {
                     visited.remove(name);
                 }
@@ -132,7 +147,8 @@ public class MavenDefaultRepository implements MavenRepository {
                     throw new IllegalStateException("No Maven repository is configured by: " + value);
                 }
             } else {
-                current = single(URI.create(location.endsWith("/") ? location : location + "/"),
+                current = single(keys,
+                        URI.create(location.endsWith("/") ? location : location + "/"),
                         local,
                         credential.grant(origin),
                         verbose);
@@ -170,7 +186,25 @@ public class MavenDefaultRepository implements MavenRepository {
                                   Map<String, URI> validations,
                                   Consumer<String> callback,
                                   String token) {
-        this(repository, local, validations, callback, token, new Repository.Retry());
+        this(SequencedProperties.NONE, repository, local, validations, callback, token);
+    }
+
+    public static MavenDefaultRepository ofKeys(Function<String, String> keys,
+                                                URI repository,
+                                                Path local,
+                                                Map<String, URI> validations,
+                                                Consumer<String> callback,
+                                                String token) {
+        return new MavenDefaultRepository(keys, repository, local, validations, callback, token);
+    }
+
+    private MavenDefaultRepository(Function<String, String> keys,
+                                   URI repository,
+                                   Path local,
+                                   Map<String, URI> validations,
+                                   Consumer<String> callback,
+                                   String token) {
+        this(repository, local, validations, callback, token, Repository.Connection.ofKeys(keys));
     }
 
     private MavenDefaultRepository(URI repository,
@@ -178,18 +212,18 @@ public class MavenDefaultRepository implements MavenRepository {
                                    Map<String, URI> validations,
                                    Consumer<String> callback,
                                    String token,
-                                   Repository.Retry retry) {
+                                   Repository.Connection connection) {
         this.repository = repository;
         this.local = local;
         this.writable = local != null && Files.isWritable(local);
         this.validations = validations;
         this.callback = callback;
         this.token = token;
-        this.retry = retry;
+        this.connection = connection;
     }
 
-    public MavenDefaultRepository retry(Repository.Retry retry) {
-        return new MavenDefaultRepository(repository, local, validations, callback, token, retry);
+    public MavenDefaultRepository connection(Repository.Connection connection) {
+        return new MavenDefaultRepository(repository, local, validations, callback, token, connection);
     }
 
     public MavenDefaultRepository printing(boolean printing) {
@@ -199,7 +233,7 @@ public class MavenDefaultRepository implements MavenRepository {
                         "[FETCHED]",
                         BuildExecutorCallback.RESET,
                         repository.resolve(path))
-                : null, token, retry);
+                : null, token, connection);
     }
 
     @SuppressWarnings("unchecked")
@@ -351,32 +385,32 @@ public class MavenDefaultRepository implements MavenRepository {
                 path.substring(dash + 1, dot),
                 path.substring(dot),
                 token,
-                retry);
+                connection);
     }
 
-    private static Optional<Path> download(URI uri,
+    private static Optional<Path> download(Repository.Connection connection,
+                                           URI uri,
                                            SequencedMap<LazyRepositoryItem, MessageDigest> digests,
                                            String prefix,
                                            String suffix,
                                            String token,
-                                           Repository.Retry retry,
                                            Path directory) throws IOException {
         Path temporary = directory == null
                 ? Files.createTempFile(prefix, suffix)
                 : Files.createTempFile(directory, prefix, suffix);
         try {
             for (int attempt = 0; ; attempt++) {
-                try (InputStream stream = Repository.open(uri, token, retry)) {
+                try (InputStream stream = Repository.open(connection, uri, token)) {
                     Files.copy(stream, temporary, StandardCopyOption.REPLACE_EXISTING);
                     break;
                 } catch (FileNotFoundException _) {
                     Files.deleteIfExists(temporary);
                     return Optional.empty();
                 } catch (SocketException | SocketTimeoutException e) {
-                    if (attempt >= retry.retries()) {
+                    if (attempt >= connection.retries()) {
                         throw e;
                     }
-                    Thread.sleep(retry.backoff().toMillis() << attempt);
+                    Thread.sleep(connection.backoff().toMillis() << attempt);
                 }
             }
         } catch (InterruptedException e) {
@@ -523,7 +557,7 @@ public class MavenDefaultRepository implements MavenRepository {
                                 String prefix,
                                 String suffix,
                                 String token,
-                                Repository.Retry retry) implements LazyRepositoryItem {
+                                Repository.Connection connection) implements LazyRepositoryItem {
 
         @Override
         public void storeIfNotPresent(byte[] bytes) throws IOException {
@@ -547,7 +581,7 @@ public class MavenDefaultRepository implements MavenRepository {
 
         @Override
         public Optional<InputStream> toLazyInputStream() throws IOException {
-            Optional<Path> temporary = download(uri, digests, prefix, suffix, token, retry, null);
+            Optional<Path> temporary = download(connection, uri, digests, prefix, suffix, token, null);
             if (temporary.isEmpty()) {
                 return Optional.empty();
             }
@@ -577,7 +611,7 @@ public class MavenDefaultRepository implements MavenRepository {
                 return LazyRepositoryItem.super.materialize();
             }
             Files.createDirectories(path.getParent());
-            Optional<Path> temporary = download(uri, digests, prefix, suffix, token, retry, path.getParent());
+            Optional<Path> temporary = download(connection, uri, digests, prefix, suffix, token, path.getParent());
             if (temporary.isEmpty()) {
                 return Optional.empty();
             }

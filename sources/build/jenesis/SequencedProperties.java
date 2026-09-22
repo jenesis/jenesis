@@ -4,6 +4,9 @@ import module java.base;
 
 public class SequencedProperties extends Properties {
 
+    public static final Function<String, String> SYSTEM = key -> System.getProperty("jenesis." + key);
+    public static final Function<String, String> NONE = _ -> null;
+
     private final SequencedMap<Object, Object> delegate = new LinkedHashMap<>();
 
     public static SequencedProperties ofFolders(Iterable<Path> folders, String file) throws IOException {
@@ -29,8 +32,82 @@ public class SequencedProperties extends Properties {
         return properties;
     }
 
-    public String value(String key) {
-        String value = getProperty(key);
+    public static String getProperty(Function<String, String> keys, String key) {
+        return keys.apply(key);
+    }
+
+    public static String getProperty(Function<String, String> keys, String key, String defaultValue) {
+        String value = keys.apply(key);
+        return value == null ? defaultValue : value;
+    }
+
+    public static String value(Function<String, String> keys, String key) {
+        return trimmed(keys.apply(key));
+    }
+
+    public static String value(Function<String, String> keys, String key, String defaultValue) {
+        String value = trimmed(keys.apply(key));
+        return value == null ? defaultValue : value;
+    }
+
+    public static boolean flag(Function<String, String> keys, String key) {
+        return flag(keys, key, false);
+    }
+
+    public static boolean flag(Function<String, String> keys, String key, boolean defaultValue) {
+        Boolean value = flagOrNull(keys, key);
+        return value == null ? defaultValue : value;
+    }
+
+    public static Boolean flagOrNull(Function<String, String> keys, String key) {
+        return parseFlag("jenesis." + key, keys.apply(key));
+    }
+
+    public static int number(Function<String, String> keys, String key, int defaultValue) {
+        Integer value = numberOrNull(keys, key);
+        return value == null ? defaultValue : value;
+    }
+
+    public static long number(Function<String, String> keys, String key, long defaultValue) {
+        Long value = longOrNull(keys, key);
+        return value == null ? defaultValue : value;
+    }
+
+    public static Integer numberOrNull(Function<String, String> keys, String key) {
+        String value = value(keys, key);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException _) {
+            throw new IllegalArgumentException("Malformed value for jenesis." + key + ": '" + value
+                    + "' (expected a whole number)");
+        }
+    }
+
+    public static Long longOrNull(Function<String, String> keys, String key) {
+        String value = value(keys, key);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException _) {
+            throw new IllegalArgumentException("Malformed value for jenesis." + key + ": '" + value
+                    + "' (expected a whole number)");
+        }
+    }
+
+    public static List<String> entries(Function<String, String> keys, String key) {
+        return splitEntries(value(keys, key));
+    }
+
+    public static List<String> words(Function<String, String> keys, String key) {
+        return splitWords(value(keys, key));
+    }
+
+    private static String trimmed(String value) {
         if (value == null) {
             return null;
         }
@@ -38,22 +115,7 @@ public class SequencedProperties extends Properties {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-    public String value(String key, String defaultValue) {
-        String value = value(key);
-        return value == null ? defaultValue : value;
-    }
-
-    public static boolean systemFlag(String key) {
-        return systemFlag(key, false);
-    }
-
-    public static boolean systemFlag(String key, boolean defaultValue) {
-        Boolean value = systemFlagOrNull(key);
-        return value == null ? defaultValue : value;
-    }
-
-    public static Boolean systemFlagOrNull(String key) {
-        String value = System.getProperty(key);
+    private static Boolean parseFlag(String name, String value) {
         if (value == null) {
             return null;
         }
@@ -61,24 +123,14 @@ public class SequencedProperties extends Properties {
             case "", "true" -> true;
             case "false" -> false;
             default -> throw new IllegalArgumentException("Malformed value for "
-                    + key
+                    + name
                     + ": '"
                     + value
-                    + "' (expected true, false, or the property named with no value at all)");
+                    + "' (expected true, false, or the setting named with no value at all)");
         };
     }
 
-    public boolean flag(String key) {
-        return flag(key, false);
-    }
-
-    public boolean flag(String key, boolean defaultValue) {
-        String value = value(key);
-        return value == null ? defaultValue : Boolean.parseBoolean(value);
-    }
-
-    public List<String> entries(String key) {
-        String value = value(key);
+    private static List<String> splitEntries(String value) {
         if (value == null) {
             return null;
         }
@@ -92,12 +144,41 @@ public class SequencedProperties extends Properties {
         return entries;
     }
 
-    public List<String> words(String key) {
-        String value = value(key);
+    private static List<String> splitWords(String value) {
         if (value == null) {
             return List.of();
         }
         return List.of(value.split("\\s+"));
+    }
+
+    public String value(String key) {
+        return trimmed(getProperty(key));
+    }
+
+    public String value(String key, String defaultValue) {
+        String value = value(key);
+        return value == null ? defaultValue : value;
+    }
+
+    public boolean flag(String key) {
+        return flag(key, false);
+    }
+
+    public boolean flag(String key, boolean defaultValue) {
+        Boolean value = flagOrNull(key);
+        return value == null ? defaultValue : value;
+    }
+
+    public Boolean flagOrNull(String key) {
+        return parseFlag(key, getProperty(key));
+    }
+
+    public List<String> entries(String key) {
+        return splitEntries(value(key));
+    }
+
+    public List<String> words(String key) {
+        return splitWords(value(key));
     }
 
     public void store(Path file) throws IOException {

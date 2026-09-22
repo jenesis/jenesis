@@ -1,6 +1,7 @@
 package build.jenesis.step;
 
 import module java.base;
+import build.jenesis.SequencedProperties;
 
 public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHandler.OfProcess {
 
@@ -42,7 +43,11 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         };
 
         public static Factory of() {
-            String factory = System.getProperty("jenesis.process.factory");
+            return ofKeys(SequencedProperties.NONE);
+        }
+
+        public static Factory ofKeys(Function<String, String> keys) {
+            String factory = SequencedProperties.getProperty(keys, "process.factory");
             if (factory == null) {
                 if (System.getProperty("org.graalvm.nativeimage.imagecode") == null) {
                     return TOOL;

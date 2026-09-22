@@ -12,7 +12,7 @@ public class Demo {
 
     static void main(String[] args) throws Exception {
         generateKey();
-        if (Project.perform(Path.of("."), Make.loadProperties(Path.of(".")), "stage") == null) {
+        if (new Make(Project.class.getName()).run("stage") != 0) {
             throw new IllegalStateException("The build did not stage the signed jar");
         }
         Path staged = staged();

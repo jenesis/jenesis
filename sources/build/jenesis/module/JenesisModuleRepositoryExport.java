@@ -5,16 +5,21 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.SequencedProperties;
 
 public class JenesisModuleRepositoryExport implements BuildStep {
 
     private final Path target;
 
     public JenesisModuleRepositoryExport() {
-        String override = System.getProperty("jenesis.module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
-        target = override == null
-                ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
-                : Path.of(override);
+        this(Path.of(System.getProperty("user.home")).resolve(".jenesis"));
+    }
+
+    public static JenesisModuleRepositoryExport ofKeys(Function<String, String> keys) {
+        String override = SequencedProperties.getProperty(keys, "module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
+        return override == null
+                ? new JenesisModuleRepositoryExport()
+                : new JenesisModuleRepositoryExport(Path.of(override));
     }
 
     public JenesisModuleRepositoryExport(Path target) {

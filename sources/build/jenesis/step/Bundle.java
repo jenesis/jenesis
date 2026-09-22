@@ -17,7 +17,13 @@ public class Bundle implements BuildStep {
     private final OffsetDateTime timestamp;
 
     public Bundle() {
-        this("main", BuildStep.timestamp());
+        this("main",
+             BuildStep.timestamp());
+    }
+
+    public static Bundle ofKeys(Function<String, String> keys) {
+        return new Bundle()
+                .timestamp(BuildStep.timestamp(keys));
     }
 
     private Bundle(String group, OffsetDateTime timestamp) {
@@ -26,6 +32,10 @@ public class Bundle implements BuildStep {
     }
 
     public Bundle group(String group) {
+        return new Bundle(group, timestamp);
+    }
+
+    public Bundle timestamp(OffsetDateTime timestamp) {
         return new Bundle(group, timestamp);
     }
 

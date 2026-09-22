@@ -14,6 +14,7 @@ import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class ModularJarResolverTest {
 
@@ -34,7 +35,7 @@ public class ModularJarResolverTest {
                 "managed", new ModularJarResolver(false, null, ModuleVersionNegotiator.managed()));
         for (Map.Entry<String, ModularJarResolver> entry : cases.entrySet()) {
             System.setProperty("jenesis.resolver.module", entry.getKey());
-            assertThat(serialize(new ModularJarResolver(false)))
+            assertThat(serialize(ModularJarResolver.ofKeys(SYSTEM, false)))
                     .as("mode=%s", entry.getKey())
                     .isEqualTo(serialize(entry.getValue()));
         }
@@ -43,14 +44,14 @@ public class ModularJarResolverTest {
     @Test
     public void system_property_is_read_case_insensitively() throws IOException {
         System.setProperty("jenesis.resolver.module", "IgNoRe");
-        assertThat(serialize(new ModularJarResolver(false)))
+        assertThat(serialize(ModularJarResolver.ofKeys(SYSTEM, false)))
                 .isEqualTo(serialize(new ModularJarResolver(false, null, ModuleVersionNegotiator.ignore())));
     }
 
     @Test
     public void system_property_rejects_an_unknown_mode() {
         System.setProperty("jenesis.resolver.module", "nonsense");
-        assertThatThrownBy(() -> new ModularJarResolver(false))
+        assertThatThrownBy(() -> ModularJarResolver.ofKeys(SYSTEM, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Unknown jenesis.resolver.module 'nonsense',"
                         + " expected one of: first, ignore, fail, managed");
@@ -60,7 +61,7 @@ public class ModularJarResolverTest {
     public void the_plain_resolver_negotiates_as_first() throws IOException {
         assertThat(serialize(new ModularJarResolver(false, null, ModuleVersionNegotiator.first())))
                 .as("first() names what the shorter constructors already do")
-                .isEqualTo(serialize(new ModularJarResolver(false)));
+                .isEqualTo(serialize(ModularJarResolver.ofKeys(SYSTEM, false)));
     }
 
     @Test
@@ -68,7 +69,7 @@ public class ModularJarResolverTest {
         assertThat(serialize(new ModularJarResolver(false, null, ModuleVersionNegotiator.ignore())))
                 .as("the resolver travels in the step's serialized form, which is its cache key,"
                         + " so a resolution decided differently cannot be served from the cache")
-                .isNotEqualTo(serialize(new ModularJarResolver(false)));
+                .isNotEqualTo(serialize(ModularJarResolver.ofKeys(SYSTEM, false)));
     }
 
     @Test
@@ -126,7 +127,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void reports_an_alias_a_module_layout_cannot_provide() {
-        assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
+        assertThatThrownBy(() -> ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "module",
                 Map.of("module", (_, coordinate, _) -> {
@@ -150,7 +151,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void can_parse_module_info() throws IOException {
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -173,7 +174,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void emits_followed_and_not_followed_module_edges() throws IOException {
-        Resolver.Resolution resolution = new ModularJarResolver(false).dependencies(
+        Resolver.Resolution resolution = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -202,7 +203,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void skips_non_transitive_static_requires_in_compile_scope() throws IOException {
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -221,7 +222,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void includes_static_transitive_requires_in_compile_scope() throws IOException {
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -243,7 +244,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void emits_transitive_requires_in_sorted_order_independent_of_declaration_order() throws IOException {
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -269,7 +270,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void skips_static_transitive_requires_in_runtime_scope() throws IOException {
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -343,7 +344,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void uses_version_from_module_info_class() throws IOException {
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -361,7 +362,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void rejects_module_info_version_with_path_traversal() {
-        assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
+        assertThatThrownBy(() -> ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> Optional.of(toJar("root", "../evil"))),
@@ -375,7 +376,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void unversioned_module_info_yields_unversioned_coordinate() throws IOException {
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -393,7 +394,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void rejects_module_with_unexpected_name() {
-        assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
+        assertThatThrownBy(() -> ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -413,7 +414,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void input_pin_drives_versioned_fetch() throws IOException {
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -431,7 +432,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void input_pin_rejects_mismatched_module_info_version() {
-        assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
+        assertThatThrownBy(() -> ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -452,7 +453,7 @@ public class ModularJarResolverTest {
     @Test
     public void input_pin_does_not_fall_back_to_unversioned_coordinate() {
         Map<String, String> fetched = new LinkedHashMap<>();
-        assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
+        assertThatThrownBy(() -> ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -473,7 +474,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void tolerates_version_mismatch_when_automatic_modules_are_allowed() throws IOException {
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(true).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, true).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -491,7 +492,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void input_pin_supplies_version_for_unversioned_module() throws IOException {
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -509,7 +510,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void transitive_carries_its_own_module_info_version() throws IOException {
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -530,7 +531,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void mixed_versioned_and_unversioned_transitives() throws IOException {
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -556,7 +557,7 @@ public class ModularJarResolverTest {
     @Test
     public void propagates_compiled_version_from_parent_requires() throws IOException {
         Map<String, String> fetched = new LinkedHashMap<>();
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -580,7 +581,7 @@ public class ModularJarResolverTest {
     @Test
     public void compiled_version_falls_back_to_bare_lookup_when_absent() throws IOException {
         Map<String, String> fetched = new LinkedHashMap<>();
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -604,7 +605,7 @@ public class ModularJarResolverTest {
     @Test
     public void input_pin_overrides_compiled_version_propagation() throws IOException {
         Map<String, String> fetched = new LinkedHashMap<>();
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -628,7 +629,7 @@ public class ModularJarResolverTest {
     @Test
     public void compiled_version_propagates_through_chain() throws IOException {
         Map<String, String> fetched = new LinkedHashMap<>();
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -654,7 +655,7 @@ public class ModularJarResolverTest {
     @Test
     public void compiled_version_first_seen_wins_when_two_parents_disagree() throws IOException {
         Map<String, String> fetched = new LinkedHashMap<>();
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -868,7 +869,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void input_pin_overrides_only_named_module_others_use_class_file() throws IOException {
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -889,7 +890,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void rejects_propagated_compiled_version_with_path_traversal() {
-        assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
+        assertThatThrownBy(() -> ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -912,7 +913,7 @@ public class ModularJarResolverTest {
         LinkedHashMap<Integer, String> versions = new LinkedHashMap<>();
         versions.put(runtime + 100, "9.9");
         versions.put(runtime, "2.0");
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -933,7 +934,7 @@ public class ModularJarResolverTest {
         int runtime = Runtime.version().feature();
         LinkedHashMap<Integer, String> versions = new LinkedHashMap<>();
         versions.put(runtime + 100, "9.9");
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -952,7 +953,7 @@ public class ModularJarResolverTest {
     @Test
     public void classifier_pin_drives_classified_fetch() throws IOException {
         Map<String, String> fetched = new LinkedHashMap<>();
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -973,7 +974,7 @@ public class ModularJarResolverTest {
     @Test
     public void classifier_pin_without_version_uses_module_info_version() throws IOException {
         Map<String, String> fetched = new LinkedHashMap<>();
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -994,7 +995,7 @@ public class ModularJarResolverTest {
     @Test
     public void classifier_pin_applies_to_transitive_module() throws IOException {
         Map<String, String> fetched = new LinkedHashMap<>();
-        SequencedMap<String, Resolver.Resolved> dependencies = new ModularJarResolver(false).dependencies(
+        SequencedMap<String, Resolver.Resolved> dependencies = ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -1017,7 +1018,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void classifier_pin_rejects_mismatched_module_info_version() {
-        assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
+        assertThatThrownBy(() -> ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -1037,7 +1038,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void rejects_classifier_pin_without_classifier() {
-        assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
+        assertThatThrownBy(() -> ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, _, _) -> Optional.empty()),
@@ -1050,7 +1051,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void rejects_classifier_pin_with_empty_version() {
-        assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
+        assertThatThrownBy(() -> ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, _, _) -> Optional.empty()),
@@ -1063,7 +1064,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void rejects_module_info_version_with_classifier_syntax() {
-        assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
+        assertThatThrownBy(() -> ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {
@@ -1083,7 +1084,7 @@ public class ModularJarResolverTest {
 
     @Test
     public void rejects_propagated_compiled_version_with_classifier_syntax() {
-        assertThatThrownBy(() -> new ModularJarResolver(false).dependencies(
+        assertThatThrownBy(() -> ModularJarResolver.ofKeys(SYSTEM, false).dependencies(
                 Runnable::run,
                 "foo",
                 Map.of("foo", (_, coordinate, _) -> {

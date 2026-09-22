@@ -13,17 +13,24 @@ import build.jenesis.maven.MavenDependencyKey;
 public class OsvDownload implements BuildStep {
 
     private final URI endpoint;
+    private final transient boolean insecure;
 
     public OsvDownload() {
-        this(URI.create("https://api.osv.dev"));
+        this(URI.create("https://api.osv.dev"), false);
     }
 
-    private OsvDownload(URI endpoint) {
+    public static OsvDownload ofKeys(Function<String, String> keys) {
+        return new OsvDownload(URI.create("https://api.osv.dev"),
+                SequencedProperties.flag(keys, "repository.insecure"));
+    }
+
+    private OsvDownload(URI endpoint, boolean insecure) {
         this.endpoint = endpoint;
+        this.insecure = insecure;
     }
 
     public OsvDownload endpoint(URI endpoint) {
-        return new OsvDownload(endpoint);
+        return new OsvDownload(endpoint, insecure);
     }
 
     @Override
@@ -51,7 +58,7 @@ public class OsvDownload implements BuildStep {
         List<String> coordinates = new ArrayList<>(coordinateSet);
         SequencedProperties feed = new SequencedProperties();
         if (!coordinates.isEmpty()) {
-            List<List<String>> identifiers = identifiers(request(endpoint.resolve("/v1/querybatch"), queryBatch(coordinates)));
+            List<List<String>> identifiers = identifiers(request(endpoint.resolve("/v1/querybatch"), queryBatch(coordinates), insecure));
             SequencedSet<String> distinct = new LinkedHashSet<>();
             for (List<String> ids : identifiers) {
                 distinct.addAll(ids);
@@ -60,7 +67,7 @@ public class OsvDownload implements BuildStep {
             for (String id : distinct) {
                 pending.put(id, CompletableFuture.supplyAsync(() -> {
                     try {
-                        return severity(request(endpoint.resolve("/v1/vulns/" + id), null));
+                        return severity(request(endpoint.resolve("/v1/vulns/" + id), null, insecure));
                     } catch (IOException e) {
                         throw new CompletionException(e);
                     }
@@ -308,8 +315,8 @@ public class OsvDownload implements BuildStep {
         return builder.toString();
     }
 
-    private static String request(URI uri, String body) throws IOException {
-        requireSecure(uri);
+    private static String request(URI uri, String body, boolean insecure) throws IOException {
+        requireSecure(uri, insecure);
         for (int attempt = 0; ; attempt++) {
             HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
             http.setRequestProperty("User-Agent", "Jenesis");
@@ -350,9 +357,9 @@ public class OsvDownload implements BuildStep {
         }
     }
 
-    private static void requireSecure(URI uri) {
+    private static void requireSecure(URI uri, boolean insecure) {
         String scheme = uri.getScheme();
-        if (scheme != null && !scheme.equals("https") && !SequencedProperties.systemFlag("jenesis.repository.insecure")) {
+        if (scheme != null && !scheme.equals("https") && !insecure) {
             throw new IllegalStateException("Refusing to query OSV over insecure scheme '"
                     + scheme
                     + "': "

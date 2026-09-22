@@ -26,35 +26,52 @@ public abstract class ProcessBuildStep implements BuildStep {
 
     protected final transient Function<List<String>, ? extends ProcessHandler> factory;
     private final String command;
-    protected final transient BiConsumer<Boolean, String> printing;
-    protected final transient Consumer<String> announcing;
-    private final transient Semaphore permits;
+    protected final transient Terms terms;
 
     protected ProcessBuildStep(String command, Function<List<String>, ? extends ProcessHandler> factory) {
-        this(command, factory, printing(command));
+        this(command, factory, Terms.of(command));
     }
 
     protected ProcessBuildStep(String command,
                                Function<List<String>, ? extends ProcessHandler> factory,
-                               BiConsumer<Boolean, String> printing) {
-        int concurrency = Integer.getInteger("jenesis.process.concurrency", 0);
-        if (concurrency < 0) {
-            throw new IllegalArgumentException("Process concurrency must not be negative: " + concurrency);
-        }
-        this(command, factory, printing, concurrency == 0
-                ? null
-                : PERMITS.computeIfAbsent(concurrency, Semaphore::new));
-    }
-
-    protected ProcessBuildStep(String command,
-                               Function<List<String>, ? extends ProcessHandler> factory,
-                               BiConsumer<Boolean, String> printing,
-                               Semaphore permits) {
+                               Terms terms) {
         this.command = command;
         this.factory = factory;
-        this.printing = printing;
-        this.announcing = SequencedProperties.systemFlag("jenesis.print.command") ? System.out::println : null;
-        this.permits = permits;
+        this.terms = terms;
+    }
+
+    public record Terms(BiConsumer<Boolean, String> printing, Semaphore permits, Consumer<String> announcing) {
+
+        public static Terms of(String command) {
+            return ofKeys(SequencedProperties.NONE, command, false);
+        }
+
+        public static Terms of(String command, boolean printing) {
+            return ofKeys(SequencedProperties.NONE, command, printing);
+        }
+
+        public static Terms ofKeys(Function<String, String> keys, String command) {
+            return ofKeys(keys, command, false);
+        }
+
+        public static Terms ofKeys(Function<String, String> keys, String command, boolean printing) {
+            int concurrency = SequencedProperties.number(keys, "process.concurrency", 0);
+            if (concurrency < 0) {
+                throw new IllegalArgumentException("Process concurrency must not be negative: " + concurrency);
+            }
+            boolean streamed = SequencedProperties.flag(keys, "print." + command,
+                    SequencedProperties.flag(keys, "print.process", printing));
+            return new Terms(streamed
+                    ? (error, line) -> System.out.println("\033[38;5;" + (error ? 131 : 244) + "m"
+                            + command + " >>>> " + line + BuildExecutorCallback.RESET)
+                    : null,
+                    concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Semaphore::new),
+                    SequencedProperties.flag(keys, "print.command") ? System.out::println : null);
+        }
+
+        public Terms printing(BiConsumer<Boolean, String> printing) {
+            return new Terms(printing, permits, announcing);
+        }
     }
 
     private static Charset nativeEncoding() {
@@ -69,20 +86,13 @@ public abstract class ProcessBuildStep implements BuildStep {
         }
     }
 
-    public static BiConsumer<Boolean, String> printing(String command) {
-        return SequencedProperties.systemFlag("jenesis.print." + command,
-                SequencedProperties.systemFlag("jenesis.print.process"))
-                ? (error, line) -> System.out.println("\033[38;5;" + (error ? 131 : 244) + "m"
-                        + command + " >>>> " + line + BuildExecutorCallback.RESET)
-                : null;
-    }
-
     protected List<String> configurations() {
         return factory instanceof ProcessHandler.Staged ? List.of() : List.of(command);
     }
 
     protected int execute(ProcessHandler handler, Path output, Path error, ProcessHandler.Tee tee)
             throws IOException, InterruptedException {
+        Semaphore permits = terms.permits();
         if (permits == null) {
             return handler.execute(output, error, tee);
         }
@@ -95,6 +105,7 @@ public abstract class ProcessBuildStep implements BuildStep {
     }
 
     protected ProcessHandler.Tee tee(Executor executor, ProcessHandler handler) {
+        BiConsumer<Boolean, String> printing = terms.printing();
         if (printing == null) {
             return null;
         }
@@ -170,6 +181,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                 ProcessHandler handler = factory.apply(commands);
                 Files.writeString(context.supplement().resolve("command"), String.join(" ", handler.commands()));
                 ProcessHandler.Tee tee = tee(executor, handler);
+                Consumer<String> announcing = terms.announcing();
                 if (announcing != null) {
                     announcing.accept("%s%-11s%s %s".formatted(
                             BuildExecutorCallback.YELLOW,

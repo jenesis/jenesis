@@ -69,7 +69,7 @@ store would need the line.
 Nothing else changes: the build is the ordinary inferred one, and `build/Demo.java`
 only generates the key before handing over to it exactly as `Make.java` would:
 
-    Project.perform(Path.of("."), Make.loadProperties(Path.of(".")), "stage");
+    new Make(Project.class.getName()).run("stage");
 
 A project that signs only on release puts the same lines in a release profile,
 beside the other things only a release does - see `profiles`:

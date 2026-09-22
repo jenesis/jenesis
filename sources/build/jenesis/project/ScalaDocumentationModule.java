@@ -27,59 +27,78 @@ public class ScalaDocumentationModule implements BuildExecutorModule {
     private static final String MODULE_NAME = "org.scala.lang.scaladoc", MAVEN_GROUP = "org.scala-lang",
             MAVEN_ARTIFACT = "scaladoc_3";
 
-    private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
     private final String group;
     private final String within;
-    private final transient Function<List<String>, ? extends ProcessHandler> factory;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final Function<List<String>, ? extends ProcessHandler> factory;
+    private final ProcessBuildStep.Terms terms;
 
-    public ScalaDocumentationModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "scaladoc", "main", null, null, ProcessBuildStep.printing("scaladoc"));
+    public ScalaDocumentationModule(Map<String, Repository> repositories,
+                                    Map<String, Resolver> resolvers) {
+        this(resolvers, new Dependencies(repositories, resolvers),
+             null,
+             "scaladoc",
+             "main",
+             null,
+             null,
+             ProcessBuildStep.Terms.of("scaladoc"));
     }
 
-    private ScalaDocumentationModule(Map<String, Repository> repositories,
-                                     Map<String, Resolver> resolvers,
+    public static ScalaDocumentationModule ofKeys(Function<String, String> keys,
+                                                  Map<String, Repository> repositories,
+                                                  Map<String, Resolver> resolvers) {
+        return new ScalaDocumentationModule(resolvers, Dependencies.ofKeys(keys, repositories, resolvers),
+                null,
+                "scaladoc",
+                "main",
+                null,
+                null,
+                ProcessBuildStep.Terms.ofKeys(keys, "scaladoc"));
+    }
+
+    private ScalaDocumentationModule(Map<String, Resolver> resolvers,
+                                     Dependencies dependencies,
                                      Pinning pinning,
                                      String tool,
                                      String group,
                                      String within,
                                      Function<List<String>, ? extends ProcessHandler> factory,
-                                     BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
+                                     ProcessBuildStep.Terms terms) {
         this.resolvers = resolvers;
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.group = group;
         this.within = within;
         this.factory = factory;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public ScalaDocumentationModule factory(Function<List<String>, ? extends ProcessHandler> factory) {
-        return new ScalaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
+        return new ScalaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms);
     }
 
     public ScalaDocumentationModule pinning(Pinning pinning) {
-        return new ScalaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
+        return new ScalaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms);
     }
 
     public ScalaDocumentationModule tool(String tool) {
-        return new ScalaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
+        return new ScalaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms);
     }
 
     public ScalaDocumentationModule group(String group) {
-        return new ScalaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
+        return new ScalaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms);
     }
 
     public ScalaDocumentationModule within(String within) {
-        return new ScalaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
+        return new ScalaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms);
     }
 
     public ScalaDocumentationModule printing(BiConsumer<Boolean, String> printing) {
-        return new ScalaDocumentationModule(repositories, resolvers, pinning, tool, group, within, factory, printing);
+        return new ScalaDocumentationModule(resolvers, dependencies, pinning, tool, group, within, factory, terms.printing(printing));
     }
 
     @Override
@@ -90,13 +109,13 @@ public class ScalaDocumentationModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(upstream);
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
+                dependencies.pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> documentInputs = new LinkedHashSet<>();
         documentInputs.add(DEPENDENCIES);
         documentInputs.addAll(upstream);
         buildExecutor.addStep(DOCUMENTED,
-                factory == null ? new Document(within, tool, group, printing) : new Document(within, tool, group, factory, printing),
+                factory == null ? new Document(terms, within, tool, group) : new Document(terms, within, tool, group, factory),
                 documentInputs);
     }
 
@@ -151,12 +170,19 @@ public class ScalaDocumentationModule implements BuildExecutorModule {
         private final String tool;
         private final String group;
 
-        private Document(String within, String tool, String group, BiConsumer<Boolean, String> printing) {
-            this(within, tool, group, ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
+        private Document(ProcessBuildStep.Terms terms,
+                         String within,
+                         String tool,
+                         String group) {
+            this(terms, within, tool, group, ProcessHandler.OfProcess.ofJavaHome("bin/java"));
         }
 
-        private Document(String within, String tool, String group, Function<List<String>, ? extends ProcessHandler> factory, BiConsumer<Boolean, String> printing) {
-            super("scaladoc", factory, printing);
+        private Document(ProcessBuildStep.Terms terms,
+                         String within,
+                         String tool,
+                         String group,
+                         Function<List<String>, ? extends ProcessHandler> factory) {
+            super("scaladoc", factory, terms);
             this.within = within;
             this.tool = tool;
             this.group = group;

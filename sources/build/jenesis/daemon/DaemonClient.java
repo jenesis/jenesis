@@ -2,6 +2,8 @@ package build.jenesis.daemon;
 
 import module java.base;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.SequencedProperties;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public final class DaemonClient {
 
@@ -23,7 +25,7 @@ public final class DaemonClient {
     private final SequencedMap<String, String> outputs;
 
     public DaemonClient(Path root, List<String> path, String mainClass) {
-        this(root, path, mainClass, System.getProperty("jenesis.daemon.options", "-Xmx2g"), null);
+        this(root, path, mainClass, SequencedProperties.getProperty(SYSTEM, "daemon.options", "-Xmx2g"), null);
     }
 
     private DaemonClient(Path root,

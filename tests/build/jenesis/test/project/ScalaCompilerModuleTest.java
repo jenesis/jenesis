@@ -17,6 +17,7 @@ import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class ScalaCompilerModuleTest {
 
@@ -42,8 +43,8 @@ public class ScalaCompilerModuleTest {
         executor.addModule(
                 "scala",
                 new ScalaCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.of()),
-                        Map.of("maven", new MavenPomResolver())),
+                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
                 "project");
         executor.execute();
 
@@ -95,8 +96,8 @@ public class ScalaCompilerModuleTest {
         executor.addModule(
                 "scala",
                 new ScalaCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.of()),
-                        Map.of("maven", new MavenPomResolver())),
+                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
                 "project");
         executor.execute();
 
@@ -130,8 +131,8 @@ public class ScalaCompilerModuleTest {
         executor.addModule(
                 "scala",
                 new ScalaCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.of()),
-                        Map.of("maven", new MavenPomResolver()))
+                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM)))
                         .includeResources(false),
                 "project");
         executor.execute();
@@ -167,8 +168,8 @@ public class ScalaCompilerModuleTest {
         executor.addModule(
                 "scala",
                 new ScalaCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.of()),
-                        Map.of("maven", new MavenPomResolver())),
+                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
                 "project");
         executor.execute();
 
@@ -209,8 +210,8 @@ public class ScalaCompilerModuleTest {
         executor.addModule(
                 "scala",
                 new ScalaCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.of()),
-                        Map.of("maven", new MavenPomResolver())),
+                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
                 "project");
         executor.execute();
 
@@ -237,8 +238,8 @@ public class ScalaCompilerModuleTest {
         executor.addModule(
                 "scala",
                 new ScalaCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.of()),
-                        Map.of("maven", new MavenPomResolver())),
+                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
                 "project");
         executor.execute();
 

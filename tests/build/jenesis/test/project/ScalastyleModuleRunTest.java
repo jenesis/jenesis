@@ -15,6 +15,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.ScalastyleModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class ScalastyleModuleRunTest {
 
@@ -60,7 +61,7 @@ public class ScalastyleModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "scalastyle",
-                new ScalastyleModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT),
+                new ScalastyleModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT),
                 "project");
         executor.execute();
 

@@ -23,45 +23,57 @@ public class AvroModule implements BuildExecutorModule {
     private static final String MAVEN_GROUP = "org.apache.avro", MAVEN_ARTIFACT = "avro-tools";
     private static final String SHADED = "*/*";
 
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
     private final List<String> arguments;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final ProcessBuildStep.Terms terms;
 
-    public AvroModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "avro", List.of(), ProcessBuildStep.printing("avro"));
+    public AvroModule(Map<String, Repository> repositories,
+                      Map<String, Resolver> resolvers) {
+        this(new Dependencies(repositories, resolvers),
+             null,
+             "avro",
+             List.of(),
+             ProcessBuildStep.Terms.of("avro"));
     }
 
-    private AvroModule(Map<String, Repository> repositories,
-                       Map<String, Resolver> resolvers,
+    public static AvroModule ofKeys(Function<String, String> keys,
+                                    Map<String, Repository> repositories,
+                                    Map<String, Resolver> resolvers) {
+        return new AvroModule(Dependencies.ofKeys(keys, repositories, resolvers),
+                null,
+                "avro",
+                List.of(),
+                ProcessBuildStep.Terms.ofKeys(keys, "avro"));
+    }
+
+    private AvroModule(Dependencies dependencies,
                        Pinning pinning,
                        String tool,
                        List<String> arguments,
-                       BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+                       ProcessBuildStep.Terms terms) {
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.arguments = arguments;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public AvroModule pinning(Pinning pinning) {
-        return new AvroModule(repositories, resolvers, pinning, tool, arguments, printing);
+        return new AvroModule(dependencies, pinning, tool, arguments, terms);
     }
 
     public AvroModule tool(String tool) {
-        return new AvroModule(repositories, resolvers, pinning, tool, arguments, printing);
+        return new AvroModule(dependencies, pinning, tool, arguments, terms);
     }
 
     public AvroModule arguments(List<String> arguments) {
-        return new AvroModule(repositories, resolvers, pinning, tool, arguments, printing);
+        return new AvroModule(dependencies, pinning, tool, arguments, terms);
     }
 
     public AvroModule printing(BiConsumer<Boolean, String> printing) {
-        return new AvroModule(repositories, resolvers, pinning, tool, arguments, printing);
+        return new AvroModule(dependencies, pinning, tool, arguments, terms.printing(printing));
     }
 
     @Override
@@ -71,16 +83,16 @@ public class AvroModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
+                dependencies.pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> compileInputs = new LinkedHashSet<>();
         compileInputs.add(DEPENDENCIES);
         compileInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addStep(GENERATE_SCHEMA,
-                new Compile(tool, "schema", SCHEMA, arguments, printing),
+                new Compile(terms, tool, "schema", SCHEMA, arguments),
                 compileInputs);
         buildExecutor.addStep(GENERATE_PROTOCOL,
-                new Compile(tool, "protocol", PROTOCOL, arguments, printing),
+                new Compile(terms, tool, "protocol", PROTOCOL, arguments),
                 compileInputs);
     }
 
@@ -114,12 +126,12 @@ public class AvroModule implements BuildExecutorModule {
         private final String extension;
         private final List<String> arguments;
 
-        private Compile(String tool,
+        private Compile(ProcessBuildStep.Terms terms,
+                        String tool,
                         String kind,
                         String extension,
-                        List<String> arguments,
-                        BiConsumer<Boolean, String> printing) {
-            super("avro", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
+                        List<String> arguments) {
+            super("avro", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
             this.kind = kind;
             this.extension = extension;

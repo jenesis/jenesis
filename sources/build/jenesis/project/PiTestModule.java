@@ -20,52 +20,66 @@ public class PiTestModule implements BuildExecutorModule {
     public static final String MUTATE = "mutate";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
 
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
     private final String group;
     private final SequencedProperties config;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final ProcessBuildStep.Terms terms;
 
-    public PiTestModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "pitest", "main", new SequencedProperties(), ProcessBuildStep.printing("pitest"));
+    public PiTestModule(Map<String, Repository> repositories,
+                        Map<String, Resolver> resolvers) {
+        this(new Dependencies(repositories, resolvers),
+             null,
+             "pitest",
+             "main",
+             new SequencedProperties(),
+             ProcessBuildStep.Terms.of("pitest"));
     }
 
-    private PiTestModule(Map<String, Repository> repositories,
-                         Map<String, Resolver> resolvers,
+    public static PiTestModule ofKeys(Function<String, String> keys,
+                                      Map<String, Repository> repositories,
+                                      Map<String, Resolver> resolvers) {
+        return new PiTestModule(Dependencies.ofKeys(keys, repositories, resolvers),
+                null,
+                "pitest",
+                "main",
+                new SequencedProperties(),
+                ProcessBuildStep.Terms.ofKeys(keys, "pitest"));
+    }
+
+    private PiTestModule(Dependencies dependencies,
                          Pinning pinning,
                          String tool,
                          String group,
                          SequencedProperties config,
-                         BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+                         ProcessBuildStep.Terms terms) {
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.group = group;
         this.config = config;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public PiTestModule pinning(Pinning pinning) {
-        return new PiTestModule(repositories, resolvers, pinning, tool, group, config, printing);
+        return new PiTestModule(dependencies, pinning, tool, group, config, terms);
     }
 
     public PiTestModule tool(String tool) {
-        return new PiTestModule(repositories, resolvers, pinning, tool, group, config, printing);
+        return new PiTestModule(dependencies, pinning, tool, group, config, terms);
     }
 
     public PiTestModule group(String group) {
-        return new PiTestModule(repositories, resolvers, pinning, tool, group, config, printing);
+        return new PiTestModule(dependencies, pinning, tool, group, config, terms);
     }
 
     public PiTestModule config(SequencedProperties config) {
-        return new PiTestModule(repositories, resolvers, pinning, tool, group, config, printing);
+        return new PiTestModule(dependencies, pinning, tool, group, config, terms);
     }
 
     public PiTestModule printing(BiConsumer<Boolean, String> printing) {
-        return new PiTestModule(repositories, resolvers, pinning, tool, group, config, printing);
+        return new PiTestModule(dependencies, pinning, tool, group, config, terms.printing(printing));
     }
 
     @Override
@@ -75,12 +89,12 @@ public class PiTestModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
+                dependencies.pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> mutateInputs = new LinkedHashSet<>();
         mutateInputs.add(DEPENDENCIES);
         mutateInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(MUTATE, new Mutate(tool, group, config, printing), mutateInputs);
+        buildExecutor.addStep(MUTATE, new Mutate(terms, tool, group, config), mutateInputs);
     }
 
     private record Requires(String tool) implements BuildStep {
@@ -135,8 +149,11 @@ public class PiTestModule implements BuildExecutorModule {
         private final String group;
         private final SequencedProperties config;
 
-        private Mutate(String tool, String group, SequencedProperties config, BiConsumer<Boolean, String> printing) {
-            super("pitest", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
+        private Mutate(ProcessBuildStep.Terms terms,
+                       String tool,
+                       String group,
+                       SequencedProperties config) {
+            super("pitest", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
             this.group = group;
             this.config = config;
