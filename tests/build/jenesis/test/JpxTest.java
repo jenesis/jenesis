@@ -6,6 +6,7 @@ import module jdk.httpserver;
 import java.util.jar.Attributes;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Output;
 import build.jenesis.Jpx;
 import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
@@ -715,14 +716,11 @@ public class JpxTest {
         });
         server.start();
         try {
-            System.setProperty("jenesis.repository.insecure", "true");
-            System.setProperty("jenesis.module.uri", "http://localhost:" + server.getAddress().getPort() + "/");
-            System.setProperty("jenesis.module.local", jenesisRepoFolder.toString());
-            assertThat(read(Jpx.ofKeys(SequencedProperties.SYSTEM, PathPlacement.INFERRED).repositories()
+            assertThat(read(Jpx.ofKeys(Map.of("repository.insecure", "true", "module.uri", "http://localhost:" + server.getAddress().getPort() + "/", "module.local", jenesisRepoFolder.toString())::get, new Output(), PathPlacement.INFERRED).repositories()
                     .get("module")
                     .fetch(Runnable::run, "tool.main:pom")
                     .orElseThrow())).isEqualTo("remote");
-            assertThat(read(Jpx.ofKeys(SequencedProperties.SYSTEM, PathPlacement.MODULE_PATH).repositories()
+            assertThat(read(Jpx.ofKeys(Map.of("repository.insecure", "true", "module.uri", "http://localhost:" + server.getAddress().getPort() + "/", "module.local", jenesisRepoFolder.toString())::get, new Output(), PathPlacement.MODULE_PATH).repositories()
                     .get("module")
                     .fetch(Runnable::run, "tool.main/1.0")
                     .orElseThrow())).isEqualTo("remote");
@@ -731,9 +729,6 @@ public class JpxTest {
                     "/module/tool.main/1.0/tool.main.jar");
         } finally {
             server.stop(0);
-            System.clearProperty("jenesis.repository.insecure");
-            System.clearProperty("jenesis.module.uri");
-            System.clearProperty("jenesis.module.local");
         }
     }
 
@@ -748,22 +743,16 @@ public class JpxTest {
         });
         server.start();
         try {
-            System.setProperty("jenesis.repository.insecure", "true");
-            System.setProperty("jenesis.module.uri", "http://localhost:" + server.getAddress().getPort() + "/");
-            System.setProperty("jenesis.module.local", jenesisRepoFolder.toString());
             Files.createDirectories(jenesisRepoFolder.resolve("tool.main").resolve("1.0"));
             Files.writeString(jenesisRepoFolder.resolve("tool.main").resolve("1.0").resolve("tool.main.jar"), "local");
 
-            assertThat(read(Jpx.ofKeys(SequencedProperties.SYSTEM, PathPlacement.MODULE_PATH).repositories()
+            assertThat(read(Jpx.ofKeys(Map.of("repository.insecure", "true", "module.uri", "http://localhost:" + server.getAddress().getPort() + "/", "module.local", jenesisRepoFolder.toString())::get, new Output(), PathPlacement.MODULE_PATH).repositories()
                     .get("module")
                     .fetch(Runnable::run, "tool.main/1.0")
                     .orElseThrow())).isEqualTo("local");
             assertThat(requested).isEmpty();
         } finally {
             server.stop(0);
-            System.clearProperty("jenesis.repository.insecure");
-            System.clearProperty("jenesis.module.uri");
-            System.clearProperty("jenesis.module.local");
         }
     }
 

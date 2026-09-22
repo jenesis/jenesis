@@ -8,6 +8,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Pinning;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -36,11 +37,12 @@ public class ExternalModule implements BuildExecutorModule {
     }
 
     public static ExternalModule ofKeys(Function<String, String> keys,
+                                        Output output,
                                         String coordinate,
                                         String group,
                                         Map<String, Repository> repositories,
                                         Map<String, Resolver> resolvers) {
-        return new ExternalModule(coordinate, Dependencies.ofKeys(keys, repositories, resolvers),
+        return new ExternalModule(coordinate, Dependencies.ofKeys(keys, output, repositories, resolvers),
                 Collections.emptyNavigableSet(),
                 null,
                 null,

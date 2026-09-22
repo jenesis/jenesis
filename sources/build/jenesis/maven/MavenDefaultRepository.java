@@ -3,6 +3,7 @@ package build.jenesis.maven;
 import module java.base;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SequencedProperties;
@@ -18,13 +19,13 @@ public class MavenDefaultRepository implements MavenRepository {
     private final Repository.Connection connection;
 
     public static MavenRepository of() {
-        return ofKeys(SequencedProperties.NONE);
+        return ofKeys(SequencedProperties.NONE, new Output());
     }
 
-    public static MavenRepository ofKeys(Function<String, String> keys) {
+    public static MavenRepository ofKeys(Function<String, String> keys, Output output) {
         Path local = localRepository(keys);
         Repository.Credential credential = Repository.Credential.of(keys, "maven.token", "MAVEN_REPOSITORY_TOKEN");
-        boolean verbose = SequencedProperties.flag(keys, "print.fetch");
+        Consumer<String> printing = SequencedProperties.flag(keys, "print.fetch") ? output.out() : null;
         String property = SequencedProperties.getProperty(keys, "maven.uri");
         String environment = System.getenv("MAVEN_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();
@@ -41,7 +42,7 @@ public class MavenDefaultRepository implements MavenRepository {
             text = "https://repo1.maven.org/maven2/";
             origin = Repository.Origin.DEFAULT;
         }
-        MavenRepository repository = chain(keys, text, visited, local, credential, origin, verbose, null);
+        MavenRepository repository = chain(keys, text, visited, local, credential, origin, printing, null);
         if (repository == null) {
             throw new IllegalStateException("No Maven repository is configured by: " + text);
         }
@@ -49,15 +50,18 @@ public class MavenDefaultRepository implements MavenRepository {
     }
 
     public static MavenRepository of(URI repository, String token) {
-        return ofKeys(SequencedProperties.NONE, repository, token);
+        return ofKeys(SequencedProperties.NONE, new Output(), repository, token);
     }
 
-    public static MavenRepository ofKeys(Function<String, String> keys, URI repository, String token) {
+    public static MavenRepository ofKeys(Function<String, String> keys,
+                                         Output output,
+                                         URI repository,
+                                         String token) {
         return single(keys,
                 repository.toString().endsWith("/") ? repository : URI.create(repository + "/"),
                 localRepository(keys),
                 token,
-                SequencedProperties.flag(keys, "print.fetch"));
+                SequencedProperties.flag(keys, "print.fetch") ? output.out() : null);
     }
 
     private static Path localRepository(Function<String, String> keys) {
@@ -77,7 +81,7 @@ public class MavenDefaultRepository implements MavenRepository {
                                           URI uri,
                                           Path local,
                                           String token,
-                                          boolean verbose) {
+                                          Consumer<String> printing) {
         SequencedMap<String, URI> validations = new LinkedHashMap<>();
         validations.put("SHA512", uri);
         validations.put("SHA256", uri);
@@ -86,11 +90,11 @@ public class MavenDefaultRepository implements MavenRepository {
                 uri,
                 local,
                 Collections.unmodifiableMap(validations),
-                verbose ? path -> System.out.printf("%s%-11s%s %s%n",
+                printing == null ? null : path -> printing.accept("%s%-11s%s %s".formatted(
                         BuildExecutorCallback.YELLOW,
                         "[FETCHED]",
                         BuildExecutorCallback.RESET,
-                        uri.resolve(path)) : null,
+                        uri.resolve(path))),
                 token);
     }
 
@@ -100,7 +104,7 @@ public class MavenDefaultRepository implements MavenRepository {
                                          Path local,
                                          Repository.Credential credential,
                                          Repository.Origin origin,
-                                         boolean verbose,
+                                         Consumer<String> printing,
                                          MavenRepository repository) {
         for (String entry : text.split(",")) {
             String candidate = entry.strip();
@@ -139,7 +143,7 @@ public class MavenDefaultRepository implements MavenRepository {
                         throw new IllegalStateException("Circular repository reference: @" + name);
                     }
                 }
-                current = chain(keys, value, visited, local, credential, spliced, verbose, null);
+                current = chain(keys, value, visited, local, credential, spliced, printing, null);
                 if (name != null) {
                     visited.remove(name);
                 }
@@ -151,7 +155,7 @@ public class MavenDefaultRepository implements MavenRepository {
                         URI.create(location.endsWith("/") ? location : location + "/"),
                         local,
                         credential.grant(origin),
-                        verbose);
+                        printing);
             }
             List<String> groups = new ArrayList<>();
             if (separator >= 0) {
@@ -226,14 +230,14 @@ public class MavenDefaultRepository implements MavenRepository {
         return new MavenDefaultRepository(repository, local, validations, callback, token, connection);
     }
 
-    public MavenDefaultRepository printing(boolean printing) {
-        return new MavenDefaultRepository(repository, local, validations, printing
-                ? path -> System.out.printf("%s%-11s%s %s%n",
+    public MavenDefaultRepository printing(Consumer<String> printing) {
+        return new MavenDefaultRepository(repository, local, validations, printing == null
+                ? null
+                : path -> printing.accept("%s%-11s%s %s".formatted(
                         BuildExecutorCallback.YELLOW,
                         "[FETCHED]",
                         BuildExecutorCallback.RESET,
-                        repository.resolve(path))
-                : null, token, connection);
+                        repository.resolve(path))), token, connection);
     }
 
     @SuppressWarnings("unchecked")

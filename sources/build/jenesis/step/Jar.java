@@ -2,6 +2,7 @@ package build.jenesis.step;
 
 import module java.base;
 import java.util.jar.Attributes;
+import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -22,12 +23,13 @@ public class Jar extends ProcessBuildStep {
     }
 
     public static Jar ofKeys(Function<String, String> keys,
+                             Output output,
                              ProcessHandler.Factory factory,
                              Sort sort) {
         return new Jar(factory.apply("jar", "bin/jar"),
                 sort,
                 BuildStep.timestamp(keys),
-                Terms.ofKeys(keys, "jar"));
+                Terms.ofKeys(keys, output, "jar"));
     }
 
     private Jar(Function<List<String>, ? extends ProcessHandler> factory,

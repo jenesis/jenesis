@@ -2,6 +2,7 @@ package build.jenesis.test.project;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.Output;
 import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
@@ -143,7 +144,7 @@ public class XjcModuleRunTest {
     }
 
     private XjcModule newModule() {
-        return new XjcModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM)))
+        return new XjcModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM)))
                 .pinning(Pinning.STRICT);
     }
 

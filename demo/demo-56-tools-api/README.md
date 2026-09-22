@@ -45,9 +45,11 @@ each is refused by name rather than ignored:
 
 Run such a build through the `jenesis-make` or `jenesis-exec` command instead.
 
-`jenesis-exec` forks the program it runs, as the command does, so that program writes to
-the stdio of the JVM the tool was called from rather than to the writers. Everything the
-build itself prints arrives on the writers.
+Everything the build itself prints arrives on the writers, because a run is handed the pair of
+consumers its lines go to rather than writing to the JVM's streams: two runs in one program can
+print to different places, and neither redirects anything the calling program owns.
+`jenesis-exec` forks the program it runs, as the command does, so that program writes to the
+stdio of the JVM the tool was called from rather than to the writers.
 
 Build and run it
 ----------------

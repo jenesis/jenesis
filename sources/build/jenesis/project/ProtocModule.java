@@ -8,6 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -42,15 +43,16 @@ public class ProtocModule implements BuildExecutorModule {
     }
 
     public static ProtocModule ofKeys(Function<String, String> keys,
+                                      Output output,
                                       Map<String, Repository> repositories,
                                       Map<String, Resolver> resolvers) {
-        return new ProtocModule(Dependencies.ofKeys(keys, repositories, resolvers),
+        return new ProtocModule(Dependencies.ofKeys(keys, output, repositories, resolvers),
                 null,
                 "protoc",
                 classifier(),
                 new LinkedHashMap<>(),
                 List.of(),
-                ProcessBuildStep.Terms.ofKeys(keys, "protoc"));
+                ProcessBuildStep.Terms.ofKeys(keys, output, "protoc"));
     }
 
     private ProtocModule(Dependencies dependencies,

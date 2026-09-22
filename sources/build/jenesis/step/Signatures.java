@@ -6,6 +6,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.KeyExpiry;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
@@ -40,7 +41,9 @@ public class Signatures extends ProcessBuildStep {
                 null);
     }
 
-    public static Signatures ofKeys(Function<String, String> keys, Map<String, Repository> repositories) {
+    public static Signatures ofKeys(Function<String, String> keys,
+                                    Output output,
+                                    Map<String, Repository> repositories) {
         Signatures signatures = new Signatures(repositories)
                 .verification(Verification.ofKeys(keys))
                 .expiry(KeyExpiry.ofKeys(keys));
@@ -57,7 +60,7 @@ public class Signatures extends ProcessBuildStep {
             signatures = signatures.trustedRoot(URI.create(sigstore));
         }
         Boolean print = SequencedProperties.flagOrNull(keys, "print.signatures");
-        return print == null || !print ? signatures : signatures.printing(System.out::println);
+        return print == null || !print ? signatures : signatures.printing(output.out());
     }
 
     private Signatures(Map<String, Repository> repositories,

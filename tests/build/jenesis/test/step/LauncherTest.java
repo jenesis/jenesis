@@ -185,12 +185,7 @@ public class LauncherTest {
         application.setProperty("mainClass", "sample.Sample");
         application.store(input.resolve("launcher.properties"));
         Launcher launcher;
-        System.setProperty("jenesis.archive.timestamp", "");
-        try {
-            launcher = Launcher.ofKeys(SYSTEM, "launcher", PathPlacement.INFERRED);
-        } finally {
-            System.clearProperty("jenesis.archive.timestamp");
-        }
+        launcher = Launcher.ofKeys(Map.of("archive.timestamp", "")::get, "launcher", PathPlacement.INFERRED);
 
         BuildStepResult result = launcher.apply(
                 Runnable::run,

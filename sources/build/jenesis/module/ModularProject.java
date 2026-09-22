@@ -11,6 +11,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.PathPlacement;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -113,16 +114,17 @@ public class ModularProject implements BuildExecutorModule {
 
     public static BuildExecutorModule make(Path root,
                                            MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
-        return make(SequencedProperties.NONE, root, assembler);
+        return make(SequencedProperties.NONE, new Output(), root, assembler);
     }
 
     public static BuildExecutorModule make(Function<String, String> keys,
+                                               Output output,
                                            Path root, MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
-        return make(keys, root,
+        return make(keys, output, root,
                 "main",
                 "module",
                 _ -> true,
-                Map.of("module", JenesisModuleRepository.ofKeys(keys, JenesisRepository.Scope.MODULE)),
+                Map.of("module", JenesisModuleRepository.ofKeys(keys, output, JenesisRepository.Scope.MODULE)),
                 Map.of("module", ModularJarResolver.ofKeys(keys, false)),
                 null,
                 true,
@@ -133,6 +135,7 @@ public class ModularProject implements BuildExecutorModule {
     }
 
     public static BuildExecutorModule make(Function<String, String> keys,
+                                               Output output,
                                            Path root,
                                            String group,
                                            String prefix,
@@ -145,7 +148,7 @@ public class ModularProject implements BuildExecutorModule {
                                            SequencedSet<Path> boms,
                                            SequencedSet<Path> signatures,
                                            MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
-        Dependencies dependencyModule = Dependencies.ofKeys(keys, repositories, resolvers);
+        Dependencies dependencyModule = Dependencies.ofKeys(keys, output, repositories, resolvers);
         return new MultiProjectModule(ModularProject.ofKeys(keys, prefix, root)
                 .group(group).filter(filter).modular(modular).boms(boms).signatures(signatures),
                 identity -> Optional.of(identity.substring(0, identity.indexOf('/'))),

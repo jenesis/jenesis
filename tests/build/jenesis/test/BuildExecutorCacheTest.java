@@ -179,7 +179,7 @@ public class BuildExecutorCacheTest implements Serializable {
     @Test
     public void callback_prints_cache_loads_and_stores_with_timing() {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        BuildExecutorCallback callback = BuildExecutorCallback.printing(new PrintStream(bytes), false, true, root);
+        BuildExecutorCallback callback = BuildExecutorCallback.printing(new PrintStream(bytes)::println, false, true, root);
         callback.loaded("compile/javac", 5_000_000L);
         callback.stored("compile/javac", 7_000_000L);
         String printed = bytes.toString();
@@ -189,7 +189,7 @@ public class BuildExecutorCacheTest implements Serializable {
     @Test
     public void callback_omits_cache_lines_when_not_requested() {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        BuildExecutorCallback callback = BuildExecutorCallback.printing(new PrintStream(bytes), false, false, root);
+        BuildExecutorCallback callback = BuildExecutorCallback.printing(new PrintStream(bytes)::println, false, false, root);
         callback.loaded("compile/javac", 5_000_000L);
         callback.stored("compile/javac", 7_000_000L);
         assertThat(bytes.toString()).isEmpty();

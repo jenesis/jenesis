@@ -1,6 +1,7 @@
 package build.jenesis.step;
 
 import module java.base;
+import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -23,14 +24,17 @@ public class NativeImage extends ProcessBuildStep {
         this(pathPlacement, factory, "main", Terms.of("native-image"));
     }
 
-    public static NativeImage ofKeys(Function<String, String> keys, PathPlacement pathPlacement) {
-        return ofKeys(keys, pathPlacement, ProcessHandler.OfProcess.ofCommand("native-image"));
+    public static NativeImage ofKeys(Function<String, String> keys,
+                                     Output output,
+                                     PathPlacement pathPlacement) {
+        return ofKeys(keys, output, pathPlacement, ProcessHandler.OfProcess.ofCommand("native-image"));
     }
 
     public static NativeImage ofKeys(Function<String, String> keys,
+                                     Output output,
                                      PathPlacement pathPlacement,
                                      Function<List<String>, ? extends ProcessHandler> factory) {
-        return new NativeImage(pathPlacement, factory, "main", Terms.ofKeys(keys, "native-image"));
+        return new NativeImage(pathPlacement, factory, "main", Terms.ofKeys(keys, output, "native-image"));
     }
 
     private NativeImage(PathPlacement pathPlacement,

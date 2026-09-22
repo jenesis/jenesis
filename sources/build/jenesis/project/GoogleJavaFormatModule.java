@@ -8,6 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -37,13 +38,14 @@ public class GoogleJavaFormatModule implements BuildExecutorModule {
     }
 
     public static GoogleJavaFormatModule ofKeys(Function<String, String> keys,
+                                                Output output,
                                                 Map<String, Repository> repositories,
                                                 Map<String, Resolver> resolvers) {
-        return new GoogleJavaFormatModule(Dependencies.ofKeys(keys, repositories, resolvers),
+        return new GoogleJavaFormatModule(Dependencies.ofKeys(keys, output, repositories, resolvers),
                 null,
                 "google-java-format",
                 false,
-                ProcessBuildStep.Terms.ofKeys(keys, "google-java-format"));
+                ProcessBuildStep.Terms.ofKeys(keys, output, "google-java-format"));
     }
 
     private GoogleJavaFormatModule(Dependencies dependencies,

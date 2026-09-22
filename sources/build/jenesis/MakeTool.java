@@ -10,11 +10,12 @@ public final class MakeTool extends JenesisTool {
     }
 
     @Override
-    protected int run(Function<String, String> requested, List<String> selectors) throws IOException {
+    protected int run(Function<String, String> requested, Output output, List<String> selectors) throws IOException {
         requireInProcess(requested);
         Path root = root(requested);
         Make.Settings settings = Make.settings(root, requested);
         return Project.perform(settings.keys(),
+                output,
                 root,
                 settings.profiles(),
                 selectors.toArray(String[]::new)) == null ? 1 : 0;

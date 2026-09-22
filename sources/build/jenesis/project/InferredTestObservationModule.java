@@ -6,6 +6,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.PathPlacement;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.step.Bind;
@@ -44,14 +45,15 @@ public class InferredTestObservationModule implements BuildExecutorModule {
     }
 
     public static InferredTestObservationModule ofKeys(Function<String, String> keys,
+                                                       Output output,
                                                        SequencedSet<Path> configuration,
                                                        Map<String, Repository> repositories,
                                                        Map<String, Resolver> resolvers) {
         InferredTestObservationModule module = new InferredTestObservationModule(configuration, null, PathPlacement.CLASS_PATH,
                 null,
-                TestModule.ofKeys(keys, repositories, resolvers),
-                JaCoCoModule.ofKeys(keys, repositories, resolvers),
-                PiTestModule.ofKeys(keys, repositories, resolvers),
+                TestModule.ofKeys(keys, output, repositories, resolvers),
+                JaCoCoModule.ofKeys(keys, output, repositories, resolvers),
+                PiTestModule.ofKeys(keys, output, repositories, resolvers),
                 value -> value,
                 value -> value,
                 value -> value,

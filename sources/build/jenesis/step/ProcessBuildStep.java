@@ -6,6 +6,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Output;
 import build.jenesis.SequencedProperties;
 
 public abstract class ProcessBuildStep implements BuildStep {
@@ -43,18 +44,21 @@ public abstract class ProcessBuildStep implements BuildStep {
     public record Terms(BiConsumer<Boolean, String> printing, Semaphore permits, Consumer<String> announcing) {
 
         public static Terms of(String command) {
-            return ofKeys(SequencedProperties.NONE, command, false);
+            return ofKeys(SequencedProperties.NONE, new Output(), command, false);
         }
 
         public static Terms of(String command, boolean printing) {
-            return ofKeys(SequencedProperties.NONE, command, printing);
+            return ofKeys(SequencedProperties.NONE, new Output(), command, printing);
         }
 
-        public static Terms ofKeys(Function<String, String> keys, String command) {
-            return ofKeys(keys, command, false);
+        public static Terms ofKeys(Function<String, String> keys, Output output, String command) {
+            return ofKeys(keys, output, command, false);
         }
 
-        public static Terms ofKeys(Function<String, String> keys, String command, boolean printing) {
+        public static Terms ofKeys(Function<String, String> keys,
+                                   Output output,
+                                   String command,
+                                   boolean printing) {
             int concurrency = SequencedProperties.number(keys, "process.concurrency", 0);
             if (concurrency < 0) {
                 throw new IllegalArgumentException("Process concurrency must not be negative: " + concurrency);
@@ -62,11 +66,11 @@ public abstract class ProcessBuildStep implements BuildStep {
             boolean streamed = SequencedProperties.flag(keys, "print." + command,
                     SequencedProperties.flag(keys, "print.process", printing));
             return new Terms(streamed
-                    ? (error, line) -> System.out.println("\033[38;5;" + (error ? 131 : 244) + "m"
+                    ? (error, line) -> output.out().accept("\033[38;5;" + (error ? 131 : 244) + "m"
                             + command + " >>>> " + line + BuildExecutorCallback.RESET)
                     : null,
                     concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Semaphore::new),
-                    SequencedProperties.flag(keys, "print.command") ? System.out::println : null);
+                    SequencedProperties.flag(keys, "print.command") ? output.out() : null);
         }
 
         public Terms printing(BiConsumer<Boolean, String> printing) {

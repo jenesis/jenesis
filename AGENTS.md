@@ -79,9 +79,20 @@ no public signature mentions one. The exceptions are the two types an entry poin
 scan discovers, long after the settings were read. Every setting a child resolved is a wither of its own as
 well, so a caller that names no strings configures the same object programmatically.
 
+**Where the run talks is an argument too.** Nothing in the engine writes to `System.out` or `System.err`:
+a line goes to a `Consumer<String>` that the run was given, and `Output` is the pair of them the entry point
+hands down beside the provider. A factory that resolves a setting into a printing consumer - `Terms.ofKeys`,
+`Dependencies.ofKeys`, `Signatures.ofKeys`, `Tree.ofKeys`, `BuildExecutor.Configuration`, the repositories -
+therefore takes the `Output` right after `keys`, and the consumer it builds is still a wither of its own, so a
+caller can hand one tool's lines somewhere else. `new Output()` is the pair that writes to the JVM's streams,
+`new Output(out, err)` the pair that writes to a tool's writers, and `Make`, `Toolchain` and the daemon are the
+exception, because they are the process boundary rather than the build.
+
 A setting that decides which process a build runs in cannot be honoured by the `jenesis-make`, `jenesis-exec`
 and `jpx` tools, which run inside another program's JVM: `jenesis.toolchain.version`, `jenesis.project.docker`
-and `jenesis.execute.docker` are refused by name there rather than ignored.
+and `jenesis.execute.docker` are refused by name there rather than ignored. Nothing else about a tool run
+differs, because a run is configured by the provider and the output it is handed, so two of them in one JVM
+never collide and none of them touches the JVM's own properties or streams.
 
 A setting is therefore never read again later, and a caller that builds the object itself is never
 surprised by the environment: `new Project(root)` is the defaults and nothing else, and only
@@ -205,6 +216,10 @@ silently falls back, and a lenient wildcard selector is the one deliberate excep
   the assertion carries the reason as its `.as(...)` description where one is needed.
 - A test that builds steps implements `Serializable`, so the lambdas it hands the executor can be hashed;
   state a step must not capture (a latch, a socket) lives in a static field.
+- A test names the settings it needs in a `Map.of(…)::get` provider and collects what a run prints from an
+  `Output` of its own. Setting a system property or swapping `System.out` is what the provider and the output
+  exist to avoid, and it survives only where the test is about the JVM's own properties (`SequencedPropertiesTest`)
+  or proves that a build ignores them.
 - `@TempDir` folders for every build; `BuildExecutorCallback.nop()` and `BuildExecutorCache.nop()` unless the
   test is about them; `Runnable::run` as the executor when ordering matters.
 - Behaviour that is user-visible gets a demo as well as a test.

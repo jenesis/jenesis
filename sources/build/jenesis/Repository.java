@@ -38,24 +38,25 @@ public interface Repository {
         };
     }
 
-    default Repository cached(Function<String, String> keys, Path folder) {
-        return cached(keys, folder, false);
+    default Repository cached(Function<String, String> keys, Output output, Path folder) {
+        return cached(keys, output, folder, false);
     }
 
     private Repository cached(Path folder, boolean snapshot) {
-        return cached(SequencedProperties.NONE, folder, snapshot);
+        return cached(SequencedProperties.NONE, new Output(), folder, snapshot);
     }
 
-    private Repository cached(Function<String, String> keys, Path folder, boolean snapshot) {
+    private Repository cached(Function<String, String> keys, Output output, Path folder, boolean snapshot) {
         if (folder == null) {
             return this;
         }
-        boolean verbose = SequencedProperties.flag(keys, "print.fetch");
-        return cached(folder, snapshot, verbose ? target -> System.out.printf("%s%-11s%s %s%n",
-                BuildExecutorCallback.YELLOW,
-                "[FETCHED]",
-                BuildExecutorCallback.RESET,
-                target.toAbsolutePath().toUri()) : null);
+        return cached(folder, snapshot, SequencedProperties.flag(keys, "print.fetch")
+                ? target -> output.out().accept("%s%-11s%s %s".formatted(
+                        BuildExecutorCallback.YELLOW,
+                        "[FETCHED]",
+                        BuildExecutorCallback.RESET,
+                        target.toAbsolutePath().toUri()))
+                : null);
     }
 
     default Repository cached(Path folder, Consumer<Path> callback) {
@@ -354,19 +355,22 @@ public interface Repository {
     static <F extends BiFunction<URI, String, Optional<URI>> & Serializable> Repository ofUris(
             Map<String, URI> uris,
             F versionResolver) {
-        return ofUris(SequencedProperties.NONE, uris, versionResolver);
+        return ofUris(SequencedProperties.NONE, new Output(), uris, versionResolver);
     }
 
     static <F extends BiFunction<URI, String, Optional<URI>> & Serializable> Repository ofUris(
             Function<String, String> keys,
+            Output output,
             Map<String, URI> uris,
             F versionResolver) {
-        boolean verbose = SequencedProperties.flag(keys, "print.fetch");
-        return ofUris(uris, versionResolver, new Connection().retries(0).backoff(Duration.ZERO), verbose ? uri -> System.out.printf("%s%-11s%s %s%n",
-                BuildExecutorCallback.YELLOW,
-                "[FETCHED]",
-                BuildExecutorCallback.RESET,
-                uri) : null);
+        return ofUris(uris, versionResolver, new Connection().retries(0).backoff(Duration.ZERO),
+                SequencedProperties.flag(keys, "print.fetch")
+                        ? uri -> output.out().accept("%s%-11s%s %s".formatted(
+                                BuildExecutorCallback.YELLOW,
+                                "[FETCHED]",
+                                BuildExecutorCallback.RESET,
+                                uri))
+                        : null);
     }
 
     static <F extends BiFunction<URI, String, Optional<URI>> & Serializable> Repository ofUris(

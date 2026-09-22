@@ -2,6 +2,7 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.params;
+import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -43,7 +44,7 @@ public class JavadocTest {
                 */
                 public class Sample { }
                 """);
-        BuildStepResult result = Javadoc.ofKeys(SYSTEM, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+        BuildStepResult result = Javadoc.ofKeys(SYSTEM, new Output(), process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
@@ -60,15 +61,11 @@ public class JavadocTest {
             throws IOException {
         Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"),
                 "package sample; /** Documented. */ public class Sample { }\n");
-        Javadoc javadoc;
-        if (empty) {
-            System.setProperty("jenesis.archive.timestamp", "");
-        }
-        try {
-            javadoc = Javadoc.ofKeys(SYSTEM, ProcessHandler.Factory.TOOL);
-        } finally {
-            System.clearProperty("jenesis.archive.timestamp");
-        }
+        Javadoc javadoc = Javadoc.ofKeys(empty
+                        ? Map.of("archive.timestamp", "")::get
+                        : SequencedProperties.NONE,
+                new Output(),
+                ProcessHandler.Factory.TOOL);
         javadoc.apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
@@ -100,7 +97,7 @@ public class JavadocTest {
                 public class Sample { }
                 """);
 
-        BuildStepResult result = Javadoc.ofKeys(SYSTEM, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+        BuildStepResult result = Javadoc.ofKeys(SYSTEM, new Output(), process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(

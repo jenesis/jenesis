@@ -8,6 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -40,14 +41,15 @@ public class DetektModule implements BuildExecutorModule {
     }
 
     public static DetektModule ofKeys(Function<String, String> keys,
+                                      Output output,
                                       Map<String, Repository> repositories,
                                       Map<String, Resolver> resolvers) {
-        return new DetektModule(Dependencies.ofKeys(keys, repositories, resolvers),
+        return new DetektModule(Dependencies.ofKeys(keys, output, repositories, resolvers),
                 null,
                 "detekt",
                 "detekt.yml",
                 false,
-                ProcessBuildStep.Terms.ofKeys(keys, "detekt"));
+                ProcessBuildStep.Terms.ofKeys(keys, output, "detekt"));
     }
 
     private DetektModule(Dependencies dependencies,

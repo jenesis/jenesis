@@ -4,6 +4,7 @@ import module java.base;
 import module jdk.compiler;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
+import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -34,9 +35,10 @@ public class ModularizeModule implements BuildExecutorModule {
     }
 
     public static ModularizeModule ofKeys(Function<String, String> keys,
+                                          Output output,
                                           ProcessHandler.Factory factory,
                                           boolean synthetic) {
-        return new ModularizeModule(synthetic, BuildStep.timestamp(keys), JDeps.ofKeys(keys, factory));
+        return new ModularizeModule(synthetic, BuildStep.timestamp(keys), JDeps.ofKeys(keys, output, factory));
     }
 
     private ModularizeModule(boolean synthetic, OffsetDateTime timestamp, JDeps describe) {

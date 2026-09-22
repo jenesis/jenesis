@@ -1,6 +1,7 @@
 package build.jenesis.step;
 
 import module java.base;
+import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -21,11 +22,12 @@ public class JPackage extends ProcessBuildStep {
     }
 
     public static JPackage ofKeys(Function<String, String> keys,
+                                  Output output,
                                   ProcessHandler.Factory factory) {
         return new JPackage(factory.apply("jpackage", "bin/jpackage"),
                 null,
                 "main",
-                Terms.ofKeys(keys, "jpackage"));
+                Terms.ofKeys(keys, output, "jpackage"));
     }
 
     private JPackage(Function<List<String>, ? extends ProcessHandler> factory, String type, String group, Terms terms) {

@@ -5,6 +5,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Pinning;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.step.Jar;
@@ -27,11 +28,12 @@ public class InferredDocumentationModule implements BuildExecutorModule {
     }
 
     public static InferredDocumentationModule ofKeys(Function<String, String> keys,
+                                                     Output output,
                                                      Map<String, Repository> repositories,
                                                      Map<String, Resolver> resolvers) {
-        return new InferredDocumentationModule(null, InferredDocumentationChainModule.ofKeys(keys, repositories, resolvers),
+        return new InferredDocumentationModule(null, InferredDocumentationChainModule.ofKeys(keys, output, repositories, resolvers),
                 value -> value,
-                Jar.ofKeys(keys, ProcessHandler.Factory.of(), Jar.Sort.JAVADOC));
+                Jar.ofKeys(keys, output, ProcessHandler.Factory.of(), Jar.Sort.JAVADOC));
     }
 
     private InferredDocumentationModule(Pinning pinning,

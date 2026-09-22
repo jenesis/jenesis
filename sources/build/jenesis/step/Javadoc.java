@@ -1,6 +1,7 @@
 package build.jenesis.step;
 
 import module java.base;
+import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -18,12 +19,13 @@ public class Javadoc extends ProcessBuildStep {
         this(factory.apply("javadoc", "bin/javadoc"), null, false, false, Terms.of("javadoc"));
     }
 
-    public static Javadoc ofKeys(Function<String, String> keys, ProcessHandler.Factory factory) {
+    public static Javadoc ofKeys(Function<String, String> keys,
+                                 Output output, ProcessHandler.Factory factory) {
         return new Javadoc(factory.apply("javadoc", "bin/javadoc"),
                 null,
                 false,
                 BuildStep.timestamp(keys) == null,
-                Terms.ofKeys(keys, "javadoc"));
+                Terms.ofKeys(keys, output, "javadoc"));
     }
 
     private Javadoc(Function<List<String>, ? extends ProcessHandler> factory,

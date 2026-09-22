@@ -306,14 +306,11 @@ public class RepositoryTest {
 
     @Test
     public void connection_defaults_read_the_keys_they_are_given() {
-        System.setProperty("jenesis.repository.retries", "7");
-        System.setProperty("jenesis.repository.backoff", "9");
-        System.setProperty("jenesis.repository.read.timeout", "5000");
-        assertThat(Repository.Connection.ofKeys(SYSTEM))
+        assertThat(Repository.Connection.ofKeys(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read.timeout", "5000")::get))
                 .isEqualTo(new Repository.Connection(7, Duration.ofMillis(9), false, 10_000, 5_000));
-        assertThat(Repository.Connection.ofKeys(SYSTEM).retries(1))
+        assertThat(Repository.Connection.ofKeys(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read.timeout", "5000")::get).retries(1))
                 .isEqualTo(new Repository.Connection(1, Duration.ofMillis(9), false, 10_000, 5_000));
-        assertThat(Repository.Connection.ofKeys(SYSTEM).backoff(Duration.ofMillis(2)))
+        assertThat(Repository.Connection.ofKeys(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read.timeout", "5000")::get).backoff(Duration.ofMillis(2)))
                 .isEqualTo(new Repository.Connection(7, Duration.ofMillis(2), false, 10_000, 5_000));
     }
 

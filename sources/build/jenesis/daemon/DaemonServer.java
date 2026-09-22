@@ -2,6 +2,7 @@ package build.jenesis.daemon;
 
 import module java.base;
 import build.jenesis.Make;
+import build.jenesis.Output;
 import build.jenesis.Project;
 import build.jenesis.SequencedProperties;
 import static build.jenesis.SequencedProperties.SYSTEM;
@@ -200,9 +201,9 @@ public final class DaemonServer {
                 Function<String, String> keys = settings.keys();
                 SequencedSet<Path> profiles = settings.profiles();
                 if (!mainClass.equals(Project.class.getName())) {
-                    return Project.run(keys, mainClass, root, profiles, selectors);
+                    return Project.run(keys, new Output(), mainClass, root, profiles, selectors);
                 }
-                SequencedMap<String, Path> produced = Project.perform(keys, root, profiles, selectors);
+                SequencedMap<String, Path> produced = Project.perform(keys, new Output(), root, profiles, selectors);
                 if (produced == null) {
                     return 1;
                 }

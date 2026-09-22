@@ -191,7 +191,7 @@ public record Execution(Project project, String mainClass, String module, Contai
                     .mounts(container.mountWritable(), root, false)
                     .envs(container.env());
             if (container.announcing()) {
-                System.out.println("Launching Java execution within Docker image: " + docker.image());
+                project.output().out().accept("Launching Java execution within Docker image: " + docker.image());
             }
             return docker.execute(javaArgs);
         }
@@ -221,7 +221,7 @@ public record Execution(Project project, String mainClass, String module, Contai
             if (result.code() != 0) {
                 System.exit(result.code());
             }
-            Project project = Project.ofKeys(keys, root);
+            Project project = Project.ofKeys(keys, new Output(), root);
             int code = Execution.ofKeys(keys, project).execute(result.outputs(), arguments);
             if (code != 0) {
                 System.exit(code);

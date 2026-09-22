@@ -6,6 +6,7 @@ import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.step.Jar;
@@ -45,19 +46,20 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
     }
 
     public static InferredJavaToolchainModule ofKeys(Function<String, String> keys,
+                                                     Output output,
                                                      SequencedSet<Path> configuration,
                                                      Map<String, Repository> repositories,
                                                      Map<String, Resolver> resolvers) {
         return new InferredJavaToolchainModule(configuration, null, PathPlacement.INFERRED,
-                InferredSourceGenerationModule.ofKeys(keys, configuration, repositories, resolvers),
-                InferredCompilerChainModule.ofKeys(keys, configuration, repositories, resolvers),
-                InferredByteCodeQualityModule.ofKeys(keys, configuration, repositories, resolvers),
-                JarSigner.ofKeys(keys),
+                InferredSourceGenerationModule.ofKeys(keys, output, configuration, repositories, resolvers),
+                InferredCompilerChainModule.ofKeys(keys, output, configuration, repositories, resolvers),
+                InferredByteCodeQualityModule.ofKeys(keys, output, configuration, repositories, resolvers),
+                JarSigner.ofKeys(keys, output),
                 value -> value,
                 value -> value,
                 value -> value,
                 null,
-                Jar.ofKeys(keys, ProcessHandler.Factory.of(), Jar.Sort.CLASSES).asModule("jar"),
+                Jar.ofKeys(keys, output, ProcessHandler.Factory.of(), Jar.Sort.CLASSES).asModule("jar"),
                 step -> step.configured() ? step : null);
     }
 

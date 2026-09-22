@@ -5,6 +5,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Pinning;
+import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -60,15 +61,16 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     }
 
     public static InferredSourceGenerationModule ofKeys(Function<String, String> keys,
+                                                        Output output,
                                                         SequencedSet<Path> configuration,
                                                         Map<String, Repository> repositories,
                                                         Map<String, Resolver> resolvers) {
-        InferredSourceGenerationModule module = new InferredSourceGenerationModule(configuration, null, XjcModule.ofKeys(keys, repositories, resolvers),
-                ProtocModule.ofKeys(keys, repositories, resolvers),
-                AvroModule.ofKeys(keys, repositories, resolvers),
-                WsImportModule.ofKeys(keys, repositories, resolvers),
-                OpenApiModule.ofKeys(keys, repositories, resolvers),
-                AntlrModule.ofKeys(keys, repositories, resolvers),
+        InferredSourceGenerationModule module = new InferredSourceGenerationModule(configuration, null, XjcModule.ofKeys(keys, output, repositories, resolvers),
+                ProtocModule.ofKeys(keys, output, repositories, resolvers),
+                AvroModule.ofKeys(keys, output, repositories, resolvers),
+                WsImportModule.ofKeys(keys, output, repositories, resolvers),
+                OpenApiModule.ofKeys(keys, output, repositories, resolvers),
+                AntlrModule.ofKeys(keys, output, repositories, resolvers),
                 value -> value,
                 value -> value,
                 value -> value,

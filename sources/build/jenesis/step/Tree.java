@@ -7,27 +7,28 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.DependencyTreeReport;
 import build.jenesis.Resolver;
+import build.jenesis.Output;
 import build.jenesis.SequencedProperties;
 
 public class Tree implements BuildStep {
 
-    private final transient PrintStream out;
+    private final transient Consumer<String> out;
     private final transient boolean compact, tests;
 
     public Tree() {
-        this(System.out);
+        this(new Output());
     }
 
-    public Tree(PrintStream out) {
-        this(out, false, true);
+    public Tree(Output output) {
+        this(output.out(), false, true);
     }
 
     public static Tree ofKeys(Function<String, String> keys) {
-        return ofKeys(keys, System.out);
+        return ofKeys(keys, new Output());
     }
 
-    public static Tree ofKeys(Function<String, String> keys, PrintStream out) {
-        Tree tree = new Tree(out);
+    public static Tree ofKeys(Function<String, String> keys, Output output) {
+        Tree tree = new Tree(output);
         String format = SequencedProperties.getProperty(keys, "tree.format");
         if (format != null) {
             tree = tree.compact(switch (format) {
@@ -41,7 +42,7 @@ public class Tree implements BuildStep {
         return tests == null ? tree : tree.tests(tests);
     }
 
-    private Tree(PrintStream out, boolean compact, boolean tests) {
+    private Tree(Consumer<String> out, boolean compact, boolean tests) {
         this.out = out;
         this.compact = compact;
         this.tests = tests;

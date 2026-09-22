@@ -7,13 +7,13 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.Output;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Tree;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class TreeTest {
 
@@ -32,22 +32,17 @@ public class TreeTest {
 
     @Test
     public void rejects_an_unknown_tree_format() {
-        System.setProperty("jenesis.tree.format", "fancy");
-        try {
-            assertThatThrownBy(() -> Tree.ofKeys(SYSTEM, new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8)))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("Unknown jenesis.tree.format 'fancy'")
-                    .hasMessageContaining("full")
-                    .hasMessageContaining("compact");
-        } finally {
-            System.clearProperty("jenesis.tree.format");
-        }
+        assertThatThrownBy(() -> Tree.ofKeys(Map.of("tree.format", "fancy")::get, new Output()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown jenesis.tree.format 'fancy'")
+                .hasMessageContaining("full")
+                .hasMessageContaining("compact");
     }
 
     @Test
     public void compact_format_prints_only_internal_and_counts_external() throws IOException {
-        System.setProperty("jenesis.tree.format", "compact");
-        try {
+        Function<String, String> keys = Map.of("tree.format", "compact")::get;
+        {
             SequencedProperties graph = new SequencedProperties();
             graph.setProperty("edge/0", "main\tcompile\tmodule\ttrue\tcompile\t1.0\t\tmodule/foo/1.0");
             graph.setProperty("edge/1", "main\tcompile\tmodule\ttrue\tcompile\t2.0\tmodule/foo/1.0\tmaven/org.ext/lib/2.0");
@@ -58,27 +53,26 @@ public class TreeTest {
             inventory.setProperty("module.graph.0", "graph.properties");
             inventory.store(argument.resolve(Inventory.INVENTORY));
 
-            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-            Tree.ofKeys(SYSTEM, new PrintStream(bytes, true, StandardCharsets.UTF_8)).apply(
+            List<String> printed = new ArrayList<>();
+            Tree.ofKeys(keys, new Output(printed::add, printed::add)).apply(
                     Runnable::run,
                     new BuildStepContext(previous, next, supplement),
                     new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                             argument,
                             Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
                     .toCompletableFuture().join();
-            String text = bytes.toString(StandardCharsets.UTF_8).replaceAll("\033\\[[0-9;]*m", "");
+            String text = String.join(System.lineSeparator(), printed).replaceAll("\033\\[[0-9;]*m", "")
+                    + System.lineSeparator();
             assertThat(text).contains("(module foo, local)");
             assertThat(text).doesNotContain("maven/org.ext/lib");
             assertThat(text).contains("1 external dependency");
-        } finally {
-            System.clearProperty("jenesis.tree.format");
         }
     }
 
     @Test
     public void omits_a_test_module_when_tests_are_excluded() throws IOException {
-        System.setProperty("jenesis.tree.tests", "false");
-        try {
+        Function<String, String> keys = Map.of("tree.tests", "false")::get;
+        {
             SequencedProperties graph = new SequencedProperties();
             graph.setProperty("edge/0", "main\tcompile\tmodule\ttrue\tcompile\t1.0\t\tmodule/foo/1.0");
             graph.setProperty("vertex/main/compile/module/foo", "1.0\tfoo\tfalse\ttrue");
@@ -101,17 +95,16 @@ public class TreeTest {
                     Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))));
             arguments.put("bar", new BuildStepArgument(testArgument,
                     Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))));
-            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-            Tree.ofKeys(SYSTEM, new PrintStream(bytes, true, StandardCharsets.UTF_8)).apply(
+            List<String> printed = new ArrayList<>();
+            Tree.ofKeys(keys, new Output(printed::add, printed::add)).apply(
                     Runnable::run,
                     new BuildStepContext(previous, next, supplement),
                     arguments)
                     .toCompletableFuture().join();
-            String text = bytes.toString(StandardCharsets.UTF_8).replaceAll("\033\\[[0-9;]*m", "");
+            String text = String.join(System.lineSeparator(), printed).replaceAll("\033\\[[0-9;]*m", "")
+                    + System.lineSeparator();
             assertThat(text).contains("module/foo");
             assertThat(text).doesNotContain("module/bar");
-        } finally {
-            System.clearProperty("jenesis.tree.tests");
         }
     }
 
@@ -131,8 +124,8 @@ public class TreeTest {
         inventory.setProperty("module.licenses.0", "licenses.properties");
         inventory.store(argument.resolve(Inventory.INVENTORY));
 
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        BuildStepResult result = Tree.ofKeys(SYSTEM, new PrintStream(bytes, true, StandardCharsets.UTF_8)).apply(
+        List<String> printed = new ArrayList<>();
+        BuildStepResult result = Tree.ofKeys(SequencedProperties.NONE, new Output(printed::add, printed::add)).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
@@ -140,7 +133,8 @@ public class TreeTest {
                         Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
                 .toCompletableFuture().join();
         assertThat(result.next()).isTrue();
-        String text = bytes.toString(StandardCharsets.UTF_8).replaceAll("\033\\[[0-9;]*m", "");
+        String text = String.join(System.lineSeparator(), printed).replaceAll("\033\\[[0-9;]*m", "")
+                    + System.lineSeparator();
         assertThat(text).contains("main/compile (module)");
         assertThat(text).contains("maven/org.foo/bar 1.0 [compile] (module org.foo.bar) {Apache-2.0}");
         assertThat(text).contains("└─ maven/org.foo/baz 2.0 [compile]");
