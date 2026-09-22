@@ -30,7 +30,7 @@
  * @jenesis.signature OpenPGP/BE685132AFD2740D9095F9040CC0B712FEE75827 org.assertj/*
  * @jenesis.signature OpenPGP/FF6E2C001948C5F2F38B0CC385911F425EC61B51 org.apiguardian/* org.junit.jupiter/* org.junit.platform/* org.opentest4j/*
  */
-open module build.jenesis.test {
+module build.jenesis.test {
 
     requires build.jenesis;
     requires java.compiler;

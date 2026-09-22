@@ -867,6 +867,46 @@ public class TestModule implements BuildExecutorModule {
                 if (moduleName != null) {
                     commands.add("--add-modules");
                     commands.add(moduleName);
+                    ModuleDescriptor tested = null;
+                    SequencedSet<String> targets = new LinkedHashSet<>();
+                    Set<String> reflecting = resolved.reflectingModules();
+                    for (BuildStepArgument argument : arguments.values()) {
+                        if (argument.removed()) {
+                            continue;
+                        }
+                        List<Path> files = new ArrayList<>();
+                        Path classes = argument.folder().resolve(CLASSES);
+                        if (!jarsOnly && Files.isDirectory(classes)) {
+                            files.add(classes);
+                        }
+                        Path artifacts = argument.folder().resolve(ARTIFACTS);
+                        if (Files.isDirectory(artifacts)) {
+                            try (DirectoryStream<Path> stream = Files.newDirectoryStream(artifacts)) {
+                                stream.forEach(files::add);
+                            }
+                        }
+                        files.addAll(Dependencies.select(argument.folder(), group, "runtime"));
+                        for (Path file : files) {
+                            ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(file);
+                            if (descriptor == null) {
+                                continue;
+                            }
+                            if (descriptor.name().equals(moduleName)) {
+                                if (tested == null) {
+                                    tested = ModuleFinder.of(file).find(moduleName).orElseThrow().descriptor();
+                                }
+                            } else if (reflecting.contains(descriptor.name()) && pathPlacement.test(file)) {
+                                targets.add(descriptor.name());
+                            }
+                        }
+                    }
+                    if (tested != null && !tested.isOpen()) {
+                        String target = targets.isEmpty() ? "ALL-UNNAMED" : String.join(",", targets);
+                        for (String name : new TreeSet<>(tested.packages())) {
+                            commands.add("--add-opens");
+                            commands.add(moduleName + "/" + name + "=" + target);
+                        }
+                    }
                 }
                 commands.add("-m");
                 commands.add(resolved.runnerModule() + "/" + resolved.runnerClass());

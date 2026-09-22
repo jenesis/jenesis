@@ -28,7 +28,7 @@ The project is four module directories, each with its own `module-info.java`:
     |   |-- messages.properties  a root resource, packaged into the jar and read at run time
     |   `-- sample/greeter/Greeter.java
     |-- greeter-test/        the test variant of demo.greeter
-    |   |-- module-info.java     open module demo.greeter.test (@jenesis.test demo.greeter)
+    |   |-- module-info.java     module demo.greeter.test (@jenesis.test demo.greeter)
     |   `-- greetertest/GreeterTest.java
     |-- greeter-testing/     the shared test infrastructure, declaring no tests
     |   |-- module-info.java     module demo.greeter.testing (@jenesis.test abstract)
@@ -81,14 +81,16 @@ The `greeter-test/` directory is a separate module marked as the test variant of
      * @jenesis.pin org.junit.jupiter/junit-jupiter 5.11.3 SHA-256/...
      * ... (the rest of the JUnit closure)
      */
-    open module demo.greeter.test {
+    module demo.greeter.test {
         requires demo.greeter;
         requires org.junit.jupiter;
     }
 
 The `@jenesis.test demo.greeter` tag marks the module as a test variant, so it is
-compiled and run but never staged as a published artifact. It is `open` so JUnit
-can reflect over the test classes, and its test lives in its own package
+compiled and run but never staged as a published artifact. It need not be `open`:
+the test run opens each of its packages to the modules of the test framework that
+reflect over the test classes, so the descriptor declares only what the tests
+use. Its test lives in its own package
 (`greetertest`) rather than `sample.greeter`: a test module cannot share a package
 with the module it tests, since the Java module system forbids two modules from
 exporting the same package. The JUnit closure is a test-only dependency, so it is
