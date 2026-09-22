@@ -1,0 +1,3 @@
+# the release run: the profile it switches on, and the selector it ends with
+-Djenesis.make.profiles=release
+stage

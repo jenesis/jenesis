@@ -26,6 +26,24 @@ The release build additionally stages a `-sources.jar` next to the jar and enfor
 strict dependency pinning, ready for `export`. The CycloneDX SBOM is emitted
 automatically on every build (it is on by default), so the release jar carries it too.
 
+The whole command line can live in a file as well:
+
+    java build/jenesis/Make.java @release.args
+
+`@<file>` stands for the arguments the file holds, one or more per line, `#` starts a
+comment that runs to the end of the line, and quotes hold what would otherwise split on
+whitespace. `@@<text>` is an argument that begins with an `@` rather than a file, and a
+file names no further file. This is the argument file the JDK's own tools read, and the
+one shipped here holds the run above:
+
+    # the release run: the profile it switches on, and the selector it ends with
+    -Djenesis.make.profiles=release
+    stage
+
+A profile names the settings that belong together; an argument file names the whole run,
+settings and selectors alike. Both exist so a long command line is written once, and they
+compose: the file above selects a profile.
+
 Layout
 ------
 
@@ -34,6 +52,7 @@ Layout
     |-- pom.xml                          pins commons-lang3
     |-- jenesis-release.properties       the release profile (sources + chains to supply-chain)
     |-- jenesis-supply-chain.properties  a profile that enforces strict dependency pinning
+    |-- release.args                     the release run as an argument file
     `-- sources
         `-- profiles
             `-- Sample.java

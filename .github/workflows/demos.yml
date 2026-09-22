@@ -97,7 +97,7 @@ jobs:
           - { name: groovy, dir: demo-43-groovy, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: groovy-documentation, dir: demo-43-groovy, entry: build/jenesis/Make.java, flags: -Djenesis.project.documentation=true, verify: 'find target -type d -name documentation | grep -q .' }
           - { name: groovy-quality, dir: demo-44-groovy-quality, entry: build/jenesis/Make.java, verify: 'find target -type d -name codenarc | grep -q .' }
-          - { name: profiles, dir: demo-45-profiles, entry: build/jenesis/Make.java, flags: -Djenesis.make.profiles=release, verify: 'find target -type d -path "*assemble/sources*" | grep -q .' }
+          - { name: profiles, dir: demo-45-profiles, entry: build/jenesis/Make.java, flags: -Djenesis.make.profiles=release, verify: 'find target -type d -path "*assemble/sources*" | grep -q . && java build/jenesis/Make.java @release.args && find target/stage -name "*-sources.jar" | grep -q .' }
           - { name: build-cache, dir: demo-46-build-cache, entry: build/jenesis/Make.java, flags: -Djenesis.project.cache, verify: 'find target -name classes.jar -print -quit | grep -q . && find .jenesis/cache -type d -print -quit | grep -q .' }
           - { name: docker-isolation, dir: demo-47-docker-isolation, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: agents, dir: demo-48-agents, entry: build/Demo.java, verify: 'find target -name classes.jar | grep -q . && unzip -p "$(find target -name bundle.zip | head -1)" application.unix.args | grep -q -- "-javaagent:jars/"' }
