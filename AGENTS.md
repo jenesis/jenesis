@@ -185,8 +185,10 @@ reader.
 writes into `context.next()`, nothing else. It is `Serializable` and its serialised form is part of the cache
 key, so every value that should trigger a re-run is a non-`transient` field and every field is serialisable
 (`Path` is hashed by its string form; a lambda field must be typed as a serialisable functional interface).
-A module is not serialisable and never reaches a key, so a field of one is never `transient` - the
-distinction exists inside a step and nowhere else.
+What a step holds is serialised with it - a `Resolver`, a version negotiator, a lambda typed as a
+serialisable functional interface - so those types are `Serializable` too, and their scaffolding (a parser
+factory, a lookup cache) is `transient` rather than left to drift into the key. A module is not serialisable
+and never reaches a key at all, so a field of one is never `transient`.
 Steps compose by folder conventions - `sources/`, `classes/`, `artifacts/` - never by inspecting predecessor
 names. A step that forks a JDK tool extends `ProcessBuildStep` and thereby accepts `process-<tool>.properties`.
 
