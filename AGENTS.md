@@ -88,6 +88,19 @@ caller can hand one tool's lines somewhere else. `new Output()` is the pair that
 `new Output(out, err)` the pair that writes to a tool's writers, and `Make`, `Toolchain` and the daemon are the
 exception, because they are the process boundary rather than the build.
 
+**A command line can live in a file.** `Make`, `Execute`, `Jpx` and the three tools read `@<file>` as the
+arguments it holds and `@@<text>` as an argument starting with an `@`, with `#` to the end of a line a comment
+and both quote kinds holding what would otherwise split, exactly as the JDK's own tools read an argument file -
+including that a file is not expanded again from within one. A setting may lead the arguments as
+`-Djenesis.<key>=<value>` there, so a file carries a whole run.
+
+**What the launcher and the engine must agree on lives in `Make`.** `Make` is the one type that may reference
+nothing else of this project, so a rule both of them read - how a flag parses, what an `@<file>` argument
+expands to - is written there, package-private, and the engine's own accessors call it: `flagOrNull` and
+`arguments` on `SequencedProperties` are the names the rest of the code knows it by. The dependency points at
+the launcher rather than away from it, which is what keeps a setting from meaning one thing before the build
+starts and another inside it.
+
 A setting that decides which process a build runs in cannot be honoured by the `jenesis-make`, `jenesis-exec`
 and `jpx` tools, which run inside another program's JVM: `jenesis.toolchain.version`, `jenesis.project.docker`
 and `jenesis.execute.docker` are refused by name there rather than ignored. Nothing else about a tool run
@@ -100,9 +113,10 @@ surprised by the environment: `new Project(root)` is the defaults and nothing el
 the JVM's properties. Every setting is read through a `Function<String, String>` that answers one key,
 never off `System` directly: `SequencedProperties.SYSTEM` is the provider that reads the JVM's properties,
 and it is the one place the shared `jenesis.` prefix is spelt, so a key is named without it everywhere
-else. `Make` and `Toolchain` are the exception and read the provider with their own parsing, because
-`MakeClosureTest` holds each of them to compiling alone - reaching for the shared accessors there drags
-`SequencedProperties` and its closure into every build's first step, so that duplication is deliberate.
+else. `Make` and `Toolchain` are the exception and read the provider without the shared accessors, because
+`MakeClosureTest` holds each of them to compiling alone - reaching for `SequencedProperties` there would drag
+its closure into every build's first step. Where the rule itself must not differ, `Make` holds it and the
+accessors call `Make`, rather than either side keeping a copy.
 The accessors are `getProperty(keys, key)` and `getProperty(keys, key, default)` for the raw value, `value`
 for the trimmed one that reads a blank as absent, `flag`, `flagOrNull`, `number`, `entries` and `words` -
 and nothing else, so no reader hand-rolls a parse. A boolean is the setting absent being the default,

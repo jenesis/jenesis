@@ -24,34 +24,43 @@ public final class Make {
     }
 
     public Make(String mainClass) {
+        this(mainClass, key -> System.getProperty("jenesis." + key));
+    }
+
+    public Make(String mainClass, Function<String, String> ambient) {
         this.mainClass = mainClass;
-        root = Path.of(System.getProperty("jenesis.make.root", "")).toAbsolutePath().normalize();
+        String location = ambient.apply("make.root");
+        root = Path.of(location == null ? "" : location).toAbsolutePath().normalize();
         try {
-            settings = settings(root);
+            settings = settings(root, ambient);
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot read the properties that configure this build", e);
         }
-        String location = settings.keys().apply("make.classes");
-        classes = location == null || location.isBlank()
+        String classesLocation = settings.keys().apply("make.classes");
+        classes = classesLocation == null || classesLocation.isBlank()
                 ? root.resolve(".jenesis").resolve("classes")
-                : root.resolve(location).normalize();
+                : root.resolve(classesLocation).normalize();
         daemon = flag(settings.keys(), "make.daemon", false);
         compile = flag(settings.keys(), "make.compile", true);
     }
 
     private static boolean flag(Function<String, String> keys, String key, boolean defaultValue) {
-        String value = keys.apply(key);
+        Boolean value = parsed("jenesis." + key, keys.apply(key));
+        return value == null ? defaultValue : value;
+    }
+
+    static Boolean parsed(String name, String value) {
         if (value == null) {
-            return defaultValue;
+            return null;
         }
         return switch (value.trim().toLowerCase(Locale.ROOT)) {
             case "", "true" -> true;
             case "false" -> false;
-            default -> throw new IllegalArgumentException("Malformed value for jenesis."
-                    + key
+            default -> throw new IllegalArgumentException("Malformed value for "
+                    + name
                     + ": '"
                     + value
-                    + "' (expected true, false, or the property named with no value at all)");
+                    + "' (expected true, false, or the setting named with no value at all)");
         };
     }
 
@@ -87,21 +96,127 @@ public final class Make {
     public record Result(int code, SequencedMap<String, Path> outputs) {
     }
 
-    public static void main(String... selectors) throws Exception {
-        List<String> options = options();
-        Make make = new Make("build.jenesis.Project");
+    public static void main(String... arguments) throws Exception {
+        SequencedMap<String, String> named = new LinkedHashMap<>();
+        String[] selectors = partitioned(arguments, named);
+        List<String> options = options(named);
+        Make make = new Make("build.jenesis.Project", ambient(named));
         Integer code = relaunched(Make.class, options, selectors);
         System.exit(code == null ? make.run(selectors) : code);
     }
 
-    static List<String> options() {
-        List<String> options = new ArrayList<>();
-        for (String name : new TreeSet<>(System.getProperties().stringPropertyNames())) {
-            if (name.startsWith("jenesis.") && !name.startsWith("jenesis.toolchain.")) {
-                options.add("-D" + name + "=" + System.getProperty(name));
+    static Function<String, String> ambient(SequencedMap<String, String> named) {
+        return key -> {
+            String value = named.get("jenesis." + key);
+            return value == null ? System.getProperty("jenesis." + key) : value;
+        };
+    }
+
+    static String[] partitioned(String[] arguments, SequencedMap<String, String> named) throws IOException {
+        List<String> expanded = expanded(arguments), selectors = new ArrayList<>();
+        for (String argument : expanded) {
+            if (!selectors.isEmpty() || !argument.startsWith("-D")) {
+                selectors.add(argument);
+                continue;
+            }
+            String assignment = argument.substring(2);
+            int equals = assignment.indexOf('=');
+            String name = equals < 0 ? assignment : assignment.substring(0, equals);
+            if (!name.startsWith("jenesis.")) {
+                throw new IllegalArgumentException("Not a Jenesis setting: -D"
+                        + assignment
+                        + " - a run is configured by jenesis.* settings alone, and a JVM property is named"
+                        + " before the main class");
+            }
+            named.put(name, equals < 0 ? "" : assignment.substring(equals + 1));
+        }
+        return selectors.toArray(String[]::new);
+    }
+
+    static List<String> expanded(String[] arguments) throws IOException {
+        List<String> expanded = new ArrayList<>();
+        for (String argument : arguments) {
+            if (argument.startsWith("@@")) {
+                expanded.add(argument.substring(1));
+            } else if (argument.length() > 1 && argument.charAt(0) == '@') {
+                expanded.addAll(words(Path.of(argument.substring(1))));
+            } else {
+                expanded.add(argument);
             }
         }
-        return options;
+        return expanded;
+    }
+
+    private static List<String> words(Path file) throws IOException {
+        if (!Files.isRegularFile(file)) {
+            throw new IllegalArgumentException("No argument file at "
+                    + file
+                    + " - @<file> names a file of arguments, @@<text> an argument starting with @");
+        }
+        List<String> words = new ArrayList<>();
+        StringBuilder word = new StringBuilder();
+        boolean started = false, escaped = false, comment = false;
+        char quote = 0;
+        for (char current : Files.readString(file).toCharArray()) {
+            if (escaped) {
+                word.append(switch (current) {
+                    case 'n' -> '\n';
+                    case 'r' -> '\r';
+                    case 't' -> '\t';
+                    case 'f' -> '\f';
+                    default -> current;
+                });
+                escaped = false;
+            } else if (comment) {
+                comment = current != '\n';
+            } else if (quote != 0) {
+                if (current == '\\') {
+                    escaped = true;
+                } else if (current == quote) {
+                    quote = 0;
+                } else {
+                    word.append(current);
+                }
+            } else if (current == '\'' || current == '"') {
+                quote = current;
+                started = true;
+            } else if (current == '#') {
+                comment = true;
+            } else if (Character.isWhitespace(current)) {
+                if (started) {
+                    words.add(word.toString());
+                    word.setLength(0);
+                    started = false;
+                }
+            } else {
+                word.append(current);
+                started = true;
+            }
+        }
+        if (quote != 0) {
+            throw new IllegalArgumentException("Unterminated " + quote + " in the argument file " + file);
+        }
+        if (started) {
+            words.add(word.toString());
+        }
+        return words;
+    }
+
+    static List<String> options(SequencedMap<String, String> named) {
+        SortedMap<String, String> options = new TreeMap<>();
+        for (String name : System.getProperties().stringPropertyNames()) {
+            if (name.startsWith("jenesis.")) {
+                options.put(name, System.getProperty(name));
+            }
+        }
+        options.putAll(named);
+        List<String> arguments = new ArrayList<>();
+        options.forEach((name, value) -> {
+            if (!name.startsWith("jenesis.toolchain.")) {
+                arguments.add("-D" + name + "=" + value);
+            }
+        });
+        return arguments;
     }
 
     static Integer relaunched(Class<?> main, List<String> options, String... arguments) throws Exception {

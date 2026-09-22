@@ -278,4 +278,65 @@ public class SequencedPropertiesTest {
             System.clearProperty("jenesis.test.sample.value");
         }
     }
+
+    @Test
+    public void an_argument_file_is_the_arguments_it_holds(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("arguments.txt");
+        Files.writeString(file, """
+                # what this run is
+                -Djenesis.project.version=1.0.0
+                build "+a module" 'and another'
+                trailing # and what it is not
+                """);
+        assertThat(SequencedProperties.arguments("@" + file, "last"))
+                .as("a file of arguments reads as the command line it stands for")
+                .containsExactly("-Djenesis.project.version=1.0.0",
+                        "build",
+                        "+a module",
+                        "and another",
+                        "trailing",
+                        "last");
+    }
+
+    @Test
+    public void an_argument_file_escapes_within_a_quote_and_nowhere_else(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("arguments.txt");
+        Files.writeString(file, "\"a\\tb\" \"quote\\\"inside\" c\\d");
+        assertThat(SequencedProperties.arguments("@" + file))
+                .as("a backslash escapes inside a quote, as it does for the JDK's own tools, and is a"
+                        + " character of its own outside one")
+                .containsExactly("a\tb", "quote\"inside", "c\\d");
+    }
+
+    @Test
+    public void an_argument_file_is_not_expanded_again(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("arguments.txt");
+        Files.writeString(file, "@nested.txt");
+        assertThat(SequencedProperties.arguments("@" + file))
+                .as("an @ within a file is an argument, not another file, as the JDK reads it")
+                .containsExactly("@nested.txt");
+    }
+
+    @Test
+    public void an_argument_starting_with_an_at_is_written_twice() throws IOException {
+        assertThat(SequencedProperties.arguments("@@literal", "plain"))
+                .containsExactly("@literal", "plain");
+    }
+
+    @Test
+    public void an_argument_file_that_is_not_there_names_itself(@TempDir Path directory) {
+        Path file = directory.resolve("missing.txt");
+        assertThatThrownBy(() -> SequencedProperties.arguments("@" + file))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No argument file at " + file);
+    }
+
+    @Test
+    public void an_argument_file_refuses_a_quote_that_never_closes(@TempDir Path directory) throws IOException {
+        Path file = directory.resolve("arguments.txt");
+        Files.writeString(file, "\"never closed");
+        assertThatThrownBy(() -> SequencedProperties.arguments("@" + file))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unterminated \" in the argument file " + file);
+    }
 }

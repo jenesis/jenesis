@@ -783,9 +783,11 @@ program that has the module on its path can run one in its own JVM:
 The leading `-Djenesis.*` arguments configure that run and that run alone, the rest
 is what the command line would take, and everything the tool prints arrives on the
 writers you hand it. `jenesis-make` builds, `jenesis-exec` builds and then runs what
-it built, and `jpx` runs a published program. The demo builds the same project twice
-in one JVM with a different version each time, runs the result, asks `jpx` for its
-help, and shows that the JVM itself is left holding neither version.
+it built, and `jpx` runs a published program. A whole command line can come from a
+file instead: `@<file>` stands for the arguments it holds, as it does for `javac` and
+for the commands here. The demo builds the same project twice in one JVM with a
+different version each time, runs the result, asks `jpx` for its help, and shows that
+the JVM itself is left holding neither version.
 
 Three settings cannot be honoured in-process, because they replace the process a
 build runs in - naming another JDK with `jenesis.toolchain.version`, or a container

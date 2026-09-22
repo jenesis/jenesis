@@ -290,7 +290,9 @@ public record Jpx(Path storage,
               --help              print this help""";
 
     public static void main(String... arguments) throws IOException, InterruptedException {
-        System.exit(run(SYSTEM, new Output(), arguments));
+        System.exit(run(SYSTEM,
+                new Output(),
+                SequencedProperties.arguments(arguments).toArray(String[]::new)));
     }
 
     public static int run(Function<String, String> keys, Output output, String... arguments)

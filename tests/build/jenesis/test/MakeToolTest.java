@@ -36,6 +36,26 @@ public class MakeToolTest {
     }
 
     @Test
+    public void takes_a_command_line_out_of_the_argument_file_it_names() throws IOException {
+        Files.writeString(root.resolve("module-info.java"), "module foo {}");
+        Path arguments = root.resolve("arguments.txt");
+        Files.writeString(arguments, """
+                # what this run is
+                -Djenesis.make.root=%s
+                -Djenesis.project.version=4.5.6
+                -Djenesis.print.progress=false
+                configuration
+                """.formatted(root));
+        StringWriter out = new StringWriter(), err = new StringWriter();
+        int code = ToolProvider.findFirst("jenesis-make").orElseThrow()
+                .run(new PrintWriter(out), new PrintWriter(err), "@" + arguments);
+        assertThat(code).isEqualTo(0);
+        assertThat(out.toString())
+                .as("an @ argument names a file of settings and selectors, as it does for the JDK's own tools")
+                .contains("jenesis.project.version=4.5.6");
+    }
+
+    @Test
     public void refuses_a_setting_that_is_not_the_build_tool_s() {
         StringWriter out = new StringWriter(), err = new StringWriter();
         int code = ToolProvider.findFirst("jenesis-make").orElseThrow().run(new PrintWriter(out), new PrintWriter(err),

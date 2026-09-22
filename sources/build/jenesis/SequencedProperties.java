@@ -60,7 +60,7 @@ public class SequencedProperties extends Properties {
     }
 
     public static Boolean flagOrNull(Function<String, String> keys, String key) {
-        return parseFlag("jenesis." + key, keys.apply(key));
+        return Make.parsed("jenesis." + key, keys.apply(key));
     }
 
     public static int number(Function<String, String> keys, String key, int defaultValue) {
@@ -107,27 +107,16 @@ public class SequencedProperties extends Properties {
         return splitWords(value(keys, key));
     }
 
+    public static List<String> arguments(String... arguments) throws IOException {
+        return Make.expanded(arguments);
+    }
+
     private static String trimmed(String value) {
         if (value == null) {
             return null;
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
-    }
-
-    private static Boolean parseFlag(String name, String value) {
-        if (value == null) {
-            return null;
-        }
-        return switch (value.trim().toLowerCase(Locale.ROOT)) {
-            case "", "true" -> true;
-            case "false" -> false;
-            default -> throw new IllegalArgumentException("Malformed value for "
-                    + name
-                    + ": '"
-                    + value
-                    + "' (expected true, false, or the setting named with no value at all)");
-        };
     }
 
     private static List<String> splitEntries(String value) {
@@ -170,7 +159,7 @@ public class SequencedProperties extends Properties {
     }
 
     public Boolean flagOrNull(String key) {
-        return parseFlag(key, getProperty(key));
+        return Make.parsed(key, getProperty(key));
     }
 
     public List<String> entries(String key) {

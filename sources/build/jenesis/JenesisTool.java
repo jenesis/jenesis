@@ -7,20 +7,14 @@ abstract class JenesisTool implements ToolProvider {
     @Override
     public int run(PrintWriter out, PrintWriter err, String... arguments) {
         SequencedMap<String, String> settings = new LinkedHashMap<>();
-        int index = 0;
-        while (index < arguments.length && arguments[index].startsWith("-D")) {
-            String assignment = arguments[index++].substring(2);
-            int equals = assignment.indexOf('=');
-            String key = equals < 0 ? assignment : assignment.substring(0, equals);
-            if (!key.startsWith("jenesis.")) {
-                err.println("Not a Jenesis setting: -D" + assignment
-                        + " (a tool invocation configures the build it runs, so only jenesis.* is accepted)");
-                err.flush();
-                return 1;
-            }
-            settings.put(key, equals < 0 ? "" : assignment.substring(equals + 1));
+        List<String> remaining;
+        try {
+            remaining = List.of(Make.partitioned(arguments, settings));
+        } catch (IOException | RuntimeException e) {
+            err.println(e.getMessage());
+            err.flush();
+            return 1;
         }
-        List<String> remaining = List.of(arguments).subList(index, arguments.length);
         try {
             return run(key -> settings.get("jenesis." + key), new Output(out, err), remaining);
         } catch (InterruptedException e) {
