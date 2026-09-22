@@ -21,7 +21,7 @@
  * @jenesis.pin org.opentest4j.reporting/open-test-reporting-tooling-spi 0.2.5 SHA-256/df237b68847637747f0bfdb88fa9cdd9c72cc85550fad0c41ddb33869a5ca516
  * @jenesis.pin org.opentest4j/opentest4j 1.3.0 SHA-256/48e2df636cab6563ced64dcdff8abb2355627cb236ef0bf37598682ddf742f1b
  */
-open module demo.greeter.test {
+module demo.greeter.test {
 
     requires demo.greeter;
     requires org.junit.jupiter.migrationsupport;

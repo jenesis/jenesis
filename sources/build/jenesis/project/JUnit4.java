@@ -15,6 +15,11 @@ public record JUnit4() implements TestFramework {
     }
 
     @Override
+    public Set<String> reflectingModules() {
+        return Set.of("junit");
+    }
+
+    @Override
     public String runnerClass() {
         return "org.junit.runner.JUnitCore";
     }
