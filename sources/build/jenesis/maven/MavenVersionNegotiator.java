@@ -3,7 +3,7 @@ package build.jenesis.maven;
 import module java.base;
 
 @FunctionalInterface
-public interface MavenVersionNegotiator {
+public interface MavenVersionNegotiator extends Serializable {
 
     String resolve(Executor executor,
                    MavenRepository repository,
