@@ -3,8 +3,8 @@ package build.jenesis.project;
 import module java.base;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
+import build.jenesis.Environment;
 import build.jenesis.Pinning;
-import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.step.Bind;
@@ -56,18 +56,17 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
              value -> value);
     }
 
-    public static InferredSourceCodeQualityModule ofKeys(Function<String, String> keys,
-                                                         Output output,
-                                                         SequencedSet<Path> configuration,
-                                                         Map<String, Repository> repositories,
-                                                         Map<String, Resolver> resolvers) {
-        InferredSourceCodeQualityModule module = new InferredSourceCodeQualityModule(configuration, null, CheckstyleModule.ofKeys(keys, output, repositories, resolvers),
-                PmdModule.ofKeys(keys, output, repositories, resolvers),
-                DetektModule.ofKeys(keys, output, repositories, resolvers),
-                KtlintModule.ofKeys(keys, output, repositories, resolvers),
-                ScalastyleModule.ofKeys(keys, output, repositories, resolvers),
-                ScalafmtModule.ofKeys(keys, output, repositories, resolvers),
-                CodeNarcModule.ofKeys(keys, output, repositories, resolvers),
+    public static InferredSourceCodeQualityModule ofEnvironment(Environment environment,
+                                                                SequencedSet<Path> configuration,
+                                                                Map<String, Repository> repositories,
+                                                                Map<String, Resolver> resolvers) {
+        InferredSourceCodeQualityModule module = new InferredSourceCodeQualityModule(configuration, null, CheckstyleModule.ofEnvironment(environment, repositories, resolvers),
+                PmdModule.ofEnvironment(environment, repositories, resolvers),
+                DetektModule.ofEnvironment(environment, repositories, resolvers),
+                KtlintModule.ofEnvironment(environment, repositories, resolvers),
+                ScalastyleModule.ofEnvironment(environment, repositories, resolvers),
+                ScalafmtModule.ofEnvironment(environment, repositories, resolvers),
+                CodeNarcModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value,
                 value -> value,
                 value -> value,
@@ -75,31 +74,31 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
                 value -> value,
                 value -> value,
                 value -> value);
-        Boolean checkstyle = SequencedProperties.flagOrNull(keys, "source.checkstyle");
+        Boolean checkstyle = environment.flagOrNull("source.checkstyle");
         if (checkstyle != null) {
             module = module.checkstyle(checkstyle ? value -> value : null);
         }
-        Boolean pmd = SequencedProperties.flagOrNull(keys, "source.pmd");
+        Boolean pmd = environment.flagOrNull("source.pmd");
         if (pmd != null) {
             module = module.pmd(pmd ? value -> value : null);
         }
-        Boolean detekt = SequencedProperties.flagOrNull(keys, "source.detekt");
+        Boolean detekt = environment.flagOrNull("source.detekt");
         if (detekt != null) {
             module = module.detekt(detekt ? value -> value : null);
         }
-        Boolean ktlint = SequencedProperties.flagOrNull(keys, "source.ktlint");
+        Boolean ktlint = environment.flagOrNull("source.ktlint");
         if (ktlint != null) {
             module = module.ktlint(ktlint ? value -> value : null);
         }
-        Boolean scalastyle = SequencedProperties.flagOrNull(keys, "source.scalastyle");
+        Boolean scalastyle = environment.flagOrNull("source.scalastyle");
         if (scalastyle != null) {
             module = module.scalastyle(scalastyle ? value -> value : null);
         }
-        Boolean scalafmt = SequencedProperties.flagOrNull(keys, "source.scalafmt");
+        Boolean scalafmt = environment.flagOrNull("source.scalafmt");
         if (scalafmt != null) {
             module = module.scalafmt(scalafmt ? value -> value : null);
         }
-        Boolean codenarc = SequencedProperties.flagOrNull(keys, "source.codenarc");
+        Boolean codenarc = environment.flagOrNull("source.codenarc");
         if (codenarc != null) {
             module = module.codenarc(codenarc ? value -> value : null);
         }

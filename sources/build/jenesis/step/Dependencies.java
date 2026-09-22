@@ -11,11 +11,11 @@ import build.jenesis.DependencyScope;
 import build.jenesis.License;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
-import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
+import build.jenesis.Environment;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 
@@ -44,17 +44,16 @@ public class Dependencies implements BuildExecutorModule {
         this(repositories, resolvers, new Signatures(repositories), null, null, BuildStep.timestamp(), null);
     }
 
-    public static Dependencies ofKeys(Function<String, String> keys,
-                                      Output output,
-                                      Map<String, Repository> repositories,
-                                      Map<String, Resolver> resolvers) {
+    public static Dependencies ofEnvironment(Environment environment,
+                                             Map<String, Repository> repositories,
+                                             Map<String, Resolver> resolvers) {
         return new Dependencies(repositories,
                 resolvers,
-                Signatures.ofKeys(keys, output, repositories),
+                Signatures.ofEnvironment(environment, repositories),
                 null,
                 null,
-                BuildStep.timestamp(keys),
-                SequencedProperties.flag(keys, "print.aliases") ? output.out() : null);
+                BuildStep.timestamp(environment),
+                environment.flag("print.aliases") ? environment.out() : null);
     }
 
     private Dependencies(Map<String, Repository> repositories,
@@ -796,14 +795,14 @@ public class Dependencies implements BuildExecutorModule {
                     for (String module : byModule.sequencedKeySet()) {
                         Path file = libs.resolve(BuildExecutorModule.encode(module) + ".jar");
                         if (!Files.exists(file)) {
-                            try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(file))) {
+                            try (JarOutputStream environment = new JarOutputStream(Files.newOutputStream(file))) {
                                 JarEntry entry = new JarEntry("module-info.class");
                                 if (timestamp != null) {
                                     entry.setTimeLocal(timestamp.toLocalDateTime());
                                 }
-                                output.putNextEntry(entry);
-                                output.write(carrying(module, overrideTargets.get(module).carriers()));
-                                output.closeEntry();
+                                environment.putNextEntry(entry);
+                                environment.write(carrying(module, overrideTargets.get(module).carriers()));
+                                environment.closeEntry();
                             }
                         }
                         placed.put("module/" + module, file);

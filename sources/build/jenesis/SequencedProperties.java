@@ -4,9 +4,6 @@ import module java.base;
 
 public class SequencedProperties extends Properties {
 
-    public static final Function<String, String> SYSTEM = key -> System.getProperty("jenesis." + key);
-    public static final Function<String, String> NONE = _ -> null;
-
     private final SequencedMap<Object, Object> delegate = new LinkedHashMap<>();
 
     public static SequencedProperties ofFolders(Iterable<Path> folders, String file) throws IOException {
@@ -30,81 +27,6 @@ public class SequencedProperties extends Properties {
             }
         }
         return properties;
-    }
-
-    public static String getProperty(Function<String, String> keys, String key) {
-        return keys.apply(key);
-    }
-
-    public static String getProperty(Function<String, String> keys, String key, String defaultValue) {
-        String value = keys.apply(key);
-        return value == null ? defaultValue : value;
-    }
-
-    public static String value(Function<String, String> keys, String key) {
-        return trimmed(keys.apply(key));
-    }
-
-    public static String value(Function<String, String> keys, String key, String defaultValue) {
-        String value = trimmed(keys.apply(key));
-        return value == null ? defaultValue : value;
-    }
-
-    public static boolean flag(Function<String, String> keys, String key) {
-        return flag(keys, key, false);
-    }
-
-    public static boolean flag(Function<String, String> keys, String key, boolean defaultValue) {
-        Boolean value = flagOrNull(keys, key);
-        return value == null ? defaultValue : value;
-    }
-
-    public static Boolean flagOrNull(Function<String, String> keys, String key) {
-        return Make.parsed("jenesis." + key, keys.apply(key));
-    }
-
-    public static int number(Function<String, String> keys, String key, int defaultValue) {
-        Integer value = numberOrNull(keys, key);
-        return value == null ? defaultValue : value;
-    }
-
-    public static long number(Function<String, String> keys, String key, long defaultValue) {
-        Long value = longOrNull(keys, key);
-        return value == null ? defaultValue : value;
-    }
-
-    public static Integer numberOrNull(Function<String, String> keys, String key) {
-        String value = value(keys, key);
-        if (value == null) {
-            return null;
-        }
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException _) {
-            throw new IllegalArgumentException("Malformed value for jenesis." + key + ": '" + value
-                    + "' (expected a whole number)");
-        }
-    }
-
-    public static Long longOrNull(Function<String, String> keys, String key) {
-        String value = value(keys, key);
-        if (value == null) {
-            return null;
-        }
-        try {
-            return Long.parseLong(value);
-        } catch (NumberFormatException _) {
-            throw new IllegalArgumentException("Malformed value for jenesis." + key + ": '" + value
-                    + "' (expected a whole number)");
-        }
-    }
-
-    public static List<String> entries(Function<String, String> keys, String key) {
-        return splitEntries(value(keys, key));
-    }
-
-    public static List<String> words(Function<String, String> keys, String key) {
-        return splitWords(value(keys, key));
     }
 
     public static List<String> arguments(String... arguments) throws IOException {

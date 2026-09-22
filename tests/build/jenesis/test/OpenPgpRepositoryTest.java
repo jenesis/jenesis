@@ -6,10 +6,10 @@ import module org.junit.jupiter.api;
 import build.jenesis.OpenPgpRepository;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
+import build.jenesis.Environment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class OpenPgpRepositoryTest {
 
@@ -32,7 +32,7 @@ public class OpenPgpRepositoryTest {
         });
         server.start();
         try {
-            Optional<RepositoryItem> item = OpenPgpRepository.ofKeys(Map.of("repository.insecure", "true")::get, 
+            Optional<RepositoryItem> item = OpenPgpRepository.ofEnvironment(new Environment(Map.of("repository.insecure", "true")::get), 
                     URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/"))
                     .local(root)
                     .fetch(Runnable::run, FINGERPRINT);
@@ -63,7 +63,7 @@ public class OpenPgpRepositoryTest {
         });
         server.start();
         try {
-            assertThat(OpenPgpRepository.ofKeys(Map.of("repository.insecure", "true", "test.servers", "http://127.0.0.1:" + server.getAddress().getPort() + "/", "openpgp.uri", "@test.servers", "openpgp.local", root.toString())::get).fetch(Runnable::run, FINGERPRINT))
+            assertThat(OpenPgpRepository.ofEnvironment(new Environment(Map.of("repository.insecure", "true", "test.servers", "http://127.0.0.1:" + server.getAddress().getPort() + "/", "openpgp.uri", "@test.servers", "openpgp.local", root.toString())::get)).fetch(Runnable::run, FINGERPRINT))
                     .as("the reference names a property whose value is the server list")
                     .isPresent();
         } finally {
@@ -86,10 +86,10 @@ public class OpenPgpRepositoryTest {
         });
         holding.start();
         try {
-            assertThat(OpenPgpRepository.ofKeys(Map.of("repository.insecure", "true",
+            assertThat(OpenPgpRepository.ofEnvironment(new Environment(Map.of("repository.insecure", "true",
                             "openpgp.local", root.toString(),
                             "openpgp.uri", "http://127.0.0.1:" + absent.getAddress().getPort() + "/,"
-                                    + "http://127.0.0.1:" + holding.getAddress().getPort() + "/")::get)
+                                    + "http://127.0.0.1:" + holding.getAddress().getPort() + "/")::get))
                     .fetch(Runnable::run, FINGERPRINT))
                     .as("a server that does not hold the key leaves the next one to answer")
                     .isPresent();
@@ -122,7 +122,7 @@ public class OpenPgpRepositoryTest {
         System.setProperty("jenesis.openpgp.uri", servers);
         System.setProperty("jenesis.openpgp.local", root.toString());
         try {
-            return OpenPgpRepository.ofKeys(SYSTEM).fetch(Runnable::run, FINGERPRINT);
+            return OpenPgpRepository.ofEnvironment(Environment.SYSTEM).fetch(Runnable::run, FINGERPRINT);
         } finally {
             System.clearProperty("jenesis.openpgp.local");
             System.clearProperty("jenesis.openpgp.uri");
@@ -178,7 +178,7 @@ public class OpenPgpRepositoryTest {
     @Test
     public void answers_from_the_cache_without_asking_anyone() throws Exception {
         Files.writeString(root.resolve(FINGERPRINT + ".gpg"), "vendored");
-        Optional<RepositoryItem> item = OpenPgpRepository.ofKeys(SYSTEM, URI.create("http://127.0.0.1:1/"))
+        Optional<RepositoryItem> item = OpenPgpRepository.ofEnvironment(Environment.SYSTEM, URI.create("http://127.0.0.1:1/"))
                 .local(root)
                 .fetch(Runnable::run, FINGERPRINT);
         assertThat(item)
@@ -188,7 +188,7 @@ public class OpenPgpRepositoryTest {
 
     @Test
     public void refuses_a_key_server_reached_over_plaintext() {
-        assertThatThrownBy(() -> OpenPgpRepository.ofKeys(SYSTEM, URI.create("http://127.0.0.1:1/"))
+        assertThatThrownBy(() -> OpenPgpRepository.ofEnvironment(Environment.SYSTEM, URI.create("http://127.0.0.1:1/"))
                 .fetch(Runnable::run, FINGERPRINT))
                 .as("a key server inherits the repository posture on plaintext")
                 .isInstanceOf(IllegalStateException.class)

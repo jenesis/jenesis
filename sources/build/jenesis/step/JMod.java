@@ -1,10 +1,10 @@
 package build.jenesis.step;
 
 import module java.base;
-import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
+import build.jenesis.Environment;
 
 public class JMod extends ProcessBuildStep {
 
@@ -19,12 +19,11 @@ public class JMod extends ProcessBuildStep {
              Terms.of("jmod"));
     }
 
-    public static JMod ofKeys(Function<String, String> keys,
-                              Output output,
-                              ProcessHandler.Factory factory) {
+    public static JMod ofEnvironment(Environment environment,
+                                     ProcessHandler.Factory factory) {
         return new JMod(factory.apply("jmod", "bin/jmod"),
-                BuildStep.timestamp(keys),
-                Terms.ofKeys(keys, output, "jmod"));
+                BuildStep.timestamp(environment),
+                Terms.ofEnvironment(environment, "jmod"));
     }
 
     private JMod(Function<List<String>, ? extends ProcessHandler> factory,

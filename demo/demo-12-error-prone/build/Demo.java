@@ -3,17 +3,17 @@ package build;
 import module java.base;
 import build.jenesis.Project;
 import build.jenesis.project.InferredMultiProjectAssembler;
-import static build.jenesis.SequencedProperties.SYSTEM;
+import build.jenesis.Environment;
 
 public class Demo {
 
     static void main(String[] args) throws Exception {
         expectFailure("a reference comparison of two strings, with ReferenceEquality promoted to an error",
-                () -> Project.ofKeys(SYSTEM, Path.of(".")).build());
+                () -> Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).build());
         System.out.println();
         wipe();
-        Project.ofKeys(SYSTEM, Path.of("."))
-                .assembler(InferredMultiProjectAssembler.ofKeys(SYSTEM).toolchain(toolchain ->
+        Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
+                .assembler(InferredMultiProjectAssembler.ofEnvironment(Environment.SYSTEM).toolchain(toolchain ->
                         toolchain.compiler(compiler -> compiler.errorprone(null))))
                 .build();
         System.out.println();

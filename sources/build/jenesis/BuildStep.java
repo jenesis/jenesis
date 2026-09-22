@@ -121,11 +121,11 @@ public interface BuildStep extends Serializable {
     }
 
     static OffsetDateTime timestamp() {
-        return timestamp(SequencedProperties.NONE);
+        return timestamp(Environment.NONE);
     }
 
-    static OffsetDateTime timestamp(Function<String, String> keys) {
-        String value = SequencedProperties.getProperty(keys, "archive.timestamp", "1980-02-01T00:00:00Z");
+    static OffsetDateTime timestamp(Environment environment) {
+        String value = environment.getProperty("archive.timestamp", "1980-02-01T00:00:00Z");
         if (value.isBlank()) {
             return null;
         }

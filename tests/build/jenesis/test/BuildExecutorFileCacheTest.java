@@ -11,10 +11,10 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Environment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class BuildExecutorFileCacheTest implements Serializable {
 
@@ -94,15 +94,15 @@ public class BuildExecutorFileCacheTest implements Serializable {
         String previousUri = System.getProperty("jenesis.cache.uri");
         try {
             System.clearProperty("jenesis.cache.uri");
-            assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).cache()).isNull();
+            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).cache()).isNull();
             System.setProperty("jenesis.cache.uri", "");
-            assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).cache()).isNull();
+            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).cache()).isNull();
             System.setProperty("jenesis.cache.uri", cacheRoot.toUri().toString());
-            assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).cache()).isInstanceOf(BuildExecutorFileCache.class);
+            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).cache()).isInstanceOf(BuildExecutorFileCache.class);
             System.setProperty("jenesis.cache.uri", "https://cache.example.test/");
-            assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).cache()).isInstanceOf(BuildExecutorHttpCache.class);
+            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).cache()).isInstanceOf(BuildExecutorHttpCache.class);
             System.setProperty("jenesis.cache.uri", cacheRoot.toString());
-            assertThatThrownBy(() -> BuildExecutor.Configuration.ofKeys(SYSTEM)).isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM)).isInstanceOf(IllegalArgumentException.class);
         } finally {
             restore("jenesis.cache.uri", previousUri);
         }

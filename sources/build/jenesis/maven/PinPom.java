@@ -5,6 +5,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
 import build.jenesis.Pinning;
@@ -32,12 +33,12 @@ public class PinPom implements BuildStep {
         this(prefix, path, pomFiles, hashFunction, new Platform(), Pinning.permits());
     }
 
-    public static PinPom ofKeys(Function<String, String> keys,
-                                String prefix,
-                                String path,
-                                List<Path> pomFiles,
-                                HashDigestFunction hashFunction) {
-        return new PinPom(prefix, path, pomFiles, hashFunction).permits(Pinning.permits(keys));
+    public static PinPom ofEnvironment(Environment environment,
+                                       String prefix,
+                                       String path,
+                                       List<Path> pomFiles,
+                                       HashDigestFunction hashFunction) {
+        return new PinPom(prefix, path, pomFiles, hashFunction).permits(Pinning.permits(environment));
     }
 
     private PinPom(String prefix,

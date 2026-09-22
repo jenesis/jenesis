@@ -1,10 +1,10 @@
 package build.jenesis.step;
 
 import module java.base;
-import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 
 public class JLink extends ProcessBuildStep {
@@ -19,10 +19,9 @@ public class JLink extends ProcessBuildStep {
              Terms.of("jlink"));
     }
 
-    public static JLink ofKeys(Function<String, String> keys,
-                               Output output,
-                               ProcessHandler.Factory factory) {
-        return new JLink(factory.apply("jlink", "bin/jlink"), "main", Terms.ofKeys(keys, output, "jlink"));
+    public static JLink ofEnvironment(Environment environment,
+                                      ProcessHandler.Factory factory) {
+        return new JLink(factory.apply("jlink", "bin/jlink"), "main", Terms.ofEnvironment(environment, "jlink"));
     }
 
     private JLink(Function<List<String>, ? extends ProcessHandler> factory, String group, Terms terms) {

@@ -7,7 +7,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Tree;
@@ -32,7 +32,7 @@ public class TreeTest {
 
     @Test
     public void rejects_an_unknown_tree_format() {
-        assertThatThrownBy(() -> Tree.ofKeys(Map.of("tree.format", "fancy")::get, new Output()))
+        assertThatThrownBy(() -> Tree.ofEnvironment(new Environment(Map.of("tree.format", "fancy")::get)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown jenesis.tree.format 'fancy'")
                 .hasMessageContaining("full")
@@ -54,7 +54,7 @@ public class TreeTest {
             inventory.store(argument.resolve(Inventory.INVENTORY));
 
             List<String> printed = new ArrayList<>();
-            Tree.ofKeys(keys, new Output(printed::add, printed::add)).apply(
+            Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
                     Runnable::run,
                     new BuildStepContext(previous, next, supplement),
                     new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
@@ -96,7 +96,7 @@ public class TreeTest {
             arguments.put("bar", new BuildStepArgument(testArgument,
                     Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))));
             List<String> printed = new ArrayList<>();
-            Tree.ofKeys(keys, new Output(printed::add, printed::add)).apply(
+            Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
                     Runnable::run,
                     new BuildStepContext(previous, next, supplement),
                     arguments)
@@ -125,7 +125,7 @@ public class TreeTest {
         inventory.store(argument.resolve(Inventory.INVENTORY));
 
         List<String> printed = new ArrayList<>();
-        BuildStepResult result = Tree.ofKeys(SequencedProperties.NONE, new Output(printed::add, printed::add)).apply(
+        BuildStepResult result = Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(

@@ -8,7 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -43,17 +43,16 @@ public class WsImportModule implements BuildExecutorModule {
              ProcessBuildStep.Terms.of("wsimport"));
     }
 
-    public static WsImportModule ofKeys(Function<String, String> keys,
-                                        Output output,
-                                        Map<String, Repository> repositories,
-                                        Map<String, Resolver> resolvers) {
-        return new WsImportModule(Dependencies.ofKeys(keys, output, repositories, resolvers),
+    public static WsImportModule ofEnvironment(Environment environment,
+                                               Map<String, Repository> repositories,
+                                               Map<String, Resolver> resolvers) {
+        return new WsImportModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "wsimport",
                 null,
                 null,
                 List.of(),
-                ProcessBuildStep.Terms.ofKeys(keys, output, "wsimport"));
+                ProcessBuildStep.Terms.ofEnvironment(environment, "wsimport"));
     }
 
     private WsImportModule(Dependencies dependencies,

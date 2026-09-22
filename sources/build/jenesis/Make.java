@@ -17,7 +17,9 @@ public final class Make {
     private final boolean compile;
     private final Settings settings;
 
-    public record Settings(Function<String, String> keys, SequencedSet<Path> profiles) {
+    public record Settings(Function<String, String> keys,
+                           SequencedSet<Path> profiles,
+                           SequencedSet<String> declared) {
     }
 
     private record Layer(Properties properties, boolean trusted) {
@@ -351,23 +353,32 @@ public final class Make {
                            String... selectors) throws Exception {
         return (int) Class.forName("build.jenesis.daemon.DaemonClient", true, loader)
                 .getMethod("doDispatch", Path.class, List.class, String.class, String.class,
-                        SequencedMap.class, String[].class)
-                .invoke(null, root, path, mainClass, seed, collected, selectors);
+                        SequencedMap.class, SequencedMap.class, String[].class)
+                .invoke(null, root, path, mainClass, seed, supplied(), collected, selectors);
+    }
+
+    private SequencedMap<String, String> supplied() {
+        SequencedMap<String, String> supplied = new LinkedHashMap<>();
+        for (String key : settings.declared()) {
+            String value = settings.keys().apply(key);
+            if (value != null) {
+                supplied.put("jenesis." + key, value);
+            }
+        }
+        return supplied;
     }
 
     private int invoke(ClassLoader loader, SequencedMap<String, String> collected, String... selectors)
             throws Exception {
         Class<?> project = Class.forName("build.jenesis.Project", true, loader);
-        Class<?> console = Class.forName("build.jenesis.Output", true, loader);
-        Object defaults = console.getConstructor().newInstance();
         if (collected == null || !mainClass.equals("build.jenesis.Project")) {
             return (int) project
-                    .getMethod("run", Function.class, console, String.class, Path.class, SequencedSet.class, String[].class)
-                    .invoke(null, settings.keys(), defaults, mainClass, root, settings.profiles(), selectors);
+                    .getMethod("run", Function.class, String.class, Path.class, SequencedSet.class, String[].class)
+                    .invoke(null, settings.keys(), mainClass, root, settings.profiles(), selectors);
         }
         Object produced = project
-                .getMethod("perform", Function.class, console, Path.class, SequencedSet.class, String[].class)
-                .invoke(null, settings.keys(), defaults, root, settings.profiles(), selectors);
+                .getMethod("perform", Function.class, Path.class, SequencedSet.class, String[].class)
+                .invoke(null, settings.keys(), root, settings.profiles(), selectors);
         if (produced == null) {
             return 1;
         }
@@ -421,7 +432,15 @@ public final class Make {
             String name = file.getFileName().toString();
             profiles.add(Path.of(name.substring("jenesis-".length(), name.length() - ".properties".length())));
         }
-        return new Settings(layered(ambient, layers), profiles);
+        SequencedSet<String> declared = new LinkedHashSet<>();
+        for (Layer layer : layers) {
+            for (String name : layer.properties().stringPropertyNames()) {
+                if (name.startsWith("jenesis.")) {
+                    declared.add(name.substring("jenesis.".length()));
+                }
+            }
+        }
+        return new Settings(layered(ambient, layers), profiles, declared);
     }
 
     private static Function<String, String> layered(Function<String, String> ambient, List<Layer> layers) {

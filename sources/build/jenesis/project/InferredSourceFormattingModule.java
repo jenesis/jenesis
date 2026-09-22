@@ -5,7 +5,7 @@ import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.step.Bind;
@@ -40,31 +40,30 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
              value -> value);
     }
 
-    public static InferredSourceFormattingModule ofKeys(Function<String, String> keys,
-                                                        Output output,
-                                                        SequencedSet<Path> configuration,
-                                                        Map<String, Repository> repositories,
-                                                        Map<String, Resolver> resolvers) {
-        InferredSourceFormattingModule module = new InferredSourceFormattingModule(configuration, null, true, GoogleJavaFormatModule.ofKeys(keys, output, repositories, resolvers),
-                PalantirJavaFormatModule.ofKeys(keys, output, repositories, resolvers),
-                KtlintFormatModule.ofKeys(keys, output, repositories, resolvers),
-                ScalafmtFormatModule.ofKeys(keys, output, repositories, resolvers),
+    public static InferredSourceFormattingModule ofEnvironment(Environment environment,
+                                                               SequencedSet<Path> configuration,
+                                                               Map<String, Repository> repositories,
+                                                               Map<String, Resolver> resolvers) {
+        InferredSourceFormattingModule module = new InferredSourceFormattingModule(configuration, null, true, GoogleJavaFormatModule.ofEnvironment(environment, repositories, resolvers),
+                PalantirJavaFormatModule.ofEnvironment(environment, repositories, resolvers),
+                KtlintFormatModule.ofEnvironment(environment, repositories, resolvers),
+                ScalafmtFormatModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value,
                 value -> value,
                 value -> value);
-        Boolean rewrite = SequencedProperties.flagOrNull(keys, "format.rewrite");
+        Boolean rewrite = environment.flagOrNull("format.rewrite");
         if (rewrite != null) {
             module = module.verify(!rewrite);
         }
-        Boolean java = SequencedProperties.flagOrNull(keys, "format.java");
+        Boolean java = environment.flagOrNull("format.java");
         if (java != null) {
             module = module.java(java ? value -> value : null);
         }
-        Boolean ktlint = SequencedProperties.flagOrNull(keys, "format.ktlint");
+        Boolean ktlint = environment.flagOrNull("format.ktlint");
         if (ktlint != null) {
             module = module.ktlint(ktlint ? value -> value : null);
         }
-        Boolean scalafmt = SequencedProperties.flagOrNull(keys, "format.scalafmt");
+        Boolean scalafmt = environment.flagOrNull("format.scalafmt");
         if (scalafmt != null) {
             module = module.scalafmt(scalafmt ? value -> value : null);
         }

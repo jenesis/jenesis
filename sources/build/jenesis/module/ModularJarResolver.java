@@ -2,6 +2,7 @@ package build.jenesis.module;
 
 import module java.base;
 import build.jenesis.DependencyScope;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -24,14 +25,14 @@ public class ModularJarResolver implements Resolver {
         this(resolveAutomaticModules, fallback, ModuleVersionNegotiator.first());
     }
 
-    public static ModularJarResolver ofKeys(Function<String, String> keys, boolean resolveAutomaticModules) {
-        return ofKeys(keys, resolveAutomaticModules, null);
+    public static ModularJarResolver ofEnvironment(Environment environment, boolean resolveAutomaticModules) {
+        return ofEnvironment(environment, resolveAutomaticModules, null);
     }
 
-    public static ModularJarResolver ofKeys(Function<String, String> keys,
-                                            boolean resolveAutomaticModules,
-                                            Resolver fallback) {
-        String property = SequencedProperties.getProperty(keys, "resolver.module");
+    public static ModularJarResolver ofEnvironment(Environment environment,
+                                                   boolean resolveAutomaticModules,
+                                                   Resolver fallback) {
+        String property = environment.getProperty("resolver.module");
         if (property == null) {
             return new ModularJarResolver(resolveAutomaticModules, fallback);
         }

@@ -3,7 +3,7 @@ package build.jenesis.test.project;
 import module java.base;
 import module java.compiler;
 import module org.junit.jupiter.api;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
@@ -21,7 +21,6 @@ import build.jenesis.step.Javac;
 import javax.tools.ToolProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class JaCoCoModuleRunTest {
 
@@ -104,14 +103,14 @@ public class JaCoCoModuleRunTest {
         executor.addSource("sources", sources);
         executor.addModule(
                 "test",
-                new TestModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM)))
+                new TestModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM)))
                         .observe(new JaCoCo())
                         .isTest(candidate -> candidate.endsWith("CoveredTest"))
                         .jarsOnly(false),
                 "dependencies", "classes");
         executor.addModule(
                 "coverage",
-                new JaCoCoModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT),
+                new JaCoCoModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))).pinning(Pinning.STRICT),
                 "test", "classes", "sources", "dependencies");
         executor.execute();
 

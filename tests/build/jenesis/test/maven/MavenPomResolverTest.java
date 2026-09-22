@@ -18,11 +18,11 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.maven.MavenRepository;
 import build.jenesis.maven.MavenResolver;
 import build.jenesis.step.Dependencies;
+import build.jenesis.Environment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class MavenPomResolverTest {
 
@@ -52,7 +52,7 @@ public class MavenPomResolverTest {
                 "fail", new MavenPomResolver(MavenDefaultVersionNegotiator.fail()),
                 "managed", new MavenPomResolver(MavenDefaultVersionNegotiator.managed()));
         for (Map.Entry<String, MavenPomResolver> entry : cases.entrySet()) {
-            assertThat(serialize(MavenPomResolver.ofKeys(Map.of("resolver.maven", entry.getKey())::get)))
+            assertThat(serialize(MavenPomResolver.ofEnvironment(new Environment(Map.of("resolver.maven", entry.getKey())::get))))
                     .as("strategy=%s", entry.getKey())
                     .isEqualTo(serialize(entry.getValue()));
         }
@@ -60,13 +60,13 @@ public class MavenPomResolverTest {
 
     @Test
     public void system_property_is_read_case_insensitively() throws IOException {
-        assertThat(serialize(MavenPomResolver.ofKeys(Map.of("resolver.maven", "LaTeSt")::get)))
+        assertThat(serialize(MavenPomResolver.ofEnvironment(new Environment(Map.of("resolver.maven", "LaTeSt")::get))))
                 .isEqualTo(serialize(new MavenPomResolver(MavenDefaultVersionNegotiator.latest())));
     }
 
     @Test
     public void system_property_rejects_an_unknown_strategy() {
-        assertThatThrownBy(() -> MavenPomResolver.ofKeys(Map.of("resolver.maven", "nonsense")::get))
+        assertThatThrownBy(() -> MavenPomResolver.ofEnvironment(new Environment(Map.of("resolver.maven", "nonsense")::get)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Unknown jenesis.resolver.maven 'nonsense',"
                         + " expected one of: maven, latest, release, stable, closest, fail, managed");
@@ -76,7 +76,7 @@ public class MavenPomResolverTest {
     public void the_plain_resolver_negotiates_as_maven() throws IOException {
         assertThat(serialize(new MavenPomResolver(MavenDefaultVersionNegotiator.maven())))
                 .as("maven() names what the no-argument constructor already does")
-                .isEqualTo(serialize(MavenPomResolver.ofKeys(SYSTEM)));
+                .isEqualTo(serialize(MavenPomResolver.ofEnvironment(Environment.SYSTEM)));
     }
 
     @Test
@@ -84,7 +84,7 @@ public class MavenPomResolverTest {
         assertThat(serialize(new MavenPomResolver(MavenDefaultVersionNegotiator.latest())))
                 .as("the resolver travels in the step's serialized form, which is its cache key,"
                         + " so a resolution decided differently cannot be served from the cache")
-                .isNotEqualTo(serialize(MavenPomResolver.ofKeys(SYSTEM)));
+                .isNotEqualTo(serialize(MavenPomResolver.ofEnvironment(Environment.SYSTEM)));
     }
 
     @Test

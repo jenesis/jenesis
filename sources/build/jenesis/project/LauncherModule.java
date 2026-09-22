@@ -8,8 +8,8 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
-import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -33,11 +33,10 @@ public class LauncherModule implements BuildExecutorModule {
              PathPlacement.INFERRED);
     }
 
-    public static LauncherModule ofKeys(Function<String, String> keys,
-                                        Output output,
-                                        Map<String, Repository> repositories,
-                                        Map<String, Resolver> resolvers) {
-        return new LauncherModule(Dependencies.ofKeys(keys, output, repositories, resolvers),
+    public static LauncherModule ofEnvironment(Environment environment,
+                                               Map<String, Repository> repositories,
+                                               Map<String, Resolver> resolvers) {
+        return new LauncherModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "launcher",
                 PathPlacement.INFERRED);

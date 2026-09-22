@@ -4,11 +4,11 @@ import module java.base;
 import module jdk.compiler;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
-import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.PathPlacement;
 import build.jenesis.Resolver;
@@ -34,11 +34,10 @@ public class ModularizeModule implements BuildExecutorModule {
         this(synthetic, BuildStep.timestamp(), new JDeps(factory));
     }
 
-    public static ModularizeModule ofKeys(Function<String, String> keys,
-                                          Output output,
-                                          ProcessHandler.Factory factory,
-                                          boolean synthetic) {
-        return new ModularizeModule(synthetic, BuildStep.timestamp(keys), JDeps.ofKeys(keys, output, factory));
+    public static ModularizeModule ofEnvironment(Environment environment,
+                                                 ProcessHandler.Factory factory,
+                                                 boolean synthetic) {
+        return new ModularizeModule(synthetic, BuildStep.timestamp(environment), JDeps.ofEnvironment(environment, factory));
     }
 
     private ModularizeModule(boolean synthetic, OffsetDateTime timestamp, JDeps describe) {

@@ -8,7 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -40,16 +40,15 @@ public class XjcModule implements BuildExecutorModule {
              ProcessBuildStep.Terms.of("xjc"));
     }
 
-    public static XjcModule ofKeys(Function<String, String> keys,
-                                   Output output,
-                                   Map<String, Repository> repositories,
-                                   Map<String, Resolver> resolvers) {
-        return new XjcModule(Dependencies.ofKeys(keys, output, repositories, resolvers),
+    public static XjcModule ofEnvironment(Environment environment,
+                                          Map<String, Repository> repositories,
+                                          Map<String, Resolver> resolvers) {
+        return new XjcModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "xjc",
                 null,
                 List.of(),
-                ProcessBuildStep.Terms.ofKeys(keys, output, "xjc"));
+                ProcessBuildStep.Terms.ofEnvironment(environment, "xjc"));
     }
 
     private XjcModule(Dependencies dependencies,

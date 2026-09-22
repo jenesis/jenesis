@@ -6,6 +6,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 
@@ -28,11 +29,11 @@ public class Launcher implements BuildStep {
              BuildStep.timestamp());
     }
 
-    public static Launcher ofKeys(Function<String, String> keys,
-                                  String tool,
-                                  PathPlacement pathPlacement) {
+    public static Launcher ofEnvironment(Environment environment,
+                                         String tool,
+                                         PathPlacement pathPlacement) {
         return new Launcher(tool, pathPlacement)
-                .timestamp(BuildStep.timestamp(keys));
+                .timestamp(BuildStep.timestamp(environment));
     }
 
     private Launcher(String tool, String group, PathPlacement pathPlacement, OffsetDateTime timestamp) {

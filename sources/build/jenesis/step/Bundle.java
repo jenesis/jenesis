@@ -1,11 +1,11 @@
 package build.jenesis.step;
 
 import module java.base;
-import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
@@ -22,9 +22,9 @@ public class Bundle implements BuildStep {
              BuildStep.timestamp());
     }
 
-    public static Bundle ofKeys(Function<String, String> keys, Output output) {
+    public static Bundle ofEnvironment(Environment environment) {
         return new Bundle()
-                .timestamp(BuildStep.timestamp(keys));
+                .timestamp(BuildStep.timestamp(environment));
     }
 
     private Bundle(String group, OffsetDateTime timestamp) {

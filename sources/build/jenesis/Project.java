@@ -59,8 +59,7 @@ public record Project(
         Supplier<BuildExecutor.Configuration> configurator,
         Map<String, Repository> repositories,
         Map<String, Resolver> resolvers,
-        Function<String, String> keys,
-        Output output) {
+        Environment environment) {
 
     public static final String BUILD = "build",
             STAGE = "stage",
@@ -114,30 +113,30 @@ public record Project(
         }
 
         Layout MAVEN = (executor, project, assembler) -> {
-            executor.addModule(HELP, new HelpModule("maven", assembler.getClass().getName(), project.output()));
-            executor.addModule(SKILL, new SkillModule(project.target(), project.output()));
+            executor.addModule(HELP, new HelpModule("maven", assembler.getClass().getName(), project.environment().out()));
+            executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
             MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler, null, null, false);
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
                 repositories.putIfAbsent("maven",
-                        MavenDefaultRepository.ofKeys(project.keys(), project.output())
-                                .cached(project.keys(), project.output(), project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
-                repositories.putIfAbsent("OpenPGP", OpenPgpRepository.ofKeys(project.keys()));
+                        MavenDefaultRepository.ofEnvironment(project.environment())
+                                .cached(project.environment(), project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                repositories.putIfAbsent("OpenPGP", OpenPgpRepository.ofEnvironment(project.environment()));
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
-                resolvers.putIfAbsent("maven", MavenPomResolver.ofKeys(project.keys()));
+                resolvers.putIfAbsent("maven", MavenPomResolver.ofEnvironment(project.environment()));
                 SequencedSet<String> mavenDeps = new LinkedHashSet<>();
                 inherited.sequencedKeySet().stream()
                         .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + METADATA + "/"))
                         .forEach(mavenDeps::add);
-                sub.addModule("maven", MavenProject.make(project.keys(), project.output(), project.root(),
-                                "main",
-                                "maven",
-                                Collections.unmodifiableMap(repositories),
-                                Collections.unmodifiableMap(resolvers),
-                                project.pinning(),
-                                project.licenseFiles(Dependencies.SPDX),
-                                (descriptor, mergedRepos, mergedResolvers) -> pomAware.apply(
+                sub.addModule("maven", MavenProject.make(project.environment(), project.root(),
+                                                         "main",
+                                                         "maven",
+                                                         Collections.unmodifiableMap(repositories),
+                                                         Collections.unmodifiableMap(resolvers),
+                                                         project.pinning(),
+                                                         project.licenseFiles(Dependencies.SPDX),
+                                                         (descriptor, mergedRepos, mergedResolvers) -> pomAware.apply(
                                         new ProjectModuleDescriptor(descriptor,
                                                 configurations(descriptor.configurations(), project.configuration(), project.profiles()),
                                                 project.tests(),
@@ -147,28 +146,27 @@ public record Project(
                                                 PathPlacement.CLASS_PATH),
                                         mergedRepos,
                                         mergedResolvers)),
-                        mavenDeps);
+                              mavenDeps);
             }, METADATA);
             executor.addModule(STAGE, (stage, inherited) -> {
-                stage.addStep("maven", MavenRepositoryStaging.ofKeys(project.keys()), inherited.sequencedKeySet());
+                stage.addStep("maven", MavenRepositoryStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
                 stage.addStep("packages", new ImageStaging("package").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("native", new ImageStaging("native").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("docker", new ImageStaging("docker"), inherited.sequencedKeySet());
                 stage.addStep("reports", new ReportStaging(), inherited.sequencedKeySet());
             }, BUILD);
             executor.addModule(EXPORT, (export, _) -> export.addStep(
-                    "maven", MavenRepositoryExport.ofKeys(project.keys()), BuildExecutorModule.PREVIOUS + STAGE + "/maven"), STAGE);
+                    "maven", MavenRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/maven"), STAGE);
             String prefix = BUILD + "/maven/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
             executor.addModule(PIN, new PinModule(project.root(),
                     "pom.xml",
-                    (path, file) -> PinPom.ofKeys(project.keys(), "maven", path, List.of(file), project.hashFunction()),
+                    (path, file) -> PinPom.ofEnvironment(project.environment(), "maven", path, List.of(file), project.hashFunction()),
                     project.hashFunction(),
-                    project.keys(),
-                    project.output()), BUILD);
+                    project.environment()), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
-                    "tree", Tree.ofKeys(project.keys(), project.output()), inherited.sequencedKeySet()), BUILD);
+                    "tree", Tree.ofEnvironment(project.environment()), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
-            executor.addModule(RELEASE, ReleaseModule.ofKeys(project.keys(), project.output(), project.root(), project.version()), STAGE);
+            executor.addModule(RELEASE, ReleaseModule.ofEnvironment(project.environment(), project.root(), project.version()), STAGE);
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
@@ -178,34 +176,34 @@ public record Project(
         };
 
         Layout MODULAR = (executor, project, assembler) -> {
-            executor.addModule(HELP, new HelpModule("modular", assembler.getClass().getName(), project.output()));
-            executor.addModule(SKILL, new SkillModule(project.target(), project.output()));
+            executor.addModule(HELP, new HelpModule("modular", assembler.getClass().getName(), project.environment().out()));
+            executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
             MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(assembler, project.hashFunction());
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
                 repositories.putIfAbsent("module",
-                        JenesisModuleRepository.ofKeys(project.keys(), project.output(), JenesisRepository.Scope.MODULE)
-                                .cached(project.keys(), project.output(), project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
-                repositories.putIfAbsent("OpenPGP", OpenPgpRepository.ofKeys(project.keys()));
+                        JenesisModuleRepository.ofEnvironment(project.environment(), JenesisRepository.Scope.MODULE)
+                                .cached(project.environment(), project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                repositories.putIfAbsent("OpenPGP", OpenPgpRepository.ofEnvironment(project.environment()));
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
-                resolvers.putIfAbsent("module", ModularJarResolver.ofKeys(project.keys(), false));
+                resolvers.putIfAbsent("module", ModularJarResolver.ofEnvironment(project.environment(), false));
                 SequencedSet<String> modulesDeps = new LinkedHashSet<>();
                 inherited.sequencedKeySet().stream()
                         .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + METADATA + "/"))
                         .forEach(modulesDeps::add);
-                sub.addModule("modules", ModularProject.make(project.keys(), project.output(), project.root(),
-                                "main",
-                                "module",
-                                _ -> true,
-                                Collections.unmodifiableMap(repositories),
-                                Collections.unmodifiableMap(resolvers),
-                                project.pinning(),
-                                true,
-                                project.licenseFiles(Dependencies.SPDX),
-                                project.boms(),
-                project.signatures(),
-                                (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
+                sub.addModule("modules", ModularProject.make(project.environment(), project.root(),
+                                                             "main",
+                                                             "module",
+                                                             _ -> true,
+                                                             Collections.unmodifiableMap(repositories),
+                                                             Collections.unmodifiableMap(resolvers),
+                                                             project.pinning(),
+                                                             true,
+                                                             project.licenseFiles(Dependencies.SPDX),
+                                                             project.boms(),
+                                                             project.signatures(),
+                                                             (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
                                         new ProjectModuleDescriptor(descriptor,
                                                 configurations(
                                                         modularConfigurationFolder(descriptor.location()),
@@ -218,10 +216,10 @@ public record Project(
                                                 PathPlacement.MODULE_PATH),
                                         mergedRepos,
                                         mergedResolvers)),
-                        modulesDeps);
+                              modulesDeps);
             }, METADATA);
             executor.addModule(STAGE, (stage, inherited) -> {
-                stage.addStep("modular", ModularStaging.ofKeys(project.keys()), inherited.sequencedKeySet());
+                stage.addStep("modular", ModularStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
                 stage.addStep("packages", new ImageStaging("package").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("runtime", new ImageStaging("image"), inherited.sequencedKeySet());
                 stage.addStep("layers", new ImageStaging("layers"), inherited.sequencedKeySet());
@@ -230,17 +228,16 @@ public record Project(
                 stage.addStep("reports", new ReportStaging(), inherited.sequencedKeySet());
             }, BUILD);
             executor.addModule(EXPORT, (export, _) -> export.addStep(
-                    "modular", JenesisModuleRepositoryExport.ofKeys(project.keys()), BuildExecutorModule.PREVIOUS + STAGE + "/modular"), STAGE);
+                    "modular", JenesisModuleRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/modular"), STAGE);
             String prefix = BUILD + "/modules/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
             executor.addModule(PIN, new PinModule(project.root(), "module-info.java",
-                    (path, file) -> PinModuleInfo.ofKeys(project.keys(), project.output(), "module", path, List.of(file), project.hashFunction()),
+                    (path, file) -> PinModuleInfo.ofEnvironment(project.environment(), "module", path, List.of(file), project.hashFunction()),
                     project.hashFunction(),
-                    project.keys(),
-                    project.output()), BUILD);
+                    project.environment()), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
-                    "tree", Tree.ofKeys(project.keys(), project.output()), inherited.sequencedKeySet()), BUILD);
+                    "tree", Tree.ofEnvironment(project.environment()), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
-            executor.addModule(RELEASE, ReleaseModule.ofKeys(project.keys(), project.output(), project.root(), project.version()), STAGE);
+            executor.addModule(RELEASE, ReleaseModule.ofEnvironment(project.environment(), project.root(), project.version()), STAGE);
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
@@ -250,8 +247,8 @@ public record Project(
         };
 
         Layout MODULAR_TO_MAVEN = (executor, project, assembler) -> {
-            executor.addModule(HELP, new HelpModule("modular_to_maven", assembler.getClass().getName(), project.output()));
-            executor.addModule(SKILL, new SkillModule(project.target(), project.output()));
+            executor.addModule(HELP, new HelpModule("modular_to_maven", assembler.getClass().getName(), project.environment().out()));
+            executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
             MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler,
                     BuildExecutorModule.PREVIOUS.repeat(2) + MultiProjectModule.MANIFESTS,
@@ -261,32 +258,32 @@ public record Project(
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
                 repositories.putIfAbsent("maven",
-                        MavenDefaultRepository.ofKeys(project.keys(), project.output())
-                                .cached(project.keys(), project.output(), project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                        MavenDefaultRepository.ofEnvironment(project.environment())
+                                .cached(project.environment(), project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
                 repositories.putIfAbsent("module",
-                        JenesisModuleRepository.ofKeys(project.keys(), project.output(), JenesisRepository.Scope.ARTIFACT)
-                                .cached(project.keys(), project.output(), project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
-                repositories.putIfAbsent("OpenPGP", OpenPgpRepository.ofKeys(project.keys()));
+                        JenesisModuleRepository.ofEnvironment(project.environment(), JenesisRepository.Scope.ARTIFACT)
+                                .cached(project.environment(), project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                repositories.putIfAbsent("OpenPGP", OpenPgpRepository.ofEnvironment(project.environment()));
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
-                resolvers.putIfAbsent("maven", MavenPomResolver.ofKeys(project.keys()));
+                resolvers.putIfAbsent("maven", MavenPomResolver.ofEnvironment(project.environment()));
                 resolvers.putIfAbsent("module", new MavenModuleResolver("maven",
                         MavenResolver.of(resolvers.get("maven")), repositories.get("module")));
                 SequencedSet<String> modulesDeps = new LinkedHashSet<>();
                 inherited.sequencedKeySet().stream()
                         .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + METADATA + "/"))
                         .forEach(modulesDeps::add);
-                sub.addModule("modules", ModularProject.make(project.keys(), project.output(), project.root(),
-                                "main",
-                                "module",
-                                _ -> true,
-                                Collections.unmodifiableMap(repositories),
-                                Collections.unmodifiableMap(resolvers),
-                                project.pinning(),
-                                true,
-                                project.licenseFiles(Dependencies.SPDX),
-                                project.boms(),
-                project.signatures(),
-                                (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
+                sub.addModule("modules", ModularProject.make(project.environment(), project.root(),
+                                                             "main",
+                                                             "module",
+                                                             _ -> true,
+                                                             Collections.unmodifiableMap(repositories),
+                                                             Collections.unmodifiableMap(resolvers),
+                                                             project.pinning(),
+                                                             true,
+                                                             project.licenseFiles(Dependencies.SPDX),
+                                                             project.boms(),
+                                                             project.signatures(),
+                                                             (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
                                         new ProjectModuleDescriptor(descriptor,
                                                 configurations(modularConfigurationFolder(descriptor.location()), project.configuration(), project.profiles()),
                                                 project.tests(),
@@ -296,11 +293,11 @@ public record Project(
                                                 PathPlacement.INFERRED),
                                         mergedRepos,
                                         mergedResolvers)),
-                        modulesDeps);
+                              modulesDeps);
             }, METADATA);
             executor.addModule(STAGE, (stage, inherited) -> {
-                stage.addStep("maven", MavenRepositoryStaging.ofKeys(project.keys()), inherited.sequencedKeySet());
-                stage.addStep("modular", ModularStaging.ofKeys(project.keys()), inherited.sequencedKeySet());
+                stage.addStep("maven", MavenRepositoryStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
+                stage.addStep("modular", ModularStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
                 stage.addStep("packages", new ImageStaging("package").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("runtime", new ImageStaging("image"), inherited.sequencedKeySet());
                 stage.addStep("layers", new ImageStaging("layers"), inherited.sequencedKeySet());
@@ -309,21 +306,20 @@ public record Project(
                 stage.addStep("reports", new ReportStaging(), inherited.sequencedKeySet());
             }, BUILD);
             executor.addModule(EXPORT, (export, _) -> {
-                export.addStep("maven", MavenRepositoryExport.ofKeys(project.keys()), BuildExecutorModule.PREVIOUS + STAGE + "/maven");
-                export.addStep("modular", JenesisModuleRepositoryExport.ofKeys(project.keys()), BuildExecutorModule.PREVIOUS + STAGE + "/modular");
+                export.addStep("maven", MavenRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/maven");
+                export.addStep("modular", JenesisModuleRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/modular");
             }, STAGE);
             String prefix = BUILD + "/modules/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
             executor.addModule(PIN,
                     new PinModule(project.root(),
                             "module-info.java",
-                            (path, file) -> PinModuleInfo.ofKeys(project.keys(), project.output(), "module", path, List.of(file), project.hashFunction()),
+                            (path, file) -> PinModuleInfo.ofEnvironment(project.environment(), "module", path, List.of(file), project.hashFunction()),
                             project.hashFunction(),
-                            project.keys(),
-                            project.output()),
+                            project.environment()),
                     BUILD);
-            executor.addStep(DEPENDENCIES, Tree.ofKeys(project.keys(), project.output()), BUILD);
+            executor.addStep(DEPENDENCIES, Tree.ofEnvironment(project.environment()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
-            executor.addModule(RELEASE, ReleaseModule.ofKeys(project.keys(), project.output(), project.root(), project.version()), STAGE);
+            executor.addModule(RELEASE, ReleaseModule.ofEnvironment(project.environment(), project.root(), project.version()), STAGE);
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
@@ -432,11 +428,11 @@ public record Project(
         }
     }
 
-    private record HelpModule(String layout, String assembler, Output output) implements BuildExecutorModule {
+    private record HelpModule(String layout, String assembler, Consumer<String> out) implements BuildExecutorModule {
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-            output.out().accept(("""
+            out.accept(("""
                     %{title}Jenesis%{reset} - a Java build tool, written and configured in Java.
 
                     %{header}Active configuration:%{reset}
@@ -528,20 +524,20 @@ public record Project(
                       %{name}configuration%{reset}               Every setting, its value and what it does
                       %{name}skill%{reset}                       The whole tool as a briefing for a coding agent
                     """)
-                    .replace("%{layout}", layout)
-                    .replace("%{assembler}", assembler)
-                    .replace("%{reset}", BuildExecutorCallback.RESET)
-                    .replace("%{header}", BuildExecutorCallback.YELLOW)
-                    .replace("%{name}", BuildExecutorCallback.CYAN)
-                    .replace("%{title}", BuildExecutorCallback.GREEN));
+                                     .replace("%{layout}", layout)
+                                     .replace("%{assembler}", assembler)
+                                     .replace("%{reset}", BuildExecutorCallback.RESET)
+                                     .replace("%{header}", BuildExecutorCallback.YELLOW)
+                                     .replace("%{name}", BuildExecutorCallback.CYAN)
+                                     .replace("%{title}", BuildExecutorCallback.GREEN));
         }
     }
 
-    private record SkillModule(Path target, Output output) implements BuildExecutorModule {
+    private record SkillModule(Path target, Consumer<String> out) implements BuildExecutorModule {
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-            output.out().accept(("""
+            out.accept(("""
                     # Jenesis build tool - operating instructions
 
                     You are in a Jenesis-built Java project. Use this to drive the build, read its
@@ -1047,34 +1043,31 @@ public record Project(
                              Path file,
                              SequencedSet<Path> provided,
                              HashDigestFunction hashFunction,
-                             Function<String, String> keys,
-                             Output output)
+                             Consumer<String> printing)
             implements BuildExecutorModule {
 
         private PinModule(Path root,
                           String fileName,
                           BiFunction<String, Path, BuildStep> stepFactory,
                           HashDigestFunction hashFunction,
-                          Function<String, String> keys,
-                          Output output) {
+                          Environment environment) {
             this(root,
-                    fileName,
-                    stepFactory,
-                    fileFromKeys(keys, root),
-                    providedFromKeys(keys, root),
-                    hashFunction,
-                    keys,
-                    output);
+                 fileName,
+                 stepFactory,
+                 fileFromKeys(environment, root),
+                 providedFromKeys(environment, root),
+                 hashFunction,
+                 environment.flag("print.divergence") ? environment.out() : null);
         }
 
-        private static Path fileFromKeys(Function<String, String> keys, Path root) {
-            String value = SequencedProperties.getProperty(keys, "pin.file");
+        private static Path fileFromKeys(Environment environment, Path root) {
+            String value = environment.getProperty("pin.file");
             return value == null ? null : root.resolve(value).normalize();
         }
 
-        private static SequencedSet<Path> providedFromKeys(Function<String, String> keys, Path root) {
+        private static SequencedSet<Path> providedFromKeys(Environment environment, Path root) {
             SequencedSet<Path> provided = new LinkedHashSet<>();
-            String value = SequencedProperties.getProperty(keys, "pin.provided");
+            String value = environment.getProperty("pin.provided");
             if (value != null) {
                 for (String entry : value.split(",")) {
                     String candidate = entry.trim();
@@ -1087,11 +1080,11 @@ public record Project(
         }
 
         PinModule file(Path file) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, keys, output);
+            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing);
         }
 
         PinModule provided(SequencedSet<Path> provided) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, keys, output);
+            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing);
         }
 
         @Override
@@ -1125,9 +1118,7 @@ public record Project(
                         new LinkedHashSet<>(inherited.sequencedKeySet()));
             }
             buildExecutor.addStep("divergence",
-                    new Divergence(paths, SequencedProperties.flag(keys, "print.divergence")
-                            ? output.out()
-                            : null),
+                    new Divergence(paths, printing),
                     new LinkedHashSet<>(inherited.sequencedKeySet()));
         }
     }
@@ -1344,12 +1335,14 @@ public record Project(
     }
 
     public Project(Path root) {
-        this(resolvedRoot(root), Collections.unmodifiableSequencedSet(
-                new LinkedHashSet<>(List.of(resolvedRoot(root).resolve("build.jenesis")))));
+        this(root, Environment.NONE);
     }
 
-    private Project(Path root, SequencedSet<Path> configuration) {
-        this(root,
+    private Project(Path root, Environment environment) {
+        Path resolved = resolvedRoot(root);
+        SequencedSet<Path> configuration = Collections.unmodifiableSequencedSet(
+                new LinkedHashSet<>(List.of(resolved.resolve("build.jenesis"))));
+        this(resolved,
                 Path.of("target"),
                 Path.of(".jenesis", "artifacts"),
                 Collections.emptyNavigableSet(),
@@ -1373,8 +1366,7 @@ public record Project(
                 BuildExecutor.Configuration::new,
                 Map.of(),
                 Map.of(),
-                SequencedProperties.NONE,
-                new Output());
+                environment);
     }
 
     private static Path resolvedRoot(Path root) {
@@ -1390,31 +1382,31 @@ public record Project(
         return relative.toString().isEmpty() ? Path.of(".") : relative;
     }
 
-    public static Project ofKeys(Function<String, String> keys, Output output, Path root) {
-        Project project = new Project(root).keys(keys).output(output);
-        String configuration = SequencedProperties.getProperty(keys, "project.configuration");
+    public static Project ofEnvironment(Environment environment, Path root) {
+        Project project = new Project(root, environment);
+        String configuration = environment.getProperty("project.configuration");
         if (configuration != null) {
-            project = project.configuration(locations(keys, configuration, project).toArray(Path[]::new));
+            project = project.configuration(locations(environment, configuration, project).toArray(Path[]::new));
             project = project.boms(project.configuration().toArray(Path[]::new));
             project = project.signatures(project.configuration().toArray(Path[]::new));
         }
-        String boms = SequencedProperties.getProperty(keys, "project.boms");
+        String boms = environment.getProperty("project.boms");
         if (boms != null) {
-            project = project.boms(locations(keys, boms, project).toArray(Path[]::new));
+            project = project.boms(locations(environment, boms, project).toArray(Path[]::new));
         }
-        String signatures = SequencedProperties.getProperty(keys, "project.signatures");
+        String signatures = environment.getProperty("project.signatures");
         if (signatures != null) {
-            project = project.signatures(locations(keys, signatures, project).toArray(Path[]::new));
+            project = project.signatures(locations(environment, signatures, project).toArray(Path[]::new));
         }
-        String target = SequencedProperties.getProperty(keys, "project.target");
+        String target = environment.getProperty("project.target");
         if (target != null) {
             project = project.target(Path.of(target));
         }
-        String artifacts = SequencedProperties.getProperty(keys, "project.artifacts");
+        String artifacts = environment.getProperty("project.artifacts");
         if (artifacts != null) {
             project = project.artifacts(Path.of(artifacts));
         }
-        String cache = SequencedProperties.getProperty(keys, "project.cache");
+        String cache = environment.getProperty("project.cache");
         if (cache != null) {
             if (cache.contains("://")) {
                 throw new IllegalArgumentException("jenesis.project.cache is a filesystem path, not a URI"
@@ -1424,7 +1416,7 @@ public record Project(
                     ? Path.of(".jenesis", "cache")
                     : Path.of(cache))));
         }
-        String layout = SequencedProperties.getProperty(keys, "project.layout");
+        String layout = environment.getProperty("project.layout");
         if (layout != null) {
             project = project.layout(switch (layout.toLowerCase(Locale.ROOT)) {
                 case "auto" -> Layout.AUTO;
@@ -1435,7 +1427,7 @@ public record Project(
                         "Unknown layout: " + layout + " (expected auto, maven, modular, or modular_to_maven)");
             });
         }
-        String metadata = SequencedProperties.getProperty(keys, "project.metadata");
+        String metadata = environment.getProperty("project.metadata");
         if (metadata != null) {
             project = project.metadata(Arrays.stream(metadata.split(","))
                     .map(String::trim)
@@ -1443,47 +1435,47 @@ public record Project(
                     .map(Path::of)
                     .toArray(Path[]::new));
         }
-        String digest = SequencedProperties.getProperty(keys, "project.digest");
+        String digest = environment.getProperty("project.digest");
         if (digest != null) {
             project = project.hashFunction(new HashDigestFunction(digest));
         }
-        Boolean sources = SequencedProperties.flagOrNull(keys, "project.sources");
+        Boolean sources = environment.flagOrNull("project.sources");
         if (sources != null) {
             project = project.sources(sources);
         }
-        Boolean documentation = SequencedProperties.flagOrNull(keys, "project.documentation");
+        Boolean documentation = environment.flagOrNull("project.documentation");
         if (documentation != null) {
             project = project.documentation(documentation);
         }
-        String version = SequencedProperties.getProperty(keys, "project.version");
+        String version = environment.getProperty("project.version");
         if (version != null) {
             project = project.version(version);
         }
-        String tag = SequencedProperties.getProperty(keys, "project.tag");
+        String tag = environment.getProperty("project.tag");
         if (tag != null) {
             project = project.tag(tag);
         }
-        String revision = SequencedProperties.getProperty(keys, "project.revision");
+        String revision = environment.getProperty("project.revision");
         if (revision != null) {
             project = project.revision(revision);
         }
-        String tree = SequencedProperties.getProperty(keys, "project.tree");
+        String tree = environment.getProperty("project.tree");
         if (tree != null) {
             project = project.tree(tree);
         }
-        BuildExecutor.Configuration executor = BuildExecutor.Configuration.ofKeys(keys).output(output);
-        return project.pinning(Pinning.ofKeys(keys))
-                .assembler(InferredMultiProjectAssembler.ofKeys(keys, output))
+        BuildExecutor.Configuration executor = BuildExecutor.Configuration.ofEnvironment(environment);
+        return project.pinning(Pinning.ofEnvironment(environment))
+                .assembler(InferredMultiProjectAssembler.ofEnvironment(environment))
                 .configurator(() -> executor);
     }
 
-    private static SequencedSet<Path> locations(Function<String, String> keys, String text, Project project) {
+    private static SequencedSet<Path> locations(Environment environment, String text, Project project) {
         SequencedSet<Path> target = new LinkedHashSet<>();
-        locations(keys, text, project.root(), project.configuration(), new HashSet<>(), target);
+        locations(environment, text, project.root(), project.configuration(), new HashSet<>(), target);
         return target;
     }
 
-    private static void locations(Function<String, String> keys,
+    private static void locations(Environment environment,
                                   String text,
                                   Path root,
                                   SequencedSet<Path> defaults,
@@ -1499,14 +1491,14 @@ public record Project(
                 if (name.isEmpty()) {
                     target.addAll(defaults);
                 } else {
-                    String value = SequencedProperties.getProperty(keys, name, System.getenv(name));
+                    String value = environment.getProperty(name, System.getenv(name));
                     if (value == null) {
                         throw new IllegalStateException("Unresolved location reference: @" + name);
                     }
                     if (!visited.add(name)) {
                         throw new IllegalStateException("Circular location reference: @" + name);
                     }
-                    locations(keys, value, root, defaults, visited, target);
+                    locations(environment, value, root, defaults, visited, target);
                     visited.remove(name);
                 }
             } else {
@@ -1540,8 +1532,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project configuration(Path... configuration) {
@@ -1569,8 +1560,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project signatures(Path... signatures) {
@@ -1598,8 +1588,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project boms(Path... boms) {
@@ -1627,8 +1616,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project profiles(Path... profiles) {
@@ -1656,8 +1644,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project target(Path target) {
@@ -1685,8 +1672,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project artifacts(Path artifacts) {
@@ -1714,8 +1700,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project cache(BuildExecutorCache cache) {
@@ -1743,8 +1728,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project hashFunction(HashDigestFunction hashFunction) {
@@ -1772,8 +1756,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project layout(Layout layout) {
@@ -1801,8 +1784,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project tests(boolean tests) {
@@ -1830,8 +1812,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project sources(boolean sources) {
@@ -1859,8 +1840,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project documentation(boolean documentation) {
@@ -1888,8 +1868,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project pinning(Pinning pinning) {
@@ -1917,8 +1896,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project metadata(Path... metadata) {
@@ -1946,8 +1924,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project version(String version) {
@@ -1975,8 +1952,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project tag(String tag) {
@@ -2004,8 +1980,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project revision(String revision) {
@@ -2033,8 +2008,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project tree(String tree) {
@@ -2062,8 +2036,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project defaultTarget(String... defaultTarget) {
@@ -2091,8 +2064,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project assembler(MultiProjectAssembler<? super ProjectModuleDescriptor> assembler) {
@@ -2120,8 +2092,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project repositories(Map<String, Repository> repositories) {
@@ -2149,8 +2120,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project resolvers(Map<String, Resolver> resolvers) {
@@ -2178,8 +2148,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public Project configurator(Supplier<BuildExecutor.Configuration> configurator) {
@@ -2207,66 +2176,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                keys,
-                output);
-    }
-
-    public Project output(Output output) {
-        return new Project(root,
-                target,
-                artifacts,
-                metadata,
-                configuration,
-                boms,
-                signatures,
-                profiles,
-                cache,
-                hashFunction,
-                layout,
-                tests,
-                sources,
-                documentation,
-                pinning,
-                version,
-                tag,
-                revision,
-                tree,
-                defaultTarget,
-                assembler,
-                configurator,
-                repositories,
-                resolvers,
-                keys,
-                output);
-    }
-
-    public Project keys(Function<String, String> keys) {
-        return new Project(root,
-                target,
-                artifacts,
-                metadata,
-                configuration,
-                boms,
-                signatures,
-                profiles,
-                cache,
-                hashFunction,
-                layout,
-                tests,
-                sources,
-                documentation,
-                pinning,
-                version,
-                tag,
-                revision,
-                tree,
-                defaultTarget,
-                assembler,
-                configurator,
-                repositories,
-                resolvers,
-                keys,
-                output);
+                environment);
     }
 
     public SequencedMap<String, Path> build(String... selectors) throws IOException {
@@ -2291,17 +2201,16 @@ public record Project(
         if (artifacts() != null) {
             excluded.add(artifacts().toAbsolutePath().normalize());
         }
-        new ProjectWatch(absoluteRoot, excluded, 200L, output).watch(() -> {
+        new ProjectWatch(absoluteRoot, excluded, 200L, environment.out()).watch(() -> {
             try {
                 build(selectors);
             } catch (Exception e) {
-                output.out().accept("Build failed: " + e);
+                environment.out().accept("Build failed: " + e);
             }
         });
     }
 
-    private static void printConfiguration(Function<String, String> keys, Output output) {
-        String catalogue = """
+    private static final String CATALOGUE = """
                 project.target|target|Folder the build writes its outputs to
                 project.artifacts||Folder resolved dependencies and repository metadata are cached in
                 project.layout|auto|auto|maven|modular|modular_to_maven; auto reads the project
@@ -2445,44 +2354,48 @@ public record Project(
                 jreleaser.config||JReleaser configuration file
                 jreleaser.dryRun|true|Run JReleaser without actually publishing
                 """;
-        for (String line : catalogue.lines().toList()) {
+
+    private static SortedMap<String, String> settings(Environment environment) {
+        SortedMap<String, String> settings = new TreeMap<>();
+        for (String line : CATALOGUE.lines().toList()) {
+            String key = line.split("\\|", 3)[0];
+            String value = environment.getProperty(key);
+            if (value != null) {
+                settings.put("jenesis." + key, value);
+            }
+        }
+        return settings;
+    }
+
+    private static void printConfiguration(Environment environment) {
+        for (String line : CATALOGUE.lines().toList()) {
             String[] entry = line.split("\\|", 3);
             String name = "jenesis." + entry[0];
-            String value = keys.apply(entry[0]);
+            String value = environment.getProperty(entry[0]);
             String assignment = name + "=" + (value == null ? entry[1] : value);
             String state = value != null ? "[set]" : entry[1].isEmpty() ? "[unset]" : "[default]";
             String prefix = assignment + " ".repeat(Math.max(1, 46 - assignment.length())) + state;
-            output.out().accept(prefix + " ".repeat(Math.max(1, 56 - prefix.length())) + entry[2]);
+            environment.out().accept(prefix + " ".repeat(Math.max(1, 56 - prefix.length())) + entry[2]);
         }
     }
 
     SequencedMap<String, Path> doMain(String... selectors) throws IOException, InterruptedException {
         if (selectors.length == 1 && selectors[0].equals(CONFIGURATION)) {
-            printConfiguration(keys, output);
+            printConfiguration(environment);
             return Collections.emptyNavigableMap();
         }
         if (selectors.length == 1 && selectors[0].equals(PROPERTIES)) {
-            SortedMap<String, String> properties = new TreeMap<>();
-            for (String name : System.getProperties().stringPropertyNames()) {
-                if (name.startsWith("jenesis.")) {
-                    properties.put(name, System.getProperty(name));
-                }
-            }
-            properties.forEach((name, value) -> output.out().accept(name + "=" + value));
+            settings(environment).forEach((name, value) -> environment.out().accept(name + "=" + value));
             return Collections.emptyNavigableMap();
         }
-        if (SequencedProperties.flag(keys, "project.watch")) {
+        if (environment.flag("project.watch")) {
             watch(selectors);
             return Collections.emptyNavigableMap();
         }
-        if (SequencedProperties.flag(keys, "project.docker")) {
-            SortedMap<String, String> properties = new TreeMap<>();
-            for (String name : System.getProperties().stringPropertyNames()) {
-                if (name.startsWith("jenesis.") && !name.startsWith("jenesis.project.docker")) {
-                    properties.put(name, System.getProperty(name));
-                }
-            }
-            String image = SequencedProperties.getProperty(keys, "project.docker.image");
+        if (environment.flag("project.docker")) {
+            SortedMap<String, String> properties = new TreeMap<>(settings(environment));
+            properties.keySet().removeIf(name -> name.startsWith("jenesis.project.docker"));
+            String image = environment.getProperty("project.docker.image");
             Path root = this.root().toAbsolutePath().normalize();
             DockerizedJava docker = image == null ? new DockerizedJava(root) : new DockerizedJava(root, image);
             for (Path path : List.of(this.target(), this.artifacts())) {
@@ -2506,7 +2419,7 @@ public record Project(
                     docker = docker.mount(absolute, absolute.toString(), true);
                 }
             }
-            String cacheOverride = SequencedProperties.getProperty(keys, "project.cache");
+            String cacheOverride = environment.getProperty("project.cache");
             if (cacheOverride != null && !cacheOverride.contains("://")) {
                 Path cache = root.resolve(cacheOverride.isEmpty()
                         ? Path.of(".jenesis", "cache")
@@ -2515,37 +2428,37 @@ public record Project(
                     docker = docker.mount(Files.createDirectories(cache), cache.toString(), false);
                 }
             }
-            String cacheUri = SequencedProperties.getProperty(keys, "cache.uri");
+            String cacheUri = environment.getProperty("cache.uri");
             if (cacheUri != null && cacheUri.startsWith("file:")) {
                 Path cache = Path.of(URI.create(cacheUri)).toAbsolutePath().normalize();
                 if (!cache.startsWith(root)) {
                     docker = docker.mount(Files.createDirectories(cache), cache.toString(), false);
                 }
             }
-            docker = docker.mounts(SequencedProperties.getProperty(keys, "project.docker.mount"), root, true);
-            docker = docker.mounts(SequencedProperties.getProperty(keys, "project.docker.mountWritable"), root, false);
-            docker = docker.envs(SequencedProperties.getProperty(keys, "project.docker.env"));
-            String mavenRepositoryUri = SequencedProperties.getProperty(keys, "maven.uri", System.getenv("MAVEN_REPOSITORY_URI"));
+            docker = docker.mounts(environment.getProperty("project.docker.mount"), root, true);
+            docker = docker.mounts(environment.getProperty("project.docker.mountWritable"), root, false);
+            docker = docker.envs(environment.getProperty("project.docker.env"));
+            String mavenRepositoryUri = environment.getProperty("maven.uri", System.getenv("MAVEN_REPOSITORY_URI"));
             if (mavenRepositoryUri != null) {
                 docker = docker.env("MAVEN_REPOSITORY_URI", mavenRepositoryUri);
             }
-            String jenesisRepositoryUri = SequencedProperties.getProperty(keys, "module.uri", System.getenv("JENESIS_REPOSITORY_URI"));
+            String jenesisRepositoryUri = environment.getProperty("module.uri", System.getenv("JENESIS_REPOSITORY_URI"));
             if (jenesisRepositoryUri != null) {
                 docker = docker.env("JENESIS_REPOSITORY_URI", jenesisRepositoryUri);
             }
-            String mavenRepositoryLocal = SequencedProperties.getProperty(keys, "maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
+            String mavenRepositoryLocal = environment.getProperty("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
             Path mavenLocal = (mavenRepositoryLocal == null
-                    ? Path.of(System.getProperty("user.home"), ".m2", "repository")
-                    : Path.of(mavenRepositoryLocal)).toAbsolutePath().normalize();
+                               ? Path.of(System.getProperty("user.home"), ".m2", "repository")
+                               : Path.of(mavenRepositoryLocal)).toAbsolutePath().normalize();
             if (Files.isDirectory(mavenLocal)) {
                 docker = docker.mount(mavenLocal, mavenLocal.toString(), true);
                 docker = docker.env("MAVEN_REPOSITORY_LOCAL", mavenLocal.toString());
             }
-            String openPgpRepositoryUri = SequencedProperties.getProperty(keys, "openpgp.uri", System.getenv("OPENPGP_REPOSITORY_URI"));
+            String openPgpRepositoryUri = environment.getProperty("openpgp.uri", System.getenv("OPENPGP_REPOSITORY_URI"));
             if (openPgpRepositoryUri != null) {
                 docker = docker.env("OPENPGP_REPOSITORY_URI", openPgpRepositoryUri);
             }
-            String openPgpRepositoryLocal = SequencedProperties.getProperty(keys, "openpgp.local", System.getenv("OPENPGP_REPOSITORY_LOCAL"));
+            String openPgpRepositoryLocal = environment.getProperty("openpgp.local", System.getenv("OPENPGP_REPOSITORY_LOCAL"));
             if (openPgpRepositoryLocal != null) {
                 Path openPgpLocal = Path.of(openPgpRepositoryLocal).toAbsolutePath().normalize();
                 if (Files.isDirectory(openPgpLocal) && !openPgpLocal.startsWith(root)) {
@@ -2553,16 +2466,16 @@ public record Project(
                 }
                 docker = docker.env("OPENPGP_REPOSITORY_LOCAL", openPgpLocal.toString());
             }
-            String jenesisRepositoryLocal = SequencedProperties.getProperty(keys, "module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
+            String jenesisRepositoryLocal = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
             Path jenesisLocal = (jenesisRepositoryLocal == null
-                    ? Path.of(System.getProperty("user.home"), ".jenesis")
-                    : Path.of(jenesisRepositoryLocal)).toAbsolutePath().normalize();
+                                 ? Path.of(System.getProperty("user.home"), ".jenesis")
+                                 : Path.of(jenesisRepositoryLocal)).toAbsolutePath().normalize();
             if (Files.isDirectory(jenesisLocal)) {
                 docker = docker.mount(jenesisLocal, jenesisLocal.toString(), true);
                 docker = docker.env("JENESIS_REPOSITORY_LOCAL", jenesisLocal.toString());
             }
-            if (SequencedProperties.flag(keys, "print.docker", true)) {
-                output.out().accept("Launching build within Docker image: " + docker.image());
+            if (environment.flag("print.docker", true)) {
+                environment.out().accept("Launching build within Docker image: " + docker.image());
             }
             int code = docker.execute("build/jenesis/Project.java", properties, selectors);
             if (code != 0) {
@@ -2574,26 +2487,39 @@ public record Project(
     }
 
     public static SequencedMap<String, Path> perform(Function<String, String> keys,
-                                                    Output output,
-                                                    Path root,
-                                                    SequencedSet<Path> profiles,
-                                                    String... selectors) {
+                                                     Path root,
+                                                     SequencedSet<Path> profiles,
+                                                     String... selectors) {
+        return perform(new Environment(keys), root, profiles, selectors);
+    }
+
+    public static SequencedMap<String, Path> perform(Environment environment,
+                                                     Path root,
+                                                     SequencedSet<Path> profiles,
+                                                     String... selectors) {
         try {
-            return ofKeys(keys, output, root).profiles(profiles.toArray(Path[]::new)).doMain(selectors);
+            return ofEnvironment(environment, root).profiles(profiles.toArray(Path[]::new)).doMain(selectors);
         } catch (Throwable t) {
-            report(t, output);
+            report(t, environment);
             return null;
         }
     }
 
     public static int run(Function<String, String> keys,
-                          Output output,
+                          String mainClass,
+                          Path root,
+                          SequencedSet<Path> profiles,
+                          String... selectors) {
+        return run(new Environment(keys), mainClass, root, profiles, selectors);
+    }
+
+    public static int run(Environment environment,
                           String mainClass,
                           Path root,
                           SequencedSet<Path> profiles,
                           String... selectors) {
         if (mainClass.equals(Project.class.getName())) {
-            return perform(keys, output, root, profiles, selectors) == null ? 1 : 0;
+            return perform(environment, root, profiles, selectors) == null ? 1 : 0;
         }
         try {
             Class.forName(mainClass, true, Project.class.getClassLoader())
@@ -2601,20 +2527,20 @@ public record Project(
                     .invoke(null, (Object) selectors);
             return 0;
         } catch (Throwable t) {
-            report(t, output);
+            report(t, environment);
             return 1;
         }
     }
 
-    private static void report(Throwable t, Output output) {
+    private static void report(Throwable t, Environment environment) {
         if (t instanceof InterruptedException) {
             Thread.currentThread().interrupt();
         }
         StringWriter trace = new StringWriter();
         t.printStackTrace(new PrintWriter(trace));
-        trace.toString().lines().forEach(output.err());
-        output.err().accept("");
-        output.err().accept("The build failed with the error above. If you meant to look up how to"
+        trace.toString().lines().forEach(environment.err());
+        environment.err().accept("");
+        environment.err().accept("The build failed with the error above. If you meant to look up how to"
                 + " invoke Jenesis, pass `help` as the only argument on the command line, or `skill`"
                 + " for an agent-oriented briefing.");
     }

@@ -2,7 +2,7 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.params;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -15,7 +15,6 @@ import build.jenesis.step.Javac;
 import build.jenesis.step.Javadoc;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class JavadocTest {
 
@@ -44,7 +43,7 @@ public class JavadocTest {
                 */
                 public class Sample { }
                 """);
-        BuildStepResult result = Javadoc.ofKeys(SYSTEM, new Output(), process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+        BuildStepResult result = Javadoc.ofEnvironment(Environment.SYSTEM, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
@@ -61,10 +60,9 @@ public class JavadocTest {
             throws IOException {
         Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"),
                 "package sample; /** Documented. */ public class Sample { }\n");
-        Javadoc javadoc = Javadoc.ofKeys(empty
-                        ? Map.of("archive.timestamp", "")::get
-                        : SequencedProperties.NONE,
-                new Output(),
+        Javadoc javadoc = Javadoc.ofEnvironment(empty
+                        ? new Environment(Map.of("archive.timestamp", "")::get)
+                        : Environment.NONE,
                 ProcessHandler.Factory.TOOL);
         javadoc.apply(
                 Runnable::run,
@@ -97,7 +95,7 @@ public class JavadocTest {
                 public class Sample { }
                 """);
 
-        BuildStepResult result = Javadoc.ofKeys(SYSTEM, new Output(), process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+        BuildStepResult result = Javadoc.ofEnvironment(Environment.SYSTEM, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(

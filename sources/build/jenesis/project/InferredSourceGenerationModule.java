@@ -5,7 +5,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Pinning;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -60,44 +60,43 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
              value -> value);
     }
 
-    public static InferredSourceGenerationModule ofKeys(Function<String, String> keys,
-                                                        Output output,
+    public static InferredSourceGenerationModule ofEnvironment(Environment environment,
                                                         SequencedSet<Path> configuration,
                                                         Map<String, Repository> repositories,
                                                         Map<String, Resolver> resolvers) {
-        InferredSourceGenerationModule module = new InferredSourceGenerationModule(configuration, null, XjcModule.ofKeys(keys, output, repositories, resolvers),
-                ProtocModule.ofKeys(keys, output, repositories, resolvers),
-                AvroModule.ofKeys(keys, output, repositories, resolvers),
-                WsImportModule.ofKeys(keys, output, repositories, resolvers),
-                OpenApiModule.ofKeys(keys, output, repositories, resolvers),
-                AntlrModule.ofKeys(keys, output, repositories, resolvers),
+        InferredSourceGenerationModule module = new InferredSourceGenerationModule(configuration, null, XjcModule.ofEnvironment(environment, repositories, resolvers),
+                ProtocModule.ofEnvironment(environment, repositories, resolvers),
+                AvroModule.ofEnvironment(environment, repositories, resolvers),
+                WsImportModule.ofEnvironment(environment, repositories, resolvers),
+                OpenApiModule.ofEnvironment(environment, repositories, resolvers),
+                AntlrModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value,
                 value -> value,
                 value -> value,
                 value -> value,
                 value -> value,
                 value -> value);
-        Boolean xjc = SequencedProperties.flagOrNull(keys, "generate.xjc");
+        Boolean xjc = environment.flagOrNull("generate.xjc");
         if (xjc != null) {
             module = module.xjc(xjc ? value -> value : null);
         }
-        Boolean protoc = SequencedProperties.flagOrNull(keys, "generate.protoc");
+        Boolean protoc = environment.flagOrNull("generate.protoc");
         if (protoc != null) {
             module = module.protoc(protoc ? value -> value : null);
         }
-        Boolean avro = SequencedProperties.flagOrNull(keys, "generate.avro");
+        Boolean avro = environment.flagOrNull("generate.avro");
         if (avro != null) {
             module = module.avro(avro ? value -> value : null);
         }
-        Boolean wsimport = SequencedProperties.flagOrNull(keys, "generate.wsimport");
+        Boolean wsimport = environment.flagOrNull("generate.wsimport");
         if (wsimport != null) {
             module = module.wsimport(wsimport ? value -> value : null);
         }
-        Boolean openapi = SequencedProperties.flagOrNull(keys, "generate.openapi");
+        Boolean openapi = environment.flagOrNull("generate.openapi");
         if (openapi != null) {
             module = module.openapi(openapi ? value -> value : null);
         }
-        Boolean antlr = SequencedProperties.flagOrNull(keys, "generate.antlr");
+        Boolean antlr = environment.flagOrNull("generate.antlr");
         if (antlr != null) {
             module = module.antlr(antlr ? value -> value : null);
         }

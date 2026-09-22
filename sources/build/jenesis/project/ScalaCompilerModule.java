@@ -9,7 +9,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -48,17 +48,16 @@ public class ScalaCompilerModule implements BuildExecutorModule {
              ProcessBuildStep.Terms.of("scalac"));
     }
 
-    public static ScalaCompilerModule ofKeys(Function<String, String> keys,
-                                             Output output,
-                                             Map<String, Repository> repositories,
-                                             Map<String, Resolver> resolvers) {
-        return new ScalaCompilerModule(resolvers, Dependencies.ofKeys(keys, output, repositories, resolvers),
+    public static ScalaCompilerModule ofEnvironment(Environment environment,
+                                                    Map<String, Repository> repositories,
+                                                    Map<String, Resolver> resolvers) {
+        return new ScalaCompilerModule(resolvers, Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 true,
                 "scalac",
                 "main",
                 null,
-                ProcessBuildStep.Terms.ofKeys(keys, output, "scalac"));
+                ProcessBuildStep.Terms.ofEnvironment(environment, "scalac"));
     }
 
     private ScalaCompilerModule(Map<String, Resolver> resolvers,

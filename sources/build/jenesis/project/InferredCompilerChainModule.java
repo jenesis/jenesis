@@ -8,8 +8,8 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
-import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -59,26 +59,25 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 step -> step);
     }
 
-    public static InferredCompilerChainModule ofKeys(Function<String, String> keys,
-                                                     Output output,
-                                                     SequencedSet<Path> configuration,
-                                                     Map<String, Repository> repositories,
-                                                     Map<String, Resolver> resolvers) {
+    public static InferredCompilerChainModule ofEnvironment(Environment environment,
+                                                            SequencedSet<Path> configuration,
+                                                            Map<String, Repository> repositories,
+                                                            Map<String, Resolver> resolvers) {
         InferredCompilerChainModule module = new InferredCompilerChainModule(configuration,
                 repositories,
                 resolvers,
                 null,
                 PathPlacement.INFERRED,
-                Javac.ofKeys(keys, output, ProcessHandler.Factory.of()),
-                KotlinCompilerModule.ofKeys(keys, output, repositories, resolvers),
-                ScalaCompilerModule.ofKeys(keys, output, repositories, resolvers),
-                GroovyCompilerModule.ofKeys(keys, output, repositories, resolvers),
+                Javac.ofEnvironment(environment, ProcessHandler.Factory.of()),
+                KotlinCompilerModule.ofEnvironment(environment, repositories, resolvers),
+                ScalaCompilerModule.ofEnvironment(environment, repositories, resolvers),
+                GroovyCompilerModule.ofEnvironment(environment, repositories, resolvers),
                 step -> step,
                 value -> value,
                 value -> value,
                 value -> value,
                 step -> step);
-        Boolean errorprone = SequencedProperties.flagOrNull(keys, "compile.errorprone");
+        Boolean errorprone = environment.flagOrNull("compile.errorprone");
         return errorprone == null ? module : module.errorprone(errorprone ? step -> step : null);
     }
 

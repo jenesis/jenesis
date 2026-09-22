@@ -10,8 +10,8 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
-import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -57,9 +57,9 @@ public class ModularProject implements BuildExecutorModule {
                 MavenModuleRepository.segments());
     }
 
-    public static ModularProject ofKeys(Function<String, String> keys, String prefix, Path root) {
+    public static ModularProject ofEnvironment(Environment environment, String prefix, Path root) {
         ModularProject project = new ModularProject(prefix, root);
-        Integer segments = SequencedProperties.numberOrNull(keys, "maven.segments");
+        Integer segments = environment.numberOrNull("maven.segments");
         return segments == null ? project : project.segments(segments);
     }
 
@@ -114,18 +114,17 @@ public class ModularProject implements BuildExecutorModule {
 
     public static BuildExecutorModule make(Path root,
                                            MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
-        return make(SequencedProperties.NONE, new Output(), root, assembler);
+        return make(Environment.NONE, root, assembler);
     }
 
-    public static BuildExecutorModule make(Function<String, String> keys,
-                                               Output output,
+    public static BuildExecutorModule make(Environment environment,
                                            Path root, MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
-        return make(keys, output, root,
+        return make(environment, root,
                 "main",
                 "module",
                 _ -> true,
-                Map.of("module", JenesisModuleRepository.ofKeys(keys, output, JenesisRepository.Scope.MODULE)),
-                Map.of("module", ModularJarResolver.ofKeys(keys, false)),
+                Map.of("module", JenesisModuleRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE)),
+                Map.of("module", ModularJarResolver.ofEnvironment(environment, false)),
                 null,
                 true,
                 Collections.emptyNavigableSet(),
@@ -134,8 +133,7 @@ public class ModularProject implements BuildExecutorModule {
                 assembler);
     }
 
-    public static BuildExecutorModule make(Function<String, String> keys,
-                                               Output output,
+    public static BuildExecutorModule make(Environment environment,
                                            Path root,
                                            String group,
                                            String prefix,
@@ -148,8 +146,8 @@ public class ModularProject implements BuildExecutorModule {
                                            SequencedSet<Path> boms,
                                            SequencedSet<Path> signatures,
                                            MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
-        Dependencies dependencyModule = Dependencies.ofKeys(keys, output, repositories, resolvers);
-        return new MultiProjectModule(ModularProject.ofKeys(keys, prefix, root)
+        Dependencies dependencyModule = Dependencies.ofEnvironment(environment, repositories, resolvers);
+        return new MultiProjectModule(ModularProject.ofEnvironment(environment, prefix, root)
                 .group(group).filter(filter).modular(modular).boms(boms).signatures(signatures),
                 identity -> Optional.of(identity.substring(0, identity.indexOf('/'))),
                 _ -> (name, dependencies, arguments) -> {

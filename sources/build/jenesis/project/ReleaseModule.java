@@ -3,7 +3,7 @@ package build.jenesis.project;
 import module java.base;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 
 public class ReleaseModule implements BuildExecutorModule {
@@ -16,22 +16,21 @@ public class ReleaseModule implements BuildExecutorModule {
     private final JReleaserModule jreleaser;
 
     public ReleaseModule(Path root, String version) {
-        this(root, version, JReleaserModule.configured(SequencedProperties.NONE, root));
+        this(root, version, JReleaserModule.configured(Environment.NONE, root));
     }
 
     private ReleaseModule(Path root, String version, Path configuration) {
         this(root, version, configuration, new JReleaserModule(root, configuration, version));
     }
 
-    public static ReleaseModule ofKeys(Function<String, String> keys,
-                                       Output output,
-                                       Path root,
-                                       String version) {
-        Path configuration = JReleaserModule.configured(keys, root);
+    public static ReleaseModule ofEnvironment(Environment environment,
+                                              Path root,
+                                              String version) {
+        Path configuration = JReleaserModule.configured(environment, root);
         return new ReleaseModule(root,
-                version,
-                configuration,
-                JReleaserModule.ofKeys(keys, output, root, configuration, version));
+                                 version,
+                                 configuration,
+                                 JReleaserModule.ofEnvironment(environment, root, configuration, version));
     }
 
     private ReleaseModule(Path root, String version, Path configuration, JReleaserModule jreleaser) {

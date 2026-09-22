@@ -5,8 +5,8 @@ import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
-import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.step.Bind;
@@ -44,29 +44,28 @@ public class InferredTestObservationModule implements BuildExecutorModule {
              value -> value);
     }
 
-    public static InferredTestObservationModule ofKeys(Function<String, String> keys,
-                                                       Output output,
-                                                       SequencedSet<Path> configuration,
-                                                       Map<String, Repository> repositories,
-                                                       Map<String, Resolver> resolvers) {
+    public static InferredTestObservationModule ofEnvironment(Environment environment,
+                                                              SequencedSet<Path> configuration,
+                                                              Map<String, Repository> repositories,
+                                                              Map<String, Resolver> resolvers) {
         InferredTestObservationModule module = new InferredTestObservationModule(configuration, null, PathPlacement.CLASS_PATH,
                 null,
-                TestModule.ofKeys(keys, output, repositories, resolvers),
-                JaCoCoModule.ofKeys(keys, output, repositories, resolvers),
-                PiTestModule.ofKeys(keys, output, repositories, resolvers),
+                TestModule.ofEnvironment(environment, repositories, resolvers),
+                JaCoCoModule.ofEnvironment(environment, repositories, resolvers),
+                PiTestModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value,
                 value -> value,
                 value -> value,
                 value -> value);
-        Boolean jacoco = SequencedProperties.flagOrNull(keys, "observe.jacoco");
+        Boolean jacoco = environment.flagOrNull("observe.jacoco");
         if (jacoco != null) {
             module = module.jacoco(jacoco ? value -> value : null);
         }
-        Boolean nativeImage = SequencedProperties.flagOrNull(keys, "observe.native");
+        Boolean nativeImage = environment.flagOrNull("observe.native");
         if (nativeImage != null) {
             module = module.nativeImage(nativeImage ? value -> value : null);
         }
-        Boolean pitest = SequencedProperties.flagOrNull(keys, "mutate.pitest");
+        Boolean pitest = environment.flagOrNull("mutate.pitest");
         if (pitest != null) {
             module = module.pitest(pitest ? value -> value : null);
         }

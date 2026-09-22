@@ -3,7 +3,7 @@ package build.jenesis.test;
 import module java.base;
 import module org.junit.jupiter.api;
 import build.jenesis.Execution;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Project;
 import build.jenesis.SequencedProperties;
 import sample.Sample;
@@ -11,7 +11,6 @@ import sample.Sample;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class ExecutionTest {
 
@@ -26,14 +25,14 @@ public class ExecutionTest {
 
     @Test
     public void defaults_carry_no_overrides() {
-        Execution execute = Execution.ofKeys(SYSTEM, Project.ofKeys(SYSTEM, new Output(), Path.of(".")));
+        Execution execute = Execution.ofEnvironment(Environment.SYSTEM, Project.ofEnvironment(Environment.SYSTEM, Path.of(".")));
         assertThat(execute.mainClass()).isNull();
         assertThat(execute.module()).isNull();
     }
 
     @Test
     public void main_class_setter_returns_fresh_instance() {
-        Execution original = Execution.ofKeys(SYSTEM, Project.ofKeys(SYSTEM, new Output(), Path.of(".")));
+        Execution original = Execution.ofEnvironment(Environment.SYSTEM, Project.ofEnvironment(Environment.SYSTEM, Path.of(".")));
         Execution updated = original.mainClass("foo.Bar");
         assertThat(updated.mainClass()).isEqualTo("foo.Bar");
         assertThat(original.mainClass()).isNull();
@@ -41,7 +40,7 @@ public class ExecutionTest {
 
     @Test
     public void module_setter_returns_fresh_instance() {
-        Execution original = Execution.ofKeys(SYSTEM, Project.ofKeys(SYSTEM, new Output(), Path.of(".")));
+        Execution original = Execution.ofEnvironment(Environment.SYSTEM, Project.ofEnvironment(Environment.SYSTEM, Path.of(".")));
         Execution updated = original.module("sub");
         assertThat(updated.module()).isEqualTo("sub");
         assertThat(original.module()).isNull();
@@ -49,19 +48,19 @@ public class ExecutionTest {
 
     @Test
     public void system_property_picks_up_main_class() {
-        Execution execute = Execution.ofKeys(Map.of("execute.mainClass", "foo.Bar")::get, Project.ofKeys(Map.of("execute.mainClass", "foo.Bar")::get, new Output(), Path.of(".")));
+        Execution execute = Execution.ofEnvironment(new Environment(Map.of("execute.mainClass", "foo.Bar")::get), Project.ofEnvironment(new Environment(Map.of("execute.mainClass", "foo.Bar")::get), Path.of(".")));
         assertThat(execute.mainClass()).isEqualTo("foo.Bar");
     }
 
     @Test
     public void system_property_picks_up_module() {
-        Execution execute = Execution.ofKeys(Map.of("execute.module", "sub")::get, Project.ofKeys(Map.of("execute.module", "sub")::get, new Output(), Path.of(".")));
+        Execution execute = Execution.ofEnvironment(new Environment(Map.of("execute.module", "sub")::get), Project.ofEnvironment(new Environment(Map.of("execute.module", "sub")::get), Path.of(".")));
         assertThat(execute.module()).isEqualTo("sub");
     }
 
     @Test
     public void explicit_overrides_win_over_system_properties() {
-        Execution execute = Execution.ofKeys(Map.of("execute.mainClass", "ignored.Main", "execute.module", "ignored")::get, Project.ofKeys(Map.of("execute.mainClass", "ignored.Main", "execute.module", "ignored")::get, new Output(), Path.of(".")))
+        Execution execute = Execution.ofEnvironment(new Environment(Map.of("execute.mainClass", "ignored.Main", "execute.module", "ignored")::get), Project.ofEnvironment(new Environment(Map.of("execute.mainClass", "ignored.Main", "execute.module", "ignored")::get), Path.of(".")))
                 .mainClass("a.B")
                 .module("sub");
         assertThat(execute.mainClass()).isEqualTo("a.B");
@@ -73,8 +72,8 @@ public class ExecutionTest {
         Path target = Files.createDirectory(root.resolve("target"));
         Path alpha = writeInventory("alpha", "alpha", null, null, null);
         Project.Layout layout = layoutWithModules(Map.of("module-alpha", alpha));
-        Project project = Project.ofKeys(SYSTEM, new Output(), root).target(target).layout(layout);
-        assertThatThrownBy(() -> Execution.ofKeys(SYSTEM, project).execute())
+        Project project = Project.ofEnvironment(Environment.SYSTEM, root).target(target).layout(layout);
+        assertThatThrownBy(() -> Execution.ofEnvironment(Environment.SYSTEM, project).execute())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No module declares a main class");
     }
@@ -87,8 +86,8 @@ public class ExecutionTest {
         Project.Layout layout = layoutWithModules(Map.of(
                 "module-alpha", alpha,
                 "module-beta", beta));
-        Project project = Project.ofKeys(SYSTEM, new Output(), root).target(target).layout(layout);
-        assertThatThrownBy(() -> Execution.ofKeys(SYSTEM, project).execute())
+        Project project = Project.ofEnvironment(Environment.SYSTEM, root).target(target).layout(layout);
+        assertThatThrownBy(() -> Execution.ofEnvironment(Environment.SYSTEM, project).execute())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Multiple modules declare a main class")
                 .hasMessageContaining("foo.Alpha")
@@ -100,8 +99,8 @@ public class ExecutionTest {
         Path target = Files.createDirectory(root.resolve("target"));
         Path alpha = writeInventory("alpha", "alpha", null, null, null);
         Project.Layout layout = layoutWithModules(Map.of("module-alpha", alpha));
-        Project project = Project.ofKeys(SYSTEM, new Output(), root).target(target).layout(layout);
-        assertThatThrownBy(() -> Execution.ofKeys(SYSTEM, project).module("alpha").execute())
+        Project project = Project.ofEnvironment(Environment.SYSTEM, root).target(target).layout(layout);
+        assertThatThrownBy(() -> Execution.ofEnvironment(Environment.SYSTEM, project).module("alpha").execute())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No module at path: alpha");
     }
@@ -111,8 +110,8 @@ public class ExecutionTest {
         Path target = Files.createDirectory(root.resolve("target"));
         Path alpha = writeInventory("alpha", "alpha", "foo.Alpha", null, "missing.jar");
         Project.Layout layout = layoutWithModules(Map.of("module-alpha", alpha));
-        Project project = Project.ofKeys(SYSTEM, new Output(), root).target(target).layout(layout);
-        assertThatThrownBy(() -> Execution.ofKeys(SYSTEM, project).execute())
+        Project project = Project.ofEnvironment(Environment.SYSTEM, root).target(target).layout(layout);
+        assertThatThrownBy(() -> Execution.ofEnvironment(Environment.SYSTEM, project).execute())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Missing runtime artifact");
     }
@@ -124,8 +123,8 @@ public class ExecutionTest {
         Path classesJar = packageSample(alpha.resolve("classes.jar"));
         writeInventoryFile(alpha, "alpha", Sample.class.getName(), null, alpha.relativize(classesJar).toString());
         Project.Layout layout = layoutWithModules(Map.of("module-alpha", alpha));
-        Project project = Project.ofKeys(SYSTEM, new Output(), root).target(target).layout(layout);
-        int code = Execution.ofKeys(SYSTEM, project).execute();
+        Project project = Project.ofEnvironment(Environment.SYSTEM, root).target(target).layout(layout);
+        int code = Execution.ofEnvironment(Environment.SYSTEM, project).execute();
         assertThat(code).isEqualTo(0);
     }
 
@@ -156,13 +155,13 @@ public class ExecutionTest {
                 """.formatted(Sample.class.getName()));
         Path target = Files.createDirectory(root.resolve("target"));
         Path artifacts = Files.createDirectory(root.resolve("artifacts"));
-        Project project = Project.ofKeys(SYSTEM, new Output(), Path.of("."))
+        Project project = Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
                 .root(root)
                 .target(target)
                 .artifacts(artifacts)
                 .layout(Project.Layout.MAVEN)
                 .tests(false);
-        int code = Execution.ofKeys(SYSTEM, project).execute();
+        int code = Execution.ofEnvironment(Environment.SYSTEM, project).execute();
         assertThat(code).isEqualTo(0);
     }
 
@@ -173,8 +172,8 @@ public class ExecutionTest {
         Path classesJar = packageSample(alpha.resolve("classes.jar"));
         writeInventoryFile(alpha, "alpha", "ignored.OldMain", null, alpha.relativize(classesJar).toString());
         Project.Layout layout = layoutWithModules(Map.of("module-alpha", alpha));
-        Project project = Project.ofKeys(SYSTEM, new Output(), root).target(target).layout(layout);
-        int code = Execution.ofKeys(SYSTEM, project).mainClass(Sample.class.getName()).execute();
+        Project project = Project.ofEnvironment(Environment.SYSTEM, root).target(target).layout(layout);
+        int code = Execution.ofEnvironment(Environment.SYSTEM, project).mainClass(Sample.class.getName()).execute();
         assertThat(code).isEqualTo(0);
     }
 

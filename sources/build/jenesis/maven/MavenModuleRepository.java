@@ -2,6 +2,7 @@ package build.jenesis.maven;
 
 import module java.base;
 import module java.xml;
+import build.jenesis.Environment;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SafeSegment;
 import build.jenesis.SequencedProperties;
@@ -26,8 +27,8 @@ public class MavenModuleRepository implements JenesisRepository {
         this(repository, null, segments(), MavenDefaultVersionNegotiator.toDocumentBuilderFactory());
     }
 
-    public static MavenModuleRepository ofKeys(Function<String, String> keys, MavenRepository repository) {
-        return new MavenModuleRepository(repository).segments(segments(keys));
+    public static MavenModuleRepository ofEnvironment(Environment environment, MavenRepository repository) {
+        return new MavenModuleRepository(repository).segments(segments(environment));
     }
 
     private MavenModuleRepository(MavenRepository repository,
@@ -59,8 +60,8 @@ public class MavenModuleRepository implements JenesisRepository {
         return DEFAULT_SEGMENTS;
     }
 
-    public static int segments(Function<String, String> keys) {
-        return checkedSegments(SequencedProperties.number(keys, "maven.segments", DEFAULT_SEGMENTS));
+    public static int segments(Environment environment) {
+        return checkedSegments(environment.number("maven.segments", DEFAULT_SEGMENTS));
     }
 
     public static int checkedSegments(int segments) {

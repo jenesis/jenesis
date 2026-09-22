@@ -1,20 +1,19 @@
 package build.jenesis.project;
 
 import module java.base;
-import build.jenesis.Output;
 
 public final class ProjectWatch {
 
     private final Path root;
     private final Set<Path> excluded;
     private final long debounceMillis;
-    private final Output output;
+    private final Consumer<String> out;
 
-    public ProjectWatch(Path root, Set<Path> excluded, long debounceMillis, Output output) {
+    public ProjectWatch(Path root, Set<Path> excluded, long debounceMillis, Consumer<String> out) {
         this.root = root;
         this.excluded = excluded;
         this.debounceMillis = debounceMillis;
-        this.output = output;
+        this.out = out;
     }
 
     public void watch(Runnable build) throws IOException {
@@ -22,7 +21,7 @@ public final class ProjectWatch {
             Map<WatchKey, Path> keys = new HashMap<>();
             register(service, root, keys);
             build.run();
-            output.out().accept("Watching " + root + " for changes (press Ctrl+C to stop).");
+            out.accept("Watching " + root + " for changes (press Ctrl+C to stop).");
             while (!Thread.interrupted()) {
                 WatchKey key = service.take();
                 boolean rebuild = false;
@@ -57,7 +56,7 @@ public final class ProjectWatch {
                     key = service.poll(debounceMillis, TimeUnit.MILLISECONDS);
                 }
                 if (rebuild) {
-                    output.out().accept("Change detected, rebuilding.");
+                    out.accept("Change detected, rebuilding.");
                     build.run();
                 }
             }

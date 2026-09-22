@@ -8,7 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -48,17 +48,16 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
              ProcessBuildStep.Terms.of("dokka"));
     }
 
-    public static DokkaDocumentationModule ofKeys(Function<String, String> keys,
-                                                  Output output,
+    public static DokkaDocumentationModule ofEnvironment(Environment environment,
                                                   Map<String, Repository> repositories,
                                                   Map<String, Resolver> resolvers) {
-        return new DokkaDocumentationModule(resolvers, Dependencies.ofKeys(keys, output, repositories, resolvers),
+        return new DokkaDocumentationModule(resolvers, Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "dokka",
                 "main",
                 null,
                 null,
-                ProcessBuildStep.Terms.ofKeys(keys, output, "dokka"));
+                ProcessBuildStep.Terms.ofEnvironment(environment, "dokka"));
     }
 
     private DokkaDocumentationModule(Map<String, Resolver> resolvers,

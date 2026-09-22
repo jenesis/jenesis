@@ -7,7 +7,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.maven.MavenRepository;
@@ -42,14 +42,14 @@ public class BuildStepHashFunctionTest {
     public void a_setting_that_shapes_the_output_shapes_the_key_and_one_that_does_not_leaves_it_alone()
             throws IOException {
         BuildStepHashFunction hash = BuildStepHashFunction.ofSerializationDigest("MD5");
-        assertThat(hash.hash(JarSigner.ofKeys(Map.of("jarsigner.alias", "one")::get, new Output())))
+        assertThat(hash.hash(JarSigner.ofEnvironment(new Environment(Map.of("jarsigner.alias", "one")::get))))
                 .as("the key a jar is signed with decides what the step produces, so a step signed with"
                         + " another one is not the cached step")
-                .isNotEqualTo(hash.hash(JarSigner.ofKeys(Map.of("jarsigner.alias", "two")::get, new Output())));
-        assertThat(hash.hash(OsvDownload.ofKeys(Map.of("repository.insecure", "true")::get, new Output())))
+                .isNotEqualTo(hash.hash(JarSigner.ofEnvironment(new Environment(Map.of("jarsigner.alias", "two")::get))));
+        assertThat(hash.hash(OsvDownload.ofEnvironment(new Environment(Map.of("repository.insecure", "true")::get))))
                 .as("allowing an insecure scheme changes what the step may reach, never what it produces,"
                         + " so it stays out of the key as every print setting does")
-                .isEqualTo(hash.hash(OsvDownload.ofKeys(SequencedProperties.NONE, new Output())));
+                .isEqualTo(hash.hash(OsvDownload.ofEnvironment(Environment.NONE)));
     }
 
     @Test

@@ -1,7 +1,7 @@
 package build.jenesis.module;
 
 import module java.base;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SafeSegment;
@@ -22,39 +22,38 @@ public class JenesisModuleRepository implements JenesisRepository {
     private final Boolean speculative;
 
     public static JenesisRepository of(Scope scope) {
-        return ofKeys(SequencedProperties.NONE, new Output(), scope);
+        return ofEnvironment(Environment.NONE, scope);
     }
 
-    public static JenesisRepository ofKeys(Function<String, String> keys, Output output, Scope scope) {
-        Repository.Credential credential = Repository.Credential.of(keys,
-                "module.token",
-                "JENESIS_REPOSITORY_TOKEN");
-        Repository.Credential maven = Repository.Credential.of(keys, "maven.token", "MAVEN_REPOSITORY_TOKEN");
-        String property = SequencedProperties.getProperty(keys, "module.uri");
-        String environment = System.getenv("JENESIS_REPOSITORY_URI");
+    public static JenesisRepository ofEnvironment(Environment environment, Scope scope) {
+        Repository.Credential credential = Repository.Credential.of(environment,
+                                                                    "module.token",
+                                                                    "JENESIS_REPOSITORY_TOKEN");
+        Repository.Credential maven = Repository.Credential.of(environment, "maven.token", "MAVEN_REPOSITORY_TOKEN");
+        String property = environment.getProperty("module.uri");
+        String variable = System.getenv("JENESIS_REPOSITORY_URI");
         Set<String> visited = new HashSet<>();
         String text;
         Repository.Origin origin;
         if (property != null) {
             text = property;
-            origin = Repository.Origin.of(keys, "module.uri");
-        } else if (environment != null) {
-            text = environment;
+            origin = Repository.Origin.of(environment, "module.uri");
+        } else if (variable != null) {
+            text = variable;
             visited.add("JENESIS_REPOSITORY_URI");
             origin = Repository.Origin.ENVIRONMENT;
         } else {
             text = "https://repo.jenesis.build/";
             origin = Repository.Origin.DEFAULT;
         }
-        JenesisRepository repository = chain(keys, output, text, visited, scope, credential, maven, origin, MODULE, null);
+        JenesisRepository repository = chain(environment, text, visited, scope, credential, maven, origin, MODULE, null);
         if (repository == null) {
             throw new IllegalStateException("No Jenesis module repository is configured by: " + text);
         }
-        return repository.prepend(ofLocalKeys(keys));
+        return repository.prepend(ofLocalKeys(environment));
     }
 
-    private static JenesisRepository chain(Function<String, String> keys,
-                                           Output output,
+    private static JenesisRepository chain(Environment environment,
                                            String text,
                                            Set<String> visited,
                                            Scope scope,
@@ -107,10 +106,10 @@ public class JenesisModuleRepository implements JenesisRepository {
                 String value;
                 Repository.Origin spliced;
                 if (name.isEmpty()) {
-                    String environment = System.getenv("JENESIS_REPOSITORY_URI");
-                    if (environment != null && visited.add("JENESIS_REPOSITORY_URI")) {
+                    String variable = System.getenv("JENESIS_REPOSITORY_URI");
+                    if (variable != null && visited.add("JENESIS_REPOSITORY_URI")) {
                         name = "JENESIS_REPOSITORY_URI";
-                        value = environment;
+                        value = variable;
                         spliced = Repository.Origin.ENVIRONMENT;
                     } else {
                         name = null;
@@ -118,9 +117,9 @@ public class JenesisModuleRepository implements JenesisRepository {
                         spliced = Repository.Origin.DEFAULT;
                     }
                 } else {
-                    String declared = SequencedProperties.getProperty(keys, name);
+                    String declared = environment.getProperty(name);
                     value = declared == null ? System.getenv(name) : declared;
-                    spliced = declared == null ? Repository.Origin.ENVIRONMENT : Repository.Origin.of(keys, name);
+                    spliced = declared == null ? Repository.Origin.ENVIRONMENT : Repository.Origin.of(environment, name);
                     if (value == null) {
                         throw new IllegalStateException("Unresolved repository reference: @" + name);
                     }
@@ -128,7 +127,7 @@ public class JenesisModuleRepository implements JenesisRepository {
                         throw new IllegalStateException("Circular repository reference: @" + name);
                     }
                 }
-                current = chain(keys, output, value, visited, scope, granted, grantedMaven, spliced, type, null);
+                current = chain(environment, value, visited, scope, granted, grantedMaven, spliced, type, null);
                 if (name != null) {
                     visited.remove(name);
                 }
@@ -136,15 +135,15 @@ public class JenesisModuleRepository implements JenesisRepository {
                     throw new IllegalStateException("No Jenesis module repository is configured by: " + value);
                 }
             } else if (type.equals(MAVEN)) {
-                MavenModuleRepository convention = MavenModuleRepository.ofKeys(keys,
-                        MavenDefaultRepository.ofKeys(keys, output,
-                                URI.create(location.endsWith("/") ? location : location + "/"),
-                                grantedMaven.grant(origin)));
+                MavenModuleRepository convention = MavenModuleRepository.ofEnvironment(environment,
+                        MavenDefaultRepository.ofEnvironment(environment,
+                                                             URI.create(location.endsWith("/") ? location : location + "/"),
+                                                             grantedMaven.grant(origin)));
                 current = segments == null ? convention : convention.segments(segments);
             } else {
-                current = ofKeys(keys,
+                current = ofEnvironment(environment,
                         URI.create((location.endsWith("/") ? location : location + "/")
-                                + (scope == Scope.MODULE ? "module/" : "artifact/")),
+                                   + (scope == Scope.MODULE ? "module/" : "artifact/")),
                         granted.grant(origin));
             }
             List<String> modules = new ArrayList<>();
@@ -218,25 +217,25 @@ public class JenesisModuleRepository implements JenesisRepository {
     }
 
     public JenesisModuleRepository(URI root, String token) {
-        this(SequencedProperties.NONE, root, token);
+        this(Environment.NONE, root, token);
     }
 
-    public static JenesisModuleRepository ofKeys(Function<String, String> keys, URI root) {
-        return new JenesisModuleRepository(keys, root, null);
+    public static JenesisModuleRepository ofEnvironment(Environment environment, URI root) {
+        return new JenesisModuleRepository(environment, root, null);
     }
 
-    public static JenesisModuleRepository ofKeys(Function<String, String> keys, URI root, String token) {
-        return new JenesisModuleRepository(keys, root, token);
+    public static JenesisModuleRepository ofEnvironment(Environment environment, URI root, String token) {
+        return new JenesisModuleRepository(environment, root, token);
     }
 
-    private JenesisModuleRepository(Function<String, String> keys, URI root, String token) {
+    private JenesisModuleRepository(Environment environment, URI root, String token) {
         this(root,
-                token,
-                Repository.Connection.ofKeys(keys),
-                toMavenRepository(SequencedProperties.getProperty(keys, "maven.uri",
-                        System.getenv("MAVEN_REPOSITORY_URI"))),
-                SequencedProperties.flagOrNull(keys, "module.prerelease"),
-                SequencedProperties.flagOrNull(keys, "module.speculative"));
+             token,
+             Repository.Connection.ofEnvironment(environment),
+             toMavenRepository(environment.getProperty("maven.uri",
+                                                       System.getenv("MAVEN_REPOSITORY_URI"))),
+             environment.flagOrNull("module.prerelease"),
+             environment.flagOrNull("module.speculative"));
     }
 
     private JenesisModuleRepository(URI root,
@@ -267,10 +266,6 @@ public class JenesisModuleRepository implements JenesisRepository {
     }
 
     public JenesisModuleRepository speculative(Boolean speculative) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative);
-    }
-
-    public JenesisModuleRepository keys(Function<String, String> keys) {
         return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative);
     }
 
@@ -313,15 +308,15 @@ public class JenesisModuleRepository implements JenesisRepository {
     }
 
     public static JenesisModuleRepository ofLocal() {
-        return ofLocalKeys(SequencedProperties.NONE);
+        return ofLocalKeys(Environment.NONE);
     }
 
-    public static JenesisModuleRepository ofLocalKeys(Function<String, String> keys) {
-        String override = SequencedProperties.getProperty(keys, "module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
+    public static JenesisModuleRepository ofLocalKeys(Environment environment) {
+        String override = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
         Path path = override == null
                 ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
                 : Path.of(override);
-        return ofKeys(keys, path.toUri());
+        return ofEnvironment(environment, path.toUri());
     }
 
     @Override
