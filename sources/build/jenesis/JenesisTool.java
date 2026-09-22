@@ -12,11 +12,10 @@ abstract class JenesisTool implements ToolProvider {
             remaining = List.of(Make.partitioned(arguments, settings));
         } catch (IOException | RuntimeException e) {
             err.println(e.getMessage());
-            err.flush();
             return 1;
         }
         try {
-            return run(key -> settings.get("jenesis." + key), new Output(out, err), remaining);
+            return run(new Environment(key -> settings.get("jenesis." + key), out, err), remaining);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             err.println(name() + " was interrupted running " + String.join(" ", remaining));
@@ -27,26 +26,27 @@ abstract class JenesisTool implements ToolProvider {
         } catch (RuntimeException e) {
             err.println(e.getMessage());
             return 1;
-        } finally {
-            out.flush();
-            err.flush();
         }
     }
 
-    protected abstract int run(Function<String, String> requested, Output output, List<String> arguments)
+    protected abstract int run(Environment environment, List<String> arguments)
             throws IOException, InterruptedException;
 
-    protected Path root(Function<String, String> requested) {
-        return Path.of(SequencedProperties.getProperty(requested, "make.root", "")).toAbsolutePath().normalize();
+    protected Environment layered(Environment environment, Path root) throws IOException {
+        return environment.keys(Make.settings(root, environment.keys()).keys());
     }
 
-    protected void requireInProcess(Function<String, String> requested) {
-        if (requested.apply("toolchain.version") != null) {
+    protected Path root(Environment environment) {
+        return Path.of(environment.getProperty("make.root", "")).toAbsolutePath().normalize();
+    }
+
+    protected void requireInProcess(Environment environment) {
+        if (environment.getProperty("toolchain.version") != null) {
             throw new IllegalStateException("jenesis.toolchain.version cannot be honored by the "
                     + name() + " tool, because a toolchain replaces the JVM a build runs on"
                     + " - run the " + name() + " command instead");
         }
-        if (SequencedProperties.flag(requested, "project.docker")) {
+        if (environment.flag("project.docker")) {
             throw new IllegalStateException("A dockerized build cannot be run by the "
                     + name() + " tool, because a container replaces the process a build runs in"
                     + " - unset jenesis.project.docker, or run the " + name() + " command instead");

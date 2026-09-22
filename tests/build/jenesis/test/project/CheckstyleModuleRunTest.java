@@ -2,7 +2,7 @@ package build.jenesis.test.project;
 
 import module java.base;
 import module org.junit.jupiter.api;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
@@ -17,7 +17,6 @@ import build.jenesis.project.CheckstyleModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class CheckstyleModuleRunTest {
 
@@ -96,7 +95,7 @@ public class CheckstyleModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "checkstyle",
-                new CheckstyleModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT),
+                new CheckstyleModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))).pinning(Pinning.STRICT),
                 "project");
         executor.execute();
 
@@ -119,7 +118,7 @@ public class CheckstyleModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "checkstyle",
-                new CheckstyleModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT)
+                new CheckstyleModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))).pinning(Pinning.STRICT)
                         .strict(true),
                 "project");
 

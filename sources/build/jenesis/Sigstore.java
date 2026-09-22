@@ -344,24 +344,24 @@ public final class Sigstore {
         return HexFormat.of().formatHex(content);
     }
 
-    private static Object at(Object owner, String... keys) {
+    private static Object at(Object owner, String... environment) {
         Object value = owner;
-        for (String key : keys) {
+        for (String key : environment) {
             if (!(value instanceof Map<?, ?> map) || !map.containsKey(key)) {
                 throw new IllegalArgumentException("Expected a Sigstore document that states "
-                        + String.join(".", keys));
+                        + String.join(".", environment));
             }
             value = map.get(key);
         }
         return value;
     }
 
-    private static String text(Object owner, String... keys) {
-        return (String) at(owner, keys);
+    private static String text(Object owner, String... environment) {
+        return (String) at(owner, environment);
     }
 
-    private static byte[] binary(Object owner, String... keys) {
-        return Base64.getDecoder().decode(text(owner, keys));
+    private static byte[] binary(Object owner, String... environment) {
+        return Base64.getDecoder().decode(text(owner, environment));
     }
 
     private static final String TRUSTED_ROOT = """
@@ -493,8 +493,8 @@ public final class Sigstore {
             }
             """;
 
-    private static long number(Object owner, String... keys) {
-        Object value = at(owner, keys);
+    private static long number(Object owner, String... environment) {
+        Object value = at(owner, environment);
         return value instanceof Number digits ? digits.longValue() : Long.parseLong((String) value);
     }
 }

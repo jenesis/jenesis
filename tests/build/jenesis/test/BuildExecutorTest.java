@@ -16,11 +16,11 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.HashFunction;
 import build.jenesis.SequencedProperties;
+import build.jenesis.Environment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class BuildExecutorTest implements Serializable {
 
@@ -384,11 +384,11 @@ public class BuildExecutorTest implements Serializable {
 
     @Test
     public void aggregate_configuration_defaults_from_property_and_is_overridable() {
-        assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).aggregate()).isFalse();
-        assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).aggregate(true).aggregate()).isTrue();
+        assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).aggregate()).isFalse();
+        assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).aggregate(true).aggregate()).isTrue();
         System.setProperty("jenesis.executor.aggregate", "true");
         try {
-            assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).aggregate()).isTrue();
+            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).aggregate()).isTrue();
         } finally {
             System.clearProperty("jenesis.executor.aggregate");
         }
@@ -403,7 +403,7 @@ public class BuildExecutorTest implements Serializable {
                     .as("an embedder that builds its own configuration is never surprised by the environment")
                     .isFalse();
             assertThat(new BuildExecutor.Configuration().digest()).isEqualTo("MD5");
-            assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).aggregate()).isTrue();
+            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).aggregate()).isTrue();
         } finally {
             System.clearProperty("jenesis.executor.aggregate");
             System.clearProperty("jenesis.executor.digest");

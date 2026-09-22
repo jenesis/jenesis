@@ -6,8 +6,8 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.DependencyTreeReport;
+import build.jenesis.Environment;
 import build.jenesis.Resolver;
-import build.jenesis.Output;
 import build.jenesis.SequencedProperties;
 
 public class Tree implements BuildStep {
@@ -16,20 +16,16 @@ public class Tree implements BuildStep {
     private final transient boolean compact, tests;
 
     public Tree() {
-        this(new Output());
+        this(System.out::println, false, true);
     }
 
-    public Tree(Output output) {
-        this(output.out(), false, true);
+    public Tree(Environment environment) {
+        this(environment.out(), false, true);
     }
 
-    public static Tree ofKeys(Function<String, String> keys) {
-        return ofKeys(keys, new Output());
-    }
-
-    public static Tree ofKeys(Function<String, String> keys, Output output) {
-        Tree tree = new Tree(output);
-        String format = SequencedProperties.getProperty(keys, "tree.format");
+    public static Tree ofEnvironment(Environment environment) {
+        Tree tree = new Tree(environment);
+        String format = environment.getProperty("tree.format");
         if (format != null) {
             tree = tree.compact(switch (format) {
                 case "full" -> false;
@@ -38,7 +34,7 @@ public class Tree implements BuildStep {
                         "Unknown jenesis.tree.format '" + format + "', expected 'full' or 'compact'");
             });
         }
-        Boolean tests = SequencedProperties.flagOrNull(keys, "tree.tests");
+        Boolean tests = environment.flagOrNull("tree.tests");
         return tests == null ? tree : tree.tests(tests);
     }
 

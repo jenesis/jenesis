@@ -10,7 +10,7 @@ import build.jenesis.project.InternalModule;
 import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.ProjectModuleDescriptor;
-import static build.jenesis.SequencedProperties.SYSTEM;
+import build.jenesis.Environment;
 
 /**
  * Like the {@code custom-assembler} demo, this wraps the stock
@@ -36,8 +36,8 @@ import static build.jenesis.SequencedProperties.SYSTEM;
 public class Demo {
 
     static void main(String[] args) throws Exception {
-        Project project = Project.ofKeys(SYSTEM, Path.of("."))
-                .assembler(new PreprocessingAssembler(InferredMultiProjectAssembler.ofKeys(SYSTEM), Path.of("plugin")));
+        Project project = Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
+                .assembler(new PreprocessingAssembler(InferredMultiProjectAssembler.ofEnvironment(Environment.SYSTEM), Path.of("plugin")));
         // Build the project (running the substitution plugin) and launch the
         // produced module so its main prints the rewritten greeting - the result
         // the plugin set out to produce. Execute reads the build's inventory to

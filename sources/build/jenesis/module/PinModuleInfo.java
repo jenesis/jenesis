@@ -10,9 +10,9 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
-import build.jenesis.Output;
 import build.jenesis.Pinning;
 import build.jenesis.step.Inventory;
 import build.jenesis.SequencedProperties;
@@ -34,18 +34,17 @@ public class PinModuleInfo implements BuildStep {
                 true, false, Pinning.permits(), null);
     }
 
-    public static PinModuleInfo ofKeys(Function<String, String> keys,
-                                       Output output,
-                                       String prefix,
-                                       String path,
-                                       List<Path> moduleInfoFiles,
-                                       HashDigestFunction hashFunction) {
+    public static PinModuleInfo ofEnvironment(Environment environment,
+                                              String prefix,
+                                              String path,
+                                              List<Path> moduleInfoFiles,
+                                              HashDigestFunction hashFunction) {
         PinModuleInfo pin = new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction)
-                .checksum(checksumFrom(keys))
-                .flatten(flattenFrom(keys))
-                .permits(Pinning.permits(keys));
-        Boolean pins = SequencedProperties.flagOrNull(keys, "print.pins");
-        return pins == null || !pins ? pin : pin.printing(output.out());
+                .checksum(checksumFrom(environment))
+                .flatten(flattenFrom(environment))
+                .permits(Pinning.permits(environment));
+        Boolean pins = environment.flagOrNull("print.pins");
+        return pins == null || !pins ? pin : pin.printing(environment.out());
     }
 
     private PinModuleInfo(String prefix,
@@ -88,8 +87,8 @@ public class PinModuleInfo implements BuildStep {
         return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, permits, printing);
     }
 
-    private static boolean checksumFrom(Function<String, String> keys) {
-        String value = SequencedProperties.getProperty(keys, "pin.checksum");
+    private static boolean checksumFrom(Environment environment) {
+        String value = environment.getProperty("pin.checksum");
         if (value == null || value.equals("true")) {
             return true;
         }
@@ -99,8 +98,8 @@ public class PinModuleInfo implements BuildStep {
         throw new IllegalArgumentException("Unknown pin checksum mode: " + value + " (expected true or false)");
     }
 
-    private static boolean flattenFrom(Function<String, String> keys) {
-        String value = SequencedProperties.getProperty(keys, "pin.bom");
+    private static boolean flattenFrom(Environment environment) {
+        String value = environment.getProperty("pin.bom");
         if (value == null || value.equals("keep")) {
             return false;
         }

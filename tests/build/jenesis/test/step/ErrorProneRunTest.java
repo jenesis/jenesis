@@ -8,7 +8,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
@@ -17,7 +17,6 @@ import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class ErrorProneRunTest {
 
@@ -127,14 +126,14 @@ public class ErrorProneRunTest {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
         executor.addModule("dependencies",
-                new Dependencies(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
-                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).group("javac"),
+                new Dependencies(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))).group("javac"),
                 "project");
         executor.addModule("chain",
                 new InferredCompilerChainModule(
                         new LinkedHashSet<>(Set.of(configuration)),
-                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
-                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
                 "project", "dependencies");
         executor.execute();
     }

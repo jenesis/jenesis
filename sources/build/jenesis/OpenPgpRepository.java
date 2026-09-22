@@ -17,8 +17,8 @@ public class OpenPgpRepository implements Repository {
         this(server, null, new Repository.Connection());
     }
 
-    public static OpenPgpRepository ofKeys(Function<String, String> keys, URI server) {
-        return new OpenPgpRepository(server, null, Repository.Connection.ofKeys(keys));
+    public static OpenPgpRepository ofEnvironment(Environment environment, URI server) {
+        return new OpenPgpRepository(server, null, Repository.Connection.ofEnvironment(environment));
     }
 
     private OpenPgpRepository(URI server, Path local, Repository.Connection connection) {
@@ -36,20 +36,20 @@ public class OpenPgpRepository implements Repository {
     }
 
     public static Repository of() {
-        return ofKeys(SequencedProperties.NONE);
+        return ofEnvironment(Environment.NONE);
     }
 
-    public static Repository ofKeys(Function<String, String> keys) {
-        String property = SequencedProperties.getProperty(keys, "openpgp.uri");
+    public static Repository ofEnvironment(Environment environment) {
+        String property = environment.getProperty("openpgp.uri");
         String text = property == null ? System.getenv("OPENPGP_REPOSITORY_URI") : property;
-        Path local = Path.of(SequencedProperties.getProperty(keys, "openpgp.local",
-                System.getenv("OPENPGP_REPOSITORY_LOCAL") == null
-                        ? ".jenesis/keys"
-                        : System.getenv("OPENPGP_REPOSITORY_LOCAL")));
+        Path local = Path.of(environment.getProperty("openpgp.local",
+                                                     System.getenv("OPENPGP_REPOSITORY_LOCAL") == null
+                                                     ? ".jenesis/keys"
+                                                     : System.getenv("OPENPGP_REPOSITORY_LOCAL")));
         List<URI> servers = new ArrayList<>();
-        servers(keys, text == null ? "@" : text, new HashSet<>(), servers);
+        servers(environment, text == null ? "@" : text, new HashSet<>(), servers);
         List<OpenPgpRepository> chain = servers.stream()
-                .map(server -> OpenPgpRepository.ofKeys(keys, server).local(local))
+                .map(server -> OpenPgpRepository.ofEnvironment(environment, server).local(local))
                 .toList();
         return (executor, coordinate, extension) -> {
             if (extension != null) {
@@ -93,7 +93,7 @@ public class OpenPgpRepository implements Repository {
         return Files.isRegularFile(candidate) ? Optional.of(RepositoryItem.ofFile(candidate)) : Optional.empty();
     }
 
-    private static void servers(Function<String, String> keys,
+    private static void servers(Environment environment,
                                 String text,
                                 Set<String> visited,
                                 List<URI> target) {
@@ -105,22 +105,22 @@ public class OpenPgpRepository implements Repository {
             if (candidate.startsWith("@")) {
                 String name = candidate.substring(1);
                 if (name.isEmpty()) {
-                    String environment = System.getenv("OPENPGP_REPOSITORY_URI");
-                    if (environment != null && visited.add("OPENPGP_REPOSITORY_URI")) {
-                        servers(keys, environment, visited, target);
+                    String uri = System.getenv("OPENPGP_REPOSITORY_URI");
+                    if (uri != null && visited.add("OPENPGP_REPOSITORY_URI")) {
+                        servers(environment, uri, visited, target);
                         visited.remove("OPENPGP_REPOSITORY_URI");
                     } else {
                         target.addAll(DEFAULTS);
                     }
                 } else {
-                    String value = SequencedProperties.getProperty(keys, name, System.getenv(name));
+                    String value = environment.getProperty(name, System.getenv(name));
                     if (value == null) {
                         throw new IllegalStateException("Unresolved key server reference: @" + name);
                     }
                     if (!visited.add(name)) {
                         throw new IllegalStateException("Circular key server reference: @" + name);
                     }
-                    servers(keys, value, visited, target);
+                    servers(environment, value, visited, target);
                     visited.remove(name);
                 }
             } else {

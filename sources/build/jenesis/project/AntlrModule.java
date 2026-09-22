@@ -8,7 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -40,16 +40,15 @@ public class AntlrModule implements BuildExecutorModule {
              ProcessBuildStep.Terms.of("antlr"));
     }
 
-    public static AntlrModule ofKeys(Function<String, String> keys,
-                                     Output output,
-                                     Map<String, Repository> repositories,
-                                     Map<String, Resolver> resolvers) {
-        return new AntlrModule(Dependencies.ofKeys(keys, output, repositories, resolvers),
+    public static AntlrModule ofEnvironment(Environment environment,
+                                            Map<String, Repository> repositories,
+                                            Map<String, Resolver> resolvers) {
+        return new AntlrModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "antlr",
                 null,
                 List.of(),
-                ProcessBuildStep.Terms.ofKeys(keys, output, "antlr"));
+                ProcessBuildStep.Terms.ofEnvironment(environment, "antlr"));
     }
 
     private AntlrModule(Dependencies dependencies,

@@ -10,25 +10,25 @@ public final class ExecuteTool extends JenesisTool {
     }
 
     @Override
-    protected int run(Function<String, String> requested, Output output, List<String> arguments)
+    protected int run(Environment environment, List<String> arguments)
             throws IOException, InterruptedException {
-        requireInProcess(requested);
-        if (SequencedProperties.flag(requested, "execute.docker")) {
+        requireInProcess(environment);
+        if (environment.flag("execute.docker")) {
             throw new IllegalStateException("A dockerized program cannot be run by the " + name()
                     + " tool, because a container replaces the process it runs in"
                     + " - unset jenesis.execute.docker, or run the " + name() + " command instead");
         }
-        Path root = root(requested);
-        Make.Settings settings = Make.settings(root, requested);
-        SequencedMap<String, Path> outputs = Project.perform(settings.keys(),
-                output,
-                root,
-                settings.profiles(),
-                Project.BUILD);
+        Path root = root(environment);
+        Make.Settings settings = Make.settings(root, environment.keys());
+        Environment layered = environment.keys(settings.keys());
+        SequencedMap<String, Path> outputs = Project.perform(layered,
+                                                             root,
+                                                             settings.profiles(),
+                                                             Project.BUILD);
         if (outputs == null) {
             return 1;
         }
-        return Execution.ofKeys(settings.keys(), Project.ofKeys(settings.keys(), output, root))
+        return Execution.ofEnvironment(layered, Project.ofEnvironment(layered, root))
                 .execute(outputs, arguments.toArray(String[]::new));
     }
 }

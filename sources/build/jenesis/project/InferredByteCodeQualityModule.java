@@ -4,7 +4,7 @@ import module java.base;
 import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.step.Bind;
@@ -26,14 +26,13 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
              value -> value);
     }
 
-    public static InferredByteCodeQualityModule ofKeys(Function<String, String> keys,
-                                                       Output output,
-                                                       SequencedSet<Path> configuration,
-                                                       Map<String, Repository> repositories,
-                                                       Map<String, Resolver> resolvers) {
-        InferredByteCodeQualityModule module = new InferredByteCodeQualityModule(configuration, null, SpotBugsModule.ofKeys(keys, output, repositories, resolvers),
+    public static InferredByteCodeQualityModule ofEnvironment(Environment environment,
+                                                              SequencedSet<Path> configuration,
+                                                              Map<String, Repository> repositories,
+                                                              Map<String, Resolver> resolvers) {
+        InferredByteCodeQualityModule module = new InferredByteCodeQualityModule(configuration, null, SpotBugsModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value);
-        Boolean spotbugs = SequencedProperties.flagOrNull(keys, "validator.spotbugs");
+        Boolean spotbugs = environment.flagOrNull("validator.spotbugs");
         if (spotbugs != null) {
             module = module.spotbugs(spotbugs ? value -> value : null);
         }

@@ -8,7 +8,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
@@ -20,7 +20,6 @@ import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class KotlinCompilerModuleTest {
 
@@ -47,8 +46,8 @@ public class KotlinCompilerModuleTest {
         executor.addModule(
                 "kotlin",
                 new KotlinCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
-                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
                 "project");
         executor.execute();
 
@@ -95,8 +94,8 @@ public class KotlinCompilerModuleTest {
         executor.addModule(
                 "kotlin",
                 new KotlinCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
-                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM)))
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM)))
                         .includeResources(false),
                 "project");
         executor.execute();
@@ -133,8 +132,8 @@ public class KotlinCompilerModuleTest {
         executor.addModule(
                 "kotlin",
                 new KotlinCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
-                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
                 "project");
         executor.execute();
 
@@ -171,8 +170,8 @@ public class KotlinCompilerModuleTest {
         executor.addModule(
                 "kotlin",
                 new KotlinCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
-                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
                 "project");
         executor.execute();
 
@@ -214,8 +213,8 @@ public class KotlinCompilerModuleTest {
         executor.addModule(
                 "kotlin",
                 new KotlinCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
-                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
                 "project");
         executor.execute();
 
@@ -242,8 +241,8 @@ public class KotlinCompilerModuleTest {
         executor.addModule(
                 "kotlin",
                 new KotlinCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
-                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
                 "project");
         executor.execute();
 

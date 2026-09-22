@@ -14,7 +14,7 @@ import build.jenesis.project.ExternalModule;
 import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.ProjectModuleDescriptor;
-import static build.jenesis.SequencedProperties.SYSTEM;
+import build.jenesis.Environment;
 
 /**
  * The {@code ExternalModule} counterpart of the {@code ../internal-module} demo.
@@ -42,7 +42,7 @@ public class Demo {
 
     static void main(String[] args) throws Exception {
         Files.createDirectories(Path.of("target"));
-        Path modular = Project.ofKeys(SYSTEM, Path.of("."))
+        Path modular = Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
                 .root(Path.of("plugin"))
                 .target(Path.of("target", "plugin"))
                 .version("1")
@@ -57,15 +57,15 @@ public class Demo {
                     ? Optional.of(RepositoryItem.ofFile(pluginJar))
                     : Optional.empty();
         };
-        Repository repository = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE).prepend(local);
+        Repository repository = JenesisModuleRepository.ofEnvironment(Environment.SYSTEM, JenesisRepository.Scope.MODULE).prepend(local);
 
         // Build the project (the resolved plugin rewrites ${greeting} first) and
         // launch the produced module so its main prints the substituted greeting.
-        Project project = Project.ofKeys(SYSTEM, Path.of("."))
+        Project project = Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
                 .assembler(new PreprocessingAssembler(
-                        InferredMultiProjectAssembler.ofKeys(SYSTEM),
+                        InferredMultiProjectAssembler.ofEnvironment(Environment.SYSTEM),
                         Map.of("module", repository),
-                        Map.of("module", ModularJarResolver.ofKeys(SYSTEM, true))));
+                        Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, true))));
         System.exit(new Execution(project).execute(args));
     }
 

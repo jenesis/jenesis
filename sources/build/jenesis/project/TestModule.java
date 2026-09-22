@@ -9,7 +9,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.PathPlacement;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -67,30 +67,29 @@ public class TestModule implements BuildExecutorModule {
                 false);
     }
 
-    public static TestModule ofKeys(Function<String, String> keys,
-                                    Output output,
+    public static TestModule ofEnvironment(Environment environment,
                                     Map<String, Repository> repositories,
                                     Map<String, Resolver> resolvers) {
         return new TestModule(null,
                 defaultIsTest(),
                 null,
                 resolvers,
-                Dependencies.ofKeys(keys, output, repositories, resolvers),
+                Dependencies.ofEnvironment(environment, repositories, resolvers),
                 true,
                 true,
                 null,
                 PathPlacement.CLASS_PATH,
                 null,
-                SequencedProperties.getProperty(keys, "test.filter"),
-                SequencedProperties.getProperty(keys, "test.tag"),
-                SequencedProperties.flag(keys, "test.force"),
-                SequencedProperties.flag(keys, "test.parallel"),
-                SequencedProperties.flag(keys, "test.reporting"),
+                environment.getProperty("test.filter"),
+                environment.getProperty("test.tag"),
+                environment.flag("test.force"),
+                environment.flag("test.parallel"),
+                environment.flag("test.reporting"),
                 "main",
                 List.of(),
-                incrementalDigest(SequencedProperties.getProperty(keys, "test.incremental")),
-                ProcessBuildStep.Terms.ofKeys(keys, output, "tests"),
-                SequencedProperties.flag(keys, "test.skip"));
+                incrementalDigest(environment.getProperty("test.incremental")),
+                ProcessBuildStep.Terms.ofEnvironment(environment, "tests"),
+                environment.flag("test.skip"));
     }
 
     private static String incrementalDigest(String property) {

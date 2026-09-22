@@ -4,7 +4,6 @@ import module java.base;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.step.Inventory;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public record Execution(Project project, String mainClass, String module, Container container) {
 
@@ -12,22 +11,22 @@ public record Execution(Project project, String mainClass, String module, Contai
         this(project, null, null, null);
     }
 
-    public static Execution ofKeys(Function<String, String> keys, Project project) {
+    public static Execution ofEnvironment(Environment environment, Project project) {
         return new Execution(project,
-                SequencedProperties.getProperty(keys, "execute.mainClass"),
-                SequencedProperties.getProperty(keys, "execute.module"),
-                Container.ofKeys(keys));
+                environment.getProperty("execute.mainClass"),
+                environment.getProperty("execute.module"),
+                Container.ofEnvironment(environment));
     }
 
     public record Container(String image, String mount, String mountWritable, String env, boolean announcing) {
 
-        public static Container ofKeys(Function<String, String> keys) {
-            return SequencedProperties.flag(keys, "execute.docker")
-                    ? new Container(SequencedProperties.getProperty(keys, "execute.docker.image"),
-                            SequencedProperties.getProperty(keys, "execute.docker.mount"),
-                            SequencedProperties.getProperty(keys, "execute.docker.mountWritable"),
-                            SequencedProperties.getProperty(keys, "execute.docker.env"),
-                            SequencedProperties.flag(keys, "print.docker", true))
+        public static Container ofEnvironment(Environment environment) {
+            return environment.flag("execute.docker")
+                    ? new Container(environment.getProperty("execute.docker.image"),
+                                    environment.getProperty("execute.docker.mount"),
+                                    environment.getProperty("execute.docker.mountWritable"),
+                                    environment.getProperty("execute.docker.env"),
+                                    environment.flag("print.docker", true))
                     : null;
         }
     }
@@ -191,7 +190,7 @@ public record Execution(Project project, String mainClass, String module, Contai
                     .mounts(container.mountWritable(), root, false)
                     .envs(container.env());
             if (container.announcing()) {
-                project.output().out().accept("Launching Java execution within Docker image: " + docker.image());
+                project.environment().out().accept("Launching Java execution within Docker image: " + docker.image());
             }
             return docker.execute(javaArgs);
         }
@@ -215,14 +214,14 @@ public record Execution(Project project, String mainClass, String module, Contai
 
     public static void main(String... arguments) {
         try {
-            Path root = Path.of(SequencedProperties.getProperty(SYSTEM, "make.root", "."));
-            Function<String, String> keys = Make.settings(root).keys();
+            Path root = Path.of(Environment.SYSTEM.getProperty("make.root", "."));
+            Environment environment = new Environment(Make.settings(root).keys());
             Make.Result result = new Make(Project.class.getName()).build(Project.BUILD);
             if (result.code() != 0) {
                 System.exit(result.code());
             }
-            Project project = Project.ofKeys(keys, new Output(), root);
-            int code = Execution.ofKeys(keys, project).execute(result.outputs(), arguments);
+            Project project = Project.ofEnvironment(environment, root);
+            int code = Execution.ofEnvironment(environment, project).execute(result.outputs(), arguments);
             if (code != 0) {
                 System.exit(code);
             }

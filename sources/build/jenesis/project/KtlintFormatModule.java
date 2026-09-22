@@ -8,7 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -37,15 +37,14 @@ public class KtlintFormatModule implements BuildExecutorModule {
              ProcessBuildStep.Terms.of("ktlint-format"));
     }
 
-    public static KtlintFormatModule ofKeys(Function<String, String> keys,
-                                            Output output,
-                                            Map<String, Repository> repositories,
-                                            Map<String, Resolver> resolvers) {
-        return new KtlintFormatModule(Dependencies.ofKeys(keys, output, repositories, resolvers),
+    public static KtlintFormatModule ofEnvironment(Environment environment,
+                                                   Map<String, Repository> repositories,
+                                                   Map<String, Resolver> resolvers) {
+        return new KtlintFormatModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "ktlint-format",
                 false,
-                ProcessBuildStep.Terms.ofKeys(keys, output, "ktlint-format"));
+                ProcessBuildStep.Terms.ofEnvironment(environment, "ktlint-format"));
     }
 
     private KtlintFormatModule(Dependencies dependencies,

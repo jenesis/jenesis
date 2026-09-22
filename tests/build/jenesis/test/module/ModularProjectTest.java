@@ -8,7 +8,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 import build.jenesis.Platform;
 import build.jenesis.SequencedProperties;
@@ -21,7 +21,6 @@ import build.jenesis.project.MultiProjectModule;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class ModularProjectTest {
 
@@ -738,12 +737,12 @@ public class ModularProjectTest {
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
-        root.addModule("modules", ModularProject.make(SYSTEM, new Output(), project,
+        root.addModule("modules", ModularProject.make(Environment.SYSTEM, project,
                 "main",
                 "module",
                 _ -> true,
                 Map.of(),
-                Map.of("module", ModularJarResolver.ofKeys(SYSTEM, false)),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, false)),
                 null,
                 true,
                 Collections.emptyNavigableSet(),
@@ -1000,7 +999,7 @@ public class ModularProjectTest {
 
     @Test
     public void refuses_a_malformed_segment_count_where_the_project_is_built() {
-        assertThatThrownBy(() -> ModularProject.ofKeys(Map.of("maven.segments", "zero")::get, "module", Path.of(".")))
+        assertThatThrownBy(() -> ModularProject.ofEnvironment(new Environment(Map.of("maven.segments", "zero")::get), "module", Path.of(".")))
                 .as("a setting is materialized where the provider is handed over, so a bad value is refused there")
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("jenesis.maven.segments");
@@ -1008,7 +1007,7 @@ public class ModularProjectTest {
 
     @Test
     public void refuses_a_segment_count_below_one_where_the_project_is_built() {
-        assertThatThrownBy(() -> ModularProject.ofKeys(Map.of("maven.segments", "0")::get, "module", Path.of(".")))
+        assertThatThrownBy(() -> ModularProject.ofEnvironment(new Environment(Map.of("maven.segments", "0")::get), "module", Path.of(".")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("at least one leading segment");
     }

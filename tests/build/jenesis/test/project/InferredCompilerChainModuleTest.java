@@ -8,7 +8,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
@@ -18,7 +18,6 @@ import build.jenesis.project.ScalaCompilerModule;
 import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class InferredCompilerChainModuleTest {
 
@@ -43,8 +42,8 @@ public class InferredCompilerChainModuleTest {
                 "chain",
                 new InferredCompilerChainModule(
                         Collections.emptyNavigableSet(),
-                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
-                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
                 "project");
         executor.execute();
 
@@ -88,8 +87,8 @@ public class InferredCompilerChainModuleTest {
                 "chain",
                 new InferredCompilerChainModule(
                         Collections.emptyNavigableSet(),
-                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
-                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
                 "project");
         executor.execute();
 
@@ -167,8 +166,8 @@ public class InferredCompilerChainModuleTest {
                 "chain",
                 new InferredCompilerChainModule(
                         Collections.emptyNavigableSet(),
-                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
-                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
                 "project");
         executor.execute();
 
@@ -201,8 +200,8 @@ public class InferredCompilerChainModuleTest {
                 "chain",
                 new InferredCompilerChainModule(
                         Collections.emptyNavigableSet(),
-                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
-                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
                 "project");
         executor.execute();
 
@@ -236,8 +235,8 @@ public class InferredCompilerChainModuleTest {
                 "chain",
                 new InferredCompilerChainModule(
                         Collections.emptyNavigableSet(),
-                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
-                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
                 "project");
         executor.execute();
 
@@ -264,8 +263,8 @@ public class InferredCompilerChainModuleTest {
                 "chain",
                 new InferredCompilerChainModule(
                         Collections.emptyNavigableSet(),
-                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
-                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
                 "project");
         executor.execute();
 
@@ -442,8 +441,8 @@ public class InferredCompilerChainModuleTest {
                 "chain",
                 new InferredCompilerChainModule(
                         Collections.emptyNavigableSet(),
-                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())),
-                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
                 "project");
         executor.execute();
     }

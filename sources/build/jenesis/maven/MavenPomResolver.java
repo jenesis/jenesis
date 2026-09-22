@@ -3,6 +3,7 @@ package build.jenesis.maven;
 import module java.base;
 import module java.xml;
 import build.jenesis.DependencyScope;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.License;
@@ -26,8 +27,8 @@ public class MavenPomResolver implements MavenResolver {
         this(MavenDefaultVersionNegotiator.maven());
     }
 
-    public static MavenPomResolver ofKeys(Function<String, String> keys) {
-        String property = SequencedProperties.getProperty(keys, "resolver.maven");
+    public static MavenPomResolver ofEnvironment(Environment environment) {
+        String property = environment.getProperty("resolver.maven");
         if (property == null) {
             return new MavenPomResolver();
         }

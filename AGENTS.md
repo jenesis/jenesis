@@ -62,31 +62,41 @@ returns a new instance with that value replaced (`new Project(Path.of(".")).vers
 **System properties are the defaults.** Every setting is a `jenesis.<area>.<name>` system property, read
 once where the object is built:
 
-- `ofKeys(keys, …)` is the static factory that reads every setting from the provider it is given
-  (`SequencedProperties.value(keys, "executor.digest", "MD5")`,
-  `SequencedProperties.number(keys, "executor.concurrency", 0)`,
-  `SequencedProperties.flag(keys, "source.pmd", true)`), with a value the object cannot do without
-  following the provider as a further argument (`Project.ofKeys(keys, root)`);
+- `ofEnvironment(environment, …)` is the static factory that reads every setting from the `Environment` it is
+  given (`environment.value("executor.digest", "MD5")`, `environment.number("executor.concurrency", 0)`,
+  `environment.flag("source.pmd", true)`), with a value the object cannot do without following it as a
+  further argument (`Project.ofEnvironment(environment, root)`);
 - the public no-argument or short constructor reads nothing and takes each setting's default, exactly as
-  if the provider answered for none of them - that is what `SequencedProperties.NONE` is;
+  if the environment answered for none of them - that is what `Environment.NONE` is;
 - a canonical constructor takes every value explicitly;
 - the wither overrides one value and calls the canonical constructor.
 
-An object that hands settings to children it builds resolves them where it is built: its `ofKeys` calls each
-child's own `ofKeys` and keeps the result, so no module, step, repository or resolver carries a provider and
-no public signature mentions one. The exceptions are the two types an entry point hands a command line to -
+An object that hands settings to children it builds resolves them where it is built: its `ofEnvironment`
+calls each child's own `ofEnvironment` and keeps the result, so no module, step, repository or resolver
+carries an environment and no public signature mentions one. The exceptions are the two types an entry point hands a command line to -
 `Project` and the assembler it gives a multi-project build - because they build a module per project module a
 scan discovers, long after the settings were read. Every setting a child resolved is a wither of its own as
 well, so a caller that names no strings configures the same object programmatically.
 
-**Where the run talks is an argument too.** Nothing in the engine writes to `System.out` or `System.err`:
-a line goes to a `Consumer<String>` that the run was given, and `Output` is the pair of them the entry point
-hands down beside the provider. A factory that resolves a setting into a printing consumer - `Terms.ofKeys`,
-`Dependencies.ofKeys`, `Signatures.ofKeys`, `Tree.ofKeys`, `BuildExecutor.Configuration`, the repositories -
-therefore takes the `Output` right after `keys`, and the consumer it builds is still a wither of its own, so a
-caller can hand one tool's lines somewhere else. `new Output()` is the pair that writes to the JVM's streams,
-`new Output(out, err)` the pair that writes to a tool's writers, and `Make`, `Toolchain` and the daemon are the
-exception, because they are the process boundary rather than the build.
+**One `Environment` says what a run reads and where it talks.** `Environment` is the record of the three
+things a run is given - the `Function<String, String>` that answers a setting, and the `Consumer<String>` for
+its output and for its errors - and it is the single argument every `ofEnvironment` takes. Nothing in the
+engine writes to `System.out` or `System.err`; a line goes to the consumer the run was handed.
+`Environment.SYSTEM` reads the JVM's properties and writes to its streams, `Environment.NONE` answers no
+setting and writes to the same streams, `new Environment(keys)` is a provider with the JVM's streams, and
+`new Environment(keys, out, err)` is a tool's writers. Each component is a wither of its own
+(`Environment.SYSTEM.out(printed::add)`), so a caller sends one run's lines somewhere else without touching
+the rest. The environment is an argument, never a field: what must keep talking after it was built keeps the
+`Consumer<String>` it resolved, as every step does, and only `Project` and the multi-project assembler hold an
+`Environment`, because they build a module per project module long after the settings were read. `Make`,
+`Toolchain` and the daemon are the exception to the streams rule, because they are the process boundary rather
+than the build.
+
+A process the build hands a command line to - a container, the daemon - is given the settings rather than left to
+read the JVM, because a setting a `jenesis.properties` or a profile supplied was never in the JVM to begin with.
+`Make.Settings` therefore names the keys its layers declare, the daemon is handed their values with every request
+and keys its fingerprint on the JVM it would otherwise have to fork rather than on them, and what `Project`
+forwards into a container is the catalogue behind the `configuration` selector, read through the environment.
 
 **A command line can live in a file.** `Make`, `Execute`, `Jpx` and the three tools read `@<file>` as the
 arguments it holds and `@@<text>` as an argument starting with an `@`, with `#` to the end of a line a comment
@@ -108,16 +118,19 @@ differs, because a run is configured by the provider and the output it is handed
 never collide and none of them touches the JVM's own properties or streams.
 
 A setting is therefore never read again later, and a caller that builds the object itself is never
-surprised by the environment: `new Project(root)` is the defaults and nothing else, and only
-`Project.ofKeys(SequencedProperties.SYSTEM, root)` - which the entry point calls, and nobody else - reads
-the JVM's properties. Every setting is read through a `Function<String, String>` that answers one key,
-never off `System` directly: `SequencedProperties.SYSTEM` is the provider that reads the JVM's properties,
-and it is the one place the shared `jenesis.` prefix is spelt, so a key is named without it everywhere
-else. `Make` and `Toolchain` are the exception and read the provider without the shared accessors, because
-`MakeClosureTest` holds each of them to compiling alone - reaching for `SequencedProperties` there would drag
-its closure into every build's first step. Where the rule itself must not differ, `Make` holds it and the
-accessors call `Make`, rather than either side keeping a copy.
-The accessors are `getProperty(keys, key)` and `getProperty(keys, key, default)` for the raw value, `value`
+surprised by its surroundings: `new Project(root)` is the defaults and nothing else, and only
+`Project.ofEnvironment(Environment.SYSTEM, root)` - which the entry point calls, and nobody else - reads
+the JVM's properties. Every setting is read through the environment's `Function<String, String>` that answers
+one key, never off `System` directly: `Environment.SYSTEM` is the one that reads the JVM's properties, and its
+provider is the one place the shared `jenesis.` prefix is spelt, so a key is named without it everywhere
+else. `Environment.SYSTEM` and `Environment.NONE` are written out where they are used rather than
+static imported, so both stock environments read the same way. `Make` and `Toolchain` are the exception and read a bare `Function<String, String>` with their own parsing,
+because `MakeClosureTest` holds each of them to compiling alone - naming `Environment` there would drag the
+engine into every build's first step. `Make` therefore hands the engine the provider and `Project.perform`
+and `Project.run` take a `Function<String, String>` of their own that builds the default environment, so the
+reflective handoff names JDK types alone. Where the rule itself must not differ, `Make` holds it and
+`Environment` calls `Make`, rather than either side keeping a copy.
+The accessors are `environment.getProperty(key)` and `getProperty(key, default)` for the raw value, `value`
 for the trimmed one that reads a blank as absent, `flag`, `flagOrNull`, `number`, `entries` and `words` -
 and nothing else, so no reader hand-rolls a parse. A boolean is the setting absent being the default,
 `=true` or the setting named with no value at all being true, `=false` being false, and any other value an
@@ -149,8 +162,9 @@ neither is a property it reads, and no `jenesis.project.*` key is read outside i
 `jenesis-make`, `jenesis-exec` and `jpx` through `java.util.spi.ToolProvider`, under the names the
 commands already answer to, so a program with the module resolved builds a project, runs what it
 built, or runs a published program in its own JVM. They share `JenesisTool`, which takes the
-leading `-Djenesis.*` arguments as that run's provider, hands the rest to the tool as a command
-line would, and writes everything printed to the writers it was given.
+leading `-Djenesis.*` arguments as that run's settings, hands the rest to the tool as a command
+line would, and builds the `Environment` that writes everything printed to the writers it was given. It
+never flushes them: whoever owns a writer decides when it drains, and an autoflushing one already does.
 `java.util.spi.ToolProvider` is in `java.base`, so this costs no dependency. The three are declared
 twice, by `provides` in `module-info.java` and by `META-INF/services/java.util.spi.ToolProvider`,
 because a named module reads the first and a jar on the class path reads the second, and the tools
@@ -211,9 +225,9 @@ re-run the step either.
 **A module configures only its own children.** Every `Inferred*Module` holds one
 `Function<Child, BuildExecutorModule>` per module it wires, named exactly like the child it configures and
 defaulting to the identity, or to `null` when that child's `jenesis.*` property switches it off; `null`
-skips the child, and so does a configurator that returns `null`. That property is read in `ofKeys` and
+skips the child, and so does a configurator that returns `null`. That property is read in `ofEnvironment` and
 nowhere else, so the plain constructor wires every child whatever the environment says, and a module that
-wires another module builds that child with its own `ofKeys` and keeps the result beside the configurator
+wires another module builds that child with its own `ofEnvironment` and keeps the result beside the configurator
 that shapes it, named for the child it holds (`checkstyleModule`, `javacStep`) - which is how one provider
 handed to `Project` reaches the whole tree without being carried into it. A caller reaches
 further down by nesting -
@@ -232,10 +246,10 @@ silently falls back, and a lenient wildcard selector is the one deliberate excep
   the assertion carries the reason as its `.as(...)` description where one is needed.
 - A test that builds steps implements `Serializable`, so the lambdas it hands the executor can be hashed;
   state a step must not capture (a latch, a socket) lives in a static field.
-- A test names the settings it needs in a `Map.of(…)::get` provider and collects what a run prints from an
-  `Output` of its own. Setting a system property or swapping `System.out` is what the provider and the output
-  exist to avoid, and it survives only where the test is about the JVM's own properties (`SequencedPropertiesTest`)
-  or proves that a build ignores them.
+- A test names the settings it needs in `new Environment(Map.of(…)::get)` and collects what a run prints by
+  giving that environment a consumer of its own (`.out(printed::add)`). Setting a system property or swapping
+  `System.out` is what the environment exists to avoid, and it survives only where the test is about the JVM's
+  own properties (`EnvironmentTest`) or proves that a build ignores them.
 - `@TempDir` folders for every build; `BuildExecutorCallback.nop()` and `BuildExecutorCache.nop()` unless the
   test is about them; `Runnable::run` as the executor when ordering matters.
 - Behaviour that is user-visible gets a demo as well as a test.

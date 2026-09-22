@@ -20,25 +20,25 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         this(uri, null, null, "SHA-256", Duration.parse("PT1S"), Duration.parse("PT10S"), true, true, false);
     }
 
-    public static BuildExecutorHttpCache ofKeys(Function<String, String> keys, URI uri) {
+    public static BuildExecutorHttpCache ofEnvironment(Environment environment, URI uri) {
         BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri);
-        String key = SequencedProperties.getProperty(keys, "cache.key", System.getenv("JENESIS_CACHE_KEY"));
+        String key = environment.getProperty("cache.key", System.getenv("JENESIS_CACHE_KEY"));
         if (key != null) {
             cache = cache.key(key);
         }
-        String project = SequencedProperties.getProperty(keys, "cache.project", System.getenv("JENESIS_CACHE_PROJECT"));
+        String project = environment.getProperty("cache.project", System.getenv("JENESIS_CACHE_PROJECT"));
         if (project != null) {
             cache = cache.project(project);
         }
-        String connect = SequencedProperties.getProperty(keys, "cache.connect");
+        String connect = environment.getProperty("cache.connect");
         if (connect != null) {
             cache = cache.connectTimeout(Duration.parse(connect));
         }
-        String read = SequencedProperties.getProperty(keys, "cache.read");
+        String read = environment.getProperty("cache.read");
         if (read != null) {
             cache = cache.readTimeout(Duration.parse(read));
         }
-        Boolean insecure = SequencedProperties.flagOrNull(keys, "cache.insecure");
+        Boolean insecure = environment.flagOrNull("cache.insecure");
         return insecure == null ? cache : cache.insecure(insecure);
     }
 

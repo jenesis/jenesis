@@ -1,11 +1,10 @@
 package build.jenesis.daemon;
 
 import module java.base;
+import build.jenesis.Environment;
 import build.jenesis.Make;
-import build.jenesis.Output;
 import build.jenesis.Project;
 import build.jenesis.SequencedProperties;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public final class DaemonServer {
 
@@ -17,7 +16,7 @@ public final class DaemonServer {
     private volatile ServerSocket retiring;
 
     public DaemonServer(Path root, String digest) {
-        this(root, digest, Duration.ofSeconds(SequencedProperties.number(SYSTEM, "daemon.idle", 10_800L)));
+        this(root, digest, Duration.ofSeconds(Environment.SYSTEM.number("daemon.idle", 10_800L)));
     }
 
     private DaemonServer(Path root, String digest, Duration idle) {
@@ -167,9 +166,9 @@ public final class DaemonServer {
             }
             out.writeByte(6);
             out.writeInt(outputs.size());
-            for (Map.Entry<String, String> output : outputs.entrySet()) {
-                out.writeUTF(output.getKey());
-                out.writeUTF(output.getValue());
+            for (Map.Entry<String, String> environment : outputs.entrySet()) {
+                out.writeUTF(environment.getKey());
+                out.writeUTF(environment.getValue());
             }
             out.writeByte(0);
             out.writeInt(code);
@@ -193,17 +192,17 @@ public final class DaemonServer {
             System.setOut(new PrintStream(new Frames(out, 1), true));
             System.setErr(new PrintStream(new Frames(out, 2), true));
             try {
-                if (SequencedProperties.flag(requested, "project.docker")) {
+                if (new Environment(requested).flag("project.docker")) {
                     throw new IllegalStateException("A dockerized build cannot run in the daemon, because it replaces"
                             + " the running process - unset jenesis.project.docker or run build/jenesis/Make.java");
                 }
                 Make.Settings settings = Make.settings(root, requested);
-                Function<String, String> keys = settings.keys();
+                Environment environment = new Environment(settings.keys());
                 SequencedSet<Path> profiles = settings.profiles();
                 if (!mainClass.equals(Project.class.getName())) {
-                    return Project.run(keys, new Output(), mainClass, root, profiles, selectors);
+                    return Project.run(environment, mainClass, root, profiles, selectors);
                 }
-                SequencedMap<String, Path> produced = Project.perform(keys, new Output(), root, profiles, selectors);
+                SequencedMap<String, Path> produced = Project.perform(environment, root, profiles, selectors);
                 if (produced == null) {
                     return 1;
                 }

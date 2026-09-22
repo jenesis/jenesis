@@ -8,7 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -40,16 +40,15 @@ public class CheckstyleModule implements BuildExecutorModule {
              ProcessBuildStep.Terms.of("checkstyle"));
     }
 
-    public static CheckstyleModule ofKeys(Function<String, String> keys,
-                                          Output output,
-                                          Map<String, Repository> repositories,
-                                          Map<String, Resolver> resolvers) {
-        return new CheckstyleModule(Dependencies.ofKeys(keys, output, repositories, resolvers),
+    public static CheckstyleModule ofEnvironment(Environment environment,
+                                                 Map<String, Repository> repositories,
+                                                 Map<String, Resolver> resolvers) {
+        return new CheckstyleModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "checkstyle",
                 "checkstyle.xml",
                 false,
-                ProcessBuildStep.Terms.ofKeys(keys, output, "checkstyle"));
+                ProcessBuildStep.Terms.ofEnvironment(environment, "checkstyle"));
     }
 
     private CheckstyleModule(Dependencies dependencies,

@@ -4,9 +4,9 @@ import module java.base;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
-import build.jenesis.Output;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.step.Jar;
@@ -45,21 +45,20 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
              step -> step.configured() ? step : null);
     }
 
-    public static InferredJavaToolchainModule ofKeys(Function<String, String> keys,
-                                                     Output output,
-                                                     SequencedSet<Path> configuration,
-                                                     Map<String, Repository> repositories,
-                                                     Map<String, Resolver> resolvers) {
+    public static InferredJavaToolchainModule ofEnvironment(Environment environment,
+                                                            SequencedSet<Path> configuration,
+                                                            Map<String, Repository> repositories,
+                                                            Map<String, Resolver> resolvers) {
         return new InferredJavaToolchainModule(configuration, null, PathPlacement.INFERRED,
-                InferredSourceGenerationModule.ofKeys(keys, output, configuration, repositories, resolvers),
-                InferredCompilerChainModule.ofKeys(keys, output, configuration, repositories, resolvers),
-                InferredByteCodeQualityModule.ofKeys(keys, output, configuration, repositories, resolvers),
-                JarSigner.ofKeys(keys, output),
+                InferredSourceGenerationModule.ofEnvironment(environment, configuration, repositories, resolvers),
+                InferredCompilerChainModule.ofEnvironment(environment, configuration, repositories, resolvers),
+                InferredByteCodeQualityModule.ofEnvironment(environment, configuration, repositories, resolvers),
+                JarSigner.ofEnvironment(environment),
                 value -> value,
                 value -> value,
                 value -> value,
                 null,
-                Jar.ofKeys(keys, output, ProcessHandler.Factory.of(), Jar.Sort.CLASSES).asModule("jar"),
+                Jar.ofEnvironment(environment, ProcessHandler.Factory.of(), Jar.Sort.CLASSES).asModule("jar"),
                 step -> step.configured() ? step : null);
     }
 

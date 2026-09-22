@@ -10,7 +10,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Platform;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -57,7 +57,7 @@ public class MavenProject implements BuildExecutorModule {
         this(root, "main", prefix, repository, resolver, new Platform());
     }
 
-    public static MavenProject ofKeys(Function<String, String> keys,
+    public static MavenProject ofEnvironment(Environment environment,
                                       Path root,
                                       String prefix,
                                       MavenRepository repository,
@@ -89,25 +89,23 @@ public class MavenProject implements BuildExecutorModule {
 
     public static BuildExecutorModule make(Path root,
                                            MultiProjectAssembler<? super MavenModuleDescriptor> assembler) {
-        return make(SequencedProperties.NONE, new Output(), root, assembler);
+        return make(Environment.NONE, root, assembler);
     }
 
-    public static BuildExecutorModule make(Function<String, String> keys,
-                                               Output output,
+    public static BuildExecutorModule make(Environment environment,
                                            Path root,
                                            MultiProjectAssembler<? super MavenModuleDescriptor> assembler) {
-        return make(keys, output, root,
+        return make(environment, root,
                 "main",
                 "maven",
-                Map.of("maven", MavenDefaultRepository.ofKeys(keys, output)),
-                Map.of("maven", MavenPomResolver.ofKeys(keys)),
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(environment)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(environment)),
                 null,
                 Collections.emptyNavigableSet(),
                 assembler);
     }
 
-    public static BuildExecutorModule make(Function<String, String> keys,
-                                               Output output,
+    public static BuildExecutorModule make(Environment environment,
                                            Path root,
                                            String group,
                                            String prefix,
@@ -118,8 +116,8 @@ public class MavenProject implements BuildExecutorModule {
                                            MultiProjectAssembler<? super MavenModuleDescriptor> assembler) {
         MavenRepository repository = MavenRepository.of(requireNonNull(repositories.get(prefix)));
         MavenResolver resolver = MavenResolver.of(resolvers.get(prefix));
-        Dependencies dependencyModule = Dependencies.ofKeys(keys, output, repositories, resolvers);
-        return new MultiProjectModule(MavenProject.ofKeys(keys, root, prefix, repository, resolver).group(group),
+        Dependencies dependencyModule = Dependencies.ofEnvironment(environment, repositories, resolvers);
+        return new MultiProjectModule(MavenProject.ofEnvironment(environment, root, prefix, repository, resolver).group(group),
                 identifier -> Optional.of(identifier.substring(0, identifier.indexOf('/'))),
                 _ -> (name, dependencies, arguments) -> {
                     Path location = MultiProjectModule.location(root, arguments);

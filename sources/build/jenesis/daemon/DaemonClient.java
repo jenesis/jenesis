@@ -3,7 +3,8 @@ package build.jenesis.daemon;
 import module java.base;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.SequencedProperties;
-import static build.jenesis.SequencedProperties.SYSTEM;
+import build.jenesis.Environment;
+import static build.jenesis.Environment.SYSTEM;
 
 public final class DaemonClient {
 
@@ -21,41 +22,56 @@ public final class DaemonClient {
     private final Path folder;
     private final List<String> path;
     private final String mainClass;
+    private final SequencedMap<String, String> supplied;
     private final String options;
     private final SequencedMap<String, String> outputs;
 
-    public DaemonClient(Path root, List<String> path, String mainClass) {
-        this(root, path, mainClass, SequencedProperties.getProperty(SYSTEM, "daemon.options", "-Xmx2g"), null);
+    public DaemonClient(Path root, List<String> path, String mainClass, SequencedMap<String, String> supplied) {
+        this(root, path, mainClass, supplied, effective(supplied)
+                .getOrDefault("jenesis.make.daemon.options", "-Xmx2g"), null);
     }
 
     private DaemonClient(Path root,
                          List<String> path,
                          String mainClass,
+                         SequencedMap<String, String> supplied,
                          String options,
                          SequencedMap<String, String> outputs) {
         this.root = root.toAbsolutePath().normalize();
         this.path = path;
         this.mainClass = mainClass;
+        this.supplied = supplied;
         this.options = options;
         this.outputs = outputs;
         folder = this.root.resolve(".jenesis");
     }
 
     public DaemonClient options(String options) {
-        return new DaemonClient(root, path, mainClass, options, outputs);
+        return new DaemonClient(root, path, mainClass, supplied, options, outputs);
     }
 
     public DaemonClient outputs(SequencedMap<String, String> outputs) {
-        return new DaemonClient(root, path, mainClass, options, outputs);
+        return new DaemonClient(root, path, mainClass, supplied, options, outputs);
+    }
+
+    private static SequencedMap<String, String> effective(SequencedMap<String, String> supplied) {
+        SequencedMap<String, String> effective = new LinkedHashMap<>(supplied);
+        for (String name : System.getProperties().stringPropertyNames()) {
+            if (name.startsWith("jenesis.")) {
+                effective.put(name, System.getProperty(name));
+            }
+        }
+        return effective;
     }
 
     public static int doDispatch(Path root,
                                  List<String> path,
                                  String mainClass,
                                  String seed,
+                                 SequencedMap<String, String> supplied,
                                  SequencedMap<String, String> outputs,
                                  String... selectors) throws IOException, InterruptedException {
-        return new DaemonClient(root, path, mainClass).outputs(outputs).dispatch(seed, selectors);
+        return new DaemonClient(root, path, mainClass, supplied).outputs(outputs).dispatch(seed, selectors);
     }
 
     public int dispatch(String seed, String... selectors) throws IOException, InterruptedException {
@@ -144,12 +160,7 @@ public final class DaemonClient {
             out.writeUTF(fingerprint);
             out.writeUTF(mainClass);
             out.writeBoolean(stop);
-            SequencedMap<String, String> properties = new LinkedHashMap<>();
-            for (String name : System.getProperties().stringPropertyNames()) {
-                if (name.startsWith("jenesis.")) {
-                    properties.put(name, System.getProperty(name));
-                }
-            }
+            SequencedMap<String, String> properties = effective(supplied);
             out.writeInt(properties.size());
             for (Map.Entry<String, String> property : properties.entrySet()) {
                 out.writeUTF(property.getKey());

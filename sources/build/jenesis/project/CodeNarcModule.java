@@ -8,7 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -39,16 +39,15 @@ public class CodeNarcModule implements BuildExecutorModule {
              ProcessBuildStep.Terms.of("codenarc"));
     }
 
-    public static CodeNarcModule ofKeys(Function<String, String> keys,
-                                        Output output,
-                                        Map<String, Repository> repositories,
-                                        Map<String, Resolver> resolvers) {
-        return new CodeNarcModule(Dependencies.ofKeys(keys, output, repositories, resolvers),
+    public static CodeNarcModule ofEnvironment(Environment environment,
+                                               Map<String, Repository> repositories,
+                                               Map<String, Resolver> resolvers) {
+        return new CodeNarcModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "codenarc",
                 "codenarc.xml",
                 false,
-                ProcessBuildStep.Terms.ofKeys(keys, output, "codenarc"));
+                ProcessBuildStep.Terms.ofEnvironment(environment, "codenarc"));
     }
 
     private CodeNarcModule(Dependencies dependencies,

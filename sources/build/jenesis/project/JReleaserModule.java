@@ -3,11 +3,11 @@ package build.jenesis.project;
 import module java.base;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
-import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
@@ -32,18 +32,17 @@ public class JReleaserModule implements BuildExecutorModule {
                 ProcessBuildStep.Terms.of("jreleaser", true));
     }
 
-    public static JReleaserModule ofKeys(Function<String, String> keys,
-                                         Output output,
-                                         Path root,
-                                         Path configuration,
-                                         String version) {
+    public static JReleaserModule ofEnvironment(Environment environment,
+                                                Path root,
+                                                Path configuration,
+                                                String version) {
         return new JReleaserModule(root,
                 configuration,
                 version,
-                SequencedProperties.getProperty(keys, "jreleaser.executable", "jreleaser"),
-                SequencedProperties.getProperty(keys, "jreleaser.command", "full-release"),
-                SequencedProperties.flag(keys, "jreleaser.dryRun", true),
-                ProcessBuildStep.Terms.ofKeys(keys, output, "jreleaser", true));
+                environment.getProperty("jreleaser.executable", "jreleaser"),
+                environment.getProperty("jreleaser.command", "full-release"),
+                environment.flag("jreleaser.dryRun", true),
+                ProcessBuildStep.Terms.ofEnvironment(environment, "jreleaser", true));
     }
 
     private JReleaserModule(Path root,
@@ -82,8 +81,8 @@ public class JReleaserModule implements BuildExecutorModule {
         return new JReleaserModule(root, configuration, version, executable, command, dryRun, terms.printing(printing));
     }
 
-    public static Path configured(Function<String, String> keys, Path root) {
-        String explicit = SequencedProperties.getProperty(keys, "jreleaser.config");
+    public static Path configured(Environment environment, Path root) {
+        String explicit = environment.getProperty("jreleaser.config");
         if (explicit != null && !explicit.isBlank()) {
             Path candidate = root.resolve(explicit.trim());
             if (!Files.isRegularFile(candidate)) {
@@ -102,7 +101,7 @@ public class JReleaserModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        buildExecutor.addStep(ENVIRONMENT, new Environment(version), inherited.sequencedKeySet());
+        buildExecutor.addStep(ENVIRONMENT, new Variables(version), inherited.sequencedKeySet());
         SequencedSet<String> inputs = new LinkedHashSet<>();
         inputs.add(ENVIRONMENT);
         inputs.addAll(inherited.sequencedKeySet());
@@ -116,7 +115,7 @@ public class JReleaserModule implements BuildExecutorModule {
                 inputs);
     }
 
-    private record Environment(String version) implements BuildStep {
+    private record Variables(String version) implements BuildStep {
 
         @Override
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {

@@ -12,7 +12,7 @@ import build.jenesis.maven.MavenModuleResolver;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisRepository;
-import static build.jenesis.SequencedProperties.SYSTEM;
+import build.jenesis.Environment;
 
 public class Demo {
 
@@ -23,10 +23,10 @@ public class Demo {
         // coordinates come from Maven Central, and every jar is placed as it describes a
         // module. So the demo resolves from scratch and leaves nothing behind outside this
         // directory.
-        Repository modules = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.ARTIFACT);
-        MavenPomResolver maven = MavenPomResolver.ofKeys(SYSTEM);
+        Repository modules = JenesisModuleRepository.ofEnvironment(Environment.SYSTEM, JenesisRepository.Scope.ARTIFACT);
+        MavenPomResolver maven = MavenPomResolver.ofEnvironment(Environment.SYSTEM);
         Jpx jpx = new Jpx(Path.of("target", "jpx"),
-                Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM), "module", modules),
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM), "module", modules),
                 Map.<String, Resolver>of("maven", maven, "module", new MavenModuleResolver("maven", maven, modules)),
                 new HashDigestFunction("SHA-256"),
                 PathPlacement.INFERRED);

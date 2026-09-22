@@ -11,7 +11,6 @@ import build.jenesis.maven.MavenRepository;
 import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisRepository;
 import build.jenesis.module.ModularJarResolver;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public record Jpx(Path storage,
                   Map<String, Repository> repositories,
@@ -24,26 +23,26 @@ public record Jpx(Path storage,
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
 
     public Jpx(PathPlacement placement) {
-        this(SequencedProperties.NONE, new Output(), placement);
+        this(Environment.NONE, placement);
     }
 
-    public static Jpx ofKeys(Function<String, String> keys, Output output, PathPlacement placement) {
-        return new Jpx(keys, output, placement);
+    public static Jpx ofEnvironment(Environment environment, PathPlacement placement) {
+        return new Jpx(environment, placement);
     }
 
-    private Jpx(Function<String, String> keys, Output output, PathPlacement placement) {
+    private Jpx(Environment environment, PathPlacement placement) {
         boolean modular = placement == PathPlacement.MODULE_PATH;
-        Repository module = JenesisModuleRepository.ofKeys(keys, output, modular
-                ? JenesisRepository.Scope.MODULE
-                : JenesisRepository.Scope.ARTIFACT);
+        Repository module = JenesisModuleRepository.ofEnvironment(environment, modular
+                                                                  ? JenesisRepository.Scope.MODULE
+                                                                  : JenesisRepository.Scope.ARTIFACT);
         Map<String, Repository> repositories = new LinkedHashMap<>();
-        repositories.put("maven", MavenDefaultRepository.ofKeys(keys, output));
+        repositories.put("maven", MavenDefaultRepository.ofEnvironment(environment));
         repositories.put("module", module);
         Map<String, Resolver> resolvers = new LinkedHashMap<>();
-        MavenPomResolver maven = MavenPomResolver.ofKeys(keys);
+        MavenPomResolver maven = MavenPomResolver.ofEnvironment(environment);
         resolvers.put("maven", maven);
         resolvers.put("module", modular
-                ? ModularJarResolver.ofKeys(keys, false)
+                ? ModularJarResolver.ofEnvironment(environment, false)
                 : new MavenModuleResolver("maven", maven, module));
         this(Path.of(System.getProperty("user.home")).resolve(".jenesis").resolve("jpx"),
                 Collections.unmodifiableMap(repositories),
@@ -290,12 +289,10 @@ public record Jpx(Path storage,
               --help              print this help""";
 
     public static void main(String... arguments) throws IOException, InterruptedException {
-        System.exit(run(SYSTEM,
-                new Output(),
-                SequencedProperties.arguments(arguments).toArray(String[]::new)));
+        System.exit(run(Environment.SYSTEM, SequencedProperties.arguments(arguments).toArray(String[]::new)));
     }
 
-    public static int run(Function<String, String> keys, Output output, String... arguments)
+    public static int run(Environment environment, String... arguments)
             throws IOException, InterruptedException {
         PathPlacement placement = PathPlacement.INFERRED;
         boolean dockerized = false, pin = false;
@@ -307,7 +304,7 @@ public record Jpx(Path storage,
                 case "--docker" -> dockerized = true;
                 case "--pin" -> pin = true;
                 case "--help" -> {
-                    output.out().accept(HELP);
+                    environment.out().accept(HELP);
                     return 0;
                 }
                 default -> {
@@ -321,8 +318,8 @@ public record Jpx(Path storage,
                     } else if (arguments[target].startsWith("--hash=")) {
                         checksum = requireValidChecksum(arguments[target].substring("--hash=".length()));
                     } else {
-                        output.err().accept("Unknown option: " + arguments[target]);
-                        output.err().accept(HELP);
+                        environment.err().accept("Unknown option: " + arguments[target]);
+                        environment.err().accept(HELP);
                         return 64;
                     }
                 }
@@ -330,7 +327,7 @@ public record Jpx(Path storage,
             target++;
         }
         if (arguments.length == target) {
-            output.err().accept(HELP);
+            environment.err().accept(HELP);
             return 64;
         }
         Command command = Command.parse(arguments[target]);
@@ -338,8 +335,8 @@ public record Jpx(Path storage,
             throw new IllegalArgumentException("Pure module resolution requires a module name, "
                     + "not Maven coordinates: " + command.name());
         }
-        Toolchain toolchain = java == null ? null : Toolchain.ofKeys(keys).version(java);
-        Installation installation = Jpx.ofKeys(keys, output, placement).install(command);
+        Toolchain toolchain = java == null ? null : Toolchain.ofKeys(environment.keys()).version(java);
+        Installation installation = Jpx.ofEnvironment(environment, placement).install(command);
         if (toolchain != null) {
             installation = installation.home(toolchain.home());
         }
@@ -366,10 +363,10 @@ public record Jpx(Path storage,
             options.add(image == null ? "--docker" : "--docker=" + image);
         }
         if (pin) {
-            output.out().accept(String.join(" ", installation.pinned(options, command.mainClass(), remaining)));
-            output.out().accept(String.join(" ", docker == null
-                    ? installation.command(command.mainClass(), remaining)
-                    : installation.command(command.mainClass(), remaining, docker)));
+            environment.out().accept(String.join(" ", installation.pinned(options, command.mainClass(), remaining)));
+            environment.out().accept(String.join(" ", docker == null
+                                                 ? installation.command(command.mainClass(), remaining)
+                                                 : installation.command(command.mainClass(), remaining, docker)));
             return 0;
         }
         return docker == null

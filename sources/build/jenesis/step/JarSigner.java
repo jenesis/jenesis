@@ -1,10 +1,10 @@
 package build.jenesis.step;
 
 import module java.base;
-import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
+import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 
 public class JarSigner extends ProcessBuildStep {
@@ -21,34 +21,34 @@ public class JarSigner extends ProcessBuildStep {
         this(null, null, null, null, null, null, List.of(), Terms.of("jarsigner"));
     }
 
-    public static JarSigner ofKeys(Function<String, String> keys, Output output) {
+    public static JarSigner ofEnvironment(Environment environment) {
         JarSigner signer = new JarSigner(null, null, null, null, null, null, List.of(),
-                Terms.ofKeys(keys, output, "jarsigner"));
-        String keystore = SequencedProperties.getProperty(keys, "jarsigner.keystore");
+                Terms.ofEnvironment(environment, "jarsigner"));
+        String keystore = environment.getProperty("jarsigner.keystore");
         if (keystore != null) {
             signer = signer.keystore(keystore);
         }
-        String alias = SequencedProperties.getProperty(keys, "jarsigner.alias");
+        String alias = environment.getProperty("jarsigner.alias");
         if (alias != null) {
             signer = signer.alias(alias);
         }
-        String storepass = SequencedProperties.getProperty(keys, "jarsigner.storepass");
+        String storepass = environment.getProperty("jarsigner.storepass");
         if (storepass != null) {
             signer = signer.storepass(storepass);
         }
-        String keypass = SequencedProperties.getProperty(keys, "jarsigner.keypass");
+        String keypass = environment.getProperty("jarsigner.keypass");
         if (keypass != null) {
             signer = signer.keypass(keypass);
         }
-        String storetype = SequencedProperties.getProperty(keys, "jarsigner.storetype");
+        String storetype = environment.getProperty("jarsigner.storetype");
         if (storetype != null) {
             signer = signer.storetype(storetype);
         }
-        String tsa = SequencedProperties.getProperty(keys, "jarsigner.tsa");
+        String tsa = environment.getProperty("jarsigner.tsa");
         if (tsa != null) {
             signer = signer.tsa(tsa);
         }
-        String arguments = SequencedProperties.getProperty(keys, "jarsigner.arguments");
+        String arguments = environment.getProperty("jarsigner.arguments");
         return arguments == null ? signer : signer.arguments(words(arguments));
     }
 

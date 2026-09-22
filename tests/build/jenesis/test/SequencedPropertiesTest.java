@@ -3,10 +3,10 @@ package build.jenesis.test;
 import module java.base;
 import module org.junit.jupiter.api;
 import build.jenesis.SequencedProperties;
+import build.jenesis.Environment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class SequencedPropertiesTest {
 
@@ -139,144 +139,6 @@ public class SequencedPropertiesTest {
         StringWriter writer = new StringWriter();
         original.store(writer, "header");
         assertThat(writer.toString()).isEqualTo("k1=v1\n");
-    }
-
-    @Test
-    public void a_system_flag_is_the_default_when_it_is_not_set() {
-        System.clearProperty("jenesis.test.sample.flag");
-        assertThat(SequencedProperties.flag(SYSTEM, "test.sample.flag")).isFalse();
-        assertThat(SequencedProperties.flag(SYSTEM, "test.sample.flag", true)).isTrue();
-    }
-
-    @Test
-    public void a_system_flag_named_with_no_value_is_true() {
-        System.setProperty("jenesis.test.sample.flag", "");
-        try {
-            assertThat(SequencedProperties.flag(SYSTEM, "test.sample.flag"))
-                    .as("naming a flag on the command line and nothing else is how it is switched on")
-                    .isTrue();
-        } finally {
-            System.clearProperty("jenesis.test.sample.flag");
-        }
-    }
-
-    @Test
-    public void a_system_flag_set_to_false_is_false() {
-        System.setProperty("jenesis.test.sample.flag", "false");
-        try {
-            assertThat(SequencedProperties.flag(SYSTEM, "test.sample.flag"))
-                    .as("=false once switched a presence-read flag on, which is the whole reason"
-                            + " every boolean is read the same way now")
-                    .isFalse();
-            assertThat(SequencedProperties.flag(SYSTEM, "test.sample.flag", true)).isFalse();
-        } finally {
-            System.clearProperty("jenesis.test.sample.flag");
-        }
-    }
-
-    @Test
-    public void a_system_flag_set_to_anything_else_is_refused() {
-        System.setProperty("jenesis.test.sample.flag", "yes");
-        try {
-            assertThatThrownBy(() -> SequencedProperties.flag(SYSTEM, "test.sample.flag"))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Malformed value for jenesis.test.sample.flag: 'yes'"
-                            + " (expected true, false, or the setting named with no value at all)");
-        } finally {
-            System.clearProperty("jenesis.test.sample.flag");
-        }
-    }
-
-    @Test
-    public void a_system_flag_ignores_case_and_surrounding_space() {
-        System.setProperty("jenesis.test.sample.flag", " TRUE ");
-        try {
-            assertThat(SequencedProperties.flag(SYSTEM, "test.sample.flag")).isTrue();
-        } finally {
-            System.clearProperty("jenesis.test.sample.flag");
-        }
-    }
-
-    @Test
-    public void a_system_flag_that_is_not_set_can_be_told_from_one_set_to_false() {
-        System.clearProperty("jenesis.test.sample.flag");
-        assertThat(SequencedProperties.flagOrNull(SYSTEM, "test.sample.flag")).isNull();
-        System.setProperty("jenesis.test.sample.flag", "false");
-        try {
-            assertThat(SequencedProperties.flagOrNull(SYSTEM, "test.sample.flag")).isFalse();
-        } finally {
-            System.clearProperty("jenesis.test.sample.flag");
-        }
-    }
-
-    @Test
-    public void a_system_flag_read_for_its_absence_reads_a_value_like_every_other() {
-        System.setProperty("jenesis.test.sample.flag", "");
-        try {
-            assertThat(SequencedProperties.flagOrNull(SYSTEM, "test.sample.flag")).isTrue();
-        } finally {
-            System.clearProperty("jenesis.test.sample.flag");
-        }
-        System.setProperty("jenesis.test.sample.flag", "yes");
-        try {
-            assertThatThrownBy(() -> SequencedProperties.flagOrNull(SYSTEM, "test.sample.flag"))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Malformed value for jenesis.test.sample.flag: 'yes'"
-                            + " (expected true, false, or the setting named with no value at all)");
-        } finally {
-            System.clearProperty("jenesis.test.sample.flag");
-        }
-    }
-
-    @Test
-    public void reads_every_setting_through_the_provider_it_is_given() {
-        Map<String, String> settings = Map.of("sample.value", " text ",
-                "sample.flag", "",
-                "sample.count", "4",
-                "sample.entries", "a, ,b",
-                "sample.words", "-a  -b");
-        Function<String, String> keys = settings::get;
-        assertThat(SequencedProperties.value(keys, "sample.value")).isEqualTo("text");
-        assertThat(SequencedProperties.value(keys, "sample.absent", "fallback")).isEqualTo("fallback");
-        assertThat(SequencedProperties.flag(keys, "sample.flag")).isTrue();
-        assertThat(SequencedProperties.flag(keys, "sample.absent", true)).isTrue();
-        assertThat(SequencedProperties.number(keys, "sample.count", 0)).isEqualTo(4);
-        assertThat(SequencedProperties.number(keys, "sample.absent", 7)).isEqualTo(7);
-        assertThat(SequencedProperties.entries(keys, "sample.entries")).containsExactly("a", "b");
-        assertThat(SequencedProperties.words(keys, "sample.words")).containsExactly("-a", "-b");
-    }
-
-    @Test
-    public void tells_a_raw_value_from_a_trimmed_one() {
-        Map<String, String> settings = Map.of("sample.empty", "");
-        Function<String, String> keys = settings::get;
-        assertThat(SequencedProperties.getProperty(keys, "sample.empty"))
-                .as("a setting named with no value is empty rather than absent,"
-                        + " which is what tells a tag deliberately cleared from one never given")
-                .isEmpty();
-        assertThat(SequencedProperties.value(keys, "sample.empty")).isNull();
-        assertThat(SequencedProperties.getProperty(keys, "sample.absent", "fallback")).isEqualTo("fallback");
-    }
-
-    @Test
-    public void refuses_a_number_that_is_not_one() {
-        Function<String, String> keys = Map.of("sample.count", "many")::get;
-        assertThatThrownBy(() -> SequencedProperties.number(keys, "sample.count", 0))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Malformed value for jenesis.sample.count: 'many' (expected a whole number)");
-    }
-
-    @Test
-    public void the_system_provider_prepends_the_namespace_every_setting_shares() {
-        System.setProperty("jenesis.test.sample.value", "text");
-        try {
-            assertThat(SYSTEM.apply("test.sample.value")).isEqualTo("text");
-            assertThat(SYSTEM.apply("jenesis.test.sample.value"))
-                    .as("a key is named without the prefix everywhere, and the provider is the only place it is added")
-                    .isNull();
-        } finally {
-            System.clearProperty("jenesis.test.sample.value");
-        }
     }
 
     @Test

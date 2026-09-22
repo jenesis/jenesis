@@ -3,7 +3,7 @@ package build;
 import module java.base;
 import build.jenesis.Pinning;
 import build.jenesis.Project;
-import static build.jenesis.SequencedProperties.SYSTEM;
+import build.jenesis.Environment;
 
 public class Demo {
 
@@ -25,7 +25,7 @@ public class Demo {
             throws Exception {
         wipe(project);
         try {
-            Project.ofKeys(SYSTEM, Path.of(project)).pinning(pinning).build();
+            Project.ofEnvironment(Environment.SYSTEM, Path.of(project)).pinning(pinning).build();
         } catch (Throwable _) {
             if (success) {
                 throw new AssertionError("Expected the build to succeed: " + description);

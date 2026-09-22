@@ -38,25 +38,25 @@ public interface Repository {
         };
     }
 
-    default Repository cached(Function<String, String> keys, Output output, Path folder) {
-        return cached(keys, output, folder, false);
+    default Repository cached(Environment environment, Path folder) {
+        return cached(environment, folder, false);
     }
 
     private Repository cached(Path folder, boolean snapshot) {
-        return cached(SequencedProperties.NONE, new Output(), folder, snapshot);
+        return cached(Environment.NONE, folder, snapshot);
     }
 
-    private Repository cached(Function<String, String> keys, Output output, Path folder, boolean snapshot) {
+    private Repository cached(Environment environment, Path folder, boolean snapshot) {
         if (folder == null) {
             return this;
         }
-        return cached(folder, snapshot, SequencedProperties.flag(keys, "print.fetch")
-                ? target -> output.out().accept("%s%-11s%s %s".formatted(
-                        BuildExecutorCallback.YELLOW,
-                        "[FETCHED]",
-                        BuildExecutorCallback.RESET,
-                        target.toAbsolutePath().toUri()))
-                : null);
+        return cached(folder, snapshot, environment.flag("print.fetch")
+                      ? target -> environment.out().accept("%s%-11s%s %s".formatted(
+                                                                                    BuildExecutorCallback.YELLOW,
+                                                                                    "[FETCHED]",
+                                                                                    BuildExecutorCallback.RESET,
+                                                                                    target.toAbsolutePath().toUri()))
+                      : null);
     }
 
     default Repository cached(Path folder, Consumer<Path> callback) {
@@ -260,18 +260,18 @@ public interface Repository {
         ENVIRONMENT,
         DEFAULT;
 
-        public static Origin of(Function<String, String> keys, String key) {
-            List<String> provided = SequencedProperties.entries(keys, "make.provided");
+        public static Origin of(Environment environment, String key) {
+            List<String> provided = environment.entries("make.provided");
             return provided != null && provided.contains(key) ? PROJECT : USER;
         }
     }
 
     record Credential(String token, Origin origin) {
 
-        public static Credential of(Function<String, String> keys, String key, String variable) {
-            String value = SequencedProperties.getProperty(keys, key);
+        public static Credential of(Environment environment, String key, String variable) {
+            String value = environment.getProperty(key);
             if (value != null) {
-                return new Credential(value, Origin.of(keys, key));
+                return new Credential(value, Origin.of(environment, key));
             }
             String fallback = System.getenv(variable);
             return fallback == null
@@ -312,19 +312,19 @@ public interface Repository {
         }
 
         public Connection() {
-            this(SequencedProperties.NONE);
+            this(Environment.NONE);
         }
 
-        public static Connection ofKeys(Function<String, String> keys) {
-            return new Connection(keys);
+        public static Connection ofEnvironment(Environment environment) {
+            return new Connection(environment);
         }
 
-        private Connection(Function<String, String> keys) {
-            this(SequencedProperties.number(keys, "repository.retries", 2),
-                    Duration.ofMillis(SequencedProperties.number(keys, "repository.backoff", 125)),
-                    SequencedProperties.flag(keys, "repository.insecure"),
-                    SequencedProperties.number(keys, "repository.connect.timeout", 10_000),
-                    SequencedProperties.number(keys, "repository.read.timeout", 30_000));
+        private Connection(Environment environment) {
+            this(environment.number("repository.retries", 2),
+                 Duration.ofMillis(environment.number("repository.backoff", 125)),
+                 environment.flag("repository.insecure"),
+                 environment.number("repository.connect.timeout", 10_000),
+                 environment.number("repository.read.timeout", 30_000));
         }
 
         public Connection retries(int retries) {
@@ -355,21 +355,20 @@ public interface Repository {
     static <F extends BiFunction<URI, String, Optional<URI>> & Serializable> Repository ofUris(
             Map<String, URI> uris,
             F versionResolver) {
-        return ofUris(SequencedProperties.NONE, new Output(), uris, versionResolver);
+        return ofUris(Environment.NONE, uris, versionResolver);
     }
 
     static <F extends BiFunction<URI, String, Optional<URI>> & Serializable> Repository ofUris(
-            Function<String, String> keys,
-            Output output,
+            Environment environment,
             Map<String, URI> uris,
             F versionResolver) {
         return ofUris(uris, versionResolver, new Connection().retries(0).backoff(Duration.ZERO),
-                SequencedProperties.flag(keys, "print.fetch")
-                        ? uri -> output.out().accept("%s%-11s%s %s".formatted(
-                                BuildExecutorCallback.YELLOW,
-                                "[FETCHED]",
-                                BuildExecutorCallback.RESET,
-                                uri))
+                environment.flag("print.fetch")
+                        ? uri -> environment.out().accept("%s%-11s%s %s".formatted(
+                                                                                   BuildExecutorCallback.YELLOW,
+                                                                                   "[FETCHED]",
+                                                                                   BuildExecutorCallback.RESET,
+                                                                                   uri))
                         : null);
     }
 

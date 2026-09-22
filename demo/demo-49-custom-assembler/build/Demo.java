@@ -12,7 +12,7 @@ import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.ProjectModuleDescriptor;
-import static build.jenesis.SequencedProperties.SYSTEM;
+import build.jenesis.Environment;
 
 public class Demo {
 
@@ -20,8 +20,8 @@ public class Demo {
         // Wrap the stock InferredMultiProjectAssembler so that every module's Java
         // sources pass through a preprocessing step before the regular compile,
         // jar, and test flow runs unchanged.
-        Project.ofKeys(SYSTEM, Path.of("."))
-                .assembler(new PreprocessingAssembler(InferredMultiProjectAssembler.ofKeys(SYSTEM)))
+        Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
+                .assembler(new PreprocessingAssembler(InferredMultiProjectAssembler.ofEnvironment(Environment.SYSTEM)))
                 .build(args);
     }
 

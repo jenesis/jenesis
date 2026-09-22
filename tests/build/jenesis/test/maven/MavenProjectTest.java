@@ -9,7 +9,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Platform;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenDefaultVersionNegotiator;
@@ -22,7 +22,6 @@ import build.jenesis.project.JavaToolchainModule;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class MavenProjectTest {
 
@@ -698,11 +697,11 @@ public class MavenProjectTest {
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
-        root.addModule("maven", MavenProject.make(SYSTEM, new Output(), project,
+        root.addModule("maven", MavenProject.make(Environment.SYSTEM, project,
                 "main",
                 "maven",
                 Map.of("maven", new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)),
-                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM)),
                 null,
                 Collections.emptyNavigableSet(),
                 (descriptor, _, _) -> {

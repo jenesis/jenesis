@@ -5,7 +5,7 @@ import module org.junit.jupiter.api;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
@@ -16,7 +16,6 @@ import build.jenesis.step.ProcessHandler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class ModularizeModuleTest {
 
@@ -161,7 +160,7 @@ public class ModularizeModuleTest {
                 modularized.resolve(Dependencies.MODULAR_PATH + "demo.automatic.jar").toFile())) {
             assertThat(jar.stream().map(ZipEntry::getTimeLocal))
                     .as("the time the dependency was packed at is dropped, as it would be converted to local time")
-                    .containsOnly(BuildStep.timestamp(SYSTEM).toLocalDateTime());
+                    .containsOnly(BuildStep.timestamp(Environment.SYSTEM).toLocalDateTime());
         }
     }
 
@@ -207,7 +206,7 @@ public class ModularizeModuleTest {
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         buildExecutor.addSource("closure", closure);
         buildExecutor.addModule("modules",
-                ModularizeModule.ofKeys(SYSTEM, new Output(), ProcessHandler.Factory.TOOL, synthetic),
+                ModularizeModule.ofEnvironment(Environment.SYSTEM, ProcessHandler.Factory.TOOL, synthetic),
                 "closure");
         SequencedMap<String, Path> steps = buildExecutor.execute();
         return steps.get("modules");

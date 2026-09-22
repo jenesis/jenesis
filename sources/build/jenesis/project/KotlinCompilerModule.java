@@ -8,7 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -48,17 +48,16 @@ public class KotlinCompilerModule implements BuildExecutorModule {
              ProcessBuildStep.Terms.of("kotlinc"));
     }
 
-    public static KotlinCompilerModule ofKeys(Function<String, String> keys,
-                                              Output output,
-                                              Map<String, Repository> repositories,
-                                              Map<String, Resolver> resolvers) {
-        return new KotlinCompilerModule(resolvers, Dependencies.ofKeys(keys, output, repositories, resolvers),
+    public static KotlinCompilerModule ofEnvironment(Environment environment,
+                                                     Map<String, Repository> repositories,
+                                                     Map<String, Resolver> resolvers) {
+        return new KotlinCompilerModule(resolvers, Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 true,
                 "kotlinc",
                 "main",
                 null,
-                ProcessBuildStep.Terms.ofKeys(keys, output, "kotlinc"));
+                ProcessBuildStep.Terms.ofEnvironment(environment, "kotlinc"));
     }
 
     private KotlinCompilerModule(Map<String, Resolver> resolvers,

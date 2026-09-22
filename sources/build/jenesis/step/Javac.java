@@ -2,7 +2,7 @@ package build.jenesis.step;
 
 import module java.base;
 import java.util.jar.Attributes;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -29,14 +29,13 @@ public class Javac extends ProcessBuildStep {
              Terms.of("javac"));
     }
 
-    public static Javac ofKeys(Function<String, String> keys,
-                               Output output,
+    public static Javac ofEnvironment(Environment environment,
                                ProcessHandler.Factory factory) {
         return new Javac(factory.apply("javac", "bin/javac"),
                 true,
                 PathPlacement.INFERRED,
                 "main",
-                Terms.ofKeys(keys, output, "javac"));
+                Terms.ofEnvironment(environment, "javac"));
     }
 
     private Javac(Function<List<String>, ? extends ProcessHandler> factory,

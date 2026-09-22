@@ -1,10 +1,10 @@
 package build.jenesis.step;
 
 import module java.base;
-import build.jenesis.Output;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 
 public class Javadoc extends ProcessBuildStep {
@@ -19,13 +19,13 @@ public class Javadoc extends ProcessBuildStep {
         this(factory.apply("javadoc", "bin/javadoc"), null, false, false, Terms.of("javadoc"));
     }
 
-    public static Javadoc ofKeys(Function<String, String> keys,
-                                 Output output, ProcessHandler.Factory factory) {
+    public static Javadoc ofEnvironment(Environment environment,
+                                        ProcessHandler.Factory factory) {
         return new Javadoc(factory.apply("javadoc", "bin/javadoc"),
                 null,
                 false,
-                BuildStep.timestamp(keys) == null,
-                Terms.ofKeys(keys, output, "javadoc"));
+                BuildStep.timestamp(environment) == null,
+                Terms.ofEnvironment(environment, "javadoc"));
     }
 
     private Javadoc(Function<List<String>, ? extends ProcessHandler> factory,

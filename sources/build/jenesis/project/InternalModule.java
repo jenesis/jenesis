@@ -9,7 +9,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -63,15 +63,15 @@ public class InternalModule implements BuildExecutorModule {
                 group);
     }
 
-    public static InternalModule ofKeys(Function<String, String> keys,
-                                        Output output, String prefix, String group, Path source) {
+    public static InternalModule ofEnvironment(Environment environment,
+                                               String prefix, String group, Path source) {
         Map<String, Repository> repositories = Map.of(prefix,
-                JenesisModuleRepository.ofKeys(keys, output, JenesisRepository.Scope.MODULE));
-        Map<String, Resolver> resolvers = Map.of(prefix, ModularJarResolver.ofKeys(keys, true));
+                JenesisModuleRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE));
+        Map<String, Resolver> resolvers = Map.of(prefix, ModularJarResolver.ofEnvironment(environment, true));
         return new InternalModule(prefix,
                 source,
-                Dependencies.ofKeys(keys, output, repositories, resolvers),
-                Javac.ofKeys(keys, output, ProcessHandler.Factory.ofKeys(keys)),
+                Dependencies.ofEnvironment(environment, repositories, resolvers),
+                Javac.ofEnvironment(environment, ProcessHandler.Factory.ofEnvironment(environment)),
                 Collections.emptyNavigableSet(),
                 null,
                 null,

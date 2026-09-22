@@ -10,7 +10,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Make;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Project;
 import build.jenesis.SequencedProperties;
 import build.jenesis.module.JenesisModuleRepositoryExport;
@@ -21,7 +21,6 @@ import build.jenesis.project.ProjectModuleDescriptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class ProjectTest {
 
@@ -59,29 +58,29 @@ public class ProjectTest {
 
     @Test
     public void reads_the_tag_revision_and_tree_from_their_properties_and_keeps_empty_ones() {
-        assertThat(Project.ofKeys(SYSTEM, new Output(), root).tag()).isNull();
-        assertThat(Project.ofKeys(SYSTEM, new Output(), root).revision()).isNull();
-        assertThat(Project.ofKeys(SYSTEM, new Output(), root).tree()).isNull();
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, root).tag()).isNull();
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, root).revision()).isNull();
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, root).tree()).isNull();
         System.setProperty("jenesis.project.tag", "v1.2.3");
         System.setProperty("jenesis.project.revision", "0123abcd");
         System.setProperty("jenesis.project.tree", "4b825dc642cb6eb9a060e54bf8d69288fbee4904");
-        assertThat(Project.ofKeys(SYSTEM, new Output(), root).tag()).isEqualTo("v1.2.3");
-        assertThat(Project.ofKeys(SYSTEM, new Output(), root).revision()).isEqualTo("0123abcd");
-        assertThat(Project.ofKeys(SYSTEM, new Output(), root).tree()).isEqualTo("4b825dc642cb6eb9a060e54bf8d69288fbee4904");
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, root).tag()).isEqualTo("v1.2.3");
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, root).revision()).isEqualTo("0123abcd");
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, root).tree()).isEqualTo("4b825dc642cb6eb9a060e54bf8d69288fbee4904");
         System.setProperty("jenesis.project.tag", "");
         System.setProperty("jenesis.project.revision", "");
         System.setProperty("jenesis.project.tree", "");
-        assertThat(Project.ofKeys(SYSTEM, new Output(), root).tag()).isEmpty();
-        assertThat(Project.ofKeys(SYSTEM, new Output(), root).revision()).isEmpty();
-        assertThat(Project.ofKeys(SYSTEM, new Output(), root).tree()).isEmpty();
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, root).tag()).isEmpty();
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, root).revision()).isEmpty();
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, root).tree()).isEmpty();
     }
 
     @Test
     public void reads_every_setting_from_the_provider_it_is_given() {
-        Project project = Project.ofKeys(Map.of("project.version", "1.2.3",
+        Project project = Project.ofEnvironment(new Environment(Map.of("project.version", "1.2.3",
                 "project.target", "out",
                 "project.sources", "",
-                "project.digest", "SHA-512")::get, new Output(), root);
+                "project.digest", "SHA-512")::get), root);
         assertThat(project.version()).isEqualTo("1.2.3");
         assertThat(project.target()).isEqualTo(Path.of("out"));
         assertThat(project.sources()).isTrue();
@@ -98,12 +97,12 @@ public class ProjectTest {
                 .as("the environment configures the entry point's project, not every project a caller builds")
                 .isNull();
         assertThat(project.target()).isEqualTo(Path.of("target"));
-        assertThat(Project.ofKeys(Map.of("project.version", "9.9.9", "project.target", "elsewhere")::get, new Output(), root).version()).isEqualTo("9.9.9");
+        assertThat(Project.ofEnvironment(new Environment(Map.of("project.version", "9.9.9", "project.target", "elsewhere")::get), root).version()).isEqualTo("9.9.9");
     }
 
     @Test
     public void records_no_scm_tag_for_a_version_alone() throws IOException {
-        assertThat(metadataValues(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).version("1.2.3")))
+        assertThat(metadataValues(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).version("1.2.3")))
                 .as("how a project names its release tags is not derived from its version")
                 .containsEntry("version", "1.2.3")
                 .doesNotContainKey("scm.tag");
@@ -111,7 +110,7 @@ public class ProjectTest {
 
     @Test
     public void records_a_set_tag_and_revision() throws IOException {
-        assertThat(metadataValues(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).tag("v1.2.3").revision("0123abcd")
+        assertThat(metadataValues(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).tag("v1.2.3").revision("0123abcd")
                 .tree("4b825dc642cb6eb9a060e54bf8d69288fbee4904")))
                 .containsEntry("scm.tag", "v1.2.3")
                 .containsEntry("scm.revision", "0123abcd")
@@ -120,7 +119,7 @@ public class ProjectTest {
 
     @Test
     public void records_an_empty_tag_and_revision_to_replace_declared_ones() throws IOException {
-        assertThat(metadataValues(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).tag("").revision("")))
+        assertThat(metadataValues(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).tag("").revision("")))
                 .as("an empty value overrides what a metadata file or a pom.xml declares")
                 .containsEntry("scm.tag", "")
                 .containsEntry("scm.revision", "");
@@ -128,7 +127,7 @@ public class ProjectTest {
 
     @Test
     public void records_no_scm_tag_or_revision_unless_set() throws IOException {
-        assertThat(metadataValues(Project.ofKeys(SYSTEM, new Output(), Path.of("."))))
+        assertThat(metadataValues(Project.ofEnvironment(Environment.SYSTEM, Path.of("."))))
                 .as("what a metadata file or a pom.xml declares stays in force")
                 .doesNotContainKeys("scm.tag", "scm.revision", "scm.tree");
     }
@@ -185,7 +184,7 @@ public class ProjectTest {
 
     @Test
     public void build_throws_when_no_descriptor_is_detected() {
-        assertThatThrownBy(() -> Project.ofKeys(SYSTEM, new Output(), root).target(root.resolve("target")).build())
+        assertThatThrownBy(() -> Project.ofEnvironment(Environment.SYSTEM, root).target(root.resolve("target")).build())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No build descriptor found");
     }
@@ -193,7 +192,7 @@ public class ProjectTest {
     @Test
     public void layout_setter_round_trips_each_concrete_layout() {
         for (Project.Layout layout : List.of(Project.Layout.MAVEN, Project.Layout.MODULAR, Project.Layout.MODULAR_TO_MAVEN)) {
-            assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).layout(layout).layout()).isSameAs(layout);
+            assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).layout(layout).layout()).isSameAs(layout);
         }
     }
 
@@ -204,7 +203,7 @@ public class ProjectTest {
                 "modular", Project.Layout.MODULAR,
                 "modular_to_maven", Project.Layout.MODULAR_TO_MAVEN);
         cases.forEach((name, layout) -> {
-            assertThat(Project.ofKeys(Map.of("project.layout", name)::get, new Output(), Path.of(".")).layout())
+            assertThat(Project.ofEnvironment(new Environment(Map.of("project.layout", name)::get), Path.of(".")).layout())
                     .as("layout=%s", name)
                     .isSameAs(layout);
         });
@@ -212,74 +211,74 @@ public class ProjectTest {
 
     @Test
     public void explicit_layout_overrides_system_property() {
-        assertThat(Project.ofKeys(Map.of("project.layout", "maven")::get, new Output(), Path.of(".")).layout(Project.Layout.MODULAR).layout())
+        assertThat(Project.ofEnvironment(new Environment(Map.of("project.layout", "maven")::get), Path.of(".")).layout(Project.Layout.MODULAR).layout())
                 .isSameAs(Project.Layout.MODULAR);
     }
 
     @Test
     public void system_property_rejects_unknown_layout() {
-        assertThatThrownBy(() -> Project.ofKeys(Map.of("project.layout", "nonsense")::get, new Output(), Path.of(".")))
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.layout", "nonsense")::get), Path.of(".")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown layout");
     }
 
     @Test
     public void skip_tests_setter_skips_tests() {
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).tests(false).tests()).isFalse();
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).tests(false).tests()).isFalse();
     }
 
     @Test
     public void defaults_keep_tests_enabled() {
-        Project project = Project.ofKeys(SYSTEM, new Output(), Path.of("."));
+        Project project = Project.ofEnvironment(Environment.SYSTEM, Path.of("."));
         assertThat(project.tests()).isTrue();
     }
 
     @Test
     public void default_target_is_build() {
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).defaultTarget()).containsExactly("build");
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).defaultTarget()).containsExactly("build");
     }
 
     @Test
     public void configuration_defaults_to_build_jenesis_under_the_root() {
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).configuration())
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).configuration())
                 .containsExactly(Path.of(".").resolve("build.jenesis"));
     }
 
     @Test
     public void empty_configuration_property_skips_the_global_configuration() {
-        assertThat(Project.ofKeys(Map.of("project.configuration", "")::get, new Output(), Path.of(".")).configuration()).isEmpty();
+        assertThat(Project.ofEnvironment(new Environment(Map.of("project.configuration", "")::get), Path.of(".")).configuration()).isEmpty();
     }
 
     @Test
     public void boms_default_to_the_configuration() {
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).boms())
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).boms())
                 .containsExactly(Path.of(".").resolve("build.jenesis"));
         System.setProperty("jenesis.project.configuration", "config");
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).boms()).containsExactly(Path.of(".").resolve("config"));
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).boms()).containsExactly(Path.of(".").resolve("config"));
     }
 
     @Test
     public void boms_property_overrides_the_configuration() {
         System.setProperty("jenesis.project.boms", "platform");
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).boms()).containsExactly(Path.of(".").resolve("platform"));
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).boms()).containsExactly(Path.of(".").resolve("platform"));
         System.setProperty("jenesis.project.boms", "");
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).boms()).isEmpty();
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).boms()).isEmpty();
     }
 
     @Test
     public void boms_wither_replaces_the_locations() {
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).boms(Path.of("platform")).boms()).containsExactly(Path.of("platform"));
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).boms(Path.of("platform")).boms()).containsExactly(Path.of("platform"));
     }
 
     @Test
     public void configuration_reference_splices_the_default() {
-        assertThat(Project.ofKeys(Map.of("project.configuration", "shared,@")::get, new Output(), Path.of(".")).configuration())
+        assertThat(Project.ofEnvironment(new Environment(Map.of("project.configuration", "shared,@")::get), Path.of(".")).configuration())
                 .containsExactly(Path.of(".").resolve("shared"), Path.of(".").resolve("build.jenesis"));
     }
 
     @Test
     public void configuration_named_reference_splices_a_property_value() {
-        assertThat(Project.ofKeys(Map.of("test.sample.key", "shared,extra", "project.configuration", "@test.sample.key,@")::get, new Output(), Path.of(".")).configuration())
+        assertThat(Project.ofEnvironment(new Environment(Map.of("test.sample.key", "shared,extra", "project.configuration", "@test.sample.key,@")::get), Path.of(".")).configuration())
                 .containsExactly(Path.of(".").resolve("shared"),
                         Path.of(".").resolve("extra"),
                         Path.of(".").resolve("build.jenesis"));
@@ -287,21 +286,21 @@ public class ProjectTest {
 
     @Test
     public void configuration_fails_on_unresolved_reference() {
-        assertThatThrownBy(() -> Project.ofKeys(Map.of("project.configuration", "@test.sample.unset")::get, new Output(), Path.of(".")))
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.configuration", "@test.sample.unset")::get), Path.of(".")))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Unresolved location reference: @test.sample.unset");
     }
 
     @Test
     public void configuration_fails_on_circular_reference() {
-        assertThatThrownBy(() -> Project.ofKeys(Map.of("test.sample.a", "@test.sample.b", "test.sample.b", "@test.sample.a", "project.configuration", "@test.sample.a")::get, new Output(), Path.of(".")))
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("test.sample.a", "@test.sample.b", "test.sample.b", "@test.sample.a", "project.configuration", "@test.sample.a")::get), Path.of(".")))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Circular location reference: @test.sample.a");
     }
 
     @Test
     public void boms_reference_splices_the_configuration() {
-        assertThat(Project.ofKeys(Map.of("project.configuration", "config", "project.boms", "platform,@")::get, new Output(), Path.of(".")).boms())
+        assertThat(Project.ofEnvironment(new Environment(Map.of("project.configuration", "config", "project.boms", "platform,@")::get), Path.of(".")).boms())
                 .containsExactly(Path.of(".").resolve("platform"), Path.of(".").resolve("config"));
     }
 
@@ -349,12 +348,12 @@ public class ProjectTest {
 
     @Test
     public void profiles_default_to_empty_without_a_selection() {
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).profiles()).isEmpty();
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).profiles()).isEmpty();
     }
 
     @Test
     public void profiles_wither_round_trips() {
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).profiles(Path.of("release"), Path.of("ci")).profiles())
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).profiles(Path.of("release"), Path.of("ci")).profiles())
                 .containsExactly(Path.of("release"), Path.of("ci"));
     }
 
@@ -377,86 +376,86 @@ public class ProjectTest {
 
     @Test
     public void default_target_can_be_overridden() {
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).defaultTarget("foo", "bar").defaultTarget())
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).defaultTarget("foo", "bar").defaultTarget())
                 .containsExactly("foo", "bar");
     }
 
     @Test
     public void a_project_is_built_from_the_folder_it_is_given() {
-        assertThat(Project.ofKeys(SYSTEM, new Output(), root).root()).isEqualTo(root);
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, root).root()).isEqualTo(root);
     }
 
     @Test
     public void system_property_overrides_target() {
-        assertThat(Project.ofKeys(Map.of("project.target", "custom-target")::get, new Output(), Path.of(".")).target()).isEqualTo(Path.of("custom-target"));
+        assertThat(Project.ofEnvironment(new Environment(Map.of("project.target", "custom-target")::get), Path.of(".")).target()).isEqualTo(Path.of("custom-target"));
     }
 
     @Test
     public void system_property_overrides_artifacts() {
-        assertThat(Project.ofKeys(Map.of("project.artifacts", "custom-artifacts")::get, new Output(), Path.of(".")).artifacts()).isEqualTo(Path.of("custom-artifacts"));
+        assertThat(Project.ofEnvironment(new Environment(Map.of("project.artifacts", "custom-artifacts")::get), Path.of(".")).artifacts()).isEqualTo(Path.of("custom-artifacts"));
     }
 
     @Test
     public void local_build_cache_is_disabled_by_default() {
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).cache()).isNull();
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).cache()).isNull();
     }
 
     @Test
     public void local_build_cache_rejects_a_uri_value() {
-        assertThatThrownBy(() -> Project.ofKeys(Map.of("project.cache", "file:///tmp/cache")::get, new Output(), Path.of("."))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.cache", "file:///tmp/cache")::get), Path.of("."))).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     public void empty_property_enables_local_build_cache_at_default_location() {
-        BuildExecutorCache cache = Project.ofKeys(Map.of("make.root", root.toString(), "project.cache", "")::get, new Output(), Path.of(".")).cache();
+        BuildExecutorCache cache = Project.ofEnvironment(new Environment(Map.of("make.root", root.toString(), "project.cache", "")::get), Path.of(".")).cache();
         assertThat(cache).isInstanceOf(BuildExecutorFileCache.class);
         assertThat(((BuildExecutorFileCache) cache).root().endsWith(Path.of(".jenesis", "cache"))).isTrue();
     }
 
     @Test
     public void system_property_overrides_local_build_cache_location() {
-        BuildExecutorCache cache = Project.ofKeys(Map.of("make.root", root.toString(), "project.cache", "custom-cache")::get, new Output(), Path.of(".")).cache();
+        BuildExecutorCache cache = Project.ofEnvironment(new Environment(Map.of("make.root", root.toString(), "project.cache", "custom-cache")::get), Path.of(".")).cache();
         assertThat(cache).isInstanceOf(BuildExecutorFileCache.class);
         assertThat(((BuildExecutorFileCache) cache).root().endsWith(Path.of("custom-cache"))).isTrue();
     }
 
     @Test
     public void default_digest_is_sha_256() {
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).hashFunction()).isEqualTo(new HashDigestFunction("SHA-256"));
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).hashFunction()).isEqualTo(new HashDigestFunction("SHA-256"));
     }
 
     @Test
     public void system_property_overrides_digest() {
-        assertThat(Project.ofKeys(Map.of("project.digest", "SHA-512")::get, new Output(), Path.of(".")).hashFunction())
+        assertThat(Project.ofEnvironment(new Environment(Map.of("project.digest", "SHA-512")::get), Path.of(".")).hashFunction())
                 .isEqualTo(new HashDigestFunction("SHA-512"));
     }
 
     @Test
     public void digest_can_be_overridden() {
         HashDigestFunction digest = new HashDigestFunction("SHA-512");
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).hashFunction(digest).hashFunction()).isSameAs(digest);
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).hashFunction(digest).hashFunction()).isSameAs(digest);
     }
 
     @Test
     public void default_assembler_is_set() {
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).assembler()).isNotNull();
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).assembler()).isNotNull();
     }
 
     @Test
     public void assembler_can_be_overridden() {
         MultiProjectAssembler<ProjectModuleDescriptor> custom = (_, _, _) -> new AssemblyDescriptor((_, _) -> {});
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).assembler(custom).assembler()).isSameAs(custom);
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).assembler(custom).assembler()).isSameAs(custom);
     }
 
     @Test
     public void default_layout_is_auto() {
-        assertThat(Project.ofKeys(SYSTEM, new Output(), Path.of(".")).layout()).isSameAs(Project.Layout.AUTO);
+        assertThat(Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).layout()).isSameAs(Project.Layout.AUTO);
     }
 
     @Test
     public void maven_layout_resolver_maps_named_and_unnamed_modules() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = Project.ofKeys(SYSTEM, new Output(), root).target(target);
+        Project project = Project.ofEnvironment(Environment.SYSTEM, root).target(target);
         Function<String, String> resolver = Project.Layout.MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -472,7 +471,7 @@ public class ProjectTest {
     @Test
     public void modular_layout_resolver_maps_named_and_unnamed_modules() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = Project.ofKeys(SYSTEM, new Output(), root).target(target);
+        Project project = Project.ofEnvironment(Environment.SYSTEM, root).target(target);
         Function<String, String> resolver = Project.Layout.MODULAR.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -488,7 +487,7 @@ public class ProjectTest {
     @Test
     public void maven_layout_resolver_preserves_step_path_after_slash() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = Project.ofKeys(SYSTEM, new Output(), root).target(target);
+        Project project = Project.ofEnvironment(Environment.SYSTEM, root).target(target);
         Function<String, String> resolver = Project.Layout.MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -506,7 +505,7 @@ public class ProjectTest {
     @Test
     public void modular_layout_resolver_preserves_step_path_after_slash() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = Project.ofKeys(SYSTEM, new Output(), root).target(target);
+        Project project = Project.ofEnvironment(Environment.SYSTEM, root).target(target);
         Function<String, String> resolver = Project.Layout.MODULAR.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -524,7 +523,7 @@ public class ProjectTest {
     @Test
     public void modular_to_maven_layout_resolver_preserves_step_path_after_slash() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = Project.ofKeys(SYSTEM, new Output(), root).target(target);
+        Project project = Project.ofEnvironment(Environment.SYSTEM, root).target(target);
         Function<String, String> resolver = Project.Layout.MODULAR_TO_MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -542,7 +541,7 @@ public class ProjectTest {
     @Test
     public void modular_layout_registers_export_step() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = Project.ofKeys(SYSTEM, new Output(), root).target(target);
+        Project project = Project.ofEnvironment(Environment.SYSTEM, root).target(target);
         BuildExecutor executor = BuildExecutor.of(target,
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
@@ -557,7 +556,7 @@ public class ProjectTest {
     @Test
     public void modular_to_maven_layout_resolver_maps_named_and_unnamed_modules() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = Project.ofKeys(SYSTEM, new Output(), root).target(target);
+        Project project = Project.ofEnvironment(Environment.SYSTEM, root).target(target);
         Function<String, String> resolver = Project.Layout.MODULAR_TO_MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -578,7 +577,7 @@ public class ProjectTest {
             executor.addSource(Project.BUILD, source);
             return name -> name;
         };
-        SequencedMap<String, Path> result = Project.ofKeys(SYSTEM, new Output(), Path.of("."))
+        SequencedMap<String, Path> result = Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
                 .root(root)
                 .target(target)
                 .layout(layout)
@@ -596,7 +595,7 @@ public class ProjectTest {
             executor.addSource("beta", beta);
             return name -> name;
         };
-        SequencedMap<String, Path> result = Project.ofKeys(SYSTEM, new Output(), Path.of("."))
+        SequencedMap<String, Path> result = Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
                 .root(root)
                 .target(target)
                 .layout(layout)
@@ -612,7 +611,7 @@ public class ProjectTest {
             executor.addSource("resolved", source);
             return name -> "resolved";
         };
-        SequencedMap<String, Path> result = Project.ofKeys(SYSTEM, new Output(), Path.of("."))
+        SequencedMap<String, Path> result = Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
                 .root(root)
                 .target(target)
                 .layout(layout)
@@ -636,6 +635,16 @@ public class ProjectTest {
     @Test
     public void the_layered_settings_is_a_no_op_when_absent() throws IOException {
         assertThat(Make.settings(root).keys().apply("test.sample.key")).isNull();
+    }
+
+    @Test
+    public void the_layered_settings_names_every_key_a_file_supplied() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"),
+                "jenesis.test.sample.key=fromFile\njenesis.test.sample.other=also\n");
+        assertThat(Make.settings(root).declared())
+                .as("a process the build hands a command line to - a container, the daemon - is given what"
+                        + " the files supplied, which is why the keys they name can be enumerated")
+                .contains("test.sample.key", "test.sample.other");
     }
 
     @Test
@@ -816,7 +825,7 @@ public class ProjectTest {
 
     @Test
     public void keeps_every_default_where_no_setting_names_one() {
-        Project project = Project.ofKeys(Map.<String, String>of()::get, new Output(), Path.of("."));
+        Project project = Project.ofEnvironment(new Environment(Map.<String, String>of()::get), Path.of("."));
         assertThat(project.target()).isEqualTo(Path.of("target"));
         assertThat(project.layout())
                 .as("a wither is applied only where a setting is named, so an absent one keeps the default")

@@ -8,7 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -37,15 +37,14 @@ public class PalantirJavaFormatModule implements BuildExecutorModule {
              ProcessBuildStep.Terms.of("palantir-java-format"));
     }
 
-    public static PalantirJavaFormatModule ofKeys(Function<String, String> keys,
-                                                  Output output,
-                                                  Map<String, Repository> repositories,
-                                                  Map<String, Resolver> resolvers) {
-        return new PalantirJavaFormatModule(Dependencies.ofKeys(keys, output, repositories, resolvers),
+    public static PalantirJavaFormatModule ofEnvironment(Environment environment,
+                                                         Map<String, Repository> repositories,
+                                                         Map<String, Resolver> resolvers) {
+        return new PalantirJavaFormatModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "palantir-java-format",
                 false,
-                ProcessBuildStep.Terms.ofKeys(keys, output, "palantir-java-format"));
+                ProcessBuildStep.Terms.ofEnvironment(environment, "palantir-java-format"));
     }
 
     private PalantirJavaFormatModule(Dependencies dependencies,

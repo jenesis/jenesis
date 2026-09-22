@@ -3,8 +3,8 @@ package build.jenesis.project;
 import module java.base;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
-import build.jenesis.Output;
 import build.jenesis.BuildStep;
+import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.LicenseCheck;
@@ -29,18 +29,17 @@ public class InferredComplianceModule implements BuildExecutorModule {
              value -> value);
     }
 
-    public static InferredComplianceModule ofKeys(Function<String, String> keys,
-                                                  Output output,
-                                                  SequencedSet<Path> configuration) {
+    public static InferredComplianceModule ofEnvironment(Environment environment,
+                                                         SequencedSet<Path> configuration) {
         InferredComplianceModule module = new InferredComplianceModule(configuration,
-                OsvDownload.ofKeys(keys, output),
+                OsvDownload.ofEnvironment(environment),
                 value -> value,
                 value -> value);
-        Boolean license = SequencedProperties.flagOrNull(keys, "compliance");
+        Boolean license = environment.flagOrNull("compliance");
         if (license != null) {
             module = module.license(license ? value -> value : null);
         }
-        Boolean vulnerability = SequencedProperties.flagOrNull(keys, "compliance");
+        Boolean vulnerability = environment.flagOrNull("compliance");
         if (vulnerability != null) {
             module = module.vulnerability(vulnerability ? value -> value : null);
         }

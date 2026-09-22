@@ -3,7 +3,7 @@ package build.jenesis.test.step;
 import module java.base;
 import module org.junit.jupiter.api;
 import module org.junit.jupiter.params;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -14,7 +14,6 @@ import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.JMod;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class JModTest {
 
@@ -43,7 +42,7 @@ public class JModTest {
                 sources.resolve("module-info.java").toString(),
                 sources.resolve("sample/Sample.java").toString());
         assertThat(code).isZero();
-        BuildStepResult result = JMod.ofKeys(SYSTEM, new Output(), process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+        BuildStepResult result = JMod.ofEnvironment(Environment.SYSTEM, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(
@@ -62,7 +61,7 @@ public class JModTest {
                 "-d", classes.toString(),
                 sources.resolve("module-info.java").toString());
         assertThat(code).isZero();
-        BuildStepResult result = JMod.ofKeys(SYSTEM, new Output(), ProcessHandler.Factory.TOOL).apply(
+        BuildStepResult result = JMod.ofEnvironment(Environment.SYSTEM, ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(
@@ -72,7 +71,7 @@ public class JModTest {
         try (ZipFile jmod = new ZipFile(next.resolve(JMod.JMODS + "sample.jmod").toFile())) {
             assertThat(jmod.stream().map(ZipEntry::getTimeLocal))
                     .as("a jmod created at another moment carries the same bytes")
-                    .containsOnly(BuildStep.timestamp(SYSTEM).toLocalDateTime());
+                    .containsOnly(BuildStep.timestamp(Environment.SYSTEM).toLocalDateTime());
         }
     }
 
@@ -85,7 +84,7 @@ public class JModTest {
                 "-d", classes.toString(),
                 sources.resolve("module-info.java").toString())).isZero();
         JMod jmod;
-        jmod = JMod.ofKeys(Map.of("archive.timestamp", "")::get, new Output(), ProcessHandler.Factory.TOOL);
+        jmod = JMod.ofEnvironment(new Environment(Map.of("archive.timestamp", "")::get), ProcessHandler.Factory.TOOL);
         BuildStepResult result = jmod.apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
@@ -110,7 +109,7 @@ public class JModTest {
         assertThat(code).isZero();
         Files.writeString(Files.createDirectory(bundle.resolve(JMod.CONFIG)).resolve("app.properties"), "greeting=configured");
 
-        BuildStepResult result = JMod.ofKeys(SYSTEM, new Output(), ProcessHandler.Factory.TOOL).apply(
+        BuildStepResult result = JMod.ofEnvironment(Environment.SYSTEM, ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(
@@ -134,7 +133,7 @@ public class JModTest {
     @ValueSource(booleans = {true, false})
     public void skips_when_no_module_is_present(boolean process) throws IOException {
         Files.createDirectory(bundle.resolve(BuildStep.CLASSES));
-        BuildStepResult result = JMod.ofKeys(SYSTEM, new Output(), process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+        BuildStepResult result = JMod.ofEnvironment(Environment.SYSTEM, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("classes", new BuildStepArgument(

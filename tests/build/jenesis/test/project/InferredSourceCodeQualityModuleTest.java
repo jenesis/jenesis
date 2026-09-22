@@ -2,7 +2,7 @@ package build.jenesis.test.project;
 
 import module java.base;
 import module org.junit.jupiter.api;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
@@ -68,7 +68,7 @@ public class InferredSourceCodeQualityModuleTest {
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("quality", InferredSourceCodeQualityModule.ofKeys(Map.of("source.checkstyle", "false")::get, new Output(),
+        executor.addModule("quality", InferredSourceCodeQualityModule.ofEnvironment(new Environment(Map.of("source.checkstyle", "false")::get),
                 new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
         executor.execute();
 

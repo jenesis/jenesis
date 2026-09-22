@@ -3,7 +3,7 @@ package build.jenesis.test.step;
 import module java.base;
 import module jdk.httpserver;
 import module org.junit.jupiter.api;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -16,7 +16,6 @@ import build.jenesis.step.OsvDownload;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class OsvDownloadTest {
 
@@ -30,7 +29,7 @@ public class OsvDownloadTest {
         SequencedProperties dependencies = new SequencedProperties();
         dependencies.setProperty("main/compile/maven/org.example/lib/1.2.3", "resolved/lib.jar");
         dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
-        OsvDownload step = OsvDownload.ofKeys(SYSTEM, new Output()).endpoint(URI.create("http://osv.invalid"));
+        OsvDownload step = OsvDownload.ofEnvironment(Environment.SYSTEM).endpoint(URI.create("http://osv.invalid"));
         assertThatThrownBy(() -> step.apply(Runnable::run,
                 new BuildStepContext(root.resolve("previous"), next, root.resolve("supplement")),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
@@ -68,7 +67,7 @@ public class OsvDownloadTest {
             dependencies.setProperty("main/compile/maven/org.example/lib/1.2.3", "resolved/lib.jar");
             dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
             URI endpoint = URI.create("http://localhost:" + server.getAddress().getPort());
-            BuildStepResult result = OsvDownload.ofKeys(Map.of("repository.insecure", "true")::get, new Output()).endpoint(endpoint).apply(Runnable::run,
+            BuildStepResult result = OsvDownload.ofEnvironment(new Environment(Map.of("repository.insecure", "true")::get)).endpoint(endpoint).apply(Runnable::run,
                     new BuildStepContext(root.resolve("retry-previous"), next, root.resolve("retry-supplement")),
                     new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                             argument,

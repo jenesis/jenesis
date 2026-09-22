@@ -2,7 +2,7 @@ package build.jenesis.test.project;
 
 import module java.base;
 import module org.junit.jupiter.api;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
@@ -16,7 +16,6 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.ScalafmtFormatModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class ScalafmtFormatModuleRunTest {
 
@@ -103,7 +102,7 @@ public class ScalafmtFormatModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "scalafmt-format",
-                new ScalafmtFormatModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output())), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT),
+                new ScalafmtFormatModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))).pinning(Pinning.STRICT),
                 "project");
         return executor;
     }

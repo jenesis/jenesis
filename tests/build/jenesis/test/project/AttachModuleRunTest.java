@@ -9,7 +9,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -21,7 +21,6 @@ import javax.tools.ToolProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class AttachModuleRunTest {
 
@@ -151,11 +150,11 @@ public class AttachModuleRunTest {
         executor.addSource("dependencies", dependencies);
         executor.addSource("classes", classes);
         Map<String, Repository> repositories = Map.of(
-                "maven", MavenDefaultRepository.ofKeys(SYSTEM, new Output()),
+                "maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM),
                 "probes", new MavenDefaultRepository(repository.toUri(), null, Map.of(), null));
         Map<String, Resolver> resolvers = Map.of(
-                "maven", MavenPomResolver.ofKeys(SYSTEM),
-                "probes", MavenPomResolver.ofKeys(SYSTEM));
+                "maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM),
+                "probes", MavenPomResolver.ofEnvironment(Environment.SYSTEM));
         executor.addModule(
                 "test",
                 new TestModule(repositories, resolvers)

@@ -2,7 +2,7 @@ package build.jenesis.test.project;
 
 import module java.base;
 import module org.junit.jupiter.api;
-import build.jenesis.Output;
+import build.jenesis.Environment;
 import build.jenesis.project.ProjectWatch;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,7 +26,7 @@ public class ProjectWatchTest {
             }
         };
         AtomicReference<Throwable> failure = new AtomicReference<>();
-        Thread thread = watching(new ProjectWatch(root, Set.of(), 50L, new Output()), build, failure);
+        Thread thread = watching(new ProjectWatch(root, Set.of(), 50L, _ -> { }), build, failure);
         try {
             await(initial, failure);
             Files.writeString(root.resolve("Sample.java"), "changed");
@@ -47,7 +47,7 @@ public class ProjectWatchTest {
             initial.countDown();
         };
         AtomicReference<Throwable> failure = new AtomicReference<>();
-        Thread thread = watching(new ProjectWatch(root, Set.of(excluded.toAbsolutePath().normalize()), 50L, new Output()), build, failure);
+        Thread thread = watching(new ProjectWatch(root, Set.of(excluded.toAbsolutePath().normalize()), 50L, _ -> { }), build, failure);
         try {
             await(initial, failure);
             Files.writeString(excluded.resolve("ignored.txt"), "noise");
