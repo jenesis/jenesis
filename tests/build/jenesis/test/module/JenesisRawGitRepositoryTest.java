@@ -2,6 +2,7 @@ package build.jenesis.test.module;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.Environment;
 import build.jenesis.RepositoryItem;
 import build.jenesis.module.JenesisRawGitRepository;
 import build.jenesis.module.JenesisRepository;
@@ -158,6 +159,87 @@ public class JenesisRawGitRepositoryTest {
 
         assertThatThrownBy(() -> named().fetch(Runnable::run, "widget"))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    public void skips_a_pre_release_when_no_version_is_named() throws IOException {
+        writeTsv("widget", "modules.tsv",
+                "2.0-M1\tcom.example\twidget-core\t2.0-M1",
+                "1.0\tcom.example\twidget-core\t1.0");
+        writeArtifact("com.example", "widget-core", "1.0", "jar", "v1");
+
+        assertThat(content(named().fetch(Runnable::run, "widget")))
+                .as("the newest version a module offers is the newest one published as a release")
+                .isEqualTo("v1");
+    }
+
+    @Test
+    public void serves_the_newest_pre_release_where_one_is_accepted() throws IOException {
+        writeTsv("widget", "modules.tsv",
+                "2.0-M1\tcom.example\twidget-core\t2.0-M1",
+                "1.0\tcom.example\twidget-core\t1.0");
+        writeArtifact("com.example", "widget-core", "2.0-M1", "jar", "v2m1");
+
+        assertThat(content(named().prerelease(true).fetch(Runnable::run, "widget"))).isEqualTo("v2m1");
+    }
+
+    @Test
+    public void serves_a_pre_release_that_is_named_by_version() throws IOException {
+        writeTsv("widget", "modules.tsv",
+                "2.0-M1\tcom.example\twidget-core\t2.0-M1",
+                "1.0\tcom.example\twidget-core\t1.0");
+        writeArtifact("com.example", "widget-core", "2.0-M1", "jar", "v2m1");
+
+        assertThat(content(named().fetch(Runnable::run, "widget/2.0-M1")))
+                .as("naming a version is already an unambiguous request for it")
+                .isEqualTo("v2m1");
+    }
+
+    @Test
+    public void resolves_nothing_where_every_version_is_a_pre_release() throws IOException {
+        writeTsv("widget", "modules.tsv",
+                "2.0-M1\tcom.example\twidget-core\t2.0-M1",
+                "1.0-alpha\tcom.example\twidget-core\t1.0-alpha");
+        writeArtifact("com.example", "widget-core", "2.0-M1", "jar", "v2m1");
+
+        assertThat(named().fetch(Runnable::run, "widget")).isEmpty();
+    }
+
+    @Test
+    public void reads_a_row_as_a_release_only_where_both_of_its_versions_are() throws IOException {
+        writeTsv("widget", "modules.tsv",
+                "2.0\tcom.example\twidget-core\t2.0-M1",
+                "1.0\tcom.example\twidget-core\t1.0");
+        writeArtifact("com.example", "widget-core", "1.0", "jar", "v1");
+
+        assertThat(content(named().fetch(Runnable::run, "widget")))
+                .as("a module version that reads as a release but resolves to a pre-release is one")
+                .isEqualTo("v1");
+    }
+
+    @Test
+    public void refuses_to_guess_a_version_the_index_does_not_record() throws IOException {
+        writeTsv("widget", "modules.tsv", "1.0\tcom.example\twidget-core\t1.0");
+        writeArtifact("com.example", "widget-core", "2.0", "jar", "v2");
+
+        assertThat(named().speculative(false).fetch(Runnable::run, "widget/2.0"))
+                .as("a version the crawl has not recorded is not resolved on a guess where one is refused")
+                .isEmpty();
+    }
+
+    @Test
+    public void reads_both_options_from_the_settings_the_run_was_given() throws IOException {
+        writeTsv("widget", "modules.tsv",
+                "2.0-M1\tcom.example\twidget-core\t2.0-M1",
+                "1.0\tcom.example\twidget-core\t1.0");
+        writeArtifact("com.example", "widget-core", "2.0-M1", "jar", "v2m1");
+
+        assertThat(content(JenesisRawGitRepository.ofEnvironment(
+                new Environment(Map.of("module.prerelease", "true")::get),
+                JenesisRepository.Scope.MODULE,
+                data.toUri(),
+                maven.toUri(),
+                null).fetch(Runnable::run, "widget"))).isEqualTo("v2m1");
     }
 
     private JenesisRawGitRepository named() {
