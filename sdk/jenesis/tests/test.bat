@@ -23,14 +23,29 @@ if /i "!VERSION:~0,14!"=="build.jenesis-" set "VERSION=!VERSION:~14!"
 if /i "!VERSION:~-8!"=="-sources" set "VERSION=!VERSION:~0,-8!"
 echo sdk-tests: SDK version !VERSION!
 
+REM The floor the launcher refuses through, read from the launcher itself, and a version
+REM above it: a project that has to be refused records the floor, a project that has to
+REM reach the engine through jenesis records the version above it.
+set "UNSAFE_THROUGH="
+for /f "usebackq tokens=2 delims==" %%v in (`findstr /c:"UNSAFE_THROUGH=" "%SDK_HOME%\bin\jenesis.bat"`) do (
+    if not defined UNSAFE_THROUGH set "UNSAFE_THROUGH=%%v"
+)
+if defined UNSAFE_THROUGH set "UNSAFE_THROUGH=!UNSAFE_THROUGH:"=!"
+if not defined UNSAFE_THROUGH (
+    echo sdk-tests: %SDK_HOME%\bin\jenesis.bat records no UNSAFE_THROUGH version 1>&2
+    exit /b 1
+)
+set "SAFE=99.0.0"
+echo sdk-tests: unsafe through !UNSAFE_THROUGH!
+
 set "TMPDIR=%TEMP%\sdk-tests-%RANDOM%-%RANDOM%"
 mkdir "%TMPDIR%" || exit /b 1
 set "PROJ=%TMPDIR%\proj"
 mkdir "%PROJ%"
 set "OUTFILE=%TMPDIR%\out.txt"
 
-REM [1/9] jenesis-version on fresh directory: exit 1, reports missing build/jenesis
-echo [1/9] jenesis-version on fresh directory
+REM [1/11] jenesis-version on fresh directory: exit 1, reports missing build/jenesis
+echo [1/11] jenesis-version on fresh directory
 call "%SDK_HOME%\bin\jenesis-version.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
 if not "!RC!"=="1" goto :fail
@@ -38,8 +53,8 @@ findstr /c:"sdk is at version !VERSION!" "%OUTFILE%" >nul || goto :fail
 findstr /c:"no build/jenesis found" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [2/9] jenesis-init: populates build\jenesis and writes jenesis.version
-echo [2/9] jenesis-init
+REM [2/11] jenesis-init: populates build\jenesis and writes jenesis.version
+echo [2/11] jenesis-init
 call "%SDK_HOME%\bin\jenesis-init.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 if errorlevel 1 goto :fail
 if not exist "%PROJ%\build\jenesis\" goto :fail
@@ -49,34 +64,60 @@ for /f "usebackq delims=" %%v in ("%PROJ%\build\jenesis\jenesis.version") do if 
 if not "!RECORDED!"=="!VERSION!" goto :fail
 echo   ok
 
-REM [3/9] jenesis-version on initialised project: exit 0, reports matching version
-echo [3/9] jenesis-version on initialised project
+REM [3/11] jenesis-version on initialised project: exit 0, reports matching version
+echo [3/11] jenesis-version on initialised project
 call "%SDK_HOME%\bin\jenesis-version.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 if errorlevel 1 goto :fail
 findstr /c:"build/jenesis is at version !VERSION!" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [4/9] jenesis-validate: reports zero drift against the bundled sources
-echo [4/9] jenesis-validate
+REM [4/11] jenesis-validate: reports zero drift against the bundled sources
+echo [4/11] jenesis-validate
 call "%SDK_HOME%\bin\jenesis-validate.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 findstr /c:"0 differs, 0 missing, 0 additional" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [5/9] jenesis: the launcher resolves the engine from the SDK and dispatches to it;
-REM `help` is a print-only goal, so it runs offline once a project descriptor exists.
-echo [5/9] jenesis help
+REM [5/11] jenesis: a recorded version the floor covers is refused, never installed and
+REM never run - the floor version itself as much as one below it
+echo [5/11] jenesis refuses a version that is no longer considered safe
 if not exist "%PROJ%\sources\" mkdir "%PROJ%\sources"
 (echo module sdktest {})> "%PROJ%\sources\module-info.java"
-pushd "%PROJ%"
+set "UNSAFE=%TMPDIR%\unsafe"
+xcopy /s /e /y /i /q "%PROJ%" "%UNSAFE%" >nul
+<nul set /p ="!UNSAFE_THROUGH!">"%UNSAFE%\build\jenesis\jenesis.version"
+pushd "%UNSAFE%"
 call "%SDK_HOME%\bin\jenesis.bat" help > "%OUTFILE%" 2>&1
+set "RC=!ERRORLEVEL!"
+popd
+if not "!RC!"=="1" goto :fail
+findstr /c:"every Jenesis up to !UNSAFE_THROUGH! is no longer considered safe" "%OUTFILE%" >nul || goto :fail
+findstr /c:"is at version !UNSAFE_THROUGH!" "%OUTFILE%" >nul || goto :fail
+findstr /c:"refusing to run" "%OUTFILE%" >nul || goto :fail
+findstr /c:"a Java build tool" "%OUTFILE%" >nul && goto :fail
+findstr /c:"jenesis-init" "%OUTFILE%" >nul || goto :fail
+findstr /c:"jenesis-unsafe [selectors]" "%OUTFILE%" >nul || goto :fail
+<nul set /p ="0.0.1">"%UNSAFE%\build\jenesis\jenesis.version"
+pushd "%UNSAFE%"
+call "%SDK_HOME%\bin\jenesis.bat" help > "%OUTFILE%" 2>&1
+set "RC=!ERRORLEVEL!"
+popd
+if not "!RC!"=="1" goto :fail
+findstr /c:"is at version 0.0.1" "%OUTFILE%" >nul || goto :fail
+echo   ok
+
+REM [6/11] jenesis-unsafe: the same version, verified and run, because it carries no floor;
+REM `help` is a print-only goal, so it runs offline once a project descriptor exists.
+echo [6/11] jenesis-unsafe help
+pushd "%PROJ%"
+call "%SDK_HOME%\bin\jenesis-unsafe.bat" help > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
 popd
 if not "!RC!"=="0" goto :fail
 findstr /c:"a Java build tool" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [6/9] jenesis-make: runs the installed version directly, without the version lookup
-echo [6/9] jenesis-make
+REM [7/11] jenesis-make: runs the installed version directly, without the version lookup
+echo [7/11] jenesis-make
 pushd "%PROJ%"
 call "%SDK_HOME%\bin\jenesis-make.bat" help > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
@@ -85,13 +126,33 @@ if not "!RC!"=="0" goto :fail
 findstr /c:"a Java build tool" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [7/9] jenesis: a patched vendored tree is refused, never run and never built from
-echo [7/9] jenesis refuses an engine the vendored sources do not match
+REM [8/11] jenesis: a recorded version above the floor is resolved, verified and dispatched
+REM to - here out of a Scoop installation the launcher finds under USERPROFILE
+echo [8/11] jenesis on a version above the floor
+set "SAFE_HOME=%TMPDIR%\home"
+mkdir "%SAFE_HOME%\scoop\apps\jenesis"
+xcopy /s /e /y /i /q "%SDK_HOME%" "%SAFE_HOME%\scoop\apps\jenesis\%SAFE%" >nul
+set "FUTURE=%TMPDIR%\future"
+xcopy /s /e /y /i /q "%PROJ%" "%FUTURE%" >nul
+<nul set /p ="%SAFE%">"%FUTURE%\build\jenesis\jenesis.version"
+set "SAVED_USERPROFILE=%USERPROFILE%"
+set "USERPROFILE=%SAFE_HOME%"
+pushd "%FUTURE%"
+call "%SDK_HOME%\bin\jenesis.bat" help > "%OUTFILE%" 2>&1
+set "RC=!ERRORLEVEL!"
+popd
+set "USERPROFILE=%SAVED_USERPROFILE%"
+if not "!RC!"=="0" goto :fail
+findstr /c:"a Java build tool" "%OUTFILE%" >nul || goto :fail
+echo   ok
+
+REM [9/11] jenesis-unsafe: a patched vendored tree is refused, never run and never built from
+echo [9/11] jenesis-unsafe refuses an engine the vendored sources do not match
 set "PATCHED=%TMPDIR%\patched"
 xcopy /s /e /y /i /q "%PROJ%" "%PATCHED%" >nul
 echo // local patch>> "%PATCHED%\build\jenesis\Platform.java"
 pushd "%PATCHED%"
-call "%SDK_HOME%\bin\jenesis.bat" help > "%OUTFILE%" 2>&1
+call "%SDK_HOME%\bin\jenesis-unsafe.bat" help > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
 popd
 if not "!RC!"=="1" goto :fail
@@ -109,11 +170,12 @@ findstr /c:"that command executes unreviewed code" "%OUTFILE%" >nul || goto :fai
 findstr /c:"run builds from sources you" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [8/9] jenesis: a stamp naming a version that cannot be installed is refused, not built
-echo [8/9] jenesis on an uninstalled stamp
+REM [10/11] jenesis: a stamp above the floor naming a version that cannot be installed is
+REM refused, not built
+echo [10/11] jenesis on an uninstalled stamp
 set "UNSTAMPED=%TMPDIR%\unstamped"
 xcopy /s /e /y /i /q "%PROJ%" "%UNSTAMPED%" >nul
-<nul set /p ="0.0.0-ABSENT">"%UNSTAMPED%\build\jenesis\jenesis.version"
+<nul set /p ="99.9.9-ABSENT">"%UNSTAMPED%\build\jenesis\jenesis.version"
 pushd "%UNSTAMPED%"
 call "%SDK_HOME%\bin\jenesis.bat" help > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
@@ -123,9 +185,9 @@ findstr /c:"no installed Jenesis matches" "%OUTFILE%" >nul || goto :fail
 findstr /c:"refusing to run" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [9/9] jenesis-validate: a class file beside its source is inert and stays unreported,
+REM [11/11] jenesis-validate: a class file beside its source is inert and stays unreported,
 REM one whose source is gone is live code and is named
-echo [9/9] jenesis-validate on locally compiled classes
+echo [11/11] jenesis-validate on locally compiled classes
 set "COMPILED=%TMPDIR%\compiled"
 xcopy /s /e /y /i /q "%PROJ%" "%COMPILED%" >nul
 pushd "%COMPILED%"

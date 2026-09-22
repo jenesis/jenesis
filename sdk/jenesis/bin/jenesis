@@ -11,50 +11,22 @@ done
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT")" && pwd -P)"
 JENESIS_HOME="$(dirname "$SCRIPT_DIR")"
 
+# Every Jenesis up to and including this version is refused: its engine is no longer
+# considered safe to run, so a project that records one is sent to jenesis-unsafe rather
+# than built. Raise it here and in jenesis.bat together, in the release that supersedes
+# the version it names.
+UNSAFE_THROUGH="0.14.0"
+
 DIR="$PWD"
 VENDORED=""
 while :; do
     if [ -d "$DIR/build/jenesis" ]; then
-        ROOT="$DIR"
         VENDORED="$DIR/build/jenesis"
         break
     fi
     [ "$DIR" = "/" ] && break
     DIR="$(dirname "$DIR")"
 done
-
-if [ -z "$VENDORED" ]; then
-    exec "$SCRIPT_DIR/jenesis-make" "$@"
-fi
-
-refuse() {
-    echo "jenesis: $1" >&2
-    cat >&2 <<EOM
-jenesis: refusing to run - this launcher only executes a released Jenesis whose published
-    sources match ${VENDORED} exactly, so that no unreviewed build code ever runs under it.
-
-The released engine still builds this project as a standard build, which is often all a
-project needs. Neither of these executes the vendored build code:
-
-    . jenesis-switch            switch this shell to the version the project records
-    jenesis-make [selectors]     run the installed engine as it stands
-
-Only where the project truly needs its own engine, run the vendored sources yourself, from
-the project root at ${ROOT}. Read the project's build instructions first: Make.java is
-the usual entry point, but a project that vendors a changed engine states why it does, and
-may drive it from one of its own.
-
-    java build/jenesis/Make.java [selectors]
-
-The first such run compiles the engine into .jenesis/classes, and later runs reuse it
-until the vendored sources change.
-
-Warning: that command executes unreviewed code with the rights of your build and can
-break the encapsulation the released engine gives you. Only run builds from sources you
-trust.
-EOM
-    exit 1
-}
 
 version() {
     local jar
@@ -70,147 +42,56 @@ version() {
 }
 
 STAMP=""
-if [ -f "$VENDORED/jenesis.version" ]; then
+if [ -n "$VENDORED" ] && [ -f "$VENDORED/jenesis.version" ]; then
     STAMP="$(cat "$VENDORED/jenesis.version")"
 fi
 if [ -z "$STAMP" ]; then
     STAMP="$(version "$JENESIS_HOME")" || STAMP=""
 fi
-if [ -z "$STAMP" ]; then
-    refuse "${VENDORED} records no version in jenesis.version and ${JENESIS_HOME} ships no sources to assume one from"
-fi
 
-locate() {
-    local home
-    if [ "$(version "$JENESIS_HOME" 2>/dev/null || true)" = "$1" ]; then
-        printf '%s' "$JENESIS_HOME"
-        return 0
-    fi
-    for home in \
-            "${SDKMAN_DIR:-$HOME/.sdkman}/candidates/jenesis/$1" \
-            "$(dirname "$JENESIS_HOME")/$1" \
-            "$HOME/scoop/apps/jenesis/$1"; do
-        if [ -d "$home/bin" ]; then
-            printf '%s' "$home"
-            return 0
-        fi
+# A version is read as its leading numeric components, so that a pre-release of a version
+# counts as that version: 0.14.0-rc1 is refused where 0.14.0 is, and a version that names
+# no number at all reads as 0.0.0 and is refused as well.
+above() {
+    local left="${1%%[!0-9.]*}" right="$2" l r
+    while [ -n "$left" ] || [ -n "$right" ]; do
+        l="${left%%.*}"
+        r="${right%%.*}"
+        [ -n "$l" ] || l=0
+        [ -n "$r" ] || r=0
+        if [ "$l" -gt "$r" ]; then return 0; fi
+        if [ "$l" -lt "$r" ]; then return 1; fi
+        case "$left" in *.*) left="${left#*.}" ;; *) left="" ;; esac
+        case "$right" in *.*) right="${right#*.}" ;; *) right="" ;; esac
     done
-    if command -v brew >/dev/null 2>&1; then
-        home="$(brew --cellar jenesis 2>/dev/null)/$1"
-        if [ -d "$home/bin" ]; then
-            printf '%s' "$home"
-            return 0
-        fi
-        if [ -d "$home/libexec/bin" ]; then
-            printf '%s' "$home/libexec"
-            return 0
-        fi
-    fi
     return 1
 }
 
-provider() {
-    case "$JENESIS_HOME/" in
-        "${SDKMAN_DIR:-$HOME/.sdkman}/candidates/jenesis/"*) printf sdkman; return 0 ;;
-        "$HOME/scoop/apps/jenesis/"*) printf scoop; return 0 ;;
-    esac
-    local cellar
-    if command -v brew >/dev/null 2>&1; then
-        cellar="$(brew --cellar jenesis 2>/dev/null)" || cellar=""
-        if [ -n "$cellar" ]; then
-            case "$JENESIS_HOME/" in
-                "$cellar/"*) printf brew; return 0 ;;
-            esac
-        fi
-    fi
-    return 1
-}
+if [ -n "$STAMP" ] && ! above "$STAMP" "$UNSAFE_THROUGH"; then
+    echo "jenesis: ${VENDORED:-$JENESIS_HOME} is at version ${STAMP}, and every Jenesis up to ${UNSAFE_THROUGH} is no longer considered safe" >&2
+    cat >&2 <<EOM
+jenesis: refusing to run - this launcher executes a Jenesis newer than ${UNSAFE_THROUGH} only, so
+    that a project cannot pull an engine whose release is no longer trusted.
 
-sdkmanInstall() {
-    command -v sdk >/dev/null 2>&1 || [ -s "${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh" ] || return 1
-    echo "jenesis: build/jenesis records ${1}, installing that version via SDKMAN" >&2
-    (
-        set +e
-        if ! command -v sdk >/dev/null 2>&1; then
-            # shellcheck disable=SC1090
-            . "${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh" >/dev/null 2>&1
-        fi
-        command -v sdk >/dev/null 2>&1 || exit 1
-        printf 'n\n' | sdk install jenesis "$1" >&2
-    )
-}
+Move the project on, which is the fix this asks for: re-vendor build/jenesis from the
+installed version and commit what changes.
 
-scoopInstall() {
-    command -v scoop >/dev/null 2>&1 || return 1
-    echo "jenesis: build/jenesis records ${1}, installing that version via Scoop" >&2
-    scoop install "jenesis@$1" >&2
-}
+    jenesis-init                 re-vendor build/jenesis from the installed version
+    jenesis-validate             report how the vendored tree differs from it first
 
-# Homebrew is missing here on purpose: a formula carries the one version it was
-# published at, so brew can hold a matching installation - locate finds it in the
-# cellar - but it cannot fetch the version a project records.
-remedy() {
-    case "$(provider || true)" in
-        scoop) printf "install it with 'scoop install jenesis@%s' or from https://jenesis.build" "$1" ;;
-        brew) printf "Homebrew carries one version per formula, so install %s with 'sdk install jenesis %s', 'scoop install jenesis@%s' or from https://jenesis.build" "$1" "$1" "$1" ;;
-        *) printf "install it with 'sdk install jenesis %s' or from https://jenesis.build" "$1" ;;
-    esac
-}
+Where ${STAMP} has to run all the same - reproducing an old build, a branch that is not
+moving - the unguarded launcher still runs it, and still verifies the vendored sources
+against the published ones before it does:
 
-digestOf() {
-    (cd "$1" && find . -name '*.java' | LC_ALL=C sort | xargs "$HASH" | "$HASH" | cut -d' ' -f1)
-}
+    jenesis-unsafe [selectors]   run the ${STAMP} the project records
 
-if command -v sha256sum >/dev/null 2>&1; then
-    HASH=sha256sum
-elif command -v shasum >/dev/null 2>&1; then
-    HASH="shasum -a 256"
-else
-    refuse "no SHA-256 tool found - install 'sha256sum' or 'shasum', without one ${VENDORED} cannot be verified"
+Warning: that command runs an engine that is no longer considered safe.
+EOM
+    exit 1
 fi
 
-TARGET_HOME="$(locate "$STAMP")" || TARGET_HOME=""
-if [ -z "$TARGET_HOME" ]; then
-    case "$(provider || true)" in
-        scoop) scoopInstall "$STAMP" || sdkmanInstall "$STAMP" || true ;;
-        *) sdkmanInstall "$STAMP" || scoopInstall "$STAMP" || true ;;
-    esac
-    TARGET_HOME="$(locate "$STAMP")" || TARGET_HOME=""
+if [ ! -x "$SCRIPT_DIR/jenesis-unsafe" ]; then
+    echo "jenesis: ${SCRIPT_DIR} ships no executable jenesis-unsafe to hand the build over to" >&2
+    exit 1
 fi
-if [ -z "$TARGET_HOME" ]; then
-    refuse "no installed Jenesis matches the ${STAMP} that ${VENDORED} records, and it could not be installed - $(remedy "$STAMP")"
-fi
-
-REFERENCE=""
-for jar in "$TARGET_HOME"/sources/*-sources.jar; do
-    if [ -f "$jar" ]; then
-        REFERENCE="$jar"
-        break
-    fi
-done
-if [ -z "$REFERENCE" ]; then
-    refuse "Jenesis ${STAMP} at ${TARGET_HOME} ships no sources jar, so ${VENDORED} cannot be verified against it"
-fi
-
-EXTRACTED="$(mktemp -d)"
-trap 'rm -rf "$EXTRACTED"' EXIT
-if command -v unzip >/dev/null 2>&1; then
-    unzip -qq -o "$REFERENCE" 'build/jenesis/*' -d "$EXTRACTED" >/dev/null 2>&1 || true
-elif command -v jar >/dev/null 2>&1; then
-    (cd "$EXTRACTED" && jar xf "$REFERENCE" build/jenesis) >/dev/null 2>&1 || true
-fi
-if [ ! -d "$EXTRACTED/build/jenesis" ]; then
-    refuse "the sources of Jenesis ${STAMP} in ${REFERENCE} could not be read, so ${VENDORED} cannot be verified against them"
-fi
-
-if [ "$(digestOf "$VENDORED")" != "$(digestOf "$EXTRACTED/build/jenesis")" ]; then
-    refuse "${VENDORED} does not match the sources of Jenesis ${STAMP}"
-fi
-
-rm -rf "$EXTRACTED"
-trap - EXIT
-
-if [ ! -x "$TARGET_HOME/bin/jenesis-make" ]; then
-    refuse "Jenesis ${STAMP} at ${TARGET_HOME} ships no executable bin/jenesis-make to dispatch to"
-fi
-exec "$TARGET_HOME/bin/jenesis-make" "$@"
+exec "$SCRIPT_DIR/jenesis-unsafe" "$@"
