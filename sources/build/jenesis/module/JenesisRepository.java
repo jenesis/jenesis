@@ -1,6 +1,7 @@
 package build.jenesis.module;
 
 import module java.base;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 
@@ -96,6 +97,17 @@ public interface JenesisRepository extends Repository {
                                    String classifier,
                                    String version,
                                    String type) throws IOException;
+
+    static JenesisRepository ofEnvironment(Environment environment, Scope scope) {
+        String source = environment.value("module.source", "service");
+        return switch (source) {
+            case "service" -> JenesisModuleRepository.ofEnvironment(environment, scope);
+            case "git" -> JenesisRawGitRepository.ofEnvironment(environment, scope);
+            default -> throw new IllegalArgumentException("Unknown jenesis.module.source '"
+                    + source
+                    + "', expected 'service' for repo.jenesis.build or 'git' for the published index");
+        };
+    }
 
     static JenesisRepository of(Repository repository) {
         return repository instanceof JenesisRepository jenesisRepository ? jenesisRepository : (executor,

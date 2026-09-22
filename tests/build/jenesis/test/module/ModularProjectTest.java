@@ -8,6 +8,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 import build.jenesis.Platform;
 import build.jenesis.SequencedProperties;
@@ -688,7 +689,6 @@ public class ModularProjectTest {
                 .hasRootCauseMessage("Local BOM not found: main/pin-missing.properties");
     }
 
-
     @Test
     public void omits_versions_properties_when_no_pins() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
@@ -737,12 +737,12 @@ public class ModularProjectTest {
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
-        root.addModule("modules", ModularProject.make(project,
+        root.addModule("modules", ModularProject.make(Environment.SYSTEM, project,
                 "main",
                 "module",
                 _ -> true,
                 Map.of(),
-                Map.of("module", new ModularJarResolver(false)),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, false)),
                 null,
                 true,
                 Collections.emptyNavigableSet(),
@@ -995,5 +995,20 @@ public class ModularProjectTest {
                 .hasRootCauseMessage("Layer render of module 'foo' names no API module - declare"
                         + " @jenesis.layer render api <module>, the one module the layer shares with this"
                         + " one");
+    }
+
+    @Test
+    public void refuses_a_malformed_segment_count_where_the_project_is_built() {
+        assertThatThrownBy(() -> ModularProject.ofEnvironment(new Environment(Map.of("maven.segments", "zero")::get), "module", Path.of(".")))
+                .as("a setting is materialized where the provider is handed over, so a bad value is refused there")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.maven.segments");
+    }
+
+    @Test
+    public void refuses_a_segment_count_below_one_where_the_project_is_built() {
+        assertThatThrownBy(() -> ModularProject.ofEnvironment(new Environment(Map.of("maven.segments", "0")::get), "module", Path.of(".")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at least one leading segment");
     }
 }

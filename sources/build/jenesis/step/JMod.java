@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
+import build.jenesis.Environment;
 
 public class JMod extends ProcessBuildStep {
 
@@ -13,18 +14,31 @@ public class JMod extends ProcessBuildStep {
     private final OffsetDateTime timestamp;
 
     public JMod(ProcessHandler.Factory factory) {
-        this(factory.apply("jmod", "bin/jmod"), BuildStep.timestamp(), printing("jmod"));
+        this(factory.apply("jmod", "bin/jmod"),
+             BuildStep.timestamp(),
+             Terms.of("jmod"));
+    }
+
+    public static JMod ofEnvironment(Environment environment,
+                                     ProcessHandler.Factory factory) {
+        return new JMod(factory.apply("jmod", "bin/jmod"),
+                BuildStep.timestamp(environment),
+                Terms.ofEnvironment(environment, "jmod"));
     }
 
     private JMod(Function<List<String>, ? extends ProcessHandler> factory,
                  OffsetDateTime timestamp,
-                 BiConsumer<Boolean, String> printing) {
-        super("jmod", factory, printing);
+                 Terms terms) {
+        super("jmod", factory, terms);
         this.timestamp = timestamp;
     }
 
     public JMod verbose(BiConsumer<Boolean, String> printing) {
-        return new JMod(factory, timestamp, printing);
+        return new JMod(factory, timestamp, terms.printing(printing));
+    }
+
+    public JMod timestamp(OffsetDateTime timestamp) {
+        return new JMod(factory, timestamp, terms);
     }
 
     @Override

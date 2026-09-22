@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
+import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.LicenseCheck;
@@ -17,31 +18,50 @@ public class InferredComplianceModule implements BuildExecutorModule {
     private static final Set<String> VULNERABILITY_KEYS = Set.of("severity", "warn", "osv.endpoint");
 
     private final SequencedSet<Path> configuration;
+    private final OsvDownload osv;
     private final Function<BuildExecutorModule, BuildExecutorModule> license;
     private final Function<BuildExecutorModule, BuildExecutorModule> vulnerability;
 
     public InferredComplianceModule(SequencedSet<Path> configuration) {
-        this(configuration, enabledBy("jenesis.compliance"), enabledBy("jenesis.compliance"));
+        this(configuration,
+             new OsvDownload(),
+             value -> value,
+             value -> value);
+    }
+
+    public static InferredComplianceModule ofEnvironment(Environment environment,
+                                                         SequencedSet<Path> configuration) {
+        InferredComplianceModule module = new InferredComplianceModule(configuration,
+                OsvDownload.ofEnvironment(environment),
+                value -> value,
+                value -> value);
+        Boolean license = environment.flagOrNull("compliance");
+        if (license != null) {
+            module = module.license(license ? value -> value : null);
+        }
+        Boolean vulnerability = environment.flagOrNull("compliance");
+        if (vulnerability != null) {
+            module = module.vulnerability(vulnerability ? value -> value : null);
+        }
+        return module;
     }
 
     private InferredComplianceModule(SequencedSet<Path> configuration,
+                                     OsvDownload osv,
                                      Function<BuildExecutorModule, BuildExecutorModule> license,
                                      Function<BuildExecutorModule, BuildExecutorModule> vulnerability) {
         this.configuration = configuration;
+        this.osv = osv;
         this.license = license;
         this.vulnerability = vulnerability;
     }
 
-    private static <M extends BuildExecutorModule> Function<M, BuildExecutorModule> enabledBy(String property) {
-        return SequencedProperties.systemFlag(property, true) ? module -> module : null;
-    }
-
     public InferredComplianceModule license(Function<BuildExecutorModule, BuildExecutorModule> license) {
-        return new InferredComplianceModule(configuration, license, vulnerability);
+        return new InferredComplianceModule(configuration, osv, license, vulnerability);
     }
 
     public InferredComplianceModule vulnerability(Function<BuildExecutorModule, BuildExecutorModule> vulnerability) {
-        return new InferredComplianceModule(configuration, license, vulnerability);
+        return new InferredComplianceModule(configuration, osv, license, vulnerability);
     }
 
     @Override
@@ -62,11 +82,7 @@ public class InferredComplianceModule implements BuildExecutorModule {
                         return null;
                     }
                     return (nested, nestedInherited) -> {
-                        String endpoint = properties.value("osv.endpoint");
-                        nested.addStep("osv", endpoint == null
-                                        ? new OsvDownload()
-                                        : new OsvDownload().endpoint(URI.create(endpoint)),
-                                nestedInherited.sequencedKeySet().stream());
+                        nested.addStep("osv", osvDownload(properties), nestedInherited.sequencedKeySet().stream());
                         nested.addStep("check", vulnerabilityCheck(properties),
                                 Stream.concat(nestedInherited.sequencedKeySet().stream(), Stream.of("osv")));
                     };
@@ -87,6 +103,11 @@ public class InferredComplianceModule implements BuildExecutorModule {
                 .denied(licenses(properties.entries("denied")))
                 .unknown(unknown(properties.value("unknown")))
                 .overrides(overrides);
+    }
+
+    private OsvDownload osvDownload(SequencedProperties properties) {
+        String endpoint = properties.value("osv.endpoint");
+        return endpoint == null ? osv : osv.endpoint(URI.create(endpoint));
     }
 
     private static VulnerabilityCheck vulnerabilityCheck(SequencedProperties properties) {

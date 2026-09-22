@@ -15,81 +15,210 @@ public final class Make {
     private final Path classes;
     private final boolean daemon;
     private final boolean compile;
+    private final Settings settings;
+
+    public record Settings(Function<String, String> keys,
+                           SequencedSet<Path> profiles,
+                           SequencedSet<String> declared) {
+    }
+
+    private record Layer(Properties properties, boolean trusted) {
+    }
 
     public Make(String mainClass) {
+        this(mainClass, key -> System.getProperty("jenesis." + key));
+    }
+
+    public Make(String mainClass, Function<String, String> ambient) {
         this.mainClass = mainClass;
-        root = Path.of(System.getProperty("jenesis.make.root", "")).toAbsolutePath().normalize();
+        String location = ambient.apply("make.root");
+        root = Path.of(location == null ? "" : location).toAbsolutePath().normalize();
         try {
-            loadProperties(root);
+            settings = settings(root, ambient);
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot read the properties that configure this build", e);
         }
-        String location = System.getProperty("jenesis.make.classes");
-        classes = location == null || location.isBlank()
+        String classesLocation = settings.keys().apply("make.classes");
+        classes = classesLocation == null || classesLocation.isBlank()
                 ? root.resolve(".jenesis").resolve("classes")
-                : root.resolve(location).normalize();
-        daemon = flag("jenesis.make.daemon", false);
-        compile = flag("jenesis.make.compile", true);
+                : root.resolve(classesLocation).normalize();
+        daemon = flag(settings.keys(), "make.daemon", false);
+        compile = flag(settings.keys(), "make.compile", true);
     }
 
-    private static boolean flag(String key, boolean defaultValue) {
-        String value = System.getProperty(key);
+    private static boolean flag(Function<String, String> keys, String key, boolean defaultValue) {
+        Boolean value = parsed("jenesis." + key, keys.apply(key));
+        return value == null ? defaultValue : value;
+    }
+
+    static Boolean parsed(String name, String value) {
         if (value == null) {
-            return defaultValue;
+            return null;
         }
         return switch (value.trim().toLowerCase(Locale.ROOT)) {
             case "", "true" -> true;
             case "false" -> false;
             default -> throw new IllegalArgumentException("Malformed value for "
-                    + key
+                    + name
                     + ": '"
                     + value
-                    + "' (expected true, false, or the property named with no value at all)");
+                    + "' (expected true, false, or the setting named with no value at all)");
         };
     }
 
-    private Make(String mainClass, Path root, Path classes, boolean daemon, boolean compile) {
+    private Make(String mainClass, Path root, Path classes, boolean daemon, boolean compile, Settings settings) {
         this.mainClass = mainClass;
         this.root = root;
         this.classes = classes;
         this.daemon = daemon;
         this.compile = compile;
+        this.settings = settings;
     }
 
     public Make root(Path root) {
-        return new Make(mainClass, root, classes, daemon, compile);
+        try {
+            return new Make(mainClass, root, classes, daemon, compile, settings(root));
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot read the properties that configure this build", e);
+        }
     }
 
     public Make classes(Path classes) {
-        return new Make(mainClass, root, classes, daemon, compile);
+        return new Make(mainClass, root, classes, daemon, compile, settings);
     }
 
     public Make daemon(boolean daemon) {
-        return new Make(mainClass, root, classes, daemon, compile);
+        return new Make(mainClass, root, classes, daemon, compile, settings);
     }
 
     public Make compile(boolean compile) {
-        return new Make(mainClass, root, classes, daemon, compile);
+        return new Make(mainClass, root, classes, daemon, compile, settings);
     }
 
     public record Result(int code, SequencedMap<String, Path> outputs) {
     }
 
-    public static void main(String... selectors) throws Exception {
-        List<String> options = options();
-        Make make = new Make("build.jenesis.Project");
+    public static void main(String... arguments) throws Exception {
+        SequencedMap<String, String> named = new LinkedHashMap<>();
+        String[] selectors = partitioned(arguments, named);
+        List<String> options = options(named);
+        Make make = new Make("build.jenesis.Project", ambient(named));
         Integer code = relaunched(Make.class, options, selectors);
         System.exit(code == null ? make.run(selectors) : code);
     }
 
-    static List<String> options() {
-        List<String> options = new ArrayList<>();
-        for (String name : new TreeSet<>(System.getProperties().stringPropertyNames())) {
-            if (name.startsWith("jenesis.") && !name.startsWith("jenesis.toolchain.")) {
-                options.add("-D" + name + "=" + System.getProperty(name));
+    static Function<String, String> ambient(SequencedMap<String, String> named) {
+        return key -> {
+            String value = named.get("jenesis." + key);
+            return value == null ? System.getProperty("jenesis." + key) : value;
+        };
+    }
+
+    static String[] partitioned(String[] arguments, SequencedMap<String, String> named) throws IOException {
+        List<String> expanded = expanded(arguments), selectors = new ArrayList<>();
+        for (String argument : expanded) {
+            if (!selectors.isEmpty() || !argument.startsWith("-D")) {
+                selectors.add(argument);
+                continue;
+            }
+            String assignment = argument.substring(2);
+            int equals = assignment.indexOf('=');
+            String name = equals < 0 ? assignment : assignment.substring(0, equals);
+            if (!name.startsWith("jenesis.")) {
+                throw new IllegalArgumentException("Not a Jenesis setting: -D"
+                        + assignment
+                        + " - a run is configured by jenesis.* settings alone, and a JVM property is named"
+                        + " before the main class");
+            }
+            named.put(name, equals < 0 ? "" : assignment.substring(equals + 1));
+        }
+        return selectors.toArray(String[]::new);
+    }
+
+    static List<String> expanded(String[] arguments) throws IOException {
+        List<String> expanded = new ArrayList<>();
+        for (String argument : arguments) {
+            if (argument.startsWith("@@")) {
+                expanded.add(argument.substring(1));
+            } else if (argument.length() > 1 && argument.charAt(0) == '@') {
+                expanded.addAll(words(Path.of(argument.substring(1))));
+            } else {
+                expanded.add(argument);
             }
         }
-        return options;
+        return expanded;
+    }
+
+    private static List<String> words(Path file) throws IOException {
+        if (!Files.isRegularFile(file)) {
+            throw new IllegalArgumentException("No argument file at "
+                    + file
+                    + " - @<file> names a file of arguments, @@<text> an argument starting with @");
+        }
+        List<String> words = new ArrayList<>();
+        StringBuilder word = new StringBuilder();
+        boolean started = false, escaped = false, comment = false;
+        char quote = 0;
+        for (char current : Files.readString(file).toCharArray()) {
+            if (escaped) {
+                word.append(switch (current) {
+                    case 'n' -> '\n';
+                    case 'r' -> '\r';
+                    case 't' -> '\t';
+                    case 'f' -> '\f';
+                    default -> current;
+                });
+                escaped = false;
+            } else if (comment) {
+                comment = current != '\n';
+            } else if (quote != 0) {
+                if (current == '\\') {
+                    escaped = true;
+                } else if (current == quote) {
+                    quote = 0;
+                } else {
+                    word.append(current);
+                }
+            } else if (current == '\'' || current == '"') {
+                quote = current;
+                started = true;
+            } else if (current == '#') {
+                comment = true;
+            } else if (Character.isWhitespace(current)) {
+                if (started) {
+                    words.add(word.toString());
+                    word.setLength(0);
+                    started = false;
+                }
+            } else {
+                word.append(current);
+                started = true;
+            }
+        }
+        if (quote != 0) {
+            throw new IllegalArgumentException("Unterminated " + quote + " in the argument file " + file);
+        }
+        if (started) {
+            words.add(word.toString());
+        }
+        return words;
+    }
+
+    static List<String> options(SequencedMap<String, String> named) {
+        SortedMap<String, String> options = new TreeMap<>();
+        for (String name : System.getProperties().stringPropertyNames()) {
+            if (name.startsWith("jenesis.")) {
+                options.put(name, System.getProperty(name));
+            }
+        }
+        options.putAll(named);
+        List<String> arguments = new ArrayList<>();
+        options.forEach((name, value) -> {
+            if (!name.startsWith("jenesis.toolchain.")) {
+                arguments.add("-D" + name + "=" + value);
+            }
+        });
+        return arguments;
     }
 
     static Integer relaunched(Class<?> main, List<String> options, String... arguments) throws Exception {
@@ -99,7 +228,8 @@ public final class Make {
         }
         Class<?> type = Class.forName("build.jenesis.Toolchain", true, Make.class.getClassLoader());
         try {
-            Object toolchain = type.getConstructor().newInstance();
+            Object toolchain = type.getMethod("ofKeys", Function.class)
+                    .invoke(null, (Function<String, String>) key -> System.getProperty("jenesis." + key));
             if (type.getMethod("home").invoke(toolchain).equals(Path.of(System.getProperty("java.home")))) {
                 return null;
             }
@@ -223,20 +353,32 @@ public final class Make {
                            String... selectors) throws Exception {
         return (int) Class.forName("build.jenesis.daemon.DaemonClient", true, loader)
                 .getMethod("doDispatch", Path.class, List.class, String.class, String.class,
-                        SequencedMap.class, String[].class)
-                .invoke(null, root, path, mainClass, seed, collected, selectors);
+                        SequencedMap.class, SequencedMap.class, String[].class)
+                .invoke(null, root, path, mainClass, seed, supplied(), collected, selectors);
+    }
+
+    private SequencedMap<String, String> supplied() {
+        SequencedMap<String, String> supplied = new LinkedHashMap<>();
+        for (String key : settings.declared()) {
+            String value = settings.keys().apply(key);
+            if (value != null) {
+                supplied.put("jenesis." + key, value);
+            }
+        }
+        return supplied;
     }
 
     private int invoke(ClassLoader loader, SequencedMap<String, String> collected, String... selectors)
             throws Exception {
         Class<?> project = Class.forName("build.jenesis.Project", true, loader);
-        SequencedSet<Path> profiles = loadProperties(root);
         if (collected == null || !mainClass.equals("build.jenesis.Project")) {
-            return (int) project.getMethod("run", String.class, Path.class, SequencedSet.class, String[].class)
-                    .invoke(null, mainClass, root, profiles, selectors);
+            return (int) project
+                    .getMethod("run", Function.class, String.class, Path.class, SequencedSet.class, String[].class)
+                    .invoke(null, settings.keys(), mainClass, root, settings.profiles(), selectors);
         }
-        Object produced = project.getMethod("perform", Path.class, SequencedSet.class, String[].class)
-                .invoke(null, root, profiles, selectors);
+        Object produced = project
+                .getMethod("perform", Function.class, Path.class, SequencedSet.class, String[].class)
+                .invoke(null, settings.keys(), root, settings.profiles(), selectors);
         if (produced == null) {
             return 1;
         }
@@ -245,14 +387,18 @@ public final class Make {
         return 0;
     }
 
-    public static SequencedSet<Path> loadProperties(Path path) throws IOException {
-        SequencedSet<String> provided = new LinkedHashSet<>();
+    public static Settings settings(Path path) throws IOException {
+        return settings(path, key -> System.getProperty("jenesis." + key));
+    }
+
+    public static Settings settings(Path path, Function<String, String> ambient) throws IOException {
         Path base = path.resolve("jenesis.properties");
         Properties project = read(base);
         if (project != null) {
             requireApplicable(base, project, false);
         }
-        String location = System.getProperty("jenesis.make.global", System.getProperty("user.home"));
+        String configured = ambient.apply("make.global");
+        String location = configured == null ? System.getProperty("user.home") : configured;
         Properties user = null;
         Path home = null;
         if (!location.isEmpty()) {
@@ -265,32 +411,71 @@ public final class Make {
         }
         Set<Path> loaded = new LinkedHashSet<>();
         Deque<Path> pending = new ArrayDeque<>();
-        addProfiles(pending, path, System.getProperty("jenesis.make.profiles"));
+        List<Layer> layers = new ArrayList<>();
+        addProfiles(pending, path, ambient.apply("make.profiles"));
         if (project != null) {
             addProfiles(pending, path, project.getProperty("jenesis.make.profiles"));
         }
-        loadProfiles(loaded, pending, path, false, provided);
+        loadProfiles(loaded, layers, pending, path, false);
         if (user != null) {
             addProfiles(pending, home, user.getProperty("jenesis.make.profiles"));
-            loadProfiles(loaded, pending, home, true, null);
+            loadProfiles(loaded, layers, pending, home, true);
         }
         if (project != null) {
-            apply(project, provided);
+            layers.add(new Layer(project, false));
         }
         if (user != null) {
-            apply(user, null);
-        }
-        if (provided.isEmpty()) {
-            System.clearProperty(PROVIDED);
-        } else {
-            System.setProperty(PROVIDED, String.join(",", provided));
+            layers.add(new Layer(user, true));
         }
         SequencedSet<Path> profiles = new LinkedHashSet<>();
         for (Path file : loaded) {
             String name = file.getFileName().toString();
             profiles.add(Path.of(name.substring("jenesis-".length(), name.length() - ".properties".length())));
         }
-        return profiles;
+        SequencedSet<String> declared = new LinkedHashSet<>();
+        for (Layer layer : layers) {
+            for (String name : layer.properties().stringPropertyNames()) {
+                if (name.startsWith("jenesis.")) {
+                    declared.add(name.substring("jenesis.".length()));
+                }
+            }
+        }
+        return new Settings(layered(ambient, layers), profiles, declared);
+    }
+
+    private static Function<String, String> layered(Function<String, String> ambient, List<Layer> layers) {
+        List<Layer> ordered = List.copyOf(layers);
+        SequencedSet<String> provided = new LinkedHashSet<>();
+        Set<String> declared = new HashSet<>();
+        for (Layer layer : ordered) {
+            for (String name : layer.properties().stringPropertyNames()) {
+                if (!name.startsWith("jenesis.")) {
+                    continue;
+                }
+                String key = name.substring("jenesis.".length());
+                if (declared.add(key) && ambient.apply(key) == null && !layer.trusted()) {
+                    provided.add(key);
+                }
+            }
+        }
+        String supplied = String.join(",", provided);
+        return key -> {
+            if (key.equals("make.provided")) {
+                return supplied.isEmpty() ? null : supplied;
+            }
+            String value = ambient.apply(key);
+            if (value != null) {
+                return value;
+            }
+            String qualified = "jenesis." + key;
+            for (Layer layer : ordered) {
+                value = layer.properties().getProperty(qualified);
+                if (value != null) {
+                    return value;
+                }
+            }
+            return null;
+        };
     }
 
     private static void addProfiles(Deque<Path> pending, Path base, String list) {
@@ -309,10 +494,10 @@ public final class Make {
     }
 
     private static void loadProfiles(Set<Path> loaded,
+                                     List<Layer> layers,
                                      Deque<Path> pending,
                                      Path base,
-                                     boolean trusted,
-                                     Set<String> provided) throws IOException {
+                                     boolean trusted) throws IOException {
         while (!pending.isEmpty()) {
             Path file = pending.removeFirst().normalize();
             if (!loaded.add(file) || !Files.isRegularFile(file)) {
@@ -321,15 +506,7 @@ public final class Make {
             Properties properties = read(file);
             requireApplicable(file, properties, trusted);
             addProfiles(pending, base, properties.getProperty("jenesis.make.profiles"));
-            apply(properties, provided);
-        }
-    }
-
-    private static void apply(Properties properties, Set<String> provided) {
-        for (String name : properties.stringPropertyNames()) {
-            if (System.getProperties().putIfAbsent(name, properties.getProperty(name)) == null && provided != null) {
-                provided.add(name);
-            }
+            layers.add(new Layer(properties, trusted));
         }
     }
 

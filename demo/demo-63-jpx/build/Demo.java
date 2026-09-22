@@ -12,14 +12,21 @@ import build.jenesis.maven.MavenModuleResolver;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisRepository;
+import build.jenesis.Environment;
 
 public class Demo {
 
     static void main(String[] args) throws Exception {
-        Repository modules = JenesisModuleRepository.of(JenesisRepository.Scope.ARTIFACT);
-        MavenPomResolver maven = new MavenPomResolver();
+        // The wiring the jpx command carries, named out in full because this demo installs
+        // into its own target/ folder instead of ~/.jenesis/jpx: module names are looked up
+        // in the Jenesis module repository and resolved through their published POM, Maven
+        // coordinates come from Maven Central, and every jar is placed as it describes a
+        // module. So the demo resolves from scratch and leaves nothing behind outside this
+        // directory.
+        Repository modules = JenesisModuleRepository.ofEnvironment(Environment.SYSTEM, JenesisRepository.Scope.ARTIFACT);
+        MavenPomResolver maven = MavenPomResolver.ofEnvironment(Environment.SYSTEM);
         Jpx jpx = new Jpx(Path.of("target", "jpx"),
-                Map.of("maven", MavenDefaultRepository.of(), "module", modules),
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM), "module", modules),
                 Map.<String, Resolver>of("maven", maven, "module", new MavenModuleResolver("maven", maven, modules)),
                 new HashDigestFunction("SHA-256"),
                 PathPlacement.INFERRED);

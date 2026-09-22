@@ -8,6 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -22,52 +23,66 @@ public class JApiCmpModule implements BuildExecutorModule {
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
     private static final String MAVEN_GROUP = "com.github.siom79.japicmp", MAVEN_ARTIFACT = "japicmp";
 
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
     private final String group;
     private final SequencedProperties config;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final ProcessBuildStep.Terms terms;
 
-    public JApiCmpModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "japicmp", "main", new SequencedProperties(), ProcessBuildStep.printing("japicmp"));
+    public JApiCmpModule(Map<String, Repository> repositories,
+                         Map<String, Resolver> resolvers) {
+        this(new Dependencies(repositories, resolvers),
+             null,
+             "japicmp",
+             "main",
+             new SequencedProperties(),
+             ProcessBuildStep.Terms.of("japicmp"));
     }
 
-    private JApiCmpModule(Map<String, Repository> repositories,
-                          Map<String, Resolver> resolvers,
+    public static JApiCmpModule ofEnvironment(Environment environment,
+                                              Map<String, Repository> repositories,
+                                              Map<String, Resolver> resolvers) {
+        return new JApiCmpModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
+                null,
+                "japicmp",
+                "main",
+                new SequencedProperties(),
+                ProcessBuildStep.Terms.ofEnvironment(environment, "japicmp"));
+    }
+
+    private JApiCmpModule(Dependencies dependencies,
                           Pinning pinning,
                           String tool,
                           String group,
                           SequencedProperties config,
-                          BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+                          ProcessBuildStep.Terms terms) {
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.group = group;
         this.config = config;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public JApiCmpModule pinning(Pinning pinning) {
-        return new JApiCmpModule(repositories, resolvers, pinning, tool, group, config, printing);
+        return new JApiCmpModule(dependencies, pinning, tool, group, config, terms);
     }
 
     public JApiCmpModule tool(String tool) {
-        return new JApiCmpModule(repositories, resolvers, pinning, tool, group, config, printing);
+        return new JApiCmpModule(dependencies, pinning, tool, group, config, terms);
     }
 
     public JApiCmpModule group(String group) {
-        return new JApiCmpModule(repositories, resolvers, pinning, tool, group, config, printing);
+        return new JApiCmpModule(dependencies, pinning, tool, group, config, terms);
     }
 
     public JApiCmpModule config(SequencedProperties config) {
-        return new JApiCmpModule(repositories, resolvers, pinning, tool, group, config, printing);
+        return new JApiCmpModule(dependencies, pinning, tool, group, config, terms);
     }
 
     public JApiCmpModule printing(BiConsumer<Boolean, String> printing) {
-        return new JApiCmpModule(repositories, resolvers, pinning, tool, group, config, printing);
+        return new JApiCmpModule(dependencies, pinning, tool, group, config, terms.printing(printing));
     }
 
     @Override
@@ -77,12 +92,12 @@ public class JApiCmpModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
+                dependencies.pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> compareInputs = new LinkedHashSet<>();
         compareInputs.add(DEPENDENCIES);
         compareInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(COMPARE, new Compare(tool, group, config, printing), compareInputs);
+        buildExecutor.addStep(COMPARE, new Compare(terms, tool, group, config), compareInputs);
     }
 
     private record Requires(String tool, String baseline) implements BuildStep {
@@ -143,8 +158,11 @@ public class JApiCmpModule implements BuildExecutorModule {
         private final String group;
         private final SequencedProperties config;
 
-        private Compare(String tool, String group, SequencedProperties config, BiConsumer<Boolean, String> printing) {
-            super("japicmp", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
+        private Compare(ProcessBuildStep.Terms terms,
+                        String tool,
+                        String group,
+                        SequencedProperties config) {
+            super("japicmp", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
             this.group = group;
             this.config = config;

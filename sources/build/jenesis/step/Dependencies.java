@@ -15,6 +15,7 @@ import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
+import build.jenesis.Environment;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 
@@ -31,38 +32,73 @@ public class Dependencies implements BuildExecutorModule {
     public static final String RESOLVED = "resolved/", MODULAR_PATH = "modular/";
     public static final String RESOLVE = "resolve", SIGNATURES = "signatures";
 
-    private final transient Map<String, Repository> repositories;
+    private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
+    private final Signatures signatures;
     private final Pinning pinning;
     private final String group;
-    private final transient Consumer<String> printing;
+    private final OffsetDateTime timestamp;
+    private final Consumer<String> printing;
 
     public Dependencies(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, null, SequencedProperties.systemFlag("jenesis.print.aliases") ? System.out::println : null);
+        this(repositories, resolvers, new Signatures(repositories), null, null, BuildStep.timestamp(), null);
+    }
+
+    public static Dependencies ofEnvironment(Environment environment,
+                                             Map<String, Repository> repositories,
+                                             Map<String, Resolver> resolvers) {
+        return new Dependencies(repositories,
+                resolvers,
+                Signatures.ofEnvironment(environment, repositories),
+                null,
+                null,
+                BuildStep.timestamp(environment),
+                environment.flag("print.aliases") ? environment.out() : null);
     }
 
     private Dependencies(Map<String, Repository> repositories,
                          Map<String, Resolver> resolvers,
+                         Signatures signatures,
                          Pinning pinning,
                          String group,
+                         OffsetDateTime timestamp,
                          Consumer<String> printing) {
         this.repositories = repositories;
         this.resolvers = new LinkedHashMap<>(resolvers);
+        this.signatures = signatures;
         this.pinning = pinning;
         this.group = group;
+        this.timestamp = timestamp;
         this.printing = printing;
     }
 
+    public Dependencies repositories(Map<String, Repository> repositories) {
+        return new Dependencies(repositories, resolvers, signatures.repositories(repositories),
+                pinning, group, timestamp, printing);
+    }
+
+    public Dependencies resolvers(Map<String, Resolver> resolvers) {
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing);
+    }
+
+    public Dependencies signatures(Signatures signatures) {
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing);
+    }
+
     public Dependencies pinning(Pinning pinning) {
-        return new Dependencies(repositories, resolvers, pinning, group, printing);
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing);
     }
 
     public Dependencies group(String group) {
-        return new Dependencies(repositories, resolvers, pinning, group, printing);
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing);
+    }
+
+    public Dependencies timestamp(OffsetDateTime timestamp) {
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing);
     }
 
     public Dependencies printing(Consumer<String> printing) {
-        return new Dependencies(repositories, resolvers, pinning, group, printing);
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing);
     }
 
     public static SequencedMap<String, String> bomEntries(SequencedProperties properties, String group) {
@@ -71,22 +107,22 @@ public class Dependencies implements BuildExecutorModule {
         return entries;
     }
 
-
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
         buildExecutor.addStep(RESOLVE,
-                new Resolve(repositories, resolvers, pinning, group, printing),
+                new Resolve(repositories, resolvers, pinning, group, printing, timestamp),
                 inherited.sequencedKeySet());
         SequencedSet<String> verified = new LinkedHashSet<>();
         verified.add(RESOLVE);
         verified.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(SIGNATURES, new Signatures(repositories), verified);
+        buildExecutor.addStep(SIGNATURES, signatures, verified);
     }
 
     @Override
     public Optional<String> resolve(String path) {
         return path.equals(RESOLVE) ? Optional.of("") : Optional.empty();
     }
+
     private static class Resolve implements BuildStep {
 
         private final transient Map<String, Repository> repositories;
@@ -100,12 +136,13 @@ public class Dependencies implements BuildExecutorModule {
                         Map<String, Resolver> resolvers,
                         Pinning pinning,
                         String group,
-                        Consumer<String> printing) {
+                        Consumer<String> printing,
+                        OffsetDateTime timestamp) {
             this.repositories = repositories;
             this.resolvers = new LinkedHashMap<>(resolvers);
             this.pinning = pinning;
             this.group = group;
-            this.timestamp = BuildStep.timestamp();
+            this.timestamp = timestamp;
             this.printing = printing;
         }
 
@@ -758,14 +795,14 @@ public class Dependencies implements BuildExecutorModule {
                     for (String module : byModule.sequencedKeySet()) {
                         Path file = libs.resolve(BuildExecutorModule.encode(module) + ".jar");
                         if (!Files.exists(file)) {
-                            try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(file))) {
+                            try (JarOutputStream environment = new JarOutputStream(Files.newOutputStream(file))) {
                                 JarEntry entry = new JarEntry("module-info.class");
                                 if (timestamp != null) {
                                     entry.setTimeLocal(timestamp.toLocalDateTime());
                                 }
-                                output.putNextEntry(entry);
-                                output.write(carrying(module, overrideTargets.get(module).carriers()));
-                                output.closeEntry();
+                                environment.putNextEntry(entry);
+                                environment.write(carrying(module, overrideTargets.get(module).carriers()));
+                                environment.closeEntry();
                             }
                         }
                         placed.put("module/" + module, file);
@@ -829,7 +866,6 @@ public class Dependencies implements BuildExecutorModule {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }
-
 
     private static String text(String value) {
         return value == null ? "" : value;

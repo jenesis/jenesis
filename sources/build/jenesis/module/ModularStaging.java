@@ -5,6 +5,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.SafeSegment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
@@ -16,7 +17,11 @@ public class ModularStaging implements BuildStep {
     private final boolean includeTests;
 
     public ModularStaging() {
-        this(SequencedProperties.systemFlag("jenesis.stage.tests"));
+        this(false);
+    }
+
+    public static ModularStaging ofEnvironment(Environment environment) {
+        return new ModularStaging(environment.flag("stage.tests"));
     }
 
     public ModularStaging(boolean includeTests) {

@@ -4,6 +4,7 @@ import module java.base;
 import module org.junit.jupiter.api;
 import module org.junit.jupiter.params;
 import build.jenesis.BuildStep;
+import build.jenesis.Environment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -20,20 +21,18 @@ public class BuildStepTest {
 
     @Test
     public void archive_timestamp_defaults_to_a_date_no_time_zone_reads_as_1979() {
-        assertThat(BuildStep.timestamp()).isEqualTo(OffsetDateTime.parse("1980-02-01T00:00:00Z"));
+        assertThat(BuildStep.timestamp(Environment.SYSTEM)).isEqualTo(OffsetDateTime.parse("1980-02-01T00:00:00Z"));
     }
 
     @Test
     public void archive_timestamp_is_read_from_its_property_as_utc() {
-        System.setProperty("jenesis.archive.timestamp", "2026-09-17T09:30:00+02:00");
-        assertThat(BuildStep.timestamp()).isEqualTo(OffsetDateTime.parse("2026-09-17T07:30:00Z"));
+        assertThat(BuildStep.timestamp(new Environment(Map.of("archive.timestamp", "2026-09-17T09:30:00+02:00")::get))).isEqualTo(OffsetDateTime.parse("2026-09-17T07:30:00Z"));
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"1980-01-01T00:00:00Z", "2100-01-01T00:00:00Z"})
     public void archive_timestamp_outside_what_an_entry_records_without_a_zone_is_rejected(String value) {
-        System.setProperty("jenesis.archive.timestamp", value);
-        assertThatThrownBy(BuildStep::timestamp)
+        assertThatThrownBy(() -> BuildStep.timestamp(new Environment(Map.of("archive.timestamp", value)::get)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("between 1980-01-01T00:00:02Z and 2099-12-31T23:59:59Z")
                 .hasMessageEndingWith(value);
@@ -42,14 +41,12 @@ public class BuildStepTest {
     @ParameterizedTest
     @ValueSource(strings = {"", " "})
     public void archive_timestamp_set_empty_turns_the_fixed_time_off(String value) {
-        System.setProperty("jenesis.archive.timestamp", value);
-        assertThat(BuildStep.timestamp()).isNull();
+        assertThat(BuildStep.timestamp(new Environment(Map.of("archive.timestamp", value)::get))).isNull();
     }
 
     @Test
     public void archive_timestamp_without_an_offset_is_rejected() {
-        System.setProperty("jenesis.archive.timestamp", "2026-09-17T09:30:00");
-        assertThatThrownBy(BuildStep::timestamp)
+        assertThatThrownBy(() -> BuildStep.timestamp(new Environment(Map.of("archive.timestamp", "2026-09-17T09:30:00")::get)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ISO-8601 date-time with an offset")
                 .hasMessageEndingWith("2026-09-17T09:30:00");

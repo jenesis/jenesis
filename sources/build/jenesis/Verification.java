@@ -6,8 +6,8 @@ public enum Verification {
 
     NONE, DECLARED, STRICT;
 
-    public static Verification fromProperty() {
-        String property = System.getProperty("jenesis.dependency.signature", "none");
+    public static Verification ofEnvironment(Environment environment) {
+        String property = environment.getProperty("dependency.signature", "none");
         try {
             return Verification.valueOf(property.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException _) {

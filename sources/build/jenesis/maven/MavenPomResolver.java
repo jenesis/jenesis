@@ -3,12 +3,14 @@ package build.jenesis.maven;
 import module java.base;
 import module java.xml;
 import build.jenesis.DependencyScope;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.License;
 import build.jenesis.PathPlacement;
 import build.jenesis.Platform;
 import build.jenesis.Resolver;
+import build.jenesis.SequencedProperties;
 
 public class MavenPomResolver implements MavenResolver {
 
@@ -22,8 +24,15 @@ public class MavenPomResolver implements MavenResolver {
     private final transient DocumentBuilderFactory factory = MavenDefaultVersionNegotiator.toDocumentBuilderFactory();
 
     public MavenPomResolver() {
-        String property = System.getProperty("jenesis.resolver.maven", "maven");
-        negotiatorSupplier = switch (property.toLowerCase(Locale.ROOT)) {
+        this(MavenDefaultVersionNegotiator.maven());
+    }
+
+    public static MavenPomResolver ofEnvironment(Environment environment) {
+        String property = environment.getProperty("resolver.maven");
+        if (property == null) {
+            return new MavenPomResolver();
+        }
+        return new MavenPomResolver(switch (property.toLowerCase(Locale.ROOT)) {
             case "maven" -> MavenDefaultVersionNegotiator.maven();
             case "latest" -> MavenDefaultVersionNegotiator.latest();
             case "release" -> MavenDefaultVersionNegotiator.release();
@@ -34,7 +43,7 @@ public class MavenPomResolver implements MavenResolver {
             default -> throw new IllegalArgumentException("Unknown jenesis.resolver.maven '"
                     + property
                     + "', expected one of: maven, latest, release, stable, closest, fail, managed");
-        };
+        });
     }
 
     public <S extends Supplier<MavenVersionNegotiator> & Serializable> MavenPomResolver(S negotiatorSupplier) {

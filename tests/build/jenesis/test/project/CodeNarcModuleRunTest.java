@@ -2,6 +2,7 @@ package build.jenesis.test.project;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.Environment;
 import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
@@ -67,7 +68,7 @@ public class CodeNarcModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "codenarc",
-                new CodeNarcModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT),
+                new CodeNarcModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))).pinning(Pinning.STRICT),
                 "project");
         executor.execute();
 

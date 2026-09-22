@@ -13,6 +13,7 @@ import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.ProjectModuleDescriptor;
 import build.jenesis.step.JMod;
+import build.jenesis.Environment;
 
 /**
  * A custom assembler that packages extra, non-class content into a module's
@@ -37,8 +38,11 @@ import build.jenesis.step.JMod;
 public class Demo {
 
     static void main(String[] args) throws Exception {
-        Project project = new Project(Path.of("."))
-                .assembler(new ConfigJmodAssembler(new InferredMultiProjectAssembler()));
+        // jmod, jlink and jpackage are selected by the committed packaging.properties in this
+        // directory (jmod=true / jlink=true / jpackage=app-image), which Jenesis reads from
+        // the configuration location, so the wrapped stock assembler needs no extra wiring.
+        Project project = Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
+                .assembler(new ConfigJmodAssembler(InferredMultiProjectAssembler.ofEnvironment(Environment.SYSTEM)));
 
         SequencedMap<String, Path> outputs = project.build("stage");
         Path output = outputs.get("stage/packages");

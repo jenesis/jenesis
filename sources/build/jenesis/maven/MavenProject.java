@@ -10,6 +10,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Platform;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -49,8 +50,19 @@ public class MavenProject implements BuildExecutorModule {
     private final MavenResolver resolver;
     private final Platform platform;
 
-    public MavenProject(Path root, String prefix, MavenRepository repository, MavenResolver resolver) {
+    public MavenProject(Path root,
+                        String prefix,
+                        MavenRepository repository,
+                        MavenResolver resolver) {
         this(root, "main", prefix, repository, resolver, new Platform());
+    }
+
+    public static MavenProject ofEnvironment(Environment environment,
+                                      Path root,
+                                      String prefix,
+                                      MavenRepository repository,
+                                      MavenResolver resolver) {
+        return new MavenProject(root, prefix, repository, resolver);
     }
 
     private MavenProject(Path root,
@@ -77,17 +89,24 @@ public class MavenProject implements BuildExecutorModule {
 
     public static BuildExecutorModule make(Path root,
                                            MultiProjectAssembler<? super MavenModuleDescriptor> assembler) {
-        return make(root,
+        return make(Environment.NONE, root, assembler);
+    }
+
+    public static BuildExecutorModule make(Environment environment,
+                                           Path root,
+                                           MultiProjectAssembler<? super MavenModuleDescriptor> assembler) {
+        return make(environment, root,
                 "main",
                 "maven",
-                Map.of("maven", MavenDefaultRepository.of()),
-                Map.of("maven", new MavenPomResolver()),
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(environment)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(environment)),
                 null,
                 Collections.emptyNavigableSet(),
                 assembler);
     }
 
-    public static BuildExecutorModule make(Path root,
+    public static BuildExecutorModule make(Environment environment,
+                                           Path root,
                                            String group,
                                            String prefix,
                                            Map<String, Repository> repositories,
@@ -97,7 +116,8 @@ public class MavenProject implements BuildExecutorModule {
                                            MultiProjectAssembler<? super MavenModuleDescriptor> assembler) {
         MavenRepository repository = MavenRepository.of(requireNonNull(repositories.get(prefix)));
         MavenResolver resolver = MavenResolver.of(resolvers.get(prefix));
-        return new MultiProjectModule(new MavenProject(root, prefix, repository, resolver).group(group),
+        Dependencies dependencyModule = Dependencies.ofEnvironment(environment, repositories, resolvers);
+        return new MultiProjectModule(MavenProject.ofEnvironment(environment, root, prefix, repository, resolver).group(group),
                 identifier -> Optional.of(identifier.substring(0, identifier.indexOf('/'))),
                 _ -> (name, dependencies, arguments) -> {
                     Path location = MultiProjectModule.location(root, arguments);
@@ -145,7 +165,7 @@ public class MavenProject implements BuildExecutorModule {
                         artifactInputs.add(PREPARE);
                         artifactInputs.addAll(spdxSources);
                         depExec.addModule(ARTIFACTS,
-                                new Dependencies(mergedRepositories, resolvers).pinning(pinning),
+                                dependencyModule.repositories(mergedRepositories).pinning(pinning),
                                 artifactInputs);
                     }, dependencyDeps);
                     SequencedMap<String, String> produceDeps = new LinkedHashMap<>();

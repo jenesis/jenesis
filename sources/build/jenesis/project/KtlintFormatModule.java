@@ -8,6 +8,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -21,29 +22,41 @@ public class KtlintFormatModule implements BuildExecutorModule {
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
     private static final String MAVEN_GROUP = "com.pinterest.ktlint", MAVEN_ARTIFACT = "ktlint-cli";
 
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String group;
     private final boolean verify;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final ProcessBuildStep.Terms terms;
 
-    public KtlintFormatModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "ktlint-format", false, ProcessBuildStep.printing("ktlint-format"));
+    public KtlintFormatModule(Map<String, Repository> repositories,
+                              Map<String, Resolver> resolvers) {
+        this(new Dependencies(repositories, resolvers),
+             null,
+             "ktlint-format",
+             false,
+             ProcessBuildStep.Terms.of("ktlint-format"));
     }
 
-    private KtlintFormatModule(Map<String, Repository> repositories,
-                               Map<String, Resolver> resolvers,
+    public static KtlintFormatModule ofEnvironment(Environment environment,
+                                                   Map<String, Repository> repositories,
+                                                   Map<String, Resolver> resolvers) {
+        return new KtlintFormatModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
+                null,
+                "ktlint-format",
+                false,
+                ProcessBuildStep.Terms.ofEnvironment(environment, "ktlint-format"));
+    }
+
+    private KtlintFormatModule(Dependencies dependencies,
                                Pinning pinning,
                                String group,
                                boolean verify,
-                               BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+                               ProcessBuildStep.Terms terms) {
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.group = group;
         this.verify = verify;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public static Path configurationFile(SequencedSet<Path> configuration) {
@@ -51,19 +64,19 @@ public class KtlintFormatModule implements BuildExecutorModule {
     }
 
     public KtlintFormatModule pinning(Pinning pinning) {
-        return new KtlintFormatModule(repositories, resolvers, pinning, group, verify, printing);
+        return new KtlintFormatModule(dependencies, pinning, group, verify, terms);
     }
 
     public KtlintFormatModule group(String group) {
-        return new KtlintFormatModule(repositories, resolvers, pinning, group, verify, printing);
+        return new KtlintFormatModule(dependencies, pinning, group, verify, terms);
     }
 
     public KtlintFormatModule verify(boolean verify) {
-        return new KtlintFormatModule(repositories, resolvers, pinning, group, verify, printing);
+        return new KtlintFormatModule(dependencies, pinning, group, verify, terms);
     }
 
     public KtlintFormatModule printing(BiConsumer<Boolean, String> printing) {
-        return new KtlintFormatModule(repositories, resolvers, pinning, group, verify, printing);
+        return new KtlintFormatModule(dependencies, pinning, group, verify, terms.printing(printing));
     }
 
     @Override
@@ -73,12 +86,12 @@ public class KtlintFormatModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(group),
+                dependencies.pinning(pinning).group(group),
                 resolveInputs);
         SequencedSet<String> formatInputs = new LinkedHashSet<>();
         formatInputs.add(DEPENDENCIES);
         formatInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(FORMAT, new Format(group, verify, printing), formatInputs);
+        buildExecutor.addStep(FORMAT, new Format(terms, group, verify), formatInputs);
     }
 
     private record Requires(String group) implements BuildStep {
@@ -102,8 +115,8 @@ public class KtlintFormatModule implements BuildExecutorModule {
 
     private static class Format extends FormatBuildStep {
 
-        private Format(String group, boolean verify, BiConsumer<Boolean, String> printing) {
-            super("ktlint-format", group, verify, printing);
+        private Format(ProcessBuildStep.Terms terms, String group, boolean verify) {
+            super("ktlint-format", group, verify, terms);
         }
 
         @Override

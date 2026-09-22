@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
+import build.jenesis.Environment;
 import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
@@ -20,24 +21,35 @@ public class NativeImage extends ProcessBuildStep {
     }
 
     public NativeImage(PathPlacement pathPlacement, Function<List<String>, ? extends ProcessHandler> factory) {
-        this(pathPlacement, factory, "main", printing("native-image"));
+        this(pathPlacement, factory, "main", Terms.of("native-image"));
+    }
+
+    public static NativeImage ofEnvironment(Environment environment,
+                                            PathPlacement pathPlacement) {
+        return ofEnvironment(environment, pathPlacement, ProcessHandler.OfProcess.ofCommand("native-image"));
+    }
+
+    public static NativeImage ofEnvironment(Environment environment,
+                                            PathPlacement pathPlacement,
+                                            Function<List<String>, ? extends ProcessHandler> factory) {
+        return new NativeImage(pathPlacement, factory, "main", Terms.ofEnvironment(environment, "native-image"));
     }
 
     private NativeImage(PathPlacement pathPlacement,
                         Function<List<String>, ? extends ProcessHandler> factory,
                         String group,
-                        BiConsumer<Boolean, String> printing) {
-        super("native-image", factory, printing);
+                        Terms terms) {
+        super("native-image", factory, terms);
         this.pathPlacement = pathPlacement;
         this.group = group;
     }
 
     public NativeImage group(String group) {
-        return new NativeImage(pathPlacement, factory, group, printing);
+        return new NativeImage(pathPlacement, factory, group, terms);
     }
 
     public NativeImage verbose(BiConsumer<Boolean, String> printing) {
-        return new NativeImage(pathPlacement, factory, group, printing);
+        return new NativeImage(pathPlacement, factory, group, terms.printing(printing));
     }
 
     @Override

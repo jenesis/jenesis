@@ -7,14 +7,14 @@ public final class DependencyTreeReport {
     private static final int[] GRADIENT = {
             39, 44, 48, 83, 113, 148, 184, 214, 208, 203, 168, 134};
 
-    private final PrintStream out;
+    private final Consumer<String> out;
     private final boolean compact;
 
-    public DependencyTreeReport(PrintStream out) {
+    public DependencyTreeReport(Consumer<String> out) {
         this(out, false);
     }
 
-    private DependencyTreeReport(PrintStream out, boolean compact) {
+    private DependencyTreeReport(Consumer<String> out, boolean compact) {
         this.out = out;
         this.compact = compact;
     }
@@ -60,7 +60,7 @@ public final class DependencyTreeReport {
             }
         }
         synchronized (out) {
-            out.print(builder);
+            builder.toString().lines().forEach(out);
         }
     }
 
@@ -142,7 +142,7 @@ public final class DependencyTreeReport {
                 .append(row("automatic", automatic, total, width, 214))
                 .append(row("non-modular", plain, total, width, 245));
         synchronized (out) {
-            out.print(builder);
+            builder.toString().lines().forEach(out);
         }
     }
 

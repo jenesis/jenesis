@@ -4,6 +4,8 @@ import module java.base;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
+import build.jenesis.Environment;
+import build.jenesis.SequencedProperties;
 
 public class JarSigner extends ProcessBuildStep {
 
@@ -16,14 +18,38 @@ public class JarSigner extends ProcessBuildStep {
     private final List<String> arguments;
 
     public JarSigner() {
-        this(System.getProperty("jenesis.jarsigner.keystore"),
-                System.getProperty("jenesis.jarsigner.alias"),
-                password("-storepass", System.getProperty("jenesis.jarsigner.storepass")),
-                password("-keypass", System.getProperty("jenesis.jarsigner.keypass")),
-                System.getProperty("jenesis.jarsigner.storetype"),
-                System.getProperty("jenesis.jarsigner.tsa"),
-                words(System.getProperty("jenesis.jarsigner.arguments")),
-                printing("jarsigner"));
+        this(null, null, null, null, null, null, List.of(), Terms.of("jarsigner"));
+    }
+
+    public static JarSigner ofEnvironment(Environment environment) {
+        JarSigner signer = new JarSigner(null, null, null, null, null, null, List.of(),
+                Terms.ofEnvironment(environment, "jarsigner"));
+        String keystore = environment.getProperty("jarsigner.keystore");
+        if (keystore != null) {
+            signer = signer.keystore(keystore);
+        }
+        String alias = environment.getProperty("jarsigner.alias");
+        if (alias != null) {
+            signer = signer.alias(alias);
+        }
+        String storepass = environment.getProperty("jarsigner.storepass");
+        if (storepass != null) {
+            signer = signer.storepass(storepass);
+        }
+        String keypass = environment.getProperty("jarsigner.keypass");
+        if (keypass != null) {
+            signer = signer.keypass(keypass);
+        }
+        String storetype = environment.getProperty("jarsigner.storetype");
+        if (storetype != null) {
+            signer = signer.storetype(storetype);
+        }
+        String tsa = environment.getProperty("jarsigner.tsa");
+        if (tsa != null) {
+            signer = signer.tsa(tsa);
+        }
+        String arguments = environment.getProperty("jarsigner.arguments");
+        return arguments == null ? signer : signer.arguments(words(arguments));
     }
 
     private JarSigner(String keystore,
@@ -33,8 +59,8 @@ public class JarSigner extends ProcessBuildStep {
                       String storetype,
                       String tsa,
                       List<String> arguments,
-                      BiConsumer<Boolean, String> printing) {
-        super("jarsigner", ProcessHandler.OfProcess.ofJavaHome("bin/jarsigner"), printing);
+                      Terms terms) {
+        super("jarsigner", ProcessHandler.OfProcess.ofJavaHome("bin/jarsigner"), terms);
         this.keystore = keystore;
         this.alias = alias;
         this.storepass = storepass;
@@ -55,35 +81,35 @@ public class JarSigner extends ProcessBuildStep {
     }
 
     public JarSigner keystore(String keystore) {
-        return new JarSigner(keystore, alias, storepass, keypass, storetype, tsa, arguments, printing);
+        return new JarSigner(keystore, alias, storepass, keypass, storetype, tsa, arguments, terms);
     }
 
     public JarSigner alias(String alias) {
-        return new JarSigner(keystore, alias, storepass, keypass, storetype, tsa, arguments, printing);
+        return new JarSigner(keystore, alias, storepass, keypass, storetype, tsa, arguments, terms);
     }
 
     public JarSigner storepass(String storepass) {
-        return new JarSigner(keystore, alias, password("-storepass", storepass), keypass, storetype, tsa, arguments, printing);
+        return new JarSigner(keystore, alias, password("-storepass", storepass), keypass, storetype, tsa, arguments, terms);
     }
 
     public JarSigner keypass(String keypass) {
-        return new JarSigner(keystore, alias, storepass, password("-keypass", keypass), storetype, tsa, arguments, printing);
+        return new JarSigner(keystore, alias, storepass, password("-keypass", keypass), storetype, tsa, arguments, terms);
     }
 
     public JarSigner storetype(String storetype) {
-        return new JarSigner(keystore, alias, storepass, keypass, storetype, tsa, arguments, printing);
+        return new JarSigner(keystore, alias, storepass, keypass, storetype, tsa, arguments, terms);
     }
 
     public JarSigner tsa(String tsa) {
-        return new JarSigner(keystore, alias, storepass, keypass, storetype, tsa, arguments, printing);
+        return new JarSigner(keystore, alias, storepass, keypass, storetype, tsa, arguments, terms);
     }
 
     public JarSigner arguments(List<String> arguments) {
-        return new JarSigner(keystore, alias, storepass, keypass, storetype, tsa, arguments, printing);
+        return new JarSigner(keystore, alias, storepass, keypass, storetype, tsa, arguments, terms);
     }
 
     public JarSigner verbose(BiConsumer<Boolean, String> printing) {
-        return new JarSigner(keystore, alias, storepass, keypass, storetype, tsa, arguments, printing);
+        return new JarSigner(keystore, alias, storepass, keypass, storetype, tsa, arguments, terms.printing(printing));
     }
 
     private static List<String> words(String value) {

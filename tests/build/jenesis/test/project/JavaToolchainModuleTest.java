@@ -17,6 +17,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.JavaToolchainModule;
 import build.jenesis.project.TestModule;
 import sample.Sample;
+import build.jenesis.Environment;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -215,7 +216,7 @@ public class JavaToolchainModuleTest {
                         null,
                         Map.of(),
                         null)),
-                Map.of("maven", new MavenPomResolver())), "output", "input");
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))), "output", "input");
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps).containsKeys("output/classes", "output/artifacts", "output-test/executed");
         assertThat(steps.get("output/classes").resolve(BuildStep.CLASSES).resolve("other/SampleTest.class")).exists();

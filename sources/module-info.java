@@ -20,4 +20,8 @@ module build.jenesis {
     exports build.jenesis.step;
 
     uses build.jenesis.BuildExecutorModule;
+
+    provides java.util.spi.ToolProvider with build.jenesis.MakeTool,
+            build.jenesis.ExecuteTool,
+            build.jenesis.JpxTool;
 }

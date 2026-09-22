@@ -2,6 +2,7 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.Environment;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
@@ -93,7 +94,7 @@ public class JarSignerTest {
 
     @Test
     public void rejects_a_password_that_is_not_a_location() {
-        assertThatThrownBy(() -> new JarSigner().storepass("secret"))
+        assertThatThrownBy(() -> JarSigner.ofEnvironment(Environment.SYSTEM).storepass("secret"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("jenesis.jarsigner.storepass")
                 .hasMessageContaining("'env <variable>' or 'file <path>'");
@@ -101,14 +102,10 @@ public class JarSignerTest {
 
     @Test
     public void reads_the_key_it_signs_with_from_the_environment() throws IOException {
-        System.setProperty("jenesis.jarsigner.keystore", keystore.toString());
-        System.setProperty("jenesis.jarsigner.storetype", "PKCS12");
-        System.setProperty("jenesis.jarsigner.alias", ALIAS);
-        System.setProperty("jenesis.jarsigner.storepass", "file " + password);
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addStep("sign", new JarSigner(), "project");
+        executor.addStep("sign", JarSigner.ofEnvironment(new Environment(Map.of("jarsigner.keystore", keystore.toString(), "jarsigner.storetype", "PKCS12", "jarsigner.alias", ALIAS, "jarsigner.storepass", "file " + password)::get)), "project");
         executor.execute();
 
         try (JarFile jar = new JarFile(signed().toFile())) {
@@ -122,7 +119,7 @@ public class JarSignerTest {
     public void refuses_to_ship_unsigned_when_no_key_store_was_supplied() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addStep("sign", new JarSigner().alias(ALIAS), "project");
+        executor.addStep("sign", JarSigner.ofEnvironment(Environment.SYSTEM).alias(ALIAS), "project");
 
         assertThatThrownBy(executor::execute).rootCause()
                 .as("a project that says it signs must not quietly produce an unsigned jar"
@@ -136,7 +133,7 @@ public class JarSignerTest {
     public void refuses_a_key_store_whose_password_nothing_locates() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addStep("sign", new JarSigner().keystore(keystore.toString()).alias(ALIAS), "project");
+        executor.addStep("sign", JarSigner.ofEnvironment(Environment.SYSTEM).keystore(keystore.toString()).alias(ALIAS), "project");
 
         assertThatThrownBy(executor::execute).rootCause()
                 .as("jarsigner would ask for the password, and a build that cannot answer hangs")
@@ -146,10 +143,10 @@ public class JarSignerTest {
 
     @Test
     public void says_nothing_about_signing_until_something_names_it() {
-        assertThat(new JarSigner().configured())
+        assertThat(JarSigner.ofEnvironment(Environment.SYSTEM).configured())
                 .as("nothing is set, so the archiver's jar is the artifact")
                 .isFalse();
-        assertThat(new JarSigner().alias(ALIAS).configured())
+        assertThat(JarSigner.ofEnvironment(Environment.SYSTEM).alias(ALIAS).configured())
                 .as("a project that names the key it signs with has said it signs")
                 .isTrue();
     }
@@ -172,7 +169,7 @@ public class JarSignerTest {
     }
 
     private JarSigner newSigner() {
-        return new JarSigner()
+        return JarSigner.ofEnvironment(Environment.SYSTEM)
                 .keystore(keystore.toString())
                 .storetype("PKCS12")
                 .alias(ALIAS)

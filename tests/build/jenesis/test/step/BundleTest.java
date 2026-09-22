@@ -2,6 +2,7 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.Environment;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -39,7 +40,7 @@ public class BundleTest {
         launcher.setProperty("mainClass", "sample.Sample");
         launcher.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = new Bundle().apply(
+        BuildStepResult result = Bundle.ofEnvironment(Environment.SYSTEM).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -83,7 +84,7 @@ public class BundleTest {
         launcher.setProperty("mainModule", "sample");
         launcher.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = new Bundle().apply(
+        BuildStepResult result = Bundle.ofEnvironment(Environment.SYSTEM).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -121,7 +122,7 @@ public class BundleTest {
         launcher.setProperty("mainModule", "sample");
         launcher.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = new Bundle().apply(
+        BuildStepResult result = Bundle.ofEnvironment(Environment.SYSTEM).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -173,7 +174,7 @@ public class BundleTest {
         launcher.setProperty("mainModule", "sample");
         launcher.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = new Bundle().apply(
+        BuildStepResult result = Bundle.ofEnvironment(Environment.SYSTEM).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -198,7 +199,7 @@ public class BundleTest {
     public void skips_a_module_without_a_main() throws IOException {
         writePlainJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"));
 
-        BuildStepResult result = new Bundle().apply(
+        BuildStepResult result = Bundle.ofEnvironment(Environment.SYSTEM).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -216,7 +217,7 @@ public class BundleTest {
         launcher.setProperty("mainClass", "sample.Sample");
         launcher.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = new Bundle().apply(
+        BuildStepResult result = Bundle.ofEnvironment(Environment.SYSTEM).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -228,7 +229,7 @@ public class BundleTest {
         try (ZipFile zip = new ZipFile(next.resolve(Bundle.BUNDLE).resolve("bundle.zip").toFile())) {
             assertThat(zip.stream().map(ZipEntry::getTimeLocal))
                     .as("a bundle created at another moment carries the same bytes")
-                    .containsOnly(BuildStep.timestamp().toLocalDateTime());
+                    .containsOnly(BuildStep.timestamp(Environment.SYSTEM).toLocalDateTime());
         }
     }
 
@@ -242,12 +243,7 @@ public class BundleTest {
         launcher.setProperty("mainClass", "sample.Sample");
         launcher.store(input.resolve("launcher.properties"));
         Bundle bundle;
-        System.setProperty("jenesis.archive.timestamp", "");
-        try {
-            bundle = new Bundle();
-        } finally {
-            System.clearProperty("jenesis.archive.timestamp");
-        }
+        bundle = Bundle.ofEnvironment(new Environment(Map.of("archive.timestamp", "")::get));
 
         BuildStepResult result = bundle.apply(
                 Runnable::run,

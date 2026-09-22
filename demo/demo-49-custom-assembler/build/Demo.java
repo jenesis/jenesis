@@ -12,12 +12,16 @@ import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.ProjectModuleDescriptor;
+import build.jenesis.Environment;
 
 public class Demo {
 
     static void main(String[] args) throws Exception {
-        new Project(Path.of("."))
-                .assembler(new PreprocessingAssembler(new InferredMultiProjectAssembler()))
+        // Wrap the stock InferredMultiProjectAssembler so that every module's Java
+        // sources pass through a preprocessing step before the regular compile,
+        // jar, and test flow runs unchanged.
+        Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
+                .assembler(new PreprocessingAssembler(InferredMultiProjectAssembler.ofEnvironment(Environment.SYSTEM)))
                 .build(args);
     }
 
