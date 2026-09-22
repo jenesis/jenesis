@@ -93,7 +93,7 @@ Quick index
 | 42 | [`scala-quality`](demo-42-scala-quality/README.md)                | Scalastyle and scalafmt, inferred from their config files                    | `java build/jenesis/Make.java`    |
 | 43 | [`groovy`](demo-43-groovy/README.md)                              | Java and Groovy in one module                                                | `java build/jenesis/Make.java`    |
 | 44 | [`groovy-quality`](demo-44-groovy-quality/README.md)              | CodeNarc, inferred from its config file                                      | `java build/jenesis/Make.java`    |
-| 45 | [`profiles`](demo-45-profiles/README.md)                          | Switch a set of properties on together with a named profile                  | `java build/jenesis/Make.java`    |
+| 45 | [`profiles`](demo-45-profiles/README.md)                          | Switch a set of properties on together with a named profile, or a run with a file | `java build/jenesis/Make.java`    |
 | 46 | [`build-cache`](demo-46-build-cache/README.md)                    | Serve step outputs from a cache shared across builds                         | `java build/jenesis/Make.java`    |
 | 47 | [`docker-isolation`](demo-47-docker-isolation/README.md)          | Confine the build and the program it produces to a container                 | `java build/jenesis/Make.java`    |
 | 48 | [`agents`](demo-48-agents/README.md)                              | Attach a library as a Java agent with `@jenesis.attach`                      | `java build/Demo.java`            |

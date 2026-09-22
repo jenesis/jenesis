@@ -27,9 +27,8 @@ A whole command line can live in a file instead, the way the JDK's own tools rea
     -Djenesis.print.progress=false
     build
 
-and `@<file>` stands for what it holds, with `#` a comment to the end of a line and quotes
-holding what would otherwise split. `@@<text>` is an argument that starts with an `@`, and
-a file names no further file. The commands read the same argument, so
+and `@<file>` stands for the arguments it holds, the argument file `profiles` introduces.
+Nothing about it belongs to the tools: the commands read it the same way, so
 `java build/jenesis/Make.java @release.args` is the same run from a shell.
 
 A tool run is configured by those arguments alone, never by the properties of the JVM it
