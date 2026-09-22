@@ -99,8 +99,8 @@ the declared license:
 
     java build/jenesis/Make.java dependencies
 
-    main/compile (module)
-    maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT License}
+    ./sources 1-SNAPSHOT (module demo.modular)
+    └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT}
 
 Because this is the default MODULAR_TO_MAVEN layout, `requires org.slf4j` is shown
 as the Maven coordinate it resolves to, with a Maven scope. Under the pure MODULAR
