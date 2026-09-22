@@ -6,6 +6,7 @@ import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SafeSegment;
 import build.jenesis.SequencedProperties;
+import build.jenesis.maven.MavenDefaultVersionNegotiator;
 public class JenesisRawGitRepository implements JenesisRepository {
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
@@ -18,6 +19,8 @@ public class JenesisRawGitRepository implements JenesisRepository {
     private final String token;
     private final Predicate<String> predicate;
     private final Repository.Connection connection;
+    private final Boolean prerelease;
+    private final Boolean speculative;
     private final Map<String, Optional<String>> tsvCache = new ConcurrentHashMap<>();
 
     public JenesisRawGitRepository(Scope scope, URI data, URI repository) {
@@ -41,8 +44,14 @@ public class JenesisRawGitRepository implements JenesisRepository {
                                     URI data,
                                     URI repository,
                                     String token) {
-        this(scope, trailingSlash(data), trailingSlash(repository), token, _ -> true,
-                Repository.Connection.ofEnvironment(environment));
+        this(scope,
+             trailingSlash(data),
+             trailingSlash(repository),
+             token,
+             _ -> true,
+             Repository.Connection.ofEnvironment(environment),
+             environment.flagOrNull("module.prerelease"),
+             environment.flagOrNull("module.speculative"));
     }
 
     private JenesisRawGitRepository(Scope scope,
@@ -50,21 +59,37 @@ public class JenesisRawGitRepository implements JenesisRepository {
                                     URI repository,
                                     String token,
                                     Predicate<String> predicate,
-                                    Repository.Connection connection) {
+                                    Repository.Connection connection,
+                                    Boolean prerelease,
+                                    Boolean speculative) {
         this.scope = scope;
         this.data = data;
         this.repository = repository;
         this.token = token;
         this.predicate = predicate;
         this.connection = connection;
+        this.prerelease = prerelease;
+        this.speculative = speculative;
     }
 
     public JenesisRawGitRepository groups(Predicate<String> predicate) {
-        return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection);
+        return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection,
+                prerelease, speculative);
     }
 
     public JenesisRawGitRepository connection(Repository.Connection connection) {
-        return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection);
+        return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection,
+                prerelease, speculative);
+    }
+
+    public JenesisRawGitRepository prerelease(Boolean prerelease) {
+        return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection,
+                prerelease, speculative);
+    }
+
+    public JenesisRawGitRepository speculative(Boolean speculative) {
+        return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection,
+                prerelease, speculative);
     }
 
     public static JenesisRepository of(Scope scope) {
@@ -268,11 +293,15 @@ public class JenesisRawGitRepository implements JenesisRepository {
             if (newest == null) {
                 newest = row;
             }
-            if (version == null || columns[0].equals(version)) {
+            if (version == null
+                    ? prerelease != null && prerelease
+                            || MavenDefaultVersionNegotiator.isStable(columns[0])
+                            && MavenDefaultVersionNegotiator.isStable(row.version())
+                    : columns[0].equals(version)) {
                 return row;
             }
         }
-        if (version != null && newest != null) {
+        if (version != null && newest != null && (speculative == null || speculative)) {
             return new Coordinate(newest.groupId(), newest.artifactId(), version);
         }
         return null;
