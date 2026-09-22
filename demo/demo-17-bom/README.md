@@ -120,7 +120,7 @@ A module can also *publish* a BOM of its own resolved dependency closure. A
 switches the modular layouts to emit the closure as a properties file, which
 `export` stages into the local Jenesis repository alongside the module jar:
 
-    ~/.jenesis/demo.bom/1-SNAPSHOT/demo.bom.properties
+    ~/.jenesis/demo.bom/demo.bom.properties
 
 The file is the module's full closure with a version and checksum per
 coordinate, keyed group-less exactly like a hand-written BOM, so another
