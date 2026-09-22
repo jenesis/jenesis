@@ -16,6 +16,7 @@ import build.jenesis.project.ScalafmtModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class ScalafmtModuleRunTest {
 
@@ -78,7 +79,7 @@ public class ScalafmtModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "scalafmt",
-                new ScalafmtModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT),
+                new ScalafmtModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT),
                 "project");
         executor.execute();
 
@@ -101,7 +102,7 @@ public class ScalafmtModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "scalafmt",
-                new ScalafmtModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT)
+                new ScalafmtModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT)
                         .strict(true),
                 "project");
 

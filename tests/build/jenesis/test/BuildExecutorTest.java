@@ -20,6 +20,7 @@ import build.jenesis.SequencedProperties;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.catchThrowable;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class BuildExecutorTest implements Serializable {
 
@@ -383,13 +384,29 @@ public class BuildExecutorTest implements Serializable {
 
     @Test
     public void aggregate_configuration_defaults_from_property_and_is_overridable() {
-        assertThat(new BuildExecutor.Configuration().aggregate()).isFalse();
-        assertThat(new BuildExecutor.Configuration().aggregate(true).aggregate()).isTrue();
+        assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).aggregate()).isFalse();
+        assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).aggregate(true).aggregate()).isTrue();
         System.setProperty("jenesis.executor.aggregate", "true");
         try {
-            assertThat(new BuildExecutor.Configuration().aggregate()).isTrue();
+            assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).aggregate()).isTrue();
         } finally {
             System.clearProperty("jenesis.executor.aggregate");
+        }
+    }
+
+    @Test
+    public void a_configuration_takes_its_defaults_when_it_is_given_no_provider() {
+        System.setProperty("jenesis.executor.aggregate", "true");
+        System.setProperty("jenesis.executor.digest", "SHA-256");
+        try {
+            assertThat(new BuildExecutor.Configuration().aggregate())
+                    .as("an embedder that builds its own configuration is never surprised by the environment")
+                    .isFalse();
+            assertThat(new BuildExecutor.Configuration().digest()).isEqualTo("MD5");
+            assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).aggregate()).isTrue();
+        } finally {
+            System.clearProperty("jenesis.executor.aggregate");
+            System.clearProperty("jenesis.executor.digest");
         }
     }
 

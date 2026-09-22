@@ -21,6 +21,7 @@ import sample.Sample;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class JavaToolchainModuleTest {
 
@@ -215,7 +216,7 @@ public class JavaToolchainModuleTest {
                         null,
                         Map.of(),
                         null)),
-                Map.of("maven", new MavenPomResolver())), "output", "input");
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))), "output", "input");
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps).containsKeys("output/classes", "output/artifacts", "output-test/executed");
         assertThat(steps.get("output/classes").resolve(BuildStep.CLASSES).resolve("other/SampleTest.class")).exists();

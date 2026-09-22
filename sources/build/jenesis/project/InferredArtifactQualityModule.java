@@ -28,36 +28,46 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
             "error-on-semantic-incompatibility");
 
     private final SequencedSet<Path> configuration;
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
+    private final JApiCmpModule japicmpModule;
     private final Function<JApiCmpModule, BuildExecutorModule> japicmp;
 
     public InferredArtifactQualityModule(SequencedSet<Path> configuration,
-                                          Map<String, Repository> repositories,
-                                          Map<String, Resolver> resolvers) {
-        this(configuration, repositories, resolvers, null,
-                SequencedProperties.systemFlag("jenesis.artifact.japicmp", true) ? module -> module : null);
+                                         Map<String, Repository> repositories,
+                                         Map<String, Resolver> resolvers) {
+        this(configuration, null, new JApiCmpModule(repositories, resolvers),
+             value -> value);
+    }
+
+    public static InferredArtifactQualityModule ofKeys(Function<String, String> keys,
+                                                      SequencedSet<Path> configuration,
+                                                      Map<String, Repository> repositories,
+                                                      Map<String, Resolver> resolvers) {
+        InferredArtifactQualityModule module = new InferredArtifactQualityModule(configuration, null, JApiCmpModule.ofKeys(keys, repositories, resolvers),
+                value -> value);
+        Boolean japicmp = SequencedProperties.flagOrNull(keys, "artifact.japicmp");
+        if (japicmp != null) {
+            module = module.japicmp(japicmp ? value -> value : null);
+        }
+        return module;
     }
 
     private InferredArtifactQualityModule(SequencedSet<Path> configuration,
-                                           Map<String, Repository> repositories,
-                                           Map<String, Resolver> resolvers,
-                                           Pinning pinning,
-                                           Function<JApiCmpModule, BuildExecutorModule> japicmp) {
+                                          Pinning pinning,
+                                          JApiCmpModule japicmpModule,
+                                          Function<JApiCmpModule, BuildExecutorModule> japicmp) {
         this.configuration = configuration;
-        this.repositories = repositories;
-        this.resolvers = resolvers;
         this.pinning = pinning;
+        this.japicmpModule = japicmpModule;
         this.japicmp = japicmp;
     }
 
     public InferredArtifactQualityModule pinning(Pinning pinning) {
-        return new InferredArtifactQualityModule(configuration, repositories, resolvers, pinning, japicmp);
+        return new InferredArtifactQualityModule(configuration, pinning, japicmpModule, japicmp);
     }
 
     public InferredArtifactQualityModule japicmp(Function<JApiCmpModule, BuildExecutorModule> japicmp) {
-        return new InferredArtifactQualityModule(configuration, repositories, resolvers, pinning, japicmp);
+        return new InferredArtifactQualityModule(configuration, pinning, japicmpModule, japicmp);
     }
 
     @Override
@@ -74,7 +84,7 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
                                     + ")");
                         }
                     }
-                    return new JApiCmpModule(repositories, resolvers).pinning(pinning).config(properties);
+                    return japicmpModule.pinning(pinning).config(properties);
                 });
     }
 }

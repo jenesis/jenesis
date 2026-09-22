@@ -20,6 +20,7 @@ import javax.tools.ToolProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class AttachModuleRunTest {
 
@@ -149,11 +150,11 @@ public class AttachModuleRunTest {
         executor.addSource("dependencies", dependencies);
         executor.addSource("classes", classes);
         Map<String, Repository> repositories = Map.of(
-                "maven", MavenDefaultRepository.of(),
+                "maven", MavenDefaultRepository.ofKeys(SYSTEM),
                 "probes", new MavenDefaultRepository(repository.toUri(), null, Map.of(), null));
         Map<String, Resolver> resolvers = Map.of(
-                "maven", new MavenPomResolver(),
-                "probes", new MavenPomResolver());
+                "maven", MavenPomResolver.ofKeys(SYSTEM),
+                "probes", MavenPomResolver.ofKeys(SYSTEM));
         executor.addModule(
                 "test",
                 new TestModule(repositories, resolvers)

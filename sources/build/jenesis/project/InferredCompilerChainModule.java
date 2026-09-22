@@ -29,6 +29,10 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
     private final Map<String, Resolver> resolvers;
     private final Pinning pinning;
     private final PathPlacement pathPlacement;
+    private final Javac javacStep;
+    private final KotlinCompilerModule kotlincModule;
+    private final ScalaCompilerModule scalacModule;
+    private final GroovyCompilerModule groovycModule;
     private final Function<Javac, BuildStep> javac;
     private final Function<KotlinCompilerModule, BuildExecutorModule> kotlinc;
     private final Function<ScalaCompilerModule, BuildExecutorModule> scalac;
@@ -38,9 +42,42 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
     public InferredCompilerChainModule(SequencedSet<Path> configuration,
                                        Map<String, Repository> repositories,
                                        Map<String, Resolver> resolvers) {
-        this(configuration, repositories, resolvers, null, PathPlacement.INFERRED,
-                step -> step, module -> module, module -> module, module -> module,
-                SequencedProperties.systemFlag("jenesis.compile.errorprone", true) ? step -> step : null);
+        this(configuration,
+                repositories,
+                resolvers,
+                null,
+                PathPlacement.INFERRED,
+                new Javac(ProcessHandler.Factory.of()),
+                new KotlinCompilerModule(repositories, resolvers),
+                new ScalaCompilerModule(repositories, resolvers),
+                new GroovyCompilerModule(repositories, resolvers),
+                step -> step,
+                value -> value,
+                value -> value,
+                value -> value,
+                step -> step);
+    }
+
+    public static InferredCompilerChainModule ofKeys(Function<String, String> keys,
+                                                     SequencedSet<Path> configuration,
+                                                     Map<String, Repository> repositories,
+                                                     Map<String, Resolver> resolvers) {
+        InferredCompilerChainModule module = new InferredCompilerChainModule(configuration,
+                repositories,
+                resolvers,
+                null,
+                PathPlacement.INFERRED,
+                Javac.ofKeys(keys, ProcessHandler.Factory.of()),
+                KotlinCompilerModule.ofKeys(keys, repositories, resolvers),
+                ScalaCompilerModule.ofKeys(keys, repositories, resolvers),
+                GroovyCompilerModule.ofKeys(keys, repositories, resolvers),
+                step -> step,
+                value -> value,
+                value -> value,
+                value -> value,
+                step -> step);
+        Boolean errorprone = SequencedProperties.flagOrNull(keys, "compile.errorprone");
+        return errorprone == null ? module : module.errorprone(errorprone ? step -> step : null);
     }
 
     private InferredCompilerChainModule(SequencedSet<Path> configuration,
@@ -48,6 +85,10 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                                         Map<String, Resolver> resolvers,
                                         Pinning pinning,
                                         PathPlacement pathPlacement,
+                                        Javac javacStep,
+                                        KotlinCompilerModule kotlincModule,
+                                        ScalaCompilerModule scalacModule,
+                                        GroovyCompilerModule groovycModule,
                                         Function<Javac, BuildStep> javac,
                                         Function<KotlinCompilerModule, BuildExecutorModule> kotlinc,
                                         Function<ScalaCompilerModule, BuildExecutorModule> scalac,
@@ -58,6 +99,10 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
         this.resolvers = resolvers;
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
+        this.javacStep = javacStep;
+        this.kotlincModule = kotlincModule;
+        this.scalacModule = scalacModule;
+        this.groovycModule = groovycModule;
         this.javac = javac;
         this.kotlinc = kotlinc;
         this.scalac = scalac;
@@ -66,31 +111,45 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
     }
 
     public InferredCompilerChainModule pinning(Pinning pinning) {
-        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone);
+        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
+                javacStep, kotlincModule, scalacModule, groovycModule,
+                javac, kotlinc, scalac, groovyc, errorprone);
     }
 
     public InferredCompilerChainModule pathPlacement(PathPlacement pathPlacement) {
-        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone);
+        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
+                javacStep, kotlincModule, scalacModule, groovycModule,
+                javac, kotlinc, scalac, groovyc, errorprone);
     }
 
     public InferredCompilerChainModule javac(Function<Javac, BuildStep> javac) {
-        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone);
+        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
+                javacStep, kotlincModule, scalacModule, groovycModule,
+                javac, kotlinc, scalac, groovyc, errorprone);
     }
 
     public InferredCompilerChainModule kotlinc(Function<KotlinCompilerModule, BuildExecutorModule> kotlinc) {
-        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone);
+        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
+                javacStep, kotlincModule, scalacModule, groovycModule,
+                javac, kotlinc, scalac, groovyc, errorprone);
     }
 
     public InferredCompilerChainModule scalac(Function<ScalaCompilerModule, BuildExecutorModule> scalac) {
-        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone);
+        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
+                javacStep, kotlincModule, scalacModule, groovycModule,
+                javac, kotlinc, scalac, groovyc, errorprone);
     }
 
     public InferredCompilerChainModule groovyc(Function<GroovyCompilerModule, BuildExecutorModule> groovyc) {
-        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone);
+        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
+                javacStep, kotlincModule, scalacModule, groovycModule,
+                javac, kotlinc, scalac, groovyc, errorprone);
     }
 
     public InferredCompilerChainModule errorprone(Function<ErrorProne, BuildStep> errorprone) {
-        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone);
+        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
+                javacStep, kotlincModule, scalacModule, groovycModule,
+                javac, kotlinc, scalac, groovyc, errorprone);
     }
 
     @Override
@@ -99,7 +158,9 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
         SequencedSet<String> compileInputs = new LinkedHashSet<>(inherited.sequencedKeySet());
         compileInputs.add(SCAN);
         buildExecutor.addModule(COMPILE,
-                new Compile(configuration, repositories, resolvers, pinning, pathPlacement, javac, kotlinc, scalac, groovyc, errorprone),
+                new Compile(configuration, repositories, resolvers, pinning, pathPlacement,
+                        javacStep, kotlincModule, scalacModule, groovycModule,
+                        javac, kotlinc, scalac, groovyc, errorprone),
                 compileInputs);
     }
 
@@ -164,6 +225,10 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                            Map<String, Resolver> resolvers,
                            Pinning pinning,
                            PathPlacement pathPlacement,
+                           Javac javacStep,
+                           KotlinCompilerModule kotlincModule,
+                           ScalaCompilerModule scalacModule,
+                           GroovyCompilerModule groovycModule,
                            Function<Javac, BuildStep> javac,
                            Function<KotlinCompilerModule, BuildExecutorModule> kotlinc,
                            Function<ScalaCompilerModule, BuildExecutorModule> scalac,
@@ -188,8 +253,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
 
             SequencedSet<String> dependencies = new LinkedHashSet<>(sourceInputs);
             if (hasKotlin) {
-                BuildExecutorModule compiler = kotlinc.apply(new KotlinCompilerModule(repositories, resolvers)
-                        .pinning(pinning)
+                BuildExecutorModule compiler = kotlinc.apply(kotlincModule.pinning(pinning)
                         .includeResources(!hasJava && !hasScala && !hasGroovy));
                 if (compiler != null) {
                     buildExecutor.addModule(KOTLINC, compiler, dependencies);
@@ -199,8 +263,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 }
             }
             if (hasScala) {
-                BuildExecutorModule compiler = scalac.apply(new ScalaCompilerModule(repositories, resolvers)
-                        .pinning(pinning)
+                BuildExecutorModule compiler = scalac.apply(scalacModule.pinning(pinning)
                         .includeResources(!hasJava && !hasKotlin && !hasGroovy));
                 if (compiler != null) {
                     buildExecutor.addModule(SCALAC, compiler, dependencies);
@@ -211,9 +274,9 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
             }
             if (hasJava) {
                 BuildStep plugin = configured();
-                BuildStep compiler = javac.apply(new Javac(plugin == null
-                        ? ProcessHandler.Factory.of()
-                        : ProcessHandler.Factory.FORK)
+                BuildStep compiler = javac.apply((plugin == null
+                        ? javacStep
+                        : javacStep.factory(ProcessHandler.Factory.FORK))
                         .includeResources(!hasKotlin && !hasScala && !hasGroovy)
                         .pathPlacement(pathPlacement));
                 if (compiler != null) {
@@ -229,8 +292,7 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 }
             }
             if (hasGroovy) {
-                BuildExecutorModule compiler = groovyc.apply(new GroovyCompilerModule(repositories, resolvers)
-                        .pinning(pinning)
+                BuildExecutorModule compiler = groovyc.apply(groovycModule.pinning(pinning)
                         .includeResources(!hasJava && !hasKotlin && !hasScala));
                 if (compiler != null) {
                     buildExecutor.addModule(GROOVYC, compiler, dependencies);

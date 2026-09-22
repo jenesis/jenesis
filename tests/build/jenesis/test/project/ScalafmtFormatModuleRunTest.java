@@ -15,6 +15,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.ScalafmtFormatModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class ScalafmtFormatModuleRunTest {
 
@@ -101,7 +102,7 @@ public class ScalafmtFormatModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "scalafmt-format",
-                new ScalafmtFormatModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT),
+                new ScalafmtFormatModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT),
                 "project");
         return executor;
     }

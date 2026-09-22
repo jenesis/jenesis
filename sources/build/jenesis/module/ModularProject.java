@@ -56,6 +56,12 @@ public class ModularProject implements BuildExecutorModule {
                 MavenModuleRepository.segments());
     }
 
+    public static ModularProject ofKeys(Function<String, String> keys, String prefix, Path root) {
+        ModularProject project = new ModularProject(prefix, root);
+        Integer segments = SequencedProperties.numberOrNull(keys, "maven.segments");
+        return segments == null ? project : project.segments(segments);
+    }
+
     private ModularProject(String group,
                            String prefix,
                            Path root,
@@ -105,13 +111,19 @@ public class ModularProject implements BuildExecutorModule {
                 MavenModuleRepository.checkedSegments(segments));
     }
 
-    public static BuildExecutorModule make(Path root, MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
-        return make(root,
+    public static BuildExecutorModule make(Path root,
+                                           MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
+        return make(SequencedProperties.NONE, root, assembler);
+    }
+
+    public static BuildExecutorModule make(Function<String, String> keys,
+                                           Path root, MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
+        return make(keys, root,
                 "main",
                 "module",
                 _ -> true,
-                Map.of("module", JenesisModuleRepository.of(JenesisRepository.Scope.MODULE)),
-                Map.of("module", new ModularJarResolver(false)),
+                Map.of("module", JenesisModuleRepository.ofKeys(keys, JenesisRepository.Scope.MODULE)),
+                Map.of("module", ModularJarResolver.ofKeys(keys, false)),
                 null,
                 true,
                 Collections.emptyNavigableSet(),
@@ -120,7 +132,8 @@ public class ModularProject implements BuildExecutorModule {
                 assembler);
     }
 
-    public static BuildExecutorModule make(Path root,
+    public static BuildExecutorModule make(Function<String, String> keys,
+                                           Path root,
                                            String group,
                                            String prefix,
                                            Predicate<Path> filter,
@@ -132,7 +145,8 @@ public class ModularProject implements BuildExecutorModule {
                                            SequencedSet<Path> boms,
                                            SequencedSet<Path> signatures,
                                            MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
-        return new MultiProjectModule(new ModularProject(prefix, root)
+        Dependencies dependencyModule = Dependencies.ofKeys(keys, repositories, resolvers);
+        return new MultiProjectModule(ModularProject.ofKeys(keys, prefix, root)
                 .group(group).filter(filter).modular(modular).boms(boms).signatures(signatures),
                 identity -> Optional.of(identity.substring(0, identity.indexOf('/'))),
                 _ -> (name, dependencies, arguments) -> {
@@ -181,7 +195,7 @@ public class ModularProject implements BuildExecutorModule {
                         artifactInputs.add(PREPARE);
                         artifactInputs.addAll(spdxSources);
                         depExec.addModule(ARTIFACTS,
-                                new Dependencies(mergedRepositories, resolvers).pinning(pinning),
+                                dependencyModule.repositories(mergedRepositories).pinning(pinning),
                                 artifactInputs);
                     }, dependencyDeps);
                     SequencedMap<String, String> produceDeps = new LinkedHashMap<>();

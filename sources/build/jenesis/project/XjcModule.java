@@ -22,52 +22,66 @@ public class XjcModule implements BuildExecutorModule {
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
     private static final String MAVEN_GROUP = "org.glassfish.jaxb", MAVEN_ARTIFACT = "jaxb-xjc";
 
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
     private final String packageName;
     private final List<String> arguments;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final ProcessBuildStep.Terms terms;
 
-    public XjcModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "xjc", null, List.of(), ProcessBuildStep.printing("xjc"));
+    public XjcModule(Map<String, Repository> repositories,
+                     Map<String, Resolver> resolvers) {
+        this(new Dependencies(repositories, resolvers),
+             null,
+             "xjc",
+             null,
+             List.of(),
+             ProcessBuildStep.Terms.of("xjc"));
     }
 
-    private XjcModule(Map<String, Repository> repositories,
-                      Map<String, Resolver> resolvers,
+    public static XjcModule ofKeys(Function<String, String> keys,
+                                   Map<String, Repository> repositories,
+                                   Map<String, Resolver> resolvers) {
+        return new XjcModule(Dependencies.ofKeys(keys, repositories, resolvers),
+                null,
+                "xjc",
+                null,
+                List.of(),
+                ProcessBuildStep.Terms.ofKeys(keys, "xjc"));
+    }
+
+    private XjcModule(Dependencies dependencies,
                       Pinning pinning,
                       String tool,
                       String packageName,
                       List<String> arguments,
-                      BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+                      ProcessBuildStep.Terms terms) {
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.packageName = packageName;
         this.arguments = arguments;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public XjcModule pinning(Pinning pinning) {
-        return new XjcModule(repositories, resolvers, pinning, tool, packageName, arguments, printing);
+        return new XjcModule(dependencies, pinning, tool, packageName, arguments, terms);
     }
 
     public XjcModule tool(String tool) {
-        return new XjcModule(repositories, resolvers, pinning, tool, packageName, arguments, printing);
+        return new XjcModule(dependencies, pinning, tool, packageName, arguments, terms);
     }
 
     public XjcModule packageName(String packageName) {
-        return new XjcModule(repositories, resolvers, pinning, tool, packageName, arguments, printing);
+        return new XjcModule(dependencies, pinning, tool, packageName, arguments, terms);
     }
 
     public XjcModule arguments(List<String> arguments) {
-        return new XjcModule(repositories, resolvers, pinning, tool, packageName, arguments, printing);
+        return new XjcModule(dependencies, pinning, tool, packageName, arguments, terms);
     }
 
     public XjcModule printing(BiConsumer<Boolean, String> printing) {
-        return new XjcModule(repositories, resolvers, pinning, tool, packageName, arguments, printing);
+        return new XjcModule(dependencies, pinning, tool, packageName, arguments, terms.printing(printing));
     }
 
     @Override
@@ -77,13 +91,13 @@ public class XjcModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
+                dependencies.pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> generateInputs = new LinkedHashSet<>();
         generateInputs.add(DEPENDENCIES);
         generateInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addStep(GENERATE,
-                new Generate(tool, packageName, arguments, printing),
+                new Generate(terms, tool, packageName, arguments),
                 generateInputs);
     }
 
@@ -112,11 +126,11 @@ public class XjcModule implements BuildExecutorModule {
         private final String packageName;
         private final List<String> arguments;
 
-        private Generate(String tool,
+        private Generate(ProcessBuildStep.Terms terms,
+                         String tool,
                          String packageName,
-                         List<String> arguments,
-                         BiConsumer<Boolean, String> printing) {
-            super("xjc", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
+                         List<String> arguments) {
+            super("xjc", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
             this.packageName = packageName;
             this.arguments = arguments;

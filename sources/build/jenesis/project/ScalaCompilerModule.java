@@ -27,59 +27,78 @@ public class ScalaCompilerModule implements BuildExecutorModule {
     private static final String MODULE_NAME = "org.scala.lang.scala3.compiler", MAVEN_GROUP = "org.scala-lang",
             MAVEN_ARTIFACT = "scala3-compiler_3";
 
-    private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final boolean includeResources;
     private final String tool;
     private final String group;
-    private final transient Function<List<String>, ? extends ProcessHandler> factory;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final Function<List<String>, ? extends ProcessHandler> factory;
+    private final ProcessBuildStep.Terms terms;
 
-    public ScalaCompilerModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, true, "scalac", "main", null, ProcessBuildStep.printing("scalac"));
+    public ScalaCompilerModule(Map<String, Repository> repositories,
+                               Map<String, Resolver> resolvers) {
+        this(resolvers, new Dependencies(repositories, resolvers),
+             null,
+             true,
+             "scalac",
+             "main",
+             null,
+             ProcessBuildStep.Terms.of("scalac"));
     }
 
-    private ScalaCompilerModule(Map<String, Repository> repositories,
-                                Map<String, Resolver> resolvers,
+    public static ScalaCompilerModule ofKeys(Function<String, String> keys,
+                                             Map<String, Repository> repositories,
+                                             Map<String, Resolver> resolvers) {
+        return new ScalaCompilerModule(resolvers, Dependencies.ofKeys(keys, repositories, resolvers),
+                null,
+                true,
+                "scalac",
+                "main",
+                null,
+                ProcessBuildStep.Terms.ofKeys(keys, "scalac"));
+    }
+
+    private ScalaCompilerModule(Map<String, Resolver> resolvers,
+                                Dependencies dependencies,
                                 Pinning pinning,
                                 boolean includeResources,
                                 String tool,
                                 String group,
                                 Function<List<String>, ? extends ProcessHandler> factory,
-                                BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
+                                ProcessBuildStep.Terms terms) {
         this.resolvers = resolvers;
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.includeResources = includeResources;
         this.tool = tool;
         this.group = group;
         this.factory = factory;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public ScalaCompilerModule factory(Function<List<String>, ? extends ProcessHandler> factory) {
-        return new ScalaCompilerModule(repositories, resolvers, pinning, includeResources, tool, group, factory, printing);
+        return new ScalaCompilerModule(resolvers, dependencies, pinning, includeResources, tool, group, factory, terms);
     }
 
     public ScalaCompilerModule pinning(Pinning pinning) {
-        return new ScalaCompilerModule(repositories, resolvers, pinning, includeResources, tool, group, factory, printing);
+        return new ScalaCompilerModule(resolvers, dependencies, pinning, includeResources, tool, group, factory, terms);
     }
 
     public ScalaCompilerModule includeResources(boolean includeResources) {
-        return new ScalaCompilerModule(repositories, resolvers, pinning, includeResources, tool, group, factory, printing);
+        return new ScalaCompilerModule(resolvers, dependencies, pinning, includeResources, tool, group, factory, terms);
     }
 
     public ScalaCompilerModule tool(String tool) {
-        return new ScalaCompilerModule(repositories, resolvers, pinning, includeResources, tool, group, factory, printing);
+        return new ScalaCompilerModule(resolvers, dependencies, pinning, includeResources, tool, group, factory, terms);
     }
 
     public ScalaCompilerModule group(String group) {
-        return new ScalaCompilerModule(repositories, resolvers, pinning, includeResources, tool, group, factory, printing);
+        return new ScalaCompilerModule(resolvers, dependencies, pinning, includeResources, tool, group, factory, terms);
     }
 
     public ScalaCompilerModule printing(BiConsumer<Boolean, String> printing) {
-        return new ScalaCompilerModule(repositories, resolvers, pinning, includeResources, tool, group, factory, printing);
+        return new ScalaCompilerModule(resolvers, dependencies, pinning, includeResources, tool, group, factory, terms.printing(printing));
     }
 
     @Override
@@ -90,13 +109,13 @@ public class ScalaCompilerModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(upstream);
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
+                dependencies.pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> compileInputs = new LinkedHashSet<>();
         compileInputs.add(DEPENDENCIES);
         compileInputs.addAll(upstream);
         buildExecutor.addStep(COMPILED,
-                factory == null ? new Compile(includeResources, tool, group, printing) : new Compile(includeResources, tool, group, factory, printing),
+                factory == null ? new Compile(terms, includeResources, tool, group) : new Compile(terms, includeResources, tool, group, factory),
                 compileInputs);
         buildExecutor.addStep(CLASSES, new Versions(), Stream.concat(
                 Stream.of(COMPILED),
@@ -156,12 +175,19 @@ public class ScalaCompilerModule implements BuildExecutorModule {
         private final String tool;
         private final String group;
 
-        private Compile(boolean includeResources, String tool, String group, BiConsumer<Boolean, String> printing) {
-            this(includeResources, tool, group, ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
+        private Compile(ProcessBuildStep.Terms terms,
+                        boolean includeResources,
+                        String tool,
+                        String group) {
+            this(terms, includeResources, tool, group, ProcessHandler.OfProcess.ofJavaHome("bin/java"));
         }
 
-        private Compile(boolean includeResources, String tool, String group, Function<List<String>, ? extends ProcessHandler> factory, BiConsumer<Boolean, String> printing) {
-            super("scalac", factory, printing);
+        private Compile(ProcessBuildStep.Terms terms,
+                        boolean includeResources,
+                        String tool,
+                        String group,
+                        Function<List<String>, ? extends ProcessHandler> factory) {
+            super("scalac", factory, terms);
             this.includeResources = includeResources;
             this.tool = tool;
             this.group = group;

@@ -16,7 +16,11 @@ public class ModularStaging implements BuildStep {
     private final boolean includeTests;
 
     public ModularStaging() {
-        this(SequencedProperties.systemFlag("jenesis.stage.tests"));
+        this(false);
+    }
+
+    public static ModularStaging ofKeys(Function<String, String> keys) {
+        return new ModularStaging(SequencedProperties.flag(keys, "stage.tests"));
     }
 
     public ModularStaging(boolean includeTests) {

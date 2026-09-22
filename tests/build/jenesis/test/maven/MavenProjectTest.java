@@ -21,6 +21,7 @@ import build.jenesis.project.JavaToolchainModule;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class MavenProjectTest {
 
@@ -696,11 +697,11 @@ public class MavenProjectTest {
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
-        root.addModule("maven", MavenProject.make(project,
+        root.addModule("maven", MavenProject.make(SYSTEM, project,
                 "main",
                 "maven",
                 Map.of("maven", new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)),
-                Map.of("maven", new MavenPomResolver()),
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM)),
                 null,
                 Collections.emptyNavigableSet(),
                 (descriptor, _, _) -> {

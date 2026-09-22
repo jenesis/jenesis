@@ -9,6 +9,7 @@ import build.jenesis.maven.MavenModuleRepository;
 import build.jenesis.maven.MavenRepository;
 import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisRepository;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 /**
  * Resolving a module from a plain Maven repository by the coordinate convention
@@ -34,7 +35,7 @@ public class Demo {
 
     static void main(String[] args) throws Exception {
         Files.createDirectories(Path.of("target"));
-        Path published = new Project(Path.of("."))
+        Path published = Project.ofKeys(SYSTEM, Path.of("."))
                 .root(Path.of("greeter"))
                 .target(Path.of("target", "greeter"))
                 .version("1.0.0")
@@ -58,7 +59,8 @@ public class Demo {
         MavenRepository maven = new MavenDefaultRepository(published.toUri(), null, Map.of(), null);
         Map<String, Repository> repositories = Map.of("module", new MavenModuleRepository(maven), "maven", maven);
 
-        Path modular = new Project(Path.of("."))
+        // Build the consumer, which requires the library by its module name.
+        Path modular = Project.ofKeys(SYSTEM, Path.of("."))
                 .repositories(repositories)
                 .boms(boms)
                 .version("1.0.0")
@@ -101,7 +103,7 @@ public class Demo {
         System.setProperty("jenesis.module.uri", "maven:2:" + published.toUri() + "|demo.convention,"
                 + Path.of("target", "modules").toUri());
         try {
-            JenesisRepository chain = JenesisModuleRepository.of(JenesisRepository.Scope.MODULE);
+            JenesisRepository chain = JenesisModuleRepository.ofKeys(SYSTEM, JenesisRepository.Scope.MODULE);
             System.out.println();
             System.out.println("Resolving through the configured chain, with no repository in code:");
             report(chain, module, "the company repository, by the Maven convention");

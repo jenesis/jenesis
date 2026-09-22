@@ -19,13 +19,26 @@ public class Tree implements BuildStep {
     }
 
     public Tree(PrintStream out) {
-        String format = System.getProperty("jenesis.tree.format", "full");
-        this(out, switch (format) {
-            case "full" -> false;
-            case "compact" -> true;
-            default -> throw new IllegalArgumentException(
-                    "Unknown jenesis.tree.format '" + format + "', expected 'full' or 'compact'");
-        }, SequencedProperties.systemFlag("jenesis.tree.tests", true));
+        this(out, false, true);
+    }
+
+    public static Tree ofKeys(Function<String, String> keys) {
+        return ofKeys(keys, System.out);
+    }
+
+    public static Tree ofKeys(Function<String, String> keys, PrintStream out) {
+        Tree tree = new Tree(out);
+        String format = SequencedProperties.getProperty(keys, "tree.format");
+        if (format != null) {
+            tree = tree.compact(switch (format) {
+                case "full" -> false;
+                case "compact" -> true;
+                default -> throw new IllegalArgumentException(
+                        "Unknown jenesis.tree.format '" + format + "', expected 'full' or 'compact'");
+            });
+        }
+        Boolean tests = SequencedProperties.flagOrNull(keys, "tree.tests");
+        return tests == null ? tree : tree.tests(tests);
     }
 
     private Tree(PrintStream out, boolean compact, boolean tests) {

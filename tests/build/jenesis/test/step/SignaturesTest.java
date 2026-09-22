@@ -253,7 +253,7 @@ public class SignaturesTest {
         resolved("maven/org.example/lib", "1.0", null);
         declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
         System.setProperty("jenesis.openpgp.uri", "@jenesis.test.absent");
-        assertThatThrownBy(() -> run(step(signature("lib"), OpenPgpRepository.of(), validated(PRIMARY))))
+        assertThatThrownBy(() -> run(step(signature("lib"), OpenPgpRepository.ofKeys(SYSTEM), validated(PRIMARY))))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Unresolved key server reference: @jenesis.test.absent");
     }
@@ -265,7 +265,7 @@ public class SignaturesTest {
             resolved("maven/org.example/lib", "1.0", null);
             declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
             System.setProperty("jenesis.openpgp.uri", "@jenesis.test.loop");
-        assertThatThrownBy(() -> run(step(signature("lib"), OpenPgpRepository.of(), validated(PRIMARY))))
+        assertThatThrownBy(() -> run(step(signature("lib"), OpenPgpRepository.ofKeys(SYSTEM), validated(PRIMARY))))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Circular key server reference: @jenesis.test.loop");
         } finally {

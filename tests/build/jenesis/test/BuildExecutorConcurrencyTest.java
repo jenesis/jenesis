@@ -13,6 +13,7 @@ import build.jenesis.HashDigestFunction;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class BuildExecutorConcurrencyTest implements Serializable {
 
@@ -113,10 +114,10 @@ public class BuildExecutorConcurrencyTest implements Serializable {
         String previous = System.getProperty("jenesis.executor.concurrency");
         try {
             System.clearProperty("jenesis.executor.concurrency");
-            assertThat(new BuildExecutor.Configuration().concurrency()).isEqualTo(0);
+            assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).concurrency()).isEqualTo(0);
             System.setProperty("jenesis.executor.concurrency", "3");
-            assertThat(new BuildExecutor.Configuration().concurrency()).isEqualTo(3);
-            assertThat(new BuildExecutor.Configuration().concurrency(5).concurrency()).isEqualTo(5);
+            assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).concurrency()).isEqualTo(3);
+            assertThat(BuildExecutor.Configuration.ofKeys(SYSTEM).concurrency(5).concurrency()).isEqualTo(5);
         } finally {
             if (previous == null) {
                 System.clearProperty("jenesis.executor.concurrency");

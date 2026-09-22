@@ -6,8 +6,8 @@ public enum KeyExpiry {
 
     IGNORED, SIGNING, CURRENT;
 
-    public static KeyExpiry fromProperty() {
-        String property = System.getProperty("jenesis.openpgp.expiry", "signing");
+    public static KeyExpiry ofKeys(Function<String, String> keys) {
+        String property = SequencedProperties.getProperty(keys, "openpgp.expiry", "signing");
         try {
             return KeyExpiry.valueOf(property.toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException _) {

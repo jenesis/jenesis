@@ -14,6 +14,7 @@ import build.jenesis.step.Inventory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class PinModuleInfoTest {
 
@@ -90,7 +91,7 @@ public class PinModuleInfoTest {
     }
 
     private String run(Path moduleInfo, Platform platform, UnaryOperator<PinModuleInfo> configurator) throws IOException {
-        configurator.apply(new PinModuleInfo("module", "", List.of(moduleInfo), new HashDigestFunction("SHA-256"))
+        configurator.apply(PinModuleInfo.ofKeys(SYSTEM, "module", "", List.of(moduleInfo), new HashDigestFunction("SHA-256"))
                         .platform(platform))
                 .apply(Runnable::run,
                         new BuildStepContext(previous, next, supplement),

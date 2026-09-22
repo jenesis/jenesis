@@ -6,6 +6,8 @@ import build.jenesis.Verification;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
+import build.jenesis.SequencedProperties;
 
 public class VerificationTest {
 
@@ -15,25 +17,39 @@ public class VerificationTest {
     }
 
     @Test
-    public void from_property_is_none_when_unset() {
+    public void reads_the_signature_setting_from_the_provider_it_is_given() {
+        System.setProperty("jenesis.dependency.signature", "strict");
+        try {
+            assertThat(Verification.ofKeys(Map.of("dependency.signature", "declared")::get))
+                    .as("what a build verifies is decided by the provider it was handed, not by the JVM"
+                            + " the build happens to run in")
+                    .isEqualTo(Verification.DECLARED);
+            assertThat(Verification.ofKeys(SequencedProperties.NONE)).isEqualTo(Verification.NONE);
+        } finally {
+            System.clearProperty("jenesis.dependency.signature");
+        }
+    }
+
+    @Test
+    public void reading_the_signature_setting_is_none_when_unset() {
         System.clearProperty("jenesis.dependency.signature");
-        assertThat(Verification.fromProperty())
+        assertThat(Verification.ofKeys(SYSTEM))
                 .as("verification is opt-in, so an unset property checks nothing")
                 .isEqualTo(Verification.NONE);
     }
 
     @Test
-    public void from_property_parses_case_insensitively() {
+    public void reading_the_signature_setting_parses_case_insensitively() {
         System.setProperty("jenesis.dependency.signature", "declared");
-        assertThat(Verification.fromProperty()).isEqualTo(Verification.DECLARED);
+        assertThat(Verification.ofKeys(SYSTEM)).isEqualTo(Verification.DECLARED);
         System.setProperty("jenesis.dependency.signature", "STRICT");
-        assertThat(Verification.fromProperty()).isEqualTo(Verification.STRICT);
+        assertThat(Verification.ofKeys(SYSTEM)).isEqualTo(Verification.STRICT);
     }
 
     @Test
-    public void from_property_rejects_an_unknown_value() {
+    public void reading_the_signature_setting_rejects_an_unknown_value() {
         System.setProperty("jenesis.dependency.signature", "bogus");
-        assertThatThrownBy(Verification::fromProperty)
+        assertThatThrownBy(() -> Verification.ofKeys(SYSTEM))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown jenesis.dependency.signature 'bogus'");
     }

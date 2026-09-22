@@ -20,24 +20,34 @@ public class NativeImage extends ProcessBuildStep {
     }
 
     public NativeImage(PathPlacement pathPlacement, Function<List<String>, ? extends ProcessHandler> factory) {
-        this(pathPlacement, factory, "main", printing("native-image"));
+        this(pathPlacement, factory, "main", Terms.of("native-image"));
+    }
+
+    public static NativeImage ofKeys(Function<String, String> keys, PathPlacement pathPlacement) {
+        return ofKeys(keys, pathPlacement, ProcessHandler.OfProcess.ofCommand("native-image"));
+    }
+
+    public static NativeImage ofKeys(Function<String, String> keys,
+                                     PathPlacement pathPlacement,
+                                     Function<List<String>, ? extends ProcessHandler> factory) {
+        return new NativeImage(pathPlacement, factory, "main", Terms.ofKeys(keys, "native-image"));
     }
 
     private NativeImage(PathPlacement pathPlacement,
                         Function<List<String>, ? extends ProcessHandler> factory,
                         String group,
-                        BiConsumer<Boolean, String> printing) {
-        super("native-image", factory, printing);
+                        Terms terms) {
+        super("native-image", factory, terms);
         this.pathPlacement = pathPlacement;
         this.group = group;
     }
 
     public NativeImage group(String group) {
-        return new NativeImage(pathPlacement, factory, group, printing);
+        return new NativeImage(pathPlacement, factory, group, terms);
     }
 
     public NativeImage verbose(BiConsumer<Boolean, String> printing) {
-        return new NativeImage(pathPlacement, factory, group, printing);
+        return new NativeImage(pathPlacement, factory, group, terms.printing(printing));
     }
 
     @Override

@@ -27,66 +27,96 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
     private static final String MODULE_NAME = "org.apache.groovy.groovydoc", MAVEN_GROUP = "org.apache.groovy",
             MAVEN_ARTIFACT = "groovy-groovydoc";
 
-    private final Map<String, Repository> repositories;
     private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
     private final String group;
     private final String within;
     private final boolean includeJava;
-    private final transient Function<List<String>, ? extends ProcessHandler> factory;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final boolean timestamped;
+    private final Function<List<String>, ? extends ProcessHandler> factory;
+    private final ProcessBuildStep.Terms terms;
 
-    public GroovyDocumentationModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "groovydoc", "main", null, false, null, ProcessBuildStep.printing("groovydoc"));
+    public GroovyDocumentationModule(Map<String, Repository> repositories,
+                                     Map<String, Resolver> resolvers) {
+        this(resolvers, new Dependencies(repositories, resolvers),
+             null,
+             "groovydoc",
+             "main",
+             null,
+             false,
+             BuildStep.timestamp() == null,
+             null,
+             ProcessBuildStep.Terms.of("groovydoc"));
     }
 
-    private GroovyDocumentationModule(Map<String, Repository> repositories,
-                                      Map<String, Resolver> resolvers,
+    public static GroovyDocumentationModule ofKeys(Function<String, String> keys,
+                                                   Map<String, Repository> repositories,
+                                                   Map<String, Resolver> resolvers) {
+        return new GroovyDocumentationModule(resolvers, Dependencies.ofKeys(keys, repositories, resolvers),
+                null,
+                "groovydoc",
+                "main",
+                null,
+                false,
+                BuildStep.timestamp(keys) == null,
+                null,
+                ProcessBuildStep.Terms.ofKeys(keys, "groovydoc"));
+    }
+
+    private GroovyDocumentationModule(Map<String, Resolver> resolvers,
+                                      Dependencies dependencies,
                                       Pinning pinning,
                                       String tool,
                                       String group,
                                       String within,
                                       boolean includeJava,
+                                      boolean timestamped,
                                       Function<List<String>, ? extends ProcessHandler> factory,
-                                      BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
+                                      ProcessBuildStep.Terms terms) {
         this.resolvers = resolvers;
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.group = group;
         this.within = within;
         this.includeJava = includeJava;
+        this.timestamped = timestamped;
         this.factory = factory;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public GroovyDocumentationModule factory(Function<List<String>, ? extends ProcessHandler> factory) {
-        return new GroovyDocumentationModule(repositories, resolvers, pinning, tool, group, within, includeJava, factory, printing);
+        return new GroovyDocumentationModule(resolvers, dependencies, pinning, tool, group, within, includeJava, timestamped, factory, terms);
     }
 
     public GroovyDocumentationModule pinning(Pinning pinning) {
-        return new GroovyDocumentationModule(repositories, resolvers, pinning, tool, group, within, includeJava, factory, printing);
+        return new GroovyDocumentationModule(resolvers, dependencies, pinning, tool, group, within, includeJava, timestamped, factory, terms);
     }
 
     public GroovyDocumentationModule tool(String tool) {
-        return new GroovyDocumentationModule(repositories, resolvers, pinning, tool, group, within, includeJava, factory, printing);
+        return new GroovyDocumentationModule(resolvers, dependencies, pinning, tool, group, within, includeJava, timestamped, factory, terms);
     }
 
     public GroovyDocumentationModule group(String group) {
-        return new GroovyDocumentationModule(repositories, resolvers, pinning, tool, group, within, includeJava, factory, printing);
+        return new GroovyDocumentationModule(resolvers, dependencies, pinning, tool, group, within, includeJava, timestamped, factory, terms);
     }
 
     public GroovyDocumentationModule within(String within) {
-        return new GroovyDocumentationModule(repositories, resolvers, pinning, tool, group, within, includeJava, factory, printing);
+        return new GroovyDocumentationModule(resolvers, dependencies, pinning, tool, group, within, includeJava, timestamped, factory, terms);
+    }
+
+    public GroovyDocumentationModule timestamped(boolean timestamped) {
+        return new GroovyDocumentationModule(resolvers, dependencies, pinning, tool, group, within, includeJava, timestamped, factory, terms);
     }
 
     public GroovyDocumentationModule includeJava(boolean includeJava) {
-        return new GroovyDocumentationModule(repositories, resolvers, pinning, tool, group, within, includeJava, factory, printing);
+        return new GroovyDocumentationModule(resolvers, dependencies, pinning, tool, group, within, includeJava, timestamped, factory, terms);
     }
 
     public GroovyDocumentationModule printing(BiConsumer<Boolean, String> printing) {
-        return new GroovyDocumentationModule(repositories, resolvers, pinning, tool, group, within, includeJava, factory, printing);
+        return new GroovyDocumentationModule(resolvers, dependencies, pinning, tool, group, within, includeJava, timestamped, factory, terms.printing(printing));
     }
 
     @Override
@@ -97,13 +127,15 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(upstream);
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
+                dependencies.pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> documentInputs = new LinkedHashSet<>();
         documentInputs.add(DEPENDENCIES);
         documentInputs.addAll(upstream);
         buildExecutor.addStep(DOCUMENTED,
-                factory == null ? new Document(within, includeJava, tool, group, printing) : new Document(within, includeJava, tool, group, factory, printing),
+                factory == null
+                        ? new Document(terms, within, includeJava, tool, group, timestamped)
+                        : new Document(terms, within, includeJava, tool, group, timestamped, factory),
                 documentInputs);
     }
 
@@ -155,14 +187,26 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
         private final boolean includeJava;
         private final String tool;
         private final String group;
-        private final boolean timestamped = BuildStep.timestamp() == null;
+        private final boolean timestamped;
 
-        private Document(String within, boolean includeJava, String tool, String group, BiConsumer<Boolean, String> printing) {
-            this(within, includeJava, tool, group, ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
+        private Document(ProcessBuildStep.Terms terms,
+                         String within,
+                         boolean includeJava,
+                         String tool,
+                         String group,
+                         boolean timestamped) {
+            this(terms, within, includeJava, tool, group, timestamped, ProcessHandler.OfProcess.ofJavaHome("bin/java"));
         }
 
-        private Document(String within, boolean includeJava, String tool, String group, Function<List<String>, ? extends ProcessHandler> factory, BiConsumer<Boolean, String> printing) {
-            super("groovydoc", factory, printing);
+        private Document(ProcessBuildStep.Terms terms,
+                         String within,
+                         boolean includeJava,
+                         String tool,
+                         String group,
+                         boolean timestamped,
+                         Function<List<String>, ? extends ProcessHandler> factory) {
+            super("groovydoc", factory, terms);
+            this.timestamped = timestamped;
             this.within = within;
             this.includeJava = includeJava;
             this.tool = tool;

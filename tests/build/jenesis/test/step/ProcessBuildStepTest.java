@@ -10,6 +10,7 @@ import build.jenesis.step.ProcessHandler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class ProcessBuildStepTest {
 
@@ -31,7 +32,7 @@ public class ProcessBuildStepTest {
         Files.writeString(folder.resolve("process/test.properties"), "-Dshared=test\n-Dextra=test\n");
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
         AtomicReference<SequencedMap<String, SequencedMap<String, String>>> captured = new AtomicReference<>();
-        ProcessBuildStep step = new ProcessBuildStep("java", ProcessHandler.OfProcess.ofJavaHome("bin/java"), null) {
+        ProcessBuildStep step = new ProcessBuildStep("java", ProcessHandler.OfProcess.ofJavaHome("bin/java")) {
             @Override
             protected List<String> configurations() {
                 return List.of("java", "test");
@@ -61,7 +62,7 @@ public class ProcessBuildStepTest {
         Files.writeString(folder.resolve("process/protoc.properties"), "-Xmx=512m\n");
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
         AtomicReference<SequencedMap<String, SequencedMap<String, String>>> captured = new AtomicReference<>();
-        ProcessBuildStep step = new ProcessBuildStep("protoc", ProcessHandler.OfProcess.ofStaged(), null) {
+        ProcessBuildStep step = new ProcessBuildStep("protoc", ProcessHandler.OfProcess.ofStaged()) {
             @Override
             protected CompletionStage<List<String>> process(Executor executor,
                                                             BuildStepContext context,
@@ -201,11 +202,11 @@ public class ProcessBuildStepTest {
     private static final class Gated extends ProcessBuildStep {
 
         private Gated(ToolProvider provider) {
-            super("gated", ProcessHandler.OfTool.of(provider), null);
+            super("gated", ProcessHandler.OfTool.of(provider), Terms.ofKeys(SYSTEM, "gated"));
         }
 
         private Gated(ToolProvider provider, Semaphore permits) {
-            super("gated", ProcessHandler.OfTool.of(provider), null, permits);
+            super("gated", ProcessHandler.OfTool.of(provider), new Terms(null, permits, null));
         }
 
         @Override
@@ -232,11 +233,11 @@ public class ProcessBuildStepTest {
         }).apply(List.of());
 
         private Probe() {
-            super("probe", arguments -> HANDLER);
+            super("probe", arguments -> HANDLER, Terms.ofKeys(SYSTEM, "probe"));
         }
 
         private Probe(BiConsumer<Boolean, String> printing) {
-            super("probe", arguments -> HANDLER, printing);
+            super("probe", arguments -> HANDLER, Terms.of("probe").printing(printing));
         }
 
         private boolean streams() {

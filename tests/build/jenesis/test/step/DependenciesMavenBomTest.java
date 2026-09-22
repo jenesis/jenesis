@@ -23,6 +23,7 @@ import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class DependenciesMavenBomTest {
 
@@ -114,7 +115,7 @@ public class DependenciesMavenBomTest {
                             </dependencyManagement>
                         </project>
                         """))),
-                Map.of("maven", new MavenPomResolver())));
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).contains("main/compile/maven/org.acme/lib/2.0");
         SequencedProperties resolvedBoms = SequencedProperties.ofFiles(next.resolve(BuildStep.BOMS));
@@ -137,7 +138,7 @@ public class DependenciesMavenBomTest {
                             <modelVersion>4.0.0</modelVersion>
                         </project>
                         """))),
-                Map.of("maven", new MavenPomResolver())).group("tool"));
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).group("tool"));
         assertThat(SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES)).stringPropertyNames())
                 .as("a tool never fetches the bill of materials that manages the module's own closure")
                 .containsExactly("tool/runtime/maven/org.acme/tool/1.0");
@@ -169,7 +170,7 @@ public class DependenciesMavenBomTest {
                             </dependencyManagement>
                         </project>
                         """))),
-                Map.of("maven", new MavenPomResolver())));
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).contains("main/compile/maven/org.acme/lib/3.0");
     }
@@ -198,7 +199,7 @@ public class DependenciesMavenBomTest {
                             </dependencies>
                         </project>
                         """))),
-                Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT)))
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT)))
                 .as("a version-only entry re-versions what other modules reach transitively, and the"
                         + " module that fails never named the coordinate at all")
                 .hasStackTraceContaining("No checksum pinned for maven/org.slf4j/slf4j-api/2.0.18")
@@ -231,7 +232,7 @@ public class DependenciesMavenBomTest {
                             </dependencies>
                         </project>
                         """))),
-                Map.of("maven", new MavenPomResolver())));
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames())
                 .as("written in full, a classified coordinate manages a version like any other")
@@ -251,7 +252,7 @@ public class DependenciesMavenBomTest {
         boms.store(dependencies.resolve(BuildStep.BOMS));
         assertThatThrownBy(() -> apply(new Dependencies(
                 Map.of("maven", maven(Map.of()), "module", maven(Map.of())),
-                Map.of("maven", new MavenPomResolver()))))
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM)))))
                 .as("an entry under a module name sends every module importing the file to the module"
                         + " repository, which is the lookup the alias exists to replace")
                 .hasStackTraceContaining("names a module this project aliases to org.acme/lib")
@@ -268,7 +269,7 @@ public class DependenciesMavenBomTest {
         boms.store(dependencies.resolve(BuildStep.BOMS));
         assertThatThrownBy(() -> apply(new Dependencies(
                 Map.of("maven", maven(Map.of())),
-                Map.of("maven", new MavenPomResolver()))))
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM)))))
                 .as("dropping the repository turns the groupId into one, and the entry then manages"
                         + " a coordinate nothing resolves rather than the one that was meant")
                 .hasStackTraceContaining("Unknown repository 'io.netty'")
@@ -286,7 +287,7 @@ public class DependenciesMavenBomTest {
                             <modelVersion>4.0.0</modelVersion>
                         </project>
                         """))),
-                Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT));
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT));
     }
 
     @Test
@@ -312,7 +313,7 @@ public class DependenciesMavenBomTest {
                             </dependencyManagement>
                         </project>
                         """))),
-                Map.of("maven", new MavenPomResolver())));
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.getProperty("main/compile/maven/org.acme/lib/2.0")).doesNotContain("SHA");
     }
@@ -368,7 +369,7 @@ public class DependenciesMavenBomTest {
                                     </dependencyManagement>
                                 </project>
                                 """))),
-                Map.of("maven", new MavenPomResolver())));
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).contains(
                 "main/compile/maven/org.acme/lib/2.0",
@@ -399,7 +400,7 @@ public class DependenciesMavenBomTest {
                             </dependencyManagement>
                         </project>
                         """))),
-                Map.of("maven", new MavenPomResolver())));
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).contains("main/compile/maven/org.acme/lib/2.0");
         SequencedProperties resolvedBoms = SequencedProperties.ofFiles(next.resolve(BuildStep.BOMS));
@@ -430,7 +431,7 @@ public class DependenciesMavenBomTest {
                                 </project>
                                 """),
                         "<metadata><versioning><release>1.0</release></versioning></metadata>")),
-                Map.of("maven", new MavenPomResolver())));
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).contains("main/compile/maven/org.acme/lib/2.0");
         Path resolvedBoms = next.resolve(BuildStep.BOMS);
@@ -482,7 +483,7 @@ public class DependenciesMavenBomTest {
                                         </project>
                                         """),
                         "<metadata><versioning><release>2.0</release></versioning></metadata>")),
-                Map.of("maven", new MavenPomResolver())).pinning(Pinning.IGNORE));
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.IGNORE));
         SequencedProperties index = SequencedProperties.ofFiles(next.resolve(BuildStep.DEPENDENCIES));
         assertThat(index.stringPropertyNames()).contains("main/compile/maven/org.acme/lib/2.5");
         SequencedProperties resolvedBoms = SequencedProperties.ofFiles(next.resolve(BuildStep.BOMS));

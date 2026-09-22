@@ -22,32 +22,46 @@ public class CheckstyleModule implements BuildExecutorModule {
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
     private static final String MAVEN_GROUP = "com.puppycrawl.tools", MAVEN_ARTIFACT = "checkstyle";
 
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
     private final String configFile;
     private final boolean strict;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final ProcessBuildStep.Terms terms;
 
-    public CheckstyleModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "checkstyle", "checkstyle.xml", false, ProcessBuildStep.printing("checkstyle"));
+    public CheckstyleModule(Map<String, Repository> repositories,
+                            Map<String, Resolver> resolvers) {
+        this(new Dependencies(repositories, resolvers),
+             null,
+             "checkstyle",
+             "checkstyle.xml",
+             false,
+             ProcessBuildStep.Terms.of("checkstyle"));
     }
 
-    private CheckstyleModule(Map<String, Repository> repositories,
-                             Map<String, Resolver> resolvers,
+    public static CheckstyleModule ofKeys(Function<String, String> keys,
+                                          Map<String, Repository> repositories,
+                                          Map<String, Resolver> resolvers) {
+        return new CheckstyleModule(Dependencies.ofKeys(keys, repositories, resolvers),
+                null,
+                "checkstyle",
+                "checkstyle.xml",
+                false,
+                ProcessBuildStep.Terms.ofKeys(keys, "checkstyle"));
+    }
+
+    private CheckstyleModule(Dependencies dependencies,
                              Pinning pinning,
                              String tool,
                              String configFile,
                              boolean strict,
-                             BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+                             ProcessBuildStep.Terms terms) {
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.configFile = configFile;
         this.strict = strict;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public static Path configurationFile(SequencedSet<Path> configuration) {
@@ -55,23 +69,23 @@ public class CheckstyleModule implements BuildExecutorModule {
     }
 
     public CheckstyleModule pinning(Pinning pinning) {
-        return new CheckstyleModule(repositories, resolvers, pinning, tool, configFile, strict, printing);
+        return new CheckstyleModule(dependencies, pinning, tool, configFile, strict, terms);
     }
 
     public CheckstyleModule tool(String tool) {
-        return new CheckstyleModule(repositories, resolvers, pinning, tool, configFile, strict, printing);
+        return new CheckstyleModule(dependencies, pinning, tool, configFile, strict, terms);
     }
 
     public CheckstyleModule configFile(String configFile) {
-        return new CheckstyleModule(repositories, resolvers, pinning, tool, configFile, strict, printing);
+        return new CheckstyleModule(dependencies, pinning, tool, configFile, strict, terms);
     }
 
     public CheckstyleModule strict(boolean strict) {
-        return new CheckstyleModule(repositories, resolvers, pinning, tool, configFile, strict, printing);
+        return new CheckstyleModule(dependencies, pinning, tool, configFile, strict, terms);
     }
 
     public CheckstyleModule printing(BiConsumer<Boolean, String> printing) {
-        return new CheckstyleModule(repositories, resolvers, pinning, tool, configFile, strict, printing);
+        return new CheckstyleModule(dependencies, pinning, tool, configFile, strict, terms.printing(printing));
     }
 
     @Override
@@ -81,12 +95,12 @@ public class CheckstyleModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
+                dependencies.pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> checkInputs = new LinkedHashSet<>();
         checkInputs.add(DEPENDENCIES);
         checkInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(CHECK, new Check(tool, configFile, strict, printing), checkInputs);
+        buildExecutor.addStep(CHECK, new Check(terms, tool, configFile, strict), checkInputs);
     }
 
     private record Requires(String tool) implements BuildStep {
@@ -114,8 +128,11 @@ public class CheckstyleModule implements BuildExecutorModule {
         private final String configFile;
         private final boolean strict;
 
-        private Check(String tool, String configFile, boolean strict, BiConsumer<Boolean, String> printing) {
-            super("checkstyle", ProcessHandler.OfProcess.ofJavaHome("bin/java"), printing);
+        private Check(ProcessBuildStep.Terms terms,
+                      String tool,
+                      String configFile,
+                      boolean strict) {
+            super("checkstyle", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
             this.configFile = configFile;
             this.strict = strict;

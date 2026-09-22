@@ -21,15 +21,28 @@ public class Javac extends ProcessBuildStep {
     private final String group;
 
     public Javac(ProcessHandler.Factory factory) {
-        this(factory.apply("javac", "bin/javac"), true, PathPlacement.INFERRED, "main", printing("javac"));
+        this(factory.apply("javac", "bin/javac"),
+             true,
+             PathPlacement.INFERRED,
+             "main",
+             Terms.of("javac"));
+    }
+
+    public static Javac ofKeys(Function<String, String> keys,
+                               ProcessHandler.Factory factory) {
+        return new Javac(factory.apply("javac", "bin/javac"),
+                true,
+                PathPlacement.INFERRED,
+                "main",
+                Terms.ofKeys(keys, "javac"));
     }
 
     private Javac(Function<List<String>, ? extends ProcessHandler> factory,
                   boolean includeResources,
                   PathPlacement pathPlacement,
                   String group,
-                  BiConsumer<Boolean, String> printing) {
-        super("javac", factory, printing);
+                  Terms terms) {
+        super("javac", factory, terms);
         this.includeResources = includeResources;
         this.pathPlacement = pathPlacement;
         this.group = group;
@@ -44,20 +57,24 @@ public class Javac extends ProcessBuildStep {
         properties.store(target.resolve("javac.properties"));
     }
 
+    public Javac factory(ProcessHandler.Factory factory) {
+        return new Javac(factory.apply("javac", "bin/javac"), includeResources, pathPlacement, group, terms);
+    }
+
     public Javac includeResources(boolean includeResources) {
-        return new Javac(factory, includeResources, pathPlacement, group, printing);
+        return new Javac(factory, includeResources, pathPlacement, group, terms);
     }
 
     public Javac pathPlacement(PathPlacement pathPlacement) {
-        return new Javac(factory, includeResources, pathPlacement, group, printing);
+        return new Javac(factory, includeResources, pathPlacement, group, terms);
     }
 
     public Javac group(String group) {
-        return new Javac(factory, includeResources, pathPlacement, group, printing);
+        return new Javac(factory, includeResources, pathPlacement, group, terms);
     }
 
     public Javac verbose(BiConsumer<Boolean, String> printing) {
-        return new Javac(factory, includeResources, pathPlacement, group, printing);
+        return new Javac(factory, includeResources, pathPlacement, group, terms.printing(printing));
     }
 
     @Override

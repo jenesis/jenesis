@@ -15,6 +15,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.KtlintFormatModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class KtlintFormatModuleRunTest {
 
@@ -120,7 +121,7 @@ public class KtlintFormatModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "ktlint-format",
-                new KtlintFormatModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT),
+                new KtlintFormatModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT),
                 "project");
         return executor;
     }

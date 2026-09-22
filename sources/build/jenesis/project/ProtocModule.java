@@ -22,35 +22,51 @@ public class ProtocModule implements BuildExecutorModule {
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
     private static final String MAVEN_GROUP = "com.google.protobuf", MAVEN_ARTIFACT = "protoc";
 
-    private final Map<String, Repository> repositories;
-    private final Map<String, Resolver> resolvers;
+    private final Dependencies dependencies;
     private final Pinning pinning;
     private final String tool;
     private final String classifier;
     private final SequencedMap<String, String> plugins;
     private final List<String> arguments;
-    private final transient BiConsumer<Boolean, String> printing;
+    private final ProcessBuildStep.Terms terms;
 
-    public ProtocModule(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, null, "protoc", classifier(), new LinkedHashMap<>(), List.of(), ProcessBuildStep.printing("protoc"));
+    public ProtocModule(Map<String, Repository> repositories,
+                        Map<String, Resolver> resolvers) {
+        this(new Dependencies(repositories, resolvers),
+             null,
+             "protoc",
+             classifier(),
+             new LinkedHashMap<>(),
+             List.of(),
+             ProcessBuildStep.Terms.of("protoc"));
     }
 
-    private ProtocModule(Map<String, Repository> repositories,
-                         Map<String, Resolver> resolvers,
+    public static ProtocModule ofKeys(Function<String, String> keys,
+                                      Map<String, Repository> repositories,
+                                      Map<String, Resolver> resolvers) {
+        return new ProtocModule(Dependencies.ofKeys(keys, repositories, resolvers),
+                null,
+                "protoc",
+                classifier(),
+                new LinkedHashMap<>(),
+                List.of(),
+                ProcessBuildStep.Terms.ofKeys(keys, "protoc"));
+    }
+
+    private ProtocModule(Dependencies dependencies,
                          Pinning pinning,
                          String tool,
                          String classifier,
                          SequencedMap<String, String> plugins,
                          List<String> arguments,
-                         BiConsumer<Boolean, String> printing) {
-        this.repositories = repositories;
-        this.resolvers = resolvers;
+                         ProcessBuildStep.Terms terms) {
+        this.dependencies = dependencies;
         this.pinning = pinning;
         this.tool = tool;
         this.classifier = classifier;
         this.plugins = plugins;
         this.arguments = arguments;
-        this.printing = printing;
+        this.terms = terms;
     }
 
     public static String classifier() {
@@ -78,27 +94,27 @@ public class ProtocModule implements BuildExecutorModule {
     }
 
     public ProtocModule pinning(Pinning pinning) {
-        return new ProtocModule(repositories, resolvers, pinning, tool, classifier, plugins, arguments, printing);
+        return new ProtocModule(dependencies, pinning, tool, classifier, plugins, arguments, terms);
     }
 
     public ProtocModule tool(String tool) {
-        return new ProtocModule(repositories, resolvers, pinning, tool, classifier, plugins, arguments, printing);
+        return new ProtocModule(dependencies, pinning, tool, classifier, plugins, arguments, terms);
     }
 
     public ProtocModule classifier(String classifier) {
-        return new ProtocModule(repositories, resolvers, pinning, tool, classifier, plugins, arguments, printing);
+        return new ProtocModule(dependencies, pinning, tool, classifier, plugins, arguments, terms);
     }
 
     public ProtocModule plugins(SequencedMap<String, String> plugins) {
-        return new ProtocModule(repositories, resolvers, pinning, tool, classifier, plugins, arguments, printing);
+        return new ProtocModule(dependencies, pinning, tool, classifier, plugins, arguments, terms);
     }
 
     public ProtocModule arguments(List<String> arguments) {
-        return new ProtocModule(repositories, resolvers, pinning, tool, classifier, plugins, arguments, printing);
+        return new ProtocModule(dependencies, pinning, tool, classifier, plugins, arguments, terms);
     }
 
     public ProtocModule printing(BiConsumer<Boolean, String> printing) {
-        return new ProtocModule(repositories, resolvers, pinning, tool, classifier, plugins, arguments, printing);
+        return new ProtocModule(dependencies, pinning, tool, classifier, plugins, arguments, terms.printing(printing));
     }
 
     @Override
@@ -108,20 +124,20 @@ public class ProtocModule implements BuildExecutorModule {
         resolveInputs.add(REQUIRED);
         resolveInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addModule(DEPENDENCIES,
-                new Dependencies(repositories, resolvers).pinning(pinning).group(tool),
+                dependencies.pinning(pinning).group(tool),
                 resolveInputs);
         SequencedSet<String> generateInputs = new LinkedHashSet<>();
         generateInputs.add(DEPENDENCIES);
         for (String plugin : plugins.keySet()) {
             String step = DEPENDENCIES + "-" + plugin;
             buildExecutor.addModule(step,
-                    new Dependencies(repositories, resolvers).pinning(pinning).group(tool + "-" + plugin),
+                    dependencies.pinning(pinning).group(tool + "-" + plugin),
                     resolveInputs);
             generateInputs.add(step);
         }
         generateInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addStep(GENERATE,
-                new Generate(tool, List.copyOf(plugins.sequencedKeySet()), arguments, printing),
+                new Generate(terms, tool, List.copyOf(plugins.sequencedKeySet()), arguments),
                 generateInputs);
     }
 
@@ -159,8 +175,11 @@ public class ProtocModule implements BuildExecutorModule {
         private final List<String> plugins;
         private final List<String> arguments;
 
-        private Generate(String tool, List<String> plugins, List<String> arguments, BiConsumer<Boolean, String> printing) {
-            super("protoc", ProcessHandler.OfProcess.ofStaged(), printing);
+        private Generate(ProcessBuildStep.Terms terms,
+                         String tool,
+                         List<String> plugins,
+                         List<String> arguments) {
+            super("protoc", ProcessHandler.OfProcess.ofStaged(), terms);
             this.tool = tool;
             this.plugins = plugins;
             this.arguments = arguments;

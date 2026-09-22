@@ -13,20 +13,27 @@ public class JLink extends ProcessBuildStep {
     private final String group;
 
     public JLink(ProcessHandler.Factory factory) {
-        this(factory.apply("jlink", "bin/jlink"), "main", printing("jlink"));
+        this(factory.apply("jlink", "bin/jlink"),
+             "main",
+             Terms.of("jlink"));
     }
 
-    private JLink(Function<List<String>, ? extends ProcessHandler> factory, String group, BiConsumer<Boolean, String> printing) {
-        super("jlink", factory, printing);
+    public static JLink ofKeys(Function<String, String> keys,
+                               ProcessHandler.Factory factory) {
+        return new JLink(factory.apply("jlink", "bin/jlink"), "main", Terms.ofKeys(keys, "jlink"));
+    }
+
+    private JLink(Function<List<String>, ? extends ProcessHandler> factory, String group, Terms terms) {
+        super("jlink", factory, terms);
         this.group = group;
     }
 
     public JLink group(String group) {
-        return new JLink(factory, group, printing);
+        return new JLink(factory, group, terms);
     }
 
     public JLink verbose(BiConsumer<Boolean, String> printing) {
-        return new JLink(factory, group, printing);
+        return new JLink(factory, group, terms.printing(printing));
     }
 
     @Override

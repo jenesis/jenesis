@@ -20,8 +20,19 @@ public class Launcher implements BuildStep {
     private final PathPlacement pathPlacement;
     private final OffsetDateTime timestamp;
 
-    public Launcher(String tool, PathPlacement pathPlacement) {
-        this(tool, "main", pathPlacement, BuildStep.timestamp());
+    public Launcher(String tool,
+                    PathPlacement pathPlacement) {
+        this(tool,
+             "main",
+             pathPlacement,
+             BuildStep.timestamp());
+    }
+
+    public static Launcher ofKeys(Function<String, String> keys,
+                                  String tool,
+                                  PathPlacement pathPlacement) {
+        return new Launcher(tool, pathPlacement)
+                .timestamp(BuildStep.timestamp(keys));
     }
 
     private Launcher(String tool, String group, PathPlacement pathPlacement, OffsetDateTime timestamp) {
@@ -32,6 +43,10 @@ public class Launcher implements BuildStep {
     }
 
     public Launcher group(String group) {
+        return new Launcher(tool, group, pathPlacement, timestamp);
+    }
+
+    public Launcher timestamp(OffsetDateTime timestamp) {
         return new Launcher(tool, group, pathPlacement, timestamp);
     }
 

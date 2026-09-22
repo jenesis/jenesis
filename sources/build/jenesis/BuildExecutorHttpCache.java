@@ -14,16 +14,32 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
     private final Duration readTimeout;
     private final boolean read;
     private final boolean write;
+    private final boolean insecure;
 
     public BuildExecutorHttpCache(URI uri) {
-        this(uri,
-                System.getProperty("jenesis.cache.key", System.getenv("JENESIS_CACHE_KEY")),
-                System.getProperty("jenesis.cache.project", System.getenv("JENESIS_CACHE_PROJECT")),
-                "SHA-256",
-                Duration.parse(System.getProperty("jenesis.cache.connect", "PT1S")),
-                Duration.parse(System.getProperty("jenesis.cache.read", "PT10S")),
-                true,
-                true);
+        this(uri, null, null, "SHA-256", Duration.parse("PT1S"), Duration.parse("PT10S"), true, true, false);
+    }
+
+    public static BuildExecutorHttpCache ofKeys(Function<String, String> keys, URI uri) {
+        BuildExecutorHttpCache cache = new BuildExecutorHttpCache(uri);
+        String key = SequencedProperties.getProperty(keys, "cache.key", System.getenv("JENESIS_CACHE_KEY"));
+        if (key != null) {
+            cache = cache.key(key);
+        }
+        String project = SequencedProperties.getProperty(keys, "cache.project", System.getenv("JENESIS_CACHE_PROJECT"));
+        if (project != null) {
+            cache = cache.project(project);
+        }
+        String connect = SequencedProperties.getProperty(keys, "cache.connect");
+        if (connect != null) {
+            cache = cache.connectTimeout(Duration.parse(connect));
+        }
+        String read = SequencedProperties.getProperty(keys, "cache.read");
+        if (read != null) {
+            cache = cache.readTimeout(Duration.parse(read));
+        }
+        Boolean insecure = SequencedProperties.flagOrNull(keys, "cache.insecure");
+        return insecure == null ? cache : cache.insecure(insecure);
     }
 
     private BuildExecutorHttpCache(URI uri,
@@ -33,7 +49,8 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                                    Duration connectTimeout,
                                    Duration readTimeout,
                                    boolean read,
-                                   boolean write) {
+                                   boolean write,
+                                   boolean insecure) {
         this.uri = uri;
         this.key = key;
         this.project = project;
@@ -42,34 +59,39 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
         this.readTimeout = readTimeout;
         this.read = read;
         this.write = write;
+        this.insecure = insecure;
+    }
+
+    public BuildExecutorHttpCache insecure(boolean insecure) {
+        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache key(String key) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write);
+        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache project(String project) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write);
+        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache algorithm(String algorithm) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write);
+        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache connectTimeout(Duration connectTimeout) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write);
+        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache read(boolean read) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write);
+        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache write(boolean write) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write);
+        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     public BuildExecutorHttpCache readTimeout(Duration readTimeout) {
-        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write);
+        return new BuildExecutorHttpCache(uri, key, project, algorithm, connectTimeout, readTimeout, read, write, insecure);
     }
 
     @Override
@@ -180,7 +202,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                 + "/" + HexFormat.of().formatHex(fold(inputs)));
         String scheme = target.getScheme(), host = target.getHost();
         boolean loopback = "localhost".equals(host) || "127.0.0.1".equals(host) || "::1".equals(host);
-        if (!"https".equals(scheme) && !loopback && !SequencedProperties.systemFlag("jenesis.cache.insecure")) {
+        if (!"https".equals(scheme) && !loopback && !insecure) {
             throw new IllegalStateException("Refusing to send the cache key over insecure scheme '"
                     + scheme
                     + "': "

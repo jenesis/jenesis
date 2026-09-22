@@ -13,6 +13,7 @@ import build.jenesis.project.ReleaseModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class JReleaserModuleTest {
 
@@ -34,14 +35,14 @@ public class JReleaserModuleTest {
 
     @Test
     public void discovers_no_configuration_by_default() {
-        assertThat(JReleaserModule.configured(root)).isNull();
+        assertThat(JReleaserModule.configured(SYSTEM, root)).isNull();
     }
 
     @Test
     public void discovers_each_configuration_flavour() throws IOException {
         for (String name : List.of("jreleaser.json", "jreleaser.toml", "jreleaser.yaml", "jreleaser.yml")) {
             Files.writeString(root.resolve(name), "");
-            assertThat(JReleaserModule.configured(root))
+            assertThat(JReleaserModule.configured(SYSTEM, root))
                     .as("the most preferred remaining flavour wins")
                     .isEqualTo(root.resolve(name));
         }
@@ -52,13 +53,13 @@ public class JReleaserModuleTest {
         Files.writeString(root.resolve("jreleaser.yml"), "");
         Files.writeString(root.resolve("elsewhere.yml"), "");
         System.setProperty("jenesis.jreleaser.config", "elsewhere.yml");
-        assertThat(JReleaserModule.configured(root)).isEqualTo(root.resolve("elsewhere.yml"));
+        assertThat(JReleaserModule.configured(SYSTEM, root)).isEqualTo(root.resolve("elsewhere.yml"));
     }
 
     @Test
     public void rejects_an_explicitly_configured_file_that_is_missing() {
         System.setProperty("jenesis.jreleaser.config", "absent.yml");
-        assertThatThrownBy(() -> JReleaserModule.configured(root))
+        assertThatThrownBy(() -> JReleaserModule.configured(SYSTEM, root))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("absent.yml");
     }
@@ -106,7 +107,7 @@ public class JReleaserModuleTest {
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         buildExecutor.addSource("source", source);
-        buildExecutor.addModule("release", new ReleaseModule(root, version), "source");
+        buildExecutor.addModule("release", ReleaseModule.ofKeys(SYSTEM, root, version), "source");
         return buildExecutor.execute(selector);
     }
 }

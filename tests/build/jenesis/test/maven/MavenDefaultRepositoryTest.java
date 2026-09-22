@@ -9,6 +9,7 @@ import build.jenesis.maven.MavenRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class MavenDefaultRepositoryTest {
 
@@ -697,7 +698,7 @@ public class MavenDefaultRepositoryTest {
                 repository.resolve("first").toUri() + "," + repository.resolve("second").toUri());
         System.setProperty("jenesis.maven.local", local.toString());
         try {
-            Optional<RepositoryItem> item = MavenDefaultRepository.of().fetch(Runnable::run,
+            Optional<RepositoryItem> item = MavenDefaultRepository.ofKeys(SYSTEM).fetch(Runnable::run,
                     "group",
                     "artifact",
                     "1",
@@ -724,7 +725,7 @@ public class MavenDefaultRepositoryTest {
                 repository.resolve("first").toUri() + "," + repository.resolve("second").toUri());
         System.setProperty("jenesis.maven.local", local.toString());
         try {
-            Optional<RepositoryItem> item = MavenDefaultRepository.of().fetch(Runnable::run,
+            Optional<RepositoryItem> item = MavenDefaultRepository.ofKeys(SYSTEM).fetch(Runnable::run,
                     "group",
                     "artifact",
                     "1",
@@ -759,7 +760,7 @@ public class MavenDefaultRepositoryTest {
                 repository.resolve("first").toUri() + "|special," + repository.resolve("second").toUri());
         System.setProperty("jenesis.maven.local", local.toString());
         try {
-            MavenRepository merged = MavenDefaultRepository.of();
+            MavenRepository merged = MavenDefaultRepository.ofKeys(SYSTEM);
             try (InputStream stream = merged.fetch(Runnable::run, "special", "artifact", "1", "jar", null, null)
                     .orElseThrow().toInputStream()) {
                 assertThat(new String(stream.readAllBytes())).isEqualTo("first-special");
@@ -792,7 +793,7 @@ public class MavenDefaultRepositoryTest {
                 repository.resolve("first").toUri() + "|special," + repository.resolve("second").toUri());
         System.setProperty("jenesis.maven.local", local.toString());
         try {
-            MavenRepository merged = MavenDefaultRepository.of();
+            MavenRepository merged = MavenDefaultRepository.ofKeys(SYSTEM);
             try (InputStream stream = merged.fetch(Runnable::run, "special.sub", "artifact", "1", "jar", null, null)
                     .orElseThrow().toInputStream()) {
                 assertThat(new String(stream.readAllBytes())).isEqualTo("first-sub");
@@ -816,11 +817,11 @@ public class MavenDefaultRepositoryTest {
                 .createDirectories(repository.resolve("second/group/artifact/1"))
                 .resolve("artifact-1.jar"), "second-content");
         System.setProperty("jenesis.maven.uri", "@corp.test.mirrors");
-        System.setProperty("corp.test.mirrors",
+        System.setProperty("jenesis.corp.test.mirrors",
                 repository.resolve("first").toUri() + "," + repository.resolve("second").toUri());
         System.setProperty("jenesis.maven.local", local.toString());
         try {
-            Optional<RepositoryItem> item = MavenDefaultRepository.of().fetch(Runnable::run,
+            Optional<RepositoryItem> item = MavenDefaultRepository.ofKeys(SYSTEM).fetch(Runnable::run,
                     "group",
                     "artifact",
                     "1",
@@ -833,7 +834,7 @@ public class MavenDefaultRepositoryTest {
             }
         } finally {
             System.clearProperty("jenesis.maven.uri");
-            System.clearProperty("corp.test.mirrors");
+            System.clearProperty("jenesis.corp.test.mirrors");
             System.clearProperty("jenesis.maven.local");
         }
     }
@@ -851,10 +852,10 @@ public class MavenDefaultRepositoryTest {
                 .resolve("artifact-1.jar"), "second-group");
         System.setProperty("jenesis.maven.uri",
                 "@corp.test.mirrors|special," + repository.resolve("second").toUri());
-        System.setProperty("corp.test.mirrors", repository.resolve("first").toUri().toString());
+        System.setProperty("jenesis.corp.test.mirrors", repository.resolve("first").toUri().toString());
         System.setProperty("jenesis.maven.local", local.toString());
         try {
-            MavenRepository merged = MavenDefaultRepository.of();
+            MavenRepository merged = MavenDefaultRepository.ofKeys(SYSTEM);
             try (InputStream stream = merged.fetch(Runnable::run, "special", "artifact", "1", "jar", null, null)
                     .orElseThrow().toInputStream()) {
                 assertThat(new String(stream.readAllBytes())).isEqualTo("first-special");
@@ -865,7 +866,7 @@ public class MavenDefaultRepositoryTest {
             }
         } finally {
             System.clearProperty("jenesis.maven.uri");
-            System.clearProperty("corp.test.mirrors");
+            System.clearProperty("jenesis.corp.test.mirrors");
             System.clearProperty("jenesis.maven.local");
         }
     }
@@ -878,7 +879,7 @@ public class MavenDefaultRepositoryTest {
         System.setProperty("jenesis.maven.uri", repository.resolve("first").toUri() + ",@");
         System.setProperty("jenesis.maven.local", local.toString());
         try {
-            Optional<RepositoryItem> item = MavenDefaultRepository.of().fetch(Runnable::run,
+            Optional<RepositoryItem> item = MavenDefaultRepository.ofKeys(SYSTEM).fetch(Runnable::run,
                     "group",
                     "artifact",
                     "1",
@@ -900,7 +901,7 @@ public class MavenDefaultRepositoryTest {
         System.setProperty("jenesis.maven.uri", "@corp.test.unset");
         System.setProperty("jenesis.maven.local", local.toString());
         try {
-            assertThatThrownBy(MavenDefaultRepository::of)
+            assertThatThrownBy(() -> MavenDefaultRepository.ofKeys(SYSTEM))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Unresolved repository reference: @corp.test.unset");
         } finally {
@@ -912,17 +913,17 @@ public class MavenDefaultRepositoryTest {
     @Test
     public void factory_fails_on_circular_reference() {
         System.setProperty("jenesis.maven.uri", "@corp.test.left");
-        System.setProperty("corp.test.left", "@corp.test.right");
-        System.setProperty("corp.test.right", "@corp.test.left");
+        System.setProperty("jenesis.corp.test.left", "@corp.test.right");
+        System.setProperty("jenesis.corp.test.right", "@corp.test.left");
         System.setProperty("jenesis.maven.local", local.toString());
         try {
-            assertThatThrownBy(MavenDefaultRepository::of)
+            assertThatThrownBy(() -> MavenDefaultRepository.ofKeys(SYSTEM))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Circular repository reference: @corp.test.left");
         } finally {
             System.clearProperty("jenesis.maven.uri");
-            System.clearProperty("corp.test.left");
-            System.clearProperty("corp.test.right");
+            System.clearProperty("jenesis.corp.test.left");
+            System.clearProperty("jenesis.corp.test.right");
             System.clearProperty("jenesis.maven.local");
         }
     }

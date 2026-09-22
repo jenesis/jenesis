@@ -14,6 +14,7 @@ import build.jenesis.step.Javac;
 import build.jenesis.step.Javadoc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class JavadocTest {
 
@@ -42,7 +43,7 @@ public class JavadocTest {
                 */
                 public class Sample { }
                 """);
-        BuildStepResult result = new Javadoc(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+        BuildStepResult result = Javadoc.ofKeys(SYSTEM, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
@@ -64,7 +65,7 @@ public class JavadocTest {
             System.setProperty("jenesis.archive.timestamp", "");
         }
         try {
-            javadoc = new Javadoc(ProcessHandler.Factory.TOOL);
+            javadoc = Javadoc.ofKeys(SYSTEM, ProcessHandler.Factory.TOOL);
         } finally {
             System.clearProperty("jenesis.archive.timestamp");
         }
@@ -99,7 +100,7 @@ public class JavadocTest {
                 public class Sample { }
                 """);
 
-        BuildStepResult result = new Javadoc(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+        BuildStepResult result = Javadoc.ofKeys(SYSTEM, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(

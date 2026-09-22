@@ -16,6 +16,7 @@ import build.jenesis.project.JApiCmpModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class JApiCmpModuleRunTest {
 
@@ -117,8 +118,8 @@ public class JApiCmpModuleRunTest {
     private JApiCmpModule module(SequencedProperties config) {
         config.setProperty("baseline", BASELINE);
         return new JApiCmpModule(
-                Map.of("maven", MavenDefaultRepository.of()),
-                Map.of("maven", new MavenPomResolver()))
+                Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                Map.of("maven", MavenPomResolver.ofKeys(SYSTEM)))
                 .pinning(Pinning.STRICT)
                 .config(config);
     }

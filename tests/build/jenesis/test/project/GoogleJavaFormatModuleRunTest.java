@@ -16,6 +16,7 @@ import build.jenesis.project.GoogleJavaFormatModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class GoogleJavaFormatModuleRunTest {
 
@@ -94,7 +95,7 @@ public class GoogleJavaFormatModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "google-java-format",
-                new GoogleJavaFormatModule(Map.of("maven", MavenDefaultRepository.of()), Map.of("maven", new MavenPomResolver())).pinning(Pinning.STRICT)
+                new GoogleJavaFormatModule(Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)), Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))).pinning(Pinning.STRICT)
                         .verify(verify),
                 "project");
         return executor;

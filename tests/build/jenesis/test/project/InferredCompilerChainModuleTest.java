@@ -17,6 +17,7 @@ import build.jenesis.project.ScalaCompilerModule;
 import build.jenesis.step.Dependencies;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class InferredCompilerChainModuleTest {
 
@@ -41,8 +42,8 @@ public class InferredCompilerChainModuleTest {
                 "chain",
                 new InferredCompilerChainModule(
                         Collections.emptyNavigableSet(),
-                        Map.of("maven", MavenDefaultRepository.of()),
-                        Map.of("maven", new MavenPomResolver())),
+                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
                 "project");
         executor.execute();
 
@@ -86,8 +87,8 @@ public class InferredCompilerChainModuleTest {
                 "chain",
                 new InferredCompilerChainModule(
                         Collections.emptyNavigableSet(),
-                        Map.of("maven", MavenDefaultRepository.of()),
-                        Map.of("maven", new MavenPomResolver())),
+                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
                 "project");
         executor.execute();
 
@@ -165,8 +166,8 @@ public class InferredCompilerChainModuleTest {
                 "chain",
                 new InferredCompilerChainModule(
                         Collections.emptyNavigableSet(),
-                        Map.of("maven", MavenDefaultRepository.of()),
-                        Map.of("maven", new MavenPomResolver())),
+                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
                 "project");
         executor.execute();
 
@@ -199,8 +200,8 @@ public class InferredCompilerChainModuleTest {
                 "chain",
                 new InferredCompilerChainModule(
                         Collections.emptyNavigableSet(),
-                        Map.of("maven", MavenDefaultRepository.of()),
-                        Map.of("maven", new MavenPomResolver())),
+                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
                 "project");
         executor.execute();
 
@@ -234,8 +235,8 @@ public class InferredCompilerChainModuleTest {
                 "chain",
                 new InferredCompilerChainModule(
                         Collections.emptyNavigableSet(),
-                        Map.of("maven", MavenDefaultRepository.of()),
-                        Map.of("maven", new MavenPomResolver())),
+                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
                 "project");
         executor.execute();
 
@@ -262,8 +263,8 @@ public class InferredCompilerChainModuleTest {
                 "chain",
                 new InferredCompilerChainModule(
                         Collections.emptyNavigableSet(),
-                        Map.of("maven", MavenDefaultRepository.of()),
-                        Map.of("maven", new MavenPomResolver())),
+                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
                 "project");
         executor.execute();
 
@@ -440,8 +441,8 @@ public class InferredCompilerChainModuleTest {
                 "chain",
                 new InferredCompilerChainModule(
                         Collections.emptyNavigableSet(),
-                        Map.of("maven", MavenDefaultRepository.of()),
-                        Map.of("maven", new MavenPomResolver())),
+                        Map.of("maven", MavenDefaultRepository.ofKeys(SYSTEM)),
+                        Map.of("maven", MavenPomResolver.ofKeys(SYSTEM))),
                 "project");
         executor.execute();
     }

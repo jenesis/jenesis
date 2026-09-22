@@ -20,6 +20,7 @@ import build.jenesis.project.ProjectModuleDescriptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static build.jenesis.SequencedProperties.SYSTEM;
 
 public class ProjectTest {
 
@@ -57,26 +58,58 @@ public class ProjectTest {
 
     @Test
     public void reads_the_tag_revision_and_tree_from_their_properties_and_keeps_empty_ones() {
-        assertThat(new Project(root).tag()).isNull();
-        assertThat(new Project(root).revision()).isNull();
-        assertThat(new Project(root).tree()).isNull();
+        assertThat(Project.ofKeys(SYSTEM, root).tag()).isNull();
+        assertThat(Project.ofKeys(SYSTEM, root).revision()).isNull();
+        assertThat(Project.ofKeys(SYSTEM, root).tree()).isNull();
         System.setProperty("jenesis.project.tag", "v1.2.3");
         System.setProperty("jenesis.project.revision", "0123abcd");
         System.setProperty("jenesis.project.tree", "4b825dc642cb6eb9a060e54bf8d69288fbee4904");
-        assertThat(new Project(root).tag()).isEqualTo("v1.2.3");
-        assertThat(new Project(root).revision()).isEqualTo("0123abcd");
-        assertThat(new Project(root).tree()).isEqualTo("4b825dc642cb6eb9a060e54bf8d69288fbee4904");
+        assertThat(Project.ofKeys(SYSTEM, root).tag()).isEqualTo("v1.2.3");
+        assertThat(Project.ofKeys(SYSTEM, root).revision()).isEqualTo("0123abcd");
+        assertThat(Project.ofKeys(SYSTEM, root).tree()).isEqualTo("4b825dc642cb6eb9a060e54bf8d69288fbee4904");
         System.setProperty("jenesis.project.tag", "");
         System.setProperty("jenesis.project.revision", "");
         System.setProperty("jenesis.project.tree", "");
-        assertThat(new Project(root).tag()).isEmpty();
-        assertThat(new Project(root).revision()).isEmpty();
-        assertThat(new Project(root).tree()).isEmpty();
+        assertThat(Project.ofKeys(SYSTEM, root).tag()).isEmpty();
+        assertThat(Project.ofKeys(SYSTEM, root).revision()).isEmpty();
+        assertThat(Project.ofKeys(SYSTEM, root).tree()).isEmpty();
+    }
+
+    @Test
+    public void reads_every_setting_from_the_provider_it_is_given() {
+        Project project = Project.ofKeys(Map.of("project.version", "1.2.3",
+                "project.target", "out",
+                "project.sources", "",
+                "project.digest", "SHA-512")::get, root);
+        assertThat(project.version()).isEqualTo("1.2.3");
+        assertThat(project.target()).isEqualTo(Path.of("out"));
+        assertThat(project.sources()).isTrue();
+        assertThat(System.getProperty("jenesis.project.version"))
+                .as("a caller configures a build by handing it a provider, never by setting a property"
+                        + " the whole JVM shares")
+                .isNull();
+    }
+
+    @Test
+    public void takes_its_defaults_when_it_is_given_no_provider() {
+        System.setProperty("jenesis.project.version", "9.9.9");
+        System.setProperty("jenesis.project.target", "elsewhere");
+        try {
+            Project project = new Project(root);
+            assertThat(project.version())
+                    .as("the environment configures the entry point's project, not every project a caller builds")
+                    .isNull();
+            assertThat(project.target()).isEqualTo(Path.of("target"));
+            assertThat(Project.ofKeys(SYSTEM, root).version()).isEqualTo("9.9.9");
+        } finally {
+            System.clearProperty("jenesis.project.version");
+            System.clearProperty("jenesis.project.target");
+        }
     }
 
     @Test
     public void records_no_scm_tag_for_a_version_alone() throws IOException {
-        assertThat(metadataValues(new Project(Path.of(".")).version("1.2.3")))
+        assertThat(metadataValues(Project.ofKeys(SYSTEM, Path.of(".")).version("1.2.3")))
                 .as("how a project names its release tags is not derived from its version")
                 .containsEntry("version", "1.2.3")
                 .doesNotContainKey("scm.tag");
@@ -84,7 +117,7 @@ public class ProjectTest {
 
     @Test
     public void records_a_set_tag_and_revision() throws IOException {
-        assertThat(metadataValues(new Project(Path.of(".")).tag("v1.2.3").revision("0123abcd")
+        assertThat(metadataValues(Project.ofKeys(SYSTEM, Path.of(".")).tag("v1.2.3").revision("0123abcd")
                 .tree("4b825dc642cb6eb9a060e54bf8d69288fbee4904")))
                 .containsEntry("scm.tag", "v1.2.3")
                 .containsEntry("scm.revision", "0123abcd")
@@ -93,7 +126,7 @@ public class ProjectTest {
 
     @Test
     public void records_an_empty_tag_and_revision_to_replace_declared_ones() throws IOException {
-        assertThat(metadataValues(new Project(Path.of(".")).tag("").revision("")))
+        assertThat(metadataValues(Project.ofKeys(SYSTEM, Path.of(".")).tag("").revision("")))
                 .as("an empty value overrides what a metadata file or a pom.xml declares")
                 .containsEntry("scm.tag", "")
                 .containsEntry("scm.revision", "");
@@ -101,7 +134,7 @@ public class ProjectTest {
 
     @Test
     public void records_no_scm_tag_or_revision_unless_set() throws IOException {
-        assertThat(metadataValues(new Project(Path.of("."))))
+        assertThat(metadataValues(Project.ofKeys(SYSTEM, Path.of("."))))
                 .as("what a metadata file or a pom.xml declares stays in force")
                 .doesNotContainKeys("scm.tag", "scm.revision", "scm.tree");
     }
@@ -158,7 +191,7 @@ public class ProjectTest {
 
     @Test
     public void build_throws_when_no_descriptor_is_detected() {
-        assertThatThrownBy(() -> new Project(root).target(root.resolve("target")).build())
+        assertThatThrownBy(() -> Project.ofKeys(SYSTEM, root).target(root.resolve("target")).build())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No build descriptor found");
     }
@@ -166,7 +199,7 @@ public class ProjectTest {
     @Test
     public void layout_setter_round_trips_each_concrete_layout() {
         for (Project.Layout layout : List.of(Project.Layout.MAVEN, Project.Layout.MODULAR, Project.Layout.MODULAR_TO_MAVEN)) {
-            assertThat(new Project(Path.of(".")).layout(layout).layout()).isSameAs(layout);
+            assertThat(Project.ofKeys(SYSTEM, Path.of(".")).layout(layout).layout()).isSameAs(layout);
         }
     }
 
@@ -178,7 +211,7 @@ public class ProjectTest {
                 "modular_to_maven", Project.Layout.MODULAR_TO_MAVEN);
         cases.forEach((name, layout) -> {
             System.setProperty("jenesis.project.layout", name);
-            assertThat(new Project(Path.of(".")).layout())
+            assertThat(Project.ofKeys(SYSTEM, Path.of(".")).layout())
                     .as("layout=%s", name)
                     .isSameAs(layout);
         });
@@ -187,79 +220,79 @@ public class ProjectTest {
     @Test
     public void explicit_layout_overrides_system_property() {
         System.setProperty("jenesis.project.layout", "maven");
-        assertThat(new Project(Path.of(".")).layout(Project.Layout.MODULAR).layout())
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).layout(Project.Layout.MODULAR).layout())
                 .isSameAs(Project.Layout.MODULAR);
     }
 
     @Test
     public void system_property_rejects_unknown_layout() {
         System.setProperty("jenesis.project.layout", "nonsense");
-        assertThatThrownBy(() -> new Project(Path.of(".")))
+        assertThatThrownBy(() -> Project.ofKeys(SYSTEM, Path.of(".")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown layout");
     }
 
     @Test
     public void skip_tests_setter_skips_tests() {
-        assertThat(new Project(Path.of(".")).tests(false).tests()).isFalse();
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).tests(false).tests()).isFalse();
     }
 
     @Test
     public void defaults_keep_tests_enabled() {
-        Project project = new Project(Path.of("."));
+        Project project = Project.ofKeys(SYSTEM, Path.of("."));
         assertThat(project.tests()).isTrue();
     }
 
     @Test
     public void default_target_is_build() {
-        assertThat(new Project(Path.of(".")).defaultTarget()).containsExactly("build");
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).defaultTarget()).containsExactly("build");
     }
 
     @Test
     public void configuration_defaults_to_build_jenesis_under_the_root() {
-        assertThat(new Project(Path.of(".")).configuration())
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).configuration())
                 .containsExactly(Path.of(".").resolve("build.jenesis"));
     }
 
     @Test
     public void empty_configuration_property_skips_the_global_configuration() {
         System.setProperty("jenesis.project.configuration", "");
-        assertThat(new Project(Path.of(".")).configuration()).isEmpty();
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).configuration()).isEmpty();
     }
 
     @Test
     public void boms_default_to_the_configuration() {
-        assertThat(new Project(Path.of(".")).boms())
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).boms())
                 .containsExactly(Path.of(".").resolve("build.jenesis"));
         System.setProperty("jenesis.project.configuration", "config");
-        assertThat(new Project(Path.of(".")).boms()).containsExactly(Path.of(".").resolve("config"));
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).boms()).containsExactly(Path.of(".").resolve("config"));
     }
 
     @Test
     public void boms_property_overrides_the_configuration() {
         System.setProperty("jenesis.project.boms", "platform");
-        assertThat(new Project(Path.of(".")).boms()).containsExactly(Path.of(".").resolve("platform"));
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).boms()).containsExactly(Path.of(".").resolve("platform"));
         System.setProperty("jenesis.project.boms", "");
-        assertThat(new Project(Path.of(".")).boms()).isEmpty();
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).boms()).isEmpty();
     }
 
     @Test
     public void boms_wither_replaces_the_locations() {
-        assertThat(new Project(Path.of(".")).boms(Path.of("platform")).boms()).containsExactly(Path.of("platform"));
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).boms(Path.of("platform")).boms()).containsExactly(Path.of("platform"));
     }
 
     @Test
     public void configuration_reference_splices_the_default() {
         System.setProperty("jenesis.project.configuration", "shared,@");
-        assertThat(new Project(Path.of(".")).configuration())
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).configuration())
                 .containsExactly(Path.of(".").resolve("shared"), Path.of(".").resolve("build.jenesis"));
     }
 
     @Test
     public void configuration_named_reference_splices_a_property_value() {
         System.setProperty("jenesis.test.sample.key", "shared,extra");
-        System.setProperty("jenesis.project.configuration", "@jenesis.test.sample.key,@");
-        assertThat(new Project(Path.of(".")).configuration())
+        System.setProperty("jenesis.project.configuration", "@test.sample.key,@");
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).configuration())
                 .containsExactly(Path.of(".").resolve("shared"),
                         Path.of(".").resolve("extra"),
                         Path.of(".").resolve("build.jenesis"));
@@ -267,27 +300,27 @@ public class ProjectTest {
 
     @Test
     public void configuration_fails_on_unresolved_reference() {
-        System.setProperty("jenesis.project.configuration", "@jenesis.test.sample.unset");
-        assertThatThrownBy(() -> new Project(Path.of(".")))
+        System.setProperty("jenesis.project.configuration", "@test.sample.unset");
+        assertThatThrownBy(() -> Project.ofKeys(SYSTEM, Path.of(".")))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Unresolved location reference: @jenesis.test.sample.unset");
+                .hasMessageContaining("Unresolved location reference: @test.sample.unset");
     }
 
     @Test
     public void configuration_fails_on_circular_reference() {
-        System.setProperty("jenesis.test.sample.a", "@jenesis.test.sample.b");
-        System.setProperty("jenesis.test.sample.b", "@jenesis.test.sample.a");
-        System.setProperty("jenesis.project.configuration", "@jenesis.test.sample.a");
-        assertThatThrownBy(() -> new Project(Path.of(".")))
+        System.setProperty("jenesis.test.sample.a", "@test.sample.b");
+        System.setProperty("jenesis.test.sample.b", "@test.sample.a");
+        System.setProperty("jenesis.project.configuration", "@test.sample.a");
+        assertThatThrownBy(() -> Project.ofKeys(SYSTEM, Path.of(".")))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Circular location reference: @jenesis.test.sample.a");
+                .hasMessageContaining("Circular location reference: @test.sample.a");
     }
 
     @Test
     public void boms_reference_splices_the_configuration() {
         System.setProperty("jenesis.project.configuration", "config");
         System.setProperty("jenesis.project.boms", "platform,@");
-        assertThat(new Project(Path.of(".")).boms())
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).boms())
                 .containsExactly(Path.of(".").resolve("platform"), Path.of(".").resolve("config"));
     }
 
@@ -329,18 +362,18 @@ public class ProjectTest {
     @Test
     public void profiles_are_the_selected_profile_names() throws IOException {
         System.setProperty("jenesis.make.profiles", "release, supply-chain.properties");
-        assertThat(Make.loadProperties(root))
+        assertThat(Make.settings(root).profiles())
                 .containsExactly(Path.of("release"), Path.of("supply-chain"));
     }
 
     @Test
     public void profiles_default_to_empty_without_a_selection() {
-        assertThat(new Project(Path.of(".")).profiles()).isEmpty();
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).profiles()).isEmpty();
     }
 
     @Test
     public void profiles_wither_round_trips() {
-        assertThat(new Project(Path.of(".")).profiles(Path.of("release"), Path.of("ci")).profiles())
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).profiles(Path.of("release"), Path.of("ci")).profiles())
                 .containsExactly(Path.of("release"), Path.of("ci"));
     }
 
@@ -363,43 +396,43 @@ public class ProjectTest {
 
     @Test
     public void default_target_can_be_overridden() {
-        assertThat(new Project(Path.of(".")).defaultTarget("foo", "bar").defaultTarget())
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).defaultTarget("foo", "bar").defaultTarget())
                 .containsExactly("foo", "bar");
     }
 
     @Test
     public void a_project_is_built_from_the_folder_it_is_given() {
-        assertThat(new Project(root).root()).isEqualTo(root);
+        assertThat(Project.ofKeys(SYSTEM, root).root()).isEqualTo(root);
     }
 
     @Test
     public void system_property_overrides_target() {
         System.setProperty("jenesis.project.target", "custom-target");
-        assertThat(new Project(Path.of(".")).target()).isEqualTo(Path.of("custom-target"));
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).target()).isEqualTo(Path.of("custom-target"));
     }
 
     @Test
     public void system_property_overrides_artifacts() {
         System.setProperty("jenesis.project.artifacts", "custom-artifacts");
-        assertThat(new Project(Path.of(".")).artifacts()).isEqualTo(Path.of("custom-artifacts"));
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).artifacts()).isEqualTo(Path.of("custom-artifacts"));
     }
 
     @Test
     public void local_build_cache_is_disabled_by_default() {
-        assertThat(new Project(Path.of(".")).cache()).isNull();
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).cache()).isNull();
     }
 
     @Test
     public void local_build_cache_rejects_a_uri_value() {
         System.setProperty("jenesis.project.cache", "file:///tmp/cache");
-        assertThatThrownBy(() -> new Project(Path.of("."))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Project.ofKeys(SYSTEM, Path.of("."))).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     public void empty_property_enables_local_build_cache_at_default_location() {
         System.setProperty("jenesis.make.root", root.toString());
         System.setProperty("jenesis.project.cache", "");
-        BuildExecutorCache cache = new Project(Path.of(".")).cache();
+        BuildExecutorCache cache = Project.ofKeys(SYSTEM, Path.of(".")).cache();
         assertThat(cache).isInstanceOf(BuildExecutorFileCache.class);
         assertThat(((BuildExecutorFileCache) cache).root().endsWith(Path.of(".jenesis", "cache"))).isTrue();
     }
@@ -408,49 +441,49 @@ public class ProjectTest {
     public void system_property_overrides_local_build_cache_location() {
         System.setProperty("jenesis.make.root", root.toString());
         System.setProperty("jenesis.project.cache", "custom-cache");
-        BuildExecutorCache cache = new Project(Path.of(".")).cache();
+        BuildExecutorCache cache = Project.ofKeys(SYSTEM, Path.of(".")).cache();
         assertThat(cache).isInstanceOf(BuildExecutorFileCache.class);
         assertThat(((BuildExecutorFileCache) cache).root().endsWith(Path.of("custom-cache"))).isTrue();
     }
 
     @Test
     public void default_digest_is_sha_256() {
-        assertThat(new Project(Path.of(".")).hashFunction()).isEqualTo(new HashDigestFunction("SHA-256"));
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).hashFunction()).isEqualTo(new HashDigestFunction("SHA-256"));
     }
 
     @Test
     public void system_property_overrides_digest() {
         System.setProperty("jenesis.project.digest", "SHA-512");
-        assertThat(new Project(Path.of(".")).hashFunction())
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).hashFunction())
                 .isEqualTo(new HashDigestFunction("SHA-512"));
     }
 
     @Test
     public void digest_can_be_overridden() {
         HashDigestFunction digest = new HashDigestFunction("SHA-512");
-        assertThat(new Project(Path.of(".")).hashFunction(digest).hashFunction()).isSameAs(digest);
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).hashFunction(digest).hashFunction()).isSameAs(digest);
     }
 
     @Test
     public void default_assembler_is_set() {
-        assertThat(new Project(Path.of(".")).assembler()).isNotNull();
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).assembler()).isNotNull();
     }
 
     @Test
     public void assembler_can_be_overridden() {
         MultiProjectAssembler<ProjectModuleDescriptor> custom = (_, _, _) -> new AssemblyDescriptor((_, _) -> {});
-        assertThat(new Project(Path.of(".")).assembler(custom).assembler()).isSameAs(custom);
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).assembler(custom).assembler()).isSameAs(custom);
     }
 
     @Test
     public void default_layout_is_auto() {
-        assertThat(new Project(Path.of(".")).layout()).isSameAs(Project.Layout.AUTO);
+        assertThat(Project.ofKeys(SYSTEM, Path.of(".")).layout()).isSameAs(Project.Layout.AUTO);
     }
 
     @Test
     public void maven_layout_resolver_maps_named_and_unnamed_modules() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = new Project(root).target(target);
+        Project project = Project.ofKeys(SYSTEM, root).target(target);
         Function<String, String> resolver = Project.Layout.MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -466,7 +499,7 @@ public class ProjectTest {
     @Test
     public void modular_layout_resolver_maps_named_and_unnamed_modules() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = new Project(root).target(target);
+        Project project = Project.ofKeys(SYSTEM, root).target(target);
         Function<String, String> resolver = Project.Layout.MODULAR.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -482,7 +515,7 @@ public class ProjectTest {
     @Test
     public void maven_layout_resolver_preserves_step_path_after_slash() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = new Project(root).target(target);
+        Project project = Project.ofKeys(SYSTEM, root).target(target);
         Function<String, String> resolver = Project.Layout.MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -500,7 +533,7 @@ public class ProjectTest {
     @Test
     public void modular_layout_resolver_preserves_step_path_after_slash() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = new Project(root).target(target);
+        Project project = Project.ofKeys(SYSTEM, root).target(target);
         Function<String, String> resolver = Project.Layout.MODULAR.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -518,7 +551,7 @@ public class ProjectTest {
     @Test
     public void modular_to_maven_layout_resolver_preserves_step_path_after_slash() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = new Project(root).target(target);
+        Project project = Project.ofKeys(SYSTEM, root).target(target);
         Function<String, String> resolver = Project.Layout.MODULAR_TO_MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -536,7 +569,7 @@ public class ProjectTest {
     @Test
     public void modular_layout_registers_export_step() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = new Project(root).target(target);
+        Project project = Project.ofKeys(SYSTEM, root).target(target);
         BuildExecutor executor = BuildExecutor.of(target,
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
@@ -551,7 +584,7 @@ public class ProjectTest {
     @Test
     public void modular_to_maven_layout_resolver_maps_named_and_unnamed_modules() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = new Project(root).target(target);
+        Project project = Project.ofKeys(SYSTEM, root).target(target);
         Function<String, String> resolver = Project.Layout.MODULAR_TO_MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -572,7 +605,7 @@ public class ProjectTest {
             executor.addSource(Project.BUILD, source);
             return name -> name;
         };
-        SequencedMap<String, Path> result = new Project(Path.of("."))
+        SequencedMap<String, Path> result = Project.ofKeys(SYSTEM, Path.of("."))
                 .root(root)
                 .target(target)
                 .layout(layout)
@@ -590,7 +623,7 @@ public class ProjectTest {
             executor.addSource("beta", beta);
             return name -> name;
         };
-        SequencedMap<String, Path> result = new Project(Path.of("."))
+        SequencedMap<String, Path> result = Project.ofKeys(SYSTEM, Path.of("."))
                 .root(root)
                 .target(target)
                 .layout(layout)
@@ -606,7 +639,7 @@ public class ProjectTest {
             executor.addSource("resolved", source);
             return name -> "resolved";
         };
-        SequencedMap<String, Path> result = new Project(Path.of("."))
+        SequencedMap<String, Path> result = Project.ofKeys(SYSTEM, Path.of("."))
                 .root(root)
                 .target(target)
                 .layout(layout)
@@ -615,194 +648,207 @@ public class ProjectTest {
     }
 
     @Test
-    public void load_jenesis_properties_reads_a_file_from_root() throws IOException {
+    public void the_layered_settings_reads_a_file_from_root() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.test.sample.key=fromFile\n");
-        Make.loadProperties(root);
-        assertThat(System.getProperty("jenesis.test.sample.key")).isEqualTo("fromFile");
+        assertThat(Make.settings(root).keys().apply("test.sample.key")).isEqualTo("fromFile");
     }
 
     @Test
-    public void load_jenesis_properties_does_not_override_an_explicit_system_property() throws IOException {
+    public void the_layered_settings_does_not_override_an_explicit_system_property() throws IOException {
         System.setProperty("jenesis.test.sample.key", "fromCommandLine");
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.test.sample.key=fromFile\n");
-        Make.loadProperties(root);
-        assertThat(System.getProperty("jenesis.test.sample.key")).isEqualTo("fromCommandLine");
+        assertThat(Make.settings(root).keys().apply("test.sample.key")).isEqualTo("fromCommandLine");
     }
 
     @Test
-    public void load_jenesis_properties_is_a_no_op_when_absent() throws IOException {
-        Make.loadProperties(root);
-        assertThat(System.getProperty("jenesis.test.sample.key")).isNull();
+    public void the_layered_settings_is_a_no_op_when_absent() throws IOException {
+        assertThat(Make.settings(root).keys().apply("test.sample.key")).isNull();
     }
 
     @Test
-    public void load_jenesis_properties_chains_profile_files() throws IOException {
+    public void the_layered_settings_chains_profile_files() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"),
                 "jenesis.make.profiles=profile-a, profile-b\njenesis.test.sample.a=fromBase\n");
         Files.writeString(root.resolve("jenesis-profile-a.properties"),
                 "jenesis.make.profiles=profile-c\njenesis.test.sample.b=fromA\n");
         Files.writeString(root.resolve("jenesis-profile-b.properties"), "jenesis.test.sample.c=fromB\n");
         Files.writeString(root.resolve("jenesis-profile-c.properties"), "jenesis.test.sample.d=fromC\n");
-        Make.loadProperties(root);
-        assertThat(System.getProperty("jenesis.test.sample.a")).isEqualTo("fromBase");
-        assertThat(System.getProperty("jenesis.test.sample.b")).isEqualTo("fromA");
-        assertThat(System.getProperty("jenesis.test.sample.c")).isEqualTo("fromB");
-        assertThat(System.getProperty("jenesis.test.sample.d")).isEqualTo("fromC");
+        assertThat(Make.settings(root).keys().apply("test.sample.a")).isEqualTo("fromBase");
+        assertThat(Make.settings(root).keys().apply("test.sample.b")).isEqualTo("fromA");
+        assertThat(Make.settings(root).keys().apply("test.sample.c")).isEqualTo("fromB");
+        assertThat(Make.settings(root).keys().apply("test.sample.d")).isEqualTo("fromC");
     }
 
     @Test
-    public void load_jenesis_properties_rejects_root_in_the_project_file() throws IOException {
+    public void the_layered_settings_rejects_root_in_the_project_file() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.root=elsewhere\n");
-        assertThatThrownBy(() -> Make.loadProperties(root))
+        assertThatThrownBy(() -> Make.settings(root))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.make.root cannot be set in");
     }
 
     @Test
-    public void load_jenesis_properties_rejects_root_in_a_profile() throws IOException {
+    public void the_layered_settings_rejects_root_in_a_profile() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
         Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.make.root=elsewhere\n");
-        assertThatThrownBy(() -> Make.loadProperties(root))
+        assertThatThrownBy(() -> Make.settings(root))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.make.root cannot be set in");
     }
 
     @Test
-    public void load_jenesis_properties_rejects_global_in_a_profile() throws IOException {
+    public void the_layered_settings_rejects_global_in_a_profile() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
         Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.make.global=elsewhere\n");
-        assertThatThrownBy(() -> Make.loadProperties(root))
+        assertThatThrownBy(() -> Make.settings(root))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.make.global cannot be set in");
     }
 
     @Test
-    public void load_jenesis_properties_rejects_global_in_the_user_global_file() throws IOException {
+    public void the_layered_settings_rejects_global_in_the_user_global_file() throws IOException {
         Path home = Files.createDirectories(root.resolve("home/.jenesis"));
         Files.writeString(home.resolve("jenesis.properties"), "jenesis.make.global=elsewhere\n");
         System.setProperty("jenesis.make.global", root.resolve("home").toString());
-        assertThatThrownBy(() -> Make.loadProperties(root))
+        assertThatThrownBy(() -> Make.settings(root))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.make.global cannot be set in");
     }
 
     @Test
-    public void load_jenesis_properties_rejects_global_in_the_project_file() throws IOException {
+    public void the_layered_settings_rejects_global_in_the_project_file() throws IOException {
         Files.createDirectories(root.resolve("home/.jenesis"));
         Files.writeString(root.resolve("jenesis.properties"),
                 "jenesis.make.global=" + root.resolve("home").toString().replace('\\', '/') + "\n");
-        assertThatThrownBy(() -> Make.loadProperties(root))
+        assertThatThrownBy(() -> Make.settings(root))
                 .as("a project that could move the user-global folder could supply that file itself")
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.make.global cannot be set in");
     }
 
     @Test
-    public void load_jenesis_properties_accepts_global_from_the_command_line() throws IOException {
+    public void the_layered_settings_accepts_global_from_the_command_line() throws IOException {
         Path home = Files.createDirectories(root.resolve("home/.jenesis"));
         Files.writeString(home.resolve("jenesis.properties"), "jenesis.test.sample.key=fromGlobal\n");
         System.setProperty("jenesis.make.global", root.resolve("home").toString());
-        Make.loadProperties(root);
-        assertThat(System.getProperty("jenesis.test.sample.key")).isEqualTo("fromGlobal");
+        assertThat(Make.settings(root).keys().apply("test.sample.key")).isEqualTo("fromGlobal");
     }
 
     @Test
-    public void load_jenesis_properties_rejects_toolchain_searchpath_in_the_project_file() throws IOException {
+    public void the_layered_settings_rejects_toolchain_searchpath_in_the_project_file() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=/opt/jdks/*\n");
-        assertThatThrownBy(() -> Make.loadProperties(root))
+        assertThatThrownBy(() -> Make.settings(root))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.toolchain.searchpath cannot be set in");
     }
 
     @Test
-    public void load_jenesis_properties_rejects_toolchain_searchpath_in_a_profile() throws IOException {
+    public void the_layered_settings_rejects_toolchain_searchpath_in_a_profile() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
         Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.toolchain.searchpath=\n");
-        assertThatThrownBy(() -> Make.loadProperties(root))
+        assertThatThrownBy(() -> Make.settings(root))
                 .as("even an empty search path is the user's to set, so a project file never names one")
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.toolchain.searchpath cannot be set in");
     }
 
     @Test
-    public void load_jenesis_properties_accepts_toolchain_searchpath_in_the_user_global_file() throws IOException {
+    public void the_layered_settings_accepts_toolchain_searchpath_in_the_user_global_file() throws IOException {
         Path home = Files.createDirectories(root.resolve("home/.jenesis"));
         Files.writeString(home.resolve("jenesis.properties"), "jenesis.toolchain.searchpath=/opt/jdks/*\n");
         System.setProperty("jenesis.make.global", root.resolve("home").toString());
-        Make.loadProperties(root);
-        assertThat(System.getProperty("jenesis.toolchain.searchpath")).isEqualTo("/opt/jdks/*");
+        assertThat(Make.settings(root).keys().apply("toolchain.searchpath")).isEqualTo("/opt/jdks/*");
     }
 
     @Test
-    public void load_jenesis_properties_records_the_settings_a_project_file_supplied() throws IOException {
+    public void the_layered_settings_leave_the_running_jvm_untouched() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.test.sample.key=fromFile\n");
+        assertThat(Make.settings(root).keys().apply("test.sample.key")).isEqualTo("fromFile");
+        assertThat(System.getProperty("jenesis.test.sample.key"))
+                .as("a build reads its settings off what it was handed, so reading a project's files"
+                        + " no longer changes the properties of the JVM the build happens to run in")
+                .isNull();
+    }
+
+    @Test
+    public void the_layered_settings_records_the_settings_a_project_file_supplied() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.test.sample.a=fromProject\n");
-        Make.loadProperties(root);
-        assertThat(System.getProperty("jenesis.make.provided"))
+        assertThat(Make.settings(root).keys().apply("make.provided"))
                 .as("a repository url a project supplies is never handed a credential, so its keys are recorded")
-                .isEqualTo("jenesis.test.sample.a");
+                .isEqualTo("test.sample.a");
     }
 
     @Test
-    public void load_jenesis_properties_records_nothing_a_project_file_only_repeated() throws IOException {
+    public void the_layered_settings_records_nothing_a_project_file_only_repeated() throws IOException {
         System.setProperty("jenesis.test.sample.a", "fromCommandLine");
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.test.sample.a=fromProject\n");
-        Make.loadProperties(root);
-        assertThat(System.getProperty("jenesis.test.sample.a")).isEqualTo("fromCommandLine");
-        assertThat(System.getProperty("jenesis.make.provided"))
+        Function<String, String> keys = Make.settings(root).keys();
+        assertThat(keys.apply("test.sample.a")).isEqualTo("fromCommandLine");
+        assertThat(keys.apply("make.provided"))
                 .as("the value in force is the one the command line set, so nothing was supplied")
                 .isNull();
     }
 
     @Test
-    public void load_jenesis_properties_rejects_a_credential_in_the_project_file() throws IOException {
+    public void the_layered_settings_rejects_a_credential_in_the_project_file() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.maven.token=Bearer secret\n");
-        assertThatThrownBy(() -> Make.loadProperties(root))
+        assertThatThrownBy(() -> Make.settings(root))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.maven.token cannot be set in");
     }
 
     @Test
-    public void load_jenesis_properties_rejects_a_credential_in_a_profile() throws IOException {
+    public void the_layered_settings_rejects_a_credential_in_a_profile() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
         Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.module.token=Bearer secret\n");
-        assertThatThrownBy(() -> Make.loadProperties(root))
+        assertThatThrownBy(() -> Make.settings(root))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.module.token cannot be set in");
     }
 
     @Test
-    public void load_jenesis_properties_accepts_a_credential_in_the_user_global_file() throws IOException {
+    public void the_layered_settings_accepts_a_credential_in_the_user_global_file() throws IOException {
         Path home = Files.createDirectories(root.resolve("home/.jenesis"));
         Files.writeString(home.resolve("jenesis.properties"), "jenesis.maven.token=Bearer secret\n");
         System.setProperty("jenesis.make.global", root.resolve("home").toString());
-        Make.loadProperties(root);
-        assertThat(System.getProperty("jenesis.maven.token")).isEqualTo("Bearer secret");
+        assertThat(Make.settings(root).keys().apply("maven.token")).isEqualTo("Bearer secret");
     }
 
     @Test
-    public void load_jenesis_properties_rejects_a_plaintext_permission_in_the_project_file() throws IOException {
+    public void the_layered_settings_rejects_a_plaintext_permission_in_the_project_file() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.repository.insecure=true\n");
-        assertThatThrownBy(() -> Make.loadProperties(root))
+        assertThatThrownBy(() -> Make.settings(root))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.repository.insecure cannot be set in");
     }
 
     @Test
-    public void load_jenesis_properties_rejects_a_supplied_declaration_in_any_file() throws IOException {
+    public void the_layered_settings_rejects_a_supplied_declaration_in_any_file() throws IOException {
         Path home = Files.createDirectories(root.resolve("home/.jenesis"));
         Files.writeString(home.resolve("jenesis.properties"), "jenesis.make.provided=jenesis.maven.uri\n");
         System.setProperty("jenesis.make.global", root.resolve("home").toString());
-        assertThatThrownBy(() -> Make.loadProperties(root))
+        assertThatThrownBy(() -> Make.settings(root))
                 .as("what a project supplied is derived, never declared, least of all by a project")
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.make.provided cannot be set in");
     }
 
     @Test
-    public void load_jenesis_properties_tolerates_a_profile_without_a_properties_file() throws IOException {
+    public void the_layered_settings_tolerates_a_profile_without_a_properties_file() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=folder-only\n");
-        assertThat(Make.loadProperties(root))
+        assertThat(Make.settings(root).profiles())
                 .as("a profile may contribute only a configuration folder, so a missing properties file is not an error")
                 .containsExactly(Path.of("folder-only"));
+    }
+
+    @Test
+    public void keeps_every_default_where_no_setting_names_one() {
+        Project project = Project.ofKeys(Map.<String, String>of()::get, Path.of("."));
+        assertThat(project.target()).isEqualTo(Path.of("target"));
+        assertThat(project.layout())
+                .as("a wither is applied only where a setting is named, so an absent one keeps the default")
+                .isEqualTo(Project.Layout.AUTO);
+        assertThat(project.version()).isNull();
+        assertThat(project.cache()).isNull();
     }
 }
