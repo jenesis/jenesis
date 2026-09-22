@@ -122,6 +122,9 @@ public class TreeTest {
         SequencedProperties inventory = new SequencedProperties();
         inventory.setProperty("module.graph.0", "graph.properties");
         inventory.setProperty("module.licenses.0", "licenses.properties");
+        inventory.setProperty("module.module", "greeter");
+        inventory.setProperty("module.version", "1.0");
+        inventory.setProperty("module.license.0", "Apache-2.0");
         inventory.store(argument.resolve(Inventory.INVENTORY));
 
         List<String> printed = new ArrayList<>();
@@ -135,9 +138,88 @@ public class TreeTest {
         assertThat(result.next()).isTrue();
         String text = String.join(System.lineSeparator(), printed).replaceAll("\033\\[[0-9;]*m", "")
                     + System.lineSeparator();
-        assertThat(text).contains("main/compile (module)");
+        assertThat(text).contains("./ 1.0 (module greeter) {Apache-2.0}");
         assertThat(text).contains("maven/org.foo/bar 1.0 [compile] (module org.foo.bar) {Apache-2.0}");
         assertThat(text).contains("└─ maven/org.foo/baz 2.0 [compile]");
         assertThat(text).contains("maven/org.foo/bar -> 1.0");
+    }
+
+    @Test
+    public void heads_the_tree_with_the_module_path_and_no_version_when_none_is_declared() throws IOException {
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
+        graph.setProperty("vertex/main/compile/maven/org.foo/bar", "1.0\t\tfalse");
+        graph.store(argument.resolve("graph.properties"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("com.example.greeter.graph.0", "graph.properties");
+        inventory.setProperty("com.example.greeter.module", "com.example.greeter");
+        inventory.setProperty("com.example.greeter.path", "greeter");
+        inventory.store(argument.resolve(Inventory.INVENTORY));
+
+        List<String> printed = new ArrayList<>();
+        Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                        argument,
+                        Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+        assertThat(printed.stream().map(line -> line.replaceAll("\033\\[[0-9;]*m", "")))
+                .contains("./greeter (module com.example.greeter)");
+    }
+
+    @Test
+    public void merges_the_scopes_of_a_module_into_one_tree() throws IOException {
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
+        graph.setProperty("edge/1", "main\truntime\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
+        graph.setProperty("edge/2", "main\truntime\tmaven\ttrue\truntime\t2.0\t\tmaven/org.foo/qux/2.0");
+        graph.setProperty("edge/3", "main\tcompile\tmaven\tfalse\tcompile\t3.0\tmaven/org.foo/bar/1.0\tmaven/org.foo/baz/3.0");
+        graph.setProperty("edge/4", "main\truntime\tmaven\ttrue\truntime\t3.0\tmaven/org.foo/bar/1.0\tmaven/org.foo/baz/3.0");
+        graph.setProperty("vertex/main/compile/maven/org.foo/bar", "1.0\t\tfalse");
+        graph.setProperty("vertex/main/runtime/maven/org.foo/bar", "1.0\t\tfalse");
+        graph.setProperty("vertex/main/runtime/maven/org.foo/qux", "2.0\t\tfalse");
+        graph.store(argument.resolve("graph.properties"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module.graph.0", "graph.properties");
+        inventory.store(argument.resolve(Inventory.INVENTORY));
+
+        List<String> printed = new ArrayList<>();
+        Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                        argument,
+                        Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+        assertThat(printed.stream().map(line -> line.replaceAll("\033\\[[0-9;]*m", "")).toList()).containsSequence(
+                "./",
+                "├─ maven/org.foo/bar 1.0 [compile]",
+                "│  └─ maven/org.foo/baz 3.0 [runtime]",
+                "└─ maven/org.foo/qux 2.0 [runtime]");
+    }
+
+    @Test
+    public void marks_a_test_module_in_its_heading() throws IOException {
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
+        graph.setProperty("vertex/main/compile/maven/org.foo/bar", "1.0\t\tfalse");
+        graph.store(argument.resolve("graph.properties"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("test-module-greeter.graph.0", "graph.properties");
+        inventory.setProperty("test-module-greeter.path", "greeter");
+        inventory.setProperty("test-module-greeter.test", "");
+        inventory.store(argument.resolve(Inventory.INVENTORY));
+
+        List<String> printed = new ArrayList<>();
+        Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                        argument,
+                        Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+        assertThat(printed.stream().map(line -> line.replaceAll("\033\\[[0-9;]*m", "")))
+                .contains("./greeter (test)");
     }
 }

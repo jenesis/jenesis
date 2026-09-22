@@ -93,15 +93,15 @@ module repository - no Maven coordinate, no Maven scope:
 
     java build/jenesis/Make.java dependencies
 
-    main/compile (module-sources)
-    module/org.slf4j 2.0.16 (module org.slf4j)
+    ./sources 1-SNAPSHOT (module demo.modulelayout)
+    └─ module/org.slf4j 2.0.16 (module org.slf4j)
 
 Under **MODULAR_TO_MAVEN** (the same project in `../demo-02-java-modular`) the
 module is translated to its Maven coordinate and resolved through Maven, so the
 node is a Maven artifact carrying a Maven scope:
 
-    main/compile (module-sources)
-    maven/org.slf4j/slf4j-api 2.0.16 [compile]
+    ./sources 1-SNAPSHOT (module demo.modulelayout)
+    └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT}
 
 In a project with transitive dependencies the Maven side expands the full
 nearest-wins closure (resolved versions, scopes, and duplicates dimmed and marked

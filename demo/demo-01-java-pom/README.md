@@ -44,12 +44,13 @@ the declared license:
 
     java build/jenesis/Make.java dependencies
 
-    main/compile (module)
-    maven/org.apache.commons/commons-lang3 3.14.0 [compile] (module org.apache.commons.lang3) {Apache-2.0}
+    ./ 1.0.0
+    └─ maven/org.apache.commons/commons-lang3 3.14.0 [compile] (module org.apache.commons.lang3) {Apache-2.0}
 
-Each node shows the property-file key, the requested version (with the negotiated
-version inline when it differs), the Maven scope, the resolved module name, and
-the declared license.
+The tree is headed by the project's path and version, and each node below it
+shows the property-file key, the requested version (with the negotiated version
+inline when it differs), the Maven scope, the resolved module name, and the
+declared license.
 
 Opening it in your IDE
 ----------------------

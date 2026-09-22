@@ -112,6 +112,7 @@ public class Inventory implements BuildStep {
         SequencedMap<String, Path> bomFiles = new LinkedHashMap<>();
         SequencedMap<String, String> bomValues = new LinkedHashMap<>();
         SequencedMap<String, String> attachments = new LinkedHashMap<>();
+        SequencedMap<String, String> licenses = new LinkedHashMap<>();
         SequencedSet<String> identity = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -148,6 +149,17 @@ public class Inventory implements BuildStep {
                 }
                 if (artifact == null) {
                     artifact = properties.getProperty("artifact");
+                }
+                if (licenses.isEmpty()) {
+                    for (String key : properties.stringPropertyNames()) {
+                        boolean name = key.endsWith(".name");
+                        if (key.startsWith("license.") && (name || key.endsWith(".url"))
+                                && key.lastIndexOf('.') > "license.".length()) {
+                            licenses.merge(key.substring("license.".length(), key.lastIndexOf('.')),
+                                    properties.getProperty(key),
+                                    (current, candidate) -> name ? candidate : current);
+                        }
+                    }
                 }
             }
             Path identityFile = folder.resolve(IDENTITY);
@@ -324,6 +336,10 @@ public class Inventory implements BuildStep {
         }
         if (artifact != null) {
             inventory.setProperty(prefix + "artifact", artifact);
+        }
+        int licenseIndex = 0;
+        for (String license : licenses.values()) {
+            inventory.setProperty(prefix + "license." + licenseIndex++, license);
         }
         if (tests != null) {
             inventory.setProperty(prefix + "test", tests);

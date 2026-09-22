@@ -194,24 +194,31 @@ public final class DependencyTreeReport {
                     .reversed()
                     .thenComparing(Resolver.Edge::coordinate));
         }
-        StringBuilder builder = new StringBuilder();
-        Set<String> seen = new HashSet<>();
-        int[] colorIndex = {0};
-        Set<String> externalRoots = new LinkedHashSet<>();
+        List<Resolver.Edge> visible = new ArrayList<>();
+        Set<String> externalRoots = new LinkedHashSet<>(), reached = new HashSet<>();
         for (Resolver.Edge root : roots) {
             if (compact && !isInternal(root, nodes)) {
                 externalRoots.add(vertexKey(root));
-                continue;
+            } else if (!compact || reachableInternal(root.coordinate(), children, nodes, reached) > 0) {
+                visible.add(root);
             }
-            if (compact && !seen.add(root.coordinate())) {
-                continue;
+        }
+        StringBuilder builder = new StringBuilder();
+        Set<String> seen = new HashSet<>();
+        for (int index = 0; index < visible.size(); index++) {
+            boolean last = index == visible.size() - 1 && externalRoots.isEmpty();
+            Resolver.Edge root = visible.get(index);
+            if (compact) {
+                seen.add(root.coordinate());
             }
-            int treeColor = GRADIENT[colorIndex[0]++ % GRADIENT.length];
-            builder.append(label(root, nodes, treeColor, true)).append(System.lineSeparator());
-            children(builder, root.coordinate(), children, nodes, "", seen, treeColor);
+            int treeColor = GRADIENT[index % GRADIENT.length];
+            builder.append(paint(treeColor, last ? "└─ " : "├─ "))
+                    .append(label(root, nodes, treeColor, true))
+                    .append(System.lineSeparator());
+            children(builder, root.coordinate(), children, nodes, last ? "   " : "│  ", seen, treeColor);
         }
         if (!externalRoots.isEmpty()) {
-            builder.append(externalSummary(externalRoots.size())).append(System.lineSeparator());
+            builder.append("└─ ").append(externalSummary(externalRoots.size())).append(System.lineSeparator());
         }
         return builder.toString();
     }

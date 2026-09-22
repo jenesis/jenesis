@@ -73,28 +73,56 @@ public class Tree implements BuildStep {
                 continue;
             }
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
-            String candidate = null;
+            String prefix = null;
             for (String key : inventory.stringPropertyNames()) {
-                int dot = key.indexOf('.');
-                if (dot > 0) {
-                    candidate = key.substring(0, dot);
+                if (key.endsWith(".graph.0")) {
+                    prefix = key.substring(0, key.length() - "graph.0".length());
                     break;
                 }
             }
-            if (candidate == null) {
+            if (prefix == null) {
                 continue;
             }
-            String prefix = candidate;
-            if (!tests && inventory.getProperty(prefix + ".test") != null) {
+            String tested = inventory.getProperty(prefix + "test");
+            if (!tests && tested != null) {
                 continue;
             }
-            List<Path> graphs = Inventory.paths(inventory, argument.folder(), prefix + ".graph");
-            List<Path> licenses = Inventory.paths(inventory, argument.folder(), prefix + ".licenses");
-            SequencedMap<String, Resolver.Resolution> resolutions = Dependencies.graph(graphs, licenses);
-            resolutions.forEach((groupScope, resolution) -> {
-                report.render(resolution, groupScope + " (" + prefix + ")");
-                aggregated.putAll(resolution.vertices());
-            });
+            StringBuilder title = new StringBuilder("./" + inventory.value(prefix + "path", ""));
+            String version = inventory.value(prefix + "version"), module = inventory.value(prefix + "module");
+            if (version != null) {
+                title.append(' ').append(version);
+            }
+            StringBuilder meta = new StringBuilder();
+            if (module != null) {
+                meta.append("module ").append(module);
+            }
+            if (tested != null) {
+                meta.append(meta.isEmpty() ? "test" : ", test");
+            }
+            if (!meta.isEmpty()) {
+                title.append(" (").append(meta).append(')');
+            }
+            List<String> licenses = new ArrayList<>();
+            for (int index = 0; inventory.value(prefix + "license." + index) != null; index++) {
+                licenses.add(inventory.value(prefix + "license." + index));
+            }
+            if (!licenses.isEmpty()) {
+                title.append(" {").append(String.join(", ", licenses)).append('}');
+            }
+            SequencedMap<List<String>, Resolver.Edge> edges = new LinkedHashMap<>();
+            SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
+            for (Resolver.Resolution resolution : Dependencies.graph(
+                    Inventory.paths(inventory, argument.folder(), prefix + "graph"),
+                    Inventory.paths(inventory, argument.folder(), prefix + "licenses")).values()) {
+                for (Resolver.Edge edge : resolution.edges()) {
+                    edges.merge(Arrays.asList(edge.parent(), edge.coordinate()), edge,
+                            (current, candidate) -> current.followed() || !candidate.followed() ? current : candidate);
+                }
+                resolution.vertices().forEach(vertices::putIfAbsent);
+            }
+            report.render(new Resolver.Resolution(new LinkedHashMap<>(), List.copyOf(edges.values()), vertices),
+                    title.toString());
+            aggregated.putAll(vertices);
         }
         report.summary(aggregated);
         return CompletableFuture.completedStage(new BuildStepResult(true));

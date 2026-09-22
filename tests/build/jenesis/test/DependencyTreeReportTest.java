@@ -36,12 +36,26 @@ public class DependencyTreeReportTest {
                 new Resolver.Edge("maven/g/a/1.0", "maven/g/d/4.0", "4.0", "compile", true),
                 new Resolver.Edge("maven/g/b/2.0", "maven/g/c/3.0", "3.0", "runtime", true)),
                 new LinkedHashMap<>()));
-        String text = output();
-        assertThat(text).contains("Dependency tree:");
-        assertThat(text).contains("maven/g/a 1.0 [compile]");
-        assertThat(text).contains("├─ maven/g/b 2.0 [compile]");
-        assertThat(text).contains("│  └─ maven/g/c 3.0 [runtime]");
-        assertThat(text).contains("└─ maven/g/d 4.0 [compile]");
+        assertThat(output().lines().toList()).containsSequence(
+                "Dependency tree:",
+                "└─ maven/g/a 1.0 [compile]",
+                "   ├─ maven/g/b 2.0 [compile]",
+                "   │  └─ maven/g/c 3.0 [runtime]",
+                "   └─ maven/g/d 4.0 [compile]");
+    }
+
+    @Test
+    public void hangs_each_direct_dependency_below_the_title() {
+        report.render(resolution(List.of(
+                new Resolver.Edge(null, "maven/g/a/1.0", "1.0", "compile", true),
+                new Resolver.Edge("maven/g/a/1.0", "maven/g/b/2.0", "2.0", "compile", true),
+                new Resolver.Edge(null, "maven/g/c/3.0", "3.0", "compile", true)),
+                new LinkedHashMap<>()), "main/compile greeter");
+        assertThat(output().lines().toList()).containsSequence(
+                "main/compile greeter",
+                "├─ maven/g/a 1.0 [compile]",
+                "│  └─ maven/g/b 2.0 [compile]",
+                "└─ maven/g/c 3.0 [compile]");
     }
 
     @Test
