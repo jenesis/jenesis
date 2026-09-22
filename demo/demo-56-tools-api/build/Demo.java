@@ -22,8 +22,8 @@ import build.jenesis.MakeTool;
  * value this JVM holds for the setting the builds were given, which is none:
  *
  *     no service loader here, so the tools are built directly - the contract below is the same
- *     jenesis-make -Djenesis.project.version=1.0.0 build -> 0, produced demo.tools@1.0.0
- *     jenesis-make -Djenesis.project.version=2.0.0 build -> 0, produced demo.tools@2.0.0
+ *     jenesis-make -Djenesis.project.version=1.0.0 @target/build.args -> 0, produced demo.tools@1.0.0
+ *     jenesis-make -Djenesis.project.version=2.0.0 @target/build.args -> 0, produced demo.tools@2.0.0
  *     jenesis-exec builds and runs the program, which prints on its own:
  *     hello
  *     jenesis-exec -> 0
@@ -38,18 +38,23 @@ public class Demo {
                 ? "found the Jenesis tools through the service loader"
                 : "no service loader here, so the tools are built directly - the contract below is the same");
         ToolProvider make = tool("jenesis-make", MakeTool::new);
+        Path arguments = Files.writeString(
+                Files.createDirectories(Path.of("target")).resolve("build.args"), """
+                # the settings and selectors this run stands for
+                -Djenesis.print.progress=false
+                build
+                """);
         for (String version : List.of("1.0.0", "2.0.0")) {
             StringWriter out = new StringWriter(), err = new StringWriter();
             int code = make.run(new PrintWriter(out),
                     new PrintWriter(err),
                     "-Djenesis.project.version=" + version,
-                    "-Djenesis.print.progress=false",
-                    "build");
+                    "@" + arguments);
             if (code != 0) {
                 throw new IllegalStateException("Build for " + version + " failed with " + code + "\n" + out + err);
             }
-            System.out.printf("jenesis-make -Djenesis.project.version=%s build -> %d, produced %s%n",
-                    version, code, stamped(Path.of("target")));
+            System.out.printf("jenesis-make -Djenesis.project.version=%s @%s -> %d, produced %s%n",
+                    version, arguments, code, stamped(Path.of("target")));
         }
         StringWriter out = new StringWriter(), err = new StringWriter();
         System.out.println("jenesis-exec builds and runs the program, which prints on its own:");

@@ -21,6 +21,17 @@ is what the command line would take: selectors for `jenesis-make`, the program's
 arguments for `jenesis-exec`, the target and its options for `jpx`. A setting that is not
 a `jenesis.*` one is refused rather than passed on.
 
+A whole command line can live in a file instead, the way the JDK's own tools read one:
+
+    # the settings and selectors this run stands for
+    -Djenesis.print.progress=false
+    build
+
+and `@<file>` stands for what it holds, with `#` a comment to the end of a line and quotes
+holding what would otherwise split. `@@<text>` is an argument that starts with an `@`, and
+a file names no further file. The commands read the same argument, so
+`java build/jenesis/Make.java @release.args` is the same run from a shell.
+
 A tool run is configured by those arguments alone, never by the properties of the JVM it
 runs in, so two runs in one program do not interfere and neither leaves anything behind.
 The demo builds the same module twice with a different version, runs the built program,
@@ -61,8 +72,8 @@ From this directory:
 which prints:
 
     no service loader here, so the tools are built directly - the contract below is the same
-    jenesis-make -Djenesis.project.version=1.0.0 build -> 0, produced demo.tools@1.0.0
-    jenesis-make -Djenesis.project.version=2.0.0 build -> 0, produced demo.tools@2.0.0
+    jenesis-make -Djenesis.project.version=1.0.0 @target/build.args -> 0, produced demo.tools@1.0.0
+    jenesis-make -Djenesis.project.version=2.0.0 @target/build.args -> 0, produced demo.tools@2.0.0
     jenesis-exec builds and runs the program, which prints on its own:
     hello
     jenesis-exec -> 0

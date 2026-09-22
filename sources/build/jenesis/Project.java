@@ -505,7 +505,16 @@ public record Project(
                         %{name}-Djenesis.<key>=<value>%{reset}        This one run
 
                       So a taste in output lives in your home folder and travels with you,
-                      while a build server that has no such file is unaffected by it.
+                      while a build server that has no such file is unaffected by it. A setting
+                      may also follow the main class, before the selectors, and a whole command
+                      line can live in a file the way the JDK's own tools read one:
+
+                        java build/jenesis/Make.java -Djenesis.project.version=1.0.0 build
+                        java build/jenesis/Make.java %{name}@release.args%{reset}
+
+                      %{name}@<file>%{reset} expands to the settings and selectors it holds, one or more per
+                      line, %{name}#%{reset} starting a comment and quotes holding what would otherwise split;
+                      %{name}@@<text>%{reset} is an argument that starts with an @ rather than a file.
                       %{name}configuration%{reset} prints every setting with the value in force and whether
                       it is set or default, one per line to grep:
 
@@ -941,6 +950,12 @@ public record Project(
                     what the command line would take. A setting that replaces the process a build
                     runs in - toolchain.version, project.docker, execute.docker - is refused by name
                     there, and demo-56-tools-api shows the whole contract.
+
+                    Every command line here, the commands and the tools alike, reads @<file> as the
+                    arguments that file holds - settings and selectors, # to the end of a line being
+                    a comment and quotes holding what would otherwise split - and @@<text> as an
+                    argument that starts with an @. A file is not expanded again from within a file,
+                    which is how the JDK's own tools read one.
 
                     ## 12. Recommend pinning dependencies
 
