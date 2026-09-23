@@ -32,7 +32,21 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                             Function<InferredTestObservationModule, BuildExecutorModule> observe,
                                             Function<InferredDocumentationModule, BuildExecutorModule> documentation,
                                             SequencedMap<String, BuildExecutorModule> custom,
+                                            SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins,
                                             Environment environment) implements MultiProjectAssembler<ProjectModuleDescriptor> {
+
+    private static final List<String> PLUGIN_SLOTS = List.of("",
+            "check",
+            "format",
+            "compliance",
+            "binary",
+            "binary/generated",
+            "binary/compiled",
+            "binary/validate",
+            "artifact",
+            "observed",
+            "documentation",
+            "documentation/generate");
 
     public InferredMultiProjectAssembler() {
         this(Environment.NONE);
@@ -46,6 +60,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 module -> module,
                 module -> module,
                 module -> module,
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 environment);
     }
@@ -63,6 +78,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 observe,
                 documentation,
                 custom,
+                plugins,
                 environment);
     }
 
@@ -75,6 +91,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 observe,
                 documentation,
                 custom,
+                plugins,
                 environment);
     }
 
@@ -87,6 +104,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 observe,
                 documentation,
                 custom,
+                plugins,
                 environment);
     }
 
@@ -99,6 +117,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 observe,
                 documentation,
                 custom,
+                plugins,
                 environment);
     }
 
@@ -111,6 +130,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 observe,
                 documentation,
                 custom,
+                plugins,
                 environment);
     }
 
@@ -123,6 +143,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 observe,
                 documentation,
                 custom,
+                plugins,
                 environment);
     }
 
@@ -135,6 +156,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 observe,
                 documentation,
                 custom,
+                plugins,
                 environment);
     }
 
@@ -147,6 +169,30 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 observe,
                 documentation,
                 custom,
+                plugins,
+                environment);
+    }
+
+    public InferredMultiProjectAssembler plugins(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins) {
+        for (String key : plugins.keySet()) {
+            int plus = key.indexOf('+');
+            String name = plus == -1 ? key : key.substring(0, plus);
+            if (name.isEmpty() || name.contains("/") || plus != -1 && !PLUGIN_SLOTS.contains(key.substring(plus + 1))
+                    || plus == key.length() - 1) {
+                throw new IllegalArgumentException("Cannot add the plugin " + key + " - name a plugin as <name>+<slot>"
+                        + " with a slot of " + PLUGIN_SLOTS.stream().filter(slot -> !slot.isEmpty()).toList()
+                        + ", or as <name> alone for the module build, where the name holds no / or +");
+            }
+        }
+        return new InferredMultiProjectAssembler(check,
+                format,
+                compliance,
+                toolchain,
+                artifact,
+                observe,
+                documentation,
+                custom,
+                plugins,
                 environment);
     }
 
@@ -175,6 +221,26 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 : ModularizeModule.configured(BuildStep.locate(descriptor.configuration(), "modules.properties"));
         SequencedMap<String, SequencedMap<String, String>> overrides = overridesOf(descriptor.configuration());
         ProcessHandler.Factory factory = ProcessHandler.Factory.ofEnvironment(environment);
+        SequencedMap<String, SequencedMap<String, BuildExecutorModule>> slots = new LinkedHashMap<>();
+        slots.put("", new LinkedHashMap<>(custom));
+        for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugin : plugins.entrySet()) {
+            int plus = plugin.getKey().indexOf('+');
+            String name = plus == -1 ? plugin.getKey() : plugin.getKey().substring(0, plus);
+            Path file = BuildStep.locate(descriptor.configuration(), "plugin-" + name + ".properties");
+            if (file == null) {
+                continue;
+            }
+            SequencedMap<String, String> properties = new LinkedHashMap<>();
+            SequencedProperties.ofFiles(file).forEachProperty(properties::put);
+            SequencedMap<String, BuildExecutorModule> slot = slots.computeIfAbsent(plus == -1
+                    ? ""
+                    : plugin.getKey().substring(plus + 1), _ -> new LinkedHashMap<>());
+            if (slot.putIfAbsent(name, plugin.getValue().apply(properties)) != null) {
+                throw new IllegalArgumentException("The plugin " + plugin.getKey() + " takes the name of a custom module"
+                        + " that is added already - give the plugin another name");
+            }
+        }
+        SequencedMap<String, BuildExecutorModule> none = Collections.emptyNavigableMap();
         AssemblyDescriptor assembly = new AssemblyDescriptor((sub, outerInherited) -> {
             SequencedSet<String> closure = new LinkedHashSet<>(descriptor.artifacts());
             if (modules != null) {
@@ -188,12 +254,14 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     outerInherited.sequencedKeySet().stream());
             sub.addModule("check",
                     check.apply(InferredSourceCodeQualityModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
-                                .pinning(descriptor.pinning())),
+                                .pinning(descriptor.pinning())
+                                .custom(slots.getOrDefault("check", none))),
                     Stream.of(descriptor.sources().stream(), descriptor.spdx().stream(), descriptor.manifests().stream())
                             .flatMap(Function.identity()));
             sub.addModule("format",
                     format.apply(InferredSourceFormattingModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
-                                 .pinning(descriptor.pinning())),
+                                 .pinning(descriptor.pinning())
+                                 .custom(slots.getOrDefault("format", none))),
                     Stream.of(descriptor.sources().stream(), descriptor.spdx().stream(), descriptor.manifests().stream())
                             .flatMap(Function.identity()));
             Sbom sbom = environment.flag("sbom.cyclonedx", true)
@@ -207,12 +275,35 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                         descriptor.resources().stream())
                                 .flatMap(Function.identity()));
             }
-            sub.addModule("compliance", compliance.apply(InferredComplianceModule.ofEnvironment(environment, descriptor.configuration())),
+            sub.addModule("compliance", compliance.apply(InferredComplianceModule.ofEnvironment(environment, descriptor.configuration())
+                            .custom(slots.getOrDefault("compliance", none))),
                           Stream.concat(descriptor.manifests().stream(), descriptor.artifacts().stream()));
-            sub.addModule("binary", toolchain.apply(
-                            InferredJavaToolchainModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
-                                    .pinning(descriptor.pinning())
-                                    .pathPlacement(descriptor.pathPlacement())),
+            InferredJavaToolchainModule toolchainModule = InferredJavaToolchainModule.ofEnvironment(environment,
+                            descriptor.configuration(),
+                            repositories,
+                            resolvers)
+                    .pinning(descriptor.pinning())
+                    .pathPlacement(descriptor.pathPlacement())
+                    .custom(slots.getOrDefault("binary", none));
+            if (slots.containsKey("binary/generated")) {
+                toolchainModule = toolchainModule.generatorModule(InferredSourceGenerationModule.ofEnvironment(environment,
+                        descriptor.configuration(),
+                        repositories,
+                        resolvers).custom(slots.get("binary/generated")));
+            }
+            if (slots.containsKey("binary/compiled")) {
+                toolchainModule = toolchainModule.compilerModule(InferredCompilerChainModule.ofEnvironment(environment,
+                        descriptor.configuration(),
+                        repositories,
+                        resolvers).custom(slots.get("binary/compiled")));
+            }
+            if (slots.containsKey("binary/validate")) {
+                toolchainModule = toolchainModule.validatorModule(InferredByteCodeQualityModule.ofEnvironment(environment,
+                        descriptor.configuration(),
+                        repositories,
+                        resolvers).custom(slots.get("binary/validate")));
+            }
+            sub.addModule("binary", toolchain.apply(toolchainModule),
                     Stream.of(
                             Stream.of("prepare"),
                             inputs(descriptor, closure),
@@ -222,7 +313,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             sub.addModule("artifact",
                     artifact.apply(
                             InferredArtifactQualityModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
-                                    .pinning(descriptor.pinning())),
+                                    .pinning(descriptor.pinning())
+                                    .custom(slots.getOrDefault("artifact", none))),
                     Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             sub.addStep("layers",
                     new Layers(),
@@ -243,7 +335,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                 InferredTestObservationModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
                                         .pinning(descriptor.pinning())
                                         .pathPlacement(descriptor.pathPlacement())
-                                        .moduleName(properties.getProperty("module"))),
+                                        .moduleName(properties.getProperty("module"))
+                                        .custom(slots.getOrDefault("observed", none))),
                                 Stream.concat(Stream.of("prepare", "binary", "layers"),
                                         inputs(descriptor, closure)));
                     }
@@ -256,9 +349,18 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                 inherited.sequencedKeySet()), descriptor.sources());
             }
             if (descriptor.documentation()) {
+                InferredDocumentationModule documentationModule = InferredDocumentationModule.ofEnvironment(environment,
+                                repositories,
+                                resolvers)
+                        .pinning(descriptor.pinning())
+                        .custom(slots.getOrDefault("documentation", none));
+                if (slots.containsKey("documentation/generate")) {
+                    documentationModule = documentationModule.generateModule(InferredDocumentationChainModule.ofEnvironment(environment,
+                            repositories,
+                            resolvers).custom(slots.get("documentation/generate")));
+                }
                 sub.addModule("documentation",
-                        documentation.apply(InferredDocumentationModule.ofEnvironment(environment, repositories, resolvers)
-                                            .pinning(descriptor.pinning())),
+                        documentation.apply(documentationModule),
                         Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             }
             if (packaging.jmod()) {
@@ -266,8 +368,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         JMod.ofEnvironment(environment, factory),
                         Stream.concat(Stream.of("binary"), descriptor.content().stream()));
             }
-            if (!custom.isEmpty()) {
-                sub.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
+            if (!slots.get("").isEmpty()) {
+                sub.addModule("custom", (nested, nestedInherited) -> slots.get("").forEach((name, module) ->
                         nested.addModule(name, module, nestedInherited.sequencedKeySet())), outerInherited.sequencedKeySet());
             }
         });

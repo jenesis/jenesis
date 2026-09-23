@@ -594,50 +594,43 @@ public class ProjectTest {
     }
 
     @Test
-    public void applies_the_customizer_to_the_configured_assembler() {
-        Project project = Project.ofEnvironment(new Environment(Map.of("project.customizer",
-                Checkless.class.getName())::get), root);
+    public void reads_the_plugins_named_beside_jenesis_properties() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+                lint+check=./lint@lint
+                greeting+binary/generated=demo.greeting
+                """);
+        Project project = Project.ofEnvironment(new Environment(settings::get), root);
         assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
-                assembler -> assertThat(assembler.check()).isNull());
+                assembler -> assertThat(assembler.plugins()).containsOnlyKeys("lint+check", "greeting+binary/generated"));
     }
 
     @Test
-    public void applies_a_customizer_to_the_default_assembler() {
-        assertThat(new Project(root, new Checkless()).assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
-                assembler -> assertThat(assembler.check()).isNull());
-    }
-
-    @Test
-    public void leaves_the_customizer_to_the_container_when_the_build_runs_in_docker() {
-        Project project = Project.ofEnvironment(new Environment(Map.of("project.docker", "true",
-                "project.customizer", Checkless.class.getName())::get), root);
+    public void leaves_out_a_plugin_its_setting_switches_off() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+                lint+check=./lint
+                greeting+binary/generated=demo.greeting
+                """);
+        Project project = Project.ofEnvironment(new Environment(Map.of("plugin.lint", "false")::get), root);
         assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
-                assembler -> assertThat(assembler.check()).as("the container applies the customizer, never the host").isNotNull());
+                assembler -> assertThat(assembler.plugins()).containsOnlyKeys("greeting+binary/generated"));
     }
 
     @Test
-    public void points_at_make_when_the_customizer_was_not_compiled() {
-        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.customizer",
-                "build.custom.Missing")::get), root))
+    public void refuses_a_plugin_that_selects_a_provider_without_a_name() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), "lint+check=./lint@\n");
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings::get), root))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("No class build.custom.Missing")
-                .hasMessageContaining("so build a project with a customizer with java build/jenesis/Make.java");
+                .hasMessageContaining("The plugin lint+check")
+                .hasMessageContaining("followed by @<name>");
     }
 
     @Test
-    public void refuses_a_customizer_that_is_no_function() {
-        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.customizer",
-                ProjectTest.class.getName())::get), root))
+    public void refuses_a_plugin_that_names_nothing() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), "lint+check=\n");
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings::get), root))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining(ProjectTest.class.getName() + " is not a Project.Customizer");
-    }
-
-    @Test
-    public void refuses_a_customizer_that_returns_no_assembler() {
-        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.customizer",
-                Discarding.class.getName())::get), root))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("The customizer returned no assembler");
+                .hasMessageContaining("The plugin lint+check")
+                .hasMessageContaining("names nothing");
     }
 
     @Test
@@ -764,14 +757,6 @@ public class ProjectTest {
     }
 
     @Test
-    public void the_layered_settings_accepts_a_customizer_in_the_project_file() throws IOException {
-        Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.customizer=build.Build\n");
-        assertThat(Make.settings(root, Map.<String, String>of()::get).keys().apply("project.customizer"))
-                .as("a customizer runs the project's code as its tests do, so the project may name one")
-                .isEqualTo("build.Build");
-    }
-
-    @Test
     public void the_layered_settings_rejects_docker_settings_in_the_project_file() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.docker=false\n");
         assertThatThrownBy(() -> Make.settings(root, Map.<String, String>of()::get))
@@ -796,15 +781,6 @@ public class ProjectTest {
         assertThat(Make.settings(root, Map.of("make.global", root.resolve("home").toString())::get)
                 .keys()
                 .apply("project.docker")).isEqualTo("true");
-    }
-
-    @Test
-    public void the_layered_settings_accepts_a_customizer_in_the_user_global_file() throws IOException {
-        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
-        Files.writeString(home.resolve("jenesis.properties"), "jenesis.project.customizer=build.Build\n");
-        assertThat(Make.settings(root, Map.of("make.global", root.resolve("home").toString())::get)
-                .keys()
-                .apply("project.customizer")).isEqualTo("build.Build");
     }
 
     @Test
@@ -897,21 +873,5 @@ public class ProjectTest {
                 .isEqualTo(Project.Layout.AUTO);
         assertThat(project.version()).isNull();
         assertThat(project.cache()).isNull();
-    }
-
-    public static class Checkless implements Project.Customizer {
-
-        @Override
-        public MultiProjectAssembler<? super ProjectModuleDescriptor> apply(InferredMultiProjectAssembler assembler) {
-            return assembler.check(null);
-        }
-    }
-
-    public static class Discarding implements Project.Customizer {
-
-        @Override
-        public MultiProjectAssembler<? super ProjectModuleDescriptor> apply(InferredMultiProjectAssembler assembler) {
-            return null;
-        }
     }
 }
