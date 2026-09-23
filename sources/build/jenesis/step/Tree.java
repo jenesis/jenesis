@@ -75,11 +75,10 @@ public class Tree implements BuildStep {
             for (String key : inventory.stringPropertyNames()) {
                 if (key.endsWith(".graph.0")) {
                     String prefix = key.substring(0, key.length() - "graph.0".length());
-                    String version = inventory.value(prefix + "version");
                     for (int index = 0; inventory.value(prefix + "identity." + index) != null; index++) {
                         String identity = inventory.value(prefix + "identity." + index);
-                        locations.put(version != null && identity.endsWith("/" + version)
-                                ? identity.substring(0, identity.length() - version.length() - 1)
+                        locations.put(identity.startsWith("maven/")
+                                ? identity.substring(0, identity.lastIndexOf('/'))
                                 : identity, "./" + inventory.value(prefix + "path", ""));
                     }
                     inventories.put(argument.folder(), inventory);
@@ -103,10 +102,9 @@ public class Tree implements BuildStep {
                     break;
                 }
             }
-            String version = inventory.value(prefix + "version");
-            String key = identity == null || version == null || !identity.endsWith("/" + version)
-                    ? identity
-                    : identity.substring(0, identity.length() - version.length() - 1);
+            boolean maven = identity != null && identity.startsWith("maven/");
+            String key = maven ? identity.substring(0, identity.lastIndexOf('/')) : identity,
+                    version = maven ? identity.substring(identity.lastIndexOf('/') + 1) : inventory.value(prefix + "version");
             List<License> licenses = new ArrayList<>();
             for (int index = 0; inventory.value(prefix + "license." + index) != null; index++) {
                 licenses.add(new License(null, null, inventory.value(prefix + "license." + index), null));
