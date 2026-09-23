@@ -74,11 +74,11 @@ public class JenesisRepositoryTest {
         server.start();
         try {
             String uri = "http://localhost:" + server.getAddress().getPort() + "/";
-            JenesisRepository.ofEnvironment(environment(Map.of(
+            assertThat(content(JenesisRepository.ofEnvironment(environment(Map.of(
                     "repository.insecure", "true",
                     "print.fetch", "true",
                     "module.uri", uri)).out(printed::add), JenesisRepository.Scope.MODULE)
-                    .fetch(Runnable::run, "widget", null, null, "jar");
+                    .fetch(Runnable::run, "widget", null, null, "jar"))).isEqualTo("fromService");
             assertThat(printed).singleElement(as(InstanceOfAssertFactories.STRING))
                     .contains("[FETCHED]")
                     .endsWith(uri + "module/widget/widget.jar");
@@ -93,12 +93,12 @@ public class JenesisRepositoryTest {
         writeArtifact("com.example", "widget-core", "2.0", "fromIndex");
         List<String> printed = new ArrayList<>();
 
-        JenesisRepository.ofEnvironment(environment(Map.of(
+        assertThat(content(JenesisRepository.ofEnvironment(environment(Map.of(
                 "module.source", "git",
                 "print.fetch", "true",
                 "module.index", index.toUri().toString(),
                 "maven.uri", maven.toUri().toString())).out(printed::add), JenesisRepository.Scope.MODULE)
-                .fetch(Runnable::run, "widget", null, null, "jar");
+                .fetch(Runnable::run, "widget", null, null, "jar"))).isEqualTo("fromIndex");
 
         assertThat(printed).singleElement(as(InstanceOfAssertFactories.STRING))
                 .contains("[FETCHED]")
