@@ -34,23 +34,27 @@ public class InferredTestObservationModule implements BuildExecutorModule {
     public InferredTestObservationModule(SequencedSet<Path> configuration,
                                          Map<String, Repository> repositories,
                                          Map<String, Resolver> resolvers) {
-        this(configuration, null, PathPlacement.CLASS_PATH,
-             null,
-             new TestModule(repositories, resolvers),
-             new JaCoCoModule(repositories, resolvers),
-             new PiTestModule(repositories, resolvers),
-             value -> value,
-             value -> value,
-             value -> value,
-             value -> value,
-             Collections.emptyNavigableMap());
+        this(configuration,
+                null,
+                PathPlacement.CLASS_PATH,
+                null,
+                new TestModule(repositories, resolvers),
+                new JaCoCoModule(repositories, resolvers),
+                new PiTestModule(repositories, resolvers),
+                value -> value,
+                value -> value,
+                value -> value,
+                value -> value,
+                Collections.emptyNavigableMap());
     }
 
     public static InferredTestObservationModule ofEnvironment(Environment environment,
                                                               SequencedSet<Path> configuration,
                                                               Map<String, Repository> repositories,
                                                               Map<String, Resolver> resolvers) {
-        InferredTestObservationModule module = new InferredTestObservationModule(configuration, null, PathPlacement.CLASS_PATH,
+        InferredTestObservationModule module = new InferredTestObservationModule(configuration,
+                null,
+                PathPlacement.CLASS_PATH,
                 null,
                 TestModule.ofEnvironment(environment, repositories, resolvers),
                 JaCoCoModule.ofEnvironment(environment, repositories, resolvers),
@@ -116,43 +120,123 @@ public class InferredTestObservationModule implements BuildExecutorModule {
     }
 
     public InferredTestObservationModule pinning(Pinning pinning) {
-        return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest, custom);
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
     }
 
     public InferredTestObservationModule pathPlacement(PathPlacement pathPlacement) {
-        return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest, custom);
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
     }
 
     public InferredTestObservationModule moduleName(String moduleName) {
-        return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest, custom);
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
     }
 
     public InferredTestObservationModule test(Function<TestModule, BuildExecutorModule> test) {
-        return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest, custom);
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
     }
 
     public InferredTestObservationModule jacoco(Function<JaCoCoModule, BuildExecutorModule> jacoco) {
-        return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest, custom);
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
     }
 
     public InferredTestObservationModule nativeImage(Function<NativeImageAgentModule, BuildExecutorModule> nativeImage) {
-        return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest, custom);
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
     }
 
     public InferredTestObservationModule pitest(Function<PiTestModule, BuildExecutorModule> pitest) {
-        return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest, custom);
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
     }
 
     public InferredTestObservationModule custom(SequencedMap<String, BuildExecutorModule> custom) {
-        return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest, custom);
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
     }
 
     @Override

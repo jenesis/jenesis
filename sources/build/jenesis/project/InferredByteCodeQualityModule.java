@@ -23,16 +23,20 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
     public InferredByteCodeQualityModule(SequencedSet<Path> configuration,
                                          Map<String, Repository> repositories,
                                          Map<String, Resolver> resolvers) {
-        this(configuration, null, new SpotBugsModule(repositories, resolvers),
-             value -> value,
-             Collections.emptyNavigableMap());
+        this(configuration,
+                null,
+                new SpotBugsModule(repositories, resolvers),
+                value -> value,
+                Collections.emptyNavigableMap());
     }
 
     public static InferredByteCodeQualityModule ofEnvironment(Environment environment,
                                                               SequencedSet<Path> configuration,
                                                               Map<String, Repository> repositories,
                                                               Map<String, Resolver> resolvers) {
-        InferredByteCodeQualityModule module = new InferredByteCodeQualityModule(configuration, null, SpotBugsModule.ofEnvironment(environment, repositories, resolvers),
+        InferredByteCodeQualityModule module = new InferredByteCodeQualityModule(configuration,
+                null,
+                SpotBugsModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value,
                 Collections.emptyNavigableMap());
         Boolean spotbugs = environment.flagOrNull("validator.spotbugs");
@@ -55,15 +59,27 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
     }
 
     public InferredByteCodeQualityModule pinning(Pinning pinning) {
-        return new InferredByteCodeQualityModule(configuration, pinning, spotbugsModule, spotbugs, custom);
+        return new InferredByteCodeQualityModule(configuration,
+                pinning,
+                spotbugsModule,
+                spotbugs,
+                custom);
     }
 
     public InferredByteCodeQualityModule spotbugs(Function<SpotBugsModule, BuildExecutorModule> spotbugs) {
-        return new InferredByteCodeQualityModule(configuration, pinning, spotbugsModule, spotbugs, custom);
+        return new InferredByteCodeQualityModule(configuration,
+                pinning,
+                spotbugsModule,
+                spotbugs,
+                custom);
     }
 
     public InferredByteCodeQualityModule custom(SequencedMap<String, BuildExecutorModule> custom) {
-        return new InferredByteCodeQualityModule(configuration, pinning, spotbugsModule, spotbugs, custom);
+        return new InferredByteCodeQualityModule(configuration,
+                pinning,
+                spotbugsModule,
+                spotbugs,
+                custom);
     }
 
     @Override

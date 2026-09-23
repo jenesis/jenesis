@@ -47,26 +47,30 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     public InferredSourceGenerationModule(SequencedSet<Path> configuration,
                                           Map<String, Repository> repositories,
                                           Map<String, Resolver> resolvers) {
-        this(configuration, null, new XjcModule(repositories, resolvers),
-             new ProtocModule(repositories, resolvers),
-             new AvroModule(repositories, resolvers),
-             new WsImportModule(repositories, resolvers),
-             new OpenApiModule(repositories, resolvers),
-             new AntlrModule(repositories, resolvers),
-             value -> value,
-             value -> value,
-             value -> value,
-             value -> value,
-             value -> value,
-             value -> value,
-             Collections.emptyNavigableMap());
+        this(configuration,
+                null,
+                new XjcModule(repositories, resolvers),
+                new ProtocModule(repositories, resolvers),
+                new AvroModule(repositories, resolvers),
+                new WsImportModule(repositories, resolvers),
+                new OpenApiModule(repositories, resolvers),
+                new AntlrModule(repositories, resolvers),
+                value -> value,
+                value -> value,
+                value -> value,
+                value -> value,
+                value -> value,
+                value -> value,
+                Collections.emptyNavigableMap());
     }
 
     public static InferredSourceGenerationModule ofEnvironment(Environment environment,
                                                         SequencedSet<Path> configuration,
                                                         Map<String, Repository> repositories,
                                                         Map<String, Resolver> resolvers) {
-        InferredSourceGenerationModule module = new InferredSourceGenerationModule(configuration, null, XjcModule.ofEnvironment(environment, repositories, resolvers),
+        InferredSourceGenerationModule module = new InferredSourceGenerationModule(configuration,
+                null,
+                XjcModule.ofEnvironment(environment, repositories, resolvers),
                 ProtocModule.ofEnvironment(environment, repositories, resolvers),
                 AvroModule.ofEnvironment(environment, repositories, resolvers),
                 WsImportModule.ofEnvironment(environment, repositories, resolvers),
@@ -139,43 +143,147 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     }
 
     public InferredSourceGenerationModule pinning(Pinning pinning) {
-        return new InferredSourceGenerationModule(configuration, pinning, xjcModule, protocModule, avroModule,
-                wsimportModule, openapiModule, antlrModule, xjc, protoc, avro, wsimport, openapi, antlr, custom);
+        return new InferredSourceGenerationModule(configuration,
+                pinning,
+                xjcModule,
+                protocModule,
+                avroModule,
+                wsimportModule,
+                openapiModule,
+                antlrModule,
+                xjc,
+                protoc,
+                avro,
+                wsimport,
+                openapi,
+                antlr,
+                custom);
     }
 
     public InferredSourceGenerationModule xjc(Function<XjcModule, BuildExecutorModule> xjc) {
-        return new InferredSourceGenerationModule(configuration, pinning, xjcModule, protocModule, avroModule,
-                wsimportModule, openapiModule, antlrModule, xjc, protoc, avro, wsimport, openapi, antlr, custom);
+        return new InferredSourceGenerationModule(configuration,
+                pinning,
+                xjcModule,
+                protocModule,
+                avroModule,
+                wsimportModule,
+                openapiModule,
+                antlrModule,
+                xjc,
+                protoc,
+                avro,
+                wsimport,
+                openapi,
+                antlr,
+                custom);
     }
 
     public InferredSourceGenerationModule protoc(Function<ProtocModule, BuildExecutorModule> protoc) {
-        return new InferredSourceGenerationModule(configuration, pinning, xjcModule, protocModule, avroModule,
-                wsimportModule, openapiModule, antlrModule, xjc, protoc, avro, wsimport, openapi, antlr, custom);
+        return new InferredSourceGenerationModule(configuration,
+                pinning,
+                xjcModule,
+                protocModule,
+                avroModule,
+                wsimportModule,
+                openapiModule,
+                antlrModule,
+                xjc,
+                protoc,
+                avro,
+                wsimport,
+                openapi,
+                antlr,
+                custom);
     }
 
     public InferredSourceGenerationModule avro(Function<AvroModule, BuildExecutorModule> avro) {
-        return new InferredSourceGenerationModule(configuration, pinning, xjcModule, protocModule, avroModule,
-                wsimportModule, openapiModule, antlrModule, xjc, protoc, avro, wsimport, openapi, antlr, custom);
+        return new InferredSourceGenerationModule(configuration,
+                pinning,
+                xjcModule,
+                protocModule,
+                avroModule,
+                wsimportModule,
+                openapiModule,
+                antlrModule,
+                xjc,
+                protoc,
+                avro,
+                wsimport,
+                openapi,
+                antlr,
+                custom);
     }
 
     public InferredSourceGenerationModule wsimport(Function<WsImportModule, BuildExecutorModule> wsimport) {
-        return new InferredSourceGenerationModule(configuration, pinning, xjcModule, protocModule, avroModule,
-                wsimportModule, openapiModule, antlrModule, xjc, protoc, avro, wsimport, openapi, antlr, custom);
+        return new InferredSourceGenerationModule(configuration,
+                pinning,
+                xjcModule,
+                protocModule,
+                avroModule,
+                wsimportModule,
+                openapiModule,
+                antlrModule,
+                xjc,
+                protoc,
+                avro,
+                wsimport,
+                openapi,
+                antlr,
+                custom);
     }
 
     public InferredSourceGenerationModule openapi(Function<OpenApiModule, BuildExecutorModule> openapi) {
-        return new InferredSourceGenerationModule(configuration, pinning, xjcModule, protocModule, avroModule,
-                wsimportModule, openapiModule, antlrModule, xjc, protoc, avro, wsimport, openapi, antlr, custom);
+        return new InferredSourceGenerationModule(configuration,
+                pinning,
+                xjcModule,
+                protocModule,
+                avroModule,
+                wsimportModule,
+                openapiModule,
+                antlrModule,
+                xjc,
+                protoc,
+                avro,
+                wsimport,
+                openapi,
+                antlr,
+                custom);
     }
 
     public InferredSourceGenerationModule antlr(Function<AntlrModule, BuildExecutorModule> antlr) {
-        return new InferredSourceGenerationModule(configuration, pinning, xjcModule, protocModule, avroModule,
-                wsimportModule, openapiModule, antlrModule, xjc, protoc, avro, wsimport, openapi, antlr, custom);
+        return new InferredSourceGenerationModule(configuration,
+                pinning,
+                xjcModule,
+                protocModule,
+                avroModule,
+                wsimportModule,
+                openapiModule,
+                antlrModule,
+                xjc,
+                protoc,
+                avro,
+                wsimport,
+                openapi,
+                antlr,
+                custom);
     }
 
     public InferredSourceGenerationModule custom(SequencedMap<String, BuildExecutorModule> custom) {
-        return new InferredSourceGenerationModule(configuration, pinning, xjcModule, protocModule, avroModule,
-                wsimportModule, openapiModule, antlrModule, xjc, protoc, avro, wsimport, openapi, antlr, custom);
+        return new InferredSourceGenerationModule(configuration,
+                pinning,
+                xjcModule,
+                protocModule,
+                avroModule,
+                wsimportModule,
+                openapiModule,
+                antlrModule,
+                xjc,
+                protoc,
+                avro,
+                wsimport,
+                openapi,
+                antlr,
+                custom);
     }
 
     @Override

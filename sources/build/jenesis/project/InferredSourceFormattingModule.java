@@ -32,21 +32,27 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     public InferredSourceFormattingModule(SequencedSet<Path> configuration,
                                           Map<String, Repository> repositories,
                                           Map<String, Resolver> resolvers) {
-        this(configuration, null, true, new GoogleJavaFormatModule(repositories, resolvers),
-             new PalantirJavaFormatModule(repositories, resolvers),
-             new KtlintFormatModule(repositories, resolvers),
-             new ScalafmtFormatModule(repositories, resolvers),
-             value -> value,
-             value -> value,
-             value -> value,
-             Collections.emptyNavigableMap());
+        this(configuration,
+                null,
+                true,
+                new GoogleJavaFormatModule(repositories, resolvers),
+                new PalantirJavaFormatModule(repositories, resolvers),
+                new KtlintFormatModule(repositories, resolvers),
+                new ScalafmtFormatModule(repositories, resolvers),
+                value -> value,
+                value -> value,
+                value -> value,
+                Collections.emptyNavigableMap());
     }
 
     public static InferredSourceFormattingModule ofEnvironment(Environment environment,
                                                                SequencedSet<Path> configuration,
                                                                Map<String, Repository> repositories,
                                                                Map<String, Resolver> resolvers) {
-        InferredSourceFormattingModule module = new InferredSourceFormattingModule(configuration, null, true, GoogleJavaFormatModule.ofEnvironment(environment, repositories, resolvers),
+        InferredSourceFormattingModule module = new InferredSourceFormattingModule(configuration,
+                null,
+                true,
+                GoogleJavaFormatModule.ofEnvironment(environment, repositories, resolvers),
                 PalantirJavaFormatModule.ofEnvironment(environment, repositories, resolvers),
                 KtlintFormatModule.ofEnvironment(environment, repositories, resolvers),
                 ScalafmtFormatModule.ofEnvironment(environment, repositories, resolvers),
@@ -98,33 +104,87 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     }
 
     public InferredSourceFormattingModule pinning(Pinning pinning) {
-        return new InferredSourceFormattingModule(configuration, pinning, verify, googleModule, palantirModule,
-                ktlintModule, scalafmtModule, java, ktlint, scalafmt, custom);
+        return new InferredSourceFormattingModule(configuration,
+                pinning,
+                verify,
+                googleModule,
+                palantirModule,
+                ktlintModule,
+                scalafmtModule,
+                java,
+                ktlint,
+                scalafmt,
+                custom);
     }
 
     public InferredSourceFormattingModule verify(boolean verify) {
-        return new InferredSourceFormattingModule(configuration, pinning, verify, googleModule, palantirModule,
-                ktlintModule, scalafmtModule, java, ktlint, scalafmt, custom);
+        return new InferredSourceFormattingModule(configuration,
+                pinning,
+                verify,
+                googleModule,
+                palantirModule,
+                ktlintModule,
+                scalafmtModule,
+                java,
+                ktlint,
+                scalafmt,
+                custom);
     }
 
     public InferredSourceFormattingModule java(Function<BuildExecutorModule, BuildExecutorModule> java) {
-        return new InferredSourceFormattingModule(configuration, pinning, verify, googleModule, palantirModule,
-                ktlintModule, scalafmtModule, java, ktlint, scalafmt, custom);
+        return new InferredSourceFormattingModule(configuration,
+                pinning,
+                verify,
+                googleModule,
+                palantirModule,
+                ktlintModule,
+                scalafmtModule,
+                java,
+                ktlint,
+                scalafmt,
+                custom);
     }
 
     public InferredSourceFormattingModule ktlint(Function<KtlintFormatModule, BuildExecutorModule> ktlint) {
-        return new InferredSourceFormattingModule(configuration, pinning, verify, googleModule, palantirModule,
-                ktlintModule, scalafmtModule, java, ktlint, scalafmt, custom);
+        return new InferredSourceFormattingModule(configuration,
+                pinning,
+                verify,
+                googleModule,
+                palantirModule,
+                ktlintModule,
+                scalafmtModule,
+                java,
+                ktlint,
+                scalafmt,
+                custom);
     }
 
     public InferredSourceFormattingModule scalafmt(Function<ScalafmtFormatModule, BuildExecutorModule> scalafmt) {
-        return new InferredSourceFormattingModule(configuration, pinning, verify, googleModule, palantirModule,
-                ktlintModule, scalafmtModule, java, ktlint, scalafmt, custom);
+        return new InferredSourceFormattingModule(configuration,
+                pinning,
+                verify,
+                googleModule,
+                palantirModule,
+                ktlintModule,
+                scalafmtModule,
+                java,
+                ktlint,
+                scalafmt,
+                custom);
     }
 
     public InferredSourceFormattingModule custom(SequencedMap<String, BuildExecutorModule> custom) {
-        return new InferredSourceFormattingModule(configuration, pinning, verify, googleModule, palantirModule,
-                ktlintModule, scalafmtModule, java, ktlint, scalafmt, custom);
+        return new InferredSourceFormattingModule(configuration,
+                pinning,
+                verify,
+                googleModule,
+                palantirModule,
+                ktlintModule,
+                scalafmtModule,
+                java,
+                ktlint,
+                scalafmt,
+                custom);
     }
 
     @Override

@@ -37,17 +37,17 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
     public InferredDocumentationChainModule(Map<String, Repository> repositories,
                                             Map<String, Resolver> resolvers) {
         this(repositories,
-             resolvers,
-             null,
-             new Javadoc(ProcessHandler.Factory.of()),
-             new DokkaDocumentationModule(repositories, resolvers),
-             new ScalaDocumentationModule(repositories, resolvers),
-             new GroovyDocumentationModule(repositories, resolvers),
-             step -> step,
-             value -> value,
-             value -> value,
-             value -> value,
-             Collections.emptyNavigableMap());
+                resolvers,
+                null,
+                new Javadoc(ProcessHandler.Factory.of()),
+                new DokkaDocumentationModule(repositories, resolvers),
+                new ScalaDocumentationModule(repositories, resolvers),
+                new GroovyDocumentationModule(repositories, resolvers),
+                step -> step,
+                value -> value,
+                value -> value,
+                value -> value,
+                Collections.emptyNavigableMap());
     }
 
     public static InferredDocumentationChainModule ofEnvironment(Environment environment,
@@ -94,39 +94,93 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
     }
 
     public InferredDocumentationChainModule pinning(Pinning pinning) {
-        return new InferredDocumentationChainModule(repositories, resolvers, pinning,
-                javadocStep, dokkaModule, scaladocModule, groovydocModule,
-                javadoc, dokka, scaladoc, groovydoc, custom);
+        return new InferredDocumentationChainModule(repositories,
+                resolvers,
+                pinning,
+                javadocStep,
+                dokkaModule,
+                scaladocModule,
+                groovydocModule,
+                javadoc,
+                dokka,
+                scaladoc,
+                groovydoc,
+                custom);
     }
 
     public InferredDocumentationChainModule javadoc(Function<Javadoc, BuildStep> javadoc) {
-        return new InferredDocumentationChainModule(repositories, resolvers, pinning,
-                javadocStep, dokkaModule, scaladocModule, groovydocModule,
-                javadoc, dokka, scaladoc, groovydoc, custom);
+        return new InferredDocumentationChainModule(repositories,
+                resolvers,
+                pinning,
+                javadocStep,
+                dokkaModule,
+                scaladocModule,
+                groovydocModule,
+                javadoc,
+                dokka,
+                scaladoc,
+                groovydoc,
+                custom);
     }
 
     public InferredDocumentationChainModule dokka(Function<DokkaDocumentationModule, BuildExecutorModule> dokka) {
-        return new InferredDocumentationChainModule(repositories, resolvers, pinning,
-                javadocStep, dokkaModule, scaladocModule, groovydocModule,
-                javadoc, dokka, scaladoc, groovydoc, custom);
+        return new InferredDocumentationChainModule(repositories,
+                resolvers,
+                pinning,
+                javadocStep,
+                dokkaModule,
+                scaladocModule,
+                groovydocModule,
+                javadoc,
+                dokka,
+                scaladoc,
+                groovydoc,
+                custom);
     }
 
     public InferredDocumentationChainModule scaladoc(Function<ScalaDocumentationModule, BuildExecutorModule> scaladoc) {
-        return new InferredDocumentationChainModule(repositories, resolvers, pinning,
-                javadocStep, dokkaModule, scaladocModule, groovydocModule,
-                javadoc, dokka, scaladoc, groovydoc, custom);
+        return new InferredDocumentationChainModule(repositories,
+                resolvers,
+                pinning,
+                javadocStep,
+                dokkaModule,
+                scaladocModule,
+                groovydocModule,
+                javadoc,
+                dokka,
+                scaladoc,
+                groovydoc,
+                custom);
     }
 
     public InferredDocumentationChainModule groovydoc(Function<GroovyDocumentationModule, BuildExecutorModule> groovydoc) {
-        return new InferredDocumentationChainModule(repositories, resolvers, pinning,
-                javadocStep, dokkaModule, scaladocModule, groovydocModule,
-                javadoc, dokka, scaladoc, groovydoc, custom);
+        return new InferredDocumentationChainModule(repositories,
+                resolvers,
+                pinning,
+                javadocStep,
+                dokkaModule,
+                scaladocModule,
+                groovydocModule,
+                javadoc,
+                dokka,
+                scaladoc,
+                groovydoc,
+                custom);
     }
 
     public InferredDocumentationChainModule custom(SequencedMap<String, BuildExecutorModule> custom) {
-        return new InferredDocumentationChainModule(repositories, resolvers, pinning,
-                javadocStep, dokkaModule, scaladocModule, groovydocModule,
-                javadoc, dokka, scaladoc, groovydoc, custom);
+        return new InferredDocumentationChainModule(repositories,
+                resolvers,
+                pinning,
+                javadocStep,
+                dokkaModule,
+                scaladocModule,
+                groovydocModule,
+                javadoc,
+                dokka,
+                scaladoc,
+                groovydoc,
+                custom);
     }
 
     @Override
