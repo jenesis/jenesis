@@ -38,4 +38,6 @@ module build.jenesis.test {
     requires jdk.httpserver;
     requires org.junit.jupiter;
     requires org.assertj.core;
+
+    exports build.jenesis.test.daemon to build.jenesis;
 }
