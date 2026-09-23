@@ -84,7 +84,7 @@ public class JModTest {
                 "-d", classes.toString(),
                 sources.resolve("module-info.java").toString())).isZero();
         JMod jmod;
-        jmod = JMod.ofEnvironment(new Environment(Map.of("archive.timestamp", "")::get), ProcessHandler.Factory.TOOL);
+        jmod = JMod.ofEnvironment(new Environment(Map.of("archive.timestamp", "")), ProcessHandler.Factory.TOOL);
         BuildStepResult result = jmod.apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),

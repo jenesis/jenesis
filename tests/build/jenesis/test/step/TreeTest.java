@@ -32,7 +32,7 @@ public class TreeTest {
 
     @Test
     public void rejects_an_unknown_tree_format() {
-        assertThatThrownBy(() -> Tree.ofEnvironment(new Environment(Map.of("tree.format", "fancy")::get)))
+        assertThatThrownBy(() -> Tree.ofEnvironment(new Environment(Map.of("tree.format", "fancy"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown jenesis.tree.format 'fancy'")
                 .hasMessageContaining("full")
@@ -41,7 +41,7 @@ public class TreeTest {
 
     @Test
     public void compact_format_prints_only_internal_and_counts_external() throws IOException {
-        Function<String, String> keys = Map.of("tree.format", "compact")::get;
+        Map<String, String> keys = Map.of("tree.format", "compact");
         {
             SequencedProperties graph = new SequencedProperties();
             graph.setProperty("edge/0", "main\tcompile\tmodule\ttrue\tcompile\t1.0\t\tmodule/foo/1.0");
@@ -71,7 +71,7 @@ public class TreeTest {
 
     @Test
     public void omits_a_test_module_when_tests_are_excluded() throws IOException {
-        Function<String, String> keys = Map.of("tree.tests", "false")::get;
+        Map<String, String> keys = Map.of("tree.tests", "false");
         {
             SequencedProperties graph = new SequencedProperties();
             graph.setProperty("edge/0", "main\tcompile\tmodule\ttrue\tcompile\t1.0\t\tmodule/foo/1.0");

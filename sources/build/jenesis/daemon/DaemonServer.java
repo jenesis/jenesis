@@ -193,7 +193,7 @@ public final class DaemonServer {
                       String... selectors) throws IOException {
         PrintStream systemOut = System.out, systemErr = System.err;
         try {
-            Function<String, String> requested = requested(properties);
+            Map<String, String> requested = requested(properties);
             System.setOut(new PrintStream(new Frames(out, 1), true));
             System.setErr(new PrintStream(new Frames(out, 2), true));
             try {
@@ -224,7 +224,7 @@ public final class DaemonServer {
         }
     }
 
-    private Function<String, String> requested(SequencedMap<String, String> properties) {
+    private Map<String, String> requested(SequencedMap<String, String> properties) {
         Map<String, String> anchored = new LinkedHashMap<>(properties);
         anchored.put("jenesis.make.root", root.toString());
         anchored.put("jenesis.make.daemon", "false");

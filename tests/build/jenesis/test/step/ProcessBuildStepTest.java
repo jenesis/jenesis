@@ -77,7 +77,7 @@ public class ProcessBuildStepTest {
     @Test
     public void the_command_specific_setting_enables_streaming() {
         List<String> printed = new ArrayList<>();
-        assertThat(new Probe(new Environment(Map.of("print.probe", "true")::get, printed::add, printed::add)).streams())
+        assertThat(new Probe(new Environment(Map.of("print.probe", "true"), printed::add, printed::add)).streams())
                 .isTrue();
         assertThat(printed)
                 .as("the lines go to the output the run was given, never to the stream of the JVM")
@@ -86,12 +86,12 @@ public class ProcessBuildStepTest {
 
     @Test
     public void the_generic_setting_enables_streaming() {
-        assertThat(new Probe(new Environment(Map.of("print.process", "true")::get)).streams()).isTrue();
+        assertThat(new Probe(new Environment(Map.of("print.process", "true"))).streams()).isTrue();
     }
 
     @Test
     public void the_command_specific_setting_takes_precedence_over_the_generic_one() {
-        assertThat(new Probe(new Environment(Map.of("print.process", "true", "print.probe", "false")::get)).streams())
+        assertThat(new Probe(new Environment(Map.of("print.process", "true", "print.probe", "false"))).streams())
                 .isFalse();
     }
 
@@ -117,7 +117,7 @@ public class ProcessBuildStepTest {
     @Test
     public void shares_the_limit_of_the_setting_between_steps() throws Exception {
         AtomicInteger running = new AtomicInteger(), peak = new AtomicInteger();
-        run(() -> new Gated(counting(running, peak), new Environment(Map.of("process.concurrency", "2")::get)));
+        run(() -> new Gated(counting(running, peak), new Environment(Map.of("process.concurrency", "2"))));
         assertThat(peak).hasValueLessThanOrEqualTo(2);
         assertThat(peak).hasValueGreaterThan(0);
     }
@@ -148,7 +148,7 @@ public class ProcessBuildStepTest {
 
     @Test
     public void rejects_a_negative_limit() {
-        assertThatThrownBy(() -> new Probe(new Environment(Map.of("process.concurrency", "-1")::get)))
+        assertThatThrownBy(() -> new Probe(new Environment(Map.of("process.concurrency", "-1"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("-1");
     }

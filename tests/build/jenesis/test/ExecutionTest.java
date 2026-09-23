@@ -48,19 +48,19 @@ public class ExecutionTest {
 
     @Test
     public void system_property_picks_up_main_class() {
-        Execution execute = Execution.ofEnvironment(new Environment(Map.of("execute.mainClass", "foo.Bar")::get), Project.ofEnvironment(new Environment(Map.of("execute.mainClass", "foo.Bar")::get), Path.of(".")));
+        Execution execute = Execution.ofEnvironment(new Environment(Map.of("execute.mainClass", "foo.Bar")), Project.ofEnvironment(new Environment(Map.of("execute.mainClass", "foo.Bar")), Path.of(".")));
         assertThat(execute.mainClass()).isEqualTo("foo.Bar");
     }
 
     @Test
     public void system_property_picks_up_module() {
-        Execution execute = Execution.ofEnvironment(new Environment(Map.of("execute.module", "sub")::get), Project.ofEnvironment(new Environment(Map.of("execute.module", "sub")::get), Path.of(".")));
+        Execution execute = Execution.ofEnvironment(new Environment(Map.of("execute.module", "sub")), Project.ofEnvironment(new Environment(Map.of("execute.module", "sub")), Path.of(".")));
         assertThat(execute.module()).isEqualTo("sub");
     }
 
     @Test
     public void explicit_overrides_win_over_system_properties() {
-        Execution execute = Execution.ofEnvironment(new Environment(Map.of("execute.mainClass", "ignored.Main", "execute.module", "ignored")::get), Project.ofEnvironment(new Environment(Map.of("execute.mainClass", "ignored.Main", "execute.module", "ignored")::get), Path.of(".")))
+        Execution execute = Execution.ofEnvironment(new Environment(Map.of("execute.mainClass", "ignored.Main", "execute.module", "ignored")), Project.ofEnvironment(new Environment(Map.of("execute.mainClass", "ignored.Main", "execute.module", "ignored")), Path.of(".")))
                 .mainClass("a.B")
                 .module("sub");
         assertThat(execute.mainClass()).isEqualTo("a.B");
@@ -189,7 +189,7 @@ public class ExecutionTest {
                         "project.target", root.resolve("target").toString(),
                         "project.artifacts", root.resolve("artifacts").toString(),
                         "test.skip", "true",
-                        "execute.mainClass", "sample.Sample")::get),
+                        "execute.mainClass", "sample.Sample")),
                 Execution.class.getName(),
                 root,
                 new LinkedHashSet<>());
@@ -202,7 +202,7 @@ public class ExecutionTest {
     public void execute_grants_native_access_only_to_what_the_running_module_declares()
             throws IOException, InterruptedException {
         writeNativeModules(true);
-        Project project = Project.ofEnvironment(new Environment(Map.of("dependency.native", "strict")::get), root)
+        Project project = Project.ofEnvironment(new Environment(Map.of("dependency.native", "strict")), root)
                 .target(Files.createDirectory(root.resolve("target")))
                 .artifacts(Files.createDirectory(root.resolve("artifacts")))
                 .layout(Project.Layout.MODULAR)
@@ -216,7 +216,7 @@ public class ExecutionTest {
     @Test
     public void strict_native_access_fails_a_build_that_does_not_redeclare_what_a_dependency_names() throws IOException {
         writeNativeModules(false);
-        Project project = Project.ofEnvironment(new Environment(Map.of("dependency.native", "strict")::get), root)
+        Project project = Project.ofEnvironment(new Environment(Map.of("dependency.native", "strict")), root)
                 .target(Files.createDirectory(root.resolve("target")))
                 .artifacts(Files.createDirectory(root.resolve("artifacts")))
                 .layout(Project.Layout.MODULAR)

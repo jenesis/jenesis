@@ -13,7 +13,7 @@ public class PinningTest {
 
     @Test
     public void every_pin_writer_shares_one_ceiling() {
-        Function<String, String> keys = Map.of("pin.concurrency", "3")::get;
+        Map<String, String> keys = Map.of("pin.concurrency", "3");
         assertThat(Pinning.permits(new Environment(keys)))
                 .as("a pom writer and a module-info writer bound one fan-out between them, not one each")
                 .isSameAs(Pinning.permits(new Environment(keys)));
@@ -22,12 +22,12 @@ public class PinningTest {
 
     @Test
     public void an_unbounded_fan_out_holds_no_permit_at_all() {
-        assertThat(Pinning.permits(new Environment(Map.of("pin.concurrency", "0")::get))).isNull();
+        assertThat(Pinning.permits(new Environment(Map.of("pin.concurrency", "0")))).isNull();
     }
 
     @Test
     public void refuses_a_ceiling_below_nothing() {
-        assertThatThrownBy(() -> Pinning.permits(new Environment(Map.of("pin.concurrency", "-1")::get)))
+        assertThatThrownBy(() -> Pinning.permits(new Environment(Map.of("pin.concurrency", "-1"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Pin concurrency must not be negative: -1");
     }
@@ -39,13 +39,13 @@ public class PinningTest {
 
     @Test
     public void reading_the_pin_setting_parses_case_insensitively() {
-        assertThat(Pinning.ofEnvironment(new Environment(Map.of("dependency.pin", "strict")::get))).isEqualTo(Pinning.STRICT);
-        assertThat(Pinning.ofEnvironment(new Environment(Map.of("dependency.pin", "VERSIONS")::get))).isEqualTo(Pinning.VERSIONS);
+        assertThat(Pinning.ofEnvironment(new Environment(Map.of("dependency.pin", "strict")))).isEqualTo(Pinning.STRICT);
+        assertThat(Pinning.ofEnvironment(new Environment(Map.of("dependency.pin", "VERSIONS")))).isEqualTo(Pinning.VERSIONS);
     }
 
     @Test
     public void reading_the_pin_setting_rejects_an_unknown_value() {
-        assertThatThrownBy(() -> Pinning.ofEnvironment(new Environment(Map.of("dependency.pin", "bogus")::get)))
+        assertThatThrownBy(() -> Pinning.ofEnvironment(new Environment(Map.of("dependency.pin", "bogus"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown jenesis.dependency.pin 'bogus'");
     }

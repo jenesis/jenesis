@@ -745,11 +745,11 @@ public class JpxTest {
         });
         server.start();
         try {
-            assertThat(read(Jpx.ofEnvironment(new Environment(Map.of("repository.insecure", "true", "module.uri", "http://localhost:" + server.getAddress().getPort() + "/", "module.local", jenesisRepoFolder.toString())::get), PathPlacement.INFERRED).repositories()
+            assertThat(read(Jpx.ofEnvironment(new Environment(Map.of("repository.insecure", "true", "module.uri", "http://localhost:" + server.getAddress().getPort() + "/", "module.local", jenesisRepoFolder.toString())), PathPlacement.INFERRED).repositories()
                     .get("module")
                     .fetch(Runnable::run, "tool.main:pom")
                     .orElseThrow())).isEqualTo("remote");
-            assertThat(read(Jpx.ofEnvironment(new Environment(Map.of("repository.insecure", "true", "module.uri", "http://localhost:" + server.getAddress().getPort() + "/", "module.local", jenesisRepoFolder.toString())::get), PathPlacement.MODULE_PATH).repositories()
+            assertThat(read(Jpx.ofEnvironment(new Environment(Map.of("repository.insecure", "true", "module.uri", "http://localhost:" + server.getAddress().getPort() + "/", "module.local", jenesisRepoFolder.toString())), PathPlacement.MODULE_PATH).repositories()
                     .get("module")
                     .fetch(Runnable::run, "tool.main/1.0")
                     .orElseThrow())).isEqualTo("remote");
@@ -775,7 +775,7 @@ public class JpxTest {
             Files.createDirectories(jenesisRepoFolder.resolve("tool.main").resolve("1.0"));
             Files.writeString(jenesisRepoFolder.resolve("tool.main").resolve("1.0").resolve("tool.main.jar"), "local");
 
-            assertThat(read(Jpx.ofEnvironment(new Environment(Map.of("repository.insecure", "true", "module.uri", "http://localhost:" + server.getAddress().getPort() + "/", "module.local", jenesisRepoFolder.toString())::get), PathPlacement.MODULE_PATH).repositories()
+            assertThat(read(Jpx.ofEnvironment(new Environment(Map.of("repository.insecure", "true", "module.uri", "http://localhost:" + server.getAddress().getPort() + "/", "module.local", jenesisRepoFolder.toString())), PathPlacement.MODULE_PATH).repositories()
                     .get("module")
                     .fetch(Runnable::run, "tool.main/1.0")
                     .orElseThrow())).isEqualTo("local");
