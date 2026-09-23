@@ -72,8 +72,7 @@ public class Sbom implements BuildStep {
         SequencedProperties metadata = SequencedProperties.ofFolders(folders, METADATA);
         String groupId = metadata.getProperty("project");
         String artifactId = metadata.getProperty("artifact");
-        String rawVersion = metadata.getProperty("version");
-        String version = rawVersion == null || rawVersion.equals("1-SNAPSHOT") ? null : rawVersion;
+        String version = metadata.getProperty("version");
         HashDigestFunction hash = new HashDigestFunction("SHA-256");
         SequencedMap<String, CycloneDx.Component> components = new LinkedHashMap<>();
         List<Path> graphFiles = new ArrayList<>();

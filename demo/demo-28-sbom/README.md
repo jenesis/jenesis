@@ -67,9 +67,10 @@ back to the project.
 The `metadata.component` (the project itself) is described from the POM: its
 `description`, its `Apache-2.0` license, its developers (rendered as CycloneDX
 `authors`), and its homepage and source repository (rendered as `website` and
-`vcs` external references). Jenesis fills in only what the POM actually declares:
-an unset version (the `1-SNAPSHOT` placeholder) is omitted rather than fabricated,
-since a version is not required for a valid SBOM.
+`vcs` external references). Jenesis fills in only what the project actually
+declares: a module that names no version is described without one rather than with
+the placeholder its POM has to carry, since a version is not required for a valid
+SBOM.
 
 The document also carries a `serialNumber` (`urn:uuid:...`) derived
 deterministically from the document's own content, so a reproducible build
