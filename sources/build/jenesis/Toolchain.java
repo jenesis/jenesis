@@ -42,12 +42,6 @@ public final class Toolchain {
                 throw new IllegalArgumentException("Malformed jenesis.toolchain.version: '" + this.version
                         + "' names a number too large for any JDK");
             }
-            if (numbers.getFirst() < 25) {
-                throw new IllegalArgumentException("jenesis.toolchain.version=" + this.version + " names a JDK"
-                        + " Jenesis cannot run on, as it needs 25 or newer - to compile for an older Java, keep"
-                        + " the toolchain on 25 or newer and declare the release, as @jenesis.release or"
-                        + " maven.compiler.release");
-            }
             for (int index = 1; index < parts.length; index++) {
                 words.add(parts[index].toLowerCase(Locale.ROOT));
             }
@@ -81,11 +75,13 @@ public final class Toolchain {
     }
 
     public List<String> command(Class<?> main, List<String> options, List<String> arguments) throws IOException {
+        requireRunnable();
         return command(select().home(), main, options, arguments);
     }
 
     public int launch(Class<?> main, List<String> options, List<String> arguments)
             throws IOException, InterruptedException {
+        requireRunnable();
         Candidate candidate = select();
         List<String> command = command(candidate.home(), main, options, arguments);
         System.err.println("Running on " + candidate.version() + " (" + String.join(" ", candidate.words())
@@ -102,6 +98,15 @@ public final class Toolchain {
             } catch (IllegalStateException _) {
                 process.destroy();
             }
+        }
+    }
+
+    private void requireRunnable() {
+        if (!numbers.isEmpty() && numbers.getFirst() < 25) {
+            throw new IllegalArgumentException("jenesis.toolchain.version=" + version + " names a JDK"
+                    + " Jenesis cannot run on, as it needs 25 or newer - to compile for an older Java, keep"
+                    + " the toolchain on 25 or newer and declare the release, as @jenesis.release or"
+                    + " maven.compiler.release");
         }
     }
 
