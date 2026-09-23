@@ -5,6 +5,8 @@ import module org.junit.jupiter.api;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
+import build.jenesis.BuildExecutorModule;
+import build.jenesis.BuildStepResult;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.project.InferredComplianceModule;
@@ -84,7 +86,26 @@ public class InferredComplianceModuleTest {
                 .hasMessageContaining("bogus");
     }
 
-    private SequencedMap<String, Path> execute(InferredComplianceModule module, String selector) throws IOException {
+    @Test
+    public void a_custom_module_runs_beside_a_stock_one_of_the_same_name_with_the_inputs_of_the_module() throws Exception {
+        Path configuration = Files.createDirectories(root.resolve("configuration"));
+        Files.writeString(configuration.resolve("licensing.properties"), "allowed=Apache\n");
+        SequencedMap<String, BuildExecutorModule> custom = new LinkedHashMap<>();
+        custom.put("license", (executor, inherited) -> executor.addStep("report", (_, context, arguments) -> {
+            Files.writeString(context.next().resolve("inputs.txt"), String.join("\n", arguments.sequencedKeySet()));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }, inherited.sequencedKeySet()));
+        SequencedMap<String, Path> outputs = execute(new InferredComplianceModule(new LinkedHashSet<>(List.of(configuration))).custom(custom),
+                "compliance/license/check",
+                "compliance/custom/license/report");
+        assertThat(outputs).containsKeys("compliance/license/check", "compliance/custom/license/report");
+        assertThat(Files.readAllLines(outputs.get("compliance/custom/license/report").resolve("inputs.txt")))
+                .as("a custom module reads what the module it is added to reads")
+                .singleElement()
+                .satisfies(input -> assertThat(input).endsWith("input"));
+    }
+
+    private SequencedMap<String, Path> execute(InferredComplianceModule module, String... selectors) throws IOException {
         Path build = Files.createDirectories(root.resolve("build"));
         Path input = Files.createDirectories(root.resolve("input"));
         BuildExecutor executor = BuildExecutor.of(build,
@@ -94,6 +115,6 @@ public class InferredComplianceModuleTest {
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         executor.addSource("input", input);
         executor.addModule("compliance", module, "input");
-        return executor.execute(Runnable::run, selector).toCompletableFuture().join();
+        return executor.execute(Runnable::run, selectors).toCompletableFuture().join();
     }
 }

@@ -31,6 +31,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                             Function<InferredArtifactQualityModule, BuildExecutorModule> artifact,
                                             Function<InferredTestObservationModule, BuildExecutorModule> observe,
                                             Function<InferredDocumentationModule, BuildExecutorModule> documentation,
+                                            SequencedMap<String, BuildExecutorModule> custom,
                                             Environment environment) implements MultiProjectAssembler<ProjectModuleDescriptor> {
 
     public InferredMultiProjectAssembler() {
@@ -45,6 +46,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 module -> module,
                 module -> module,
                 module -> module,
+                Collections.emptyNavigableMap(),
                 environment);
     }
 
@@ -53,31 +55,35 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
     }
 
     public InferredMultiProjectAssembler check(Function<InferredSourceCodeQualityModule, BuildExecutorModule> check) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, environment);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
     }
 
     public InferredMultiProjectAssembler format(Function<InferredSourceFormattingModule, BuildExecutorModule> format) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, environment);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
     }
 
     public InferredMultiProjectAssembler compliance(Function<InferredComplianceModule, BuildExecutorModule> compliance) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, environment);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
     }
 
     public InferredMultiProjectAssembler toolchain(Function<InferredJavaToolchainModule, BuildExecutorModule> toolchain) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, environment);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
     }
 
     public InferredMultiProjectAssembler artifact(Function<InferredArtifactQualityModule, BuildExecutorModule> artifact) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, environment);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
     }
 
     public InferredMultiProjectAssembler observe(Function<InferredTestObservationModule, BuildExecutorModule> observe) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, environment);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
     }
 
     public InferredMultiProjectAssembler documentation(Function<InferredDocumentationModule, BuildExecutorModule> documentation) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, environment);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
+    }
+
+    public InferredMultiProjectAssembler custom(SequencedMap<String, BuildExecutorModule> custom) {
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
     }
 
     @Override
@@ -181,6 +187,10 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 sub.addStep("jmod",
                         JMod.ofEnvironment(environment, factory),
                         Stream.concat(Stream.of("binary"), descriptor.content().stream()));
+            }
+            if (!custom.isEmpty()) {
+                sub.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
+                        nested.addModule(name, module, nestedInherited.sequencedKeySet())), outerInherited.sequencedKeySet());
             }
         });
         if (packaging.jlink() || packaging.jpackage() != null || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || packaging.docker() != null) {
