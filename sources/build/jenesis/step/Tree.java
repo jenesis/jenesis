@@ -20,12 +20,8 @@ public class Tree implements BuildStep {
         this(System.out::println, false, true);
     }
 
-    public Tree(Environment environment) {
-        this(environment.out(), false, true);
-    }
-
     public static Tree ofEnvironment(Environment environment) {
-        Tree tree = new Tree(environment);
+        Tree tree = new Tree(environment.out(), false, true);
         String format = environment.getProperty("tree.format");
         if (format != null) {
             tree = tree.compact(switch (format) {
