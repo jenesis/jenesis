@@ -111,6 +111,13 @@ once the layer is defined, so the launch carries
 `-Djlayer.enableNativeAccess.<name>=<module>` and the launcher grants it when it
 defines the layer, and is granted native access itself to do so.
 
+System properties can be rewritten while the JVM runs, and the launcher reads a
+layer's `jlayer.*` properties only when it defines the layer. Code that runs
+before then - in the application or in an outer layer - can therefore change
+which jars an inner layer holds and which of its modules are granted native
+access. A layer bundled in an executable jar is read from the jar and is not
+affected.
+
 Discovering what to grant
 -------------------------
 
