@@ -40,11 +40,15 @@ public interface JenesisRepository extends Repository {
 
     @Override
     default JenesisRepository cached(Path folder) {
+        return cached(Environment.NONE, folder);
+    }
+
+    @Override
+    default JenesisRepository cached(Environment environment, Path folder) {
         if (folder == null) {
             return this;
         }
-        Repository cached = Repository.super.cached(folder);
-        JenesisRepository origin = this;
+        Repository cached = Repository.super.cached(environment, folder);
         return new JenesisRepository() {
 
             @Override

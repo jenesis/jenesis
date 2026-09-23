@@ -612,6 +612,42 @@ public class MavenDefaultRepositoryTest {
     }
 
     @Test
+    public void cached_repository_with_environment_serves_metadata() throws IOException {
+        Path folder = Files.createDirectories(repository.resolve("group/artifact"));
+        Files.writeString(folder.resolve("maven-metadata.xml"), "foo");
+        Path cache = Files.createDirectory(result.resolve("cache"));
+        MavenRepository store = new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)
+                .cached(Environment.NONE, cache);
+        Path target = result.resolve("metadata.xml");
+        try (InputStream inputStream = store.fetchMetadata(Runnable::run,
+                "group",
+                "artifact",
+                null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, target);
+        }
+        assertThat(target).content().isEqualTo("foo");
+        assertThat(cache.resolve("group%2Fartifact%2Fmaven-metadata.xml")).content().isEqualTo("foo");
+    }
+
+    @Test
+    public void cached_repository_with_environment_preserves_metadata_through_generic_repository_adaptation() throws IOException {
+        Path folder = Files.createDirectories(repository.resolve("group/artifact"));
+        Files.writeString(folder.resolve("maven-metadata.xml"), "foo");
+        Path cache = Files.createDirectory(result.resolve("cache"));
+        Repository repositoryInstance = new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)
+                .cached(Environment.NONE, cache);
+        MavenRepository store = MavenRepository.of(repositoryInstance);
+        Path target = result.resolve("metadata.xml");
+        try (InputStream inputStream = store.fetchMetadata(Runnable::run,
+                "group",
+                "artifact",
+                null).orElseThrow().toInputStream()) {
+            Files.copy(inputStream, target);
+        }
+        assertThat(target).content().isEqualTo("foo");
+    }
+
+    @Test
     public void serves_cached_metadata_when_the_repository_no_longer_answers() throws IOException {
         Path folder = Files.createDirectories(repository.resolve("group/artifact"));
         Files.writeString(folder.resolve("maven-metadata.xml"), "foo");

@@ -2,6 +2,7 @@ package build.jenesis.maven;
 
 import module java.base;
 import build.jenesis.BuildExecutorModule;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 
@@ -23,7 +24,12 @@ public interface MavenRepository extends Repository {
 
     @Override
     default MavenRepository cached(Path folder) {
-        return folder == null ? this : caching(Repository.super.cached(folder), folder);
+        return cached(Environment.NONE, folder);
+    }
+
+    @Override
+    default MavenRepository cached(Environment environment, Path folder) {
+        return folder == null ? this : caching(Repository.super.cached(environment, folder), folder);
     }
 
     @Override

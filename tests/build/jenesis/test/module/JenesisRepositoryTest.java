@@ -4,6 +4,7 @@ import module java.base;
 import module jdk.httpserver;
 import module org.junit.jupiter.api;
 import build.jenesis.Environment;
+import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.module.JenesisRepository;
 
@@ -67,6 +68,35 @@ public class JenesisRepositoryTest {
                 .hasMessageContaining("Unknown jenesis.module.source 'cloudflare'")
                 .hasMessageContaining("'service'")
                 .hasMessageContaining("'git'");
+    }
+
+    @Test
+    public void cached_repository_with_environment_serves_artifact() throws IOException {
+        writeIndex("widget", "2.0\tcom.example\twidget-core\t2.0");
+        writeArtifact("com.example", "widget-core", "2.0", "fromIndex");
+        Path cache = Files.createDirectory(local.resolve("cache"));
+        JenesisRepository repository = JenesisRepository.ofEnvironment(environment(Map.of(
+                "module.source", "git",
+                "module.index", index.toUri().toString(),
+                "maven.uri", maven.toUri().toString())), JenesisRepository.Scope.MODULE)
+                .cached(Environment.NONE, cache);
+
+        assertThat(content(repository.fetch(Runnable::run, "widget", null, null, "jar"))).isEqualTo("fromIndex");
+    }
+
+    @Test
+    public void cached_repository_with_environment_preserves_module_fetch_through_generic_repository_adaptation() throws IOException {
+        writeIndex("widget", "2.0\tcom.example\twidget-core\t2.0");
+        writeArtifact("com.example", "widget-core", "2.0", "fromIndex");
+        Path cache = Files.createDirectory(local.resolve("cache"));
+        Repository repositoryInstance = JenesisRepository.ofEnvironment(environment(Map.of(
+                "module.source", "git",
+                "module.index", index.toUri().toString(),
+                "maven.uri", maven.toUri().toString())), JenesisRepository.Scope.MODULE)
+                .cached(Environment.NONE, cache);
+        JenesisRepository repository = JenesisRepository.of(repositoryInstance);
+
+        assertThat(content(repository.fetch(Runnable::run, "widget", null, null, "jar"))).isEqualTo("fromIndex");
     }
 
     private Environment environment(Map<String, String> settings) {
