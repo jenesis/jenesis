@@ -621,6 +621,30 @@ public class ProjectTest {
     }
 
     @Test
+    public void applies_each_customizer_in_order_to_the_configured_project() {
+        Project project = Project.ofEnvironment(new Environment(Map.of("project.version", "1",
+                "project.customizers", Versioning.class.getName() + ", " + Tagging.class.getName())::get), root);
+        assertThat(project.version()).isEqualTo("1.1");
+        assertThat(project.tag()).as("the second customizer sees what the first one set").isEqualTo("v1.1");
+    }
+
+    @Test
+    public void refuses_a_customizer_that_is_no_unary_operator() {
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.customizers",
+                ProjectTest.class.getName())::get), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining(ProjectTest.class.getName() + " is not a UnaryOperator<Project>");
+    }
+
+    @Test
+    public void refuses_a_customizer_that_returns_no_project() {
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.customizers",
+                Discarding.class.getName())::get), root))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining(Discarding.class.getName() + " returned no project");
+    }
+
+    @Test
     public void the_layered_settings_reads_a_file_from_root() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.test.sample.key=fromFile\n");
         assertThat(Make.settings(root).keys().apply("test.sample.key")).isEqualTo("fromFile");
@@ -744,6 +768,33 @@ public class ProjectTest {
     }
 
     @Test
+    public void the_layered_settings_rejects_customizers_in_the_project_file() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.customizers=build.Build\n");
+        assertThatThrownBy(() -> Make.settings(root, Map.<String, String>of()::get))
+                .as("a customizer runs code the engine does not ship, so a project cannot name one for itself")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.project.customizers cannot be set in");
+    }
+
+    @Test
+    public void the_layered_settings_rejects_customizers_in_a_profile() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
+        Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.project.customizers=build.Build\n");
+        assertThatThrownBy(() -> Make.settings(root, Map.<String, String>of()::get))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.project.customizers cannot be set in");
+    }
+
+    @Test
+    public void the_layered_settings_accepts_customizers_in_the_user_global_file() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.project.customizers=build.Build\n");
+        assertThat(Make.settings(root, Map.of("make.global", root.resolve("home").toString())::get)
+                .keys()
+                .apply("project.customizers")).isEqualTo("build.Build");
+    }
+
+    @Test
     public void the_layered_settings_leave_the_running_jvm_untouched() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.test.sample.key=fromFile\n");
         assertThat(Make.settings(root).keys().apply("test.sample.key")).isEqualTo("fromFile");
@@ -833,5 +884,29 @@ public class ProjectTest {
                 .isEqualTo(Project.Layout.AUTO);
         assertThat(project.version()).isNull();
         assertThat(project.cache()).isNull();
+    }
+
+    public static class Versioning implements UnaryOperator<Project> {
+
+        @Override
+        public Project apply(Project project) {
+            return project.version(project.version() + ".1");
+        }
+    }
+
+    public static class Tagging implements UnaryOperator<Project> {
+
+        @Override
+        public Project apply(Project project) {
+            return project.tag("v" + project.version());
+        }
+    }
+
+    public static class Discarding implements UnaryOperator<Project> {
+
+        @Override
+        public Project apply(Project project) {
+            return null;
+        }
     }
 }
