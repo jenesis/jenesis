@@ -34,7 +34,7 @@ builds the consumer at the project root against it, and runs the produced module
 Layout
 ------
 
-    demo/demo-60-module-convention
+    demo/demo-61-module-convention
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- build/Demo.java      publishes greeter/, then builds the root project against it
     |-- greeter/             the library, staged into a Maven repository under target/
@@ -51,7 +51,7 @@ The convention
 The MODULAR_TO_MAVEN layout derives the Maven coordinate of every module it
 publishes from the module name alone: the **groupId is the first two dotted
 segments**, the **artifactId is the full module name** (see
-`../demo-59-publishing`). `module demo.convention.greeter` is therefore published
+`../demo-60-publishing`). `module demo.convention.greeter` is therefore published
 as `demo.convention:demo.convention.greeter`, and `MavenModuleRepository` derives
 exactly the same pair when resolving it - one method, `MavenModuleRepository.groupId(...)`,
 serves both directions, so the publisher and the consumer cannot drift apart.
