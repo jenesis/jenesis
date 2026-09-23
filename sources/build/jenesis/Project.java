@@ -573,12 +573,14 @@ public record Project(
                     the command line or ~/.jenesis/jenesis.properties may set it. Nothing is installed.
 
                     To adjust the stock build rather than replace it, put a UnaryOperator<Project>
-                    under build/custom/ and pass -Djenesis.project.customizers=build.custom.Build:
-                    Make compiles build/custom/ with the engine and applies each customizer, in order,
-                    to the project the settings configured, so the build keeps every feature of Make.
-                    It runs code the engine does not ship, so only the command line or ~/.jenesis may
-                    name one. jenesis-validate checks build/jenesis alone, so a customizer leaves the
-                    vendored engine valid, and the installed jenesis never runs one.
+                    under build/custom/ and name it in jenesis.project.customizers=build.custom.Build,
+                    in jenesis.properties or on the command line: Make compiles build/custom/ with the
+                    engine and applies each customizer, in order, to the project the settings
+                    configured, so the build keeps every feature of Make. A customizer runs the
+                    project's code, as its tests do, so build an untrusted project with
+                    -Djenesis.project.docker=true, which applies it inside the container only.
+                    jenesis-validate checks build/jenesis alone, so a customizer leaves the vendored
+                    engine valid, and the installed jenesis never runs one.
 
                     A project with its own entry point calls `new Make("build.Demo").run(selectors)`,
                     which returns the status to exit with. For a GraalVM native launcher, read the
@@ -1496,7 +1498,9 @@ public record Project(
         project = project.pinning(Pinning.ofEnvironment(environment))
                 .assembler(InferredMultiProjectAssembler.ofEnvironment(environment))
                 .configurator(() -> executor);
-        List<String> customizers = environment.entries("project.customizers");
+        List<String> customizers = environment.flag("project.docker")
+                ? null
+                : environment.entries("project.customizers");
         for (String customizer : customizers == null ? List.<String>of() : customizers) {
             Object instance;
             try {
@@ -2454,10 +2458,6 @@ public record Project(
             settings(environment).forEach((name, value) -> environment.out().accept(name + "=" + value));
             return Collections.emptyNavigableMap();
         }
-        if (environment.flag("project.watch")) {
-            watch(selectors);
-            return Collections.emptyNavigableMap();
-        }
         if (environment.flag("project.docker")) {
             SortedMap<String, String> properties = new TreeMap<>(settings(environment));
             properties.keySet().removeIf(name -> name.startsWith("jenesis.project.docker"));
@@ -2547,6 +2547,10 @@ public record Project(
             if (code != 0) {
                 System.exit(code);
             }
+            return Collections.emptyNavigableMap();
+        }
+        if (environment.flag("project.watch")) {
+            watch(selectors);
             return Collections.emptyNavigableMap();
         }
         return this.build(selectors);

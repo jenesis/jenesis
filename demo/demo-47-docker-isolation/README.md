@@ -124,6 +124,19 @@ container, so the build-time actor is confined the same way: the test prints
 `DEMO_SECRET is unset` / `out of reach` and the host secret file is left
 untouched.
 
+All of the project's code runs in that container. On the host, Jenesis only
+reads the settings and starts the container. It runs no test there, and none of
+the build code a project can add under `build/custom/`, until the container is up
+and the isolation is in place. The engine that does this has to be the trusted
+one, as the last section of this page explains.
+
+The project also cannot undo the isolation. Its `jenesis.properties` and its
+profiles are refused if they set any `jenesis.project.docker*` or
+`jenesis.execute.docker*` key, so a project can neither switch Docker off nor
+widen the container with a mount or an environment variable. Only your command
+line or your own `~/.jenesis/jenesis.properties` configures Docker. Put
+`jenesis.project.docker=true` in that file to isolate every build you run.
+
 Why the extra mount is needed here. The demos share one engine through the
 `build/jenesis -> ../../../sources/build/jenesis` symlink, which points outside
 the project root. `jenesis.project.docker` mounts only the project root, so inside
@@ -186,7 +199,9 @@ host rights the moment you launch it - before any dependency, test, or artifact
 What breaks the cycle is that a standard Jenesis project carries **no build logic
 to execute at all**. The build is described declaratively - a `pom.xml` or
 `module-info.java` giving the project structure and its dependency coordinates -
-and nothing in that description runs code. So an *untrusted* project can be built
+and nothing in that description runs code. Build code a project adds under
+`build/custom/` is the one exception: the installed `jenesis` never runs it, and
+`jenesis.project.docker` runs it only inside the container. So an *untrusted* project can be built
 by a *trusted, external* Jenesis that you already have. Installed through SDKMAN,
 `jenesis` runs the SDK's own copy of `Project.main(...)` against the current
 directory and never executes the project's `build/` sources:
@@ -227,6 +242,26 @@ version matches:
 A clean report means the embedded engine is byte-for-byte the trusted one, so
 `java build/jenesis/Make.java` runs exactly the code SDKMAN shipped - not a
 tampered fork.
+
+Building a project you do not trust
+-----------------------------------
+
+Put together, building an untrusted project takes two steps. First, check with
+the installed Jenesis that the vendored engine is the released one:
+
+    jenesis-validate
+
+Then build the project inside the container, where its tests and any build code
+it adds under `build/custom/` run only after the isolation is in place:
+
+    java -Djenesis.project.docker=true build/jenesis/Make.java
+
+Once you have vetted the project and it pins its dependencies (see
+`../demo-02-java-modular`), you can trust it to build on the host. Build it there
+with strict pinning, so any dependency that lacks a pinned checksum fails the
+build instead of running:
+
+    java -Djenesis.dependency.pin=strict build/jenesis/Make.java
 
 Shipping the app as a container image with `bundle`
 ---------------------------------------------------

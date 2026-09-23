@@ -187,12 +187,16 @@ before it is chosen. The search path decides what the build executes, so `Make.s
 every file a project provides: a new way to read properties keeps that rule, and the relaunch
 never takes a JVM option that configuration could supply.
 
-**`jenesis.project.customizers` adjusts the stock build, and only the user names one.** It lists
+**`jenesis.project.customizers` adjusts the stock build.** It lists
 `UnaryOperator<Project>` classes that `Project.ofEnvironment` applies, in order, to the project it configured, so
 every entry point that builds a project from settings - `Make`, `Execute`, the daemon, the tools, a container -
 builds the adjusted one. `Make` compiles `build/custom/` with the engine for that reason, beside the folder of
-the file it launches, while that file still names nothing but itself. A customizer runs code the engine does not ship, so `Make.settings`
-refuses the key in every file a project provides, as it refuses `jenesis.toolchain.searchpath`.
+the file it launches, while that file still names nothing but itself. A customizer runs the project's code, as its
+tests and annotation processors do, so a project names it in its own `jenesis.properties` like any other setting:
+refusing the key there would guard nothing a build does not already hand the project. What isolates an untrusted
+project is `jenesis.project.docker`, so under it the host applies no customizer and runs no build, `watch` included,
+before the container is up, and `Make.settings` refuses every `jenesis.project.docker*` and `jenesis.execute.docker*`
+key in a file the project provides, so a project can neither switch the isolation off nor widen it.
 
 **Configuration files are read through `SequencedProperties`.** A file is read with the type's own accessors -
 `value`, `value(key, default)`, `flag`, `flag(key, default)`, `flagOrNull`, `entries` for a comma-separated

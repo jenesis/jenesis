@@ -599,11 +599,15 @@ public final class Make {
                     + ": it locates your own user-global settings, which no file may move, least of all one a"
                     + " project provides (pass -Djenesis.make.global on the command line instead)");
         }
-        if (!trusted && properties.getProperty("jenesis.project.customizers") != null) {
-            throw new IllegalStateException("jenesis.project.customizers cannot be set in " + file
-                    + ": a customizer runs code the engine does not ship, so only the command line or your own"
-                    + " ~/.jenesis/jenesis.properties may name one, never a file the project provides"
-                    + " (pass -Djenesis.project.customizers instead)");
+        if (!trusted) {
+            for (String name : properties.stringPropertyNames()) {
+                if (name.startsWith("jenesis.project.docker") || name.startsWith("jenesis.execute.docker")) {
+                    throw new IllegalStateException(name + " cannot be set in " + file
+                            + ": whether and how the build is isolated is yours to decide, so only the command line"
+                            + " or your own ~/.jenesis/jenesis.properties may configure Docker, never a file the"
+                            + " project provides (pass -D" + name + " instead)");
+                }
+            }
         }
         if (!trusted && properties.getProperty("jenesis.toolchain.searchpath") != null) {
             throw new IllegalStateException("jenesis.toolchain.searchpath cannot be set in " + file
