@@ -13,6 +13,7 @@ import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
 
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -203,47 +204,52 @@ public class InventoryTest {
     }
 
     @Test
-    public void ignores_a_dependency_that_signals_native_access_by_default() throws IOException {
-        Path manifests = Files.createDirectory(root.resolve("manifests"));
-        SequencedProperties module = new SequencedProperties();
-        module.setProperty("path", "foo");
-        module.store(manifests.resolve(BuildStep.MODULE));
-        Path runtime = signalling();
+    public void ignores_what_a_dependency_names_by_default() throws IOException {
+        Path manifests = manifests();
+        Path runtime = naming("main");
 
         run(args("manifests", manifests, "runtime", runtime));
 
         assertThat(read(next.resolve(Inventory.INVENTORY)).getProperty("module-foo.nativeAccess.0"))
-                .as("a dependency may say it needs native access, but only its consumer can grant it")
+                .as("a dependency's declaration grants nothing to the module that runs it")
                 .isNull();
     }
 
     @Test
-    public void strict_native_access_refuses_a_dependency_that_signals_it_without_a_grant() throws IOException {
-        Path manifests = Files.createDirectory(root.resolve("manifests"));
-        SequencedProperties module = new SequencedProperties();
-        module.setProperty("path", "foo");
-        module.store(manifests.resolve(BuildStep.MODULE));
-        Path runtime = signalling();
+    public void warns_about_what_a_dependency_names_that_the_running_module_does_not_grant() throws IOException {
+        Path manifests = manifests();
+        Path runtime = naming("main");
+        List<String> warnings = new ArrayList<>();
 
-        assertThatThrownBy(() -> run(new Inventory().strictNativeAccess(true),
+        run(new Inventory().nativeAccess(Inventory.NativeAccess.WARN).warnings(warnings::add),
+                args("manifests", manifests, "runtime", runtime));
+
+        assertThat(warnings).hasSize(1);
+        assertThat(warnings.getFirst()).contains("org.example.words names org.example.jni");
+    }
+
+    @Test
+    public void strict_native_access_refuses_what_a_dependency_names_that_the_running_module_does_not_grant()
+            throws IOException {
+        Path manifests = manifests();
+        Path runtime = naming("main");
+
+        assertThatThrownBy(() -> run(new Inventory().nativeAccess(Inventory.NativeAccess.STRICT),
                 args("manifests", manifests, "runtime", runtime)))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("main/maven/org.example/jni/1.0")
+                .hasMessageContaining("org.example.words names org.example.jni")
                 .hasMessageContaining("@jenesis.native");
     }
 
     @Test
-    public void strict_native_access_accepts_a_dependency_its_module_grants() throws IOException {
-        Path manifests = Files.createDirectory(root.resolve("manifests"));
-        SequencedProperties module = new SequencedProperties();
-        module.setProperty("path", "foo");
-        module.store(manifests.resolve(BuildStep.MODULE));
+    public void strict_native_access_accepts_what_the_running_module_redeclares() throws IOException {
+        Path manifests = manifests();
         SequencedProperties natives = new SequencedProperties();
-        natives.setProperty("main/native/maven/org.example/jni", "");
+        natives.setProperty("main/native/module/org.example.jni", "");
         natives.store(manifests.resolve(BuildStep.NATIVES));
-        Path runtime = signalling();
+        Path runtime = naming("main");
 
-        run(new Inventory().strictNativeAccess(true), args("manifests", manifests, "runtime", runtime));
+        run(new Inventory().nativeAccess(Inventory.NativeAccess.STRICT), args("manifests", manifests, "runtime", runtime));
 
         assertThat(Inventory.nativeAccess(next)).containsExactly(
                 runtime.resolve("dependencies/jni-1.0.jar").toAbsolutePath().normalize());
@@ -251,10 +257,7 @@ public class InventoryTest {
 
     @Test
     public void grants_native_access_to_a_module_in_one_of_its_layers() throws IOException {
-        Path manifests = Files.createDirectory(root.resolve("manifests"));
-        SequencedProperties module = new SequencedProperties();
-        module.setProperty("path", "foo");
-        module.store(manifests.resolve(BuildStep.MODULE));
+        Path manifests = manifests();
         SequencedProperties natives = new SequencedProperties();
         natives.setProperty("layer:render/native/maven/org.example/jni", "");
         natives.store(manifests.resolve(BuildStep.NATIVES));
@@ -270,33 +273,43 @@ public class InventoryTest {
     }
 
     @Test
-    public void strict_native_access_refuses_an_ungranted_need_in_a_layer() throws IOException {
+    public void strict_native_access_refuses_what_a_module_in_a_layer_names() throws IOException {
+        Path manifests = manifests();
+        Path runtime = naming("layer:render");
+
+        assertThatThrownBy(() -> run(new Inventory().nativeAccess(Inventory.NativeAccess.STRICT),
+                args("manifests", manifests, "runtime", runtime)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("org.example.words names org.example.jni");
+    }
+
+    private Path manifests() throws IOException {
         Path manifests = Files.createDirectory(root.resolve("manifests"));
         SequencedProperties module = new SequencedProperties();
         module.setProperty("path", "foo");
         module.store(manifests.resolve(BuildStep.MODULE));
-        Path runtime = signalling();
-        SequencedProperties index = new SequencedProperties();
-        index.setProperty("layer:render/runtime/maven/org.example/jni/1.0", "dependencies/jni-1.0.jar");
-        index.store(runtime.resolve(BuildStep.DEPENDENCIES));
-
-        assertThatThrownBy(() -> run(new Inventory().strictNativeAccess(true),
-                args("manifests", manifests, "runtime", runtime)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("layer:render/maven/org.example/jni/1.0");
+        return manifests;
     }
 
-    private Path signalling() throws IOException {
+    private Path naming(String group) throws IOException {
         Path runtime = Files.createDirectory(root.resolve("runtime"));
-        Manifest manifest = new Manifest();
-        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
-        manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, "true");
-        Path jar = Files.createDirectory(runtime.resolve("dependencies")).resolve("jni-1.0.jar");
-        new JarOutputStream(Files.newOutputStream(jar), manifest).close();
+        Path dependencies = Files.createDirectory(runtime.resolve("dependencies"));
+        jar(dependencies.resolve("jni-1.0.jar"), Map.of("Automatic-Module-Name", "org.example.jni"));
+        jar(dependencies.resolve("words-1.0.jar"), Map.of(
+                "Automatic-Module-Name", "org.example.words",
+                PathPlacement.NATIVE_ACCESS, "org.example.jni"));
         SequencedProperties index = new SequencedProperties();
-        index.setProperty("main/runtime/maven/org.example/jni/1.0", "dependencies/jni-1.0.jar");
+        index.setProperty(group + "/runtime/maven/org.example/jni/1.0", "dependencies/jni-1.0.jar");
+        index.setProperty(group + "/runtime/maven/org.example/words/1.0", "dependencies/words-1.0.jar");
         index.store(runtime.resolve(BuildStep.DEPENDENCIES));
         return runtime;
+    }
+
+    private static void jar(Path file, Map<String, String> attributes) throws IOException {
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        attributes.forEach(manifest.getMainAttributes()::putValue);
+        new JarOutputStream(Files.newOutputStream(file), manifest).close();
     }
 
     @Test

@@ -825,18 +825,18 @@ public record Project(
                           verbatim as agent options. MAVEN modules declare the same lines in a
                           project-level <!--jenesis.attach ... --> comment, where a test-scoped match
                           attaches to test runs only and &#45;&#45; escapes a double dash.
-                      @jenesis.native [<token>...]
-                          Grant native access (--enable-native-access) to this module, with no
-                          token, or to a dependency it runs with, on its Execute run, its test runs
-                          and what it packages; a grant adds no dependency. Only the running module's
-                          own grants count and none is inherited: a module that grants itself marks
-                          its jar with Jenesis-Native-Access: true, which tells a consumer of the need
-                          but grants nothing there. jenesis.dependency.native=strict fails a build
-                          whose module runs such a jar without granting it. A module in one of the
-                          run's layers is granted the same way, by name or as layer:<name>/<repo>/...,
-                          and reaches the launcher as jlayer.enableNativeAccess.<name>, which grants
-                          it when it defines the layer. MAVEN modules declare tokens in a
-                          <!--jenesis.native ... --> comment, an empty one naming the project itself.
+                      @jenesis.native <token>...
+                          Grant native access (--enable-native-access) to the modules named, this
+                          one included only when it names itself, on this module's Execute run, its
+                          test runs and what it packages; a grant adds no dependency. A grant is
+                          never inherited: the names are recorded in the jar's Jenesis-Native-Access
+                          manifest attribute, so a module that runs this one learns what to grant
+                          itself. jenesis.dependency.native=warn reports a name the running module
+                          does not grant, strict fails the build on it. A module in one of the run's
+                          layers is named the same way, or as layer:<name>/<repo>/..., and reaches
+                          the launcher as jlayer.enableNativeAccess.<name>, which grants it when it
+                          defines the layer. MAVEN modules declare tokens in a
+                          <!--jenesis.native ... --> comment.
 
                     ## 9. Activate a tool by dropping in its configuration file
 
@@ -2283,7 +2283,7 @@ public record Project(
                 print.docker|true|The image notice when a build or run is containerized
                 print.jreleaser|true|The JReleaser command line when a release runs
                 dependency.pin||strict|versions|ignore; unset keeps existing pins and tolerates missing ones
-                dependency.native|ignore|ignore|strict: strict fails a module whose run includes a jar declaring Jenesis-Native-Access that the module does not grant with @jenesis.native
+                dependency.native|ignore|ignore|warn|strict: what to do when a module runs a jar whose Jenesis-Native-Access names a module it does not grant with @jenesis.native; warn reports it, strict fails the build
                 resolver.maven|maven|maven|closest|latest|release|stable|fail|managed: which version a Maven coordinate resolves to; stable skips pre-release qualifiers, fail rejects a coordinate two dependencies require at different versions, managed rejects that and any version only a dependency's POM names
                 resolver.module|first|first|ignore|fail|managed: what to do with the versions a module-info records; fail rejects two requires that record different versions, managed rejects that and any module only another module's requires names
                 pin.file||Write the whole project's pins to this properties file instead of the module declarations

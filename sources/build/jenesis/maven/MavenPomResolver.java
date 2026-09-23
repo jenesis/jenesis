@@ -602,14 +602,7 @@ public class MavenPomResolver implements MavenResolver {
                     managedDependencies,
                     pom.qualifiedDependencies(),
                     pom.attachments(),
-                    pom.natives().stream()
-                            .map(key -> key.isEmpty()
-                                    ? "main/maven/"
-                                            + property(pom.groupId(), pom.properties())
-                                            + "/"
-                                            + property(pom.artifactId(), pom.properties())
-                                    : key)
-                            .collect(Collectors.toCollection(LinkedHashSet::new)),
+                    pom.natives(),
                     pom.plugins(),
                     pom.signatures(),
                     property(pom.properties().get("mainClass"), pom.properties())));
@@ -1303,8 +1296,9 @@ public class MavenPomResolver implements MavenResolver {
                 .forEach(text -> {
                     String declaration = text.substring("jenesis.native".length()).trim();
                     if (declaration.isEmpty()) {
-                        entries.add("");
-                        return;
+                        throw new IllegalArgumentException("A jenesis.native comment names no module:"
+                                + " name each module or <groupId>/<artifactId> granted native access,"
+                                + " the project's own included");
                     }
                     for (String token : declaration.split("\\s+")) {
                         if (token.startsWith("java.") || token.startsWith("jdk.")) {

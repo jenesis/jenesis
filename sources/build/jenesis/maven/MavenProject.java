@@ -364,10 +364,11 @@ public class MavenProject implements BuildExecutorModule {
                                     }
                                     natives.store(context.next().resolve(BuildStep.NATIVES));
                                 }
-                                if (properties.flag("native")) {
+                                String named = properties.getProperty("named");
+                                if (named != null) {
                                     Manifest manifest = new Manifest();
                                     manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
-                                    manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, "true");
+                                    manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, named);
                                     try (OutputStream out = Files.newOutputStream(context.next().resolve(Versions.MANIFEST))) {
                                         manifest.write(out);
                                     }
@@ -761,8 +762,17 @@ public class MavenProject implements BuildExecutorModule {
             }
             if (value.natives() != null && !value.natives().isEmpty()) {
                 String self = "main/maven/" + value.groupId() + "/" + value.artifactId();
-                if (!test && value.natives().contains(self)) {
-                    properties.setProperty("native", "true");
+                if (!test) {
+                    properties.setProperty("named", value.natives().stream()
+                            .map(key -> key.startsWith("main/module/")
+                                    ? key.substring("main/module/".length())
+                                    : key.startsWith("main/maven/") && key.chars().filter(character -> character == '/').count() == 3
+                                            ? key.substring("main/maven/".length())
+                                            : key)
+                            .collect(Collectors.joining(",")));
+                    if (value.natives().contains(self)) {
+                        properties.setProperty("native", "true");
+                    }
                 }
                 String natives = value.natives().stream()
                         .filter(key -> test || !key.equals(self))

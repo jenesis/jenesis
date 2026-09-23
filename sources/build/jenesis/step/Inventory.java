@@ -51,38 +51,50 @@ public class Inventory implements BuildStep {
 
     private final String group;
     private final String module;
-    private final boolean strictNativeAccess;
+    private final NativeAccess nativeAccess;
+    private final transient Consumer<String> warnings;
+
+    public enum NativeAccess {
+        IGNORE, WARN, STRICT
+    }
 
     public Inventory() {
-        this("main", null, false);
+        this("main", null, NativeAccess.IGNORE, null);
     }
 
     public static Inventory ofEnvironment(Environment environment) {
         String mode = environment.value("dependency.native", "ignore");
-        return new Inventory().strictNativeAccess(switch (mode) {
-            case "ignore" -> false;
-            case "strict" -> true;
-            default -> throw new IllegalArgumentException("Unknown jenesis.dependency.native '" + mode
-                    + "', expected one of: ignore, strict");
-        });
+        try {
+            return new Inventory()
+                    .nativeAccess(NativeAccess.valueOf(mode.toUpperCase(Locale.ROOT)))
+                    .warnings(environment.err());
+        } catch (IllegalArgumentException _) {
+            throw new IllegalArgumentException("Unknown jenesis.dependency.native '" + mode
+                    + "', expected one of: ignore, warn, strict");
+        }
     }
 
-    private Inventory(String group, String module, boolean strictNativeAccess) {
+    private Inventory(String group, String module, NativeAccess nativeAccess, Consumer<String> warnings) {
         this.group = group;
         this.module = module;
-        this.strictNativeAccess = strictNativeAccess;
+        this.nativeAccess = nativeAccess;
+        this.warnings = warnings;
     }
 
     public Inventory group(String group) {
-        return new Inventory(group, module, strictNativeAccess);
+        return new Inventory(group, module, nativeAccess, warnings);
     }
 
     public Inventory module(String module) {
-        return new Inventory(group, module, strictNativeAccess);
+        return new Inventory(group, module, nativeAccess, warnings);
     }
 
-    public Inventory strictNativeAccess(boolean strictNativeAccess) {
-        return new Inventory(group, module, strictNativeAccess);
+    public Inventory nativeAccess(NativeAccess nativeAccess) {
+        return new Inventory(group, module, nativeAccess, warnings);
+    }
+
+    public Inventory warnings(Consumer<String> warnings) {
+        return new Inventory(group, module, nativeAccess, warnings);
     }
 
     @Override
@@ -148,7 +160,7 @@ public class Inventory implements BuildStep {
         SequencedMap<String, String> bomValues = new LinkedHashMap<>();
         SequencedMap<String, String> attachments = new LinkedHashMap<>();
         SequencedSet<String> natives = new LinkedHashSet<>();
-        boolean nativeAccess = false;
+        boolean self = false;
         SequencedSet<String> identity = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -171,7 +183,7 @@ public class Inventory implements BuildStep {
                     tests = properties.getProperty("test");
                 }
                 abstractTest |= properties.flag("abstract");
-                nativeAccess |= properties.flag("native");
+                self |= properties.flag("native");
                 modular |= properties.flag("modular");
             }
             Path javacProperties = folder.resolve(ProcessBuildStep.PROCESS + "javac.properties");
@@ -327,58 +339,49 @@ public class Inventory implements BuildStep {
             }
         }
         SequencedSet<Path> granted = new LinkedHashSet<>();
-        if (nativeAccess) {
+        if (self) {
             granted.addAll(artifacts);
         }
         for (String key : natives) {
-            int slash = key.indexOf('/'), second = key.indexOf('/', slash + 1);
-            String candidate = key.substring(0, slash) + key.substring(second);
-            String named = key.startsWith("module/", second + 1) ? key.substring(second + 8) : null;
-            Path jar = null;
-            for (Map.Entry<String, Path> closure : closureJars.entrySet()) {
-                String coordinate = closure.getKey();
-                if (reachable.contains(closure.getValue())
-                        && (coordinate.equals(candidate)
-                                || coordinate.startsWith(candidate + "/")
-                                && coordinate.indexOf('/', candidate.length() + 1) < 0)) {
-                    jar = closure.getValue();
-                    break;
-                }
-            }
-            if (jar == null && named != null) {
-                for (Path file : reachable) {
-                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(file);
-                    if (descriptor != null && descriptor.name().equals(named)) {
-                        jar = file;
-                        break;
-                    }
-                }
-            }
+            Path jar = located(key, closureJars, reachable);
             if (jar == null) {
                 throw new IllegalStateException("@jenesis.native grants "
-                        + candidate
+                        + key.substring(0, key.indexOf('/')) + key.substring(key.indexOf('/', key.indexOf('/') + 1))
                         + " native access, but "
                         + (module == null ? path : module)
                         + " does not resolve it at run time");
             }
             granted.add(jar);
         }
-        if (strictNativeAccess) {
+        if (nativeAccess != NativeAccess.IGNORE) {
             List<String> violations = new ArrayList<>();
-            for (Map.Entry<String, Path> closure : closureJars.entrySet()) {
-                Path jar = closure.getValue();
-                if (reachable.contains(jar) && !granted.contains(jar) && PathPlacement.nativeAccess(jar)) {
-                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
-                    violations.add(closure.getKey() + (descriptor == null ? "" : " (module " + descriptor.name() + ")"));
+            for (Path jar : reachable) {
+                for (String token : PathPlacement.nativeAccess(jar)) {
+                    int slash = token.indexOf('/'), second = slash < 0 ? -1 : token.indexOf('/', slash + 1);
+                    Path named = located(slash < 0
+                            ? this.group + "/native/module/" + token
+                            : second < 0
+                                    ? this.group + "/native/maven/" + token
+                                    : token.substring(0, slash) + "/native" + token.substring(slash), closureJars, reachable);
+                    if (named != null && !granted.contains(named)) {
+                        ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
+                        violations.add((descriptor == null ? jar.getFileName().toString() : descriptor.name())
+                                + " names " + token);
+                    }
                 }
             }
             if (!violations.isEmpty()) {
-                throw new IllegalStateException("Dependencies of "
-                        + (module == null ? path : module)
-                        + " declare that they need native access, which only the module that runs them grants:\n  "
+                String message = (module == null ? path : module)
+                        + " runs modules that declare a need for native access it does not grant:\n  "
                         + String.join("\n  ", violations)
-                        + "\nDeclare each with @jenesis.native <module> or <groupId>/<artifactId>,"
-                        + " or build with -Djenesis.dependency.native=ignore");
+                        + "\nGrant each with @jenesis.native in "
+                        + (module == null ? path : module)
+                        + " if it runs code that needs it, or build with -Djenesis.dependency.native=ignore";
+                if (nativeAccess == NativeAccess.STRICT) {
+                    throw new IllegalStateException(message);
+                } else if (warnings != null) {
+                    warnings.accept("WARNING: " + message);
+                }
             }
         }
         int nativeIndex = 0;
@@ -456,6 +459,29 @@ public class Inventory implements BuildStep {
             inventory.store(context.next().resolve(INVENTORY));
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
+    }
+
+    private static Path located(String key, SequencedMap<String, Path> closureJars, SequencedSet<Path> reachable) {
+        int slash = key.indexOf('/'), second = key.indexOf('/', slash + 1);
+        String candidate = key.substring(0, slash) + key.substring(second);
+        for (Map.Entry<String, Path> closure : closureJars.entrySet()) {
+            String coordinate = closure.getKey();
+            if (reachable.contains(closure.getValue())
+                    && (coordinate.equals(candidate)
+                            || coordinate.startsWith(candidate + "/")
+                            && coordinate.indexOf('/', candidate.length() + 1) < 0)) {
+                return closure.getValue();
+            }
+        }
+        if (key.startsWith("module/", second + 1)) {
+            for (Path file : reachable) {
+                ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(file);
+                if (descriptor != null && descriptor.name().equals(key.substring(second + 8))) {
+                    return file;
+                }
+            }
+        }
+        return null;
     }
 
     private static void writePaths(SequencedProperties inventory,

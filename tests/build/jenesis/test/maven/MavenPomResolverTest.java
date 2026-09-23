@@ -3953,7 +3953,7 @@ public class MavenPomResolverTest {
     }
 
     @Test
-    public void local_pom_reads_native_comment_blocks_where_an_empty_one_names_the_project() throws IOException {
+    public void local_pom_reads_native_comment_blocks() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -3961,7 +3961,7 @@ public class MavenPomResolverTest {
                     <groupId>project</groupId>
                     <artifactId>artifact</artifactId>
                     <version>1</version>
-                    <!--jenesis.native-->
+                    <!--jenesis.native project/artifact-->
                     <!--jenesis.native
                     org.example/jni
                     some.module
@@ -3973,6 +3973,23 @@ public class MavenPomResolverTest {
                 "main/maven/project/artifact",
                 "main/maven/org.example/jni",
                 "main/module/some.module");
+    }
+
+    @Test
+    public void native_block_that_names_nothing_is_refused() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.native-->
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("names no module");
     }
 
     @Test

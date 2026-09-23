@@ -512,10 +512,24 @@ public class ModuleInfoParserTest {
     }
 
     @Test
-    public void jenesis_native_without_a_token_grants_the_module_itself() throws IOException {
+    public void jenesis_native_without_a_token_names_nothing_and_is_refused() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
                  * @jenesis.native
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("@jenesis.native foo");
+    }
+
+    @Test
+    public void jenesis_native_names_the_module_itself_like_any_other() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.native foo
                  */
                 module foo {
                 }

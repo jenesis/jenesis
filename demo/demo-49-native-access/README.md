@@ -8,14 +8,17 @@ access with `--enable-native-access`; otherwise it prints a warning today and
 will refuse the call in a future release. The `@jenesis.native` tag declares
 that grant, and Jenesis adds it to every launch it makes.
 
-A grant belongs to the program that runs the code, never to the library that
-wants it. A library can only *say* that it needs native access; the module that
-runs it decides. This demo has three modules:
+Whether native code runs is decided by what a program uses, not by the library
+that offers it. A library can offer a native API that most of its users never
+touch, so it declares nothing. The module that uses the API names the module
+that needs access, and every module that runs it grants that access itself. This
+demo has four modules:
 
-- `text` - the library `demo.natives.text`, which counts the bytes of a string
-  with C's `strlen`, called through the foreign function API;
+- `text` - the library `demo.natives.text`, which offers C's `strlen` through
+  the foreign function API;
 - `text-test` - its tests;
-- `app` - the application `demo.natives.app`, which uses the library.
+- `words` - the library `demo.natives.words`, which uses that function;
+- `app` - the application `demo.natives.app`, which uses `words`.
 
 Run it
 ------
@@ -29,8 +32,8 @@ The build compiles and tests the modules, then runs the application:
     native access: demo.natives.text=true, demo.natives.app=false
     "Hello, native world!" is 20 bytes long, as C's strlen counts it
 
-The library was granted native access, the application - which asked for none -
-was not, and no warning was printed.
+`demo.natives.text` was granted native access, the application was not, and no
+warning was printed.
 
 Layout
 ------
@@ -39,61 +42,61 @@ Layout
     |-- build/jenesis                     symlink to ../../../sources/build/jenesis
     |-- jenesis.properties                jenesis.dependency.native=strict
     |-- text
-    |   |-- module-info.java              @jenesis.native: this library needs native access
+    |   |-- module-info.java              declares nothing
     |   `-- demo/natives/text/NativeText.java
     |-- text-test
     |   |-- module-info.java              @jenesis.native demo.natives.text, for the test run
     |   `-- nativetest/NativeTextTest.java
+    |-- words
+    |   |-- module-info.java              @jenesis.native demo.natives.text
+    |   `-- demo/natives/words/Words.java
     `-- app
         |-- META-INF/build.jenesis/packaging.properties   bundle=true
         |-- module-info.java              @jenesis.native demo.natives.text, for the application
         `-- demo/natives/app/Application.java
 
-Saying that a library needs native access
------------------------------------------
+Naming the need
+---------------
 
-The library states its need with a bare `@jenesis.native`:
+`words` calls the native function, so it names the module that needs access:
 
     /**
-     * @jenesis.native
+     * @jenesis.native demo.natives.text
      */
-    module demo.natives.text {
-        exports demo.natives.text;
+    module demo.natives.words {
+        requires transitive demo.natives.text;
+        exports demo.natives.words;
     }
 
-Its jar then carries the manifest attribute `Jenesis-Native-Access: true`. The
-attribute grants nothing: it only tells whoever uses the library that a grant is
-needed.
+A token names a module or a Maven coordinate (`org.example/jni`), as the pin
+grammar does, and several may share one tag. A module that calls restricted
+methods itself names itself. Every name is recorded in the module's jar as the
+manifest attribute `Jenesis-Native-Access: demo.natives.text`.
 
 Granting it
 -----------
 
-The application names the module it grants:
+A declaration grants native access only to the runs of the module that makes
+it: its tests, `Execute` and what it packages. It is never inherited. The
+application runs `words`, so it grants the same module again:
 
     /**
      * @jenesis.main demo.natives.app.Application
      * @jenesis.native demo.natives.text
      */
     module demo.natives.app {
-        requires demo.natives.text;
+        requires demo.natives.words;
     }
 
-Only the declarations of the module that runs are read. The application's run
-is granted what `app/module-info.java` names and nothing that a dependency
-declares, so no library on the path can grant itself - or anything else - native
-access. The tests are a run of their own and grant the library in
-`text-test/module-info.java`, which is why they pass without a warning too.
+The tests are a run of their own and grant it in `text-test/module-info.java`. A
+grant adds no dependency: what it names must already be part of the run, or the
+build fails saying so.
 
-A token names a module or a Maven coordinate (`org.example/jni`), as the pin
-grammar does, and several may share one tag. A grant adds no dependency: what it
-names must already be on the module's run-time path, or the build fails saying
-so. A bare `@jenesis.native` in a module that runs grants that module itself.
-
-Every launch the build makes receives the grant: the test runs, `Execute`, and
-what is packaged. This demo's `bundle` carries it in its launch:
+Every launch the build makes receives the grant. This demo's `bundle` carries it
+in its launch:
 
     "--module-path"
-    "jars/classes.jar:jars/demo.natives.text-0-SNAPSHOT.jar"
+    "jars/classes.jar:jars/demo.natives.text-0-SNAPSHOT.jar:jars/demo.natives.words-0-SNAPSHOT.jar"
     "--enable-native-access=demo.natives.text"
     "--module"
     "demo.natives.app/demo.natives.app.Application"
@@ -108,37 +111,35 @@ once the layer is defined, so the launch carries
 `-Djlayer.enableNativeAccess.<name>=<module>` and the launcher grants it when it
 defines the layer, and is granted native access itself to do so.
 
-Refusing an ungranted need
---------------------------
+Discovering what to grant
+-------------------------
 
-By default a library's `Jenesis-Native-Access` is only information. This demo's
-`jenesis.properties` sets `jenesis.dependency.native=strict`, which fails the
-build of any module whose run includes such a jar without granting it. Delete
-the `@jenesis.native demo.natives.text` line from `app/module-info.java` and
-build again:
+`Jenesis-Native-Access` is how a module that runs `words` finds out what it has
+to grant. `jenesis.dependency.native` decides what the build does with it:
+`ignore`, the default, does nothing; `warn` prints each name that the running
+module does not grant; `strict` fails the build. Delete the
+`@jenesis.native demo.natives.text` line from `app/module-info.java` and build
+with a warning:
 
-    Dependencies of demo.natives.app declare that they need native access, which only the module that runs them grants:
-      main/maven/demo.natives/demo.natives.text/0-SNAPSHOT (module demo.natives.text)
-    Declare each with @jenesis.native <module> or <groupId>/<artifactId>, or build with -Djenesis.dependency.native=ignore
+    java -Djenesis.dependency.native=warn build/jenesis/Execute.java
 
-With `-Djenesis.dependency.native=ignore` the same build succeeds, and the run
-shows what the JDK does with an ungranted call:
+    WARNING: demo.natives.app runs modules that declare a need for native access it does not grant:
+      demo.natives.words names demo.natives.text
+    Grant each with @jenesis.native in demo.natives.app if it runs code that needs it, or build with -Djenesis.dependency.native=ignore
 
-    native access: demo.natives.text=false, demo.natives.app=false
-    WARNING: A restricted method in java.lang.foreign.Linker has been called
-    ...
+The application still runs, and the JDK warns when the restricted method is
+called. This demo's `jenesis.properties` sets `strict`, so without the flag the
+same build fails with that message.
 
 Maven projects
 --------------
 
-A `pom.xml` project declares the same in a comment block, read only from the
-project's own POM. An empty block states that the project itself needs native
-access; tokens grant it to dependencies:
+A `pom.xml` project declares the same names in a comment block, read only from
+the project's own POM, and names itself with its own `<groupId>/<artifactId>`:
 
-    <!--jenesis.native-->
     <!--jenesis.native
     org.example/jni
     -->
 
-The project's tests run its own jar as a dependency, so they are granted it as
-well.
+The project's tests run its own jar as a dependency, so they are granted what
+the project names as well.

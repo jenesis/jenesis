@@ -381,9 +381,14 @@ public class ModuleInfoParser {
                             }
                             case "jenesis.native" -> {
                                 String declaration = content.replaceAll("\\s+", " ").trim();
-                                for (String token : declaration.isEmpty()
-                                        ? new String[] {module.getName().toString()}
-                                        : declaration.split(" ")) {
+                                if (declaration.isEmpty()) {
+                                    throw new IllegalArgumentException("@jenesis.native of "
+                                            + module.getName()
+                                            + " names no module: name each module granted native access,"
+                                            + " this one included, as @jenesis.native "
+                                            + module.getName());
+                                }
+                                for (String token : declaration.split(" ")) {
                                     if (token.startsWith("java.") || token.startsWith("jdk.")) {
                                         throw new IllegalArgumentException("Illegal @jenesis.native token '"
                                                 + token
