@@ -65,7 +65,7 @@ from a `module-info.java` and a `project.properties`.
 Layout
 ------
 
-    demo/demo-59-publishing
+    demo/demo-60-publishing
     |-- build/jenesis            symlink to ../../../sources/build/jenesis
     |-- build/Demo.java          stages the release bundle, then resolves it back to prove it is consumable
     |-- project.properties       only what a module declaration cannot express: url, license, developer, scm
@@ -121,22 +121,14 @@ from the published sources.
 Publishing for real
 -------------------
 
-Two more steps turn the staged bundle into a Central release, and Jenesis hands
-both to tools that own them:
-
-- **A local publish** is built in. `java build/jenesis/Make.java export` copies
-  the staged tree into your local Maven repository (`~/.m2`, or
-  `MAVEN_REPOSITORY_LOCAL`) with the `maven-metadata-local.xml` / `_remote.repositories`
-  markers - a genuine publish, just to a local repository, so a project on the
-  same machine can resolve it immediately.
-
-- **The remote upload and GPG signing** are deliberately *not* Jenesis's job. The
-  recommended tool is **[JReleaser](https://jreleaser.org/)**: point it at
-  `target/stage/maven/output/` and it signs every artifact and uploads the bundle
-  to Maven Central. This is exactly how Jenesis itself releases - see the
-  repository's `jreleaser.yml`. Central requires a detached GPG signature (`.asc`)
-  for each file, which JReleaser produces; Jenesis stops at the unsigned, validated
-  bundle so credentials and signing keys never enter the build.
+The remote upload and GPG signing that turn the staged bundle into a Central
+release are deliberately *not* Jenesis's job. The recommended tool is
+**[JReleaser](https://jreleaser.org/)**: point it at `target/stage/maven/output/`
+and it signs every artifact and uploads the bundle to Maven Central. This is
+exactly how Jenesis itself releases - see the repository's `jreleaser.yml`.
+Central requires a detached GPG signature (`.asc`) for each file, which JReleaser
+produces; Jenesis stops at the unsigned, validated bundle so credentials and
+signing keys never enter the build.
 
 So the division of labour is: Jenesis guarantees *what* you publish is complete
 and correct, and JReleaser handles *getting it there* safely.

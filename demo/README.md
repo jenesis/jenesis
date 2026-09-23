@@ -107,12 +107,13 @@ Quick index
 | 56 | [`custom-build`](demo-56-custom-build/README.md)                  | No template at all: wire the build by hand                                   | `java build/Demo.java`            |
 | 57 | [`tools-api`](demo-57-tools-api/README.md)                        | Run a build, or a published program, inside another program's JVM            | `java build/Demo.java`            |
 | 58 | [`code-signing`](demo-58-code-signing/README.md)                  | Sign the produced jar with `jarsigner`, keyed by the environment             | `java build/Demo.java`            |
-| 59 | [`publishing`](demo-59-publishing/README.md)                      | Assemble a Maven Central ready bundle and resolve it back                    | `java build/Demo.java`            |
-| 60 | [`module-convention`](demo-60-module-convention/README.md)        | Resolve your own modules from your own Maven repository                      | `java build/Demo.java`            |
-| 61 | [`reproducible`](demo-61-reproducible/README.md)                  | Build the same bytes on every machine, checked against a recorded digest     | `java build/Demo.java`            |
-| 62 | [`toolchain`](demo-62-toolchain/README.md)                        | Name the JDK the build runs on, and relaunch on it                           | `java build/jenesis/Execute.java` |
-| 63 | [`native-image`](demo-63-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
-| 64 | [`jpx`](demo-64-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
+| 59 | [`export`](demo-59-export/README.md)                              | Install a build into the local repositories, for other projects to require   | `java build/jenesis/Make.java export`|
+| 60 | [`publishing`](demo-60-publishing/README.md)                      | Assemble a Maven Central ready bundle and resolve it back                    | `java build/Demo.java`            |
+| 61 | [`module-convention`](demo-61-module-convention/README.md)        | Resolve your own modules from your own Maven repository                      | `java build/Demo.java`            |
+| 62 | [`reproducible`](demo-62-reproducible/README.md)                  | Build the same bytes on every machine, checked against a recorded digest     | `java build/Demo.java`            |
+| 63 | [`toolchain`](demo-63-toolchain/README.md)                        | Name the JDK the build runs on, and relaunch on it                           | `java build/jenesis/Execute.java` |
+| 64 | [`native-image`](demo-64-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
+| 65 | [`jpx`](demo-65-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -835,7 +836,24 @@ The password is never a value: `storepass` takes `env <variable>` or
 `file <path>`, and anything else is refused. The signed jar replaces the unsigned
 one before the inventory, the staged repositories or a publication ever see it.
 
-## 41. Publishing to Maven Central - [`publishing`](demo-59-publishing/README.md)
+## 41. Requiring a build from another local project - [`export`](demo-59-export/README.md)
+
+Before anything is published, `export` installs what `stage` laid out into this
+machine's local repositories: the modular tree into `~/.jenesis`, the Maven tree
+into `~/.m2/repository`. The demo exports one project and requires it from a
+second one by module name alone, and points both local repositories at a
+temporary folder with `jenesis.module.local` and `jenesis.maven.local` so your own
+stay untouched. Because the Maven tree carries a generated POM, Maven, Gradle and
+anything else that reads the local Maven repository consume the export too.
+
+A project that sets no version exports an unversioned module, whose POM carries
+`0-SNAPSHOT`. That serves two projects changing together, but it names no build in
+particular, so strict pinning refuses it; exporting with `jenesis.project.version`
+and pinning that version fixes the dependency. A consumer resolves again when what
+it declares changes, not when a new export appears, so `jenesis.executor.rebuild`
+is how it takes one.
+
+## 42. Publishing to Maven Central - [`publishing`](demo-60-publishing/README.md)
 
 Publishing is two jobs - produce a correct bundle and upload it - and Jenesis
 does the first. A `module-info.java` plus a `project.properties` supply the
@@ -845,13 +863,12 @@ SCM), and `stage` writes the complete upload-ready bundle under
 `-javadoc.jar`. The demo then resolves that coordinate straight back out of the
 staged tree to prove the bundle is complete, all offline.
 
-`export` publishes into your local Maven repository. The remote upload and the
-GPG signing are left to a release tool pointed at the staged tree - which is how
-Jenesis itself releases - so the demo needs no credentials, no key and no
-network. A `jreleaser.yml` at the project root adds that step to the `release`
+The remote upload and the GPG signing are left to a release tool pointed at the
+staged tree - which is how Jenesis itself releases - so the demo needs no
+credentials, no key and no network. A `jreleaser.yml` at the project root adds that step to the `release`
 goal, a rehearsal unless told otherwise.
 
-## 42. Your own modules from your own Maven repository - [`module-convention`](demo-60-module-convention/README.md)
+## 43. Your own modules from your own Maven repository - [`module-convention`](demo-61-module-convention/README.md)
 
 `publishing` showed the coordinate a module is published under: the groupId from
 the first two dotted segments of its name, the artifactId from the whole name.
@@ -868,7 +885,7 @@ group reaches into the name is configuration too:
 
     jenesis.maven.segments=3
 
-## 43. The same bytes on every machine - [`reproducible`](demo-61-reproducible/README.md)
+## 44. The same bytes on every machine - [`reproducible`](demo-62-reproducible/README.md)
 
 What you publish, anyone holding the sources should be able to build again and
 get the same bytes. `reproducible` turns that into a check: it builds a module
@@ -883,7 +900,7 @@ the time of the release commit - and the recorded digest moves with it:
 
     jenesis.archive.timestamp=2026-09-01T12:00:00Z
 
-## 44. The JDK a build runs on - [`toolchain`](demo-62-toolchain/README.md)
+## 45. The JDK a build runs on - [`toolchain`](demo-63-toolchain/README.md)
 
 `reproducible` promises the same bytes for the same JDK; `toolchain` makes the
 JDK part of the project. Its `jenesis.properties` names one:
@@ -900,7 +917,7 @@ look is yours alone to say - `jenesis.toolchain.searchpath` defaults to the
 operating system's usual JDK folders and is accepted only from the command line
 or `~/.jenesis/jenesis.properties`, never from a project's own files.
 
-## 45. Ahead-of-time native image - [`native-image`](demo-63-native-image/README.md)
+## 46. Ahead-of-time native image - [`native-image`](demo-64-native-image/README.md)
 
 Where `jpackage` bundles your bytecode with a trimmed JVM, GraalVM
 `native-image` compiles the program and the runtime it touches into a single
@@ -921,7 +938,7 @@ Native image is an alternative to `jpackage`, not a successor: `jpackage` for a
 faithful bundle of the JVM you tested against, native image when startup and
 footprint dominate. It needs GraalVM, so it is a local exercise.
 
-## 46. Running a released program - [`jpx`](demo-64-jpx/README.md)
+## 47. Running a released program - [`jpx`](demo-65-jpx/README.md)
 
 Every demo so far built something. `jpx` builds nothing: it resolves a published
 module or Maven artifact, installs its runtime closure once under
