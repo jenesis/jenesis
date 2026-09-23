@@ -671,7 +671,7 @@ public class ModularProject implements BuildExecutorModule {
             Path parent = file.getParent(), location = root.relativize(parent);
             if (filter.test(location)) {
                 String relative = location.toString().replace(File.separatorChar, '/');
-                buildExecutor.addModule(SIBLING_MODULE_PREFIX + BuildExecutorModule.encode(relative), (module, modInherited) -> {
+                buildExecutor.addModule(SIBLING_MODULE_PREFIX + BuildExecutorModule.encodePath(relative), (module, modInherited) -> {
                     module.addSource("sources", Bind.asSources(), parent);
                     SequencedSet<String> manifestDeps = new LinkedHashSet<>();
                     manifestDeps.add("sources");
