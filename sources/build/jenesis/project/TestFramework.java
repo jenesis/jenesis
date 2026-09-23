@@ -13,6 +13,8 @@ public interface TestFramework extends Serializable {
 
     boolean isMarkedBy(ModuleDescriptor module);
 
+    Set<String> reflectingModules();
+
     default SequencedMap<String, String> missingCoordinates(List<ModuleDescriptor> modules) {
         return Collections.emptyNavigableMap();
     }

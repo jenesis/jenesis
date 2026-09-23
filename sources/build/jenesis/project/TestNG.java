@@ -16,6 +16,11 @@ public record TestNG() implements TestFramework {
     }
 
     @Override
+    public Set<String> reflectingModules() {
+        return Set.of("org.testng");
+    }
+
+    @Override
     public String runnerClass() {
         return "org.testng.TestNG";
     }

@@ -35,7 +35,7 @@
  * @jenesis.pin pitest/maven/org.pitest/pitest-html-report 1.25.4 SHA-256/da45d9aa9418b12dfa64c352eda94d10afef6d3b108299a356e6a4a6d02edb17
  * @jenesis.pin pitest/maven/org.pitest/pitest-junit5-plugin 1.2.3 SHA-256/d3e2fcc8db5fd52c0c4ac2fe0d937e64da3df39b657093a1581b5fd463f9be64
  */
-open module demo.mutation.test {
+module demo.mutation.test {
     requires demo.mutation;
     requires org.junit.jupiter;
 }

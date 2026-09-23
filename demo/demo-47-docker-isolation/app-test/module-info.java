@@ -17,7 +17,7 @@
  * @jenesis.pin org.junit.platform.reporting 1.11.3 SHA-256/b8e19dbebcae7d1ff30b9d767047fbf3694027c33dfa423b371693b7f6679ed1
  * @jenesis.pin org.opentest4j 1.3.0 SHA-256/48e2df636cab6563ced64dcdff8abb2355627cb236ef0bf37598682ddf742f1b
  */
-open module demo.dockerisolation.test {
+module demo.dockerisolation.test {
     requires demo.dockerisolation;
     requires org.junit.jupiter;
 }
