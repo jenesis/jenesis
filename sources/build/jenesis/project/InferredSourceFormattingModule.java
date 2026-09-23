@@ -24,9 +24,9 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
     private final PalantirJavaFormatModule palantirModule;
     private final KtlintFormatModule ktlintModule;
     private final ScalafmtFormatModule scalafmtModule;
-    private final Function<BuildExecutorModule, BuildExecutorModule> java;
-    private final Function<KtlintFormatModule, BuildExecutorModule> ktlint;
-    private final Function<ScalafmtFormatModule, BuildExecutorModule> scalafmt;
+    private final UnaryOperator<BuildExecutorModule> java;
+    private final UnaryOperator<KtlintFormatModule> ktlint;
+    private final UnaryOperator<ScalafmtFormatModule> scalafmt;
 
     public InferredSourceFormattingModule(SequencedSet<Path> configuration,
                                           Map<String, Repository> repositories,
@@ -77,9 +77,9 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                                            PalantirJavaFormatModule palantirModule,
                                            KtlintFormatModule ktlintModule,
                                            ScalafmtFormatModule scalafmtModule,
-                                           Function<BuildExecutorModule, BuildExecutorModule> java,
-                                           Function<KtlintFormatModule, BuildExecutorModule> ktlint,
-                                           Function<ScalafmtFormatModule, BuildExecutorModule> scalafmt) {
+                                           UnaryOperator<BuildExecutorModule> java,
+                                           UnaryOperator<KtlintFormatModule> ktlint,
+                                           UnaryOperator<ScalafmtFormatModule> scalafmt) {
         this.configuration = configuration;
         this.pinning = pinning;
         this.verify = verify;
@@ -102,19 +102,19 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                 ktlintModule, scalafmtModule, java, ktlint, scalafmt);
     }
 
-    public InferredSourceFormattingModule java(Function<BuildExecutorModule, BuildExecutorModule> java) {
+    public InferredSourceFormattingModule java(UnaryOperator<BuildExecutorModule> java) {
         return new InferredSourceFormattingModule(configuration, pinning, verify, googleModule, palantirModule,
-                ktlintModule, scalafmtModule, java, ktlint, scalafmt);
+                ktlintModule, scalafmtModule, append(this.java, java), ktlint, scalafmt);
     }
 
-    public InferredSourceFormattingModule ktlint(Function<KtlintFormatModule, BuildExecutorModule> ktlint) {
+    public InferredSourceFormattingModule ktlint(UnaryOperator<KtlintFormatModule> ktlint) {
         return new InferredSourceFormattingModule(configuration, pinning, verify, googleModule, palantirModule,
-                ktlintModule, scalafmtModule, java, ktlint, scalafmt);
+                ktlintModule, scalafmtModule, java, append(this.ktlint, ktlint), scalafmt);
     }
 
-    public InferredSourceFormattingModule scalafmt(Function<ScalafmtFormatModule, BuildExecutorModule> scalafmt) {
+    public InferredSourceFormattingModule scalafmt(UnaryOperator<ScalafmtFormatModule> scalafmt) {
         return new InferredSourceFormattingModule(configuration, pinning, verify, googleModule, palantirModule,
-                ktlintModule, scalafmtModule, java, ktlint, scalafmt);
+                ktlintModule, scalafmtModule, java, ktlint, append(this.scalafmt, scalafmt));
     }
 
     @Override
@@ -133,5 +133,12 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
         Bind.configured(buildExecutor, inherited.sequencedKeySet(), SCALAFMT, scalafmt,
                 ScalafmtFormatModule.configurationFile(configuration),
                 () -> scalafmtModule.pinning(pinning).verify(verify));
+    }
+
+    private static <T> UnaryOperator<T> append(UnaryOperator<T> previous, UnaryOperator<T> next) {
+        return previous == null || next == null ? null : value -> {
+            T configured = previous.apply(value);
+            return configured == null ? null : next.apply(configured);
+        };
     }
 }

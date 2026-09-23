@@ -31,7 +31,7 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
     private final SequencedSet<Path> configuration;
     private final Pinning pinning;
     private final JApiCmpModule japicmpModule;
-    private final Function<JApiCmpModule, BuildExecutorModule> japicmp;
+    private final UnaryOperator<JApiCmpModule> japicmp;
 
     public InferredArtifactQualityModule(SequencedSet<Path> configuration,
                                          Map<String, Repository> repositories,
@@ -56,7 +56,7 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
     private InferredArtifactQualityModule(SequencedSet<Path> configuration,
                                           Pinning pinning,
                                           JApiCmpModule japicmpModule,
-                                          Function<JApiCmpModule, BuildExecutorModule> japicmp) {
+                                          UnaryOperator<JApiCmpModule> japicmp) {
         this.configuration = configuration;
         this.pinning = pinning;
         this.japicmpModule = japicmpModule;
@@ -67,8 +67,8 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
         return new InferredArtifactQualityModule(configuration, pinning, japicmpModule, japicmp);
     }
 
-    public InferredArtifactQualityModule japicmp(Function<JApiCmpModule, BuildExecutorModule> japicmp) {
-        return new InferredArtifactQualityModule(configuration, pinning, japicmpModule, japicmp);
+    public InferredArtifactQualityModule japicmp(UnaryOperator<JApiCmpModule> japicmp) {
+        return new InferredArtifactQualityModule(configuration, pinning, japicmpModule, append(this.japicmp, japicmp));
     }
 
     @Override
@@ -87,5 +87,12 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
                     }
                     return japicmpModule.pinning(pinning).config(properties);
                 });
+    }
+
+    private static <T> UnaryOperator<T> append(UnaryOperator<T> previous, UnaryOperator<T> next) {
+        return previous == null || next == null ? null : value -> {
+            T configured = previous.apply(value);
+            return configured == null ? null : next.apply(configured);
+        };
     }
 }

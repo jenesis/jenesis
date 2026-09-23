@@ -430,7 +430,7 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
-    public void sub_module_configurators_default_to_identity_and_round_trip() {
+    public void sub_module_configurators_default_to_identity() {
         InferredMultiProjectAssembler assembler = new InferredMultiProjectAssembler();
         assertThat(assembler.check().apply(null)).as("check configurator defaults to identity").isNull();
         assertThat(assembler.format().apply(null)).as("format configurator defaults to identity").isNull();
@@ -438,17 +438,43 @@ public class InferredMultiProjectAssemblerTest {
         assertThat(assembler.toolchain().apply(null)).as("toolchain configurator defaults to identity").isNull();
         assertThat(assembler.observe().apply(null)).as("observe configurator defaults to identity").isNull();
         assertThat(assembler.documentation().apply(null)).as("documentation configurator defaults to identity").isNull();
+    }
 
-        Function<InferredTestObservationModule, BuildExecutorModule> custom = observe -> observe.test(null);
-        assertThat(assembler.observe(custom).observe()).as("the observe wither stores the configurator").isSameAs(custom);
+    @Test
+    public void a_sub_module_configurator_appends_to_the_one_before_it() {
+        InferredComplianceModule module = new InferredComplianceModule(new LinkedHashSet<>());
+        List<String> applied = new ArrayList<>();
+        InferredMultiProjectAssembler assembler = new InferredMultiProjectAssembler()
+                .compliance(compliance -> {
+                    applied.add("first");
+                    return compliance;
+                })
+                .compliance(compliance -> {
+                    applied.add("second");
+                    return compliance;
+                });
+        assertThat(assembler.compliance().apply(module)).isSameAs(module);
+        assertThat(applied).containsExactly("first", "second");
+    }
 
-        Function<InferredComplianceModule, BuildExecutorModule> customCompliance = compliance -> compliance;
-        assertThat(assembler.compliance(customCompliance).compliance())
-                .as("the compliance wither stores the configurator").isSameAs(customCompliance);
+    @Test
+    public void a_sub_module_configurator_returning_null_skips_the_ones_after_it() {
+        List<String> applied = new ArrayList<>();
+        InferredMultiProjectAssembler assembler = new InferredMultiProjectAssembler()
+                .compliance(_ -> null)
+                .compliance(compliance -> {
+                    applied.add("after");
+                    return compliance;
+                });
+        assertThat(assembler.compliance().apply(new InferredComplianceModule(new LinkedHashSet<>()))).isNull();
+        assertThat(applied).isEmpty();
+    }
 
-        Function<InferredDocumentationModule, BuildExecutorModule> customDocumentation = documentation -> documentation;
-        assertThat(assembler.documentation(customDocumentation).documentation())
-                .as("the documentation wither stores the configurator").isSameAs(customDocumentation);
+    @Test
+    public void a_null_sub_module_configurator_switches_the_sub_module_off_for_good() {
+        assertThat(new InferredMultiProjectAssembler().compliance(null).compliance(compliance -> compliance).compliance())
+                .as("a configurator appended to a switched off sub-module leaves it off")
+                .isNull();
     }
 
     private static SequencedProperties readProperties(Path path) throws IOException {

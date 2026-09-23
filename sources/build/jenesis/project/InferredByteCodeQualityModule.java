@@ -17,7 +17,7 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
     private final SequencedSet<Path> configuration;
     private final Pinning pinning;
     private final SpotBugsModule spotbugsModule;
-    private final Function<SpotBugsModule, BuildExecutorModule> spotbugs;
+    private final UnaryOperator<SpotBugsModule> spotbugs;
 
     public InferredByteCodeQualityModule(SequencedSet<Path> configuration,
                                          Map<String, Repository> repositories,
@@ -42,7 +42,7 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
     private InferredByteCodeQualityModule(SequencedSet<Path> configuration,
                                           Pinning pinning,
                                           SpotBugsModule spotbugsModule,
-                                          Function<SpotBugsModule, BuildExecutorModule> spotbugs) {
+                                          UnaryOperator<SpotBugsModule> spotbugs) {
         this.configuration = configuration;
         this.pinning = pinning;
         this.spotbugsModule = spotbugsModule;
@@ -53,8 +53,8 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
         return new InferredByteCodeQualityModule(configuration, pinning, spotbugsModule, spotbugs);
     }
 
-    public InferredByteCodeQualityModule spotbugs(Function<SpotBugsModule, BuildExecutorModule> spotbugs) {
-        return new InferredByteCodeQualityModule(configuration, pinning, spotbugsModule, spotbugs);
+    public InferredByteCodeQualityModule spotbugs(UnaryOperator<SpotBugsModule> spotbugs) {
+        return new InferredByteCodeQualityModule(configuration, pinning, spotbugsModule, append(this.spotbugs, spotbugs));
     }
 
     @Override
@@ -65,5 +65,12 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 spotbugs,
                 SpotBugsModule.configurationFile(configuration),
                 () -> spotbugsModule.pinning(pinning));
+    }
+
+    private static <T> UnaryOperator<T> append(UnaryOperator<T> previous, UnaryOperator<T> next) {
+        return previous == null || next == null ? null : value -> {
+            T configured = previous.apply(value);
+            return configured == null ? null : next.apply(configured);
+        };
     }
 }

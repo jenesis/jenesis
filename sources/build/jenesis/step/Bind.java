@@ -50,7 +50,7 @@ public class Bind implements BuildStep {
     public static <M extends BuildExecutorModule> void configured(BuildExecutor buildExecutor,
                                                                   SequencedSet<String> inputs,
                                                                   String name,
-                                                                  Function<M, BuildExecutorModule> configurator,
+                                                                  UnaryOperator<M> configurator,
                                                                   Path configurationFile,
                                                                   Supplier<M> module) {
         if (configurator == null || configurationFile == null) {
@@ -74,7 +74,7 @@ public class Bind implements BuildStep {
     public static <M extends BuildExecutorModule> void configuredByProperties(BuildExecutor buildExecutor,
                                                                               SequencedSet<String> inputs,
                                                                               String name,
-                                                                              Function<M, BuildExecutorModule> configurator,
+                                                                              UnaryOperator<M> configurator,
                                                                               Path configurationProperties,
                                                                               Function<SequencedProperties, M> module)
             throws IOException {

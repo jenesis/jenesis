@@ -25,10 +25,10 @@ public class InferredTestObservationModule implements BuildExecutorModule {
     private final TestModule testModule;
     private final JaCoCoModule jacocoModule;
     private final PiTestModule pitestModule;
-    private final Function<TestModule, BuildExecutorModule> test;
-    private final Function<JaCoCoModule, BuildExecutorModule> jacoco;
-    private final Function<NativeImageAgentModule, BuildExecutorModule> nativeImage;
-    private final Function<PiTestModule, BuildExecutorModule> pitest;
+    private final UnaryOperator<TestModule> test;
+    private final UnaryOperator<JaCoCoModule> jacoco;
+    private final UnaryOperator<NativeImageAgentModule> nativeImage;
+    private final UnaryOperator<PiTestModule> pitest;
 
     public InferredTestObservationModule(SequencedSet<Path> configuration,
                                          Map<String, Repository> repositories,
@@ -93,10 +93,10 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                                           TestModule testModule,
                                           JaCoCoModule jacocoModule,
                                           PiTestModule pitestModule,
-                                          Function<TestModule, BuildExecutorModule> test,
-                                          Function<JaCoCoModule, BuildExecutorModule> jacoco,
-                                          Function<NativeImageAgentModule, BuildExecutorModule> nativeImage,
-                                          Function<PiTestModule, BuildExecutorModule> pitest) {
+                                          UnaryOperator<TestModule> test,
+                                          UnaryOperator<JaCoCoModule> jacoco,
+                                          UnaryOperator<NativeImageAgentModule> nativeImage,
+                                          UnaryOperator<PiTestModule> pitest) {
         this.configuration = configuration;
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
@@ -125,24 +125,24 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 jacocoModule, pitestModule, test, jacoco, nativeImage, pitest);
     }
 
-    public InferredTestObservationModule test(Function<TestModule, BuildExecutorModule> test) {
+    public InferredTestObservationModule test(UnaryOperator<TestModule> test) {
         return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest);
+                jacocoModule, pitestModule, append(this.test, test), jacoco, nativeImage, pitest);
     }
 
-    public InferredTestObservationModule jacoco(Function<JaCoCoModule, BuildExecutorModule> jacoco) {
+    public InferredTestObservationModule jacoco(UnaryOperator<JaCoCoModule> jacoco) {
         return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest);
+                jacocoModule, pitestModule, test, append(this.jacoco, jacoco), nativeImage, pitest);
     }
 
-    public InferredTestObservationModule nativeImage(Function<NativeImageAgentModule, BuildExecutorModule> nativeImage) {
+    public InferredTestObservationModule nativeImage(UnaryOperator<NativeImageAgentModule> nativeImage) {
         return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest);
+                jacocoModule, pitestModule, test, jacoco, append(this.nativeImage, nativeImage), pitest);
     }
 
-    public InferredTestObservationModule pitest(Function<PiTestModule, BuildExecutorModule> pitest) {
+    public InferredTestObservationModule pitest(UnaryOperator<PiTestModule> pitest) {
         return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest);
+                jacocoModule, pitestModule, test, jacoco, nativeImage, append(this.pitest, pitest));
     }
 
     @Override
@@ -183,5 +183,12 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         Bind.configuredByProperties(buildExecutor, inherited.sequencedKeySet(), MUTATE, pitest,
                 BuildStep.locate(configuration, "pitest.properties"),
                 properties -> pitestModule.pinning(pinning).config(properties));
+    }
+
+    private static <T> UnaryOperator<T> append(UnaryOperator<T> previous, UnaryOperator<T> next) {
+        return previous == null || next == null ? null : value -> {
+            T configured = previous.apply(value);
+            return configured == null ? null : next.apply(configured);
+        };
     }
 }

@@ -17,7 +17,7 @@ public class InferredDocumentationModule implements BuildExecutorModule {
 
     private final Pinning pinning;
     private final InferredDocumentationChainModule generateModule;
-    private final Function<InferredDocumentationChainModule, BuildExecutorModule> generate;
+    private final UnaryOperator<InferredDocumentationChainModule> generate;
     private final BuildStep archiver;
 
     public InferredDocumentationModule(Map<String, Repository> repositories,
@@ -37,7 +37,7 @@ public class InferredDocumentationModule implements BuildExecutorModule {
 
     private InferredDocumentationModule(Pinning pinning,
                                         InferredDocumentationChainModule generateModule,
-                                        Function<InferredDocumentationChainModule, BuildExecutorModule> generate,
+                                        UnaryOperator<InferredDocumentationChainModule> generate,
                                         BuildStep archiver) {
         this.pinning = pinning;
         this.generateModule = generateModule;
@@ -49,8 +49,8 @@ public class InferredDocumentationModule implements BuildExecutorModule {
         return new InferredDocumentationModule(pinning, generateModule, generate, archiver);
     }
 
-    public InferredDocumentationModule generate(Function<InferredDocumentationChainModule, BuildExecutorModule> generate) {
-        return new InferredDocumentationModule(pinning, generateModule, generate, archiver);
+    public InferredDocumentationModule generate(UnaryOperator<InferredDocumentationChainModule> generate) {
+        return new InferredDocumentationModule(pinning, generateModule, append(this.generate, generate), archiver);
     }
 
     public InferredDocumentationModule archiver(BuildStep archiver) {
@@ -76,5 +76,12 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                             + "/"
                             + InferredDocumentationChainModule.AGGREGATE);
         }
+    }
+
+    private static <T> UnaryOperator<T> append(UnaryOperator<T> previous, UnaryOperator<T> next) {
+        return previous == null || next == null ? null : value -> {
+            T configured = previous.apply(value);
+            return configured == null ? null : next.apply(configured);
+        };
     }
 }

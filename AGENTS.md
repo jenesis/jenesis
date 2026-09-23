@@ -57,7 +57,8 @@ used). Records, sealed types, pattern switches and unnamed variables (`_`) are t
 **Immutable records with withers.** Configuration objects are records or final classes whose state never
 changes after construction. Each exposes one method per component, named exactly like the component, that
 returns a new instance with that value replaced (`new Project<>(Path.of("."), new InferredMultiProjectAssembler()).version("1.0.0").sources(true)`,
-`new BuildExecutor.Configuration().concurrency(4)`). No setters, no builders, no `with` prefix.
+`new BuildExecutor.Configuration().concurrency(4)`). No setters, no builders, no `with` prefix. A configurator
+is the one component whose wither appends rather than replaces, as the modules below describe.
 
 **System properties are the defaults.** Every setting is a `jenesis.<area>.<name>` system property, read
 once where the object is built:
@@ -236,10 +237,12 @@ tool identifies by name rather than by kind - a catalog, an OpenAPI document - i
 under the customary name the tool expects, so renaming the file in the project does not
 re-run the step either.
 
-**A module configures only its own children.** Every `Inferred*Module` holds one
-`Function<Child, BuildExecutorModule>` per module it wires, named exactly like the child it configures and
-defaulting to the identity, or to `null` when that child's `jenesis.*` property switches it off; `null`
-skips the child, and so does a configurator that returns `null`. That property is read in `ofEnvironment` and
+**A module configures only its own children.** Every `Inferred*Module` holds one `UnaryOperator<Child>` per
+module it wires, named exactly like the child it configures and defaulting to the identity, or to `null` when
+that child's `jenesis.*` property switches it off; `null` skips the child, and so does a configurator that
+returns `null`. The wither appends the operator it is given to the one in place, so several customizers
+adjust one child in the order they are applied and the last one wins; a `null` operator switches the child
+off for good, and nothing appended after it switches it back on. That property is read in `ofEnvironment` and
 nowhere else, so the plain constructor wires every child whatever the environment says, and a module that
 wires another module builds that child with its own `ofEnvironment` and keeps the result beside the configurator
 that shapes it, named for the child it holds (`checkstyleModule`, `javacStep`) - which is how one provider

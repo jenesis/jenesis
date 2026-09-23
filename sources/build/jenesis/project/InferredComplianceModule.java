@@ -19,8 +19,8 @@ public class InferredComplianceModule implements BuildExecutorModule {
 
     private final SequencedSet<Path> configuration;
     private final OsvDownload osv;
-    private final Function<BuildExecutorModule, BuildExecutorModule> license;
-    private final Function<BuildExecutorModule, BuildExecutorModule> vulnerability;
+    private final UnaryOperator<BuildExecutorModule> license;
+    private final UnaryOperator<BuildExecutorModule> vulnerability;
 
     public InferredComplianceModule(SequencedSet<Path> configuration) {
         this(configuration,
@@ -48,20 +48,20 @@ public class InferredComplianceModule implements BuildExecutorModule {
 
     private InferredComplianceModule(SequencedSet<Path> configuration,
                                      OsvDownload osv,
-                                     Function<BuildExecutorModule, BuildExecutorModule> license,
-                                     Function<BuildExecutorModule, BuildExecutorModule> vulnerability) {
+                                     UnaryOperator<BuildExecutorModule> license,
+                                     UnaryOperator<BuildExecutorModule> vulnerability) {
         this.configuration = configuration;
         this.osv = osv;
         this.license = license;
         this.vulnerability = vulnerability;
     }
 
-    public InferredComplianceModule license(Function<BuildExecutorModule, BuildExecutorModule> license) {
-        return new InferredComplianceModule(configuration, osv, license, vulnerability);
+    public InferredComplianceModule license(UnaryOperator<BuildExecutorModule> license) {
+        return new InferredComplianceModule(configuration, osv, append(this.license, license), vulnerability);
     }
 
-    public InferredComplianceModule vulnerability(Function<BuildExecutorModule, BuildExecutorModule> vulnerability) {
-        return new InferredComplianceModule(configuration, osv, license, vulnerability);
+    public InferredComplianceModule vulnerability(UnaryOperator<BuildExecutorModule> vulnerability) {
+        return new InferredComplianceModule(configuration, osv, license, append(this.vulnerability, vulnerability));
     }
 
     @Override
@@ -145,5 +145,12 @@ public class InferredComplianceModule implements BuildExecutorModule {
         } catch (IllegalArgumentException _) {
             return null;
         }
+    }
+
+    private static <T> UnaryOperator<T> append(UnaryOperator<T> previous, UnaryOperator<T> next) {
+        return previous == null || next == null ? null : value -> {
+            T configured = previous.apply(value);
+            return configured == null ? null : next.apply(configured);
+        };
     }
 }

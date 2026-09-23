@@ -29,13 +29,13 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
     private final ScalastyleModule scalastyleModule;
     private final ScalafmtModule scalafmtModule;
     private final CodeNarcModule codenarcModule;
-    private final Function<CheckstyleModule, BuildExecutorModule> checkstyle;
-    private final Function<PmdModule, BuildExecutorModule> pmd;
-    private final Function<DetektModule, BuildExecutorModule> detekt;
-    private final Function<KtlintModule, BuildExecutorModule> ktlint;
-    private final Function<ScalastyleModule, BuildExecutorModule> scalastyle;
-    private final Function<ScalafmtModule, BuildExecutorModule> scalafmt;
-    private final Function<CodeNarcModule, BuildExecutorModule> codenarc;
+    private final UnaryOperator<CheckstyleModule> checkstyle;
+    private final UnaryOperator<PmdModule> pmd;
+    private final UnaryOperator<DetektModule> detekt;
+    private final UnaryOperator<KtlintModule> ktlint;
+    private final UnaryOperator<ScalastyleModule> scalastyle;
+    private final UnaryOperator<ScalafmtModule> scalafmt;
+    private final UnaryOperator<CodeNarcModule> codenarc;
 
     public InferredSourceCodeQualityModule(SequencedSet<Path> configuration,
                                            Map<String, Repository> repositories,
@@ -114,13 +114,13 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
                                             ScalastyleModule scalastyleModule,
                                             ScalafmtModule scalafmtModule,
                                             CodeNarcModule codenarcModule,
-                                            Function<CheckstyleModule, BuildExecutorModule> checkstyle,
-                                            Function<PmdModule, BuildExecutorModule> pmd,
-                                            Function<DetektModule, BuildExecutorModule> detekt,
-                                            Function<KtlintModule, BuildExecutorModule> ktlint,
-                                            Function<ScalastyleModule, BuildExecutorModule> scalastyle,
-                                            Function<ScalafmtModule, BuildExecutorModule> scalafmt,
-                                            Function<CodeNarcModule, BuildExecutorModule> codenarc) {
+                                            UnaryOperator<CheckstyleModule> checkstyle,
+                                            UnaryOperator<PmdModule> pmd,
+                                            UnaryOperator<DetektModule> detekt,
+                                            UnaryOperator<KtlintModule> ktlint,
+                                            UnaryOperator<ScalastyleModule> scalastyle,
+                                            UnaryOperator<ScalafmtModule> scalafmt,
+                                            UnaryOperator<CodeNarcModule> codenarc) {
         this.configuration = configuration;
         this.pinning = pinning;
         this.checkstyleModule = checkstyleModule;
@@ -145,46 +145,46 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
                 ktlint, scalastyle, scalafmt, codenarc);
     }
 
-    public InferredSourceCodeQualityModule checkstyle(Function<CheckstyleModule, BuildExecutorModule> checkstyle) {
+    public InferredSourceCodeQualityModule checkstyle(UnaryOperator<CheckstyleModule> checkstyle) {
         return new InferredSourceCodeQualityModule(configuration, pinning, checkstyleModule, pmdModule,
-                detektModule, ktlintModule, scalastyleModule, scalafmtModule, codenarcModule, checkstyle, pmd, detekt,
+                detektModule, ktlintModule, scalastyleModule, scalafmtModule, codenarcModule, append(this.checkstyle, checkstyle), pmd, detekt,
                 ktlint, scalastyle, scalafmt, codenarc);
     }
 
-    public InferredSourceCodeQualityModule pmd(Function<PmdModule, BuildExecutorModule> pmd) {
+    public InferredSourceCodeQualityModule pmd(UnaryOperator<PmdModule> pmd) {
         return new InferredSourceCodeQualityModule(configuration, pinning, checkstyleModule, pmdModule,
-                detektModule, ktlintModule, scalastyleModule, scalafmtModule, codenarcModule, checkstyle, pmd, detekt,
+                detektModule, ktlintModule, scalastyleModule, scalafmtModule, codenarcModule, checkstyle, append(this.pmd, pmd), detekt,
                 ktlint, scalastyle, scalafmt, codenarc);
     }
 
-    public InferredSourceCodeQualityModule detekt(Function<DetektModule, BuildExecutorModule> detekt) {
+    public InferredSourceCodeQualityModule detekt(UnaryOperator<DetektModule> detekt) {
         return new InferredSourceCodeQualityModule(configuration, pinning, checkstyleModule, pmdModule,
-                detektModule, ktlintModule, scalastyleModule, scalafmtModule, codenarcModule, checkstyle, pmd, detekt,
+                detektModule, ktlintModule, scalastyleModule, scalafmtModule, codenarcModule, checkstyle, pmd, append(this.detekt, detekt),
                 ktlint, scalastyle, scalafmt, codenarc);
     }
 
-    public InferredSourceCodeQualityModule ktlint(Function<KtlintModule, BuildExecutorModule> ktlint) {
+    public InferredSourceCodeQualityModule ktlint(UnaryOperator<KtlintModule> ktlint) {
         return new InferredSourceCodeQualityModule(configuration, pinning, checkstyleModule, pmdModule,
                 detektModule, ktlintModule, scalastyleModule, scalafmtModule, codenarcModule, checkstyle, pmd, detekt,
-                ktlint, scalastyle, scalafmt, codenarc);
+                append(this.ktlint, ktlint), scalastyle, scalafmt, codenarc);
     }
 
-    public InferredSourceCodeQualityModule scalastyle(Function<ScalastyleModule, BuildExecutorModule> scalastyle) {
+    public InferredSourceCodeQualityModule scalastyle(UnaryOperator<ScalastyleModule> scalastyle) {
         return new InferredSourceCodeQualityModule(configuration, pinning, checkstyleModule, pmdModule,
                 detektModule, ktlintModule, scalastyleModule, scalafmtModule, codenarcModule, checkstyle, pmd, detekt,
-                ktlint, scalastyle, scalafmt, codenarc);
+                ktlint, append(this.scalastyle, scalastyle), scalafmt, codenarc);
     }
 
-    public InferredSourceCodeQualityModule scalafmt(Function<ScalafmtModule, BuildExecutorModule> scalafmt) {
+    public InferredSourceCodeQualityModule scalafmt(UnaryOperator<ScalafmtModule> scalafmt) {
         return new InferredSourceCodeQualityModule(configuration, pinning, checkstyleModule, pmdModule,
                 detektModule, ktlintModule, scalastyleModule, scalafmtModule, codenarcModule, checkstyle, pmd, detekt,
-                ktlint, scalastyle, scalafmt, codenarc);
+                ktlint, scalastyle, append(this.scalafmt, scalafmt), codenarc);
     }
 
-    public InferredSourceCodeQualityModule codenarc(Function<CodeNarcModule, BuildExecutorModule> codenarc) {
+    public InferredSourceCodeQualityModule codenarc(UnaryOperator<CodeNarcModule> codenarc) {
         return new InferredSourceCodeQualityModule(configuration, pinning, checkstyleModule, pmdModule,
                 detektModule, ktlintModule, scalastyleModule, scalafmtModule, codenarcModule, checkstyle, pmd, detekt,
-                ktlint, scalastyle, scalafmt, codenarc);
+                ktlint, scalastyle, scalafmt, append(this.codenarc, codenarc));
     }
 
     @Override
@@ -210,5 +210,12 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
         Bind.configured(buildExecutor, inherited.sequencedKeySet(), CODENARC, codenarc,
                 CodeNarcModule.configurationFile(configuration),
                 () -> codenarcModule.pinning(pinning));
+    }
+
+    private static <T> UnaryOperator<T> append(UnaryOperator<T> previous, UnaryOperator<T> next) {
+        return previous == null || next == null ? null : value -> {
+            T configured = previous.apply(value);
+            return configured == null ? null : next.apply(configured);
+        };
     }
 }

@@ -28,10 +28,10 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
     private final DokkaDocumentationModule dokkaModule;
     private final ScalaDocumentationModule scaladocModule;
     private final GroovyDocumentationModule groovydocModule;
-    private final Function<Javadoc, BuildStep> javadoc;
-    private final Function<DokkaDocumentationModule, BuildExecutorModule> dokka;
-    private final Function<ScalaDocumentationModule, BuildExecutorModule> scaladoc;
-    private final Function<GroovyDocumentationModule, BuildExecutorModule> groovydoc;
+    private final UnaryOperator<Javadoc> javadoc;
+    private final UnaryOperator<DokkaDocumentationModule> dokka;
+    private final UnaryOperator<ScalaDocumentationModule> scaladoc;
+    private final UnaryOperator<GroovyDocumentationModule> groovydoc;
 
     public InferredDocumentationChainModule(Map<String, Repository> repositories,
                                             Map<String, Resolver> resolvers) {
@@ -71,10 +71,10 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                                              DokkaDocumentationModule dokkaModule,
                                              ScalaDocumentationModule scaladocModule,
                                              GroovyDocumentationModule groovydocModule,
-                                             Function<Javadoc, BuildStep> javadoc,
-                                             Function<DokkaDocumentationModule, BuildExecutorModule> dokka,
-                                             Function<ScalaDocumentationModule, BuildExecutorModule> scaladoc,
-                                             Function<GroovyDocumentationModule, BuildExecutorModule> groovydoc) {
+                                             UnaryOperator<Javadoc> javadoc,
+                                             UnaryOperator<DokkaDocumentationModule> dokka,
+                                             UnaryOperator<ScalaDocumentationModule> scaladoc,
+                                             UnaryOperator<GroovyDocumentationModule> groovydoc) {
         this.repositories = repositories;
         this.resolvers = resolvers;
         this.pinning = pinning;
@@ -94,28 +94,28 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                 javadoc, dokka, scaladoc, groovydoc);
     }
 
-    public InferredDocumentationChainModule javadoc(Function<Javadoc, BuildStep> javadoc) {
+    public InferredDocumentationChainModule javadoc(UnaryOperator<Javadoc> javadoc) {
         return new InferredDocumentationChainModule(repositories, resolvers, pinning,
                 javadocStep, dokkaModule, scaladocModule, groovydocModule,
-                javadoc, dokka, scaladoc, groovydoc);
+                append(this.javadoc, javadoc), dokka, scaladoc, groovydoc);
     }
 
-    public InferredDocumentationChainModule dokka(Function<DokkaDocumentationModule, BuildExecutorModule> dokka) {
+    public InferredDocumentationChainModule dokka(UnaryOperator<DokkaDocumentationModule> dokka) {
         return new InferredDocumentationChainModule(repositories, resolvers, pinning,
                 javadocStep, dokkaModule, scaladocModule, groovydocModule,
-                javadoc, dokka, scaladoc, groovydoc);
+                javadoc, append(this.dokka, dokka), scaladoc, groovydoc);
     }
 
-    public InferredDocumentationChainModule scaladoc(Function<ScalaDocumentationModule, BuildExecutorModule> scaladoc) {
+    public InferredDocumentationChainModule scaladoc(UnaryOperator<ScalaDocumentationModule> scaladoc) {
         return new InferredDocumentationChainModule(repositories, resolvers, pinning,
                 javadocStep, dokkaModule, scaladocModule, groovydocModule,
-                javadoc, dokka, scaladoc, groovydoc);
+                javadoc, dokka, append(this.scaladoc, scaladoc), groovydoc);
     }
 
-    public InferredDocumentationChainModule groovydoc(Function<GroovyDocumentationModule, BuildExecutorModule> groovydoc) {
+    public InferredDocumentationChainModule groovydoc(UnaryOperator<GroovyDocumentationModule> groovydoc) {
         return new InferredDocumentationChainModule(repositories, resolvers, pinning,
                 javadocStep, dokkaModule, scaladocModule, groovydocModule,
-                javadoc, dokka, scaladoc, groovydoc);
+                javadoc, dokka, scaladoc, append(this.groovydoc, groovydoc));
     }
 
     @Override
@@ -198,10 +198,10 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                             DokkaDocumentationModule dokkaModule,
                             ScalaDocumentationModule scaladocModule,
                             GroovyDocumentationModule groovydocModule,
-                            Function<Javadoc, BuildStep> javadoc,
-                            Function<DokkaDocumentationModule, BuildExecutorModule> dokka,
-                            Function<ScalaDocumentationModule, BuildExecutorModule> scaladoc,
-                            Function<GroovyDocumentationModule, BuildExecutorModule> groovydoc)
+                            UnaryOperator<Javadoc> javadoc,
+                            UnaryOperator<DokkaDocumentationModule> dokka,
+                            UnaryOperator<ScalaDocumentationModule> scaladoc,
+                            UnaryOperator<GroovyDocumentationModule> groovydoc)
             implements BuildExecutorModule {
 
         @Override
@@ -342,5 +342,12 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
+    }
+
+    private static <T> UnaryOperator<T> append(UnaryOperator<T> previous, UnaryOperator<T> next) {
+        return previous == null || next == null ? null : value -> {
+            T configured = previous.apply(value);
+            return configured == null ? null : next.apply(configured);
+        };
     }
 }

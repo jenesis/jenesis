@@ -26,7 +26,7 @@ public class InferredTestObservationModuleTest {
         Files.writeString(project.resolve("jacoco.properties"), "");
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
+        executor.addModule("observed", observation(), "project");
         executor.execute("observed/jacoco/required");
 
         Path requiredOutput = root.resolve("observed").resolve("jacoco").resolve("required").resolve("output");
@@ -39,7 +39,7 @@ public class InferredTestObservationModuleTest {
     public void does_not_wire_an_engine_without_a_config_file() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
+        executor.addModule("observed", observation(), "project");
         executor.execute();
 
         assertThat(root.resolve("observed").resolve("jacoco"))
@@ -52,7 +52,7 @@ public class InferredTestObservationModuleTest {
         Files.writeString(project.resolve("jacoco.properties"), "");
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("observed", observation().test(_ -> (_, _) -> {}).jacoco(null), "project");
+        executor.addModule("observed", observation().jacoco(null), "project");
         executor.execute();
 
         assertThat(root.resolve("observed").resolve("jacoco")).doesNotExist();
@@ -66,7 +66,7 @@ public class InferredTestObservationModuleTest {
         executor.addSource("project", project);
         executor.addModule("observed", observation().test(module -> {
             decorated.add(module);
-            return (_, _) -> {};
+            return module;
         }), "project");
         executor.execute("observed/jacoco/required");
 
@@ -94,7 +94,7 @@ public class InferredTestObservationModuleTest {
         Files.writeString(project.resolve("pitest.properties"), "targetClasses=sample.*\ntargetTests=sample.*\n");
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
+        executor.addModule("observed", observation(), "project");
         executor.execute("observed/mutate/required");
 
         Path requiredOutput = root.resolve("observed").resolve("mutate").resolve("required").resolve("output");
@@ -109,7 +109,7 @@ public class InferredTestObservationModuleTest {
     public void does_not_wire_mutate_without_a_pitest_config() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
+        executor.addModule("observed", observation(), "project");
         executor.execute();
 
         assertThat(root.resolve("observed").resolve("mutate"))
@@ -122,7 +122,7 @@ public class InferredTestObservationModuleTest {
         Files.writeString(project.resolve("pitest.properties"), "targetClasses=sample.*\n");
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addModule("observed", observation().test(_ -> (_, _) -> {}).pitest(null), "project");
+        executor.addModule("observed", observation().pitest(null), "project");
         executor.execute();
 
         assertThat(root.resolve("observed").resolve("mutate")).doesNotExist();
@@ -192,7 +192,8 @@ public class InferredTestObservationModuleTest {
     }
 
     private InferredTestObservationModule observation() {
-        return new InferredTestObservationModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of());
+        return new InferredTestObservationModule(new LinkedHashSet<>(List.of(project)), Map.of(), Map.of())
+                .test(module -> module.requireFramework(false));
     }
 
     private BuildExecutor newExecutor() throws IOException {

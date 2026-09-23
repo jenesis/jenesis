@@ -24,13 +24,13 @@ import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.Sbom;
 
-public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityModule, BuildExecutorModule> check,
-                                            Function<InferredSourceFormattingModule, BuildExecutorModule> format,
-                                            Function<InferredComplianceModule, BuildExecutorModule> compliance,
-                                            Function<InferredJavaToolchainModule, BuildExecutorModule> toolchain,
-                                            Function<InferredArtifactQualityModule, BuildExecutorModule> artifact,
-                                            Function<InferredTestObservationModule, BuildExecutorModule> observe,
-                                            Function<InferredDocumentationModule, BuildExecutorModule> documentation,
+public record InferredMultiProjectAssembler(UnaryOperator<InferredSourceCodeQualityModule> check,
+                                            UnaryOperator<InferredSourceFormattingModule> format,
+                                            UnaryOperator<InferredComplianceModule> compliance,
+                                            UnaryOperator<InferredJavaToolchainModule> toolchain,
+                                            UnaryOperator<InferredArtifactQualityModule> artifact,
+                                            UnaryOperator<InferredTestObservationModule> observe,
+                                            UnaryOperator<InferredDocumentationModule> documentation,
                                             Environment environment) implements MultiProjectAssembler<ProjectModuleDescriptor> {
 
     public InferredMultiProjectAssembler() {
@@ -52,32 +52,32 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         return new InferredMultiProjectAssembler(environment);
     }
 
-    public InferredMultiProjectAssembler check(Function<InferredSourceCodeQualityModule, BuildExecutorModule> check) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, environment);
+    public InferredMultiProjectAssembler check(UnaryOperator<InferredSourceCodeQualityModule> check) {
+        return new InferredMultiProjectAssembler(append(this.check, check), format, compliance, toolchain, artifact, observe, documentation, environment);
     }
 
-    public InferredMultiProjectAssembler format(Function<InferredSourceFormattingModule, BuildExecutorModule> format) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, environment);
+    public InferredMultiProjectAssembler format(UnaryOperator<InferredSourceFormattingModule> format) {
+        return new InferredMultiProjectAssembler(check, append(this.format, format), compliance, toolchain, artifact, observe, documentation, environment);
     }
 
-    public InferredMultiProjectAssembler compliance(Function<InferredComplianceModule, BuildExecutorModule> compliance) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, environment);
+    public InferredMultiProjectAssembler compliance(UnaryOperator<InferredComplianceModule> compliance) {
+        return new InferredMultiProjectAssembler(check, format, append(this.compliance, compliance), toolchain, artifact, observe, documentation, environment);
     }
 
-    public InferredMultiProjectAssembler toolchain(Function<InferredJavaToolchainModule, BuildExecutorModule> toolchain) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, environment);
+    public InferredMultiProjectAssembler toolchain(UnaryOperator<InferredJavaToolchainModule> toolchain) {
+        return new InferredMultiProjectAssembler(check, format, compliance, append(this.toolchain, toolchain), artifact, observe, documentation, environment);
     }
 
-    public InferredMultiProjectAssembler artifact(Function<InferredArtifactQualityModule, BuildExecutorModule> artifact) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, environment);
+    public InferredMultiProjectAssembler artifact(UnaryOperator<InferredArtifactQualityModule> artifact) {
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, append(this.artifact, artifact), observe, documentation, environment);
     }
 
-    public InferredMultiProjectAssembler observe(Function<InferredTestObservationModule, BuildExecutorModule> observe) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, environment);
+    public InferredMultiProjectAssembler observe(UnaryOperator<InferredTestObservationModule> observe) {
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, append(this.observe, observe), documentation, environment);
     }
 
-    public InferredMultiProjectAssembler documentation(Function<InferredDocumentationModule, BuildExecutorModule> documentation) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, environment);
+    public InferredMultiProjectAssembler documentation(UnaryOperator<InferredDocumentationModule> documentation) {
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, append(this.documentation, documentation), environment);
     }
 
     @Override
@@ -404,5 +404,12 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
 
+    }
+
+    private static <T> UnaryOperator<T> append(UnaryOperator<T> previous, UnaryOperator<T> next) {
+        return previous == null || next == null ? null : value -> {
+            T configured = previous.apply(value);
+            return configured == null ? null : next.apply(configured);
+        };
     }
 }

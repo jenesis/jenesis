@@ -22,12 +22,12 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
     private final InferredCompilerChainModule compilerModule;
     private final InferredByteCodeQualityModule validatorModule;
     private final JarSigner signerStep;
-    private final Function<InferredSourceGenerationModule, BuildExecutorModule> generator;
-    private final Function<InferredCompilerChainModule, BuildExecutorModule> compiler;
-    private final Function<InferredByteCodeQualityModule, BuildExecutorModule> validator;
+    private final UnaryOperator<InferredSourceGenerationModule> generator;
+    private final UnaryOperator<InferredCompilerChainModule> compiler;
+    private final UnaryOperator<InferredByteCodeQualityModule> validator;
     private final BuildExecutorModule transformer;
     private final BuildExecutorModule archiver;
-    private final Function<JarSigner, BuildStep> signer;
+    private final UnaryOperator<JarSigner> signer;
 
     public InferredJavaToolchainModule(SequencedSet<Path> configuration,
                                        Map<String, Repository> repositories,
@@ -42,7 +42,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
              value -> value,
              null,
              new Jar(ProcessHandler.Factory.of(), Jar.Sort.CLASSES).asModule("jar"),
-             step -> step.configured() ? step : null);
+             value -> value);
     }
 
     public static InferredJavaToolchainModule ofEnvironment(Environment environment,
@@ -59,7 +59,7 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 value -> value,
                 null,
                 Jar.ofEnvironment(environment, ProcessHandler.Factory.of(), Jar.Sort.CLASSES).asModule("jar"),
-                step -> step.configured() ? step : null);
+                value -> value);
     }
 
     private InferredJavaToolchainModule(SequencedSet<Path> configuration,
@@ -69,12 +69,12 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                                         InferredCompilerChainModule compilerModule,
                                         InferredByteCodeQualityModule validatorModule,
                                         JarSigner signerStep,
-                                        Function<InferredSourceGenerationModule, BuildExecutorModule> generator,
-                                        Function<InferredCompilerChainModule, BuildExecutorModule> compiler,
-                                        Function<InferredByteCodeQualityModule, BuildExecutorModule> validator,
+                                        UnaryOperator<InferredSourceGenerationModule> generator,
+                                        UnaryOperator<InferredCompilerChainModule> compiler,
+                                        UnaryOperator<InferredByteCodeQualityModule> validator,
                                         BuildExecutorModule transformer,
                                         BuildExecutorModule archiver,
-                                        Function<JarSigner, BuildStep> signer) {
+                                        UnaryOperator<JarSigner> signer) {
         this.configuration = configuration;
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
@@ -102,21 +102,21 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer);
     }
 
-    public InferredJavaToolchainModule generator(Function<InferredSourceGenerationModule, BuildExecutorModule> generator) {
+    public InferredJavaToolchainModule generator(UnaryOperator<InferredSourceGenerationModule> generator) {
         return new InferredJavaToolchainModule(configuration, pinning, pathPlacement, generatorModule,
-                compilerModule, validatorModule, signerStep, generator, compiler, validator, transformer, archiver,
+                compilerModule, validatorModule, signerStep, append(this.generator, generator), compiler, validator, transformer, archiver,
                 signer);
     }
 
-    public InferredJavaToolchainModule compiler(Function<InferredCompilerChainModule, BuildExecutorModule> compiler) {
+    public InferredJavaToolchainModule compiler(UnaryOperator<InferredCompilerChainModule> compiler) {
         return new InferredJavaToolchainModule(configuration, pinning, pathPlacement, generatorModule,
-                compilerModule, validatorModule, signerStep, generator, compiler, validator, transformer, archiver,
+                compilerModule, validatorModule, signerStep, generator, append(this.compiler, compiler), validator, transformer, archiver,
                 signer);
     }
 
-    public InferredJavaToolchainModule validator(Function<InferredByteCodeQualityModule, BuildExecutorModule> validator) {
+    public InferredJavaToolchainModule validator(UnaryOperator<InferredByteCodeQualityModule> validator) {
         return new InferredJavaToolchainModule(configuration, pinning, pathPlacement, generatorModule,
-                compilerModule, validatorModule, signerStep, generator, compiler, validator, transformer, archiver,
+                compilerModule, validatorModule, signerStep, generator, compiler, append(this.validator, validator), transformer, archiver,
                 signer);
     }
 
@@ -132,15 +132,16 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 signer);
     }
 
-    public InferredJavaToolchainModule signer(Function<JarSigner, BuildStep> signer) {
+    public InferredJavaToolchainModule signer(UnaryOperator<JarSigner> signer) {
         return new InferredJavaToolchainModule(configuration, pinning, pathPlacement, generatorModule,
                 compilerModule, validatorModule, signerStep, generator, compiler, validator, transformer, archiver,
-                signer);
+                append(this.signer, signer));
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        toolchain(signer == null ? null : signer.apply(signerStep)).accept(buildExecutor, inherited);
+        JarSigner signing = signer == null ? null : signer.apply(signerStep);
+        toolchain(signing == null || !signing.configured() ? null : signing).accept(buildExecutor, inherited);
     }
 
     @Override
@@ -179,5 +180,12 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
         public Optional<String> resolve(String path) {
             return path.equals(SIGN) ? Optional.of("") : Optional.empty();
         }
+    }
+
+    private static <T> UnaryOperator<T> append(UnaryOperator<T> previous, UnaryOperator<T> next) {
+        return previous == null || next == null ? null : value -> {
+            T configured = previous.apply(value);
+            return configured == null ? null : next.apply(configured);
+        };
     }
 }

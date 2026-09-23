@@ -34,11 +34,11 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
     private final KotlinCompilerModule kotlincModule;
     private final ScalaCompilerModule scalacModule;
     private final GroovyCompilerModule groovycModule;
-    private final Function<Javac, BuildStep> javac;
-    private final Function<KotlinCompilerModule, BuildExecutorModule> kotlinc;
-    private final Function<ScalaCompilerModule, BuildExecutorModule> scalac;
-    private final Function<GroovyCompilerModule, BuildExecutorModule> groovyc;
-    private final Function<ErrorProne, BuildStep> errorprone;
+    private final UnaryOperator<Javac> javac;
+    private final UnaryOperator<KotlinCompilerModule> kotlinc;
+    private final UnaryOperator<ScalaCompilerModule> scalac;
+    private final UnaryOperator<GroovyCompilerModule> groovyc;
+    private final UnaryOperator<ErrorProne> errorprone;
 
     public InferredCompilerChainModule(SequencedSet<Path> configuration,
                                        Map<String, Repository> repositories,
@@ -90,11 +90,11 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                                         KotlinCompilerModule kotlincModule,
                                         ScalaCompilerModule scalacModule,
                                         GroovyCompilerModule groovycModule,
-                                        Function<Javac, BuildStep> javac,
-                                        Function<KotlinCompilerModule, BuildExecutorModule> kotlinc,
-                                        Function<ScalaCompilerModule, BuildExecutorModule> scalac,
-                                        Function<GroovyCompilerModule, BuildExecutorModule> groovyc,
-                                        Function<ErrorProne, BuildStep> errorprone) {
+                                        UnaryOperator<Javac> javac,
+                                        UnaryOperator<KotlinCompilerModule> kotlinc,
+                                        UnaryOperator<ScalaCompilerModule> scalac,
+                                        UnaryOperator<GroovyCompilerModule> groovyc,
+                                        UnaryOperator<ErrorProne> errorprone) {
         this.configuration = configuration;
         this.repositories = repositories;
         this.resolvers = resolvers;
@@ -123,34 +123,34 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                 javac, kotlinc, scalac, groovyc, errorprone);
     }
 
-    public InferredCompilerChainModule javac(Function<Javac, BuildStep> javac) {
+    public InferredCompilerChainModule javac(UnaryOperator<Javac> javac) {
         return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
                 javacStep, kotlincModule, scalacModule, groovycModule,
-                javac, kotlinc, scalac, groovyc, errorprone);
+                append(this.javac, javac), kotlinc, scalac, groovyc, errorprone);
     }
 
-    public InferredCompilerChainModule kotlinc(Function<KotlinCompilerModule, BuildExecutorModule> kotlinc) {
+    public InferredCompilerChainModule kotlinc(UnaryOperator<KotlinCompilerModule> kotlinc) {
         return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
                 javacStep, kotlincModule, scalacModule, groovycModule,
-                javac, kotlinc, scalac, groovyc, errorprone);
+                javac, append(this.kotlinc, kotlinc), scalac, groovyc, errorprone);
     }
 
-    public InferredCompilerChainModule scalac(Function<ScalaCompilerModule, BuildExecutorModule> scalac) {
+    public InferredCompilerChainModule scalac(UnaryOperator<ScalaCompilerModule> scalac) {
         return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
                 javacStep, kotlincModule, scalacModule, groovycModule,
-                javac, kotlinc, scalac, groovyc, errorprone);
+                javac, kotlinc, append(this.scalac, scalac), groovyc, errorprone);
     }
 
-    public InferredCompilerChainModule groovyc(Function<GroovyCompilerModule, BuildExecutorModule> groovyc) {
+    public InferredCompilerChainModule groovyc(UnaryOperator<GroovyCompilerModule> groovyc) {
         return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
                 javacStep, kotlincModule, scalacModule, groovycModule,
-                javac, kotlinc, scalac, groovyc, errorprone);
+                javac, kotlinc, scalac, append(this.groovyc, groovyc), errorprone);
     }
 
-    public InferredCompilerChainModule errorprone(Function<ErrorProne, BuildStep> errorprone) {
+    public InferredCompilerChainModule errorprone(UnaryOperator<ErrorProne> errorprone) {
         return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
                 javacStep, kotlincModule, scalacModule, groovycModule,
-                javac, kotlinc, scalac, groovyc, errorprone);
+                javac, kotlinc, scalac, groovyc, append(this.errorprone, errorprone));
     }
 
     @Override
@@ -230,11 +230,11 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
                            KotlinCompilerModule kotlincModule,
                            ScalaCompilerModule scalacModule,
                            GroovyCompilerModule groovycModule,
-                           Function<Javac, BuildStep> javac,
-                           Function<KotlinCompilerModule, BuildExecutorModule> kotlinc,
-                           Function<ScalaCompilerModule, BuildExecutorModule> scalac,
-                           Function<GroovyCompilerModule, BuildExecutorModule> groovyc,
-                           Function<ErrorProne, BuildStep> errorprone) implements BuildExecutorModule {
+                           UnaryOperator<Javac> javac,
+                           UnaryOperator<KotlinCompilerModule> kotlinc,
+                           UnaryOperator<ScalaCompilerModule> scalac,
+                           UnaryOperator<GroovyCompilerModule> groovyc,
+                           UnaryOperator<ErrorProne> errorprone) implements BuildExecutorModule {
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
@@ -364,5 +364,12 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
+    }
+
+    private static <T> UnaryOperator<T> append(UnaryOperator<T> previous, UnaryOperator<T> next) {
+        return previous == null || next == null ? null : value -> {
+            T configured = previous.apply(value);
+            return configured == null ? null : next.apply(configured);
+        };
     }
 }
