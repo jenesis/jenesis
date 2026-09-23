@@ -55,35 +55,99 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
     }
 
     public InferredMultiProjectAssembler check(Function<InferredSourceCodeQualityModule, BuildExecutorModule> check) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
+        return new InferredMultiProjectAssembler(check,
+                format,
+                compliance,
+                toolchain,
+                artifact,
+                observe,
+                documentation,
+                custom,
+                environment);
     }
 
     public InferredMultiProjectAssembler format(Function<InferredSourceFormattingModule, BuildExecutorModule> format) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
+        return new InferredMultiProjectAssembler(check,
+                format,
+                compliance,
+                toolchain,
+                artifact,
+                observe,
+                documentation,
+                custom,
+                environment);
     }
 
     public InferredMultiProjectAssembler compliance(Function<InferredComplianceModule, BuildExecutorModule> compliance) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
+        return new InferredMultiProjectAssembler(check,
+                format,
+                compliance,
+                toolchain,
+                artifact,
+                observe,
+                documentation,
+                custom,
+                environment);
     }
 
     public InferredMultiProjectAssembler toolchain(Function<InferredJavaToolchainModule, BuildExecutorModule> toolchain) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
+        return new InferredMultiProjectAssembler(check,
+                format,
+                compliance,
+                toolchain,
+                artifact,
+                observe,
+                documentation,
+                custom,
+                environment);
     }
 
     public InferredMultiProjectAssembler artifact(Function<InferredArtifactQualityModule, BuildExecutorModule> artifact) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
+        return new InferredMultiProjectAssembler(check,
+                format,
+                compliance,
+                toolchain,
+                artifact,
+                observe,
+                documentation,
+                custom,
+                environment);
     }
 
     public InferredMultiProjectAssembler observe(Function<InferredTestObservationModule, BuildExecutorModule> observe) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
+        return new InferredMultiProjectAssembler(check,
+                format,
+                compliance,
+                toolchain,
+                artifact,
+                observe,
+                documentation,
+                custom,
+                environment);
     }
 
     public InferredMultiProjectAssembler documentation(Function<InferredDocumentationModule, BuildExecutorModule> documentation) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
+        return new InferredMultiProjectAssembler(check,
+                format,
+                compliance,
+                toolchain,
+                artifact,
+                observe,
+                documentation,
+                custom,
+                environment);
     }
 
     public InferredMultiProjectAssembler custom(SequencedMap<String, BuildExecutorModule> custom) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, custom, environment);
+        return new InferredMultiProjectAssembler(check,
+                format,
+                compliance,
+                toolchain,
+                artifact,
+                observe,
+                documentation,
+                custom,
+                environment);
     }
 
     @Override

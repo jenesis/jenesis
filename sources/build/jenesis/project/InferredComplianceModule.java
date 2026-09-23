@@ -25,10 +25,10 @@ public class InferredComplianceModule implements BuildExecutorModule {
 
     public InferredComplianceModule(SequencedSet<Path> configuration) {
         this(configuration,
-             new OsvDownload(),
-             value -> value,
-             value -> value,
-             Collections.emptyNavigableMap());
+                new OsvDownload(),
+                value -> value,
+                value -> value,
+                Collections.emptyNavigableMap());
     }
 
     public static InferredComplianceModule ofEnvironment(Environment environment,
@@ -62,15 +62,27 @@ public class InferredComplianceModule implements BuildExecutorModule {
     }
 
     public InferredComplianceModule license(Function<BuildExecutorModule, BuildExecutorModule> license) {
-        return new InferredComplianceModule(configuration, osv, license, vulnerability, custom);
+        return new InferredComplianceModule(configuration,
+                osv,
+                license,
+                vulnerability,
+                custom);
     }
 
     public InferredComplianceModule vulnerability(Function<BuildExecutorModule, BuildExecutorModule> vulnerability) {
-        return new InferredComplianceModule(configuration, osv, license, vulnerability, custom);
+        return new InferredComplianceModule(configuration,
+                osv,
+                license,
+                vulnerability,
+                custom);
     }
 
     public InferredComplianceModule custom(SequencedMap<String, BuildExecutorModule> custom) {
-        return new InferredComplianceModule(configuration, osv, license, vulnerability, custom);
+        return new InferredComplianceModule(configuration,
+                osv,
+                license,
+                vulnerability,
+                custom);
     }
 
     @Override

@@ -23,15 +23,18 @@ public class InferredDocumentationModule implements BuildExecutorModule {
 
     public InferredDocumentationModule(Map<String, Repository> repositories,
                                        Map<String, Resolver> resolvers) {
-        this(null, new InferredDocumentationChainModule(repositories, resolvers),
-             value -> value,
-             new Jar(ProcessHandler.Factory.of(), Jar.Sort.JAVADOC), Collections.emptyNavigableMap());
+        this(null,
+                new InferredDocumentationChainModule(repositories, resolvers),
+                value -> value,
+                new Jar(ProcessHandler.Factory.of(), Jar.Sort.JAVADOC),
+                Collections.emptyNavigableMap());
     }
 
     public static InferredDocumentationModule ofEnvironment(Environment environment,
                                                             Map<String, Repository> repositories,
                                                             Map<String, Resolver> resolvers) {
-        return new InferredDocumentationModule(null, InferredDocumentationChainModule.ofEnvironment(environment, repositories, resolvers),
+        return new InferredDocumentationModule(null,
+                InferredDocumentationChainModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value,
                 Jar.ofEnvironment(environment, ProcessHandler.Factory.of(), Jar.Sort.JAVADOC),
                 Collections.emptyNavigableMap());
@@ -50,19 +53,35 @@ public class InferredDocumentationModule implements BuildExecutorModule {
     }
 
     public InferredDocumentationModule pinning(Pinning pinning) {
-        return new InferredDocumentationModule(pinning, generateModule, generate, archiver, custom);
+        return new InferredDocumentationModule(pinning,
+                generateModule,
+                generate,
+                archiver,
+                custom);
     }
 
     public InferredDocumentationModule generate(Function<InferredDocumentationChainModule, BuildExecutorModule> generate) {
-        return new InferredDocumentationModule(pinning, generateModule, generate, archiver, custom);
+        return new InferredDocumentationModule(pinning,
+                generateModule,
+                generate,
+                archiver,
+                custom);
     }
 
     public InferredDocumentationModule archiver(BuildStep archiver) {
-        return new InferredDocumentationModule(pinning, generateModule, generate, archiver, custom);
+        return new InferredDocumentationModule(pinning,
+                generateModule,
+                generate,
+                archiver,
+                custom);
     }
 
     public InferredDocumentationModule custom(SequencedMap<String, BuildExecutorModule> custom) {
-        return new InferredDocumentationModule(pinning, generateModule, generate, archiver, custom);
+        return new InferredDocumentationModule(pinning,
+                generateModule,
+                generate,
+                archiver,
+                custom);
     }
 
     @Override

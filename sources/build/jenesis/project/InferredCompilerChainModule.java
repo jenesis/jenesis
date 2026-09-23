@@ -117,51 +117,147 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
     }
 
     public InferredCompilerChainModule pinning(Pinning pinning) {
-        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                javacStep, kotlincModule, scalacModule, groovycModule,
-                javac, kotlinc, scalac, groovyc, errorprone, custom);
+        return new InferredCompilerChainModule(configuration,
+                repositories,
+                resolvers,
+                pinning,
+                pathPlacement,
+                javacStep,
+                kotlincModule,
+                scalacModule,
+                groovycModule,
+                javac,
+                kotlinc,
+                scalac,
+                groovyc,
+                errorprone,
+                custom);
     }
 
     public InferredCompilerChainModule pathPlacement(PathPlacement pathPlacement) {
-        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                javacStep, kotlincModule, scalacModule, groovycModule,
-                javac, kotlinc, scalac, groovyc, errorprone, custom);
+        return new InferredCompilerChainModule(configuration,
+                repositories,
+                resolvers,
+                pinning,
+                pathPlacement,
+                javacStep,
+                kotlincModule,
+                scalacModule,
+                groovycModule,
+                javac,
+                kotlinc,
+                scalac,
+                groovyc,
+                errorprone,
+                custom);
     }
 
     public InferredCompilerChainModule javac(Function<Javac, BuildStep> javac) {
-        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                javacStep, kotlincModule, scalacModule, groovycModule,
-                javac, kotlinc, scalac, groovyc, errorprone, custom);
+        return new InferredCompilerChainModule(configuration,
+                repositories,
+                resolvers,
+                pinning,
+                pathPlacement,
+                javacStep,
+                kotlincModule,
+                scalacModule,
+                groovycModule,
+                javac,
+                kotlinc,
+                scalac,
+                groovyc,
+                errorprone,
+                custom);
     }
 
     public InferredCompilerChainModule kotlinc(Function<KotlinCompilerModule, BuildExecutorModule> kotlinc) {
-        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                javacStep, kotlincModule, scalacModule, groovycModule,
-                javac, kotlinc, scalac, groovyc, errorprone, custom);
+        return new InferredCompilerChainModule(configuration,
+                repositories,
+                resolvers,
+                pinning,
+                pathPlacement,
+                javacStep,
+                kotlincModule,
+                scalacModule,
+                groovycModule,
+                javac,
+                kotlinc,
+                scalac,
+                groovyc,
+                errorprone,
+                custom);
     }
 
     public InferredCompilerChainModule scalac(Function<ScalaCompilerModule, BuildExecutorModule> scalac) {
-        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                javacStep, kotlincModule, scalacModule, groovycModule,
-                javac, kotlinc, scalac, groovyc, errorprone, custom);
+        return new InferredCompilerChainModule(configuration,
+                repositories,
+                resolvers,
+                pinning,
+                pathPlacement,
+                javacStep,
+                kotlincModule,
+                scalacModule,
+                groovycModule,
+                javac,
+                kotlinc,
+                scalac,
+                groovyc,
+                errorprone,
+                custom);
     }
 
     public InferredCompilerChainModule groovyc(Function<GroovyCompilerModule, BuildExecutorModule> groovyc) {
-        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                javacStep, kotlincModule, scalacModule, groovycModule,
-                javac, kotlinc, scalac, groovyc, errorprone, custom);
+        return new InferredCompilerChainModule(configuration,
+                repositories,
+                resolvers,
+                pinning,
+                pathPlacement,
+                javacStep,
+                kotlincModule,
+                scalacModule,
+                groovycModule,
+                javac,
+                kotlinc,
+                scalac,
+                groovyc,
+                errorprone,
+                custom);
     }
 
     public InferredCompilerChainModule errorprone(Function<ErrorProne, BuildStep> errorprone) {
-        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                javacStep, kotlincModule, scalacModule, groovycModule,
-                javac, kotlinc, scalac, groovyc, errorprone, custom);
+        return new InferredCompilerChainModule(configuration,
+                repositories,
+                resolvers,
+                pinning,
+                pathPlacement,
+                javacStep,
+                kotlincModule,
+                scalacModule,
+                groovycModule,
+                javac,
+                kotlinc,
+                scalac,
+                groovyc,
+                errorprone,
+                custom);
     }
 
     public InferredCompilerChainModule custom(SequencedMap<String, BuildExecutorModule> custom) {
-        return new InferredCompilerChainModule(configuration, repositories, resolvers, pinning, pathPlacement,
-                javacStep, kotlincModule, scalacModule, groovycModule,
-                javac, kotlinc, scalac, groovyc, errorprone, custom);
+        return new InferredCompilerChainModule(configuration,
+                repositories,
+                resolvers,
+                pinning,
+                pathPlacement,
+                javacStep,
+                kotlincModule,
+                scalacModule,
+                groovycModule,
+                javac,
+                kotlinc,
+                scalac,
+                groovyc,
+                errorprone,
+                custom);
     }
 
     @Override
