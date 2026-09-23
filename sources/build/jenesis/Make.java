@@ -283,14 +283,16 @@ public final class Make {
             return invoke(Make.class.getClassLoader(), collected, selectors);
         }
         Path build = location.getParent();
-        while (build != null && !Files.isRegularFile(build.resolve("jenesis").resolve("Make.java"))) {
-            build = build.getParent();
+        List<Path> sources = new ArrayList<>(files(build, ".java"));
+        Path base = build;
+        while (base != null && !Files.isRegularFile(base.resolve("jenesis").resolve("Make.java"))) {
+            base = base.getParent();
         }
-        if (build == null) {
-            build = location.getParent();
+        if (base != null && !base.resolve("custom").startsWith(build) && Files.isDirectory(base.resolve("custom"))) {
+            sources.addAll(files(base.resolve("custom"), ".java"));
         }
-        String seed = fingerprint(build, files(build, ".java"), classes.toString());
-        Path folder = precompiled(build, seed);
+        String seed = fingerprint(build, sources, classes.toString());
+        Path folder = precompiled(build, sources, seed);
         try (URLClassLoader loader = new URLClassLoader(
                 new URL[] { folder.toUri().toURL() },
                 ClassLoader.getPlatformClassLoader())) {
@@ -574,7 +576,7 @@ public final class Make {
         return properties;
     }
 
-    private Path precompiled(Path build, String seed) throws IOException {
+    private Path precompiled(Path build, List<Path> sources, String seed) throws IOException {
         Path stamp = root.resolve(".jenesis").resolve("make.digest");
         Path compiled = classes.resolve(mainClass.replace('.', '/') + ".class");
         if (Files.isRegularFile(stamp) && Files.readString(stamp).equals(seed) && Files.isRegularFile(compiled)) {
@@ -603,7 +605,7 @@ public final class Make {
             Files.createDirectories(classes);
             arguments.addAll(List.of("-d", classes.toString()));
         }
-        files(build, ".java").forEach(source -> arguments.add(source.toString()));
+        sources.forEach(source -> arguments.add(source.toString()));
         StringWriter out = new StringWriter(), error = new StringWriter();
         if (javac.run(new PrintWriter(out), new PrintWriter(error), arguments.toArray(String[]::new)) != 0) {
             throw new IllegalStateException("Failed to compile the build sources under "

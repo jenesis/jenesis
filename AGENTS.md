@@ -187,8 +187,8 @@ never takes a JVM option that configuration could supply.
 **`jenesis.project.customizers` adjusts the stock build, and only the user names one.** It lists
 `UnaryOperator<Project>` classes that `Project.ofEnvironment` applies, in order, to the project it configured, so
 every entry point that builds a project from settings - `Make`, `Execute`, the daemon, the tools, a container -
-builds the adjusted one. `Make` compiles all of `build/` with the engine for that reason, while the file it
-launches still names nothing but itself. A customizer runs code the engine does not ship, so `Make.settings`
+builds the adjusted one. `Make` compiles `build/custom/` with the engine for that reason, beside the folder of
+the file it launches, while that file still names nothing but itself. A customizer runs code the engine does not ship, so `Make.settings`
 refuses the key in every file a project provides, as it refuses `jenesis.toolchain.searchpath`.
 
 **Configuration files are read through `SequencedProperties`.** A file is read with the type's own accessors -
