@@ -172,9 +172,9 @@ public class PinModuleInfo implements BuildStep {
             if (printing != null && !carried.isEmpty()) {
                 printing.accept("%s%-11s%s %s".formatted(
                         BuildExecutorCallback.YELLOW,
-                        "[UNPINNED]",
+                        "[KEPT]",
                         BuildExecutorCallback.RESET,
-                        file + ": kept without a checksum, resolved by no closure: "
+                        file + ": kept, resolved by no closure: "
                                 + String.join(", ", carried)));
             }
         }
@@ -462,11 +462,9 @@ public class PinModuleInfo implements BuildStep {
                 if (insertAt < 0) {
                     insertAt = kept.size();
                 }
-                if (!regenerated.contains(expand(tag.token()))) {
+                if (tag.token().indexOf('/') >= 0 && !regenerated.contains(expand(tag.token()))) {
                     merged.putIfAbsent(tag.token(), tag.rest());
-                    if (!tag.rest().contains("/")) {
-                        carried.add(tag.token() + " " + tag.rest());
-                    }
+                    carried.add(tag.token() + " " + tag.rest());
                 }
                 continue;
             }

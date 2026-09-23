@@ -12,7 +12,6 @@ public interface MavenResolver extends Resolver {
     Closure dependencies(Executor executor,
                          MavenRepository repository,
                          List<RootPom> rootPoms,
-                         List<RootPom> managedPoms,
                          Map<MavenDependencyKey, MavenDependencyValue> managedCoordinates,
                          MavenDependencyScope scope,
                          String prefix) throws IOException;
