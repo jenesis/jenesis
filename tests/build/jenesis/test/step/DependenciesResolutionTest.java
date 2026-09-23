@@ -220,6 +220,28 @@ public class DependenciesResolutionTest implements Serializable {
     }
 
     @Test
+    public void identifies_a_license_by_its_url_when_it_names_none() throws IOException {
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("main/compile/foo/qux", "");
+        properties.store(dependencies.resolve(BuildStep.REQUIRES));
+        execute(new Dependencies(Map.of("foo", files(Map.of())),
+                Map.of("foo", (executor, prefix, repositories, descriptors, bom, scope) -> {
+                    SequencedMap<String, String> resolved = new LinkedHashMap<>();
+                    descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
+                    SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
+                    vertices.put(prefix + "/qux", new Resolver.Vertex(null, null, false,
+                            false, List.of(new License(null, null, null, "http://www.opensource.org/licenses/mit-license.php"))));
+                    return new Resolver.Resolution(
+                            Resolver.materializeAll(executor, repositories, prefix, resolved),
+                            List.of(),
+                            vertices);
+                })));
+        SequencedProperties licenses = SequencedProperties.ofFiles(next.resolve("licenses.properties"));
+        assertThat(licenses.getProperty("foo/qux#0#id")).isEqualTo("MIT");
+        assertThat(licenses.getProperty("foo/qux#0#category")).isEqualTo("permissive");
+    }
+
+    @Test
     public void appends_license_aliases_and_categories_from_input_files() throws IOException {
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("main/compile/foo/qux", "");

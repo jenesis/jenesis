@@ -94,7 +94,7 @@ module repository - no Maven coordinate, no Maven scope:
     java build/jenesis/Make.java dependencies
 
     module/demo.modulelayout [compile] (module demo.modulelayout, local ./sources)
-    └─ module/org.slf4j 2.0.16 (module org.slf4j)
+    └─ module/org.slf4j 2.0.16 (module org.slf4j) {MIT}
 
 Under **MODULAR_TO_MAVEN** (the same project in `../demo-02-java-modular`) the
 module is translated to its Maven coordinate and resolved through Maven, so the
