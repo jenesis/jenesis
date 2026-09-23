@@ -76,6 +76,14 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                 custom);
     }
 
+    public InferredDocumentationModule generateModule(InferredDocumentationChainModule generateModule) {
+        return new InferredDocumentationModule(pinning,
+                generateModule,
+                generate,
+                archiver,
+                custom);
+    }
+
     public InferredDocumentationModule custom(SequencedMap<String, BuildExecutorModule> custom) {
         return new InferredDocumentationModule(pinning,
                 generateModule,
