@@ -33,13 +33,18 @@ The build compiles and tests the modules, then runs the application:
     "Hello, native world!" is 20 bytes long, as C's strlen counts it
 
 `demo.natives.text` was granted native access, the application was not, and no
-warning was printed.
+warning was printed. `build.jenesis/process-java.properties` passes
+`--illegal-native-access=deny` to every `java` process the build forks, the tests
+and the application alike, so a missing grant fails the run instead of printing a
+warning.
 
 Layout
 ------
 
     demo/demo-49-native-access
     |-- build/jenesis                     symlink to ../../../sources/build/jenesis
+    |-- build.jenesis
+    |   `-- process-java.properties       --illegal-native-access=deny
     |-- jenesis.properties                jenesis.dependency.native=strict
     |-- text
     |   |-- module-info.java              declares nothing
@@ -104,15 +109,6 @@ in its launch:
 A jar on the class path cannot be named, so a grant for one becomes
 `--enable-native-access=ALL-UNNAMED`, which covers the whole class path.
 
-A module isolated in a layer, as `module-layers` showed, is granted the same
-way: the module that runs names it, by its module name or as
-`layer:<name>/module/<module>`. The JVM cannot name a module that only exists
-once the layer is defined, so the launch carries
-`-Djlayer.enableNativeAccess.<name>=<module>` and the launcher grants it when it
-defines the layer. It grants it on behalf of the module that asks for the layer,
-through the `MethodHandles.lookup()` that module passes, so the JDK only allows
-it if that module has native access itself: name it as well.
-
 Discovering what to grant
 -------------------------
 
@@ -129,8 +125,8 @@ with a warning:
       demo.natives.words names demo.natives.text
     Grant each with @jenesis.native in demo.natives.app if it runs code that needs it, or build with -Djenesis.dependency.native=ignore
 
-The application still runs, and the JDK warns when the restricted method is
-called. This demo's `jenesis.properties` sets `strict`, so without the flag the
+The build still runs the application, and the JDK refuses the restricted method
+because this demo denies native access that was not granted. This demo's `jenesis.properties` sets `strict`, so without the flag the
 same build fails with that message.
 
 Maven projects

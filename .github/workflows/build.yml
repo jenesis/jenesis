@@ -56,12 +56,12 @@ jobs:
 
       - name: Native image demo
         shell: bash
-        working-directory: demo/demo-64-native-image
+        working-directory: demo/demo-65-native-image
         run: java -Djenesis.dependency.pin=strict build/jenesis/Make.java stage
 
       - name: Verify native image
         shell: bash
-        working-directory: demo/demo-64-native-image
+        working-directory: demo/demo-65-native-image
         run: |
           image=$(find target -path "*stage/native/output/*" -type f | head -1)
           if [ -z "$image" ]; then
@@ -77,7 +77,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: target-native-image-${{ matrix.os }}
-          path: demo/demo-64-native-image/target/
+          path: demo/demo-65-native-image/target/
           retention-days: 3
           if-no-files-found: ignore
 

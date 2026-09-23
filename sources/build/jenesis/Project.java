@@ -853,11 +853,14 @@ public record Project(
                           never inherited: the names are recorded in the jar's Jenesis-Native-Access
                           manifest attribute, so a module that runs this one learns what to grant
                           itself. jenesis.dependency.native=warn reports a name the running module
-                          does not grant, strict fails the build on it. A module in one of the run's
-                          layers is named the same way, or as layer:<name>/<repo>/..., and reaches
-                          the launcher as jlayer.enableNativeAccess.<name>; the launcher grants it
-                          through the Lookup the module asking for the layer passes, so that module
-                          needs native access itself and is named too. MAVEN modules declare tokens in
+                          does not grant, strict fails the build on it. A module in a layer this
+                          module declares is named the same way, or as layer:<name>/<repo>/..., and
+                          reaches the launcher as jlayer.enableNativeAccess.<name>; the launcher
+                          grants it through the Lookup this module passes, so it names itself too.
+                          What a granted module names in its own layers is granted with it, so a
+                          module that runs a library with a layer grants the library alone, and a
+                          module in another module's layer does not resolve. MAVEN modules declare
+                          tokens in
                           a <!--jenesis.native ... --> comment.
 
                     ## 9. Activate a tool by dropping in its configuration file
@@ -979,7 +982,7 @@ public record Project(
                     than the JVM, so two runs in one program never clash; everything after them is
                     what the command line would take. A setting that replaces the process a build
                     runs in - toolchain.version, project.docker, execute.docker - is refused by name
-                    there, and demo-57-tools-api shows the whole contract.
+                    there, and demo-58-tools-api shows the whole contract.
 
                     Every command line here, the commands and the tools alike, reads @<file> as the
                     arguments that file holds - settings and selectors, # to the end of a line being
@@ -1016,7 +1019,7 @@ public record Project(
 
                     ## 13. Copy a demo: they are the recipe book
 
-                    65 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    66 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -1028,9 +1031,9 @@ public record Project(
                       Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
                                          04 java-modular-multi, 19 module-layout (forcing MODULAR)
                       Starting a build   05 startup (what launching costs, and the daemon),
-                                         63 toolchain (the JDK the build runs on)
+                                         64 toolchain (the JDK the build runs on)
                       Runnable output    06, 07 java-*-executable (jpackage), 08 bundle (jars for a
-                                         stock JRE), 09 java-multi-release, 64 native-image (GraalVM)
+                                         stock JRE), 09 java-multi-release, 65 native-image (GraalVM)
                       Compiler control   10 javac-arguments (process-javac.properties),
                                          11 annotations (an annotation processor via @jenesis.plugin),
                                          12 error-prone (a javac plugin)
@@ -1052,16 +1055,17 @@ public record Project(
                       Other languages    38 kotlin, 40 kotlin-plugin, 41 scala, 43 groovy
                       Operating it       45 profiles, 46 build-cache, 47 docker-isolation,
                                          48 agents (@jenesis.attach),
-                                         49 native-access (@jenesis.native)
-                      Shipping it        58 code-signing (jarsigner), 59 export (into the local repositories),
-                                         60 publishing (Maven Central),
-                                         61 module-convention (resolving what you published),
-                                         62 reproducible (a jar checked against a recorded digest),
-                                         65 jpx (run a released program without building)
-                      Extending it       50 custom-assembler, 51 custom-jmod, 52 internal-module,
-                                         53 external-module, 54 custom-maven, 55 custom-modular,
-                                         56 custom-build (no Project at all),
-                                         57 tools-api (a build inside another program's JVM)
+                                         49 native-access (@jenesis.native),
+                                         50 native-access-layer (passed on to a layer)
+                      Shipping it        59 code-signing (jarsigner), 60 export (into the local repositories),
+                                         61 publishing (Maven Central),
+                                         62 module-convention (resolving what you published),
+                                         63 reproducible (a jar checked against a recorded digest),
+                                         66 jpx (run a released program without building)
+                      Extending it       51 custom-assembler, 52 custom-jmod, 53 internal-module,
+                                         54 external-module, 55 custom-maven, 56 custom-modular,
+                                         57 custom-build (no Project at all),
+                                         58 tools-api (a build inside another program's JVM)
 
                     ## 14. When stuck, read the source
 

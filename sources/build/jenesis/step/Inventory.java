@@ -102,6 +102,7 @@ public class Inventory implements BuildStep {
         return arguments.values().stream().anyMatch(argument -> argument.hasChanged(
                 Path.of(MODULE),
                 Path.of(ProcessBuildStep.PROCESS + "javac.properties"),
+                Path.of(ProcessBuildStep.PROCESS + "java.properties"),
                 Path.of(METADATA),
                 Path.of(IDENTITY),
                 Path.of(ATTACHMENTS),
@@ -146,6 +147,7 @@ public class Inventory implements BuildStep {
         Path metadataImage = null;
         Path dockerContext = null;
         SequencedSet<Path> artifacts = new LinkedHashSet<>();
+        SequencedSet<Path> processes = new LinkedHashSet<>();
         SequencedSet<Path> bomArtifacts = new LinkedHashSet<>();
         SequencedSet<Path> sources = new LinkedHashSet<>();
         SequencedSet<Path> documentation = new LinkedHashSet<>();
@@ -190,6 +192,10 @@ public class Inventory implements BuildStep {
             Path javacProperties = folder.resolve(ProcessBuildStep.PROCESS + "javac.properties");
             if (release == null && Files.isRegularFile(javacProperties)) {
                 release = SequencedProperties.ofFiles(javacProperties).value("--release");
+            }
+            Path javaProperties = folder.resolve(ProcessBuildStep.PROCESS + "java.properties");
+            if (Files.isRegularFile(javaProperties)) {
+                processes.add(javaProperties);
             }
             Path metadataFile = folder.resolve(METADATA);
             if (Files.isRegularFile(metadataFile)) {
@@ -350,12 +356,27 @@ public class Inventory implements BuildStep {
                 reachable.add(entry.getValue());
             }
         }
+        SequencedMap<Path, String> layered = new LinkedHashMap<>();
+        for (Map.Entry<String, Path> entry : closureJars.entrySet()) {
+            if (entry.getKey().startsWith("layer:") && reachable.contains(entry.getValue())) {
+                layered.putIfAbsent(entry.getValue(), entry.getKey().substring(6, entry.getKey().indexOf('/')));
+            }
+        }
+        SequencedSet<String> declaring = new LinkedHashSet<>();
+        for (Map.Entry<String, Layers.Declaration> declaration : Layers.declared(arguments).entrySet()) {
+            if (declaration.getValue().module().equals(module)) {
+                declaring.add(declaration.getKey());
+            }
+        }
         SequencedSet<Path> granted = new LinkedHashSet<>();
         if (self) {
             granted.addAll(artifacts);
         }
         for (String key : natives) {
             Path jar = located(key, closureJars, reachable);
+            if (jar != null && layered.containsKey(jar) && !declaring.contains(layered.get(jar))) {
+                jar = null;
+            }
             if (jar == null) {
                 throw new IllegalStateException("@jenesis.native grants "
                         + key.substring(0, key.indexOf('/')) + key.substring(key.indexOf('/', key.indexOf('/') + 1))
@@ -365,20 +386,36 @@ public class Inventory implements BuildStep {
             }
             granted.add(jar);
         }
+        Deque<Path> delegating = new ArrayDeque<>(granted);
+        while (!delegating.isEmpty()) {
+            Path jar = delegating.removeFirst();
+            Set<String> declared = PathPlacement.layers(jar).keySet();
+            if (declared.isEmpty()) {
+                continue;
+            }
+            for (String token : PathPlacement.nativeAccess(jar)) {
+                Path named = located(key(token), closureJars, reachable);
+                if (named != null && declared.contains(layered.get(named)) && granted.add(named)) {
+                    delegating.addLast(named);
+                }
+            }
+        }
         if (nativeAccess != NativeAccess.IGNORE) {
             List<String> violations = new ArrayList<>();
             for (Path jar : reachable) {
+                Set<String> declared = PathPlacement.layers(jar).keySet();
                 for (String token : PathPlacement.nativeAccess(jar)) {
-                    int slash = token.indexOf('/'), second = slash < 0 ? -1 : token.indexOf('/', slash + 1);
-                    Path named = located(slash < 0
-                            ? this.group + "/native/module/" + token
-                            : second < 0
-                                    ? this.group + "/native/maven/" + token
-                                    : token.substring(0, slash) + "/native" + token.substring(slash), closureJars, reachable);
-                    if (named != null && !granted.contains(named)) {
+                    Path named = located(key(token), closureJars, reachable);
+                    if (named == null) {
+                        continue;
+                    }
+                    boolean delegated = declared.contains(layered.get(named));
+                    if (!granted.contains(delegated ? jar : named)) {
                         ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
-                        violations.add((descriptor == null ? jar.getFileName().toString() : descriptor.name())
-                                + " names " + token);
+                        String name = descriptor == null ? jar.getFileName().toString() : descriptor.name();
+                        violations.add(name + " names " + token + (delegated
+                                ? " in its layer " + layered.get(named) + ", which " + name + " grants once granted itself"
+                                : ""));
                     }
                 }
             }
@@ -409,6 +446,7 @@ public class Inventory implements BuildStep {
             inventory.setProperty(prefix + "bom." + bomIndex++, entry.getKey() + " " + entry.getValue());
         }
         writePaths(inventory, context, prefix + "artifacts", artifacts);
+        writePaths(inventory, context, prefix + "process", processes);
         writePaths(inventory, context, prefix + "bomfile", bomArtifacts);
         writePaths(inventory, context, prefix + "sources", sources);
         writePaths(inventory, context, prefix + "documentation", documentation);
@@ -475,6 +513,15 @@ public class Inventory implements BuildStep {
             inventory.store(context.next().resolve(INVENTORY));
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
+    }
+
+    private String key(String token) {
+        int slash = token.indexOf('/'), second = slash < 0 ? -1 : token.indexOf('/', slash + 1);
+        return slash < 0
+                ? group + "/native/module/" + token
+                : second < 0
+                        ? group + "/native/maven/" + token
+                        : token.substring(0, slash) + "/native" + token.substring(slash);
     }
 
     private static Path located(String key, SequencedMap<String, Path> closureJars, SequencedSet<Path> reachable) {
