@@ -770,7 +770,7 @@ public class MavenProject implements BuildExecutorModule {
                 properties.setProperty("resources." + index, resources.get(index));
             }
             properties.store(maven.resolve((test ? "test-module-" : "module-")
-                    + BuildExecutorModule.encode(relativePath) + ".properties"));
+                    + BuildExecutorModule.encodePath(relativePath) + ".properties"));
         }
     }
 
