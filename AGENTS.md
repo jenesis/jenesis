@@ -249,6 +249,13 @@ further down by nesting -
 module ever exposes a configurator for a module it does not wire itself, so a new child is a new
 configurator on its own parent, never a new component on the assembler.
 
+**An assembler is wrapped by a `Decoration`, never by adding steps beside the one it wraps.** A wrapper that
+adds steps to what another assembler builds - `Project`'s POM and BOM steps, a customizer - nests that build as
+a module of its own with `Decoration.around`, rather than calling it in place and declaring steps next to its
+own, where a name could collide with one it declares. The decorated build is handed `descriptor.toInherited()`,
+so it still finds every folder one level up, and each sibling the redirected descriptor names; `before` adds
+what it reads and `after` what reads it.
+
 **Fail loudly, name the fix.** Bad input is an `IllegalArgumentException` whose message says what was given
 and what would be valid; a missing prerequisite is an `IllegalStateException` that names it. Nothing
 silently falls back, and a lenient wildcard selector is the one deliberate exception, documented as such.

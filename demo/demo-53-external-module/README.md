@@ -29,7 +29,7 @@ Layout
 
     demo/demo-53-external-module
     |-- build/jenesis            symlink to ../../../sources/build/jenesis
-    |-- build/Demo.java          the launcher (stage, then Project + assembler)
+    |-- build/Demo.java          the launcher (stage, then a decorated Project)
     |-- plugin/                  the build module (identical to internal-module)
     |   |-- .jenesis.skip       marks plugin/ as its own build root
     |   |-- module-info.java     module demo.plugin { requires build.jenesis;
@@ -66,14 +66,14 @@ source, `main` first stages the build module to stand in for that artifact:
    `module/demo.plugin` by a small `Repository`, placed ahead of the default
    Jenesis repository (which resolves the module's `build.jenesis` and `org.json`
    dependencies).
-3. **Resolve as external.** The custom `Project`'s `PreprocessingAssembler` wires
+3. **Resolve as external.** The `Decoration` the launcher hands `Project.decorate` wires
    that coordinate as an `ExternalModule`. `ExternalModule` writes the
    coordinate, resolves and downloads its dependency closure, loads the
    `BuildExecutorModule` service provider, and runs it - reading the project's
    sources (forwarded to it) and emitting the substituted copy that the regular
    flow then compiles, jars, and tests.
 
-The assembler redirects the descriptor's sources to the module's output with
+The decoration redirects the descriptor's sources to the module's output with
 `descriptor.sources("preprocess/substitute")`, exactly as in
 `internal-module`. Unlike `InternalModule`, `ExternalModule` does not compile the
 plugin (it is already staged), so the project's sources are simply forwarded to

@@ -84,19 +84,16 @@ How the wrapping works
 ----------------------
 
 `ConfigJmod` is a customizer, named in `jenesis.properties` as in the
-`custom-assembler` demo: it wraps the assembler the settings configured in a
-lambda. `jmod`, `jlink`, and packaging
+`custom-assembler` demo: it decorates the assembler the settings configured
+with a `Decoration`. `jmod`, `jlink`, and packaging
 are selected by the committed `packaging.properties` in this directory, which
 Jenesis reads from the configuration location:
 
-    return project.assembler((descriptor, repositories, resolvers) -> project.assembler()
-            .apply(descriptor.content("config"), repositories, resolvers)
-            .mapBuild(inner -> (sub, inherited) -> {
-                sub.addStep("config", (executor, context, arguments) -> {
-                    ... // write jmodconfig/app.properties into context.next()
-                });
-                inner.accept(sub, inherited);
-            }));
+    return project.decorate(new Decoration("assemble")
+            .descriptor(descriptor -> descriptor.content("config"))
+            .before(_ -> (sub, _) -> sub.addStep("config", (executor, context, arguments) -> {
+                ... // write jmodconfig/app.properties into context.next()
+            })));
 
     packaging.properties:  jmod=true
                          jlink=true
@@ -104,15 +101,13 @@ Jenesis reads from the configuration location:
 
 With those keys the stock assembler already adds the `jmod`, `jlink`, and
 `jpackage` steps, wires `jlink` to read the `.jmod`, and wires `jpackage` to bundle
-the `jlink` runtime via `--runtime-image`. The wrapper does not duplicate any of
-that. It adds exactly one thing, the extra input, and lets the stock pipeline
-consume it:
+the `jlink` runtime via `--runtime-image`. The decoration does not duplicate any
+of that. It adds exactly one thing, the extra input, in its `before` hook, and
+lets the stock pipeline, nested under `assemble`, consume it.
 
-    sub.addStep("config", ...);      // produces jmodconfig/app.properties
-    inner.accept(sub, inherited);    // the stock java -> jmod -> jlink -> jpackage pipeline
-
-The link between the two is the module descriptor's `content` set. The wrapper
-calls `descriptor.content("config")` before delegating, and the stock `jmod`
+The link between the two is the module descriptor's `content` set. The
+decoration's `descriptor` operator calls `descriptor.content("config")`, which
+also hands the `config` step to the stock build, and the stock `jmod`
 step depends on every step named in `content` in addition to `java`. The only
 other framework knowledge involved is a folder convention: the `JMod` step routes
 a predecessor's `jmodconfig/` directory to `jmod --config` (and likewise

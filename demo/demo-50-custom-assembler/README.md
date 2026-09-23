@@ -25,7 +25,7 @@ To confirm the substituted value is what ended up compiled into the jar, run the
 produced modular jar yourself:
 
     java --module-path \
-        target/build/modules/compose/module/module-sources/produce/assemble/binary/artifacts/jar/output/artifacts/classes.jar \
+        target/build/modules/compose/module/module-sources/produce/assemble/assemble/binary/artifacts/jar/output/artifacts/classes.jar \
         --module demo.custom
 
 which prints:
@@ -61,18 +61,15 @@ instead.
 
             @Override
             public Project apply(Project project) {
-                return project.assembler((descriptor, repositories, resolvers) -> project.assembler()
-                        .apply(descriptor.sources("preprocess"), repositories, resolvers)
-                        .mapBuild(inner -> (sub, inherited) -> {
-                            sub.addStep("preprocess", (executor, context, arguments) -> {
-                                ... // rewrite ${greeting} into context.next()
-                            }, descriptor.sources().stream());
-                            inner.accept(sub, inherited);
-                        }));
+                return project.decorate(new Decoration("assemble")
+                        .descriptor(descriptor -> descriptor.sources("preprocess"))
+                        .before(descriptor -> (sub, _) -> sub.addStep("preprocess", (executor, context, arguments) -> {
+                            ... // rewrite ${greeting} into context.next()
+                        }, descriptor.sources().stream())));
             }
         }
 
-The assembler and the `preprocess` step are both lambdas. A build step is
+The `preprocess` step is a lambda. A build step is
 serialised into the key its output is cached under, so the class whose lambda
 becomes a step implements `Serializable`.
 
@@ -93,29 +90,30 @@ unchanged.
 > customizer is then applied inside the container and never on your machine, and
 > the project cannot switch Docker off.
 
-The preprocessing is delivered by an assembler that wraps the stock one.
-`Project.assembler(...)` accepts any
-`MultiProjectAssembler<? super ProjectModuleDescriptor>`, which is a functional
-interface, so the lambda above is the whole assembler. `project.assembler()` is
-the `InferredMultiProjectAssembler` the settings configured, and the lambda calls
-it for every module.
+The preprocessing is delivered by a `Decoration`, which wraps the assembler the
+settings configured. `project.decorate(...)` hands it the project's assembler
+and keeps the decorated one. For each module the decoration does three things:
 
-For each module the wrapper does three things:
-
-1. Adds a `preprocess` build step that reads the module's original `sources/`
+1. Its `before` step, `preprocess`, reads the module's original `sources/`
    tree, copies it into its own output, and rewrites `${greeting}` in every
    `.java` file (other files are linked through unchanged).
-2. Hands the stock assembler a `ProjectModuleDescriptor` whose `sources()` is
-   redirected to the `preprocess` step instead of the original source folder.
-   `ProjectModuleDescriptor` is immutable with a wither per property, so this is
-   a one-liner: `descriptor.sources("preprocess")`. Every reference
+2. Its `descriptor` operator hands the stock build a `ProjectModuleDescriptor`
+   whose `sources()` names the `preprocess` step instead of the original source
+   folder. `ProjectModuleDescriptor` is immutable with a wither per property, so
+   this is a one-liner: `descriptor.sources("preprocess")`. Every reference
    accessor (`dependencies`, `sources`, `resources`, `manifests`, `coordinates`,
    `artifacts`, `content`) returns a `SequencedSet<String>`, so a customizer can add folders
    as readily as replace them.
-3. Runs the stock assembler's module unchanged. Because its `sources()` now
-   points at the preprocessed tree, `javac`, the jar step, and (when present)
-   the test step all consume the substituted sources, and the rest of the build
-   - dependency resolution, staging, pinning - is untouched.
+3. It runs the stock build unchanged, as a module of its own named `assemble`,
+   which is why the jar above sits under `assemble/assemble`. Because its
+   `sources()` now points at the preprocessed tree, `javac`, the jar step, and
+   (when present) the test step all consume the substituted sources, and the
+   rest of the build - dependency resolution, staging, pinning - is untouched.
+
+The stock build sits in a module of its own, so a step the decoration adds never
+collides with one the stock build declares, whatever it is named. A step that
+should run after the stock build goes in `after` instead of `before`, and names
+`assemble` as its input.
 
 That redirection is the whole trick: the custom assembler never reimplements the
 Java toolchain, it only interposes a source transformation in front of it. Any

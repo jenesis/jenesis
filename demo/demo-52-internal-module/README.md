@@ -56,20 +56,21 @@ How it works
 ------------
 
 `Substitution` is a customizer, named in `jenesis.properties` as in the
-`custom-assembler` demo: it wraps the
-assembler the settings configured in a lambda, and `Execute` builds the adjusted
+`custom-assembler` demo: it decorates the
+assembler the settings configured with a `Decoration`, and `Execute` builds the adjusted
 project and launches the produced module's `main` so the substituted greeting is
 shown. `Execute` reads the build's inventory to find the module and its runtime
-classpath, so nothing is located by hand. For each module the wrapper:
+classpath, so nothing is located by hand. For each module the decoration:
 
-1. Adds a `preprocess` node that is an `InternalModule` pointed at `plugin/`.
+1. Adds a `preprocess` node, in its `before` hook, that is an `InternalModule` pointed at `plugin/`.
    `InternalModule` compiles the plugin from source, resolves its declared
    dependencies, loads the `BuildExecutorModule` service provider, and runs it.
    The three-argument constructor wires the **default Jenesis repository** with
    the local export (`~/.jenesis`) prepended, so the plugin's `build.jenesis` and
    `org.json` dependencies resolve from there - nothing is downloaded explicitly.
 2. Redirects the descriptor's sources to the module's output with
-   `descriptor.sources("preprocess/substitute")`, so the stock assembler's
+   `descriptor.sources("preprocess/substitute")` in its `descriptor` operator,
+   so the stock assembler's
    regular flow compiles, jars, and tests the preprocessed sources.
 
 The project's sources are passed to the module as inherited steps.
@@ -86,7 +87,7 @@ that ends up in the jar is the substituted one.
 
 The plugin's `substitute` step is reachable in the build graph as
 `preprocess/substitute` (the delegated module's steps surface directly under the
-module name), which is exactly the key the assembler redirects the sources to.
+module name), which is exactly the key the decoration redirects the sources to.
 
 Isolating the build module's Jenesis
 ------------------------------------

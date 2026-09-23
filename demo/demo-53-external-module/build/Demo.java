@@ -9,11 +9,8 @@ import build.jenesis.Resolver;
 import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisRepository;
 import build.jenesis.module.ModularJarResolver;
-import build.jenesis.project.AssemblyDescriptor;
+import build.jenesis.project.Decoration;
 import build.jenesis.project.ExternalModule;
-import build.jenesis.project.InferredMultiProjectAssembler;
-import build.jenesis.project.MultiProjectAssembler;
-import build.jenesis.project.ProjectModuleDescriptor;
 import build.jenesis.Environment;
 import build.jenesis.Make;
 
@@ -63,36 +60,14 @@ public class Demo {
 
         // Build the project (the resolved plugin rewrites ${greeting} first) and
         // launch the produced module so its main prints the substituted greeting.
+        Map<String, Repository> pluginRepositories = Map.of("module", repository);
+        Map<String, Resolver> pluginResolvers = Map.of("module", ModularJarResolver.ofEnvironment(environment, true));
         Project project = Project.ofEnvironment(environment, Path.of("."))
-                .assembler(new PreprocessingAssembler(
-                        InferredMultiProjectAssembler.ofEnvironment(environment),
-                        Map.of("module", repository),
-                        Map.of("module", ModularJarResolver.ofEnvironment(environment, true))));
+                .decorate(new Decoration("assemble")
+                        .descriptor(descriptor -> descriptor.sources("preprocess/substitute"))
+                        .before(descriptor -> (sub, _) -> sub.addModule("preprocess",
+                                new ExternalModule("module/demo.plugin", "tool", pluginRepositories, pluginResolvers),
+                                Stream.concat(descriptor.sources().stream(), descriptor.manifests().stream()))));
         System.exit(new Execution(project).execute(args));
-    }
-
-    private record PreprocessingAssembler(
-            MultiProjectAssembler<? super ProjectModuleDescriptor> delegate,
-            Map<String, Repository> pluginRepositories,
-            Map<String, Resolver> pluginResolvers)
-            implements MultiProjectAssembler<ProjectModuleDescriptor> {
-
-        @Override
-        public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
-                                        Map<String, Repository> repositories,
-                                        Map<String, Resolver> resolvers) throws IOException {
-            SequencedSet<String> original = descriptor.sources();
-            SequencedSet<String> manifests = descriptor.manifests();
-            ProjectModuleDescriptor redirected = descriptor.sources("preprocess/substitute");
-            return delegate.apply(redirected, repositories, resolvers).mapBuild(inner -> (sub, inherited) -> {
-                ExternalModule preprocess = new ExternalModule(
-                        "module/demo.plugin",               // the coordinate to resolve
-                        "tool",                             // dependency group for the plugin's resolved closure
-                        pluginRepositories,
-                        pluginResolvers);
-                sub.addModule("preprocess", preprocess, Stream.concat(original.stream(), manifests.stream()));
-                inner.accept(sub, inherited);
-            });
-        }
     }
 }

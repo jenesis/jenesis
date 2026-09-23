@@ -19,6 +19,7 @@ import build.jenesis.module.ModularProject;
 import build.jenesis.module.ModularStaging;
 import build.jenesis.module.PinModuleInfo;
 import build.jenesis.project.AssemblyDescriptor;
+import build.jenesis.project.Decoration;
 import build.jenesis.project.Ide;
 import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.MultiProjectAssembler;
@@ -116,7 +117,7 @@ public record Project(
             executor.addModule(HELP, new HelpModule("maven", assembler.getClass().getName(), project.environment().out()));
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
-            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler, null, null, false);
+            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = pomAware(assembler, null, null, false);
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
                 repositories.putIfAbsent("maven",
@@ -252,11 +253,10 @@ public record Project(
             executor.addModule(HELP, new HelpModule("modular_to_maven", assembler.getClass().getName(), project.environment().out()));
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
-            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler,
+            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = pomAware(new BomAwareAssembler(assembler, project.hashFunction()),
                     BuildExecutorModule.PREVIOUS.repeat(2) + MultiProjectModule.MANIFESTS,
                     "module",
                     true);
-            MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(pomAware, project.hashFunction());
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
                 repositories.putIfAbsent("maven",
@@ -286,7 +286,7 @@ public record Project(
                                                              project.licenseFiles(Dependencies.SPDX),
                                                              project.boms(),
                                                              project.signatures(),
-                                                             (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
+                                                             (descriptor, mergedRepos, mergedResolvers) -> pomAware.apply(
                                         new ProjectModuleDescriptor(descriptor)
                                                 .configuration(configurations(modularConfigurationFolder(descriptor.location()), project.configuration(), project.profiles()))
                                                 .test(project.tests())
@@ -581,6 +581,11 @@ public record Project(
                     -Djenesis.project.docker=true, which applies it inside the container only.
                     jenesis-validate checks build/jenesis alone, so a customizer leaves the vendored
                     engine valid, and the installed jenesis never runs one.
+
+                    A customizer adds steps with project.decorate(new Decoration("assemble")...):
+                    the stock build runs as a module named assemble, a before hook adds what it reads
+                    (with descriptor(...) redirecting its sources, content, ...) and an after hook
+                    adds what reads assemble, so no step collides with one the stock build declares.
 
                     A project with its own entry point calls `new Make("build.Demo").run(selectors)`,
                     which returns the status to exit with. For a GraalVM native launcher, read the
@@ -1300,26 +1305,17 @@ public record Project(
         }
     }
 
-    private record PomAwareAssembler(MultiProjectAssembler<? super ProjectModuleDescriptor> base,
-                                     String manifests,
-                                     String prefix,
-                                     boolean resolved) implements MultiProjectAssembler<ProjectModuleDescriptor> {
-
-        @Override
-        public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
-                                        Map<String, Repository> repositories,
-                                        Map<String, Resolver> resolvers) throws IOException {
-            return base.apply(descriptor.toInherited(), repositories, resolvers).mapBuild(delegate -> (sub, inherited) -> {
-                sub.addModule("assemble", delegate, inherited.sequencedKeySet().stream());
-                sub.addModule("describe", (describe, describeInherited) -> {
-                            describe.addStep("pom", new Pom().resolved(resolved), describeInherited.sequencedKeySet().stream());
-                            if (manifests != null) {
-                                describe.addStep("identity", new MavenIdentity(prefix, manifests), "pom", manifests);
-                            }
-                        },
-                        inherited.sequencedKeySet().stream());
-            });
-        }
+    private static MultiProjectAssembler<ProjectModuleDescriptor> pomAware(MultiProjectAssembler<? super ProjectModuleDescriptor> base,
+                                                                           String manifests,
+                                                                           String prefix,
+                                                                           boolean resolved) {
+        return new Decoration("assemble").after(_ -> (sub, inherited) -> sub.addModule("describe", (describe, describeInherited) -> {
+                    describe.addStep("pom", new Pom().resolved(resolved), describeInherited.sequencedKeySet().stream());
+                    if (manifests != null) {
+                        describe.addStep("identity", new MavenIdentity(prefix, manifests), "pom", manifests);
+                    }
+                },
+                inherited.sequencedKeySet().stream())).around(base);
     }
 
     private record BomAwareAssembler(MultiProjectAssembler<? super ProjectModuleDescriptor> base,
@@ -1329,14 +1325,13 @@ public record Project(
         public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
                                         Map<String, Repository> repositories,
                                         Map<String, Resolver> resolvers) throws IOException {
-            AssemblyDescriptor assembly = base.apply(descriptor, repositories, resolvers);
             if (BuildStep.locate(descriptor.configuration(), "bom.properties") == null) {
-                return assembly;
+                return base.apply(descriptor, repositories, resolvers);
             }
-            return assembly.mapBuild(delegate -> (sub, inherited) -> {
-                delegate.accept(sub, inherited);
-                sub.addStep("bom", new Bom(hashFunction), inherited.sequencedKeySet().stream());
-            });
+            return new Decoration("assemble")
+                    .after(_ -> (sub, inherited) -> sub.addStep("bom", new Bom(hashFunction), inherited.sequencedKeySet().stream()))
+                    .around(base)
+                    .apply(descriptor, repositories, resolvers);
         }
     }
 
@@ -2157,6 +2152,10 @@ public record Project(
                 repositories,
                 resolvers,
                 environment);
+    }
+
+    public Project decorate(Decoration decoration) {
+        return assembler(decoration.around(assembler));
     }
 
     public Project repositories(Map<String, Repository> repositories) {
