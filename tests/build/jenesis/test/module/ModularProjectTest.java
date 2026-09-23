@@ -793,7 +793,8 @@ public class ModularProjectTest {
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
-        root.addModule("modules", ModularProject.make(Environment.SYSTEM, project,
+        root.addModule("modules", ModularProject.make(Environment.SYSTEM,
+                project,
                 "main",
                 "module",
                 _ -> true,

@@ -92,17 +92,12 @@ public class MavenProject implements BuildExecutorModule {
 
     public static BuildExecutorModule make(Path root,
                                            MultiProjectAssembler<? super MavenModuleDescriptor> assembler) {
-        return make(Environment.NONE, root, assembler);
-    }
-
-    public static BuildExecutorModule make(Environment environment,
-                                           Path root,
-                                           MultiProjectAssembler<? super MavenModuleDescriptor> assembler) {
-        return make(environment, root,
+        return make(Environment.NONE,
+                root,
                 "main",
                 "maven",
-                Map.of("maven", MavenDefaultRepository.ofEnvironment(environment)),
-                Map.of("maven", MavenPomResolver.ofEnvironment(environment)),
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)),
                 null,
                 Collections.emptyNavigableSet(),
                 assembler);
