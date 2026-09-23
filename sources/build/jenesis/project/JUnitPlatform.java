@@ -42,6 +42,11 @@ public record JUnitPlatform() implements TestFramework {
     }
 
     @Override
+    public Set<String> reflectingModules() {
+        return Set.of(PLATFORM_COMMONS, JUNIT4);
+    }
+
+    @Override
     public String runnerClass() {
         return "org.junit.platform.console.ConsoleLauncher";
     }

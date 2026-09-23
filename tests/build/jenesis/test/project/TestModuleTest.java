@@ -34,7 +34,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 public class TestModuleTest {
 
     @TempDir
-    private Path root, dependencies, classes, emptyDependencies, junit4Dependencies, testngDependencies;
+    private Path root, dependencies, classes, module, emptyDependencies, junit4Dependencies, testngDependencies;
 
     @BeforeEach
     public void setUp() throws Exception {
@@ -114,6 +114,63 @@ public class TestModuleTest {
                         Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM)))
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false).pathPlacement(PathPlacement.CLASS_PATH),
                 "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content().contains("Hello world!");
+        assertThat(reportedErrors(supplement)).isEmpty();
+    }
+
+    @Test
+    public void opens_a_test_module_that_is_not_open_to_the_framework() throws Exception {
+        Path output = Files.createDirectories(module.resolve(Javac.CLASSES));
+        List<Path> modulePath = new ArrayList<>(bootModuleJars());
+        modulePath.add(downloadJar(Files.createTempFile(root, "apiguardian", ".jar"),
+                "https://repo1.maven.org/maven2/org/apiguardian/apiguardian-api/1.1.2/apiguardian-api-1.1.2.jar",
+                "b509448ac506d607319f182537f0b35d71007582ec741832a1f111e5b5b70b38"));
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        try (StandardJavaFileManager fileManager = compiler.getStandardFileManager(null, null, null)) {
+            fileManager.setLocationFromPaths(StandardLocation.CLASS_OUTPUT, List.of(output));
+            fileManager.setLocationFromPaths(StandardLocation.MODULE_PATH, modulePath);
+            List<JavaFileObject> units = new ArrayList<>();
+            for (Map.Entry<String, String> source : Map.of(
+                    "module-info", "module sample.test { requires org.junit.jupiter.api; }",
+                    "sample/TestSample", """
+                            package sample;
+                            class TestSample {
+                                @org.junit.jupiter.api.Test
+                                void test() { System.out.println("Hello world!"); }
+                            }
+                            """).entrySet()) {
+                units.add(new SimpleJavaFileObject(
+                        URI.create("string:///" + source.getKey() + ".java"),
+                        JavaFileObject.Kind.SOURCE) {
+                    @Override
+                    public CharSequence getCharContent(boolean ignoreEncodingErrors) {
+                        return source.getValue();
+                    }
+                });
+            }
+            StringWriter diagnostics = new StringWriter();
+            assertThat(compiler.getTask(diagnostics, fileManager, null, null, null, units).call())
+                    .as(diagnostics::toString)
+                    .isTrue();
+        }
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("module", module);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(Environment.SYSTEM, Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM)))
+                        .isTest(candidate -> candidate.endsWith("TestSample"))
+                        .jarsOnly(false)
+                        .moduleName("sample.test"),
+                "dependencies", "module");
         executor.execute();
 
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
@@ -292,7 +349,7 @@ public class TestModuleTest {
 
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
-        assertThat(supplement.resolve("command")).content().contains("--select-class=sample.TestSample");
+        assertThat(supplement.resolve("java.args")).content().contains("--select-class=sample.TestSample");
     }
 
     @Test
@@ -323,7 +380,7 @@ public class TestModuleTest {
         executor.execute();
 
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
-        assertThat(supplement.resolve("command")).content()
+        assertThat(supplement.resolve("java.args")).content()
                 .contains("--select-class=sample.TestSample")
                 .doesNotContain("AbstractTestSample");
     }
@@ -349,7 +406,7 @@ public class TestModuleTest {
 
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
-        assertThat(supplement.resolve("command")).content().contains("--select-method=sample.TestSample#test");
+        assertThat(supplement.resolve("java.args")).content().contains("--select-method=sample.TestSample#test");
     }
 
     @Test
@@ -901,6 +958,11 @@ public class TestModuleTest {
         @Override
         public boolean isMarkedBy(ModuleDescriptor module) {
             return false;
+        }
+
+        @Override
+        public Set<String> reflectingModules() {
+            return Set.of();
         }
 
         @Override

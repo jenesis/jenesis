@@ -21,7 +21,7 @@
  * @jenesis.pin org.objenesis/objenesis 3.3 SHA-256/02dfd0b0439a5591e35b708ed2f5474eb0948f53abf74637e959b8e4ef69bfeb
  * @jenesis.pin org.opentest4j/opentest4j 1.3.0 SHA-256/48e2df636cab6563ced64dcdff8abb2355627cb236ef0bf37598682ddf742f1b
  */
-open module demo.agents.test {
+module demo.agents.test {
     requires demo.agents;
     requires org.junit.jupiter;
     requires org.mockito;
