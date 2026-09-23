@@ -59,6 +59,7 @@ public class Launcher implements BuildStep {
         String mainClass = null, mainModule = null, name = null;
         Path shaded = null;
         SequencedMap<String, Path> jars = new TreeMap<>();
+        SequencedSet<Path> granted = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -90,6 +91,7 @@ public class Launcher implements BuildStep {
             for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
                 jars.putIfAbsent(file.getFileName().toString(), file);
             }
+            granted.addAll(Inventory.nativeAccess(argument.folder()));
         }
         if (mainClass == null || shaded == null || jars.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
@@ -115,9 +117,19 @@ public class Launcher implements BuildStep {
             }
         }
         SequencedMap<String, Path> classpath = new LinkedHashMap<>(), modulepath = new LinkedHashMap<>();
+        SequencedSet<String> nativeAccess = new LinkedHashSet<>();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
             boolean onModulePath = mainModule != null && pathPlacement.test(entry.getValue());
             (onModulePath ? modulepath : classpath).put(entry.getKey(), entry.getValue());
+            if (onModulePath && granted.contains(entry.getValue().toAbsolutePath().normalize())) {
+                ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(entry.getValue());
+                if (descriptor == null) {
+                    throw new IllegalStateException("Cannot grant native access to "
+                            + entry.getKey()
+                            + ", which is placed on the module path but describes no module");
+                }
+                nativeAccess.add(descriptor.name());
+            }
         }
         SequencedProperties application = new SequencedProperties();
         application.setProperty("mainClass", mainClass);
@@ -126,14 +138,36 @@ public class Launcher implements BuildStep {
         }
         application.setProperty("classpath", String.join(",", classpath.sequencedKeySet()));
         application.setProperty("modulepath", String.join(",", modulepath.sequencedKeySet()));
-        layers.forEach((layer, membership) -> {
-            application.setProperty("modulepath." + layer,
-                    String.join(",", membership.modulepath()));
-            if (!membership.classpath().isEmpty()) {
-                application.setProperty("classpath." + layer,
-                        String.join(",", membership.classpath()));
+        if (!nativeAccess.isEmpty()) {
+            application.setProperty("enableNativeAccess", String.join(",", nativeAccess));
+        }
+        boolean layered = false;
+        for (Map.Entry<String, Layers.Membership> layer : layers.entrySet()) {
+            application.setProperty("modulepath." + layer.getKey(),
+                    String.join(",", layer.getValue().modulepath()));
+            if (!layer.getValue().classpath().isEmpty()) {
+                application.setProperty("classpath." + layer.getKey(),
+                        String.join(",", layer.getValue().classpath()));
             }
-        });
+            SequencedSet<String> modules = new LinkedHashSet<>();
+            for (Map.Entry<Path, Boolean> member : layer.getValue().nativeAccess(isolated, granted).entrySet()) {
+                layered = true;
+                if (member.getValue()) {
+                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(member.getKey());
+                    if (descriptor == null) {
+                        throw new IllegalStateException("Cannot grant native access to "
+                                + member.getKey().getFileName()
+                                + " in layer "
+                                + layer.getKey()
+                                + ", which is placed on its module path but describes no module");
+                    }
+                    modules.add(descriptor.name());
+                }
+            }
+            if (!modules.isEmpty()) {
+                application.setProperty("enableNativeAccess." + layer.getKey(), String.join(",", modules));
+            }
+        }
         Path descriptor = context.supplement().resolve("application.properties");
         application.store(descriptor);
         SequencedMap<String, Path> stored = new TreeMap<>(classpath);
@@ -151,6 +185,9 @@ public class Launcher implements BuildStep {
         Manifest manifest = new Manifest();
         manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
         manifest.getMainAttributes().put(Attributes.Name.MAIN_CLASS, MAIN_CLASS);
+        if (layered || jars.values().stream().anyMatch(jar -> granted.contains(jar.toAbsolutePath().normalize()))) {
+            manifest.getMainAttributes().putValue("Enable-Native-Access", "ALL-UNNAMED");
+        }
         Path jar = Files.createDirectory(context.next().resolve(LAUNCHER))
                 .resolve((name == null ? "application" : name) + ".jar");
         try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {

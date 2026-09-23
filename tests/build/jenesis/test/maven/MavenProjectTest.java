@@ -8,6 +8,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.PathPlacement;
 import build.jenesis.Platform;
 import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
@@ -146,6 +147,46 @@ public class MavenProjectTest {
             assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.ATTACHMENTS))).containsOnly(
                     Map.entry("main/agent/maven/org.mockito/mockito-core", ""));
         }
+    }
+
+    @Test
+    public void native_access_of_the_project_is_signalled_by_its_jar_and_granted_to_it_in_its_tests()
+            throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.native-->
+                    <!--jenesis.native org.example/jni-->
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path main = results.get("maven/module-/manifests"), test = results.get("maven/test-module-/manifests");
+        assertThat(SequencedProperties.ofFiles(main.resolve(BuildStep.NATIVES))).containsOnlyKeys(
+                "main/native/maven/org.example/jni");
+        assertThat(SequencedProperties.ofFiles(main.resolve(BuildStep.MODULE)).getProperty("native"))
+                .isEqualTo("true");
+        Manifest manifest = new Manifest();
+        try (InputStream input = Files.newInputStream(main.resolve("manifest.mf"))) {
+            manifest.read(input);
+        }
+        assertThat(manifest.getMainAttributes().getValue(PathPlacement.NATIVE_ACCESS)).isEqualTo("true");
+        assertThat(SequencedProperties.ofFiles(test.resolve(BuildStep.NATIVES)))
+                .as("the tests run the project's jar as a dependency, so they grant it rather than themselves")
+                .containsOnlyKeys("main/native/maven/group/artifact", "main/native/maven/org.example/jni");
+        assertThat(SequencedProperties.ofFiles(test.resolve(BuildStep.MODULE)).getProperty("native")).isNull();
+        assertThat(test.resolve("manifest.mf")).doesNotExist();
     }
 
     @Test

@@ -1145,6 +1145,28 @@ public class Dependencies implements BuildExecutorModule {
         return new ArrayList<>(selected);
     }
 
+    public static Path runtime(Path folder, String key) throws IOException {
+        Path file = index(folder);
+        if (file == null) {
+            return null;
+        }
+        int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
+        String prefix = key.substring(0, first) + "/runtime" + key.substring(second);
+        SequencedProperties properties = SequencedProperties.ofFiles(file);
+        for (String candidate : properties.stringPropertyNames()) {
+            if (candidate.equals(prefix)
+                    || candidate.startsWith(prefix + "/") && candidate.indexOf('/', prefix.length() + 1) < 0) {
+                String value = properties.getProperty(candidate);
+                int space = value.indexOf(' ');
+                Path jar = folder.resolve(space < 0 ? value : value.substring(0, space)).normalize();
+                if (Files.exists(jar)) {
+                    return jar;
+                }
+            }
+        }
+        return null;
+    }
+
     public static List<Path> all(Path folder) throws IOException {
         Path file = index(folder);
         if (file == null) {

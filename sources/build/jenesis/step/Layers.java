@@ -154,6 +154,17 @@ public class Layers implements BuildStep {
             all.addAll(classpath);
             return all;
         }
+
+        public SequencedMap<Path, Boolean> nativeAccess(Map<String, Path> jars, Set<Path> granted) {
+            SequencedMap<Path, Boolean> members = new LinkedHashMap<>();
+            for (String name : all()) {
+                Path jar = jars.get(name);
+                if (jar != null && granted.contains(jar.toAbsolutePath().normalize())) {
+                    members.put(jar, modulepath.contains(name));
+                }
+            }
+            return members;
+        }
     }
 
     public static SequencedMap<String, Membership> membership(Path folder) throws IOException {

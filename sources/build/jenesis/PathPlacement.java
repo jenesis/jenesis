@@ -32,7 +32,7 @@ public enum PathPlacement {
     };
 
     public static final String ALIASES = "Jenesis-Aliases", OVERRIDES = "Jenesis-Overrides",
-            LAYERS = "Jenesis-Layer";
+            LAYERS = "Jenesis-Layer", NATIVE_ACCESS = "Jenesis-Native-Access";
     private static final Pattern DERIVED_VERSION = Pattern.compile("\\d+(\\..*)?");
 
     private final boolean modular;
@@ -154,6 +154,31 @@ public enum PathPlacement {
             return Collections.emptyNavigableMap();
         }
         return layers(declaration, path.toString());
+    }
+
+    public static boolean nativeAccess(Path path) throws IOException {
+        if (Files.isDirectory(path)) {
+            return false;
+        }
+        String declaration;
+        try (JarFile jar = new JarFile(path.toFile(), true, ZipFile.OPEN_READ, JarFile.runtimeVersion())) {
+            Manifest manifest = jar.getManifest();
+            declaration = manifest == null ? null : manifest.getMainAttributes().getValue(NATIVE_ACCESS);
+        } catch (ZipException _) {
+            return false;
+        }
+        if (declaration == null || declaration.isBlank()) {
+            return false;
+        }
+        return switch (declaration.trim()) {
+            case "true" -> true;
+            case "false" -> false;
+            default -> throw new IllegalArgumentException("Malformed " + NATIVE_ACCESS + " value '"
+                    + declaration.trim()
+                    + "' in "
+                    + path
+                    + ": expected true or false");
+        };
     }
 
     public static SequencedMap<String, SequencedSet<String>> overrides(String declaration, String origin) {

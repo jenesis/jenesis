@@ -825,6 +825,18 @@ public record Project(
                           verbatim as agent options. MAVEN modules declare the same lines in a
                           project-level <!--jenesis.attach ... --> comment, where a test-scoped match
                           attaches to test runs only and &#45;&#45; escapes a double dash.
+                      @jenesis.native [<token>...]
+                          Grant native access (--enable-native-access) to this module, with no
+                          token, or to a dependency it runs with, on its Execute run, its test runs
+                          and what it packages; a grant adds no dependency. Only the running module's
+                          own grants count and none is inherited: a module that grants itself marks
+                          its jar with Jenesis-Native-Access: true, which tells a consumer of the need
+                          but grants nothing there. jenesis.dependency.native=strict fails a build
+                          whose module runs such a jar without granting it. A module in one of the
+                          run's layers is granted the same way, by name or as layer:<name>/<repo>/...,
+                          and reaches the launcher as jlayer.enableNativeAccess.<name>, which grants
+                          it when it defines the layer. MAVEN modules declare tokens in a
+                          <!--jenesis.native ... --> comment, an empty one naming the project itself.
 
                     ## 9. Activate a tool by dropping in its configuration file
 
@@ -945,7 +957,7 @@ public record Project(
                     than the JVM, so two runs in one program never clash; everything after them is
                     what the command line would take. A setting that replaces the process a build
                     runs in - toolchain.version, project.docker, execute.docker - is refused by name
-                    there, and demo-56-tools-api shows the whole contract.
+                    there, and demo-57-tools-api shows the whole contract.
 
                     Every command line here, the commands and the tools alike, reads @<file> as the
                     arguments that file holds - settings and selectors, # to the end of a line being
@@ -981,7 +993,7 @@ public record Project(
 
                     ## 13. Copy a demo: they are the recipe book
 
-                    63 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    64 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -993,9 +1005,9 @@ public record Project(
                       Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
                                          04 java-modular-multi, 19 module-layout (forcing MODULAR)
                       Starting a build   05 startup (what launching costs, and the daemon),
-                                         61 toolchain (the JDK the build runs on)
+                                         62 toolchain (the JDK the build runs on)
                       Runnable output    06, 07 java-*-executable (jpackage), 08 bundle (jars for a
-                                         stock JRE), 09 java-multi-release, 62 native-image (GraalVM)
+                                         stock JRE), 09 java-multi-release, 63 native-image (GraalVM)
                       Compiler control   10 javac-arguments (process-javac.properties),
                                          11 annotations (an annotation processor via @jenesis.plugin),
                                          12 error-prone (a javac plugin)
@@ -1016,15 +1028,16 @@ public record Project(
                                          35 pitest (mutation), 36 jmh (benchmark harness)
                       Other languages    38 kotlin, 40 kotlin-plugin, 41 scala, 43 groovy
                       Operating it       45 profiles, 46 build-cache, 47 docker-isolation,
-                                         48 agents (@jenesis.attach)
-                      Shipping it        57 code-signing (jarsigner), 58 publishing (Maven Central),
-                                         59 module-convention (resolving what you published),
-                                         60 reproducible (a jar checked against a recorded digest),
-                                         63 jpx (run a released program without building)
-                      Extending it       49 custom-assembler, 50 custom-jmod, 51 internal-module,
-                                         52 external-module, 53 custom-maven, 54 custom-modular,
-                                         55 custom-build (no Project at all),
-                                         56 tools-api (a build inside another program's JVM)
+                                         48 agents (@jenesis.attach),
+                                         49 native-access (@jenesis.native)
+                      Shipping it        58 code-signing (jarsigner), 59 publishing (Maven Central),
+                                         60 module-convention (resolving what you published),
+                                         61 reproducible (a jar checked against a recorded digest),
+                                         64 jpx (run a released program without building)
+                      Extending it       50 custom-assembler, 51 custom-jmod, 52 internal-module,
+                                         53 external-module, 54 custom-maven, 55 custom-modular,
+                                         56 custom-build (no Project at all),
+                                         57 tools-api (a build inside another program's JVM)
 
                     ## 14. When stuck, read the source
 
@@ -2270,6 +2283,7 @@ public record Project(
                 print.docker|true|The image notice when a build or run is containerized
                 print.jreleaser|true|The JReleaser command line when a release runs
                 dependency.pin||strict|versions|ignore; unset keeps existing pins and tolerates missing ones
+                dependency.native|ignore|ignore|strict: strict fails a module whose run includes a jar declaring Jenesis-Native-Access that the module does not grant with @jenesis.native
                 resolver.maven|maven|maven|closest|latest|release|stable|fail|managed: which version a Maven coordinate resolves to; stable skips pre-release qualifiers, fail rejects a coordinate two dependencies require at different versions, managed rejects that and any version only a dependency's POM names
                 resolver.module|first|first|ignore|fail|managed: what to do with the versions a module-info records; fail rejects two requires that record different versions, managed rejects that and any module only another module's requires names
                 pin.file||Write the whole project's pins to this properties file instead of the module declarations

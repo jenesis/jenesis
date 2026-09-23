@@ -203,9 +203,7 @@ public record Jpx(Path storage,
             } else {
                 command.addAll(ProcessBuildStep.argumentFile(argumentFile, options));
             }
-            if (modulepath != null) {
-                command.addAll(ModuleGraph.load(properties));
-            }
+            command.addAll(ModuleGraph.load(properties));
             String mainModule = properties.getProperty("mainModule");
             if (mainModule != null) {
                 command.add("-m");
@@ -549,8 +547,12 @@ public record Jpx(Path storage,
         List<String> modulepath = new ArrayList<>(), classpath = new ArrayList<>();
         ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
-            boolean placed = graph.place(placement, folder.resolve(entry.getKey()));
+            Path file = folder.resolve(entry.getKey());
+            boolean placed = graph.place(placement, file);
             (placed ? modulepath : classpath).add(entry.getKey());
+            if (file.equals(root) && PathPlacement.nativeAccess(file)) {
+                graph.enableNativeAccess(file, placed);
+            }
         }
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("name", command.name());

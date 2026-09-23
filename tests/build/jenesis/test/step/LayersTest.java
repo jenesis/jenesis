@@ -31,6 +31,19 @@ public class LayersTest {
     }
 
     @Test
+    public void membership_names_the_granted_members_and_the_path_each_is_on() {
+        Path named = root.resolve("named.jar"), unnamed = root.resolve("unnamed.jar"), other = root.resolve("other.jar");
+        Layers.Membership membership = new Layers.Membership(
+                new LinkedHashSet<>(List.of("named.jar", "other.jar")),
+                new LinkedHashSet<>(List.of("unnamed.jar")));
+
+        assertThat(membership.nativeAccess(
+                Map.of("named.jar", named, "unnamed.jar", unnamed, "other.jar", other),
+                Set.of(named.toAbsolutePath().normalize(), unnamed.toAbsolutePath().normalize())))
+                .containsExactly(Map.entry(named, true), Map.entry(unnamed, false));
+    }
+
+    @Test
     public void isolates_a_layers_closure_and_shares_the_api_module() throws IOException {
         module(artifacts, "demo.api", builder -> builder.exports(PackageDesc.of("demo.api"), 0));
         module(resolved, "demo.api", builder -> builder.exports(PackageDesc.of("demo.api"), 0));
