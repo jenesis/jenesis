@@ -134,8 +134,15 @@ public class InternalModule implements BuildExecutorModule {
     }
 
     public InternalModule platform(Platform platform) {
-        return new InternalModule(prefix, source, dependencyModule, javacStep, additionalDependencies, buildModuleName,
-                pinning, group, platform);
+        return new InternalModule(prefix,
+                source,
+                dependencyModule,
+                javacStep,
+                additionalDependencies,
+                buildModuleName,
+                pinning,
+                group,
+                platform);
     }
 
     public InternalModule pinning(Pinning pinning) {

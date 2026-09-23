@@ -124,8 +124,8 @@ public class EnvironmentTest {
 
     @Test
     public void lists_the_platform_tokens_the_settings_name() {
-        Function<String, String> keys = Make.keys(Map.of("jenesis.platform.fips", "true",
-                "jenesis.platform.linux", "false"));
+        Map<String, String> properties = Map.of("jenesis.platform.fips", "true", "jenesis.platform.linux", "false");
+        Function<String, String> keys = Make.keys(properties);
         assertThat(keys.apply("make.platforms"))
                 .as("a platform token is any key, so the provider lists the ones it holds")
                 .isEqualTo("fips,linux");

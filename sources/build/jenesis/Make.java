@@ -28,7 +28,7 @@ public final class Make {
     }
 
     public Make(String mainClass) {
-        this(mainClass, ambient(new LinkedHashMap<>()));
+        this(mainClass, ambient(Map.of()));
     }
 
     public Make(String mainClass, Function<String, String> ambient) {
@@ -118,7 +118,7 @@ public final class Make {
         System.exit(code == null ? make.run(selectors) : code);
     }
 
-    static Function<String, String> ambient(SequencedMap<String, String> named) {
+    static Function<String, String> ambient(Map<String, String> named) {
         Map<String, String> properties = new HashMap<>();
         for (String name : System.getProperties().stringPropertyNames()) {
             if (name.startsWith("jenesis.")) {
@@ -426,7 +426,7 @@ public final class Make {
     }
 
     public static Settings settings(Path path) throws IOException {
-        return settings(path, ambient(new LinkedHashMap<>()));
+        return settings(path, ambient(Map.of()));
     }
 
     public static Settings settings(Path path, Function<String, String> ambient) throws IOException {
