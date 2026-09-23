@@ -122,6 +122,10 @@ public class TreeTest {
         SequencedProperties inventory = new SequencedProperties();
         inventory.setProperty("module.graph.0", "graph.properties");
         inventory.setProperty("module.licenses.0", "licenses.properties");
+        inventory.setProperty("module.identity.0", "module/greeter");
+        inventory.setProperty("module.module", "greeter");
+        inventory.setProperty("module.version", "1.0");
+        inventory.setProperty("module.license.0", "Apache-2.0");
         inventory.store(argument.resolve(Inventory.INVENTORY));
 
         List<String> printed = new ArrayList<>();
@@ -135,9 +139,131 @@ public class TreeTest {
         assertThat(result.next()).isTrue();
         String text = String.join(System.lineSeparator(), printed).replaceAll("\033\\[[0-9;]*m", "")
                     + System.lineSeparator();
-        assertThat(text).contains("main/compile (module)");
+        assertThat(text).contains("module/greeter 1.0 [compile] (module greeter, local ./) {Apache-2.0}");
         assertThat(text).contains("maven/org.foo/bar 1.0 [compile] (module org.foo.bar) {Apache-2.0}");
         assertThat(text).contains("└─ maven/org.foo/baz 2.0 [compile]");
         assertThat(text).contains("maven/org.foo/bar -> 1.0");
+    }
+
+    @Test
+    public void names_a_maven_project_by_its_coordinate() throws IOException {
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
+        graph.setProperty("vertex/main/compile/maven/org.foo/bar", "1.0\t\tfalse");
+        graph.store(argument.resolve("graph.properties"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("com.example.greeter.graph.0", "graph.properties");
+        inventory.setProperty("com.example.greeter.identity.0", "maven/com.example/greeter/1.0.0");
+        inventory.setProperty("com.example.greeter.version", "1.0.0");
+        inventory.setProperty("com.example.greeter.path", "greeter");
+        inventory.store(argument.resolve(Inventory.INVENTORY));
+
+        List<String> printed = new ArrayList<>();
+        Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                        argument,
+                        Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+        assertThat(printed.stream().map(line -> line.replaceAll("\033\\[[0-9;]*m", "")))
+                .contains("maven/com.example/greeter 1.0.0 [compile] (local ./greeter)");
+    }
+
+    @Test
+    public void heads_a_tree_per_scope_with_the_module_in_that_scope() throws IOException {
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
+        graph.setProperty("edge/1", "main\truntime\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
+        graph.setProperty("edge/2", "main\truntime\tmaven\ttrue\truntime\t2.0\t\tmaven/org.foo/qux/2.0");
+        graph.setProperty("vertex/main/compile/maven/org.foo/bar", "1.0\t\tfalse");
+        graph.setProperty("vertex/main/runtime/maven/org.foo/bar", "1.0\t\tfalse");
+        graph.setProperty("vertex/main/runtime/maven/org.foo/qux", "2.0\t\tfalse");
+        graph.store(argument.resolve("graph.properties"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module.graph.0", "graph.properties");
+        inventory.setProperty("module.identity.0", "module/foo");
+        inventory.store(argument.resolve(Inventory.INVENTORY));
+
+        List<String> printed = new ArrayList<>();
+        Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                        argument,
+                        Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+        assertThat(printed.stream().map(line -> line.replaceAll("\033\\[[0-9;]*m", "")).toList()).containsSequence(
+                "module/foo [compile] (local ./)",
+                "└─ maven/org.foo/bar 1.0 [compile]",
+                "",
+                "Resolved dependencies:",
+                "  maven/org.foo/bar -> 1.0",
+                "",
+                "module/foo [runtime] (local ./)",
+                "├─ maven/org.foo/bar 1.0 [compile]",
+                "└─ maven/org.foo/qux 2.0 [runtime]");
+    }
+
+    @Test
+    public void names_a_module_published_to_maven_by_its_maven_coordinate() throws IOException {
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
+        graph.setProperty("vertex/main/compile/maven/org.foo/bar", "1.0\t\tfalse");
+        graph.store(argument.resolve("graph.properties"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module.graph.0", "graph.properties");
+        inventory.setProperty("module.identity.0", "module/greeter");
+        inventory.setProperty("module.identity.1", "maven/greeter/greeter/0-SNAPSHOT");
+        inventory.setProperty("module.module", "greeter");
+        inventory.store(argument.resolve(Inventory.INVENTORY));
+
+        List<String> printed = new ArrayList<>();
+        Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                        argument,
+                        Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+        assertThat(printed.stream().map(line -> line.replaceAll("\033\\[[0-9;]*m", "")))
+                .contains("maven/greeter/greeter 0-SNAPSHOT [compile] (module greeter, local ./)");
+    }
+
+    @Test
+    public void locates_a_local_dependency_in_the_folder_it_is_built_from() throws IOException {
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/g/greeter/1.0");
+        graph.setProperty("vertex/main/compile/maven/g/greeter", "1.0\t\tfalse\ttrue");
+        graph.store(argument.resolve("graph.properties"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-app.graph.0", "graph.properties");
+        inventory.setProperty("module-app.identity.0", "maven/g/app/1.0");
+        inventory.setProperty("module-app.version", "1.0");
+        inventory.setProperty("module-app.path", "app");
+        inventory.store(argument.resolve(Inventory.INVENTORY));
+        SequencedProperties empty = new SequencedProperties();
+        empty.store(testArgument.resolve("graph.properties"));
+        SequencedProperties greeter = new SequencedProperties();
+        greeter.setProperty("module-greeter.graph.0", "graph.properties");
+        greeter.setProperty("module-greeter.identity.0", "maven/g/greeter/1.0");
+        greeter.setProperty("module-greeter.version", "1.0");
+        greeter.setProperty("module-greeter.path", "greeter");
+        greeter.store(testArgument.resolve(Inventory.INVENTORY));
+
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("app", new BuildStepArgument(argument,
+                Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("greeter", new BuildStepArgument(testArgument,
+                Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))));
+        List<String> printed = new ArrayList<>();
+        Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                arguments)
+                .toCompletableFuture().join();
+        assertThat(printed.stream().map(line -> line.replaceAll("\033\\[[0-9;]*m", "")).toList()).containsSequence(
+                "maven/g/app 1.0 [compile] (local ./app)",
+                "└─ maven/g/greeter 1.0 [compile] (local ./greeter)");
     }
 }

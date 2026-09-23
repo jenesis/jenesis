@@ -220,31 +220,35 @@ downloaded.
 Printing the dependency graph
 -----------------------------
 
-To see what each module resolves, run the `dependencies` selector. It prints each
-module's resolved dependency graph, one block per module and scope, with every
-node carrying its resolved module name and declared license:
+To see what each module resolves, run the `dependencies` selector. It prints one
+tree per module and scope, each starting from the module itself - tagged `local`
+with the folder it is built from - with every node carrying its resolved module
+name and declared license:
 
     java build/jenesis/Make.java dependencies
 
-    main/compile (module-greeter-test)
-    maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local)
-    └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT}
-    maven/org.junit.jupiter/junit-jupiter 5.11.3 [compile] (module org.junit.jupiter) {EPL-2.0}
-    ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (module org.junit.jupiter.api) {EPL-2.0}
-    │  ├─ maven/org.opentest4j/opentest4j 1.3.0 [compile] (module org.opentest4j) {Apache-2.0}
-    │  ├─ maven/org.junit.platform/junit-platform-commons 1.11.3 [compile] (module org.junit.platform.commons) {EPL-2.0}
-    │  │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (*)
-    │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (module org.apiguardian.api) {Apache-2.0}
-    ├─ maven/org.junit.jupiter/junit-jupiter-params 5.11.3 [compile] (module org.junit.jupiter.params) {EPL-2.0}
-    │  ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (*)
-    │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (*)
-    └─ maven/org.junit.jupiter/junit-jupiter-engine 5.11.3 [runtime] (module org.junit.jupiter.engine) {EPL-2.0}
-       ├─ maven/org.junit.platform/junit-platform-engine 1.11.3 [runtime] (module org.junit.platform.engine) {EPL-2.0}
-       │  ├─ maven/org.opentest4j/opentest4j 1.3.0 [compile] (*)
-       │  ├─ maven/org.junit.platform/junit-platform-commons 1.11.3 [compile] (*)
+    maven/demo.greeter/demo.greeter.test 0-SNAPSHOT [compile] (module demo.greeter.test, local ./greeter-test)
+    ├─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
+    │  └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT}
+    ├─ maven/demo.greeter/demo.greeter.testing 0-SNAPSHOT [compile] (module demo.greeter.testing, local ./greeter-testing)
+    │  ├─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (*)
+    │  └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (*)
+    └─ maven/org.junit.jupiter/junit-jupiter 5.11.3 [compile] (module org.junit.jupiter) {EPL-2.0}
+       ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (module org.junit.jupiter.api) {EPL-2.0}
+       │  ├─ maven/org.opentest4j/opentest4j 1.3.0 [compile] (module org.opentest4j) {Apache-2.0}
+       │  ├─ maven/org.junit.platform/junit-platform-commons 1.11.3 [compile] (module org.junit.platform.commons) {EPL-2.0}
+       │  │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (*)
+       │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (module org.apiguardian.api) {Apache-2.0}
+       ├─ maven/org.junit.jupiter/junit-jupiter-params 5.11.3 [compile] (module org.junit.jupiter.params) {EPL-2.0}
+       │  ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (*)
        │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (*)
-       ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (*)
-       └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (*)
+       └─ maven/org.junit.jupiter/junit-jupiter-engine 5.11.3 [runtime] (module org.junit.jupiter.engine) {EPL-2.0}
+          ├─ maven/org.junit.platform/junit-platform-engine 1.11.3 [runtime] (module org.junit.platform.engine) {EPL-2.0}
+          │  ├─ maven/org.opentest4j/opentest4j 1.3.0 [compile] (*)
+          │  ├─ maven/org.junit.platform/junit-platform-commons 1.11.3 [compile] (*)
+          │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (*)
+          ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (*)
+          └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (*)
 
 Even though every descriptor here is a `module-info.java`, the default
 MODULAR_TO_MAVEN layout resolves each `requires` through Maven, so the tree shows
@@ -264,15 +268,18 @@ external dependencies into counts:
 
     java -Djenesis.tree.format=compact build/jenesis/Make.java dependencies
 
-    main/compile (module-greeter-test)
-    maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local)
+    maven/demo.greeter/demo.greeter.test 0-SNAPSHOT [compile] (module demo.greeter.test, local ./greeter-test)
+    ├─ maven/demo.greeter/demo.greeter.testing 0-SNAPSHOT [compile] (module demo.greeter.testing, local ./greeter-testing)
+    │  └─ 1 external dependency
+    ├─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
+    │  └─ 1 external dependency
     └─ 1 external dependency
-    1 external dependency
 
-`demo.greeter` keeps its place with its lone external dependency collapsed
-beneath it, while the purely external `junit-jupiter` root and its closure become
-the trailing count. When several trees share the same local module, it is printed
-once inside the largest tree that reaches it and collapsed in the others.
+The local modules keep their place with the external dependencies below them
+collapsed into counts, while the purely external roots - JUnit and its closure -
+become the trailing count. When several trees share the same local module, it is
+printed once inside the largest tree that reaches it and collapsed in the
+others.
 
 `-Djenesis.tree.tests=false` is a second, independent switch. It leaves out the
 modules that are declared with `@jenesis.test`, which are not part of what the
@@ -280,14 +287,14 @@ project releases, and it does so under either format:
 
     java -Djenesis.tree.format=compact -Djenesis.tree.tests=false build/jenesis/Make.java dependencies
 
-    main/compile (module-app)
-    maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local)
-    └─ 1 external dependency
+    maven/demo.app/demo.app 0-SNAPSHOT [compile] (module demo.app, local ./app)
+    └─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
+       └─ 1 external dependency
 
 `greeter-test` declares `@jenesis.test demo.greeter` and `greeter-testing`
-declares `@jenesis.test abstract`, so their blocks are gone and the JUnit closure
-only they reached goes with them: the license and module summary below the trees
-now counts the two modules the project ships rather than the fourteen a test run
-resolves. Passed on its own, the flag prunes
-the same modules from the full graph. The default `full` format prints the whole
-graph; any other value is rejected.
+declares `@jenesis.test abstract`, so with the flag their trees are gone and the
+JUnit closure only they reached goes with them: the license and module summary
+below the trees now counts the two modules the project ships rather than the
+fourteen a test run resolves. Passed on its own, the flag prunes the same
+modules from the full graph. The default `full` format prints the whole graph;
+any other value is rejected.

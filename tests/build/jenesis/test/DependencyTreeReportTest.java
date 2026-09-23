@@ -45,6 +45,27 @@ public class DependencyTreeReportTest {
     }
 
     @Test
+    public void renders_a_module_as_the_root_of_its_dependencies() {
+        SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
+        vertices.put("maven/g/a", new Resolver.Vertex("1.0", null, false, false, List.of()));
+        vertices.put("maven/g/b", new Resolver.Vertex("2.0", null, false, false, List.of()));
+        report.render(resolution(List.of(
+                new Resolver.Edge(null, "maven/g/a/1.0", "1.0", "compile", true),
+                new Resolver.Edge("maven/g/a/1.0", "maven/g/b/2.0", "2.0", "compile", true),
+                new Resolver.Edge(null, "maven/g/b/2.0", "2.0", "compile", false)),
+                vertices), "module/greeter", "compile", new Resolver.Vertex("1.0", "greeter", false, true,
+                List.of(new License(null, null, "Apache-2.0", null))));
+        assertThat(output().lines().toList()).containsSequence(
+                "module/greeter 1.0 [compile] (module greeter, local) {Apache-2.0}",
+                "└─ maven/g/a 1.0 [compile]",
+                "   └─ maven/g/b 2.0 [compile]",
+                "",
+                "Resolved dependencies:",
+                "  maven/g/a -> 1.0",
+                "  maven/g/b -> 2.0");
+    }
+
+    @Test
     public void marks_not_followed_duplicates_and_does_not_expand_them() {
         report.render(resolution(List.of(
                 new Resolver.Edge(null, "maven/g/a/1.0", "1.0", "compile", true),
