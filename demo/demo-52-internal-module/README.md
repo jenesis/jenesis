@@ -11,9 +11,9 @@ published artifact rather than compiling it from source.
 Run it
 ------
 
-From this directory, naming the customizer this demo ships:
+From this directory:
 
-    java build/jenesis/Execute.java -Djenesis.project.customizers=build.custom.Substitution
+    java build/jenesis/Execute.java
 
 which builds the project and then launches the built module, printing the
 greeting the plugin substituted in:
@@ -28,6 +28,7 @@ Layout
     demo/demo-52-internal-module
     |-- build/jenesis            symlink to ../../../sources/build/jenesis
     |-- build/custom/Substitution.java   the customizer: wires the plugin into the assembler
+    |-- jenesis.properties       jenesis.project.customizers=build.custom.Substitution
     |-- plugin/
     |   |-- .jenesis.skip       marks plugin/ as its own build root, so the
     |   |                        project's module discovery skips it
@@ -54,7 +55,8 @@ runs against, so the class-loader bridge loads it without complaint.
 How it works
 ------------
 
-`Substitution` is a customizer, as in the `custom-assembler` demo: it wraps the
+`Substitution` is a customizer, named in `jenesis.properties` as in the
+`custom-assembler` demo: it wraps the
 assembler the settings configured in a lambda, and `Execute` builds the adjusted
 project and launches the produced module's `main` so the substituted greeting is
 shown. `Execute` reads the build's inventory to find the module and its runtime

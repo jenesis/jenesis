@@ -602,6 +602,14 @@ public class ProjectTest {
     }
 
     @Test
+    public void leaves_customizers_to_the_container_when_the_build_runs_in_docker() {
+        Project project = Project.ofEnvironment(new Environment(Map.of("project.version", "1",
+                "project.docker", "true",
+                "project.customizers", Versioning.class.getName())::get), root);
+        assertThat(project.version()).as("the container applies the customizer, never the host").isEqualTo("1");
+    }
+
+    @Test
     public void refuses_a_customizer_that_is_no_unary_operator() {
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.customizers",
                 ProjectTest.class.getName())::get), root))
@@ -741,21 +749,38 @@ public class ProjectTest {
     }
 
     @Test
-    public void the_layered_settings_rejects_customizers_in_the_project_file() throws IOException {
+    public void the_layered_settings_accepts_customizers_in_the_project_file() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.customizers=build.Build\n");
-        assertThatThrownBy(() -> Make.settings(root, Map.<String, String>of()::get))
-                .as("a customizer runs code the engine does not ship, so a project cannot name one for itself")
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.project.customizers cannot be set in");
+        assertThat(Make.settings(root, Map.<String, String>of()::get).keys().apply("project.customizers"))
+                .as("a customizer runs the project's code as its tests do, so the project may name one")
+                .isEqualTo("build.Build");
     }
 
     @Test
-    public void the_layered_settings_rejects_customizers_in_a_profile() throws IOException {
+    public void the_layered_settings_rejects_docker_settings_in_the_project_file() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.docker=false\n");
+        assertThatThrownBy(() -> Make.settings(root, Map.<String, String>of()::get))
+                .as("a project cannot switch off the isolation its user asked for")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.project.docker cannot be set in");
+    }
+
+    @Test
+    public void the_layered_settings_rejects_docker_settings_in_a_profile() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
-        Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.project.customizers=build.Build\n");
+        Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.execute.docker.mountWritable=/\n");
         assertThatThrownBy(() -> Make.settings(root, Map.<String, String>of()::get))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.project.customizers cannot be set in");
+                .hasMessageContaining("jenesis.execute.docker.mountWritable cannot be set in");
+    }
+
+    @Test
+    public void the_layered_settings_accepts_docker_settings_in_the_user_global_file() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.project.docker=true\n");
+        assertThat(Make.settings(root, Map.of("make.global", root.resolve("home").toString())::get)
+                .keys()
+                .apply("project.docker")).isEqualTo("true");
     }
 
     @Test
