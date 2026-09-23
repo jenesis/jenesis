@@ -1010,7 +1010,7 @@ public record Project(
 
                     ## 13. Copy a demo: they are the recipe book
 
-                    64 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    65 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -1022,9 +1022,9 @@ public record Project(
                       Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
                                          04 java-modular-multi, 19 module-layout (forcing MODULAR)
                       Starting a build   05 startup (what launching costs, and the daemon),
-                                         62 toolchain (the JDK the build runs on)
+                                         63 toolchain (the JDK the build runs on)
                       Runnable output    06, 07 java-*-executable (jpackage), 08 bundle (jars for a
-                                         stock JRE), 09 java-multi-release, 63 native-image (GraalVM)
+                                         stock JRE), 09 java-multi-release, 64 native-image (GraalVM)
                       Compiler control   10 javac-arguments (process-javac.properties),
                                          11 annotations (an annotation processor via @jenesis.plugin),
                                          12 error-prone (a javac plugin)
@@ -1047,10 +1047,11 @@ public record Project(
                       Operating it       45 profiles, 46 build-cache, 47 docker-isolation,
                                          48 agents (@jenesis.attach),
                                          49 native-access (@jenesis.native)
-                      Shipping it        58 code-signing (jarsigner), 59 publishing (Maven Central),
-                                         60 module-convention (resolving what you published),
-                                         61 reproducible (a jar checked against a recorded digest),
-                                         64 jpx (run a released program without building)
+                      Shipping it        58 code-signing (jarsigner), 59 export (into the local repositories),
+                                         60 publishing (Maven Central),
+                                         61 module-convention (resolving what you published),
+                                         62 reproducible (a jar checked against a recorded digest),
+                                         65 jpx (run a released program without building)
                       Extending it       50 custom-assembler, 51 custom-jmod, 52 internal-module,
                                          53 external-module, 54 custom-maven, 55 custom-modular,
                                          56 custom-build (no Project at all),
