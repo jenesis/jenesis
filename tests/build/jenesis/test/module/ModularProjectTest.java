@@ -183,6 +183,62 @@ public class ModularProjectTest {
     }
 
     @Test
+    public void grants_native_access_to_what_it_names_and_records_every_name_in_its_manifest()
+            throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                /**
+                 * @jenesis.native foo
+                 * @jenesis.native bar org.example/jni
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path module = results.get("module/module-/manifests");
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.NATIVES))).containsOnlyKeys(
+                "main/native/module/bar",
+                "main/native/maven/org.example/jni");
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.MODULE)).getProperty("native"))
+                .isEqualTo("true");
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.REQUIRES)))
+                .as("a grant names what the module already runs with, it never adds a dependency")
+                .containsOnlyKeys("main/compile/module/bar", "main/runtime/module/bar");
+        Manifest manifest = new Manifest();
+        try (InputStream input = Files.newInputStream(module.resolve("manifest.mf"))) {
+            manifest.read(input);
+        }
+        assertThat(manifest.getMainAttributes().getValue(PathPlacement.NATIVE_ACCESS))
+                .as("a module that runs this one learns what to redeclare, but is granted nothing by it")
+                .isEqualTo("foo,bar,org.example/jni");
+    }
+
+    @Test
+    public void grants_no_native_access_without_declarations() throws IOException {
+        Files.writeString(project.resolve("module-info.java"), """
+                module foo {
+                }
+                """);
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+        executor.addModule("module", new ModularProject("module", project));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        Path module = results.get("module/module-/manifests");
+        assertThat(module.resolve(BuildStep.NATIVES)).doesNotExist();
+        assertThat(module.resolve("manifest.mf")).doesNotExist();
+        assertThat(SequencedProperties.ofFiles(module.resolve(BuildStep.MODULE)).getProperty("native")).isNull();
+    }
+
+    @Test
     public void emits_aliases_properties_from_javadoc_declarations() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
@@ -737,7 +793,8 @@ public class ModularProjectTest {
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
-        root.addModule("modules", ModularProject.make(Environment.NONE, project,
+        root.addModule("modules", ModularProject.make(Environment.NONE,
+                project,
                 "main",
                 "module",
                 _ -> true,

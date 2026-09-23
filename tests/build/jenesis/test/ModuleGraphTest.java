@@ -123,6 +123,48 @@ public class ModuleGraphTest {
     }
 
     @Test
+    public void native_access_names_a_module_on_the_module_path_and_the_unnamed_module_otherwise()
+            throws IOException {
+        Path module = automatic("auto.one"), plain = plain();
+        ModuleGraph graph = new ModuleGraph();
+        graph.enableNativeAccess(module, true);
+        graph.enableNativeAccess(plain, false);
+
+        assertThat(graph.arguments())
+                .as("a jar on the class path shares the one unnamed module the JDK can name")
+                .containsExactly("--enable-native-access=auto.one,ALL-UNNAMED");
+        assertThat(graph.options()).containsExactly("--enable-native-access=auto.one,ALL-UNNAMED");
+    }
+
+    @Test
+    public void native_access_in_a_layer_is_named_to_the_launcher_that_defines_the_layer() throws IOException {
+        Path member = automatic("auto.member"), plain = plain();
+        ModuleGraph graph = new ModuleGraph();
+        graph.enableNativeAccess("render", member, true);
+        graph.enableNativeAccess("render", plain, false);
+
+        assertThat(graph.arguments())
+                .as("a layer's module exists only once the layer is defined, and its class path is the unnamed module")
+                .containsExactly(
+                        "--enable-native-access=ALL-UNNAMED",
+                        "-Djlayer.enableNativeAccess.render=auto.member");
+    }
+
+    @Test
+    public void native_access_is_stored_and_read_back_with_the_relaxation() throws IOException {
+        ModuleGraph graph = new ModuleGraph();
+        Path module = automatic("auto.one");
+        graph.module(module);
+        graph.enableNativeAccess(module, true);
+        SequencedProperties properties = new SequencedProperties();
+        graph.store(properties);
+
+        assertThat(ModuleGraph.load(properties)).containsExactly(
+                "--add-modules=ALL-MODULE-PATH,ALL-DEFAULT",
+                "--enable-native-access=auto.one");
+    }
+
+    @Test
     public void a_self_contained_graph_stores_nothing() throws IOException {
         ModuleGraph graph = new ModuleGraph();
         graph.module(named("explicit.one"));

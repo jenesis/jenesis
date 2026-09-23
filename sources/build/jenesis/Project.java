@@ -129,7 +129,8 @@ public record Project(
                 inherited.sequencedKeySet().stream()
                         .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + METADATA + "/"))
                         .forEach(mavenDeps::add);
-                sub.addModule("maven", MavenProject.make(project.environment(), project.root(),
+                sub.addModule("maven", MavenProject.make(project.environment(),
+                                                         project.root(),
                                                          "main",
                                                          "maven",
                                                          Collections.unmodifiableMap(repositories),
@@ -192,7 +193,8 @@ public record Project(
                 inherited.sequencedKeySet().stream()
                         .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + METADATA + "/"))
                         .forEach(modulesDeps::add);
-                sub.addModule("modules", ModularProject.make(project.environment(), project.root(),
+                sub.addModule("modules", ModularProject.make(project.environment(),
+                                                             project.root(),
                                                              "main",
                                                              "module",
                                                              _ -> true,
@@ -272,7 +274,8 @@ public record Project(
                 inherited.sequencedKeySet().stream()
                         .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + METADATA + "/"))
                         .forEach(modulesDeps::add);
-                sub.addModule("modules", ModularProject.make(project.environment(), project.root(),
+                sub.addModule("modules", ModularProject.make(project.environment(),
+                                                             project.root(),
                                                              "main",
                                                              "module",
                                                              _ -> true,
@@ -800,7 +803,10 @@ public record Project(
                           layer may declare one of its own; each layer is a child of its caller's, and a
                           test JVM is handed jlayer.modulepath.<name> like any deployment. That is a
                           jlayer.* key rather than a jenesis.* one: it configures no build, it is read by
-                          the application a build produced.
+                          the application a build produced. The JVM lets any code overwrite a system
+                          property at any time, so code that runs before the layer is defined can place
+                          its own jars in another module's layer; a layer inside an executable jar
+                          (launcher=true) is read from the jar instead.
                           A layer splits a module path and a class path as the application does: what
                           carries a module identity - a module-info, an Automatic-Module-Name, or a name
                           given in modules.properties - is resolved, and the long tail a legacy library
@@ -832,6 +838,19 @@ public record Project(
                           verbatim as agent options. MAVEN modules declare the same lines in a
                           project-level <!--jenesis.attach ... --> comment, where a test-scoped match
                           attaches to test runs only and &#45;&#45; escapes a double dash.
+                      @jenesis.native <token>...
+                          Grant native access (--enable-native-access) to the modules named, this
+                          one included only when it names itself, on this module's Execute run, its
+                          test runs and what it packages; a grant adds no dependency. A grant is
+                          never inherited: the names are recorded in the jar's Jenesis-Native-Access
+                          manifest attribute, so a module that runs this one learns what to grant
+                          itself. jenesis.dependency.native=warn reports a name the running module
+                          does not grant, strict fails the build on it. A module in one of the run's
+                          layers is named the same way, or as layer:<name>/<repo>/..., and reaches
+                          the launcher as jlayer.enableNativeAccess.<name>; the launcher grants it
+                          through the Lookup the module asking for the layer passes, so that module
+                          needs native access itself and is named too. MAVEN modules declare tokens in
+                          a <!--jenesis.native ... --> comment.
 
                     ## 9. Activate a tool by dropping in its configuration file
 
@@ -952,7 +971,7 @@ public record Project(
                     than the JVM, so two runs in one program never clash; everything after them is
                     what the command line would take. A setting that replaces the process a build
                     runs in - toolchain.version, project.docker, execute.docker - is refused by name
-                    there, and demo-56-tools-api shows the whole contract.
+                    there, and demo-57-tools-api shows the whole contract.
 
                     Every command line here, the commands and the tools alike, reads @<file> as the
                     arguments that file holds - settings and selectors, # to the end of a line being
@@ -989,7 +1008,7 @@ public record Project(
 
                     ## 13. Copy a demo: they are the recipe book
 
-                    63 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    64 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -1001,9 +1020,9 @@ public record Project(
                       Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
                                          04 java-modular-multi, 19 module-layout (forcing MODULAR)
                       Starting a build   05 startup (what launching costs, and the daemon),
-                                         61 toolchain (the JDK the build runs on)
+                                         62 toolchain (the JDK the build runs on)
                       Runnable output    06, 07 java-*-executable (jpackage), 08 bundle (jars for a
-                                         stock JRE), 09 java-multi-release, 62 native-image (GraalVM)
+                                         stock JRE), 09 java-multi-release, 63 native-image (GraalVM)
                       Compiler control   10 javac-arguments (process-javac.properties),
                                          11 annotations (an annotation processor via @jenesis.plugin),
                                          12 error-prone (a javac plugin)
@@ -1024,15 +1043,16 @@ public record Project(
                                          35 pitest (mutation), 36 jmh (benchmark harness)
                       Other languages    38 kotlin, 40 kotlin-plugin, 41 scala, 43 groovy
                       Operating it       45 profiles, 46 build-cache, 47 docker-isolation,
-                                         48 agents (@jenesis.attach)
-                      Shipping it        57 code-signing (jarsigner), 58 publishing (Maven Central),
-                                         59 module-convention (resolving what you published),
-                                         60 reproducible (a jar checked against a recorded digest),
-                                         63 jpx (run a released program without building)
-                      Extending it       49 custom-assembler, 50 custom-jmod, 51 internal-module,
-                                         52 external-module, 53 custom-maven, 54 custom-modular,
-                                         55 custom-build (no Project at all),
-                                         56 tools-api (a build inside another program's JVM)
+                                         48 agents (@jenesis.attach),
+                                         49 native-access (@jenesis.native)
+                      Shipping it        58 code-signing (jarsigner), 59 publishing (Maven Central),
+                                         60 module-convention (resolving what you published),
+                                         61 reproducible (a jar checked against a recorded digest),
+                                         64 jpx (run a released program without building)
+                      Extending it       50 custom-assembler, 51 custom-jmod, 52 internal-module,
+                                         53 external-module, 54 custom-maven, 55 custom-modular,
+                                         56 custom-build (no Project at all),
+                                         57 tools-api (a build inside another program's JVM)
 
                     ## 14. When stuck, read the source
 
@@ -2312,6 +2332,7 @@ public record Project(
                 print.docker|true|The image notice when a build or run is containerized
                 print.jreleaser|true|The JReleaser command line when a release runs
                 dependency.pin||strict|versions|ignore; unset keeps existing pins and tolerates missing ones
+                dependency.native|ignore|ignore|warn|strict: what to do when a module runs a jar whose Jenesis-Native-Access names a module it does not grant with @jenesis.native; warn reports it, strict fails the build
                 resolver.maven|maven|maven|closest|latest|release|stable|fail|managed: which version a Maven coordinate resolves to; stable skips pre-release qualifiers, fail rejects a coordinate two dependencies require at different versions, managed rejects that and any version only a dependency's POM names
                 resolver.module|first|first|ignore|fail|managed: what to do with the versions a module-info records; fail rejects two requires that record different versions, managed rejects that and any module only another module's requires names
                 pin.file||Write the whole project's pins to this properties file instead of the module declarations
