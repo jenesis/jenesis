@@ -2565,6 +2565,9 @@ public record Project(
             return perform(environment, root, profiles, selectors) == null ? 1 : 0;
         }
         try {
+            if (mainClass.equals(Execution.class.getName())) {
+                return Execution.run(environment, root, profiles, selectors);
+            }
             Class.forName(mainClass, true, Project.class.getClassLoader())
                     .getMethod("main", String[].class)
                     .invoke(null, (Object) selectors);
