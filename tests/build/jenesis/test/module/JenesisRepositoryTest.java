@@ -6,7 +6,9 @@ import module org.junit.jupiter.api;
 import build.jenesis.Environment;
 import build.jenesis.RepositoryItem;
 import build.jenesis.module.JenesisRepository;
+import org.assertj.core.api.InstanceOfAssertFactories;
 
+import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -57,6 +59,50 @@ public class JenesisRepositoryTest {
         } finally {
             server.stop(0);
         }
+    }
+
+    @Test
+    public void prints_each_module_fetched_from_the_module_service() throws IOException {
+        List<String> printed = new ArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            byte[] body = "fromService".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        server.start();
+        try {
+            String uri = "http://localhost:" + server.getAddress().getPort() + "/";
+            assertThat(content(JenesisRepository.ofEnvironment(environment(Map.of(
+                    "repository.insecure", "true",
+                    "print.fetch", "true",
+                    "module.uri", uri)).out(printed::add), JenesisRepository.Scope.MODULE)
+                    .fetch(Runnable::run, "widget", null, null, "jar"))).isEqualTo("fromService");
+            assertThat(printed).singleElement(as(InstanceOfAssertFactories.STRING))
+                    .contains("[FETCHED]")
+                    .endsWith(uri + "module/widget/widget.jar");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void prints_each_artifact_fetched_for_the_published_index() throws IOException {
+        writeIndex("widget", "2.0\tcom.example\twidget-core\t2.0");
+        writeArtifact("com.example", "widget-core", "2.0", "fromIndex");
+        List<String> printed = new ArrayList<>();
+
+        assertThat(content(JenesisRepository.ofEnvironment(environment(Map.of(
+                "module.source", "git",
+                "print.fetch", "true",
+                "module.index", index.toUri().toString(),
+                "maven.uri", maven.toUri().toString())).out(printed::add), JenesisRepository.Scope.MODULE)
+                .fetch(Runnable::run, "widget", null, null, "jar"))).isEqualTo("fromIndex");
+
+        assertThat(printed).singleElement(as(InstanceOfAssertFactories.STRING))
+                .contains("[FETCHED]")
+                .endsWith("/com/example/widget-core/2.0/widget-core-2.0.jar");
     }
 
     @Test

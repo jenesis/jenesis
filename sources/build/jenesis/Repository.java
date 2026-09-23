@@ -38,32 +38,7 @@ public interface Repository {
         };
     }
 
-    default Repository cached(Environment environment, Path folder) {
-        return cached(environment, folder, false);
-    }
-
     private Repository cached(Path folder, boolean snapshot) {
-        return cached(Environment.NONE, folder, snapshot);
-    }
-
-    private Repository cached(Environment environment, Path folder, boolean snapshot) {
-        if (folder == null) {
-            return this;
-        }
-        return cached(folder, snapshot, environment.flag("print.fetch")
-                      ? target -> environment.out().accept("%s%-11s%s %s".formatted(
-                                                                                    BuildExecutorCallback.YELLOW,
-                                                                                    "[FETCHED]",
-                                                                                    BuildExecutorCallback.RESET,
-                                                                                    target.toAbsolutePath().toUri()))
-                      : null);
-    }
-
-    default Repository cached(Path folder, Consumer<Path> callback) {
-        return cached(folder, false, callback);
-    }
-
-    private Repository cached(Path folder, boolean snapshot, Consumer<Path> callback) {
         if (folder == null) {
             return this;
         }
@@ -84,7 +59,6 @@ public interface Repository {
                                                     String extension) throws IOException {
                 try {
                     Path candidate = folder.resolve(BuildExecutorModule.encode(coordinate) + suffix);
-                    boolean preexisting = Files.exists(candidate);
                     Path target = cache.computeIfAbsent(coordinate + suffix, key -> {
                         if (Files.exists(candidate)) {
                             return candidate;
@@ -120,11 +94,6 @@ public interface Repository {
                             throw new UncheckedIOException(e);
                         }
                     });
-                    if (preexisting && target != null) {
-                        if (callback != null) {
-                            callback.accept(target);
-                        }
-                    }
                     return target == null
                             ? Optional.empty()
                             : Optional.of(RepositoryItem.ofFile(target, internal.contains(coordinate + suffix)));
@@ -355,21 +324,7 @@ public interface Repository {
     static <F extends BiFunction<URI, String, Optional<URI>> & Serializable> Repository ofUris(
             Map<String, URI> uris,
             F versionResolver) {
-        return ofUris(Environment.NONE, uris, versionResolver);
-    }
-
-    static <F extends BiFunction<URI, String, Optional<URI>> & Serializable> Repository ofUris(
-            Environment environment,
-            Map<String, URI> uris,
-            F versionResolver) {
-        return ofUris(uris, versionResolver, new Connection().retries(0).backoff(Duration.ZERO),
-                environment.flag("print.fetch")
-                        ? uri -> environment.out().accept("%s%-11s%s %s".formatted(
-                                                                                   BuildExecutorCallback.YELLOW,
-                                                                                   "[FETCHED]",
-                                                                                   BuildExecutorCallback.RESET,
-                                                                                   uri))
-                        : null);
+        return ofUris(uris, versionResolver, new Connection().retries(0).backoff(Duration.ZERO), null);
     }
 
     static <F extends BiFunction<URI, String, Optional<URI>> & Serializable> Repository ofUris(
