@@ -95,7 +95,7 @@ public class GoogleJavaFormatModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "google-java-format",
-                new GoogleJavaFormatModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))).pinning(Pinning.STRICT)
+                new GoogleJavaFormatModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT)
                         .verify(verify),
                 "project");
         return executor;

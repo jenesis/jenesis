@@ -15,7 +15,7 @@ abstract class JenesisTool implements ToolProvider {
             return 1;
         }
         try {
-            return run(new Environment(key -> settings.get("jenesis." + key), out, err), remaining);
+            return run(new Environment(Make.keys(settings), out, err), remaining);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             err.println(name() + " was interrupted running " + String.join(" ", remaining));

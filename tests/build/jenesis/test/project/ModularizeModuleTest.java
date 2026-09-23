@@ -19,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class ModularizeModuleTest {
 
+    private final Map<String, String> settings = new HashMap<>();
+
     private static final String NAMED = "main/compile/maven/demo/named/1.0",
             AUTOMATIC = "main/compile/maven/demo/automatic/1.0",
             PLAIN = "main/compile/maven/demo/plain/1.0";
@@ -160,7 +162,7 @@ public class ModularizeModuleTest {
                 modularized.resolve(Dependencies.MODULAR_PATH + "demo.automatic.jar").toFile())) {
             assertThat(jar.stream().map(ZipEntry::getTimeLocal))
                     .as("the time the dependency was packed at is dropped, as it would be converted to local time")
-                    .containsOnly(BuildStep.timestamp(Environment.SYSTEM).toLocalDateTime());
+                    .containsOnly(BuildStep.timestamp(new Environment(settings::get)).toLocalDateTime());
         }
     }
 
@@ -169,11 +171,11 @@ public class ModularizeModuleTest {
         named();
         Path source = automatic();
         Path modularized;
-        System.setProperty("jenesis.archive.timestamp", "");
+        settings.put("archive.timestamp", "");
         try {
             modularized = modularize(false);
         } finally {
-            System.clearProperty("jenesis.archive.timestamp");
+            settings.remove("archive.timestamp");
         }
         try (ZipFile original = new ZipFile(source.toFile());
              ZipFile rewritten = new ZipFile(modularized.resolve(Dependencies.MODULAR_PATH + "demo.automatic.jar").toFile())) {
@@ -206,7 +208,7 @@ public class ModularizeModuleTest {
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         buildExecutor.addSource("closure", closure);
         buildExecutor.addModule("modules",
-                ModularizeModule.ofEnvironment(Environment.SYSTEM, ProcessHandler.Factory.TOOL, synthetic),
+                ModularizeModule.ofEnvironment(new Environment(settings::get), ProcessHandler.Factory.TOOL, synthetic),
                 "closure");
         SequencedMap<String, Path> steps = buildExecutor.execute();
         return steps.get("modules");

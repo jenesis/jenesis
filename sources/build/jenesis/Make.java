@@ -4,13 +4,15 @@ import module java.base;
 
 public final class Make {
 
-    private static final String PROVIDED = "jenesis.make.provided";
+    private static final String PROVIDED = "jenesis.make.provided", PLATFORMS = "jenesis.make.platforms",
+            PLATFORM = "jenesis.platform.";
     private static final List<String> CREDENTIALS = List.of("jenesis.maven.token",
             "jenesis.module.token",
             "jenesis.cache.key");
     private static final List<String> PLAINTEXT = List.of("jenesis.repository.insecure", "jenesis.cache.insecure");
 
     private final String mainClass;
+    private final Function<String, String> ambient;
     private final Path root;
     private final Path classes;
     private final boolean daemon;
@@ -26,11 +28,12 @@ public final class Make {
     }
 
     public Make(String mainClass) {
-        this(mainClass, key -> System.getProperty("jenesis." + key));
+        this(mainClass, ambient(new LinkedHashMap<>()));
     }
 
     public Make(String mainClass, Function<String, String> ambient) {
         this.mainClass = mainClass;
+        this.ambient = ambient;
         String location = ambient.apply("make.root");
         root = Path.of(location == null ? "" : location).toAbsolutePath().normalize();
         try {
@@ -66,8 +69,15 @@ public final class Make {
         };
     }
 
-    private Make(String mainClass, Path root, Path classes, boolean daemon, boolean compile, Settings settings) {
+    private Make(String mainClass,
+                 Function<String, String> ambient,
+                 Path root,
+                 Path classes,
+                 boolean daemon,
+                 boolean compile,
+                 Settings settings) {
         this.mainClass = mainClass;
+        this.ambient = ambient;
         this.root = root;
         this.classes = classes;
         this.daemon = daemon;
@@ -77,22 +87,22 @@ public final class Make {
 
     public Make root(Path root) {
         try {
-            return new Make(mainClass, root, classes, daemon, compile, settings(root));
+            return new Make(mainClass, ambient, root, classes, daemon, compile, settings(root, ambient));
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot read the properties that configure this build", e);
         }
     }
 
     public Make classes(Path classes) {
-        return new Make(mainClass, root, classes, daemon, compile, settings);
+        return new Make(mainClass, ambient, root, classes, daemon, compile, settings);
     }
 
     public Make daemon(boolean daemon) {
-        return new Make(mainClass, root, classes, daemon, compile, settings);
+        return new Make(mainClass, ambient, root, classes, daemon, compile, settings);
     }
 
     public Make compile(boolean compile) {
-        return new Make(mainClass, root, classes, daemon, compile, settings);
+        return new Make(mainClass, ambient, root, classes, daemon, compile, settings);
     }
 
     public record Result(int code, SequencedMap<String, Path> outputs) {
@@ -102,16 +112,33 @@ public final class Make {
         SequencedMap<String, String> named = new LinkedHashMap<>();
         String[] selectors = partitioned(arguments, named);
         List<String> options = options(named);
-        Make make = new Make("build.jenesis.Project", ambient(named));
-        Integer code = relaunched(Make.class, options, selectors);
+        Function<String, String> ambient = ambient(named);
+        Make make = new Make("build.jenesis.Project", ambient);
+        Integer code = relaunched(Make.class, ambient, options, selectors);
         System.exit(code == null ? make.run(selectors) : code);
     }
 
     static Function<String, String> ambient(SequencedMap<String, String> named) {
-        return key -> {
-            String value = named.get("jenesis." + key);
-            return value == null ? System.getProperty("jenesis." + key) : value;
-        };
+        Map<String, String> properties = new HashMap<>();
+        for (String name : System.getProperties().stringPropertyNames()) {
+            if (name.startsWith("jenesis.")) {
+                properties.put(name, System.getProperty(name));
+            }
+        }
+        properties.putAll(named);
+        return keys(properties);
+    }
+
+    public static Function<String, String> keys(Map<String, String> properties) {
+        Map<String, String> copy = Map.copyOf(properties);
+        SequencedSet<String> platforms = new TreeSet<>();
+        for (String name : copy.keySet()) {
+            if (name.startsWith(PLATFORM)) {
+                platforms.add(name.substring(PLATFORM.length()));
+            }
+        }
+        String listed = platforms.isEmpty() ? null : String.join(",", platforms);
+        return key -> key.equals("make.platforms") ? listed : copy.get("jenesis." + key);
     }
 
     static String[] partitioned(String[] arguments, SequencedMap<String, String> named) throws IOException {
@@ -221,15 +248,18 @@ public final class Make {
         return arguments;
     }
 
-    static Integer relaunched(Class<?> main, List<String> options, String... arguments) throws Exception {
-        String version = System.getProperty("jenesis.toolchain.version");
+    static Integer relaunched(Class<?> main,
+                              Function<String, String> keys,
+                              List<String> options,
+                              String... arguments) throws Exception {
+        String version = keys.apply("toolchain.version");
         if (version == null || version.isBlank()) {
             return null;
         }
         Class<?> type = Class.forName("build.jenesis.Toolchain", true, Make.class.getClassLoader());
         try {
             Object toolchain = type.getMethod("ofKeys", Function.class)
-                    .invoke(null, (Function<String, String>) key -> System.getProperty("jenesis." + key));
+                    .invoke(null, keys);
             if (type.getMethod("home").invoke(toolchain).equals(Path.of(System.getProperty("java.home")))) {
                 return null;
             }
@@ -396,7 +426,7 @@ public final class Make {
     }
 
     public static Settings settings(Path path) throws IOException {
-        return settings(path, key -> System.getProperty("jenesis." + key));
+        return settings(path, ambient(new LinkedHashMap<>()));
     }
 
     public static Settings settings(Path path, Function<String, String> ambient) throws IOException {
@@ -467,9 +497,23 @@ public final class Make {
             }
         }
         String supplied = String.join(",", provided);
+        SequencedSet<String> platforms = new TreeSet<>();
+        String ambientPlatforms = ambient.apply("make.platforms");
+        if (ambientPlatforms != null) {
+            platforms.addAll(List.of(ambientPlatforms.split(",")));
+        }
+        for (String key : declared) {
+            if (key.startsWith("platform.")) {
+                platforms.add(key.substring("platform.".length()));
+            }
+        }
+        String listed = String.join(",", platforms);
         return key -> {
             if (key.equals("make.provided")) {
                 return supplied.isEmpty() ? null : supplied;
+            }
+            if (key.equals("make.platforms")) {
+                return listed.isEmpty() ? null : listed;
             }
             String value = ambient.apply(key);
             if (value != null) {
@@ -519,6 +563,10 @@ public final class Make {
     }
 
     private static void requireApplicable(Path file, Properties properties, boolean trusted) {
+        if (properties.getProperty(PLATFORMS) != null) {
+            throw new IllegalStateException(PLATFORMS + " cannot be set in " + file
+                    + ": it lists the jenesis.platform.<token> settings in force, and Make derives it");
+        }
         if (properties.getProperty(PROVIDED) != null) {
             throw new IllegalStateException(PROVIDED + " cannot be set in " + file
                     + ": it records which settings the files a project provides supplied, and Make derives it");

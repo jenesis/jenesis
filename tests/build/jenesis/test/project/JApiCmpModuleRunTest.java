@@ -118,8 +118,8 @@ public class JApiCmpModuleRunTest {
     private JApiCmpModule module(SequencedProperties config) {
         config.setProperty("baseline", BASELINE);
         return new JApiCmpModule(
-                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
-                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM)))
+                Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)))
                 .pinning(Pinning.STRICT)
                 .config(config);
     }

@@ -11,23 +11,25 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class VerificationTest {
 
+    private final Map<String, String> settings = new HashMap<>();
+
     @Test
     public void reads_the_signature_setting_from_the_provider_it_is_given() {
-        System.setProperty("jenesis.dependency.signature", "strict");
+        settings.put("dependency.signature", "strict");
         try {
             assertThat(Verification.ofEnvironment(new Environment(Map.of("dependency.signature", "declared")::get)))
                     .as("what a build verifies is decided by the provider it was handed, not by the JVM"
                             + " the build happens to run in")
                     .isEqualTo(Verification.DECLARED);
-            assertThat(Verification.ofEnvironment(Environment.NONE)).isEqualTo(Verification.NONE);
+            assertThat(Verification.ofEnvironment(new Environment(settings::get))).isEqualTo(Verification.NONE);
         } finally {
-            System.clearProperty("jenesis.dependency.signature");
+            settings.remove("dependency.signature");
         }
     }
 
     @Test
     public void reading_the_signature_setting_is_none_when_unset() {
-        assertThat(Verification.ofEnvironment(Environment.NONE))
+        assertThat(Verification.ofEnvironment(new Environment(settings::get)))
                 .as("verification is opt-in, so a setting nobody names checks nothing")
                 .isEqualTo(Verification.NONE);
     }

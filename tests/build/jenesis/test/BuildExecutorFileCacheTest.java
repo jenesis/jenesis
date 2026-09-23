@@ -18,6 +18,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class BuildExecutorFileCacheTest implements Serializable {
 
+    private final Map<String, String> settings = new HashMap<>();
+
     private static final AtomicInteger EXECUTIONS = new AtomicInteger();
 
     @TempDir
@@ -91,29 +93,18 @@ public class BuildExecutorFileCacheTest implements Serializable {
 
     @Test
     public void configuration_resolves_cache_from_uri() {
-        String previousUri = System.getProperty("jenesis.cache.uri");
-        try {
-            System.clearProperty("jenesis.cache.uri");
-            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).cache()).isNull();
-            System.setProperty("jenesis.cache.uri", "");
-            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).cache()).isNull();
-            System.setProperty("jenesis.cache.uri", cacheRoot.toUri().toString());
-            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).cache()).isInstanceOf(BuildExecutorFileCache.class);
-            System.setProperty("jenesis.cache.uri", "https://cache.example.test/");
-            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).cache()).isInstanceOf(BuildExecutorHttpCache.class);
-            System.setProperty("jenesis.cache.uri", cacheRoot.toString());
-            assertThatThrownBy(() -> BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM)).isInstanceOf(IllegalArgumentException.class);
-        } finally {
-            restore("jenesis.cache.uri", previousUri);
-        }
-    }
-
-    private static void restore(String key, String previous) {
-        if (previous == null) {
-            System.clearProperty(key);
-        } else {
-            System.setProperty(key, previous);
-        }
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).cache()).isNull();
+        settings.put("cache.uri", "");
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).cache()).isNull();
+        settings.put("cache.uri", cacheRoot.toUri().toString());
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).cache())
+                .isInstanceOf(BuildExecutorFileCache.class);
+        settings.put("cache.uri", "https://cache.example.test/");
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).cache())
+                .isInstanceOf(BuildExecutorHttpCache.class);
+        settings.put("cache.uri", cacheRoot.toString());
+        assertThatThrownBy(() -> BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

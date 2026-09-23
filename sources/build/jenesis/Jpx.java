@@ -288,7 +288,8 @@ public record Jpx(Path storage,
               --help              print this help""";
 
     public static void main(String... arguments) throws IOException, InterruptedException {
-        System.exit(run(Environment.SYSTEM, SequencedProperties.arguments(arguments).toArray(String[]::new)));
+        System.exit(run(new Environment(Make.ambient(new LinkedHashMap<>())),
+                SequencedProperties.arguments(arguments).toArray(String[]::new)));
     }
 
     public static int run(Environment environment, String... arguments)

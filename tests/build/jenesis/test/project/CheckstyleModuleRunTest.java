@@ -95,7 +95,7 @@ public class CheckstyleModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "checkstyle",
-                new CheckstyleModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))).pinning(Pinning.STRICT),
+                new CheckstyleModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
                 "project");
         executor.execute();
 
@@ -118,7 +118,7 @@ public class CheckstyleModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "checkstyle",
-                new CheckstyleModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))).pinning(Pinning.STRICT)
+                new CheckstyleModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT)
                         .strict(true),
                 "project");
 

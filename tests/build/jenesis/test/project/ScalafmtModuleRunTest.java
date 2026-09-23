@@ -79,7 +79,7 @@ public class ScalafmtModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "scalafmt",
-                new ScalafmtModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))).pinning(Pinning.STRICT),
+                new ScalafmtModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
                 "project");
         executor.execute();
 
@@ -102,7 +102,7 @@ public class ScalafmtModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "scalafmt",
-                new ScalafmtModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))).pinning(Pinning.STRICT)
+                new ScalafmtModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT)
                         .strict(true),
                 "project");
 
