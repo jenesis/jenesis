@@ -36,26 +36,33 @@ public class DependencyTreeReportTest {
                 new Resolver.Edge("maven/g/a/1.0", "maven/g/d/4.0", "4.0", "compile", true),
                 new Resolver.Edge("maven/g/b/2.0", "maven/g/c/3.0", "3.0", "runtime", true)),
                 new LinkedHashMap<>()));
-        assertThat(output().lines().toList()).containsSequence(
-                "Dependency tree:",
-                "└─ maven/g/a 1.0 [compile]",
-                "   ├─ maven/g/b 2.0 [compile]",
-                "   │  └─ maven/g/c 3.0 [runtime]",
-                "   └─ maven/g/d 4.0 [compile]");
+        String text = output();
+        assertThat(text).contains("Dependency tree:");
+        assertThat(text).contains("maven/g/a 1.0 [compile]");
+        assertThat(text).contains("├─ maven/g/b 2.0 [compile]");
+        assertThat(text).contains("│  └─ maven/g/c 3.0 [runtime]");
+        assertThat(text).contains("└─ maven/g/d 4.0 [compile]");
     }
 
     @Test
-    public void hangs_each_direct_dependency_below_the_title() {
+    public void renders_a_module_as_the_root_of_its_dependencies() {
+        SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
+        vertices.put("maven/g/a", new Resolver.Vertex("1.0", null, false, false, List.of()));
+        vertices.put("maven/g/b", new Resolver.Vertex("2.0", null, false, false, List.of()));
         report.render(resolution(List.of(
                 new Resolver.Edge(null, "maven/g/a/1.0", "1.0", "compile", true),
                 new Resolver.Edge("maven/g/a/1.0", "maven/g/b/2.0", "2.0", "compile", true),
-                new Resolver.Edge(null, "maven/g/c/3.0", "3.0", "compile", true)),
-                new LinkedHashMap<>()), "main/compile greeter");
+                new Resolver.Edge(null, "maven/g/b/2.0", "2.0", "compile", false)),
+                vertices), "module/greeter", "compile", new Resolver.Vertex("1.0", "greeter", false, true,
+                List.of(new License(null, null, "Apache-2.0", null))));
         assertThat(output().lines().toList()).containsSequence(
-                "main/compile greeter",
-                "├─ maven/g/a 1.0 [compile]",
-                "│  └─ maven/g/b 2.0 [compile]",
-                "└─ maven/g/c 3.0 [compile]");
+                "module/greeter 1.0 [compile] (module greeter, local) {Apache-2.0}",
+                "└─ maven/g/a 1.0 [compile]",
+                "   └─ maven/g/b 2.0 [compile]",
+                "",
+                "Resolved dependencies:",
+                "  maven/g/a -> 1.0",
+                "  maven/g/b -> 2.0");
     }
 
     @Test

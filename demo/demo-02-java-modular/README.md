@@ -99,7 +99,7 @@ the declared license:
 
     java build/jenesis/Make.java dependencies
 
-    ./sources 1-SNAPSHOT (module demo.modular)
+    maven/demo.modular/demo.modular 1-SNAPSHOT [compile] (module demo.modular, local ./sources)
     └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT}
 
 Because this is the default MODULAR_TO_MAVEN layout, `requires org.slf4j` is shown
