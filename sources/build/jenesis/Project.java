@@ -838,8 +838,9 @@ public record Project(
                           does not grant, strict fails the build on it. A module in one of the run's
                           layers is named the same way, or as layer:<name>/<repo>/..., and reaches
                           the launcher as jlayer.enableNativeAccess.<name>, which grants it when it
-                          defines the layer. MAVEN modules declare tokens in a
-                          <!--jenesis.native ... --> comment.
+                          defines the layer; code that runs earlier, in the application or an outer
+                          layer, can rewrite that property, as it can every jlayer.* one. MAVEN modules
+                          declare tokens in a <!--jenesis.native ... --> comment.
 
                     ## 9. Activate a tool by dropping in its configuration file
 
