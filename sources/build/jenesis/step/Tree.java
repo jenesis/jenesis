@@ -7,6 +7,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.DependencyTreeReport;
 import build.jenesis.Environment;
+import build.jenesis.License;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 
@@ -62,67 +63,65 @@ public class Tree implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        DependencyTreeReport report = new DependencyTreeReport(out).compact(compact);
-        SequencedMap<String, Resolver.Vertex> aggregated = new LinkedHashMap<>();
+        Map<Path, SequencedProperties> inventories = new HashMap<>();
+        SequencedMap<Path, String> prefixes = new LinkedHashMap<>();
+        SequencedMap<String, String> locations = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
-            if (argument.removed()) {
-                continue;
-            }
             Path inventoryFile = argument.folder().resolve(Inventory.INVENTORY);
-            if (!Files.isRegularFile(inventoryFile)) {
+            if (argument.removed() || !Files.isRegularFile(inventoryFile)) {
                 continue;
             }
             SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
-            String prefix = null;
             for (String key : inventory.stringPropertyNames()) {
                 if (key.endsWith(".graph.0")) {
-                    prefix = key.substring(0, key.length() - "graph.0".length());
+                    String prefix = key.substring(0, key.length() - "graph.0".length());
+                    String version = inventory.value(prefix + "version");
+                    for (int index = 0; inventory.value(prefix + "identity." + index) != null; index++) {
+                        String identity = inventory.value(prefix + "identity." + index);
+                        locations.put(version != null && identity.endsWith("/" + version)
+                                ? identity.substring(0, identity.length() - version.length() - 1)
+                                : identity, "./" + inventory.value(prefix + "path", ""));
+                    }
+                    inventories.put(argument.folder(), inventory);
+                    prefixes.put(argument.folder(), prefix);
                     break;
                 }
             }
-            if (prefix == null) {
+        }
+        DependencyTreeReport report = new DependencyTreeReport(out).compact(compact).locations(locations);
+        SequencedMap<String, Resolver.Vertex> aggregated = new LinkedHashMap<>();
+        for (Map.Entry<Path, String> entry : prefixes.entrySet()) {
+            SequencedProperties inventory = inventories.get(entry.getKey());
+            String prefix = entry.getValue();
+            if (!tests && inventory.getProperty(prefix + "test") != null) {
                 continue;
             }
-            String tested = inventory.getProperty(prefix + "test");
-            if (!tests && tested != null) {
-                continue;
-            }
-            StringBuilder title = new StringBuilder("./" + inventory.value(prefix + "path", ""));
-            String version = inventory.value(prefix + "version"), module = inventory.value(prefix + "module");
-            if (version != null) {
-                title.append(' ').append(version);
-            }
-            StringBuilder meta = new StringBuilder();
-            if (module != null) {
-                meta.append("module ").append(module);
-            }
-            if (tested != null) {
-                meta.append(meta.isEmpty() ? "test" : ", test");
-            }
-            if (!meta.isEmpty()) {
-                title.append(" (").append(meta).append(')');
-            }
-            List<String> licenses = new ArrayList<>();
-            for (int index = 0; inventory.value(prefix + "license." + index) != null; index++) {
-                licenses.add(inventory.value(prefix + "license." + index));
-            }
-            if (!licenses.isEmpty()) {
-                title.append(" {").append(String.join(", ", licenses)).append('}');
-            }
-            SequencedMap<List<String>, Resolver.Edge> edges = new LinkedHashMap<>();
-            SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
-            for (Resolver.Resolution resolution : Dependencies.graph(
-                    Inventory.paths(inventory, argument.folder(), prefix + "graph"),
-                    Inventory.paths(inventory, argument.folder(), prefix + "licenses")).values()) {
-                for (Resolver.Edge edge : resolution.edges()) {
-                    edges.merge(Arrays.asList(edge.parent(), edge.coordinate()), edge,
-                            (current, candidate) -> current.followed() || !candidate.followed() ? current : candidate);
+            String identity = inventory.value(prefix + "identity.0");
+            for (int index = 0; inventory.value(prefix + "identity." + index) != null; index++) {
+                if (inventory.value(prefix + "identity." + index).startsWith("maven/")) {
+                    identity = inventory.value(prefix + "identity." + index);
+                    break;
                 }
-                resolution.vertices().forEach(vertices::putIfAbsent);
             }
-            report.render(new Resolver.Resolution(new LinkedHashMap<>(), List.copyOf(edges.values()), vertices),
-                    title.toString());
-            aggregated.putAll(vertices);
+            String version = inventory.value(prefix + "version");
+            String key = identity == null || version == null || !identity.endsWith("/" + version)
+                    ? identity
+                    : identity.substring(0, identity.length() - version.length() - 1);
+            List<License> licenses = new ArrayList<>();
+            for (int index = 0; inventory.value(prefix + "license." + index) != null; index++) {
+                licenses.add(new License(null, null, inventory.value(prefix + "license." + index), null));
+            }
+            Resolver.Vertex root = new Resolver.Vertex(version, inventory.value(prefix + "module"), false, true, licenses);
+            Dependencies.graph(
+                    Inventory.paths(inventory, entry.getKey(), prefix + "graph"),
+                    Inventory.paths(inventory, entry.getKey(), prefix + "licenses")).forEach((groupScope, resolution) -> {
+                if (key == null) {
+                    report.render(resolution, groupScope);
+                } else {
+                    report.render(resolution, key, groupScope.substring(groupScope.indexOf('/') + 1), root);
+                }
+                aggregated.putAll(resolution.vertices());
+            });
         }
         report.summary(aggregated);
         return CompletableFuture.completedStage(new BuildStepResult(true));

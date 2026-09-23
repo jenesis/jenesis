@@ -178,23 +178,25 @@ pinned into dependency management.
 Printing the dependency graph
 -----------------------------
 
-To see what each module resolves, run the `dependencies` selector. It prints each
-module's resolved dependency graph as one tree per module, headed by the module's
-path and version, with every node carrying its resolved module name and declared
-license:
+To see what each module resolves, run the `dependencies` selector. It prints one
+tree per module and scope, each starting from the module itself - tagged `local`
+with the folder it is built from - with every node carrying its resolved module
+name and declared license:
 
     java build/jenesis/Make.java dependencies
 
-    ./greeter 1.0.0
+    maven/build.jenesis.demo/greeter 1.0.0 [compile] (local ./greeter)
     └─ maven/org.apache.commons/commons-lang3 3.14.0 [compile] (module org.apache.commons.lang3) {Apache-2.0}
 
-    ./app 1.0.0
-    └─ maven/build.jenesis.demo/greeter 1.0.0 [compile] (local)
+    maven/build.jenesis.demo/app 1.0.0 [compile] (local ./app)
+    └─ maven/build.jenesis.demo/greeter 1.0.0 [compile] (local ./greeter)
+       └─ maven/org.apache.commons/commons-lang3 3.14.0 [compile] (module org.apache.commons.lang3) {Apache-2.0}
 
-`app` reaches `greeter` as a module built in the same project, tagged `local`.
-The test module of `greeter` follows with `(test)` in its heading. Repeated
-subtrees are dimmed and marked `(*)`, and a `Resolved dependencies:` summary after
-each tree lists the final version chosen for every coordinate.
+`app` reaches `greeter` as a module built in the same project, so it is tagged
+`local` with the folder it comes from wherever it appears. The test module of
+`greeter` follows under its own coordinate, `…/greeter/jar/tests`. Repeated
+subtrees are dimmed and marked `(*)`, and a `Resolved dependencies:` summary
+after each tree lists the final version chosen for every coordinate.
 
 Each node shows the property-file key, version, and Maven scope; a dependency
 reached more than once is expanded under its first parent and dimmed with `(*)`
