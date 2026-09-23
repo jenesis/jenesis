@@ -577,7 +577,10 @@ public record Project<P extends MultiProjectAssembler<? super ProjectModuleDescr
                     it in jenesis.project.customizers=build.custom.Build, in jenesis.properties or on
                     the command line: Make compiles build/custom/ with the engine and applies each
                     customizer, in order, to the project the settings configured, so the build keeps
-                    every feature of Make. A customizer runs the project's code, as its tests do, so
+                    every feature of Make. project.assembler(assembler -> ...) adjusts the assembler:
+                    its configurators (toolchain, check, ...) and merge, which builds a module's stock
+                    build from an adjusted descriptor and returns what replaces it, append to what an
+                    earlier customizer set. A customizer runs the project's code, as its tests do, so
                     build an untrusted project with -Djenesis.project.docker=true, which applies it
                     inside the container only.
                     jenesis-validate checks build/jenesis alone, so a customizer leaves the vendored

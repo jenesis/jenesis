@@ -5,14 +5,14 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Project;
+import build.jenesis.project.InferredMultiProjectAssembler;
 
-public class Preprocessing implements UnaryOperator<Project<?>>, Serializable {
+public class Preprocessing implements UnaryOperator<Project<InferredMultiProjectAssembler>>, Serializable {
 
     @Override
-    public Project<?> apply(Project<?> project) {
-        return project.assembler((descriptor, repositories, resolvers) -> project.assembler()
-                .apply(descriptor.sources("preprocess"), repositories, resolvers)
-                .mapBuild(inner -> (sub, inherited) -> {
+    public Project<InferredMultiProjectAssembler> apply(Project<InferredMultiProjectAssembler> project) {
+        return project.assembler(assembler -> assembler.merge(descriptor -> descriptor.sources("preprocess"),
+                (descriptor, stock) -> (sub, inherited) -> {
                     sub.addStep("preprocess", (executor, context, arguments) -> {
                         Path target = context.next().resolve(BuildStep.SOURCES);
                         for (BuildStepArgument argument : arguments.values()) {
@@ -53,7 +53,7 @@ public class Preprocessing implements UnaryOperator<Project<?>>, Serializable {
                         }
                         return CompletableFuture.completedStage(new BuildStepResult(true));
                     }, descriptor.sources().stream());
-                    inner.accept(sub, inherited);
+                    stock.accept(sub, inherited);
                 }));
     }
 }

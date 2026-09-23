@@ -31,6 +31,7 @@ public record InferredMultiProjectAssembler(UnaryOperator<InferredSourceCodeQual
                                             UnaryOperator<InferredArtifactQualityModule> artifact,
                                             UnaryOperator<InferredTestObservationModule> observe,
                                             UnaryOperator<InferredDocumentationModule> documentation,
+                                            UnaryOperator<MultiProjectAssembler<ProjectModuleDescriptor>> merge,
                                             Environment environment) implements MultiProjectAssembler<ProjectModuleDescriptor> {
 
     public InferredMultiProjectAssembler() {
@@ -45,6 +46,7 @@ public record InferredMultiProjectAssembler(UnaryOperator<InferredSourceCodeQual
                 module -> module,
                 module -> module,
                 module -> module,
+                assembler -> assembler,
                 environment);
     }
 
@@ -53,37 +55,58 @@ public record InferredMultiProjectAssembler(UnaryOperator<InferredSourceCodeQual
     }
 
     public InferredMultiProjectAssembler check(UnaryOperator<InferredSourceCodeQualityModule> check) {
-        return new InferredMultiProjectAssembler(append(this.check, check), format, compliance, toolchain, artifact, observe, documentation, environment);
+        return new InferredMultiProjectAssembler(append(this.check, check), format, compliance, toolchain, artifact, observe, documentation, merge, environment);
     }
 
     public InferredMultiProjectAssembler format(UnaryOperator<InferredSourceFormattingModule> format) {
-        return new InferredMultiProjectAssembler(check, append(this.format, format), compliance, toolchain, artifact, observe, documentation, environment);
+        return new InferredMultiProjectAssembler(check, append(this.format, format), compliance, toolchain, artifact, observe, documentation, merge, environment);
     }
 
     public InferredMultiProjectAssembler compliance(UnaryOperator<InferredComplianceModule> compliance) {
-        return new InferredMultiProjectAssembler(check, format, append(this.compliance, compliance), toolchain, artifact, observe, documentation, environment);
+        return new InferredMultiProjectAssembler(check, format, append(this.compliance, compliance), toolchain, artifact, observe, documentation, merge, environment);
     }
 
     public InferredMultiProjectAssembler toolchain(UnaryOperator<InferredJavaToolchainModule> toolchain) {
-        return new InferredMultiProjectAssembler(check, format, compliance, append(this.toolchain, toolchain), artifact, observe, documentation, environment);
+        return new InferredMultiProjectAssembler(check, format, compliance, append(this.toolchain, toolchain), artifact, observe, documentation, merge, environment);
     }
 
     public InferredMultiProjectAssembler artifact(UnaryOperator<InferredArtifactQualityModule> artifact) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, append(this.artifact, artifact), observe, documentation, environment);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, append(this.artifact, artifact), observe, documentation, merge, environment);
     }
 
     public InferredMultiProjectAssembler observe(UnaryOperator<InferredTestObservationModule> observe) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, append(this.observe, observe), documentation, environment);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, append(this.observe, observe), documentation, merge, environment);
     }
 
     public InferredMultiProjectAssembler documentation(UnaryOperator<InferredDocumentationModule> documentation) {
-        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, append(this.documentation, documentation), environment);
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, append(this.documentation, documentation), merge, environment);
+    }
+
+    public InferredMultiProjectAssembler merge(UnaryOperator<MultiProjectAssembler<ProjectModuleDescriptor>> merge) {
+        return new InferredMultiProjectAssembler(check, format, compliance, toolchain, artifact, observe, documentation, append(this.merge, merge), environment);
+    }
+
+    public InferredMultiProjectAssembler merge(BiFunction<ProjectModuleDescriptor, BuildExecutorModule, BuildExecutorModule> build) {
+        return merge(UnaryOperator.identity(), build);
+    }
+
+    public InferredMultiProjectAssembler merge(UnaryOperator<ProjectModuleDescriptor> inputs,
+                                               BiFunction<ProjectModuleDescriptor, BuildExecutorModule, BuildExecutorModule> build) {
+        return merge(assembler -> (descriptor, repositories, resolvers) -> assembler
+                .apply(inputs.apply(descriptor), repositories, resolvers)
+                .mapBuild(stock -> build.apply(descriptor, stock)));
     }
 
     @Override
     public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
                                     Map<String, Repository> repositories,
                                     Map<String, Resolver> resolvers) throws IOException {
+        return merge.apply(this::assemble).apply(descriptor, repositories, resolvers);
+    }
+
+    private AssemblyDescriptor assemble(ProjectModuleDescriptor descriptor,
+                                        Map<String, Repository> repositories,
+                                        Map<String, Resolver> resolvers) throws IOException {
         Packaging packaging = Packaging.configured(
                 BuildStep.locate(descriptor.configuration(), "packaging.properties"));
         Boolean modules = descriptor.pathPlacement() == PathPlacement.MODULE_PATH

@@ -5,21 +5,16 @@ import build.jenesis.Execution;
 import build.jenesis.Project;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
-import build.jenesis.Resolver;
 import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisRepository;
 import build.jenesis.module.ModularJarResolver;
-import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.ExternalModule;
-import build.jenesis.project.InferredMultiProjectAssembler;
-import build.jenesis.project.MultiProjectAssembler;
-import build.jenesis.project.ProjectModuleDescriptor;
 import build.jenesis.Environment;
 import build.jenesis.Make;
 
 /**
  * The {@code ExternalModule} counterpart of the {@code ../internal-module} demo.
- * It does exactly the same thing - wraps the stock {@code InferredMultiProjectAssembler}
+ * It does exactly the same thing - merges into the stock {@code InferredMultiProjectAssembler}
  * so a build module preprocesses the project's sources (a {@code ${greeting}}
  * substitution driven by the {@code org.json} dependency) before the regular
  * flow - but the build module is consumed as a published artifact rather than
@@ -64,35 +59,16 @@ public class Demo {
         // Build the project (the resolved plugin rewrites ${greeting} first) and
         // launch the produced module so its main prints the substituted greeting.
         Project<?> project = Project.ofEnvironment(environment, Path.of("."))
-                .assembler(new PreprocessingAssembler(
-                        InferredMultiProjectAssembler.ofEnvironment(environment),
-                        Map.of("module", repository),
-                        Map.of("module", ModularJarResolver.ofEnvironment(environment, true))));
+                .assembler(assembler -> assembler.merge(descriptor -> descriptor.sources("preprocess/substitute"),
+                        (descriptor, stock) -> (sub, inherited) -> {
+                            sub.addModule("preprocess",
+                                    new ExternalModule("module/demo.plugin",
+                                            "tool",
+                                            Map.of("module", repository),
+                                            Map.of("module", ModularJarResolver.ofEnvironment(environment, true))),
+                                    Stream.concat(descriptor.sources().stream(), descriptor.manifests().stream()));
+                            stock.accept(sub, inherited);
+                        }));
         System.exit(new Execution(project).execute(args));
-    }
-
-    private record PreprocessingAssembler(
-            MultiProjectAssembler<? super ProjectModuleDescriptor> delegate,
-            Map<String, Repository> pluginRepositories,
-            Map<String, Resolver> pluginResolvers)
-            implements MultiProjectAssembler<ProjectModuleDescriptor> {
-
-        @Override
-        public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
-                                        Map<String, Repository> repositories,
-                                        Map<String, Resolver> resolvers) throws IOException {
-            SequencedSet<String> original = descriptor.sources();
-            SequencedSet<String> manifests = descriptor.manifests();
-            ProjectModuleDescriptor redirected = descriptor.sources("preprocess/substitute");
-            return delegate.apply(redirected, repositories, resolvers).mapBuild(inner -> (sub, inherited) -> {
-                ExternalModule preprocess = new ExternalModule(
-                        "module/demo.plugin",               // the coordinate to resolve
-                        "tool",                             // dependency group for the plugin's resolved closure
-                        pluginRepositories,
-                        pluginResolvers);
-                sub.addModule("preprocess", preprocess, Stream.concat(original.stream(), manifests.stream()));
-                inner.accept(sub, inherited);
-            });
-        }
     }
 }

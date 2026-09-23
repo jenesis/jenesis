@@ -477,6 +477,34 @@ public class InferredMultiProjectAssemblerTest {
                 .isNull();
     }
 
+    @Test
+    public void a_merge_builds_the_stock_module_from_the_adjusted_descriptor_and_replaces_it() throws IOException {
+        ProjectModuleDescriptor descriptor = setUp("main=com.example.Entry\n", false, false, false).descriptor();
+        BuildExecutorModule merged = (_, _) -> {};
+        List<ProjectModuleDescriptor> inner = new ArrayList<>(), outer = new ArrayList<>();
+        List<BuildExecutorModule> stocks = new ArrayList<>();
+        InferredMultiProjectAssembler assembler = new InferredMultiProjectAssembler()
+                .merge((adjusted, stock) -> {
+                    inner.add(adjusted);
+                    return stock;
+                })
+                .merge(original -> original.sources("preprocess"), (original, stock) -> {
+                    outer.add(original);
+                    stocks.add(stock);
+                    return merged;
+                });
+        AssemblyDescriptor assembled = assembler.apply(descriptor, Map.of(), Map.of());
+        assertThat(outer).as("the merge that adjusted the descriptor is handed the one it adjusted").containsExactly(descriptor);
+        assertThat(inner).singleElement()
+                .as("a merge appended before another builds from the descriptor the later one adjusted")
+                .satisfies(adjusted -> assertThat(adjusted.sources()).containsExactly("preprocess"));
+        assertThat(stocks).hasSize(1);
+        assertThat(assembled.build()).isSameAs(merged);
+        assertThat(assembled.tail().sequencedKeySet())
+                .as("a merge replaces the module's build and keeps the phases after it")
+                .containsExactlyElementsOf(new InferredMultiProjectAssembler().apply(descriptor, Map.of(), Map.of()).tail().sequencedKeySet());
+    }
+
     private static SequencedProperties readProperties(Path path) throws IOException {
         assertThat(path).exists();
         return SequencedProperties.ofFiles(path);

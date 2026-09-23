@@ -56,11 +56,11 @@ How it works
 ------------
 
 `Substitution` is a customizer, named in `jenesis.properties` as in the
-`custom-assembler` demo: it wraps the
-assembler the settings configured in a lambda, and `Execute` builds the adjusted
+`custom-assembler` demo: it merges a module into the
+assembler the settings configured, and `Execute` builds the adjusted
 project and launches the produced module's `main` so the substituted greeting is
 shown. `Execute` reads the build's inventory to find the module and its runtime
-classpath, so nothing is located by hand. For each module the wrapper:
+classpath, so nothing is located by hand. For each module the merge:
 
 1. Adds a `preprocess` node that is an `InternalModule` pointed at `plugin/`.
    `InternalModule` compiles the plugin from source, resolves its declared

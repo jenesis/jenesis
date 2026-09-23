@@ -80,22 +80,21 @@ Layout
         |-- module-info.java     module demo.config { requires org.slf4j; exports sample; }
         `-- sample/Sample.java   reads <java.home>/conf/app.properties, logs via slf4j, prints it
 
-How the wrapping works
-----------------------
+How the merge works
+-------------------
 
 `ConfigJmod` is a customizer, named in `jenesis.properties` as in the
-`custom-assembler` demo: it wraps the assembler the settings configured in a
-lambda. `jmod`, `jlink`, and packaging
+`custom-assembler` demo: it merges a step into the assembler the settings
+configured. `jmod`, `jlink`, and packaging
 are selected by the committed `packaging.properties` in this directory, which
 Jenesis reads from the configuration location:
 
-    return project.assembler((descriptor, repositories, resolvers) -> project.assembler()
-            .apply(descriptor.content("config"), repositories, resolvers)
-            .mapBuild(inner -> (sub, inherited) -> {
+    return project.assembler(assembler -> assembler.merge(descriptor -> descriptor.content("config"),
+            (_, stock) -> (sub, inherited) -> {
                 sub.addStep("config", (executor, context, arguments) -> {
                     ... // write jmodconfig/app.properties into context.next()
                 });
-                inner.accept(sub, inherited);
+                stock.accept(sub, inherited);
             }));
 
     packaging.properties:  jmod=true
@@ -104,15 +103,15 @@ Jenesis reads from the configuration location:
 
 With those keys the stock assembler already adds the `jmod`, `jlink`, and
 `jpackage` steps, wires `jlink` to read the `.jmod`, and wires `jpackage` to bundle
-the `jlink` runtime via `--runtime-image`. The wrapper does not duplicate any of
+the `jlink` runtime via `--runtime-image`. The merge does not duplicate any of
 that. It adds exactly one thing, the extra input, and lets the stock pipeline
 consume it:
 
     sub.addStep("config", ...);      // produces jmodconfig/app.properties
-    inner.accept(sub, inherited);    // the stock java -> jmod -> jlink -> jpackage pipeline
+    stock.accept(sub, inherited);    // the stock java -> jmod -> jlink -> jpackage pipeline
 
-The link between the two is the module descriptor's `content` set. The wrapper
-calls `descriptor.content("config")` before delegating, and the stock `jmod`
+The link between the two is the module descriptor's `content` set. The merge
+adjusts it with `descriptor.content("config")`, and the stock `jmod`
 step depends on every step named in `content` in addition to `java`. The only
 other framework knowledge involved is a folder convention: the `JMod` step routes
 a predecessor's `jmodconfig/` directory to `jmod --config` (and likewise
