@@ -23,11 +23,23 @@ public class ToolchainTest {
     }
 
     @Test
-    public void rejects_a_version_jenesis_cannot_run_on() {
-        assertThatThrownBy(() -> new Toolchain().version("21-temurin"))
+    public void refuses_to_relaunch_on_a_version_jenesis_cannot_run_on() throws IOException {
+        Path home = jdk(folder.resolve("jdk"), "21.0.4+7", "Acme Labs", null);
+
+        assertThatThrownBy(() -> new Toolchain().version("21-acme").searchpath(home.toString())
+                .command(Child.class, List.of(), List.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("needs 25 or newer")
                 .hasMessageContaining("@jenesis.release");
+    }
+
+    @Test
+    public void selects_a_jdk_older_than_jenesis_runs_on_for_a_program() throws IOException {
+        Path home = jdk(folder.resolve("jdk"), "21.0.4+7", "Acme Labs", null);
+
+        assertThat(new Toolchain().version("21-acme").searchpath(home.toString()).home())
+                .as("a program jpx runs is not the build, so any JDK it names can run it")
+                .isEqualTo(home);
     }
 
     @ParameterizedTest
