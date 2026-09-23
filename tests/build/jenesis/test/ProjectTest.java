@@ -616,6 +616,15 @@ public class ProjectTest {
     }
 
     @Test
+    public void points_at_make_when_the_customizer_was_not_compiled() {
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.customizer",
+                "build.custom.Missing")::get), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No class build.custom.Missing")
+                .hasMessageContaining("so build a project with a customizer with java build/jenesis/Make.java");
+    }
+
+    @Test
     public void refuses_a_customizer_that_is_no_function() {
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.customizer",
                 ProjectTest.class.getName())::get), root))
