@@ -15,7 +15,7 @@ import build.jenesis.Environment;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class BuildExecutorConcurrencyTest implements Serializable {
+public class BuildExecutorConcurrencyTest {
 
     private final Map<String, String> settings = new HashMap<>();
 

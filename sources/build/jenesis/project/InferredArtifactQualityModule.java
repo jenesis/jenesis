@@ -32,20 +32,27 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final JApiCmpModule japicmpModule;
     private final Function<JApiCmpModule, BuildExecutorModule> japicmp;
+    private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredArtifactQualityModule(SequencedSet<Path> configuration,
                                          Map<String, Repository> repositories,
                                          Map<String, Resolver> resolvers) {
-        this(configuration, null, new JApiCmpModule(repositories, resolvers),
-             value -> value);
+        this(configuration,
+                null,
+                new JApiCmpModule(repositories, resolvers),
+                value -> value,
+                Collections.emptyNavigableMap());
     }
 
     public static InferredArtifactQualityModule ofEnvironment(Environment environment,
                                                               SequencedSet<Path> configuration,
                                                               Map<String, Repository> repositories,
                                                               Map<String, Resolver> resolvers) {
-        InferredArtifactQualityModule module = new InferredArtifactQualityModule(configuration, null, JApiCmpModule.ofEnvironment(environment, repositories, resolvers),
-                value -> value);
+        InferredArtifactQualityModule module = new InferredArtifactQualityModule(configuration,
+                null,
+                JApiCmpModule.ofEnvironment(environment, repositories, resolvers),
+                value -> value,
+                Collections.emptyNavigableMap());
         Boolean japicmp = environment.flagOrNull("artifact.japicmp");
         if (japicmp != null) {
             module = module.japicmp(japicmp ? value -> value : null);
@@ -56,19 +63,51 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
     private InferredArtifactQualityModule(SequencedSet<Path> configuration,
                                           Pinning pinning,
                                           JApiCmpModule japicmpModule,
-                                          Function<JApiCmpModule, BuildExecutorModule> japicmp) {
+                                          Function<JApiCmpModule, BuildExecutorModule> japicmp,
+                                          SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
         this.pinning = pinning;
         this.japicmpModule = japicmpModule;
         this.japicmp = japicmp;
+        this.custom = custom;
     }
 
     public InferredArtifactQualityModule pinning(Pinning pinning) {
-        return new InferredArtifactQualityModule(configuration, pinning, japicmpModule, japicmp);
+        return new InferredArtifactQualityModule(configuration,
+                pinning,
+                japicmpModule,
+                japicmp,
+                custom);
     }
 
     public InferredArtifactQualityModule japicmp(Function<JApiCmpModule, BuildExecutorModule> japicmp) {
-        return new InferredArtifactQualityModule(configuration, pinning, japicmpModule, japicmp);
+        return new InferredArtifactQualityModule(configuration,
+                pinning,
+                japicmpModule,
+                japicmp,
+                custom);
+    }
+
+    public InferredArtifactQualityModule custom(SequencedMap<String, BuildExecutorModule> custom) {
+        return new InferredArtifactQualityModule(configuration,
+                pinning,
+                japicmpModule,
+                japicmp,
+                custom);
+    }
+
+    public InferredArtifactQualityModule custom(String name, BuildExecutorModule module) {
+        if (custom.containsKey(name)) {
+            throw new IllegalArgumentException("A custom module named " + name + " is added already - give this one"
+                    + " another name");
+        }
+        SequencedMap<String, BuildExecutorModule> added = new LinkedHashMap<>(custom);
+        added.put(name, module);
+        return custom(added);
+    }
+
+    public InferredArtifactQualityModule custom(String name, BuildStep step) {
+        return custom(name, step.asModule(name));
     }
 
     @Override
@@ -87,5 +126,9 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
                     }
                     return japicmpModule.pinning(pinning).config(properties);
                 });
+        if (!custom.isEmpty()) {
+            buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
+                    nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());
+        }
     }
 }

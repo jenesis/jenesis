@@ -29,26 +29,32 @@ public class InferredTestObservationModule implements BuildExecutorModule {
     private final Function<JaCoCoModule, BuildExecutorModule> jacoco;
     private final Function<NativeImageAgentModule, BuildExecutorModule> nativeImage;
     private final Function<PiTestModule, BuildExecutorModule> pitest;
+    private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredTestObservationModule(SequencedSet<Path> configuration,
                                          Map<String, Repository> repositories,
                                          Map<String, Resolver> resolvers) {
-        this(configuration, null, PathPlacement.CLASS_PATH,
-             null,
-             new TestModule(repositories, resolvers),
-             new JaCoCoModule(repositories, resolvers),
-             new PiTestModule(repositories, resolvers),
-             value -> value,
-             value -> value,
-             value -> value,
-             value -> value);
+        this(configuration,
+                null,
+                PathPlacement.CLASS_PATH,
+                null,
+                new TestModule(repositories, resolvers),
+                new JaCoCoModule(repositories, resolvers),
+                new PiTestModule(repositories, resolvers),
+                value -> value,
+                value -> value,
+                value -> value,
+                value -> value,
+                Collections.emptyNavigableMap());
     }
 
     public static InferredTestObservationModule ofEnvironment(Environment environment,
                                                               SequencedSet<Path> configuration,
                                                               Map<String, Repository> repositories,
                                                               Map<String, Resolver> resolvers) {
-        InferredTestObservationModule module = new InferredTestObservationModule(configuration, null, PathPlacement.CLASS_PATH,
+        InferredTestObservationModule module = new InferredTestObservationModule(configuration,
+                null,
+                PathPlacement.CLASS_PATH,
                 null,
                 TestModule.ofEnvironment(environment, repositories, resolvers),
                 JaCoCoModule.ofEnvironment(environment, repositories, resolvers),
@@ -56,7 +62,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 value -> value,
                 value -> value,
                 value -> value,
-                value -> value);
+                value -> value,
+                Collections.emptyNavigableMap());
         Boolean jacoco = environment.flagOrNull("observe.jacoco");
         if (jacoco != null) {
             module = module.jacoco(jacoco ? value -> value : null);
@@ -96,7 +103,8 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                                           Function<TestModule, BuildExecutorModule> test,
                                           Function<JaCoCoModule, BuildExecutorModule> jacoco,
                                           Function<NativeImageAgentModule, BuildExecutorModule> nativeImage,
-                                          Function<PiTestModule, BuildExecutorModule> pitest) {
+                                          Function<PiTestModule, BuildExecutorModule> pitest,
+                                          SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
@@ -108,41 +116,141 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         this.jacoco = jacoco;
         this.nativeImage = nativeImage;
         this.pitest = pitest;
+        this.custom = custom;
     }
 
     public InferredTestObservationModule pinning(Pinning pinning) {
-        return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest);
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
     }
 
     public InferredTestObservationModule pathPlacement(PathPlacement pathPlacement) {
-        return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest);
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
     }
 
     public InferredTestObservationModule moduleName(String moduleName) {
-        return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest);
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
     }
 
     public InferredTestObservationModule test(Function<TestModule, BuildExecutorModule> test) {
-        return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest);
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
     }
 
     public InferredTestObservationModule jacoco(Function<JaCoCoModule, BuildExecutorModule> jacoco) {
-        return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest);
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
     }
 
     public InferredTestObservationModule nativeImage(Function<NativeImageAgentModule, BuildExecutorModule> nativeImage) {
-        return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest);
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
     }
 
     public InferredTestObservationModule pitest(Function<PiTestModule, BuildExecutorModule> pitest) {
-        return new InferredTestObservationModule(configuration, pinning, pathPlacement, moduleName, testModule,
-                jacocoModule, pitestModule, test, jacoco, nativeImage, pitest);
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
+    }
+
+    public InferredTestObservationModule custom(SequencedMap<String, BuildExecutorModule> custom) {
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                pitest,
+                custom);
+    }
+
+    public InferredTestObservationModule custom(String name, BuildExecutorModule module) {
+        if (custom.containsKey(name)) {
+            throw new IllegalArgumentException("A custom module named " + name + " is added already - give this one"
+                    + " another name");
+        }
+        SequencedMap<String, BuildExecutorModule> added = new LinkedHashMap<>(custom);
+        added.put(name, module);
+        return custom(added);
+    }
+
+    public InferredTestObservationModule custom(String name, BuildStep step) {
+        return custom(name, step.asModule(name));
     }
 
     @Override
@@ -183,5 +291,9 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         Bind.configuredByProperties(buildExecutor, inherited.sequencedKeySet(), MUTATE, pitest,
                 BuildStep.locate(configuration, "pitest.properties"),
                 properties -> pitestModule.pinning(pinning).config(properties));
+        if (!custom.isEmpty()) {
+            buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
+                    nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());
+        }
     }
 }

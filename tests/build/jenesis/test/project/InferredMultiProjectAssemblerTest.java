@@ -7,6 +7,7 @@ import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
+import build.jenesis.BuildStepResult;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.SequencedProperties;
@@ -411,7 +412,11 @@ public class InferredMultiProjectAssemblerTest {
                            Path profile) {
 
         SequencedMap<String, Path> execute(String selector) throws IOException {
-            AssemblyDescriptor assembled = new InferredMultiProjectAssembler().apply(descriptor, Map.of(), Map.of());
+            return execute(new InferredMultiProjectAssembler(), selector);
+        }
+
+        SequencedMap<String, Path> execute(InferredMultiProjectAssembler assembler, String... selectors) throws IOException {
+            AssemblyDescriptor assembled = assembler.apply(descriptor, Map.of(), Map.of());
             BuildExecutor executor = BuildExecutor.of(build,
                     Duration.ZERO,
                     new HashDigestFunction("MD5"),
@@ -425,8 +430,28 @@ public class InferredMultiProjectAssemblerTest {
             for (Map.Entry<String, BuildExecutorModule> phase : assembled.tail().entrySet()) {
                 executor.addModule(phase.getKey(), phase.getValue(), "sub");
             }
-            return executor.execute(Runnable::run, selector).toCompletableFuture().join();
+            return executor.execute(Runnable::run, selectors).toCompletableFuture().join();
         }
+    }
+
+    @Test
+    public void a_custom_module_runs_in_the_module_build_beside_a_stock_step_of_the_same_name() throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
+        SequencedMap<String, BuildExecutorModule> custom = new LinkedHashMap<>();
+        custom.put("prepare", (executor, inherited) -> executor.addStep("inputs", (_, context, arguments) -> {
+            Files.writeString(context.next().resolve("inputs.txt"), String.join("\n", arguments.sequencedKeySet()));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }, inherited.sequencedKeySet()));
+        SequencedMap<String, Path> outputs = fixture.execute(new InferredMultiProjectAssembler().custom(custom),
+                "sub/prepare",
+                "sub/custom/prepare/inputs");
+        assertThat(outputs).containsKeys("sub/prepare", "sub/custom/prepare/inputs");
+        assertThat(Files.readAllLines(outputs.get("sub/custom/prepare/inputs").resolve("inputs.txt")))
+                .as("a custom module reads what the module build reads")
+                .hasSize(3)
+                .anySatisfy(input -> assertThat(input).endsWith("manifests"))
+                .anySatisfy(input -> assertThat(input).endsWith("sources"))
+                .anySatisfy(input -> assertThat(input).endsWith("artifacts"));
     }
 
     @Test

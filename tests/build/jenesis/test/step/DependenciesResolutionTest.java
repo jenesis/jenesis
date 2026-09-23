@@ -25,7 +25,7 @@ import build.jenesis.step.Dependencies;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class DependenciesResolutionTest implements Serializable {
+public class DependenciesResolutionTest {
 
     @TempDir
     private Path root, artifacts;
@@ -837,31 +837,9 @@ public class DependenciesResolutionTest implements Serializable {
         boms.setProperty("bom/main/module/acme.platform", "1.0");
         boms.store(dependencies.resolve(BuildStep.BOMS));
         SequencedMap<String, String> received = new LinkedHashMap<>();
-        Resolver resolver = new Resolver() {
-            @Override
-            public Resolver.Resolution dependencies(Executor executor,
-                                                    String prefix,
-                                                    Map<String, Repository> repositories,
-                                                    SequencedMap<String, SequencedSet<String>> coordinates,
-                                                    SequencedMap<String, String> versions,
-                                                    DependencyScope scope) throws IOException {
-                received.putAll(versions);
-                SequencedMap<String, String> resolved = new LinkedHashMap<>();
-                coordinates.sequencedKeySet().forEach(coordinate -> resolved.put(prefix + "/" + coordinate, ""));
-                return new Resolver.Resolution(
-                        Resolver.materializeAll(executor, repositories, prefix, resolved),
-                        List.of(),
-                        new LinkedHashMap<>());
-            }
-
-            @Override
-            public SequencedSet<String> managedPrefixes() {
-                return new LinkedHashSet<>(List.of("maven"));
-            }
-        };
         execute(new Dependencies(
                 Map.of("module", files(Map.of("acme.platform/1.0:properties", "org.slf4j/slf4j-api = 2.0.17\n"))),
-                Map.of("module", resolver)));
+                Map.of("module", new ManagingResolver(received))));
         assertThat(received).containsEntry("org.slf4j/slf4j-api", "2.0.17");
     }
 
@@ -908,5 +886,29 @@ public class DependenciesResolutionTest implements Serializable {
         executor.addModule("resolved", module, "dependencies", "upstream");
         executor.execute();
         return ran;
+    }
+
+    private record ManagingResolver(SequencedMap<String, String> received) implements Resolver {
+
+        @Override
+        public Resolver.Resolution dependencies(Executor executor,
+                                                String prefix,
+                                                Map<String, Repository> repositories,
+                                                SequencedMap<String, SequencedSet<String>> coordinates,
+                                                SequencedMap<String, String> versions,
+                                                DependencyScope scope) throws IOException {
+            received.putAll(versions);
+            SequencedMap<String, String> resolved = new LinkedHashMap<>();
+            coordinates.sequencedKeySet().forEach(coordinate -> resolved.put(prefix + "/" + coordinate, ""));
+            return new Resolver.Resolution(
+                    Resolver.materializeAll(executor, repositories, prefix, resolved),
+                    List.of(),
+                    new LinkedHashMap<>());
+        }
+
+        @Override
+        public SequencedSet<String> managedPrefixes() {
+            return new LinkedHashSet<>(List.of("maven"));
+        }
     }
 }

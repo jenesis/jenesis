@@ -16,7 +16,7 @@ import build.jenesis.Environment;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class BuildExecutorFileCacheTest implements Serializable {
+public class BuildExecutorFileCacheTest {
 
     private final Map<String, String> settings = new HashMap<>();
 

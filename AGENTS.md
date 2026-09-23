@@ -187,10 +187,12 @@ before it is chosen. The search path decides what the build executes, so `Make.s
 every file a project provides: a new way to read properties keeps that rule, and the relaunch
 never takes a JVM option that configuration could supply.
 
-**`jenesis.project.customizers` adjusts the stock build.** It lists
-`UnaryOperator<Project>` classes that `Project.ofEnvironment` applies, in order, to the project it configured, so
-every entry point that builds a project from settings - `Make`, `Execute`, the daemon, the tools, a container -
-builds the adjusted one. `Make` compiles `build/custom/` with the engine for that reason, beside the folder of
+**`jenesis.project.customizer` adjusts the stock build.** It names one
+`Project.Customizer` class - a function from the `InferredMultiProjectAssembler` to the assembler to build with - that
+`Project.ofEnvironment` applies to the assembler it configured, so every entry point that builds a project from
+settings - `Make`, `Execute`, the daemon, the tools, a container - builds with the adjusted one. A caller that
+builds the project itself hands the same function to `new Project(root, customizer)` or
+`Project.ofEnvironment(environment, root, customizer)`. `Make` compiles `build/custom/` with the engine for that reason, beside the folder of
 the file it launches, while that file still names nothing but itself. A customizer runs the project's code, as its
 tests and annotation processors do, so a project names it in its own `jenesis.properties` like any other setting:
 refusing the key there would guard nothing a build does not already hand the project. What isolates an untrusted
@@ -247,7 +249,13 @@ handed to `Project` reaches the whole tree without being carried into it. A call
 further down by nesting -
 `assembler.toolchain(toolchain -> toolchain.compiler(compiler -> compiler.javac(javac -> …)))` - and no
 module ever exposes a configurator for a module it does not wire itself, so a new child is a new
-configurator on its own parent, never a new component on the assembler.
+configurator on its own parent, never a new component on the assembler. Beside its configurators every
+`Inferred*Module`, and the assembler's module build, holds `custom`, a `SequencedMap<String, BuildExecutorModule>`
+of additional children it wires inside one sub-module named `custom`, each handed the inputs the module itself
+reads. No module names a child of its own `custom`, so an added name never collides with a stock one, and a
+customizer adds a module without wrapping or replacing another. Beside the wither that sets the map,
+`custom(name, module)` and `custom(name, step)` add one entry - a step as `step.asModule(name)` - and refuse a
+name that is taken already.
 
 **Fail loudly, name the fix.** Bad input is an `IllegalArgumentException` whose message says what was given
 and what would be valid; a missing prerequisite is an `IllegalStateException` that names it. Nothing
@@ -258,8 +266,11 @@ silently falls back, and a lenient wildcard selector is the one deliberate excep
 - `tests/` is the `@jenesis.test` module of `build.jenesis`, on JUnit Jupiter with AssertJ. A test method is
   a sentence in `snake_case` stating the behaviour it proves (`replaces_a_stale_staging_folder_from_a_crashed_run`);
   the assertion carries the reason as its `.as(...)` description where one is needed.
-- A test that builds steps implements `Serializable`, so the lambdas it hands the executor can be hashed;
-  state a step must not capture (a latch, a socket) lives in a static field.
+- A step is hashed with what it captures, so a step lambda that uses only its parameters and locals needs
+  nothing more, and a resolver or step with state of its own is a static nested record rather than an
+  anonymous class, which would capture the test. A test whose step lambdas use its own fields (a `@TempDir`)
+  implements `Serializable` so they can be hashed; state a step must not capture (a latch, a socket) lives in
+  a static field.
 - A test names the settings it needs in `new Environment(Map.of(…)::get)` and collects what a run prints by
   giving that environment a consumer of its own (`.out(printed::add)`). Setting a system property or swapping
   `System.out` is what the environment exists to avoid, and it survives only where the test is about the JVM's

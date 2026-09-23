@@ -19,46 +19,91 @@ public class InferredDocumentationModule implements BuildExecutorModule {
     private final InferredDocumentationChainModule generateModule;
     private final Function<InferredDocumentationChainModule, BuildExecutorModule> generate;
     private final BuildStep archiver;
+    private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredDocumentationModule(Map<String, Repository> repositories,
                                        Map<String, Resolver> resolvers) {
-        this(null, new InferredDocumentationChainModule(repositories, resolvers),
-             value -> value,
-             new Jar(ProcessHandler.Factory.of(), Jar.Sort.JAVADOC));
+        this(null,
+                new InferredDocumentationChainModule(repositories, resolvers),
+                value -> value,
+                new Jar(ProcessHandler.Factory.of(), Jar.Sort.JAVADOC),
+                Collections.emptyNavigableMap());
     }
 
     public static InferredDocumentationModule ofEnvironment(Environment environment,
                                                             Map<String, Repository> repositories,
                                                             Map<String, Resolver> resolvers) {
-        return new InferredDocumentationModule(null, InferredDocumentationChainModule.ofEnvironment(environment, repositories, resolvers),
+        return new InferredDocumentationModule(null,
+                InferredDocumentationChainModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value,
-                Jar.ofEnvironment(environment, ProcessHandler.Factory.of(), Jar.Sort.JAVADOC));
+                Jar.ofEnvironment(environment, ProcessHandler.Factory.of(), Jar.Sort.JAVADOC),
+                Collections.emptyNavigableMap());
     }
 
     private InferredDocumentationModule(Pinning pinning,
                                         InferredDocumentationChainModule generateModule,
                                         Function<InferredDocumentationChainModule, BuildExecutorModule> generate,
-                                        BuildStep archiver) {
+                                        BuildStep archiver,
+                                        SequencedMap<String, BuildExecutorModule> custom) {
         this.pinning = pinning;
         this.generateModule = generateModule;
         this.generate = generate;
         this.archiver = archiver;
+        this.custom = custom;
     }
 
     public InferredDocumentationModule pinning(Pinning pinning) {
-        return new InferredDocumentationModule(pinning, generateModule, generate, archiver);
+        return new InferredDocumentationModule(pinning,
+                generateModule,
+                generate,
+                archiver,
+                custom);
     }
 
     public InferredDocumentationModule generate(Function<InferredDocumentationChainModule, BuildExecutorModule> generate) {
-        return new InferredDocumentationModule(pinning, generateModule, generate, archiver);
+        return new InferredDocumentationModule(pinning,
+                generateModule,
+                generate,
+                archiver,
+                custom);
     }
 
     public InferredDocumentationModule archiver(BuildStep archiver) {
-        return new InferredDocumentationModule(pinning, generateModule, generate, archiver);
+        return new InferredDocumentationModule(pinning,
+                generateModule,
+                generate,
+                archiver,
+                custom);
+    }
+
+    public InferredDocumentationModule custom(SequencedMap<String, BuildExecutorModule> custom) {
+        return new InferredDocumentationModule(pinning,
+                generateModule,
+                generate,
+                archiver,
+                custom);
+    }
+
+    public InferredDocumentationModule custom(String name, BuildExecutorModule module) {
+        if (custom.containsKey(name)) {
+            throw new IllegalArgumentException("A custom module named " + name + " is added already - give this one"
+                    + " another name");
+        }
+        SequencedMap<String, BuildExecutorModule> added = new LinkedHashMap<>(custom);
+        added.put(name, module);
+        return custom(added);
+    }
+
+    public InferredDocumentationModule custom(String name, BuildStep step) {
+        return custom(name, step.asModule(name));
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
+        if (!custom.isEmpty()) {
+            buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
+                    nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());
+        }
         if (generate == null) {
             return;
         }
