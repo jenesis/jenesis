@@ -837,10 +837,12 @@ public record Project(
                           itself. jenesis.dependency.native=warn reports a name the running module
                           does not grant, strict fails the build on it. A module in one of the run's
                           layers is named the same way, or as layer:<name>/<repo>/..., and reaches
-                          the launcher as jlayer.enableNativeAccess.<name>, which grants it when it
-                          defines the layer; code that runs earlier, in the application or an outer
-                          layer, can rewrite that property, as it can every jlayer.* one. MAVEN modules
-                          declare tokens in a <!--jenesis.native ... --> comment.
+                          the launcher as jlayer.enableNativeAccess.<name>; the launcher grants it
+                          through the Lookup the module asking for the layer passes, so that module
+                          needs native access itself and is named too. Code that runs earlier, in the
+                          application or an outer layer, can rewrite that property, as it can every
+                          jlayer.* one. MAVEN modules declare tokens in a <!--jenesis.native ... -->
+                          comment.
 
                     ## 9. Activate a tool by dropping in its configuration file
 

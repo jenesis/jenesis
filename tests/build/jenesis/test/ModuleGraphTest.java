@@ -138,16 +138,15 @@ public class ModuleGraphTest {
 
     @Test
     public void native_access_in_a_layer_is_named_to_the_launcher_that_defines_the_layer() throws IOException {
-        Path host = named("explicit.host"), member = automatic("auto.member"), plain = plain();
+        Path member = automatic("auto.member"), plain = plain();
         ModuleGraph graph = new ModuleGraph();
-        graph.module(host);
         graph.enableNativeAccess("render", member, true);
         graph.enableNativeAccess("render", plain, false);
 
         assertThat(graph.arguments())
-                .as("the launcher grants a layer's module, and needs native access itself to do so quietly")
+                .as("a layer's module exists only once the layer is defined, and its class path is the unnamed module")
                 .containsExactly(
-                        "--enable-native-access=ALL-UNNAMED,build.jenesis.launcher",
+                        "--enable-native-access=ALL-UNNAMED",
                         "-Djlayer.enableNativeAccess.render=auto.member");
     }
 
