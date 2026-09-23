@@ -1459,8 +1459,53 @@ public class ModuleInfoParserTest {
                 """);
         ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
         assertThat(info.layerApis()).containsExactly(Map.entry("render", "my.library.spi"));
-        assertThat(info.layers()).containsExactly(Map.entry("render",
-                new LinkedHashSet<>(List.of("maven/com.example/renderer-impl", "module/org.example.legacy"))));
+        assertThat(info.layers()).containsExactly(Map.entry("render", new LinkedHashSet<>(List.of(
+                "maven/com.example/renderer-impl",
+                "module/org.example.legacy"))));
+    }
+
+    @Test
+    public void jenesis_layer_native_grants_the_layer_module_through_the_declaring_module() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render api my.library.spi
+                 * @jenesis.layer render provider org.example.impl
+                 * @jenesis.layer render native org.example.impl
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.natives()).containsExactly("main/module/foo", "layer:render/module/org.example.impl");
+    }
+
+    @Test
+    public void jenesis_native_refuses_a_module_in_a_layer() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.native layer:render/module/org.example.impl
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("@jenesis.layer <name> native <module>");
+    }
+
+    @Test
+    public void jenesis_layer_rejects_a_malformed_provider() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.layer render api my.library.spi
+                 * @jenesis.layer render provider maven/
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Malformed @jenesis.layer provider 'maven/'");
     }
 
     @Test
@@ -1475,7 +1520,7 @@ public class ModuleInfoParserTest {
         assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Malformed @jenesis.layer declaration 'render shares my.library.spi'")
-                .hasMessageContaining("expected <layer> api <module>, or <layer> provider <coordinate>");
+                .hasMessageContaining("expected <layer> api <module>, <layer> provider <token> or <layer> native <token>");
     }
 
     @Test
@@ -1492,7 +1537,7 @@ public class ModuleInfoParserTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Malformed @jenesis.layer declaration"
                         + " 'render maven/com.example/renderer-impl'")
-                .hasMessageContaining("expected <layer> api <module>, or <layer> provider <coordinate>");
+                .hasMessageContaining("expected <layer> api <module>, <layer> provider <token> or <layer> native <token>");
     }
 
     @Test

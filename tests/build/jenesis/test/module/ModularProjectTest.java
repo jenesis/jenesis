@@ -959,7 +959,7 @@ public class ModularProjectTest {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
                  * @jenesis.layer render api my.library.spi
-                 * @jenesis.layer render provider module/com.example.impl
+                 * @jenesis.layer render provider com.example.impl
                  */
                 module foo {
                   requires my.library.spi;
@@ -979,7 +979,7 @@ public class ModularProjectTest {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
                  * @jenesis.layer render api my.library.spi
-                 * @jenesis.layer render provider module/com.example.impl
+                 * @jenesis.layer render provider com.example.impl
                  */
                 module foo {
                   requires build.jenesis.launcher;
@@ -1032,14 +1032,14 @@ public class ModularProjectTest {
                 .as("a layer named on one side only is said here, not as an empty group resolving nothing")
                 .hasRootCauseInstanceOf(IllegalStateException.class)
                 .hasRootCauseMessage("Layer render of module 'foo' isolates nothing - declare"
-                        + " @jenesis.layer render provider <coordinate>, the root the layer holds");
+                        + " @jenesis.layer render provider <token>, the root the layer holds");
     }
 
     @Test
     public void rejects_a_layer_without_an_api_module() throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
-                 * @jenesis.layer render provider module/com.example.impl
+                 * @jenesis.layer render provider com.example.impl
                  */
                 module foo {
                   requires build.jenesis.launcher;

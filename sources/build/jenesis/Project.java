@@ -793,23 +793,27 @@ public record Project(
                           transitively and drops every resolved artifact declaring the overridden
                           module, so the packages appear once. Reaches consumers through the
                           Jenesis-Overrides manifest header. A carrier nothing declares is an error.
-                      @jenesis.layer <name> api <module> | <name> provider <token>
+                      @jenesis.layer <name> api <module> | <name> provider <token> | <name> native <token>
                           Keep a dependency private: resolve it, and its whole closure, into a run-time
                           ModuleLayer of its own rather than onto this module's path. Two versions of one
                           library then coexist with no package relocated - what shading is used for, without
                           rewriting a class file. `api` names the one module this module and the layer share;
-                          `provider` names a coordinate the layer isolates, resolving it in the group
-                          layer:<name>, which pins, verifies and reports like any other group. Every line
-                          names which of the two it declares, so neither is the bare one.
+                          `provider` names what the layer isolates, a module or a <repository>/<coordinate>
+                          such as maven/<groupId>/<artifactId>, resolving it in the group
+                          layer:<name>, which pins, verifies and reports like any other group; `native`
+                          passes this module's native access on to a module of the layer, which this
+                          module therefore needs itself. Every line names which kind it declares, so
+                          none is the bare one.
                           The API module and everything it reaches are shared, so producer and consumer
                           exchange the very same classes and a service crosses as a plain interface call. A
                           dependency the API module reaches is exposed by it and cannot be isolated behind
                           it, which the build says rather than leaving to a LinkageError later.
                           The declaring module requires build.jenesis.launcher and asks for the layer by
-                          name - Launcher.instance("<name>", Contract.class) - so its own consumers declare
-                          nothing and need not know. Discovery runs to a fixpoint, so a module inside a
-                          layer may declare one of its own; each layer is a child of its caller's, and a
-                          test JVM is handed jlayer.modulepath.<name> like any deployment. That is a
+                          name - Launcher.instance(MethodHandles.lookup(), "<name>", Contract.class) - so
+                          its own consumers declare nothing and need not know. Discovery runs to a
+                          fixpoint, so a module inside a layer may declare one of its own; each layer
+                          is a child of its caller's, and a test JVM is handed jlayer.modulepath.<name>
+                          like any deployment. That is a
                           jlayer.* key rather than a jenesis.* one: it configures no build, it is read by
                           the application a build produced. The JVM lets any code overwrite a system
                           property at any time, so code that runs before the layer is defined can place
@@ -853,12 +857,12 @@ public record Project(
                           never inherited: the names are recorded in the jar's Jenesis-Native-Access
                           manifest attribute, so a module that runs this one learns what to grant
                           itself. jenesis.dependency.native=warn reports a name the running module
-                          does not grant, strict fails the build on it. A module in one of the run's
-                          layers is named the same way, or as layer:<name>/<repo>/..., and reaches
-                          the launcher as jlayer.enableNativeAccess.<name>; the launcher grants it
-                          through the Lookup the module asking for the layer passes, so that module
-                          needs native access itself and is named too. MAVEN modules declare tokens in
-                          a <!--jenesis.native ... --> comment.
+                          does not grant, strict fails the build on it. A module in a layer is
+                          granted by the module that declares the layer, with @jenesis.layer <name>
+                          native, and never named here: what a granted module passes on to its own
+                          layers is granted with it, so a module that runs a library with a layer
+                          grants the library alone. MAVEN modules declare tokens in a
+                          <!--jenesis.native ... --> comment.
 
                     ## 9. Activate a tool by dropping in its configuration file
 
@@ -979,7 +983,7 @@ public record Project(
                     than the JVM, so two runs in one program never clash; everything after them is
                     what the command line would take. A setting that replaces the process a build
                     runs in - toolchain.version, project.docker, execute.docker - is refused by name
-                    there, and demo-57-tools-api shows the whole contract.
+                    there, and demo-58-tools-api shows the whole contract.
 
                     Every command line here, the commands and the tools alike, reads @<file> as the
                     arguments that file holds - settings and selectors, # to the end of a line being
@@ -1016,7 +1020,7 @@ public record Project(
 
                     ## 13. Copy a demo: they are the recipe book
 
-                    65 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    66 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -1028,9 +1032,9 @@ public record Project(
                       Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
                                          04 java-modular-multi, 19 module-layout (forcing MODULAR)
                       Starting a build   05 startup (what launching costs, and the daemon),
-                                         63 toolchain (the JDK the build runs on)
+                                         64 toolchain (the JDK the build runs on)
                       Runnable output    06, 07 java-*-executable (jpackage), 08 bundle (jars for a
-                                         stock JRE), 09 java-multi-release, 64 native-image (GraalVM)
+                                         stock JRE), 09 java-multi-release, 65 native-image (GraalVM)
                       Compiler control   10 javac-arguments (process-javac.properties),
                                          11 annotations (an annotation processor via @jenesis.plugin),
                                          12 error-prone (a javac plugin)
@@ -1052,16 +1056,17 @@ public record Project(
                       Other languages    38 kotlin, 40 kotlin-plugin, 41 scala, 43 groovy
                       Operating it       45 profiles, 46 build-cache, 47 docker-isolation,
                                          48 agents (@jenesis.attach),
-                                         49 native-access (@jenesis.native)
-                      Shipping it        58 code-signing (jarsigner), 59 export (into the local repositories),
-                                         60 publishing (Maven Central),
-                                         61 module-convention (resolving what you published),
-                                         62 reproducible (a jar checked against a recorded digest),
-                                         65 jpx (run a released program without building)
-                      Extending it       50 custom-assembler, 51 custom-jmod, 52 internal-module,
-                                         53 external-module, 54 custom-maven, 55 custom-modular,
-                                         56 custom-build (no Project at all),
-                                         57 tools-api (a build inside another program's JVM)
+                                         49 native-access (@jenesis.native),
+                                         50 native-access-layer (passed on to a layer)
+                      Shipping it        59 code-signing (jarsigner), 60 export (into the local repositories),
+                                         61 publishing (Maven Central),
+                                         62 module-convention (resolving what you published),
+                                         63 reproducible (a jar checked against a recorded digest),
+                                         66 jpx (run a released program without building)
+                      Extending it       51 custom-assembler, 52 custom-jmod, 53 internal-module,
+                                         54 external-module, 55 custom-maven, 56 custom-modular,
+                                         57 custom-build (no Project at all),
+                                         58 tools-api (a build inside another program's JVM)
 
                     ## 14. When stuck, read the source
 
