@@ -244,14 +244,15 @@ public class ModuleInfoParser {
                                     layers.computeIfAbsent(words[0], _ -> new LinkedHashSet<>());
                                 } else if (words.length == 3 && words[1].equals("provider")) {
                                     layers.computeIfAbsent(words[0], _ -> new LinkedHashSet<>())
-                                            .add(words[2].indexOf('/') < 0
-                                                    ? "module/" + words[2]
-                                                    : words[2]);
+                                            .add(layered(words[1], words[2]));
+                                } else if (words.length == 3 && words[1].equals("native")) {
+                                    natives.add(expand("jenesis.native", module.getName().toString()));
+                                    natives.add("layer:" + words[0] + "/" + layered(words[1], words[2]));
                                 } else {
                                     throw new IllegalArgumentException("Malformed @jenesis.layer declaration '"
                                             + declaration
                                             + "': expected <layer> api <module>,"
-                                            + " or <layer> provider <coordinate>");
+                                            + " <layer> provider <token> or <layer> native <token>");
                                 }
                             }
                             case "jenesis.alias" -> {
@@ -394,6 +395,11 @@ public class ModuleInfoParser {
                                                 + token
                                                 + "': platform modules cannot be granted native access");
                                     }
+                                    if (token.startsWith("layer:")) {
+                                        throw new IllegalArgumentException("Illegal @jenesis.native token '"
+                                                + token
+                                                + "': grant a module in a layer with @jenesis.layer <name> native <module>");
+                                    }
                                     natives.add(expand("jenesis.native", token));
                                 }
                             }
@@ -516,6 +522,16 @@ public class ModuleInfoParser {
                     bomVariants);
         }
         throw new IllegalArgumentException("Expected module-info.java to contain module information");
+    }
+
+    private static String layered(String kind, String token) {
+        int slash = token.indexOf('/');
+        if (slash == 0 || token.endsWith("/") || token.contains("//")) {
+            throw new IllegalArgumentException("Malformed @jenesis.layer " + kind + " '"
+                    + token
+                    + "': expected <module> or <repository>/<coordinate>");
+        }
+        return slash < 0 ? "module/" + token : token;
     }
 
     private String expand(String tag, String token) {

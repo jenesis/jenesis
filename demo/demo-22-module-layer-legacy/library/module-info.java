@@ -10,7 +10,7 @@
  * @jenesis.pin layer:beans/maven/commons-collections/commons-collections 3.2.2 SHA-256/eeeae917917144a68a741d4c0dff66aa5c5c5fd85593ff217bced3fc8ca783b8
  * @jenesis.pin layer:beans/maven/commons-logging/commons-logging 1.2 SHA-256/daddea1ea0be0f56978ab3006b8ac92834afeefbd9b7e4e6316fca57df0fa636
  * @jenesis.layer beans api demo.legacy.spi
- * @jenesis.layer beans provider module/demo.legacy.impl
+ * @jenesis.layer beans provider demo.legacy.impl
  */
 module demo.legacy.library {
     requires build.jenesis.launcher;

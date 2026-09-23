@@ -298,7 +298,7 @@ public class ModularProject implements BuildExecutorModule {
                             + info.coordinate()
                             + "' isolates nothing - declare @jenesis.layer "
                             + layer.getKey()
-                            + " provider <coordinate>, the root the layer holds");
+                            + " provider <token>, the root the layer holds");
                 }
                 if (!info.requires().contains(api)) {
                     throw new IllegalStateException("Module '"

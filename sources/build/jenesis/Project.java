@@ -793,23 +793,27 @@ public record Project(
                           transitively and drops every resolved artifact declaring the overridden
                           module, so the packages appear once. Reaches consumers through the
                           Jenesis-Overrides manifest header. A carrier nothing declares is an error.
-                      @jenesis.layer <name> api <module> | <name> provider <token>
+                      @jenesis.layer <name> api <module> | <name> provider <token> | <name> native <token>
                           Keep a dependency private: resolve it, and its whole closure, into a run-time
                           ModuleLayer of its own rather than onto this module's path. Two versions of one
                           library then coexist with no package relocated - what shading is used for, without
                           rewriting a class file. `api` names the one module this module and the layer share;
-                          `provider` names a coordinate the layer isolates, resolving it in the group
-                          layer:<name>, which pins, verifies and reports like any other group. Every line
-                          names which of the two it declares, so neither is the bare one.
+                          `provider` names what the layer isolates, a module or a <repository>/<coordinate>
+                          such as maven/<groupId>/<artifactId>, resolving it in the group
+                          layer:<name>, which pins, verifies and reports like any other group; `native`
+                          passes this module's native access on to a module of the layer, which this
+                          module therefore needs itself. Every line names which kind it declares, so
+                          none is the bare one.
                           The API module and everything it reaches are shared, so producer and consumer
                           exchange the very same classes and a service crosses as a plain interface call. A
                           dependency the API module reaches is exposed by it and cannot be isolated behind
                           it, which the build says rather than leaving to a LinkageError later.
                           The declaring module requires build.jenesis.launcher and asks for the layer by
-                          name - Launcher.instance("<name>", Contract.class) - so its own consumers declare
-                          nothing and need not know. Discovery runs to a fixpoint, so a module inside a
-                          layer may declare one of its own; each layer is a child of its caller's, and a
-                          test JVM is handed jlayer.modulepath.<name> like any deployment. That is a
+                          name - Launcher.instance(MethodHandles.lookup(), "<name>", Contract.class) - so
+                          its own consumers declare nothing and need not know. Discovery runs to a
+                          fixpoint, so a module inside a layer may declare one of its own; each layer
+                          is a child of its caller's, and a test JVM is handed jlayer.modulepath.<name>
+                          like any deployment. That is a
                           jlayer.* key rather than a jenesis.* one: it configures no build, it is read by
                           the application a build produced. The JVM lets any code overwrite a system
                           property at any time, so code that runs before the layer is defined can place
@@ -853,15 +857,12 @@ public record Project(
                           never inherited: the names are recorded in the jar's Jenesis-Native-Access
                           manifest attribute, so a module that runs this one learns what to grant
                           itself. jenesis.dependency.native=warn reports a name the running module
-                          does not grant, strict fails the build on it. A module in a layer this
-                          module declares is named the same way, or as layer:<name>/<repo>/..., and
-                          reaches the launcher as jlayer.enableNativeAccess.<name>; the launcher
-                          grants it through the Lookup this module passes, so it names itself too.
-                          What a granted module names in its own layers is granted with it, so a
-                          module that runs a library with a layer grants the library alone, and a
-                          module in another module's layer does not resolve. MAVEN modules declare
-                          tokens in
-                          a <!--jenesis.native ... --> comment.
+                          does not grant, strict fails the build on it. A module in a layer is
+                          granted by the module that declares the layer, with @jenesis.layer <name>
+                          native, and never named here: what a granted module passes on to its own
+                          layers is granted with it, so a module that runs a library with a layer
+                          grants the library alone. MAVEN modules declare tokens in a
+                          <!--jenesis.native ... --> comment.
 
                     ## 9. Activate a tool by dropping in its configuration file
 

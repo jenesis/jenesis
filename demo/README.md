@@ -418,7 +418,7 @@ version of some dependency than its consumer has nowhere to put it. Rather than
 relocate packages, declare a layer on the library that needs the isolation:
 
     @jenesis.layer render api demo.layers.spi
-    @jenesis.layer render provider module/demo.layers.impl
+    @jenesis.layer render provider demo.layers.impl
 
 The `api` line names the one module the library shares with its layer; the
 `provider` line names what the layer holds, resolved in a dependency group of its
@@ -740,14 +740,13 @@ in a `<!--jenesis.native ... -->` comment block.
 
 A library that keeps a module in a layer, as in `module-layers`, hides it from
 the application that uses the library. When that module needs native access, the
-application grants access to the library alone:
+library passes its own native access on to it:
 
-    @jenesis.native demo.strings.library
+    @jenesis.layer strings native demo.strings.text
 
-The library names itself and the module in its layer, and what a granted module
-names inside its own layers is granted with it, just as it would be for a
-dependency it had shaded. `jenesis.dependency.native` asks for the library, never
-for the module in its layer.
+and the application grants access to the library alone, as it would a library
+that had shaded the module. `jenesis.dependency.native` asks for the library,
+never for the module in its layer.
 
 ## 36. Customizing the build - [`custom-assembler`](demo-51-custom-assembler/README.md), [`custom-jmod`](demo-52-custom-jmod/README.md)
 

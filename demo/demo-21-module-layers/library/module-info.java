@@ -13,7 +13,7 @@
  * @jenesis.pin layer:render/maven/build.jenesis/build.jenesis.launcher 0.5.1 SHA-256/b9db437eccaeaef7ee04a6a00a8e330bc69542614012fa6485079f41e3c9edfb
  * @jenesis.pin layer:render/maven/com.fasterxml.jackson.core/jackson-core 2.15.4 SHA-256/8dc9210dd285db366f45f518dd1e6a9ccfeb0f1a8e184a899fe96d29edf1fd94
  * @jenesis.layer render api demo.layers.spi
- * @jenesis.layer render provider module/demo.layers.impl
+ * @jenesis.layer render provider demo.layers.impl
  */
 module demo.layers.library {
     requires build.jenesis.launcher;

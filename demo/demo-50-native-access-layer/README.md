@@ -43,7 +43,7 @@ Layout
     |   |-- module-info.java              declares nothing
     |   `-- demo/strings/text/NativeLength.java
     |-- library
-    |   |-- module-info.java              the layer, and native access for it
+    |   |-- module-info.java              the layer, and native access passed on to it
     |   `-- demo/strings/library/Strings.java
     `-- app
         |-- META-INF/build.jenesis/packaging.properties   bundle=true
@@ -53,14 +53,13 @@ Layout
 Passing native access on
 ------------------------
 
-The library declares its layer as in `module-layers`, and names the modules that
-need native access with `@jenesis.native`, as in `native-access`: itself, and the
-module in its layer.
+The library declares its layer as in `module-layers`, and names the module in it
+that needs native access with a third kind of line:
 
     /**
      * @jenesis.layer strings api demo.strings.spi
-     * @jenesis.layer strings provider module/demo.strings.text
-     * @jenesis.native demo.strings.library layer:strings/module/demo.strings.text
+     * @jenesis.layer strings provider demo.strings.text
+     * @jenesis.layer strings native demo.strings.text
      */
     module demo.strings.library {
         requires build.jenesis.launcher;
@@ -74,7 +73,9 @@ It asks for the layer with its own lookup:
 
 The layer is defined on the library's behalf, and so is the native access its
 modules are given: the JDK only allows it if the library has native access
-itself. That is why the library names itself.
+itself. A `native` line therefore also records that the library needs native
+access, in its jar's `Jenesis-Native-Access` attribute, as `native-access`
+showed for `@jenesis.native`.
 
 Granting the library
 --------------------
@@ -90,20 +91,20 @@ else:
         requires demo.strings.library;
     }
 
-A grant is otherwise never inherited, but what a granted module names inside its
-own layers is granted with it: nothing outside the library can reach those
+A grant is otherwise never inherited, but what a granted module passes on to
+its own layers is granted with it: nothing outside the library can reach those
 modules, so only the library can decide which of them need access. The
-application does not name `demo.strings.text` or the layer, and the launch
+application names neither `demo.strings.text` nor the layer, and the launch
 carries both grants:
 
     --enable-native-access=demo.strings.library
     -Djlayer.enableNativeAccess.strings=demo.strings.text
 
-The application cannot name that module either. Add
-`layer:strings/module/demo.strings.text` to its `@jenesis.native`, and the build
-fails as it would for any name the application does not run:
+The application cannot name that module either. Add `demo.strings.text` to its
+`@jenesis.native`, and the build fails as it would for any name the application
+does not run:
 
-    @jenesis.native grants layer:strings/module/demo.strings.text native access, but demo.strings.app does not resolve it at run time
+    @jenesis.native grants main/module/demo.strings.text native access, but demo.strings.app does not resolve it at run time
 
 Delete the `@jenesis.native demo.strings.library` line from
 `app/module-info.java`, and the build fails, because this demo's
@@ -112,4 +113,4 @@ library, not for the module in its layer:
 
     demo.strings.app runs modules that declare a need for native access it does not grant:
       demo.strings.library names demo.strings.library
-      demo.strings.library names layer:strings/module/demo.strings.text in its layer strings, which demo.strings.library grants once granted itself
+      demo.strings.library passes native access on to demo.strings.text in its layer strings, once granted itself
