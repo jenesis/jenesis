@@ -150,6 +150,20 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 environment);
     }
 
+    public InferredMultiProjectAssembler custom(String name, BuildExecutorModule module) {
+        if (custom.containsKey(name)) {
+            throw new IllegalArgumentException("A custom module named " + name + " is added already - give this one"
+                    + " another name");
+        }
+        SequencedMap<String, BuildExecutorModule> added = new LinkedHashMap<>(custom);
+        added.put(name, module);
+        return custom(added);
+    }
+
+    public InferredMultiProjectAssembler custom(String name, BuildStep step) {
+        return custom(name, step.asModule(name));
+    }
+
     @Override
     public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
                                     Map<String, Repository> repositories,

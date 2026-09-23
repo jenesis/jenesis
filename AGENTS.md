@@ -253,7 +253,9 @@ configurator on its own parent, never a new component on the assembler. Beside i
 `Inferred*Module`, and the assembler's module build, holds `custom`, a `SequencedMap<String, BuildExecutorModule>`
 of additional children it wires inside one sub-module named `custom`, each handed the inputs the module itself
 reads. No module names a child of its own `custom`, so an added name never collides with a stock one, and a
-customizer adds a module without wrapping or replacing another.
+customizer adds a module without wrapping or replacing another. Beside the wither that sets the map,
+`custom(name, module)` and `custom(name, step)` add one entry - a step as `step.asModule(name)` - and refuse a
+name that is taken already.
 
 **Fail loudly, name the fix.** Bad input is an `IllegalArgumentException` whose message says what was given
 and what would be valid; a missing prerequisite is an `IllegalStateException` that names it. Nothing

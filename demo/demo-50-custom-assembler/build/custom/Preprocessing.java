@@ -1,7 +1,6 @@
 package build.custom;
 
 import module java.base;
-import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepResult;
@@ -14,8 +13,7 @@ public class Preprocessing implements Project.Customizer {
 
     @Override
     public MultiProjectAssembler<? super ProjectModuleDescriptor> apply(InferredMultiProjectAssembler assembler) {
-        SequencedMap<String, BuildExecutorModule> checks = new LinkedHashMap<>();
-        checks.put("placeholders", (executor, inherited) -> executor.addStep("verify", (_, context, arguments) -> {
+        InferredMultiProjectAssembler checked = assembler.check(check -> check.custom("placeholders", (_, _, arguments) -> {
             for (BuildStepArgument argument : arguments.values()) {
                 Path sources = argument.folder().resolve(BuildStep.SOURCES);
                 if (argument.removed() || !Files.isDirectory(sources)) {
@@ -30,8 +28,7 @@ public class Preprocessing implements Project.Customizer {
                 }
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
-        }, inherited.sequencedKeySet()));
-        InferredMultiProjectAssembler checked = assembler.check(check -> check.custom(checks));
+        }));
         return (descriptor, repositories, resolvers) -> checked
                 .apply(descriptor.sources("preprocess"), repositories, resolvers)
                 .mapBuild(stock -> (sub, inherited) -> {

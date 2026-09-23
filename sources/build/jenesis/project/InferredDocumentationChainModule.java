@@ -183,6 +183,20 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
                 custom);
     }
 
+    public InferredDocumentationChainModule custom(String name, BuildExecutorModule module) {
+        if (custom.containsKey(name)) {
+            throw new IllegalArgumentException("A custom module named " + name + " is added already - give this one"
+                    + " another name");
+        }
+        SequencedMap<String, BuildExecutorModule> added = new LinkedHashMap<>(custom);
+        added.put(name, module);
+        return custom(added);
+    }
+
+    public InferredDocumentationChainModule custom(String name, BuildStep step) {
+        return custom(name, step.asModule(name));
+    }
+
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
         buildExecutor.addStep(SCAN, new Scan(), inherited.sequencedKeySet());
