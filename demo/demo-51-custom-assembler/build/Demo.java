@@ -1,19 +1,20 @@
-package build.custom;
+package build;
 
 import module java.base;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
+import build.jenesis.Execution;
+import build.jenesis.Make;
 import build.jenesis.Project;
 import build.jenesis.project.InferredMultiProjectAssembler;
-import build.jenesis.project.MultiProjectAssembler;
-import build.jenesis.project.ProjectModuleDescriptor;
 
-public class Preprocessing implements Project.Customizer {
+public class Demo {
 
-    @Override
-    public MultiProjectAssembler<? super ProjectModuleDescriptor> apply(InferredMultiProjectAssembler assembler) {
-        InferredMultiProjectAssembler checked = assembler.check(check -> check.custom("placeholders", (_, _, arguments) -> {
+    static void main(String[] args) throws Exception {
+        Environment environment = new Environment(Make.settings(Path.of(".")).keys());
+        InferredMultiProjectAssembler checked = InferredMultiProjectAssembler.ofEnvironment(environment).check(check -> check.custom("placeholders", (_, _, arguments) -> {
             for (BuildStepArgument argument : arguments.values()) {
                 Path sources = argument.folder().resolve(BuildStep.SOURCES);
                 if (argument.removed() || !Files.isDirectory(sources)) {
@@ -29,7 +30,7 @@ public class Preprocessing implements Project.Customizer {
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }));
-        return (descriptor, repositories, resolvers) -> checked
+        Project project = Project.ofEnvironment(environment, Path.of(".")).assembler((descriptor, repositories, resolvers) -> checked
                 .apply(descriptor.sources("preprocess"), repositories, resolvers)
                 .mapBuild(stock -> (sub, inherited) -> {
                     sub.addStep("preprocess", (executor, context, arguments) -> {
@@ -65,6 +66,7 @@ public class Preprocessing implements Project.Customizer {
                         return CompletableFuture.completedStage(new BuildStepResult(true));
                     }, descriptor.sources().stream());
                     stock.accept(sub, inherited);
-                });
+                }));
+        System.exit(new Execution(project).execute(args));
     }
 }

@@ -19,8 +19,10 @@ import build.jenesis.module.ModularProject;
 import build.jenesis.module.ModularStaging;
 import build.jenesis.module.PinModuleInfo;
 import build.jenesis.project.AssemblyDescriptor;
+import build.jenesis.project.ExternalModule;
 import build.jenesis.project.Ide;
 import build.jenesis.project.InferredMultiProjectAssembler;
+import build.jenesis.project.InternalModule;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.MultiProjectModule;
 import build.jenesis.project.ProjectModuleDescriptor;
@@ -73,12 +75,6 @@ public record Project(
             SKILL = "skill",
             PROPERTIES = "properties",
             CONFIGURATION = "configuration";
-
-    @FunctionalInterface
-    public interface Customizer {
-
-        MultiProjectAssembler<? super ProjectModuleDescriptor> apply(InferredMultiProjectAssembler assembler);
-    }
 
     @FunctionalInterface
     public interface Layout {
@@ -577,16 +573,18 @@ public record Project(
                     jenesis.toolchain.searchpath, this system's usual JDK folders unless set, and only
                     the command line or ~/.jenesis/jenesis.properties may set it. Nothing is installed.
 
-                    To adjust the stock build rather than replace it, put a Project.Customizer, which
-                    turns the InferredMultiProjectAssembler into the assembler to build with, under
-                    build/custom/ and name it in jenesis.project.customizer=build.custom.Build, in
-                    jenesis.properties or on the command line: Make compiles build/custom/ with the
-                    engine and applies the customizer to the assembler the settings configured, so the
-                    build keeps every feature of Make. A customizer runs the project's code, as its
-                    tests do, so build an untrusted project with -Djenesis.project.docker=true, which
-                    applies it inside the container only.
-                    jenesis-validate checks build/jenesis alone, so a customizer leaves the vendored
-                    engine valid, and the installed jenesis never runs one.
+                    To add to the stock build, name plugins in jenesis-plugins.properties beside
+                    jenesis.properties, one line each: <name>+<slot>=<module name>, or =./<folder> for
+                    a plugin compiled from source, where the slot is a module of the build (check,
+                    binary/generated, artifact, ...) or left out for the module build itself, and
+                    =<module>@<provider> selects the provider annotated @BuildModuleName. A plugin
+                    runs in a module only where plugin-<name>.properties is found in its configuration
+                    locations; a provider is created with that file's values when it declares a
+                    public constructor taking a SequencedMap of them, and with its no-argument one when
+                    the file is empty. A plugin adds to its module and replaces nothing; a build that
+                    changes what the stock steps do is an entry point of its own. A plugin runs the
+                    project's code, as its tests do, so build an untrusted project with
+                    -Djenesis.project.docker=true.
 
                     A project with its own entry point calls `new Make("build.Demo").run(selectors)`,
                     which returns the status to exit with. For a GraalVM native launcher, read the
@@ -1369,15 +1367,7 @@ public record Project(
         this(root, new InferredMultiProjectAssembler(), Environment.NONE);
     }
 
-    public Project(Path root, Customizer customizer) {
-        this(root, customizer.apply(new InferredMultiProjectAssembler()), Environment.NONE);
-    }
-
     private Project(Path root, MultiProjectAssembler<? super ProjectModuleDescriptor> assembler, Environment environment) {
-        if (assembler == null) {
-            throw new IllegalStateException("The customizer returned no assembler - return the"
-                    + " InferredMultiProjectAssembler it is handed, or one built from it");
-        }
         Path resolved = resolvedRoot(root);
         SequencedSet<Path> configuration = Collections.unmodifiableSequencedSet(
                 new LinkedHashSet<>(List.of(resolved.resolve("build.jenesis"))));
@@ -1422,39 +1412,53 @@ public record Project(
     }
 
     public static Project ofEnvironment(Environment environment, Path root) {
-        String customizer = environment.flag("project.docker") ? null : environment.value("project.customizer");
-        if (customizer == null) {
-            return ofEnvironment(environment, root, assembler -> assembler);
+        InferredMultiProjectAssembler assembler = InferredMultiProjectAssembler.ofEnvironment(environment);
+        Path file = root.resolve("jenesis-plugins.properties");
+        if (Files.isRegularFile(file)) {
+            SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+            SequencedProperties declared;
+            try {
+                declared = SequencedProperties.ofFiles(file);
+            } catch (IOException e) {
+                throw new UncheckedIOException("Cannot read " + file, e);
+            }
+            declared.forEachProperty((key, value) -> {
+                String name = key.indexOf('+') == -1 ? key : key.substring(0, key.indexOf('+'));
+                if (!environment.flag("plugin." + name, true)) {
+                    return;
+                }
+                String group = "plugin-" + name;
+                int at = value.lastIndexOf('@');
+                String location = (at == -1 ? value : value.substring(0, at)).trim();
+                String provider = at == -1 ? null : value.substring(at + 1).trim();
+                if (location.isEmpty() || provider != null && provider.isEmpty()) {
+                    throw new IllegalArgumentException("The plugin " + key + " in " + file + " names "
+                            + (value.isBlank() ? "nothing" : value.trim())
+                            + " - name the module that provides it, or its folder as ./<folder> for one compiled"
+                            + " from source, followed by @<name> to select the provider annotated with that"
+                            + " @BuildModuleName");
+                }
+                if (location.startsWith("./") || location.startsWith("../")) {
+                    Path source = root.resolve(location).normalize();
+                    plugins.put(key, properties -> InternalModule.ofEnvironment(environment, "module", group, source)
+                            .buildModuleName(provider)
+                            .properties(properties));
+                } else {
+                    Map<String, Repository> repositories = Map.of("module",
+                            JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE));
+                    Map<String, Resolver> resolvers = Map.of("module", ModularJarResolver.ofEnvironment(environment, true));
+                    plugins.put(key, properties -> ExternalModule.ofEnvironment(environment,
+                                    "module/" + location,
+                                    group,
+                                    repositories,
+                                    resolvers)
+                            .buildModuleName(provider)
+                            .properties(properties));
+                }
+            });
+            assembler = assembler.plugins(plugins);
         }
-        Object instance;
-        try {
-            instance = Class.forName(customizer, true, Customizer.class.getClassLoader())
-                    .getConstructor()
-                    .newInstance();
-        } catch (ClassNotFoundException _) {
-            throw new IllegalArgumentException("No class " + customizer + " for jenesis.project.customizer - name"
-                    + " a class compiled with the build, which build/jenesis/Make.java does for every source"
-                    + " under build/custom/. The installed jenesis command runs the released engine and compiles"
-                    + " nothing under build/custom/, so build a project with a customizer with"
-                    + " java build/jenesis/Make.java, and run what it built with java build/jenesis/Execute.java");
-        } catch (NoSuchMethodException _) {
-            throw new IllegalArgumentException("The customizer " + customizer + " declares no public constructor"
-                    + " without arguments - declare one, so the build can create it");
-        } catch (InvocationTargetException e) {
-            throw new IllegalStateException("The customizer " + customizer + " failed to construct", e.getCause());
-        } catch (ReflectiveOperationException e) {
-            throw new IllegalArgumentException("Cannot create the customizer " + customizer
-                    + " - make the class and its constructor public", e);
-        }
-        if (!(instance instanceof Customizer function)) {
-            throw new IllegalArgumentException("The customizer " + customizer + " is not a Project.Customizer"
-                    + " - implement it, and return the assembler it is handed or one built from it");
-        }
-        return ofEnvironment(environment, root, function);
-    }
-
-    public static Project ofEnvironment(Environment environment, Path root, Customizer customizer) {
-        Project project = new Project(root, customizer.apply(InferredMultiProjectAssembler.ofEnvironment(environment)), environment);
+        Project project = new Project(root, assembler, environment);
         String configuration = environment.getProperty("project.configuration");
         if (configuration != null) {
             project = project.configuration(locations(environment, configuration, project).toArray(Path[]::new));
@@ -2301,7 +2305,6 @@ public record Project(
                 project.signatures||Comma-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
-                project.customizer||A Project.Customizer class, compiled from build/custom/, applied to the configured assembler
                 project.docker|false|Run the whole build inside a container
                 project.docker.image||Image for that container
                 project.docker.mount||Extra read-only container mounts, host[:container],...
@@ -2351,6 +2354,7 @@ public record Project(
                 pin.bom|keep|keep|flatten: whether pinning keeps BOM references or resolves them away
                 pin.retain|groups|groups|all|none: which pins no closure resolved a refresh keeps - those of groups it did not resolve, all, or none
                 platform.<token>||true adds a platform token and false removes one, selecting guarded pins
+                plugin.<name>|true|false leaves out the plugin <name> that jenesis-plugins.properties names
                 repository.insecure|false|Allow plaintext http:// repository fetches; only the command line or ~/.jenesis/jenesis.properties may allow it, never a file a project provides
                 repository.retries|2|Retries after a failed fetch; 0 disables
                 repository.backoff|125|Initial retry backoff in milliseconds, doubling per attempt
@@ -2466,6 +2470,16 @@ public record Project(
         if (environment.flag("project.docker")) {
             SortedMap<String, String> properties = new TreeMap<>(settings(environment));
             properties.keySet().removeIf(name -> name.startsWith("jenesis.project.docker"));
+            Path plugins = this.root().resolve("jenesis-plugins.properties");
+            if (Files.isRegularFile(plugins)) {
+                for (String key : SequencedProperties.ofFiles(plugins).stringPropertyNames()) {
+                    String name = "plugin." + (key.indexOf('+') == -1 ? key : key.substring(0, key.indexOf('+')));
+                    String value = environment.getProperty(name);
+                    if (value != null) {
+                        properties.put("jenesis." + name, value);
+                    }
+                }
+            }
             String image = environment.getProperty("project.docker.image");
             Path root = this.root().toAbsolutePath().normalize();
             DockerizedJava docker = image == null ? new DockerizedJava(root) : new DockerizedJava(root, image);

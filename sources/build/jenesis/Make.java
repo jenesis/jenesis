@@ -313,14 +313,7 @@ public final class Make {
             return invoke(Make.class.getClassLoader(), collected, selectors);
         }
         Path build = location.getParent();
-        List<Path> sources = new ArrayList<>(files(build, ".java"));
-        Path base = build;
-        while (base != null && !Files.isRegularFile(base.resolve("jenesis").resolve("Make.java"))) {
-            base = base.getParent();
-        }
-        if (base != null && !base.resolve("custom").startsWith(build) && Files.isDirectory(base.resolve("custom"))) {
-            sources.addAll(files(base.resolve("custom"), ".java"));
-        }
+        List<Path> sources = files(build, ".java");
         String seed = fingerprint(build, sources, classes.toString());
         Path folder = precompiled(build, sources, seed);
         try (URLClassLoader loader = new URLClassLoader(
