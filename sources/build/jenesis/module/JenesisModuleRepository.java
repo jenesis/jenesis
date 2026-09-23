@@ -1,6 +1,7 @@
 package build.jenesis.module;
 
 import module java.base;
+import build.jenesis.BuildExecutorCallback;
 import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -20,6 +21,7 @@ public class JenesisModuleRepository implements JenesisRepository {
     private final URI maven;
     private final Boolean prerelease;
     private final Boolean speculative;
+    private final Consumer<String> printing;
 
     public static JenesisRepository of(Scope scope) {
         return ofEnvironment(Environment.NONE, scope);
@@ -50,7 +52,10 @@ public class JenesisModuleRepository implements JenesisRepository {
         if (repository == null) {
             throw new IllegalStateException("No Jenesis module repository is configured by: " + text);
         }
-        return repository.prepend(ofLocalKeys(environment));
+        String local = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
+        return repository.prepend(ofEnvironment(environment, (local == null
+                ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
+                : Path.of(local)).toUri()));
     }
 
     private static JenesisRepository chain(Environment environment,
@@ -235,7 +240,8 @@ public class JenesisModuleRepository implements JenesisRepository {
              toMavenRepository(environment.getProperty("maven.uri",
                                                        System.getenv("MAVEN_REPOSITORY_URI"))),
              environment.flagOrNull("module.prerelease"),
-             environment.flagOrNull("module.speculative"));
+             environment.flagOrNull("module.speculative"),
+             environment.flag("print.fetch") ? environment.out() : null);
     }
 
     private JenesisModuleRepository(URI root,
@@ -243,7 +249,8 @@ public class JenesisModuleRepository implements JenesisRepository {
                                     Repository.Connection connection,
                                     URI maven,
                                     Boolean prerelease,
-                                    Boolean speculative) {
+                                    Boolean speculative,
+                                    Consumer<String> printing) {
         String text = root.toString();
         this.root = text.endsWith("/") ? root : URI.create(text + "/");
         this.token = token;
@@ -251,22 +258,27 @@ public class JenesisModuleRepository implements JenesisRepository {
         this.maven = maven;
         this.prerelease = prerelease;
         this.speculative = speculative;
+        this.printing = printing;
     }
 
     public JenesisModuleRepository connection(Repository.Connection connection) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative);
+        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing);
     }
 
     public JenesisModuleRepository maven(URI maven) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative);
+        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing);
     }
 
     public JenesisModuleRepository prerelease(Boolean prerelease) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative);
+        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing);
     }
 
     public JenesisModuleRepository speculative(Boolean speculative) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative);
+        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing);
+    }
+
+    public JenesisModuleRepository printing(Consumer<String> printing) {
+        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing);
     }
 
     private static URI toMavenRepository(String declaration) {
@@ -307,17 +319,6 @@ public class JenesisModuleRepository implements JenesisRepository {
         return headers;
     }
 
-    public static JenesisModuleRepository ofLocal() {
-        return ofLocalKeys(Environment.NONE);
-    }
-
-    public static JenesisModuleRepository ofLocalKeys(Environment environment) {
-        String override = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
-        Path path = override == null
-                ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
-                : Path.of(override);
-        return ofEnvironment(environment, path.toUri());
-    }
 
     @Override
     public Optional<RepositoryItem> fetch(Executor executor,
@@ -354,6 +355,12 @@ public class JenesisModuleRepository implements JenesisRepository {
             stream = Repository.open(connection, uri, token, headers);
         } catch (FileNotFoundException _) {
             return Optional.empty();
+        }
+        if (printing != null) {
+            printing.accept("%s%-11s%s %s".formatted(BuildExecutorCallback.YELLOW,
+                    "[FETCHED]",
+                    BuildExecutorCallback.RESET,
+                    uri));
         }
         AtomicReference<InputStream> first = new AtomicReference<>(stream);
         return Optional.of(() -> {
