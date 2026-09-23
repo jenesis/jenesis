@@ -105,7 +105,7 @@ public class JarSignerTest {
 
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addStep("sign", JarSigner.ofEnvironment(new Environment(Map.of("jarsigner.keystore", keystore.toString(), "jarsigner.storetype", "PKCS12", "jarsigner.alias", ALIAS, "jarsigner.storepass", "file " + password)::get)), "project");
+        executor.addStep("sign", JarSigner.ofEnvironment(new Environment(Map.of("jarsigner.keystore", keystore.toString(), "jarsigner.storetype", "PKCS12", "jarsigner.alias", ALIAS, "jarsigner.storepass", "file " + password))), "project");
         executor.execute();
 
         try (JarFile jar = new JarFile(signed().toFile())) {

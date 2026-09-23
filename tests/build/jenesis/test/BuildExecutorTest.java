@@ -407,11 +407,11 @@ public class BuildExecutorTest implements Serializable {
 
     @Test
     public void aggregate_configuration_defaults_from_property_and_is_overridable() {
-        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).aggregate()).isFalse();
-        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).aggregate(true).aggregate()).isTrue();
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings)).aggregate()).isFalse();
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings)).aggregate(true).aggregate()).isTrue();
         settings.put("executor.aggregate", "true");
         try {
-            assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).aggregate()).isTrue();
+            assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings)).aggregate()).isTrue();
         } finally {
             settings.remove("executor.aggregate");
         }
@@ -426,7 +426,7 @@ public class BuildExecutorTest implements Serializable {
                     .as("an embedder that builds its own configuration is never surprised by the environment")
                     .isFalse();
             assertThat(new BuildExecutor.Configuration().digest()).isEqualTo("MD5");
-            assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).aggregate()).isTrue();
+            assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings)).aggregate()).isTrue();
         } finally {
             settings.remove("executor.aggregate");
             settings.remove("executor.digest");

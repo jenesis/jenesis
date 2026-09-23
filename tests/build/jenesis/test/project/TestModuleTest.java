@@ -86,12 +86,12 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
                                 null)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings::get))))
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
                 "dependencies", "classes");
         executor.execute();
@@ -108,12 +108,12 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
                                 null)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings::get))))
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false).pathPlacement(PathPlacement.CLASS_PATH),
                 "dependencies", "classes");
         executor.execute();
@@ -163,12 +163,12 @@ public class TestModuleTest {
         executor.addSource("module", module);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
                                 null)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings::get))))
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false)
                         .moduleName("sample.test"),
@@ -212,12 +212,12 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
                                 null)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings::get))))
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .framework(new JUnit4())
                         .isTest(candidate -> candidate.endsWith("JUnit4TestSample")).jarsOnly(false).pathPlacement(PathPlacement.CLASS_PATH),
                 "dependencies", "classes");
@@ -271,12 +271,12 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
                                 null)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings::get))))
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .framework(new TestNG())
                         .isTest(candidate -> candidate.endsWith("TestNGTestSample")).jarsOnly(false).pathPlacement(PathPlacement.CLASS_PATH),
                 "dependencies", "classes");
@@ -293,12 +293,12 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
                                 null)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings::get))))
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
                 "dependencies", "classes");
@@ -316,12 +316,12 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
                                 null)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings::get))))
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .framework(new JUnitPlatform()).jarsOnly(false),
                 "dependencies", "classes");
         executor.execute();
@@ -337,12 +337,12 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
                                 null)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings::get))))
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .framework(new JUnitPlatform())
                         .isTest((Predicate<String> & Serializable) _ -> false)
                         .filter("sample\\.TestSample").jarsOnly(false),
@@ -370,12 +370,12 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
                                 null)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings::get))))
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
                 "dependencies", "classes");
@@ -394,12 +394,12 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
                                 null)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings::get))))
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .framework(new JUnitPlatform())
                         .isTest((Predicate<String> & Serializable) _ -> false)
                         .filter("sample\\.TestSample#test").jarsOnly(false),
@@ -418,12 +418,12 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
                                 null)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings::get))))
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .framework(new JUnitPlatform())
                         .isTest((Predicate<String> & Serializable) _ -> false)
                         .filter("sample\\.DoesNotExist").jarsOnly(false),
@@ -442,7 +442,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of(), Map.of())
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of())
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false).requireFramework(true),
                 "dependencies", "classes");
 
@@ -459,7 +459,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(Map.of("test.skip", "")::get), Map.of(), Map.of())
+                TestModule.ofEnvironment(new Environment(Map.of("test.skip", "")), Map.of(), Map.of())
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false).requireFramework(true),
                 "dependencies", "classes");
 
@@ -477,12 +477,12 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
                                 null)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings::get))))
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false)
                         .skip(true),
@@ -506,7 +506,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
@@ -527,7 +527,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .observe(new JaCoCo())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
@@ -548,7 +548,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
@@ -567,7 +567,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of(), Map.of())
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of())
                         .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample"))
                         .jarsOnly(false),
@@ -585,7 +585,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of(), Map.of())
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of())
                         .framework(new JUnitPlatform())
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
                 "dependencies", "classes");
@@ -602,7 +602,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of(), Map.of())
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of())
                         .framework(new JUnit4())
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
                 "dependencies", "classes");
@@ -619,7 +619,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of(), Map.of())
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of())
                         .framework(new TestNG())
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
                 "dependencies", "classes");
@@ -636,7 +636,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of(), Map.of())
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of())
                         .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false).requireFramework(false),
                 "dependencies", "classes");
         SequencedMap<String, Path> outputs = executor.execute();
@@ -653,7 +653,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .jarsOnly(false),
                 "dependencies", "classes");
@@ -678,7 +678,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("module", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
                         .framework(new JUnitPlatform())
                         .jarsOnly(false),
                 "dependencies", "classes");
@@ -696,7 +696,7 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings::get), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
+                TestModule.ofEnvironment(new Environment(settings), Map.of(), Map.of("maven", (_, _, _, _, _, _) -> new Resolver.Resolution(new LinkedHashMap<>(), List.of(), new LinkedHashMap<>())))
                         .framework(new MultiRunnerEngine())
                         .jarsOnly(false),
                 "dependencies", "classes");
@@ -842,12 +842,12 @@ public class TestModuleTest {
                 BuildExecutorCache.nop(), false, false, 0);
         executor.addSource("dependencies", dependencies);
         executor.addSource("classes", classes);
-        TestModule module = TestModule.ofEnvironment(new Environment(settings::get), Map.of("maven", new MavenDefaultRepository(
+        TestModule module = TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
                         URI.create("https://repo1.maven.org/maven2/"),
                         null,
                         Map.of(),
                         null)),
-                Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings::get))))
+                Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
                 .isTest(candidate -> candidate.endsWith("TestSample"))
                 .jarsOnly(false)
                 .filter(filter)

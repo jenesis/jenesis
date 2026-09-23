@@ -17,9 +17,9 @@ public final class Toolchain {
         this(null, "@");
     }
 
-    public static Toolchain ofKeys(Function<String, String> keys) {
-        String searchpath = keys.apply("toolchain.searchpath");
-        return new Toolchain(keys.apply("toolchain.version"), searchpath == null ? "@" : searchpath);
+    public static Toolchain ofKeys(Map<String, String> keys) {
+        String searchpath = keys.get("toolchain.searchpath");
+        return new Toolchain(keys.get("toolchain.version"), searchpath == null ? "@" : searchpath);
     }
 
     private Toolchain(String version, String searchpath) {

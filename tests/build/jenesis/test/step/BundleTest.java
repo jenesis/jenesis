@@ -243,7 +243,7 @@ public class BundleTest {
         launcher.setProperty("mainClass", "sample.Sample");
         launcher.store(input.resolve("launcher.properties"));
         Bundle bundle;
-        bundle = Bundle.ofEnvironment(new Environment(Map.of("archive.timestamp", "")::get));
+        bundle = Bundle.ofEnvironment(new Environment(Map.of("archive.timestamp", "")));
 
         BuildStepResult result = bundle.apply(
                 Runnable::run,

@@ -4,22 +4,21 @@ import module java.base;
 
 public final class Make {
 
-    private static final String PROVIDED = "jenesis.make.provided", PLATFORMS = "jenesis.make.platforms",
-            PLATFORM = "jenesis.platform.";
+    private static final String PROVIDED = "jenesis.make.provided";
     private static final List<String> CREDENTIALS = List.of("jenesis.maven.token",
             "jenesis.module.token",
             "jenesis.cache.key");
     private static final List<String> PLAINTEXT = List.of("jenesis.repository.insecure", "jenesis.cache.insecure");
 
     private final String mainClass;
-    private final Function<String, String> ambient;
+    private final Map<String, String> ambient;
     private final Path root;
     private final Path classes;
     private final boolean daemon;
     private final boolean compile;
     private final Settings settings;
 
-    public record Settings(Function<String, String> keys,
+    public record Settings(Map<String, String> keys,
                            SequencedSet<Path> profiles,
                            SequencedSet<String> declared) {
     }
@@ -31,17 +30,17 @@ public final class Make {
         this(mainClass, ambient(Map.of()));
     }
 
-    public Make(String mainClass, Function<String, String> ambient) {
+    public Make(String mainClass, Map<String, String> ambient) {
         this.mainClass = mainClass;
-        this.ambient = ambient;
-        String location = ambient.apply("make.root");
+        this.ambient = Map.copyOf(ambient);
+        String location = ambient.get("make.root");
         root = Path.of(location == null ? "" : location).toAbsolutePath().normalize();
         try {
             settings = settings(root, ambient);
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot read the properties that configure this build", e);
         }
-        String classesLocation = settings.keys().apply("make.classes");
+        String classesLocation = settings.keys().get("make.classes");
         classes = classesLocation == null || classesLocation.isBlank()
                 ? root.resolve(".jenesis").resolve("classes")
                 : root.resolve(classesLocation).normalize();
@@ -49,8 +48,8 @@ public final class Make {
         compile = flag(settings.keys(), "make.compile", true);
     }
 
-    private static boolean flag(Function<String, String> keys, String key, boolean defaultValue) {
-        Boolean value = parsed("jenesis." + key, keys.apply(key));
+    private static boolean flag(Map<String, String> keys, String key, boolean defaultValue) {
+        Boolean value = parsed("jenesis." + key, keys.get(key));
         return value == null ? defaultValue : value;
     }
 
@@ -70,7 +69,7 @@ public final class Make {
     }
 
     private Make(String mainClass,
-                 Function<String, String> ambient,
+                 Map<String, String> ambient,
                  Path root,
                  Path classes,
                  boolean daemon,
@@ -112,13 +111,13 @@ public final class Make {
         SequencedMap<String, String> named = new LinkedHashMap<>();
         String[] selectors = partitioned(arguments, named);
         List<String> options = options(named);
-        Function<String, String> ambient = ambient(named);
+        Map<String, String> ambient = ambient(named);
         Make make = new Make("build.jenesis.Project", ambient);
         Integer code = relaunched(Make.class, ambient, options, selectors);
         System.exit(code == null ? make.run(selectors) : code);
     }
 
-    static Function<String, String> ambient(Map<String, String> named) {
+    static Map<String, String> ambient(Map<String, String> named) {
         Map<String, String> properties = new HashMap<>();
         for (String name : System.getProperties().stringPropertyNames()) {
             if (name.startsWith("jenesis.")) {
@@ -129,16 +128,14 @@ public final class Make {
         return keys(properties);
     }
 
-    public static Function<String, String> keys(Map<String, String> properties) {
-        Map<String, String> copy = Map.copyOf(properties);
-        SequencedSet<String> platforms = new TreeSet<>();
-        for (String name : copy.keySet()) {
-            if (name.startsWith(PLATFORM)) {
-                platforms.add(name.substring(PLATFORM.length()));
+    public static Map<String, String> keys(Map<String, String> properties) {
+        Map<String, String> keys = new HashMap<>();
+        properties.forEach((name, value) -> {
+            if (name.startsWith("jenesis.")) {
+                keys.put(name.substring("jenesis.".length()), value);
             }
-        }
-        String listed = platforms.isEmpty() ? null : String.join(",", platforms);
-        return key -> key.equals("make.platforms") ? listed : copy.get("jenesis." + key);
+        });
+        return Map.copyOf(keys);
     }
 
     static String[] partitioned(String[] arguments, SequencedMap<String, String> named) throws IOException {
@@ -249,16 +246,16 @@ public final class Make {
     }
 
     static Integer relaunched(Class<?> main,
-                              Function<String, String> keys,
+                              Map<String, String> keys,
                               List<String> options,
                               String... arguments) throws Exception {
-        String version = keys.apply("toolchain.version");
+        String version = keys.get("toolchain.version");
         if (version == null || version.isBlank()) {
             return null;
         }
         Class<?> type = Class.forName("build.jenesis.Toolchain", true, Make.class.getClassLoader());
         try {
-            Object toolchain = type.getMethod("ofKeys", Function.class)
+            Object toolchain = type.getMethod("ofKeys", Map.class)
                     .invoke(null, keys);
             if (type.getMethod("home").invoke(toolchain).equals(Path.of(System.getProperty("java.home")))) {
                 return null;
@@ -391,7 +388,7 @@ public final class Make {
     private SequencedMap<String, String> supplied() {
         SequencedMap<String, String> supplied = new LinkedHashMap<>();
         for (String key : settings.declared()) {
-            String value = settings.keys().apply(key);
+            String value = settings.keys().get(key);
             if (value != null) {
                 supplied.put("jenesis." + key, value);
             }
@@ -404,11 +401,11 @@ public final class Make {
         Class<?> project = Class.forName("build.jenesis.Project", true, loader);
         if (collected == null || !mainClass.equals("build.jenesis.Project")) {
             return (int) project
-                    .getMethod("run", Function.class, String.class, Path.class, SequencedSet.class, String[].class)
+                    .getMethod("run", Map.class, String.class, Path.class, SequencedSet.class, String[].class)
                     .invoke(null, settings.keys(), mainClass, root, settings.profiles(), selectors);
         }
         Object produced = project
-                .getMethod("perform", Function.class, Path.class, SequencedSet.class, String[].class)
+                .getMethod("perform", Map.class, Path.class, SequencedSet.class, String[].class)
                 .invoke(null, settings.keys(), root, settings.profiles(), selectors);
         if (produced == null) {
             return 1;
@@ -422,13 +419,13 @@ public final class Make {
         return settings(path, ambient(Map.of()));
     }
 
-    public static Settings settings(Path path, Function<String, String> ambient) throws IOException {
+    public static Settings settings(Path path, Map<String, String> ambient) throws IOException {
         Path base = path.resolve("jenesis.properties");
         Properties project = read(base);
         if (project != null) {
             requireApplicable(base, project, false);
         }
-        String configured = ambient.apply("make.global");
+        String configured = ambient.get("make.global");
         String location = configured == null ? System.getProperty("user.home") : configured;
         Properties user = null;
         Path home = null;
@@ -443,7 +440,7 @@ public final class Make {
         Set<Path> loaded = new LinkedHashSet<>();
         Deque<Path> pending = new ArrayDeque<>();
         List<Layer> layers = new ArrayList<>();
-        addProfiles(pending, path, ambient.apply("make.profiles"));
+        addProfiles(pending, path, ambient.get("make.profiles"));
         if (project != null) {
             addProfiles(pending, path, project.getProperty("jenesis.make.profiles"));
         }
@@ -474,53 +471,34 @@ public final class Make {
         return new Settings(layered(ambient, layers), profiles, declared);
     }
 
-    private static Function<String, String> layered(Function<String, String> ambient, List<Layer> layers) {
-        List<Layer> ordered = List.copyOf(layers);
+    private static Map<String, String> layered(Map<String, String> ambient, List<Layer> layers) {
         SequencedSet<String> provided = new LinkedHashSet<>();
         Set<String> declared = new HashSet<>();
-        for (Layer layer : ordered) {
+        for (Layer layer : layers) {
             for (String name : layer.properties().stringPropertyNames()) {
                 if (!name.startsWith("jenesis.")) {
                     continue;
                 }
                 String key = name.substring("jenesis.".length());
-                if (declared.add(key) && ambient.apply(key) == null && !layer.trusted()) {
+                if (declared.add(key) && !ambient.containsKey(key) && !layer.trusted()) {
                     provided.add(key);
                 }
             }
         }
-        String supplied = String.join(",", provided);
-        SequencedSet<String> platforms = new TreeSet<>();
-        String ambientPlatforms = ambient.apply("make.platforms");
-        if (ambientPlatforms != null) {
-            platforms.addAll(List.of(ambientPlatforms.split(",")));
-        }
-        for (String key : declared) {
-            if (key.startsWith("platform.")) {
-                platforms.add(key.substring("platform.".length()));
-            }
-        }
-        String listed = String.join(",", platforms);
-        return key -> {
-            if (key.equals("make.provided")) {
-                return supplied.isEmpty() ? null : supplied;
-            }
-            if (key.equals("make.platforms")) {
-                return listed.isEmpty() ? null : listed;
-            }
-            String value = ambient.apply(key);
-            if (value != null) {
-                return value;
-            }
-            String qualified = "jenesis." + key;
-            for (Layer layer : ordered) {
-                value = layer.properties().getProperty(qualified);
-                if (value != null) {
-                    return value;
+        Map<String, String> keys = new HashMap<>();
+        for (Layer layer : layers.reversed()) {
+            for (String name : layer.properties().stringPropertyNames()) {
+                if (name.startsWith("jenesis.")) {
+                    keys.put(name.substring("jenesis.".length()), layer.properties().getProperty(name));
                 }
             }
-            return null;
-        };
+        }
+        keys.putAll(ambient);
+        keys.remove("make.provided");
+        if (!provided.isEmpty()) {
+            keys.put("make.provided", String.join(",", provided));
+        }
+        return Map.copyOf(keys);
     }
 
     private static void addProfiles(Deque<Path> pending, Path base, String list) {
@@ -556,10 +534,6 @@ public final class Make {
     }
 
     private static void requireApplicable(Path file, Properties properties, boolean trusted) {
-        if (properties.getProperty(PLATFORMS) != null) {
-            throw new IllegalStateException(PLATFORMS + " cannot be set in " + file
-                    + ": it lists the jenesis.platform.<token> settings in force, and Make derives it");
-        }
         if (properties.getProperty(PROVIDED) != null) {
             throw new IllegalStateException(PROVIDED + " cannot be set in " + file
                     + ": it records which settings the files a project provides supplied, and Make derives it");

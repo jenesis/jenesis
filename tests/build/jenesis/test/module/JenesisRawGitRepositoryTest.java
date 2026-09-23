@@ -235,7 +235,7 @@ public class JenesisRawGitRepositoryTest {
         writeArtifact("com.example", "widget-core", "2.0-M1", "jar", "v2m1");
 
         assertThat(content(JenesisRawGitRepository.ofEnvironment(
-                new Environment(Map.of("module.prerelease", "true")::get),
+                new Environment(Map.of("module.prerelease", "true")),
                 JenesisRepository.Scope.MODULE,
                 data.toUri(),
                 maven.toUri(),

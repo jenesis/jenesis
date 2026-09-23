@@ -21,9 +21,12 @@ public record Platform(SequencedSet<String> tokens) implements Serializable {
 
     public static Platform ofEnvironment(Environment environment) {
         SequencedSet<String> tokens = new TreeSet<>(new Platform().tokens());
-        List<String> declared = environment.entries("make.platforms");
-        for (String token : declared == null ? List.<String>of() : declared) {
-            if (environment.flag("platform." + token)) {
+        for (String key : new TreeSet<>(environment.keys().keySet())) {
+            if (!key.startsWith("platform.")) {
+                continue;
+            }
+            String token = key.substring("platform.".length());
+            if (environment.flag(key)) {
                 tokens.add(token.toLowerCase(Locale.ROOT));
             } else {
                 tokens.remove(token.toLowerCase(Locale.ROOT));

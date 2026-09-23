@@ -15,7 +15,7 @@ public class VerificationTest {
     public void reads_the_signature_setting_from_the_provider_it_is_given() {
         System.setProperty("jenesis.dependency.signature", "strict");
         try {
-            assertThat(Verification.ofEnvironment(new Environment(Map.of("dependency.signature", "declared")::get)))
+            assertThat(Verification.ofEnvironment(new Environment(Map.of("dependency.signature", "declared"))))
                     .as("what a build verifies is decided by the provider it was handed, not by the JVM"
                             + " the build happens to run in")
                     .isEqualTo(Verification.DECLARED);
@@ -34,15 +34,15 @@ public class VerificationTest {
 
     @Test
     public void reading_the_signature_setting_parses_case_insensitively() {
-        assertThat(Verification.ofEnvironment(new Environment(Map.of("dependency.signature", "declared")::get)))
+        assertThat(Verification.ofEnvironment(new Environment(Map.of("dependency.signature", "declared"))))
                 .isEqualTo(Verification.DECLARED);
-        assertThat(Verification.ofEnvironment(new Environment(Map.of("dependency.signature", "STRICT")::get)))
+        assertThat(Verification.ofEnvironment(new Environment(Map.of("dependency.signature", "STRICT"))))
                 .isEqualTo(Verification.STRICT);
     }
 
     @Test
     public void reading_the_signature_setting_rejects_an_unknown_value() {
-        assertThatThrownBy(() -> Verification.ofEnvironment(new Environment(Map.of("dependency.signature", "bogus")::get)))
+        assertThatThrownBy(() -> Verification.ofEnvironment(new Environment(Map.of("dependency.signature", "bogus"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown jenesis.dependency.signature 'bogus'");
     }

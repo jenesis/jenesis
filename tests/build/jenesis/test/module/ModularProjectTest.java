@@ -1056,7 +1056,7 @@ public class ModularProjectTest {
 
     @Test
     public void refuses_a_malformed_segment_count_where_the_project_is_built() {
-        assertThatThrownBy(() -> ModularProject.ofEnvironment(new Environment(Map.of("maven.segments", "zero")::get), "module", Path.of(".")))
+        assertThatThrownBy(() -> ModularProject.ofEnvironment(new Environment(Map.of("maven.segments", "zero")), "module", Path.of(".")))
                 .as("a setting is materialized where the provider is handed over, so a bad value is refused there")
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("jenesis.maven.segments");
@@ -1064,7 +1064,7 @@ public class ModularProjectTest {
 
     @Test
     public void refuses_a_segment_count_below_one_where_the_project_is_built() {
-        assertThatThrownBy(() -> ModularProject.ofEnvironment(new Environment(Map.of("maven.segments", "0")::get), "module", Path.of(".")))
+        assertThatThrownBy(() -> ModularProject.ofEnvironment(new Environment(Map.of("maven.segments", "0")), "module", Path.of(".")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("at least one leading segment");
     }

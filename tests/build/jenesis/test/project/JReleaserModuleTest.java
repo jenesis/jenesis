@@ -37,14 +37,14 @@ public class JReleaserModuleTest {
 
     @Test
     public void discovers_no_configuration_by_default() {
-        assertThat(JReleaserModule.configured(new Environment(settings::get), root)).isNull();
+        assertThat(JReleaserModule.configured(new Environment(settings), root)).isNull();
     }
 
     @Test
     public void discovers_each_configuration_flavour() throws IOException {
         for (String name : List.of("jreleaser.json", "jreleaser.toml", "jreleaser.yaml", "jreleaser.yml")) {
             Files.writeString(root.resolve(name), "");
-            assertThat(JReleaserModule.configured(new Environment(settings::get), root))
+            assertThat(JReleaserModule.configured(new Environment(settings), root))
                     .as("the most preferred remaining flavour wins")
                     .isEqualTo(root.resolve(name));
         }
@@ -54,12 +54,12 @@ public class JReleaserModuleTest {
     public void honours_an_explicitly_configured_file() throws IOException {
         Files.writeString(root.resolve("jreleaser.yml"), "");
         Files.writeString(root.resolve("elsewhere.yml"), "");
-        assertThat(JReleaserModule.configured(new Environment(Map.of("jreleaser.config", "elsewhere.yml")::get), root)).isEqualTo(root.resolve("elsewhere.yml"));
+        assertThat(JReleaserModule.configured(new Environment(Map.of("jreleaser.config", "elsewhere.yml")), root)).isEqualTo(root.resolve("elsewhere.yml"));
     }
 
     @Test
     public void rejects_an_explicitly_configured_file_that_is_missing() {
-        assertThatThrownBy(() -> JReleaserModule.configured(new Environment(Map.of("jreleaser.config", "absent.yml")::get), root))
+        assertThatThrownBy(() -> JReleaserModule.configured(new Environment(Map.of("jreleaser.config", "absent.yml")), root))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("absent.yml");
     }
@@ -107,7 +107,7 @@ public class JReleaserModuleTest {
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         buildExecutor.addSource("source", source);
-        buildExecutor.addModule("release", ReleaseModule.ofEnvironment(new Environment(settings::get), root, version), "source");
+        buildExecutor.addModule("release", ReleaseModule.ofEnvironment(new Environment(settings), root, version), "source");
         return buildExecutor.execute(selector);
     }
 }
