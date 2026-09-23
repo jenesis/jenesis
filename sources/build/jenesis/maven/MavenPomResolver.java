@@ -217,7 +217,6 @@ public class MavenPomResolver implements MavenResolver {
             Executor executor,
             MavenRepository repository,
             List<RootPom> rootPoms,
-            List<RootPom> managedPoms,
             Map<MavenDependencyKey, MavenDependencyValue> managedCoordinates,
             MavenDependencyScope scope,
             String prefix) throws IOException {
@@ -226,30 +225,6 @@ public class MavenPomResolver implements MavenResolver {
         Map<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>(managedCoordinates);
         SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = new LinkedHashMap<>();
         SequencedMap<String, MavenDependencyKey> roots = new LinkedHashMap<>();
-        for (RootPom managedPom : managedPoms) {
-            UnresolvedPom assembled;
-            try (InputStream stream = managedPom.pom()) {
-                assembled = assemble(executor, repository, stream, false, true, null, null, new HashSet<>(), unresolved);
-            } catch (SAXException | ParserConfigurationException e) {
-                throw new IllegalStateException("Failed to parse provided managed POM", e);
-            }
-            ResolvedPom resolvedManaged = resolve(executor, repository, assembled, unresolved);
-            String groupId = property(assembled.groupId(), assembled.properties());
-            String artifactId = property(assembled.artifactId(), assembled.properties());
-            String version = property(assembled.version(), assembled.properties());
-            DependencyCoordinate coordinate = new DependencyCoordinate(groupId, artifactId, version);
-            unresolved.putIfAbsent(coordinate, assembled);
-            resolved.putIfAbsent(coordinate, resolvedManaged);
-            MavenDependencyKey key = new MavenDependencyKey(groupId, artifactId, "jar", null);
-            MavenDependencyValue value = new MavenDependencyValue(
-                    version, null, null, null, null, managedPom.checksum());
-            MavenDependencyValue pinned = managedCoordinates.get(key);
-            if (pinned == null) {
-                managedDependencies.putIfAbsent(key, value);
-            } else {
-                managedDependencies.put(key, reconcile(key, pinned, value));
-            }
-        }
         for (RootPom rootPom : rootPoms) {
             UnresolvedPom assembled;
             try (InputStream stream = rootPom.pom()) {

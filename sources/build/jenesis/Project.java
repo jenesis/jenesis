@@ -2305,7 +2305,7 @@ public record Project(
                 print.fetch|false|Each artifact downloaded from a repository
                 print.cache|false|Each step served from or written to the build cache
                 print.signatures|false|Each verified dependency with its signer, and each one no declaration covers
-                print.pins|false|Each pin a refresh kept that no closure resolves, so it carries no checksum
+                print.pins|false|Each coordinate pin a refresh kept although no closure resolved it
                 print.divergence|false|Each coordinate the project pins at more than one version
                 print.aliases|false|Each module alias whose target already declares that name
                 print.docker|true|The image notice when a build or run is containerized
