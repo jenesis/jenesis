@@ -13,15 +13,17 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class RepositoryTest {
 
+    private final Map<String, String> settings = new HashMap<>();
+
     @TempDir
     private Path folder;
 
     @AfterEach
     public void clear() {
-        System.clearProperty("jenesis.repository.insecure");
-        System.clearProperty("jenesis.repository.retries");
-        System.clearProperty("jenesis.repository.backoff");
-        System.clearProperty("jenesis.repository.read.timeout");
+        settings.remove("repository.insecure");
+        settings.remove("repository.retries");
+        settings.remove("repository.backoff");
+        settings.remove("repository.read.timeout");
     }
 
     @Test
@@ -103,8 +105,8 @@ public class RepositoryTest {
                 .isEqualTo(Repository.Origin.USER);
     }
 
-    private static Repository.Connection connection() {
-        return Repository.Connection.ofEnvironment(Environment.SYSTEM);
+    private Repository.Connection connection() {
+        return Repository.Connection.ofEnvironment(new Environment(settings::get));
     }
 
     private HttpServer serve(IntFunction<Integer> statusOfHit, Map<String, String> headers, AtomicInteger hits) throws IOException {
@@ -127,7 +129,7 @@ public class RepositoryTest {
 
     @Test
     public void open_retries_a_server_error_until_success() throws IOException {
-        System.setProperty("jenesis.repository.insecure", "true");
+        settings.put("repository.insecure", "true");
         AtomicInteger hits = new AtomicInteger();
         HttpServer server = serve(hit -> hit < 3 ? 502 : 200, Map.of(), hits);
         try {
@@ -143,7 +145,7 @@ public class RepositoryTest {
 
     @Test
     public void open_gives_up_after_the_configured_retries() throws IOException {
-        System.setProperty("jenesis.repository.insecure", "true");
+        settings.put("repository.insecure", "true");
         AtomicInteger hits = new AtomicInteger();
         HttpServer server = serve(_ -> 502, Map.of(), hits);
         try {
@@ -159,8 +161,8 @@ public class RepositoryTest {
 
     @Test
     public void open_times_out_on_a_stalled_server() throws IOException {
-        System.setProperty("jenesis.repository.insecure", "true");
-        System.setProperty("jenesis.repository.read.timeout", "200");
+        settings.put("repository.insecure", "true");
+        settings.put("repository.read.timeout", "200");
         HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         CountDownLatch release = new CountDownLatch(1);
         server.createContext("/", exchange -> {
@@ -186,7 +188,7 @@ public class RepositoryTest {
 
     @Test
     public void open_refuses_a_redirect_to_a_file_uri() throws IOException {
-        System.setProperty("jenesis.repository.insecure", "true");
+        settings.put("repository.insecure", "true");
         Path secret = Files.writeString(folder.resolve("secret.txt"), "top-secret");
         HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         server.createContext("/", exchange -> {
@@ -207,7 +209,7 @@ public class RepositoryTest {
 
     @Test
     public void open_keeps_the_token_on_the_origin_but_strips_it_after_a_cross_origin_redirect() throws IOException {
-        System.setProperty("jenesis.repository.insecure", "true");
+        settings.put("repository.insecure", "true");
         AtomicReference<String> originToken = new AtomicReference<>();
         AtomicBoolean mirrorSawToken = new AtomicBoolean(true);
         HttpServer mirror = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
@@ -253,7 +255,7 @@ public class RepositoryTest {
 
     @Test
     public void open_does_not_retry_a_missing_resource() throws IOException {
-        System.setProperty("jenesis.repository.insecure", "true");
+        settings.put("repository.insecure", "true");
         AtomicInteger hits = new AtomicInteger();
         HttpServer server = serve(_ -> 404, Map.of(), hits);
         try {
@@ -268,7 +270,7 @@ public class RepositoryTest {
 
     @Test
     public void open_honors_the_retry_after_header() throws IOException {
-        System.setProperty("jenesis.repository.insecure", "true");
+        settings.put("repository.insecure", "true");
         AtomicInteger hits = new AtomicInteger();
         HttpServer server = serve(hit -> hit < 2 ? 429 : 200, Map.of("Retry-After", "0"), hits);
         try {
@@ -284,7 +286,7 @@ public class RepositoryTest {
 
     @Test
     public void open_honors_the_retry_after_http_date_form() throws IOException {
-        System.setProperty("jenesis.repository.insecure", "true");
+        settings.put("repository.insecure", "true");
         AtomicInteger hits = new AtomicInteger();
         String past = DateTimeFormatter.RFC_1123_DATE_TIME.format(ZonedDateTime.now(ZoneOffset.UTC).minusMinutes(1));
         HttpServer server = serve(hit -> hit < 2 ? 429 : 200, Map.of("Retry-After", past), hits);
@@ -362,7 +364,7 @@ public class RepositoryTest {
     @Test
     public void ofUris_without_version_resolver_does_not_attempt_fallback() throws IOException {
         URI bare = URI.create("https://example.test/other/foo.jar");
-        Repository repository = Repository.ofUris(Map.of("foo", bare), null, Repository.Connection.ofEnvironment(Environment.SYSTEM), null);
+        Repository repository = Repository.ofUris(Map.of("foo", bare), null, Repository.Connection.ofEnvironment(new Environment(settings::get)), null);
         assertThat(repository.fetch(Runnable::run, "foo/9.9")).isEmpty();
     }
 
@@ -371,7 +373,7 @@ public class RepositoryTest {
         URI bare = URI.create("https://example.test/other/foo.jar");
         Repository repository = Repository.ofUris(Map.of("foo", bare),
                 (BiFunction<URI, String, Optional<URI>> & Serializable) (uri, _) -> Optional.of(uri),
-                Repository.Connection.ofEnvironment(Environment.SYSTEM),
+                Repository.Connection.ofEnvironment(new Environment(settings::get)),
                 null);
         Optional<RepositoryItem> item = repository.fetch(Runnable::run, "foo/9.9");
         assertThat(item).isPresent();
@@ -382,7 +384,7 @@ public class RepositoryTest {
         URI bare = URI.create("https://example.test/other/foo.jar");
         Repository repository = Repository.ofUris(Map.of("foo", bare),
                 (BiFunction<URI, String, Optional<URI>> & Serializable) (_, _) -> Optional.empty(),
-                Repository.Connection.ofEnvironment(Environment.SYSTEM),
+                Repository.Connection.ofEnvironment(new Environment(settings::get)),
                 null);
         assertThat(repository.fetch(Runnable::run, "foo/9.9")).isEmpty();
     }

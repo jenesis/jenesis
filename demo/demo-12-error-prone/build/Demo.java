@@ -4,16 +4,18 @@ import module java.base;
 import build.jenesis.Project;
 import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.Environment;
+import build.jenesis.Make;
 
 public class Demo {
 
     static void main(String[] args) throws Exception {
+        Environment environment = new Environment(Make.settings(Path.of(".")).keys());
         expectFailure("a reference comparison of two strings, with ReferenceEquality promoted to an error",
-                () -> Project.ofEnvironment(Environment.SYSTEM, Path.of(".")).build());
+                () -> Project.ofEnvironment(environment, Path.of(".")).build());
         System.out.println();
         wipe();
-        Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
-                .assembler(InferredMultiProjectAssembler.ofEnvironment(Environment.SYSTEM).toolchain(toolchain ->
+        Project.ofEnvironment(environment, Path.of("."))
+                .assembler(InferredMultiProjectAssembler.ofEnvironment(environment).toolchain(toolchain ->
                         toolchain.compiler(compiler -> compiler.errorprone(null))))
                 .build();
         System.out.println();

@@ -17,6 +17,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class JReleaserModuleTest {
 
+    private final Map<String, String> settings = new HashMap<>();
+
     @TempDir
     private Path root;
     private Path source;
@@ -28,21 +30,21 @@ public class JReleaserModuleTest {
 
     @AfterEach
     public void tearDown() {
-        System.clearProperty("jenesis.jreleaser.config");
-        System.clearProperty("jenesis.jreleaser.executable");
-        System.clearProperty("jenesis.jreleaser.dryRun");
+        settings.remove("jreleaser.config");
+        settings.remove("jreleaser.executable");
+        settings.remove("jreleaser.dryRun");
     }
 
     @Test
     public void discovers_no_configuration_by_default() {
-        assertThat(JReleaserModule.configured(Environment.SYSTEM, root)).isNull();
+        assertThat(JReleaserModule.configured(new Environment(settings::get), root)).isNull();
     }
 
     @Test
     public void discovers_each_configuration_flavour() throws IOException {
         for (String name : List.of("jreleaser.json", "jreleaser.toml", "jreleaser.yaml", "jreleaser.yml")) {
             Files.writeString(root.resolve(name), "");
-            assertThat(JReleaserModule.configured(Environment.SYSTEM, root))
+            assertThat(JReleaserModule.configured(new Environment(settings::get), root))
                     .as("the most preferred remaining flavour wins")
                     .isEqualTo(root.resolve(name));
         }
@@ -89,7 +91,7 @@ public class JReleaserModuleTest {
     @Test
     public void reports_a_missing_executable_by_name() throws IOException {
         Files.writeString(root.resolve("jreleaser.yml"), "");
-        System.setProperty("jenesis.jreleaser.executable", "jreleaser-is-not-installed");
+        settings.put("jreleaser.executable", "jreleaser-is-not-installed");
         assertThatThrownBy(() -> release("release/jreleaser/execute"))
                 .hasStackTraceContaining("jreleaser-is-not-installed");
     }
@@ -105,7 +107,7 @@ public class JReleaserModuleTest {
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         buildExecutor.addSource("source", source);
-        buildExecutor.addModule("release", ReleaseModule.ofEnvironment(Environment.SYSTEM, root, version), "source");
+        buildExecutor.addModule("release", ReleaseModule.ofEnvironment(new Environment(settings::get), root, version), "source");
         return buildExecutor.execute(selector);
     }
 }

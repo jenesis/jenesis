@@ -39,6 +39,7 @@ public class InternalModule implements BuildExecutorModule {
     private final String buildModuleName;
     private final Pinning pinning;
     private final String group;
+    private final Platform platform;
 
     public InternalModule(String prefix, String group, Path source) {
         this(prefix,
@@ -60,7 +61,8 @@ public class InternalModule implements BuildExecutorModule {
                 Collections.emptyNavigableSet(),
                 null,
                 null,
-                group);
+                group,
+                new Platform());
     }
 
     public static InternalModule ofEnvironment(Environment environment,
@@ -75,21 +77,22 @@ public class InternalModule implements BuildExecutorModule {
                 Collections.emptyNavigableSet(),
                 null,
                 null,
-                group == null ? "main" : group);
+                group == null ? "main" : group,
+                Platform.ofEnvironment(environment));
     }
 
     public InternalModule repositories(Map<String, Repository> repositories) {
         return new InternalModule(prefix, source, dependencyModule.repositories(repositories),
-                javacStep, additionalDependencies, buildModuleName, pinning, group);
+                javacStep, additionalDependencies, buildModuleName, pinning, group, platform);
     }
 
     public InternalModule resolvers(Map<String, Resolver> resolvers) {
         return new InternalModule(prefix, source, dependencyModule.resolvers(resolvers),
-                javacStep, additionalDependencies, buildModuleName, pinning, group);
+                javacStep, additionalDependencies, buildModuleName, pinning, group, platform);
     }
 
     public InternalModule group(String group) {
-        return new InternalModule(prefix, source, dependencyModule, javacStep, additionalDependencies, buildModuleName, pinning, group);
+        return new InternalModule(prefix, source, dependencyModule, javacStep, additionalDependencies, buildModuleName, pinning, group, platform);
     }
 
     private InternalModule(String prefix,
@@ -99,7 +102,8 @@ public class InternalModule implements BuildExecutorModule {
                            SequencedSet<String> additionalDependencies,
                            String buildModuleName,
                            Pinning pinning,
-                           String group) {
+                           String group,
+                           Platform platform) {
         this.prefix = prefix;
         this.source = source;
         this.dependencyModule = dependencyModule;
@@ -108,28 +112,34 @@ public class InternalModule implements BuildExecutorModule {
         this.buildModuleName = buildModuleName;
         this.pinning = pinning;
         this.group = group;
+        this.platform = platform;
     }
 
     public InternalModule dependencies(String... dependencies) {
         return new InternalModule(prefix, source, dependencyModule, javacStep, new LinkedHashSet<>(List.of(dependencies)),
                 buildModuleName,
                 pinning,
-                group);
+                group, platform);
     }
 
     public InternalModule dependencies(SequencedSet<String> dependencies) {
         return new InternalModule(prefix, source, dependencyModule, javacStep, new LinkedHashSet<>(dependencies),
                 buildModuleName,
                 pinning,
-                group);
+                group, platform);
     }
 
     public InternalModule buildModuleName(String name) {
-        return new InternalModule(prefix, source, dependencyModule, javacStep, additionalDependencies, name, pinning, group);
+        return new InternalModule(prefix, source, dependencyModule, javacStep, additionalDependencies, name, pinning, group, platform);
+    }
+
+    public InternalModule platform(Platform platform) {
+        return new InternalModule(prefix, source, dependencyModule, javacStep, additionalDependencies, buildModuleName,
+                pinning, group, platform);
     }
 
     public InternalModule pinning(Pinning pinning) {
-        return new InternalModule(prefix, source, dependencyModule, javacStep, additionalDependencies, buildModuleName, pinning, group);
+        return new InternalModule(prefix, source, dependencyModule, javacStep, additionalDependencies, buildModuleName, pinning, group, platform);
     }
 
     @Override
@@ -150,7 +160,7 @@ public class InternalModule implements BuildExecutorModule {
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
         buildExecutor.addSource(SOURCE, Bind.asSources(), source);
         buildExecutor.addStep(REQUIRES,
-                new ParseModuleInfo(group, prefix, additionalDependencies, new Platform()),
+                new ParseModuleInfo(group, prefix, additionalDependencies, platform),
                 Stream.concat(Stream.of(SOURCE), inherited.sequencedKeySet().stream()));
         buildExecutor.addModule(DEPENDENCIES,
                 dependencyModule.pinning(pinning),

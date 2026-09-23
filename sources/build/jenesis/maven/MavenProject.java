@@ -62,7 +62,7 @@ public class MavenProject implements BuildExecutorModule {
                                       String prefix,
                                       MavenRepository repository,
                                       MavenResolver resolver) {
-        return new MavenProject(root, prefix, repository, resolver);
+        return new MavenProject(root, prefix, repository, resolver).platform(Platform.ofEnvironment(environment));
     }
 
     private MavenProject(Path root,

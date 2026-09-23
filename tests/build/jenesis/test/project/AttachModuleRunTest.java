@@ -150,11 +150,11 @@ public class AttachModuleRunTest {
         executor.addSource("dependencies", dependencies);
         executor.addSource("classes", classes);
         Map<String, Repository> repositories = Map.of(
-                "maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM),
+                "maven", MavenDefaultRepository.ofEnvironment(Environment.NONE),
                 "probes", new MavenDefaultRepository(repository.toUri(), null, Map.of(), null));
         Map<String, Resolver> resolvers = Map.of(
-                "maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM),
-                "probes", MavenPomResolver.ofEnvironment(Environment.SYSTEM));
+                "maven", MavenPomResolver.ofEnvironment(Environment.NONE),
+                "probes", MavenPomResolver.ofEnvironment(Environment.NONE));
         executor.addModule(
                 "test",
                 new TestModule(repositories, resolvers)

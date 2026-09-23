@@ -4,7 +4,6 @@ import module java.base;
 
 public record Environment(Function<String, String> keys, Consumer<String> out, Consumer<String> err) {
 
-    public static final Environment SYSTEM = new Environment(key -> System.getProperty("jenesis." + key));
     public static final Environment NONE = new Environment(_ -> null);
 
     public Environment(Function<String, String> keys) {

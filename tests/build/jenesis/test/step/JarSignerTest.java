@@ -94,7 +94,7 @@ public class JarSignerTest {
 
     @Test
     public void rejects_a_password_that_is_not_a_location() {
-        assertThatThrownBy(() -> JarSigner.ofEnvironment(Environment.SYSTEM).storepass("secret"))
+        assertThatThrownBy(() -> JarSigner.ofEnvironment(Environment.NONE).storepass("secret"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("jenesis.jarsigner.storepass")
                 .hasMessageContaining("'env <variable>' or 'file <path>'");
@@ -119,7 +119,7 @@ public class JarSignerTest {
     public void refuses_to_ship_unsigned_when_no_key_store_was_supplied() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addStep("sign", JarSigner.ofEnvironment(Environment.SYSTEM).alias(ALIAS), "project");
+        executor.addStep("sign", JarSigner.ofEnvironment(Environment.NONE).alias(ALIAS), "project");
 
         assertThatThrownBy(executor::execute).rootCause()
                 .as("a project that says it signs must not quietly produce an unsigned jar"
@@ -133,7 +133,7 @@ public class JarSignerTest {
     public void refuses_a_key_store_whose_password_nothing_locates() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
-        executor.addStep("sign", JarSigner.ofEnvironment(Environment.SYSTEM).keystore(keystore.toString()).alias(ALIAS), "project");
+        executor.addStep("sign", JarSigner.ofEnvironment(Environment.NONE).keystore(keystore.toString()).alias(ALIAS), "project");
 
         assertThatThrownBy(executor::execute).rootCause()
                 .as("jarsigner would ask for the password, and a build that cannot answer hangs")
@@ -143,10 +143,10 @@ public class JarSignerTest {
 
     @Test
     public void says_nothing_about_signing_until_something_names_it() {
-        assertThat(JarSigner.ofEnvironment(Environment.SYSTEM).configured())
+        assertThat(JarSigner.ofEnvironment(Environment.NONE).configured())
                 .as("nothing is set, so the archiver's jar is the artifact")
                 .isFalse();
-        assertThat(JarSigner.ofEnvironment(Environment.SYSTEM).alias(ALIAS).configured())
+        assertThat(JarSigner.ofEnvironment(Environment.NONE).alias(ALIAS).configured())
                 .as("a project that names the key it signs with has said it signs")
                 .isTrue();
     }
@@ -169,7 +169,7 @@ public class JarSignerTest {
     }
 
     private JarSigner newSigner() {
-        return JarSigner.ofEnvironment(Environment.SYSTEM)
+        return JarSigner.ofEnvironment(Environment.NONE)
                 .keystore(keystore.toString())
                 .storetype("PKCS12")
                 .alias(ALIAS)

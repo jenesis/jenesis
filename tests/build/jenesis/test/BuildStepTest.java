@@ -21,7 +21,7 @@ public class BuildStepTest {
 
     @Test
     public void archive_timestamp_defaults_to_a_date_no_time_zone_reads_as_1979() {
-        assertThat(BuildStep.timestamp(Environment.SYSTEM)).isEqualTo(OffsetDateTime.parse("1980-02-01T00:00:00Z"));
+        assertThat(BuildStep.timestamp(Environment.NONE)).isEqualTo(OffsetDateTime.parse("1980-02-01T00:00:00Z"));
     }
 
     @Test
