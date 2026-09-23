@@ -12,14 +12,16 @@ runtime needs it.
 Run it
 ------
 
-From this directory:
+From this directory, naming the customizer this demo ships:
 
-    java build/Demo.java
+    java build/jenesis/Make.java -Djenesis.project.customizers=build.custom.ConfigJmod stage
 
 It builds the module, packs `classes/` plus `jmodconfig/` into `demo.config.jmod`,
-links that jmod into a runtime image, wraps the runtime into a `demo.config`
-application image, and then launches the packaged app. The app reads its config
-back from the runtime that `jpackage` bundled into it:
+links that jmod into a runtime image, and wraps the runtime into a `demo.config`
+application image under `target/stage/packages/output/`. Launch it -
+`demo.config/bin/demo.config` on Linux, `demo.config/demo.config.exe` on Windows,
+`demo.config.app/Contents/MacOS/demo.config` on macOS - and the app reads its
+config back from the runtime that `jpackage` bundled into it:
 
     The packaged app read its bundled config from .../demo.config/lib/runtime/conf/app.properties:
     Configured in a .jmod, linked into the runtime by jlink
@@ -72,7 +74,7 @@ Layout
 
     demo/demo-50-custom-jmod
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
-    |-- build/Demo.java      the launcher: wraps the assembler, builds, runs the packaged app
+    |-- build/custom/ConfigJmod.java   the customizer: adds the config step to the assembler
     `-- sources/
         |-- module-info.java     module demo.config { requires org.slf4j; exports sample; }
         `-- sample/Sample.java   reads <java.home>/conf/app.properties, logs via slf4j, prints it
@@ -80,12 +82,19 @@ Layout
 How the wrapping works
 ----------------------
 
-`Demo.java` hands `Project` a `ConfigJmodAssembler` that wraps a stock
-`InferredMultiProjectAssembler`; `jmod`, `jlink`, and packaging are selected by the
-committed `packaging.properties` in this directory, which Jenesis reads from the
-configuration location:
+`ConfigJmod` is a customizer, as in the `custom-assembler` demo: it wraps the
+assembler the settings configured in a lambda. `jmod`, `jlink`, and packaging
+are selected by the committed `packaging.properties` in this directory, which
+Jenesis reads from the configuration location:
 
-    new ConfigJmodAssembler(new InferredMultiProjectAssembler())
+    return project.assembler((descriptor, repositories, resolvers) -> project.assembler()
+            .apply(descriptor.content("config"), repositories, resolvers)
+            .mapBuild(inner -> (sub, inherited) -> {
+                sub.addStep("config", (executor, context, arguments) -> {
+                    ... // write jmodconfig/app.properties into context.next()
+                });
+                inner.accept(sub, inherited);
+            }));
 
     packaging.properties:  jmod=true
                          jlink=true
@@ -97,8 +106,8 @@ the `jlink` runtime via `--runtime-image`. The wrapper does not duplicate any of
 that. It adds exactly one thing, the extra input, and lets the stock pipeline
 consume it:
 
-    sub.addStep("config", new GenerateConfig());   // produces jmodconfig/app.properties
-    inner.accept(sub, inherited);                   // the stock java -> jmod -> jlink -> jpackage pipeline
+    sub.addStep("config", ...);      // produces jmodconfig/app.properties
+    inner.accept(sub, inherited);    // the stock java -> jmod -> jlink -> jpackage pipeline
 
 The link between the two is the module descriptor's `content` set. The wrapper
 calls `descriptor.content("config")` before delegating, and the stock `jmod`
