@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
+import build.jenesis.BuildStep;
 import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
@@ -80,6 +81,20 @@ public class InferredByteCodeQualityModule implements BuildExecutorModule {
                 spotbugsModule,
                 spotbugs,
                 custom);
+    }
+
+    public InferredByteCodeQualityModule custom(String name, BuildExecutorModule module) {
+        if (custom.containsKey(name)) {
+            throw new IllegalArgumentException("A custom module named " + name + " is added already - give this one"
+                    + " another name");
+        }
+        SequencedMap<String, BuildExecutorModule> added = new LinkedHashMap<>(custom);
+        added.put(name, module);
+        return custom(added);
+    }
+
+    public InferredByteCodeQualityModule custom(String name, BuildStep step) {
+        return custom(name, step.asModule(name));
     }
 
     @Override

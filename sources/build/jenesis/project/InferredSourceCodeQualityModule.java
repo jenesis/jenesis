@@ -3,6 +3,7 @@ package build.jenesis.project;
 import module java.base;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
+import build.jenesis.BuildStep;
 import build.jenesis.Environment;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
@@ -326,6 +327,20 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
                 scalafmt,
                 codenarc,
                 custom);
+    }
+
+    public InferredSourceCodeQualityModule custom(String name, BuildExecutorModule module) {
+        if (custom.containsKey(name)) {
+            throw new IllegalArgumentException("A custom module named " + name + " is added already - give this one"
+                    + " another name");
+        }
+        SequencedMap<String, BuildExecutorModule> added = new LinkedHashMap<>(custom);
+        added.put(name, module);
+        return custom(added);
+    }
+
+    public InferredSourceCodeQualityModule custom(String name, BuildStep step) {
+        return custom(name, step.asModule(name));
     }
 
     @Override

@@ -105,6 +105,30 @@ public class InferredComplianceModuleTest {
                 .satisfies(input -> assertThat(input).endsWith("input"));
     }
 
+    @Test
+    public void a_custom_step_is_added_by_name_and_answers_for_its_output() throws Exception {
+        Path configuration = Files.createDirectories(root.resolve("configuration"));
+        SequencedMap<String, Path> outputs = execute(new InferredComplianceModule(new LinkedHashSet<>(List.of(configuration)))
+                        .custom("report", (_, context, _) -> {
+                            Files.writeString(context.next().resolve("report.txt"), "reported");
+                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                        }),
+                "compliance/custom/report");
+        assertThat(outputs.get("compliance/custom/report").resolve("report.txt")).content().isEqualTo("reported");
+    }
+
+    @Test
+    public void refuses_a_custom_module_under_a_name_that_is_added_already() {
+        SequencedMap<String, BuildExecutorModule> custom = new LinkedHashMap<>();
+        custom.put("first", (_, _) -> {});
+        InferredComplianceModule module = new InferredComplianceModule(new LinkedHashSet<>())
+                .custom(custom)
+                .custom("second", (_, _) -> {});
+        assertThatThrownBy(() -> module.custom("first", (_, _) -> {}))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("A custom module named first is added already");
+    }
+
     private SequencedMap<String, Path> execute(InferredComplianceModule module, String... selectors) throws IOException {
         Path build = Files.createDirectories(root.resolve("build"));
         Path input = Files.createDirectories(root.resolve("input"));

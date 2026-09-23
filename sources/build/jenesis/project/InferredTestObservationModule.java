@@ -239,6 +239,20 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 custom);
     }
 
+    public InferredTestObservationModule custom(String name, BuildExecutorModule module) {
+        if (custom.containsKey(name)) {
+            throw new IllegalArgumentException("A custom module named " + name + " is added already - give this one"
+                    + " another name");
+        }
+        SequencedMap<String, BuildExecutorModule> added = new LinkedHashMap<>(custom);
+        added.put(name, module);
+        return custom(added);
+    }
+
+    public InferredTestObservationModule custom(String name, BuildStep step) {
+        return custom(name, step.asModule(name));
+    }
+
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
         SequencedMap<String, BuildExecutorModule> reports = new LinkedHashMap<>();
