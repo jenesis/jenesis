@@ -40,24 +40,25 @@ full `Project` entry point) and a build wired entirely by
 hand: a "custom but not so custom" build that reuses the stock toolchain through
 one convenience call. The launcher avoids going through `Project` - no layout, no
 goals - yet without wiring every step by hand either, because
-`ModularProject.make(root, assembler)` supplies sane defaults for the repositories,
+`ModularProject.make(environment, root, assembler)` supplies sane defaults for the repositories,
 resolvers, and digest a normal modular build configures.
 
 How the convenience make is wired
 ---------------------------------
 
 `Demo.java` creates a `BuildExecutor`, adds the result of
-`ModularProject.make(root, assembler)` as a module, and executes it:
+`ModularProject.make(environment, root, assembler)` as a module, and executes it:
 
     BuildExecutor root = BuildExecutor.of(Path.of("target"));
-    root.addModule("modules", ModularProject.make(Path.of("."),
+    root.addModule("modules", ModularProject.make(Environment.SYSTEM,
+            Path.of("."),
             (descriptor, repositories, resolvers) -> new InferredMultiProjectAssembler().apply(
                     new ProjectModuleDescriptor(descriptor, new LinkedHashSet<>(List.of(Path.of("."))), true, false, false, null, PathPlacement.MODULE_PATH),
                     repositories,
                     resolvers)));
     root.execute(args);
 
-The two-argument `make` is the convenience form: it discovers the modules under
+The three-argument `make` is the convenience form: it discovers the modules under
 the root and fills in the Jenesis module repository, a modular jar resolver, and
 a digest, so the only thing left to provide is the assembler. The assembler here
 is the stock `InferredMultiProjectAssembler`; each discovered module arrives as a
