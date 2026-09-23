@@ -83,13 +83,13 @@ and materialises them into a folder, exactly as it would for `Jenesis-Aliases` o
 `Jenesis-Overrides`. The result is visible in the bundle:
 
     jars/classes.jar                              every jar, stored once
-    jars/demo.layers.library-1-SNAPSHOT.jar
-    jars/demo.layers.spi-1-SNAPSHOT.jar
+    jars/demo.layers.library-0-SNAPSHOT.jar
+    jars/demo.layers.spi-0-SNAPSHOT.jar
     jars/com.fasterxml.jackson.core-2.18.2.jar    the application's
     jars/com.fasterxml.jackson.core-2.15.4.jar    the library's
     jars/com.fasterxml.jackson.core-2.13.5.jar    one layer deeper
-    jars/demo.layers.impl-1-SNAPSHOT.jar
-    jars/demo.layers.nested-1-SNAPSHOT.jar
+    jars/demo.layers.impl-0-SNAPSHOT.jar
+    jars/demo.layers.nested-0-SNAPSHOT.jar
 
     application.unix.args   (and application.windows.args, the same with ';')
       "-Djlayer.modulepath.inner=jars/demo.layers.nested-...:jars/...2.13.5.jar"

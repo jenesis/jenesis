@@ -227,11 +227,11 @@ name and declared license:
 
     java build/jenesis/Make.java dependencies
 
-    maven/demo.greeter/demo.greeter.test 1-SNAPSHOT [compile] (module demo.greeter.test, local ./greeter-test)
-    ├─ maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
+    maven/demo.greeter/demo.greeter.test 0-SNAPSHOT [compile] (module demo.greeter.test, local ./greeter-test)
+    ├─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
     │  └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT}
-    ├─ maven/demo.greeter/demo.greeter.testing 1-SNAPSHOT [compile] (module demo.greeter.testing, local ./greeter-testing)
-    │  ├─ maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (*)
+    ├─ maven/demo.greeter/demo.greeter.testing 0-SNAPSHOT [compile] (module demo.greeter.testing, local ./greeter-testing)
+    │  ├─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (*)
     │  └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (*)
     └─ maven/org.junit.jupiter/junit-jupiter 5.11.3 [compile] (module org.junit.jupiter) {EPL-2.0}
        ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (module org.junit.jupiter.api) {EPL-2.0}
@@ -268,10 +268,10 @@ external dependencies into counts:
 
     java -Djenesis.tree.format=compact build/jenesis/Make.java dependencies
 
-    maven/demo.greeter/demo.greeter.test 1-SNAPSHOT [compile] (module demo.greeter.test, local ./greeter-test)
-    ├─ maven/demo.greeter/demo.greeter.testing 1-SNAPSHOT [compile] (module demo.greeter.testing, local ./greeter-testing)
+    maven/demo.greeter/demo.greeter.test 0-SNAPSHOT [compile] (module demo.greeter.test, local ./greeter-test)
+    ├─ maven/demo.greeter/demo.greeter.testing 0-SNAPSHOT [compile] (module demo.greeter.testing, local ./greeter-testing)
     │  └─ 1 external dependency
-    ├─ maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
+    ├─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
     │  └─ 1 external dependency
     └─ 1 external dependency
 
@@ -287,8 +287,8 @@ project releases, and it does so under either format:
 
     java -Djenesis.tree.format=compact -Djenesis.tree.tests=false build/jenesis/Make.java dependencies
 
-    maven/demo.app/demo.app 1-SNAPSHOT [compile] (module demo.app, local ./app)
-    └─ maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
+    maven/demo.app/demo.app 0-SNAPSHOT [compile] (module demo.app, local ./app)
+    └─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
        └─ 1 external dependency
 
 `greeter-test` declares `@jenesis.test demo.greeter` and `greeter-testing`

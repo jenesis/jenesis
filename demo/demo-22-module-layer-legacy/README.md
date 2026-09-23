@@ -49,7 +49,7 @@ So `impl/module-info.java` names the one jar its own code calls, and nothing els
 commons-logging and commons-collections are never mentioned. They arrive as commons-beanutils' own
 dependencies, carry no identity, and become the layer's unnamed module. The descriptor says so:
 
-    layer.modulepath.demo.legacy.library.beans=demo.legacy.impl-1-SNAPSHOT.jar,commons.beanutils-1.9.4.jar
+    layer.modulepath.demo.legacy.library.beans=demo.legacy.impl-0-SNAPSHOT.jar,commons.beanutils-1.9.4.jar
     layer.classpath.demo.legacy.library.beans=commons-logging%2Fcommons-logging%2F1.2.jar,...
 
 The rule that decides the shape

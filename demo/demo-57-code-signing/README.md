@@ -16,7 +16,7 @@ From this directory:
 
     Generated a throwaway key store in target/keystore/demo.p12
     ...
-    Staged target/stage/maven/output/demo/signing/demo.signing/1-SNAPSHOT/demo.signing-1-SNAPSHOT.jar
+    Staged target/stage/maven/output/demo/signing/demo.signing/0-SNAPSHOT/demo.signing-0-SNAPSHOT.jar
       carries META-INF/DEMO.SF
       carries META-INF/DEMO.RSA
 

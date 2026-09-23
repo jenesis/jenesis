@@ -214,8 +214,7 @@ public class TreeTest {
         SequencedProperties inventory = new SequencedProperties();
         inventory.setProperty("module.graph.0", "graph.properties");
         inventory.setProperty("module.identity.0", "module/greeter");
-        inventory.setProperty("module.identity.1", "maven/greeter/greeter/1.0");
-        inventory.setProperty("module.version", "1.0");
+        inventory.setProperty("module.identity.1", "maven/greeter/greeter/0-SNAPSHOT");
         inventory.setProperty("module.module", "greeter");
         inventory.store(argument.resolve(Inventory.INVENTORY));
 
@@ -228,7 +227,7 @@ public class TreeTest {
                         Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
                 .toCompletableFuture().join();
         assertThat(printed.stream().map(line -> line.replaceAll("\033\\[[0-9;]*m", "")))
-                .contains("maven/greeter/greeter 1.0 [compile] (module greeter, local ./)");
+                .contains("maven/greeter/greeter 0-SNAPSHOT [compile] (module greeter, local ./)");
     }
 
     @Test

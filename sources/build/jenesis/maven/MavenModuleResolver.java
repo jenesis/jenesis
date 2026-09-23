@@ -158,17 +158,6 @@ public class MavenModuleResolver implements Resolver {
                 value.checksum() == null ? "" : value.checksum()));
         SequencedMap<String, Resolver.Resolved> materialized = new LinkedHashMap<>(
                 Resolver.materializeAll(executor, repositories, mavenPrefix, result));
-        resolution.roots().forEach((module, key) -> {
-            MavenDependencyValue value = closure.get(key);
-            if (value == null) {
-                return;
-            }
-            Resolver.Resolved root = materialized.get(key.coordinate(mavenPrefix, value.version()));
-            if (root != null && !root.internal()) {
-                materialized.putIfAbsent("module/" + module + "/" + value.version(),
-                        new Resolver.Resolved(root.file(), "", root.internal()));
-            }
-        });
         Map<String, ModuleDescriptor> descriptors = new ConcurrentHashMap<>();
         List<CompletableFuture<?>> pending = new ArrayList<>();
         closure.forEach((key, value) -> {
@@ -199,6 +188,11 @@ public class MavenModuleResolver implements Resolver {
                 throw new IllegalStateException("Expected module " + module
                         + " but the resolved jar for " + withVersion + " declares module " + descriptor.name());
             }
+            boolean unversioned = descriptor != null
+                    && !descriptor.isAutomatic()
+                    && descriptor.rawVersion().isEmpty();
+            materialized.putIfAbsent("module/" + module + (unversioned ? "" : "/" + value.version()),
+                    new Resolver.Resolved(artifact.file(), "", artifact.internal()));
         });
         SequencedMap<String, Resolver.Vertex> nodes = new LinkedHashMap<>();
         closure.forEach((key, value) -> {
