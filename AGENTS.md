@@ -249,7 +249,11 @@ handed to `Project` reaches the whole tree without being carried into it. A call
 further down by nesting -
 `assembler.toolchain(toolchain -> toolchain.compiler(compiler -> compiler.javac(javac -> …)))` - and no
 module ever exposes a configurator for a module it does not wire itself, so a new child is a new
-configurator on its own parent, never a new component on the assembler.
+configurator on its own parent, never a new component on the assembler. Beside its configurators every
+`Inferred*Module`, and the assembler's module build, holds `custom`, a `SequencedMap<String, BuildExecutorModule>`
+of additional children it wires inside one sub-module named `custom`, each handed the inputs the module itself
+reads. No module names a child of its own `custom`, so an added name never collides with a stock one, and a
+customizer adds a module without wrapping or replacing another.
 
 **Fail loudly, name the fix.** Bad input is an `IllegalArgumentException` whose message says what was given
 and what would be valid; a missing prerequisite is an `IllegalStateException` that names it. Nothing

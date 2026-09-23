@@ -121,6 +121,26 @@ Java toolchain, it only interposes a source transformation in front of it. Any
 preprocessing that produces a `sources/` tree (template expansion, code
 generation, license-header stamping) fits the same shape.
 
+Adding a module beside the stock ones
+-------------------------------------
+
+The customizer also checks that no placeholder survives. Every module the
+assembler wires - the checks, the formatters, the toolchain and what it nests,
+the documentation - takes additional modules through its `custom` wither, and
+wires them next to its own under the name `custom`, so an added name never
+collides with a stock one:
+
+        SequencedMap<String, BuildExecutorModule> checks = new LinkedHashMap<>();
+        checks.put("placeholders", (executor, inherited) -> executor.addStep("verify", (_, context, arguments) -> {
+            ... // fail on a ${ left in the sources/ of any argument
+        }, inherited.sequencedKeySet()));
+        InferredMultiProjectAssembler checked = assembler.check(check -> check.custom(checks));
+
+An added module reads what the module it is added to reads. The checks read the
+module's sources, which the redirection above made the preprocessed ones, so
+`check/custom/placeholders/verify` fails the build if the substitution missed a
+placeholder, and passes here. Nothing of the stock checks is wrapped or replaced.
+
 Running the produced jar is left to you (see above). The companion
 `build/jenesis/Execute.java` reads the same `jenesis.properties` and applies the
 same customizer, so the program it runs is built from the preprocessed sources.
