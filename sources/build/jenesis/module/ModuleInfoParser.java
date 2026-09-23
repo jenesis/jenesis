@@ -63,6 +63,7 @@ public class ModuleInfoParser {
             SequencedMap<String, String> layerApis = new LinkedHashMap<>();
             SequencedMap<String, SequencedSet<String>> layers = new LinkedHashMap<>();
             SequencedMap<String, String> attachments = new LinkedHashMap<>();
+            SequencedSet<String> natives = new LinkedHashSet<>();
             String release = null;
             String name = null;
             String description = null;
@@ -378,6 +379,19 @@ public class ModuleInfoParser {
                                             + "'");
                                 }
                             }
+                            case "jenesis.native" -> {
+                                String declaration = content.replaceAll("\\s+", " ").trim();
+                                for (String token : declaration.isEmpty()
+                                        ? new String[] {module.getName().toString()}
+                                        : declaration.split(" ")) {
+                                    if (token.startsWith("java.") || token.startsWith("jdk.")) {
+                                        throw new IllegalArgumentException("Illegal @jenesis.native token '"
+                                                + token
+                                                + "': platform modules cannot be granted native access");
+                                    }
+                                    natives.add(expand("jenesis.native", token));
+                                }
+                            }
                             case "jenesis.release" -> {
                                 if (!content.isEmpty()) {
                                     release = content;
@@ -486,6 +500,7 @@ public class ModuleInfoParser {
                     layerApis,
                     layers,
                     attachments,
+                    natives,
                     aliases,
                     excludes,
                     overrides,

@@ -3953,6 +3953,46 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_reads_native_comment_blocks_where_an_empty_one_names_the_project() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.native-->
+                    <!--jenesis.native
+                    org.example/jni
+                    some.module
+                    -->
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("")).natives()).containsExactly(
+                "main/maven/project/artifact",
+                "main/maven/org.example/jni",
+                "main/module/some.module");
+    }
+
+    @Test
+    public void native_block_rejects_platform_modules() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.native java.base-->
+                </project>
+                """);
+        assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("platform modules cannot be granted native access");
+    }
+
+    @Test
     public void attach_block_conflicting_duplicates_throw() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

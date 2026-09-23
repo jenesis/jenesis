@@ -156,11 +156,17 @@ public record Execution(Project project, String mainClass, String module, Contai
             String options = merged.getProperty(selected.getKey() + ".agent." + index + ".arguments");
             javaArgs.add("-javaagent:" + jar.toAbsolutePath() + (options == null ? "" : "=" + options));
         }
+        List<Path> granted = Inventory.paths(merged, candidate.folder, selected.getKey() + ".nativeAccess");
+        ModuleGraph graph = new ModuleGraph();
         if (candidate.module != null) {
-            ModuleGraph graph = new ModuleGraph();
             List<String> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
             for (String jar : jars) {
-                graph.place(PathPlacement.INFERRED, Path.of(jar), modulePath, classPath);
+                Path file = Path.of(jar);
+                boolean placed = graph.place(PathPlacement.INFERRED, file);
+                (placed ? modulePath : classPath).add(jar);
+                if (granted.contains(file)) {
+                    graph.enableNativeAccess(file, placed);
+                }
             }
             SequencedMap<String, String> options = new LinkedHashMap<>();
             options.put("--module-path", String.join(File.pathSeparator, modulePath));
@@ -170,8 +176,12 @@ public record Execution(Project project, String mainClass, String module, Contai
             javaArgs.add("-m");
             javaArgs.add(candidate.module + "/" + candidate.mainClass);
         } else {
+            for (Path file : granted) {
+                graph.enableNativeAccess(file, false);
+            }
             javaArgs.addAll(ProcessBuildStep.argumentFile(argumentFile,
                     new LinkedHashMap<>(Map.of("-cp", String.join(File.pathSeparator, jars)))));
+            javaArgs.addAll(graph.arguments());
             javaArgs.add(candidate.mainClass);
         }
         javaArgs.addAll(List.of(arguments));

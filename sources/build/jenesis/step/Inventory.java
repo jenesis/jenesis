@@ -5,7 +5,9 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 
 public class Inventory implements BuildStep {
@@ -29,26 +31,58 @@ public class Inventory implements BuildStep {
         }
         return agents;
     }
+
+    public static SequencedSet<Path> nativeAccess(Path folder) throws IOException {
+        Path file = folder.resolve(INVENTORY);
+        if (!Files.isRegularFile(file)) {
+            return Collections.emptyNavigableSet();
+        }
+        SequencedProperties properties = SequencedProperties.ofFiles(file);
+        SequencedSet<Path> granted = new LinkedHashSet<>();
+        for (String key : properties.stringPropertyNames()) {
+            int grant = key.indexOf(".nativeAccess.");
+            if (grant >= 0 && key.indexOf('.', grant + ".nativeAccess.".length()) < 0) {
+                granted.add(folder.resolve(properties.getProperty(key)).toAbsolutePath().normalize());
+            }
+        }
+        return granted;
+    }
     public static final String POM = "pom.xml";
 
     private final String group;
     private final String module;
+    private final boolean strictNativeAccess;
 
     public Inventory() {
-        this("main", null);
+        this("main", null, false);
     }
 
-    private Inventory(String group, String module) {
+    public static Inventory ofEnvironment(Environment environment) {
+        String mode = environment.value("dependency.native", "ignore");
+        return new Inventory().strictNativeAccess(switch (mode) {
+            case "ignore" -> false;
+            case "strict" -> true;
+            default -> throw new IllegalArgumentException("Unknown jenesis.dependency.native '" + mode
+                    + "', expected one of: ignore, strict");
+        });
+    }
+
+    private Inventory(String group, String module, boolean strictNativeAccess) {
         this.group = group;
         this.module = module;
+        this.strictNativeAccess = strictNativeAccess;
     }
 
     public Inventory group(String group) {
-        return new Inventory(group, module);
+        return new Inventory(group, module, strictNativeAccess);
     }
 
     public Inventory module(String module) {
-        return new Inventory(group, module);
+        return new Inventory(group, module, strictNativeAccess);
+    }
+
+    public Inventory strictNativeAccess(boolean strictNativeAccess) {
+        return new Inventory(group, module, strictNativeAccess);
     }
 
     @Override
@@ -59,6 +93,7 @@ public class Inventory implements BuildStep {
                 Path.of(METADATA),
                 Path.of(IDENTITY),
                 Path.of(ATTACHMENTS),
+                Path.of(NATIVES),
                 Path.of(POM),
                 Path.of(ARTIFACTS),
                 Path.of(Bom.BOM),
@@ -112,6 +147,8 @@ public class Inventory implements BuildStep {
         SequencedMap<String, Path> bomFiles = new LinkedHashMap<>();
         SequencedMap<String, String> bomValues = new LinkedHashMap<>();
         SequencedMap<String, String> attachments = new LinkedHashMap<>();
+        SequencedSet<String> natives = new LinkedHashSet<>();
+        boolean nativeAccess = false;
         SequencedSet<String> identity = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -134,6 +171,7 @@ public class Inventory implements BuildStep {
                     tests = properties.getProperty("test");
                 }
                 abstractTest |= properties.flag("abstract");
+                nativeAccess |= properties.flag("native");
                 modular |= properties.flag("modular");
             }
             Path javacProperties = folder.resolve(ProcessBuildStep.PROCESS + "javac.properties");
@@ -209,6 +247,10 @@ public class Inventory implements BuildStep {
             if (Files.isRegularFile(attachmentsFile)) {
                 SequencedProperties.ofFiles(attachmentsFile).forEachProperty(attachments::putIfAbsent);
             }
+            Path nativesFile = folder.resolve(NATIVES);
+            if (Files.isRegularFile(nativesFile)) {
+                natives.addAll(SequencedProperties.ofFiles(nativesFile).stringPropertyNames());
+            }
             collectClosure(folder, closureJars, closureScopes, closureChecksums);
             Path bomsFile = folder.resolve(BOMS);
             if (Files.isRegularFile(folder.resolve(DEPENDENCIES)) && Files.isRegularFile(bomsFile)) {
@@ -276,6 +318,72 @@ public class Inventory implements BuildStep {
             }
             inventory.setProperty(prefix + "agent." + agentIndex + ".coordinate", key);
             agentIndex++;
+        }
+        SequencedSet<Path> reachable = new LinkedHashSet<>(runtime);
+        for (Map.Entry<String, Path> entry : closureJars.entrySet()) {
+            String scope = closureScopes.get(entry.getKey());
+            if (entry.getKey().startsWith("layer:") && scope != null && List.of(scope.split(",")).contains("runtime")) {
+                reachable.add(entry.getValue());
+            }
+        }
+        SequencedSet<Path> granted = new LinkedHashSet<>();
+        if (nativeAccess) {
+            granted.addAll(artifacts);
+        }
+        for (String key : natives) {
+            int slash = key.indexOf('/'), second = key.indexOf('/', slash + 1);
+            String candidate = key.substring(0, slash) + key.substring(second);
+            String named = key.startsWith("module/", second + 1) ? key.substring(second + 8) : null;
+            Path jar = null;
+            for (Map.Entry<String, Path> closure : closureJars.entrySet()) {
+                String coordinate = closure.getKey();
+                if (reachable.contains(closure.getValue())
+                        && (coordinate.equals(candidate)
+                                || coordinate.startsWith(candidate + "/")
+                                && coordinate.indexOf('/', candidate.length() + 1) < 0)) {
+                    jar = closure.getValue();
+                    break;
+                }
+            }
+            if (jar == null && named != null) {
+                for (Path file : reachable) {
+                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(file);
+                    if (descriptor != null && descriptor.name().equals(named)) {
+                        jar = file;
+                        break;
+                    }
+                }
+            }
+            if (jar == null) {
+                throw new IllegalStateException("@jenesis.native grants "
+                        + candidate
+                        + " native access, but "
+                        + (module == null ? path : module)
+                        + " does not resolve it at run time");
+            }
+            granted.add(jar);
+        }
+        if (strictNativeAccess) {
+            List<String> violations = new ArrayList<>();
+            for (Map.Entry<String, Path> closure : closureJars.entrySet()) {
+                Path jar = closure.getValue();
+                if (reachable.contains(jar) && !granted.contains(jar) && PathPlacement.nativeAccess(jar)) {
+                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
+                    violations.add(closure.getKey() + (descriptor == null ? "" : " (module " + descriptor.name() + ")"));
+                }
+            }
+            if (!violations.isEmpty()) {
+                throw new IllegalStateException("Dependencies of "
+                        + (module == null ? path : module)
+                        + " declare that they need native access, which only the module that runs them grants:\n  "
+                        + String.join("\n  ", violations)
+                        + "\nDeclare each with @jenesis.native <module> or <groupId>/<artifactId>,"
+                        + " or build with -Djenesis.dependency.native=ignore");
+            }
+        }
+        int nativeIndex = 0;
+        for (Path jar : granted) {
+            inventory.setProperty(prefix + "nativeAccess." + nativeIndex++, relativize(context, jar));
         }
         int bomIndex = 0;
         for (Map.Entry<String, Path> entry : bomFiles.entrySet()) {

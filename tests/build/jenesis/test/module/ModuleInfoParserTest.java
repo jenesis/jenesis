@@ -512,6 +512,50 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void jenesis_native_without_a_token_grants_the_module_itself() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.native
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.natives()).containsExactly("main/module/foo");
+    }
+
+    @Test
+    public void jenesis_native_expands_every_token_it_names() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.native org.lwjgl org.example/jni
+                 * @jenesis.native other/maven/org.example/ffm
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.natives()).containsExactly(
+                "main/module/org.lwjgl",
+                "main/maven/org.example/jni",
+                "other/maven/org.example/ffm");
+    }
+
+    @Test
+    public void jenesis_native_rejects_platform_modules() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.native java.base
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("platform modules cannot be granted native access");
+    }
+
+    @Test
     public void can_identify_module_info() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 module foo {

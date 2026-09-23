@@ -11,6 +11,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Platform;
 import build.jenesis.Environment;
+import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -24,6 +25,8 @@ import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Javac;
+import build.jenesis.step.Versions;
+import java.util.jar.Attributes;
 
 import static build.jenesis.BuildStep.IDENTITY;
 import static build.jenesis.project.MultiProjectModule.ARTIFACTS;
@@ -198,7 +201,7 @@ public class MavenProject implements BuildExecutorModule {
                             MultiProjectModule.IDENTIFIER_PATH + name + "/" + COORDINATES,
                             PRODUCE);
                     buildExecutor.addStep(MultiProjectModule.INVENTORY,
-                            new Inventory(),
+                            Inventory.ofEnvironment(environment),
                             MultiProjectModule.IDENTIFIER_PATH + name + "/" + MANIFESTS,
                             ASSIGN,
                             PRODUCE,
@@ -352,6 +355,23 @@ public class MavenProject implements BuildExecutorModule {
                                 if (!attachments.isEmpty()) {
                                     attachments.store(context.next().resolve(BuildStep.ATTACHMENTS));
                                 }
+                                String granted = properties.getProperty("natives", "");
+                                if (!granted.isEmpty()) {
+                                    SequencedProperties natives = new SequencedProperties();
+                                    for (String key : granted.split("\t")) {
+                                        int slash = key.indexOf('/');
+                                        natives.setProperty(key.substring(0, slash) + "/native/" + key.substring(slash + 1), "");
+                                    }
+                                    natives.store(context.next().resolve(BuildStep.NATIVES));
+                                }
+                                if (properties.flag("native")) {
+                                    Manifest manifest = new Manifest();
+                                    manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+                                    manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, "true");
+                                    try (OutputStream out = Files.newOutputStream(context.next().resolve(Versions.MANIFEST))) {
+                                        manifest.write(out);
+                                    }
+                                }
                                 SequencedProperties exclusionsProperties = new SequencedProperties();
                                 for (String key : requires.stringPropertyNames()) {
                                     int scopeSlash = key.indexOf('/', key.indexOf('/') + 1);
@@ -410,6 +430,9 @@ public class MavenProject implements BuildExecutorModule {
                                 String mainClass = properties.getProperty("mainClass");
                                 if (mainClass != null && testsOf == null) {
                                     descriptor.setProperty("main", mainClass);
+                                }
+                                if (properties.flag("native")) {
+                                    descriptor.setProperty("native", "true");
                                 }
                                 descriptor.store(context.next().resolve(BuildStep.MODULE));
                                 SequencedProperties metadata = new SequencedProperties();
@@ -735,6 +758,18 @@ public class MavenProject implements BuildExecutorModule {
             }
             if (!attachments.isEmpty()) {
                 properties.setProperty("attachments", attachments);
+            }
+            if (value.natives() != null && !value.natives().isEmpty()) {
+                String self = "main/maven/" + value.groupId() + "/" + value.artifactId();
+                if (!test && value.natives().contains(self)) {
+                    properties.setProperty("native", "true");
+                }
+                String natives = value.natives().stream()
+                        .filter(key -> test || !key.equals(self))
+                        .collect(Collectors.joining("\t"));
+                if (!natives.isEmpty()) {
+                    properties.setProperty("natives", natives);
+                }
             }
             if (value.plugins() != null && !value.plugins().isEmpty()) {
                 properties.setProperty("plugins", value.plugins().entrySet().stream()

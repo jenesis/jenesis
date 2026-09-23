@@ -99,6 +99,12 @@ public class JPackage extends ProcessBuildStep {
         Path input = Files.createDirectory(context.supplement().resolve("input"));
         SequencedMap<String, Path> staged = new LinkedHashMap<>();
         ModuleGraph graph = new ModuleGraph();
+        SequencedSet<Path> granted = new LinkedHashSet<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            if (!argument.removed()) {
+                granted.addAll(Inventory.nativeAccess(argument.folder()));
+            }
+        }
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -122,6 +128,9 @@ public class JPackage extends ProcessBuildStep {
                 }
                 if (modular) {
                     graph.module(file);
+                }
+                if (granted.contains(file.toAbsolutePath().normalize())) {
+                    graph.enableNativeAccess(file, modular);
                 }
                 BuildStep.linkOrCopy(input.resolve(name), file);
             }

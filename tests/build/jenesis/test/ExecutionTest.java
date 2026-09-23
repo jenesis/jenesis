@@ -166,6 +166,113 @@ public class ExecutionTest {
     }
 
     @Test
+    public void execute_grants_native_access_only_to_what_the_running_module_declares()
+            throws IOException, InterruptedException {
+        writeNativeModules(true);
+        Project project = Project.ofEnvironment(new Environment(Map.of("dependency.native", "strict")::get), root)
+                .target(Files.createDirectory(root.resolve("target")))
+                .artifacts(Files.createDirectory(root.resolve("artifacts")))
+                .layout(Project.Layout.MODULAR)
+                .tests(false);
+        int code = Execution.ofEnvironment(Environment.NONE, project).execute();
+        assertThat(code)
+                .as("the library is granted by the application, and the application, which asks for nothing, is not")
+                .isEqualTo(0);
+    }
+
+    @Test
+    public void strict_native_access_fails_a_build_that_does_not_grant_what_a_dependency_signals() throws IOException {
+        writeNativeModules(false);
+        Project project = Project.ofEnvironment(new Environment(Map.of("dependency.native", "strict")::get), root)
+                .target(Files.createDirectory(root.resolve("target")))
+                .artifacts(Files.createDirectory(root.resolve("artifacts")))
+                .layout(Project.Layout.MODULAR)
+                .tests(false);
+        assertThatThrownBy(() -> Execution.ofEnvironment(Environment.NONE, project).execute())
+                .hasStackTraceContaining("need native access")
+                .hasStackTraceContaining("module demo.library");
+    }
+
+    @Test
+    public void execute_grants_native_access_a_maven_project_declares_for_itself()
+            throws IOException, InterruptedException {
+        Path source = Files.createDirectories(root.resolve("src/main/java/sample"));
+        Files.writeString(source.resolve("Sample.java"), """
+                package sample;
+
+                public class Sample {
+
+                    public static void main(String[] args) {
+                        System.exit(Sample.class.getModule().isNativeAccessEnabled() ? 0 : 3);
+                    }
+                }
+                """);
+        Files.writeString(root.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1</version>
+                    <!--jenesis.native-->
+                    <properties>
+                        <mainClass>sample.Sample</mainClass>
+                    </properties>
+                </project>
+                """);
+        Project project = Project.ofEnvironment(Environment.NONE, root)
+                .target(Files.createDirectory(root.resolve("target")))
+                .artifacts(Files.createDirectory(root.resolve("artifacts")))
+                .layout(Project.Layout.MAVEN)
+                .tests(false);
+        int code = Execution.ofEnvironment(Environment.NONE, project).execute();
+        assertThat(code).isEqualTo(0);
+    }
+
+    private void writeNativeModules(boolean granted) throws IOException {
+        Path library = Files.createDirectories(root.resolve("library/demo/library"));
+        Files.writeString(library.resolve("../../module-info.java"), """
+                /**
+                 * @jenesis.native
+                 */
+                module demo.library {
+                    exports demo.library;
+                }
+                """);
+        Files.writeString(library.resolve("Library.java"), """
+                package demo.library;
+
+                public class Library {
+
+                    public static boolean nativeAccess() {
+                        return Library.class.getModule().isNativeAccessEnabled();
+                    }
+                }
+                """);
+        Path application = Files.createDirectories(root.resolve("application/demo/application"));
+        Files.writeString(application.resolve("../../module-info.java"), """
+                /**
+                 * @jenesis.main demo.application.Main
+                 %s
+                 */
+                module demo.application {
+                    requires demo.library;
+                }
+                """.formatted(granted ? "* @jenesis.native demo.library" : ""));
+        Files.writeString(application.resolve("Main.java"), """
+                package demo.application;
+
+                public class Main {
+
+                    public static void main(String[] args) {
+                        boolean own = Main.class.getModule().isNativeAccessEnabled();
+                        System.exit(demo.library.Library.nativeAccess() && !own ? 0 : 3);
+                    }
+                }
+                """);
+    }
+
+    @Test
     public void execute_honours_explicit_main_class_override() throws IOException, InterruptedException {
         Path target = Files.createDirectory(root.resolve("target"));
         Path alpha = Files.createDirectory(root.resolve("alpha-inventory"));

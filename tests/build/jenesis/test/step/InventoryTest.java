@@ -2,12 +2,14 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import java.util.jar.Attributes;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
 
@@ -144,6 +146,157 @@ public class InventoryTest {
         assertThatThrownBy(() -> run(args("manifests", manifests)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("No resolved artifact for attached agent main/agent/maven/org.example/agent");
+    }
+
+    @Test
+    public void grants_native_access_to_its_own_artifacts_and_the_dependencies_it_names() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.setProperty("native", "true");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        SequencedProperties natives = new SequencedProperties();
+        natives.setProperty("main/native/maven/org.example/jni", "");
+        natives.store(manifests.resolve(BuildStep.NATIVES));
+        Path produce = Files.createDirectory(root.resolve("produce"));
+        Path classes = Files.writeString(
+                Files.createDirectory(produce.resolve("artifacts")).resolve("classes.jar"), "main");
+        Path runtime = Files.createDirectory(root.resolve("runtime"));
+        Path runtimeDeps = Files.createDirectory(runtime.resolve("dependencies"));
+        Path jni = Files.writeString(runtimeDeps.resolve("jni-1.0.jar"), "jni");
+        Files.writeString(runtimeDeps.resolve("other-1.0.jar"), "other");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/runtime/maven/org.example/jni/1.0", "dependencies/jni-1.0.jar");
+        index.setProperty("main/runtime/maven/org.example/other/1.0", "dependencies/other-1.0.jar");
+        index.store(runtime.resolve(BuildStep.DEPENDENCIES));
+
+        run(args("manifests", manifests, "produce", produce, "runtime", runtime));
+
+        SequencedProperties inventory = read(next.resolve(Inventory.INVENTORY));
+        assertThat(inventory.getProperty("module-foo.nativeAccess.0")).isEqualTo(relativize(classes));
+        assertThat(inventory.getProperty("module-foo.nativeAccess.1")).isEqualTo(relativize(jni));
+        assertThat(inventory.getProperty("module-foo.nativeAccess.2")).isNull();
+        assertThat(Inventory.nativeAccess(next)).containsExactly(
+                classes.toAbsolutePath().normalize(),
+                jni.toAbsolutePath().normalize());
+    }
+
+    @Test
+    public void refuses_a_native_access_grant_for_what_it_does_not_run_with() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        SequencedProperties natives = new SequencedProperties();
+        natives.setProperty("main/native/maven/org.example/jni", "");
+        natives.store(manifests.resolve(BuildStep.NATIVES));
+        Path runtime = Files.createDirectory(root.resolve("runtime"));
+        Files.writeString(Files.createDirectory(runtime.resolve("dependencies")).resolve("jni-1.0.jar"), "jni");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/compile/maven/org.example/jni/1.0", "dependencies/jni-1.0.jar");
+        index.store(runtime.resolve(BuildStep.DEPENDENCIES));
+
+        assertThatThrownBy(() -> run(args("manifests", manifests, "runtime", runtime)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("@jenesis.native grants main/maven/org.example/jni native access,"
+                        + " but foo does not resolve it at run time");
+    }
+
+    @Test
+    public void ignores_a_dependency_that_signals_native_access_by_default() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        Path runtime = signalling();
+
+        run(args("manifests", manifests, "runtime", runtime));
+
+        assertThat(read(next.resolve(Inventory.INVENTORY)).getProperty("module-foo.nativeAccess.0"))
+                .as("a dependency may say it needs native access, but only its consumer can grant it")
+                .isNull();
+    }
+
+    @Test
+    public void strict_native_access_refuses_a_dependency_that_signals_it_without_a_grant() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        Path runtime = signalling();
+
+        assertThatThrownBy(() -> run(new Inventory().strictNativeAccess(true),
+                args("manifests", manifests, "runtime", runtime)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("main/maven/org.example/jni/1.0")
+                .hasMessageContaining("@jenesis.native");
+    }
+
+    @Test
+    public void strict_native_access_accepts_a_dependency_its_module_grants() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        SequencedProperties natives = new SequencedProperties();
+        natives.setProperty("main/native/maven/org.example/jni", "");
+        natives.store(manifests.resolve(BuildStep.NATIVES));
+        Path runtime = signalling();
+
+        run(new Inventory().strictNativeAccess(true), args("manifests", manifests, "runtime", runtime));
+
+        assertThat(Inventory.nativeAccess(next)).containsExactly(
+                runtime.resolve("dependencies/jni-1.0.jar").toAbsolutePath().normalize());
+    }
+
+    @Test
+    public void grants_native_access_to_a_module_in_one_of_its_layers() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        SequencedProperties natives = new SequencedProperties();
+        natives.setProperty("layer:render/native/maven/org.example/jni", "");
+        natives.store(manifests.resolve(BuildStep.NATIVES));
+        Path runtime = Files.createDirectory(root.resolve("runtime"));
+        Path jni = Files.writeString(Files.createDirectory(runtime.resolve("dependencies")).resolve("jni-1.0.jar"), "jni");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("layer:render/runtime/maven/org.example/jni/1.0", "dependencies/jni-1.0.jar");
+        index.store(runtime.resolve(BuildStep.DEPENDENCIES));
+
+        run(args("manifests", manifests, "runtime", runtime));
+
+        assertThat(Inventory.nativeAccess(next)).containsExactly(jni.toAbsolutePath().normalize());
+    }
+
+    @Test
+    public void strict_native_access_refuses_an_ungranted_need_in_a_layer() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        Path runtime = signalling();
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("layer:render/runtime/maven/org.example/jni/1.0", "dependencies/jni-1.0.jar");
+        index.store(runtime.resolve(BuildStep.DEPENDENCIES));
+
+        assertThatThrownBy(() -> run(new Inventory().strictNativeAccess(true),
+                args("manifests", manifests, "runtime", runtime)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("layer:render/maven/org.example/jni/1.0");
+    }
+
+    private Path signalling() throws IOException {
+        Path runtime = Files.createDirectory(root.resolve("runtime"));
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, "true");
+        Path jar = Files.createDirectory(runtime.resolve("dependencies")).resolve("jni-1.0.jar");
+        new JarOutputStream(Files.newOutputStream(jar), manifest).close();
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/runtime/maven/org.example/jni/1.0", "dependencies/jni-1.0.jar");
+        index.store(runtime.resolve(BuildStep.DEPENDENCIES));
+        return runtime;
     }
 
     @Test
@@ -390,11 +543,15 @@ public class InventoryTest {
     }
 
     private BuildStepResult run(SequencedMap<String, Path> argumentFolders) throws IOException {
+        return run(new Inventory(), argumentFolders);
+    }
+
+    private BuildStepResult run(Inventory inventory, SequencedMap<String, Path> argumentFolders) throws IOException {
         SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
         for (Map.Entry<String, Path> entry : argumentFolders.entrySet()) {
             arguments.put(entry.getKey(), new BuildStepArgument(entry.getValue(), Map.of()));
         }
-        return new Inventory().apply(Runnable::run,
+        return inventory.apply(Runnable::run,
                         new BuildStepContext(previous, next, supplement),
                         arguments)
                 .toCompletableFuture()

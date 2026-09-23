@@ -55,6 +55,7 @@ public class Docker implements BuildStep {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         SequencedMap<String, Path> jars = new TreeMap<>();
+        SequencedSet<Path> granted = new LinkedHashSet<>();
         SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
         SequencedMap<String, String> agents = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
@@ -72,6 +73,7 @@ public class Docker implements BuildStep {
             for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
                 jars.putIfAbsent(file.getFileName().toString(), file);
             }
+            granted.addAll(Inventory.nativeAccess(argument.folder()));
             layers.putAll(Layers.membership(argument.folder()));
             agents.putAll(Inventory.agents(argument.folder()));
         }
@@ -81,11 +83,10 @@ public class Docker implements BuildStep {
         SequencedMap<String, Path> classpath = new LinkedHashMap<>(), modulepath = new LinkedHashMap<>();
         ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
-            if (mainModule != null) {
-                (graph.place(PathPlacement.INFERRED, entry.getValue()) ? modulepath : classpath)
-                        .put(entry.getKey(), entry.getValue());
-            } else {
-                classpath.put(entry.getKey(), entry.getValue());
+            boolean placed = mainModule != null && graph.place(PathPlacement.INFERRED, entry.getValue());
+            (placed ? modulepath : classpath).put(entry.getKey(), entry.getValue());
+            if (granted.contains(entry.getValue().toAbsolutePath().normalize())) {
+                graph.enableNativeAccess(entry.getValue(), placed);
             }
         }
         if (layers.values().stream().anyMatch(membership -> !membership.classpath().isEmpty())) {
@@ -112,6 +113,8 @@ public class Docker implements BuildStep {
                 stored.putIfAbsent(name, jar);
             }
         }
+        layers.forEach((layer, membership) -> membership.nativeAccess(resolved, granted)
+                .forEach((jar, module) -> graph.enableNativeAccess(layer, jar, module)));
         agents.keySet().retainAll(stored.sequencedKeySet());
         Path folder = Files.createDirectory(context.next().resolve(DOCKER)), store = folder.resolve("jars");
         Files.createDirectories(store);
@@ -132,6 +135,7 @@ public class Docker implements BuildStep {
             command.add(path(classpath.sequencedKeySet()));
         }
         if (modulepath.isEmpty()) {
+            command.addAll(graph.arguments());
             command.add(mainClass);
         } else {
             command.add("--module-path");
