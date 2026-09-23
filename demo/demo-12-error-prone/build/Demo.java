@@ -2,7 +2,6 @@ package build;
 
 import module java.base;
 import build.jenesis.Project;
-import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.Environment;
 import build.jenesis.Make;
 
@@ -15,7 +14,7 @@ public class Demo {
         System.out.println();
         wipe();
         Project.ofEnvironment(environment, Path.of("."))
-                .assembler(InferredMultiProjectAssembler.ofEnvironment(environment).toolchain(toolchain ->
+                .assembler(assembler -> assembler.toolchain(toolchain ->
                         toolchain.compiler(compiler -> compiler.errorprone(null))))
                 .build();
         System.out.println();

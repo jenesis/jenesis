@@ -4,10 +4,10 @@ import module java.base;
 import build.jenesis.Project;
 import build.jenesis.project.InternalModule;
 
-public class Substitution implements UnaryOperator<Project> {
+public class Substitution implements UnaryOperator<Project<?>> {
 
     @Override
-    public Project apply(Project project) {
+    public Project<?> apply(Project<?> project) {
         return project.assembler((descriptor, repositories, resolvers) -> project.assembler()
                 .apply(descriptor.sources("preprocess/substitute"), repositories, resolvers)
                 .mapBuild(inner -> (sub, inherited) -> {

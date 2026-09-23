@@ -5,10 +5,10 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Project;
 import build.jenesis.step.JMod;
 
-public class ConfigJmod implements UnaryOperator<Project> {
+public class ConfigJmod implements UnaryOperator<Project<?>> {
 
     @Override
-    public Project apply(Project project) {
+    public Project<?> apply(Project<?> project) {
         return project.assembler((descriptor, repositories, resolvers) -> project.assembler()
                 .apply(descriptor.content("config"), repositories, resolvers)
                 .mapBuild(inner -> (sub, inherited) -> {

@@ -56,7 +56,7 @@ used). Records, sealed types, pattern switches and unnamed variables (`_`) are t
 
 **Immutable records with withers.** Configuration objects are records or final classes whose state never
 changes after construction. Each exposes one method per component, named exactly like the component, that
-returns a new instance with that value replaced (`new Project(Path.of(".")).version("1.0.0").sources(true)`,
+returns a new instance with that value replaced (`new Project<>(Path.of("."), new InferredMultiProjectAssembler()).version("1.0.0").sources(true)`,
 `new BuildExecutor.Configuration().concurrency(4)`). No setters, no builders, no `with` prefix.
 
 **System properties are the defaults.** Every setting is a `jenesis.<area>.<name>` system property, read
@@ -119,7 +119,7 @@ differs, because a run is configured by the provider and the output it is handed
 never collide and none of them touches the JVM's own properties or streams.
 
 A setting is therefore never read again later, and a caller that builds the object itself is never
-surprised by its surroundings: `new Project(root)` is the defaults and nothing else. The JVM's properties are
+surprised by its surroundings: `new Project<>(root, assembler)` is the defaults and nothing else. The JVM's properties are
 read once, by `Make`: it copies every `jenesis.*` property when an entry point starts, lays the command line's
 `-Djenesis.*` arguments over the copy, and hands the result down, so a property set later changes nothing. A
 program of its own reads the same copy through `Make.settings(root).keys()`. Every setting is read through the

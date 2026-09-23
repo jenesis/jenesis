@@ -72,7 +72,7 @@ public class ExecutionTest {
         Path target = Files.createDirectory(root.resolve("target"));
         Path alpha = writeInventory("alpha", "alpha", null, null, null);
         Project.Layout layout = layoutWithModules(Map.of("module-alpha", alpha));
-        Project project = Project.ofEnvironment(Environment.NONE, root).target(target).layout(layout);
+        Project<?> project = Project.ofEnvironment(Environment.NONE, root).target(target).layout(layout);
         assertThatThrownBy(() -> Execution.ofEnvironment(Environment.NONE, project).execute())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No module declares a main class");
@@ -86,7 +86,7 @@ public class ExecutionTest {
         Project.Layout layout = layoutWithModules(Map.of(
                 "module-alpha", alpha,
                 "module-beta", beta));
-        Project project = Project.ofEnvironment(Environment.NONE, root).target(target).layout(layout);
+        Project<?> project = Project.ofEnvironment(Environment.NONE, root).target(target).layout(layout);
         assertThatThrownBy(() -> Execution.ofEnvironment(Environment.NONE, project).execute())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Multiple modules declare a main class")
@@ -99,7 +99,7 @@ public class ExecutionTest {
         Path target = Files.createDirectory(root.resolve("target"));
         Path alpha = writeInventory("alpha", "alpha", null, null, null);
         Project.Layout layout = layoutWithModules(Map.of("module-alpha", alpha));
-        Project project = Project.ofEnvironment(Environment.NONE, root).target(target).layout(layout);
+        Project<?> project = Project.ofEnvironment(Environment.NONE, root).target(target).layout(layout);
         assertThatThrownBy(() -> Execution.ofEnvironment(Environment.NONE, project).module("alpha").execute())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No module at path: alpha");
@@ -110,7 +110,7 @@ public class ExecutionTest {
         Path target = Files.createDirectory(root.resolve("target"));
         Path alpha = writeInventory("alpha", "alpha", "foo.Alpha", null, "missing.jar");
         Project.Layout layout = layoutWithModules(Map.of("module-alpha", alpha));
-        Project project = Project.ofEnvironment(Environment.NONE, root).target(target).layout(layout);
+        Project<?> project = Project.ofEnvironment(Environment.NONE, root).target(target).layout(layout);
         assertThatThrownBy(() -> Execution.ofEnvironment(Environment.NONE, project).execute())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Missing runtime artifact");
@@ -123,7 +123,7 @@ public class ExecutionTest {
         Path classesJar = packageSample(alpha.resolve("classes.jar"));
         writeInventoryFile(alpha, "alpha", Sample.class.getName(), null, alpha.relativize(classesJar).toString());
         Project.Layout layout = layoutWithModules(Map.of("module-alpha", alpha));
-        Project project = Project.ofEnvironment(Environment.NONE, root).target(target).layout(layout);
+        Project<?> project = Project.ofEnvironment(Environment.NONE, root).target(target).layout(layout);
         int code = Execution.ofEnvironment(Environment.NONE, project).execute();
         assertThat(code).isEqualTo(0);
     }
@@ -155,7 +155,7 @@ public class ExecutionTest {
                 """.formatted(Sample.class.getName()));
         Path target = Files.createDirectory(root.resolve("target"));
         Path artifacts = Files.createDirectory(root.resolve("artifacts"));
-        Project project = Project.ofEnvironment(Environment.NONE, Path.of("."))
+        Project<?> project = Project.ofEnvironment(Environment.NONE, Path.of("."))
                 .root(root)
                 .target(target)
                 .artifacts(artifacts)
@@ -202,7 +202,7 @@ public class ExecutionTest {
     public void execute_grants_native_access_only_to_what_the_running_module_declares()
             throws IOException, InterruptedException {
         writeNativeModules(true);
-        Project project = Project.ofEnvironment(new Environment(Map.of("dependency.native", "strict")::get), root)
+        Project<?> project = Project.ofEnvironment(new Environment(Map.of("dependency.native", "strict")::get), root)
                 .target(Files.createDirectory(root.resolve("target")))
                 .artifacts(Files.createDirectory(root.resolve("artifacts")))
                 .layout(Project.Layout.MODULAR)
@@ -216,7 +216,7 @@ public class ExecutionTest {
     @Test
     public void strict_native_access_fails_a_build_that_does_not_redeclare_what_a_dependency_names() throws IOException {
         writeNativeModules(false);
-        Project project = Project.ofEnvironment(new Environment(Map.of("dependency.native", "strict")::get), root)
+        Project<?> project = Project.ofEnvironment(new Environment(Map.of("dependency.native", "strict")::get), root)
                 .target(Files.createDirectory(root.resolve("target")))
                 .artifacts(Files.createDirectory(root.resolve("artifacts")))
                 .layout(Project.Layout.MODULAR)
@@ -252,7 +252,7 @@ public class ExecutionTest {
                     </properties>
                 </project>
                 """);
-        Project project = Project.ofEnvironment(Environment.NONE, root)
+        Project<?> project = Project.ofEnvironment(Environment.NONE, root)
                 .target(Files.createDirectory(root.resolve("target")))
                 .artifacts(Files.createDirectory(root.resolve("artifacts")))
                 .layout(Project.Layout.MAVEN)
@@ -317,7 +317,7 @@ public class ExecutionTest {
         Path classesJar = packageSample(alpha.resolve("classes.jar"));
         writeInventoryFile(alpha, "alpha", "ignored.OldMain", null, alpha.relativize(classesJar).toString());
         Project.Layout layout = layoutWithModules(Map.of("module-alpha", alpha));
-        Project project = Project.ofEnvironment(Environment.NONE, root).target(target).layout(layout);
+        Project<?> project = Project.ofEnvironment(Environment.NONE, root).target(target).layout(layout);
         int code = Execution.ofEnvironment(Environment.NONE, project).mainClass(Sample.class.getName()).execute();
         assertThat(code).isEqualTo(0);
     }

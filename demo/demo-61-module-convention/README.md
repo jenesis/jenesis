@@ -87,7 +87,7 @@ Jenesis module repository stays the default module repository. A build opts in b
 naming it, which is the one line this demo is about, or by naming it in the module
 repository chain, which the section after this one shows:
 
-    new Project(Path.of(".")).repositories(Map.of("module", new MavenModuleRepository()))
+    new Project<>(Path.of("."), new InferredMultiProjectAssembler()).repositories(Map.of("module", new MavenModuleRepository()))
 
 The no-argument constructor resolves through the configured Maven repository
 chain, the same `jenesis.maven.uri` (or `MAVEN_REPOSITORY_URI`) the build already

@@ -5,13 +5,13 @@ import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.step.Inventory;
 
-public record Execution(Project project, String mainClass, String module, Container container) {
+public record Execution(Project<?> project, String mainClass, String module, Container container) {
 
-    public Execution(Project project) {
+    public Execution(Project<?> project) {
         this(project, null, null, null);
     }
 
-    public static Execution ofEnvironment(Environment environment, Project project) {
+    public static Execution ofEnvironment(Environment environment, Project<?> project) {
         return new Execution(project,
                 environment.getProperty("execute.mainClass"),
                 environment.getProperty("execute.module"),
@@ -230,7 +230,7 @@ public record Execution(Project project, String mainClass, String module, Contai
         if (outputs == null) {
             return 1;
         }
-        Project project = Project.ofEnvironment(environment, root).profiles(profiles.toArray(Path[]::new));
+        Project<?> project = Project.ofEnvironment(environment, root).profiles(profiles.toArray(Path[]::new));
         return ofEnvironment(environment, project).execute(outputs, arguments);
     }
 

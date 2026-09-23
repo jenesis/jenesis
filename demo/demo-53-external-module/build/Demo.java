@@ -63,7 +63,7 @@ public class Demo {
 
         // Build the project (the resolved plugin rewrites ${greeting} first) and
         // launch the produced module so its main prints the substituted greeting.
-        Project project = Project.ofEnvironment(environment, Path.of("."))
+        Project<?> project = Project.ofEnvironment(environment, Path.of("."))
                 .assembler(new PreprocessingAssembler(
                         InferredMultiProjectAssembler.ofEnvironment(environment),
                         Map.of("module", repository),

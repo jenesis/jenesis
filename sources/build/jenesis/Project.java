@@ -34,7 +34,7 @@ import build.jenesis.step.Inventory;
 import build.jenesis.step.ReportStaging;
 import build.jenesis.step.Tree;
 
-public record Project(
+public record Project<P extends MultiProjectAssembler<? super ProjectModuleDescriptor>>(
         Path root,
         Path target,
         Path artifacts,
@@ -55,7 +55,7 @@ public record Project(
         String revision,
         String tree,
         SequencedSet<String> defaultTarget,
-        MultiProjectAssembler<? super ProjectModuleDescriptor> assembler,
+        P assembler,
         Supplier<BuildExecutor.Configuration> configurator,
         Map<String, Repository> repositories,
         Map<String, Resolver> resolvers,
@@ -78,7 +78,7 @@ public record Project(
     public interface Layout {
 
         Function<String, String> apply(BuildExecutor executor,
-                                       Project project,
+                                       Project<?> project,
                                        MultiProjectAssembler<? super ProjectModuleDescriptor> assembler) throws IOException;
 
         private static Path modularConfigurationFolder(Path location) {
@@ -550,7 +550,7 @@ public record Project(
 
                       java build/jenesis/Make.java [selectors...]  source mode, always available
                       jenesis [selectors...]                       installed CLI
-                      new Project(root).build(selectors...)        embedding it in Java
+                      new Project<>(root, assembler).build(...)    embedding it in Java
 
                     `Make` is the entry point, `Project` the configuration API and has no `main`. No
                     selector runs `build`; several, space-separated, run in one invocation.
@@ -572,13 +572,14 @@ public record Project(
                     jenesis.toolchain.searchpath, this system's usual JDK folders unless set, and only
                     the command line or ~/.jenesis/jenesis.properties may set it. Nothing is installed.
 
-                    To adjust the stock build rather than replace it, put a UnaryOperator<Project>
-                    under build/custom/ and name it in jenesis.project.customizers=build.custom.Build,
-                    in jenesis.properties or on the command line: Make compiles build/custom/ with the
-                    engine and applies each customizer, in order, to the project the settings
-                    configured, so the build keeps every feature of Make. A customizer runs the
-                    project's code, as its tests do, so build an untrusted project with
-                    -Djenesis.project.docker=true, which applies it inside the container only.
+                    To adjust the stock build rather than replace it, put a
+                    UnaryOperator<Project<InferredMultiProjectAssembler>> under build/custom/ and name
+                    it in jenesis.project.customizers=build.custom.Build, in jenesis.properties or on
+                    the command line: Make compiles build/custom/ with the engine and applies each
+                    customizer, in order, to the project the settings configured, so the build keeps
+                    every feature of Make. A customizer runs the project's code, as its tests do, so
+                    build an untrusted project with -Djenesis.project.docker=true, which applies it
+                    inside the container only.
                     jenesis-validate checks build/jenesis alone, so a customizer leaves the vendored
                     engine valid, and the installed jenesis never runs one.
 
@@ -1365,11 +1366,11 @@ public record Project(
         }
     }
 
-    public Project(Path root) {
-        this(root, Environment.NONE);
+    public Project(Path root, P assembler) {
+        this(root, assembler, Environment.NONE);
     }
 
-    private Project(Path root, Environment environment) {
+    private Project(Path root, P assembler, Environment environment) {
         Path resolved = resolvedRoot(root);
         SequencedSet<Path> configuration = Collections.unmodifiableSequencedSet(
                 new LinkedHashSet<>(List.of(resolved.resolve("build.jenesis"))));
@@ -1393,7 +1394,7 @@ public record Project(
                 null,
                 null,
                 Collections.unmodifiableSequencedSet(new LinkedHashSet<>(List.of(BUILD))),
-                new InferredMultiProjectAssembler(),
+                assembler,
                 BuildExecutor.Configuration::new,
                 Map.of(),
                 Map.of(),
@@ -1414,8 +1415,8 @@ public record Project(
     }
 
     @SuppressWarnings("unchecked")
-    public static Project ofEnvironment(Environment environment, Path root) {
-        Project project = new Project(root, environment);
+    public static Project<InferredMultiProjectAssembler> ofEnvironment(Environment environment, Path root) {
+        Project<InferredMultiProjectAssembler> project = new Project<>(root, InferredMultiProjectAssembler.ofEnvironment(environment), environment);
         String configuration = environment.getProperty("project.configuration");
         if (configuration != null) {
             project = project.configuration(locations(environment, configuration, project).toArray(Path[]::new));
@@ -1496,9 +1497,7 @@ public record Project(
             project = project.tree(tree);
         }
         BuildExecutor.Configuration executor = BuildExecutor.Configuration.ofEnvironment(environment);
-        project = project.pinning(Pinning.ofEnvironment(environment))
-                .assembler(InferredMultiProjectAssembler.ofEnvironment(environment))
-                .configurator(() -> executor);
+        project = project.pinning(Pinning.ofEnvironment(environment)).configurator(() -> executor);
         List<String> customizers = environment.flag("project.docker")
                 ? null
                 : environment.entries("project.customizers");
@@ -1522,10 +1521,11 @@ public record Project(
                         + " - make the class and its constructor public", e);
             }
             if (!(instance instanceof UnaryOperator<?> operator)) {
-                throw new IllegalArgumentException("The customizer " + customizer + " is not a UnaryOperator<Project>"
+                throw new IllegalArgumentException("The customizer " + customizer + " is not a"
+                        + " UnaryOperator<Project<InferredMultiProjectAssembler>>"
                         + " - implement it, and return the project it is handed or one derived from it");
             }
-            project = ((UnaryOperator<Project>) operator).apply(project);
+            project = ((UnaryOperator<Project<InferredMultiProjectAssembler>>) operator).apply(project);
             if (project == null) {
                 throw new IllegalStateException("The customizer " + customizer + " returned no project - return the"
                         + " project it is handed or one derived from it with its withers");
@@ -1534,7 +1534,7 @@ public record Project(
         return project;
     }
 
-    private static SequencedSet<Path> locations(Environment environment, String text, Project project) {
+    private static SequencedSet<Path> locations(Environment environment, String text, Project<?> project) {
         SequencedSet<Path> target = new LinkedHashSet<>();
         locations(environment, text, project.root(), project.configuration(), new HashSet<>(), target);
         return target;
@@ -1572,8 +1572,8 @@ public record Project(
         }
     }
 
-    public Project root(Path root) {
-        return new Project(root,
+    public Project<P> root(Path root) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -1600,8 +1600,8 @@ public record Project(
                 environment);
     }
 
-    public Project configuration(Path... configuration) {
-        return new Project(root,
+    public Project<P> configuration(Path... configuration) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -1628,8 +1628,8 @@ public record Project(
                 environment);
     }
 
-    public Project signatures(Path... signatures) {
-        return new Project(root,
+    public Project<P> signatures(Path... signatures) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -1656,8 +1656,8 @@ public record Project(
                 environment);
     }
 
-    public Project boms(Path... boms) {
-        return new Project(root,
+    public Project<P> boms(Path... boms) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -1684,8 +1684,8 @@ public record Project(
                 environment);
     }
 
-    public Project profiles(Path... profiles) {
-        return new Project(root,
+    public Project<P> profiles(Path... profiles) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -1712,8 +1712,8 @@ public record Project(
                 environment);
     }
 
-    public Project target(Path target) {
-        return new Project(root,
+    public Project<P> target(Path target) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -1740,8 +1740,8 @@ public record Project(
                 environment);
     }
 
-    public Project artifacts(Path artifacts) {
-        return new Project(root,
+    public Project<P> artifacts(Path artifacts) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -1768,8 +1768,8 @@ public record Project(
                 environment);
     }
 
-    public Project cache(BuildExecutorCache cache) {
-        return new Project(root,
+    public Project<P> cache(BuildExecutorCache cache) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -1796,8 +1796,8 @@ public record Project(
                 environment);
     }
 
-    public Project hashFunction(HashDigestFunction hashFunction) {
-        return new Project(root,
+    public Project<P> hashFunction(HashDigestFunction hashFunction) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -1824,8 +1824,8 @@ public record Project(
                 environment);
     }
 
-    public Project layout(Layout layout) {
-        return new Project(root,
+    public Project<P> layout(Layout layout) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -1852,8 +1852,8 @@ public record Project(
                 environment);
     }
 
-    public Project tests(boolean tests) {
-        return new Project(root,
+    public Project<P> tests(boolean tests) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -1880,8 +1880,8 @@ public record Project(
                 environment);
     }
 
-    public Project sources(boolean sources) {
-        return new Project(root,
+    public Project<P> sources(boolean sources) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -1908,8 +1908,8 @@ public record Project(
                 environment);
     }
 
-    public Project documentation(boolean documentation) {
-        return new Project(root,
+    public Project<P> documentation(boolean documentation) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -1936,8 +1936,8 @@ public record Project(
                 environment);
     }
 
-    public Project pinning(Pinning pinning) {
-        return new Project(root,
+    public Project<P> pinning(Pinning pinning) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -1964,8 +1964,8 @@ public record Project(
                 environment);
     }
 
-    public Project metadata(Path... metadata) {
-        return new Project(root,
+    public Project<P> metadata(Path... metadata) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 new LinkedHashSet<>(List.of(metadata)),
@@ -1992,8 +1992,8 @@ public record Project(
                 environment);
     }
 
-    public Project version(String version) {
-        return new Project(root,
+    public Project<P> version(String version) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -2020,8 +2020,8 @@ public record Project(
                 environment);
     }
 
-    public Project tag(String tag) {
-        return new Project(root,
+    public Project<P> tag(String tag) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -2048,8 +2048,8 @@ public record Project(
                 environment);
     }
 
-    public Project revision(String revision) {
-        return new Project(root,
+    public Project<P> revision(String revision) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -2076,8 +2076,8 @@ public record Project(
                 environment);
     }
 
-    public Project tree(String tree) {
-        return new Project(root,
+    public Project<P> tree(String tree) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -2104,8 +2104,8 @@ public record Project(
                 environment);
     }
 
-    public Project defaultTarget(String... defaultTarget) {
-        return new Project(root,
+    public Project<P> defaultTarget(String... defaultTarget) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -2132,8 +2132,8 @@ public record Project(
                 environment);
     }
 
-    public Project assembler(MultiProjectAssembler<? super ProjectModuleDescriptor> assembler) {
-        return new Project(root,
+    public Project<MultiProjectAssembler<? super ProjectModuleDescriptor>> assembler(MultiProjectAssembler<? super ProjectModuleDescriptor> assembler) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -2160,8 +2160,36 @@ public record Project(
                 environment);
     }
 
-    public Project repositories(Map<String, Repository> repositories) {
-        return new Project(root,
+    public <Q extends MultiProjectAssembler<? super ProjectModuleDescriptor>> Project<Q> assembler(Function<? super P, Q> assembler) {
+        return new Project<>(root,
+                target,
+                artifacts,
+                metadata,
+                configuration,
+                boms,
+                signatures,
+                profiles,
+                cache,
+                hashFunction,
+                layout,
+                tests,
+                sources,
+                documentation,
+                pinning,
+                version,
+                tag,
+                revision,
+                tree,
+                defaultTarget,
+                assembler.apply(this.assembler),
+                configurator,
+                repositories,
+                resolvers,
+                environment);
+    }
+
+    public Project<P> repositories(Map<String, Repository> repositories) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -2188,8 +2216,8 @@ public record Project(
                 environment);
     }
 
-    public Project resolvers(Map<String, Resolver> resolvers) {
-        return new Project(root,
+    public Project<P> resolvers(Map<String, Resolver> resolvers) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -2216,8 +2244,8 @@ public record Project(
                 environment);
     }
 
-    public Project configurator(Supplier<BuildExecutor.Configuration> configurator) {
-        return new Project(root,
+    public Project<P> configurator(Supplier<BuildExecutor.Configuration> configurator) {
+        return new Project<>(root,
                 target,
                 artifacts,
                 metadata,
@@ -2297,7 +2325,7 @@ public record Project(
                 project.signatures||Comma-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
-                project.customizers||Comma-separated UnaryOperator<Project> classes, compiled from build/custom/, applied in order to the configured project
+                project.customizers||Comma-separated UnaryOperator<Project<InferredMultiProjectAssembler>> classes, compiled from build/custom/, applied in order to the configured project
                 project.docker|false|Run the whole build inside a container
                 project.docker.image||Image for that container
                 project.docker.mount||Extra read-only container mounts, host[:container],...

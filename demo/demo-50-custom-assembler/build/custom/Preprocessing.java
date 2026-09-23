@@ -6,10 +6,10 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Project;
 
-public class Preprocessing implements UnaryOperator<Project>, Serializable {
+public class Preprocessing implements UnaryOperator<Project<?>>, Serializable {
 
     @Override
-    public Project apply(Project project) {
+    public Project<?> apply(Project<?> project) {
         return project.assembler((descriptor, repositories, resolvers) -> project.assembler()
                 .apply(descriptor.sources("preprocess"), repositories, resolvers)
                 .mapBuild(inner -> (sub, inherited) -> {

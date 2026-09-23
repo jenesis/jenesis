@@ -50,7 +50,7 @@ public class ProjectTest {
 
     @Test
     public void reads_every_setting_from_the_provider_it_is_given() {
-        Project project = Project.ofEnvironment(new Environment(Map.of("project.version", "1.2.3",
+        Project<?> project = Project.ofEnvironment(new Environment(Map.of("project.version", "1.2.3",
                 "project.target", "out",
                 "project.sources", "",
                 "project.digest", "SHA-512")::get), root);
@@ -65,7 +65,7 @@ public class ProjectTest {
 
     @Test
     public void takes_its_defaults_when_it_is_given_no_provider() {
-        Project project = new Project(root);
+        Project<?> project = new Project<>(root, new InferredMultiProjectAssembler());
         assertThat(project.version())
                 .as("the environment configures the entry point's project, not every project a caller builds")
                 .isNull();
@@ -105,7 +105,7 @@ public class ProjectTest {
                 .doesNotContainKeys("scm.tag", "scm.revision", "scm.tree");
     }
 
-    private SequencedProperties metadataValues(Project project) throws IOException {
+    private SequencedProperties metadataValues(Project<?> project) throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
         Path target = root.resolve("target");
         project.root(root).target(target).build(Project.METADATA);
@@ -202,7 +202,7 @@ public class ProjectTest {
 
     @Test
     public void defaults_keep_tests_enabled() {
-        Project project = Project.ofEnvironment(new Environment(settings::get), Path.of("."));
+        Project<?> project = Project.ofEnvironment(new Environment(settings::get), Path.of("."));
         assertThat(project.tests()).isTrue();
     }
 
@@ -421,6 +421,13 @@ public class ProjectTest {
     }
 
     @Test
+    public void adjusts_the_assembler_it_holds_as_the_type_it_is() {
+        Project<InferredMultiProjectAssembler> adjusted = Project.ofEnvironment(new Environment(settings::get), Path.of("."))
+                .assembler(assembler -> assembler.check(null));
+        assertThat(adjusted.assembler().check()).isNull();
+    }
+
+    @Test
     public void default_layout_is_auto() {
         assertThat(Project.ofEnvironment(new Environment(settings::get), Path.of(".")).layout()).isSameAs(Project.Layout.AUTO);
     }
@@ -428,7 +435,7 @@ public class ProjectTest {
     @Test
     public void maven_layout_resolver_maps_named_and_unnamed_modules() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = Project.ofEnvironment(new Environment(settings::get), root).target(target);
+        Project<?> project = Project.ofEnvironment(new Environment(settings::get), root).target(target);
         Function<String, String> resolver = Project.Layout.MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -444,7 +451,7 @@ public class ProjectTest {
     @Test
     public void modular_layout_resolver_maps_named_and_unnamed_modules() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = Project.ofEnvironment(new Environment(settings::get), root).target(target);
+        Project<?> project = Project.ofEnvironment(new Environment(settings::get), root).target(target);
         Function<String, String> resolver = Project.Layout.MODULAR.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -461,7 +468,7 @@ public class ProjectTest {
     @Test
     public void maven_layout_resolver_preserves_step_path_after_slash() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = Project.ofEnvironment(new Environment(settings::get), root).target(target);
+        Project<?> project = Project.ofEnvironment(new Environment(settings::get), root).target(target);
         Function<String, String> resolver = Project.Layout.MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -479,7 +486,7 @@ public class ProjectTest {
     @Test
     public void modular_layout_resolver_preserves_step_path_after_slash() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = Project.ofEnvironment(new Environment(settings::get), root).target(target);
+        Project<?> project = Project.ofEnvironment(new Environment(settings::get), root).target(target);
         Function<String, String> resolver = Project.Layout.MODULAR.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -497,7 +504,7 @@ public class ProjectTest {
     @Test
     public void modular_to_maven_layout_resolver_preserves_step_path_after_slash() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = Project.ofEnvironment(new Environment(settings::get), root).target(target);
+        Project<?> project = Project.ofEnvironment(new Environment(settings::get), root).target(target);
         Function<String, String> resolver = Project.Layout.MODULAR_TO_MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -515,7 +522,7 @@ public class ProjectTest {
     @Test
     public void modular_layout_registers_export_step() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = Project.ofEnvironment(new Environment(settings::get), root).target(target);
+        Project<?> project = Project.ofEnvironment(new Environment(settings::get), root).target(target);
         BuildExecutor executor = BuildExecutor.of(target,
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
@@ -530,7 +537,7 @@ public class ProjectTest {
     @Test
     public void modular_to_maven_layout_resolver_maps_named_and_unnamed_modules() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
-        Project project = Project.ofEnvironment(new Environment(settings::get), root).target(target);
+        Project<?> project = Project.ofEnvironment(new Environment(settings::get), root).target(target);
         Function<String, String> resolver = Project.Layout.MODULAR_TO_MAVEN.apply(
                 BuildExecutor.of(target,
                         Duration.ZERO,
@@ -595,7 +602,7 @@ public class ProjectTest {
 
     @Test
     public void applies_each_customizer_in_order_to_the_configured_project() {
-        Project project = Project.ofEnvironment(new Environment(Map.of("project.version", "1",
+        Project<?> project = Project.ofEnvironment(new Environment(Map.of("project.version", "1",
                 "project.customizers", Versioning.class.getName() + ", " + Tagging.class.getName())::get), root);
         assertThat(project.version()).isEqualTo("1.1");
         assertThat(project.tag()).as("the second customizer sees what the first one set").isEqualTo("v1.1");
@@ -603,7 +610,7 @@ public class ProjectTest {
 
     @Test
     public void leaves_customizers_to_the_container_when_the_build_runs_in_docker() {
-        Project project = Project.ofEnvironment(new Environment(Map.of("project.version", "1",
+        Project<?> project = Project.ofEnvironment(new Environment(Map.of("project.version", "1",
                 "project.docker", "true",
                 "project.customizers", Versioning.class.getName())::get), root);
         assertThat(project.version()).as("the container applies the customizer, never the host").isEqualTo("1");
@@ -614,7 +621,7 @@ public class ProjectTest {
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.customizers",
                 ProjectTest.class.getName())::get), root))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining(ProjectTest.class.getName() + " is not a UnaryOperator<Project>");
+                .hasMessageContaining(ProjectTest.class.getName() + " is not a UnaryOperator<Project<InferredMultiProjectAssembler>>");
     }
 
     @Test
@@ -875,7 +882,7 @@ public class ProjectTest {
 
     @Test
     public void keeps_every_default_where_no_setting_names_one() {
-        Project project = Project.ofEnvironment(new Environment(Map.<String, String>of()::get), Path.of("."));
+        Project<?> project = Project.ofEnvironment(new Environment(Map.<String, String>of()::get), Path.of("."));
         assertThat(project.target()).isEqualTo(Path.of("target"));
         assertThat(project.layout())
                 .as("a wither is applied only where a setting is named, so an absent one keeps the default")
@@ -884,26 +891,26 @@ public class ProjectTest {
         assertThat(project.cache()).isNull();
     }
 
-    public static class Versioning implements UnaryOperator<Project> {
+    public static class Versioning implements UnaryOperator<Project<InferredMultiProjectAssembler>> {
 
         @Override
-        public Project apply(Project project) {
+        public Project<InferredMultiProjectAssembler> apply(Project<InferredMultiProjectAssembler> project) {
             return project.version(project.version() + ".1");
         }
     }
 
-    public static class Tagging implements UnaryOperator<Project> {
+    public static class Tagging implements UnaryOperator<Project<InferredMultiProjectAssembler>> {
 
         @Override
-        public Project apply(Project project) {
+        public Project<InferredMultiProjectAssembler> apply(Project<InferredMultiProjectAssembler> project) {
             return project.tag("v" + project.version());
         }
     }
 
-    public static class Discarding implements UnaryOperator<Project> {
+    public static class Discarding implements UnaryOperator<Project<InferredMultiProjectAssembler>> {
 
         @Override
-        public Project apply(Project project) {
+        public Project<InferredMultiProjectAssembler> apply(Project<InferredMultiProjectAssembler> project) {
             return null;
         }
     }

@@ -77,7 +77,7 @@ Either globally, with the property:
 or for one build, through the assembler - which is what the second half of
 `build/Demo.java` does:
 
-    new Project(Path.of("."))
-            .assembler(new InferredMultiProjectAssembler().toolchain(toolchain ->
+    Project.ofEnvironment(environment, Path.of("."))
+            .assembler(assembler -> assembler.toolchain(toolchain ->
                     toolchain.compiler(compiler -> compiler.errorprone(null))))
             .build();

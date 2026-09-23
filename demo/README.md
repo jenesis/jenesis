@@ -742,8 +742,7 @@ The next demos open up the template, and each is launched with
 stock assembler so every module's sources pass through a preprocessing step
 before compile, jar and test run unchanged:
 
-    new Project(Path.of("."))
-            .assembler(new PreprocessingAssembler(new InferredMultiProjectAssembler()))
+    new Project<>(Path.of("."), new PreprocessingAssembler(new InferredMultiProjectAssembler()))
 
 Any step that produces a `sources/` tree fits the same shape: template expansion,
 code generation, license headers.
