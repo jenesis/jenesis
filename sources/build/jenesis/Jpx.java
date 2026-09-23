@@ -546,12 +546,30 @@ public record Jpx(Path storage,
                 : descriptor.mainClass().get();
         List<String> modulepath = new ArrayList<>(), classpath = new ArrayList<>();
         ModuleGraph graph = new ModuleGraph();
+        SequencedMap<String, Boolean> placed = new LinkedHashMap<>();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
-            Path file = folder.resolve(entry.getKey());
-            boolean placed = graph.place(placement, file);
-            (placed ? modulepath : classpath).add(entry.getKey());
-            if (file.equals(root) && PathPlacement.nativeAccess(file)) {
-                graph.enableNativeAccess(file, placed);
+            boolean module = graph.place(placement, folder.resolve(entry.getKey()));
+            (module ? modulepath : classpath).add(entry.getKey());
+            placed.put(entry.getKey(), module);
+        }
+        for (String token : PathPlacement.nativeAccess(root)) {
+            int slash = token.indexOf('/');
+            String name = null;
+            if (slash < 0) {
+                for (String candidate : jars.sequencedKeySet()) {
+                    ModuleDescriptor named = PathPlacement.moduleDescriptor(folder.resolve(candidate));
+                    if (name == null && named != null && named.name().equals(token)) {
+                        name = candidate;
+                    }
+                }
+            } else {
+                String dependency = tokens.get(token.indexOf('/', slash + 1) < 0
+                        ? "maven/" + token
+                        : token.substring(slash + 1));
+                name = dependency == null ? null : names.get(dependency);
+            }
+            if (name != null && placed.containsKey(name)) {
+                graph.enableNativeAccess(folder.resolve(name), placed.get(name));
             }
         }
         SequencedProperties properties = new SequencedProperties();

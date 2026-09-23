@@ -183,11 +183,11 @@ public class ModularProjectTest {
     }
 
     @Test
-    public void signals_its_own_native_access_and_grants_it_to_a_dependency_without_requiring_it()
+    public void grants_native_access_to_what_it_names_and_records_every_name_in_its_manifest()
             throws IOException {
         Files.writeString(project.resolve("module-info.java"), """
                 /**
-                 * @jenesis.native
+                 * @jenesis.native foo
                  * @jenesis.native bar org.example/jni
                  */
                 module foo {
@@ -215,8 +215,8 @@ public class ModularProjectTest {
             manifest.read(input);
         }
         assertThat(manifest.getMainAttributes().getValue(PathPlacement.NATIVE_ACCESS))
-                .as("a consumer learns of the need through the manifest, but only its own declaration grants it")
-                .isEqualTo("true");
+                .as("a module that runs this one learns what to redeclare, but is granted nothing by it")
+                .isEqualTo("foo,bar,org.example/jni");
     }
 
     @Test

@@ -386,12 +386,20 @@ public class ModularProject implements BuildExecutorModule {
                 attachments.store(context.next().resolve(BuildStep.ATTACHMENTS));
             }
             String self = group + "/module/" + info.coordinate();
-            boolean nativeAccess = info.natives().contains(self);
             SequencedProperties natives = new SequencedProperties();
+            List<String> named = new ArrayList<>();
             for (String key : info.natives()) {
+                int slash = key.indexOf('/');
+                String coordinate = key.substring(slash + 1);
+                named.add(!key.startsWith(group + "/")
+                        ? key
+                        : coordinate.startsWith("module/")
+                                ? coordinate.substring(7)
+                                : coordinate.startsWith("maven/") && coordinate.indexOf('/', 6) == coordinate.lastIndexOf('/')
+                                        ? coordinate.substring(6)
+                                        : key);
                 if (!key.equals(self)) {
-                    int slash = key.indexOf('/');
-                    natives.setProperty(key.substring(0, slash) + "/native/" + key.substring(slash + 1), "");
+                    natives.setProperty(key.substring(0, slash) + "/native/" + coordinate, "");
                 }
             }
             if (!natives.isEmpty()) {
@@ -412,11 +420,11 @@ public class ModularProject implements BuildExecutorModule {
                 }
                 overrides.store(context.next().resolve(BuildStep.OVERRIDES));
             }
-            if (!targets.isEmpty() || !info.overrides().isEmpty() || !info.layers().isEmpty() || nativeAccess) {
+            if (!targets.isEmpty() || !info.overrides().isEmpty() || !info.layers().isEmpty() || !named.isEmpty()) {
                 Manifest manifest = new Manifest();
                 manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
-                if (nativeAccess) {
-                    manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, "true");
+                if (!named.isEmpty()) {
+                    manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, String.join(",", named));
                 }
                 if (!targets.isEmpty()) {
                     List<String> declarations = new ArrayList<>();
@@ -589,7 +597,7 @@ public class ModularProject implements BuildExecutorModule {
             if (info.main() != null) {
                 module.setProperty("main", info.main());
             }
-            if (nativeAccess) {
+            if (info.natives().contains(self)) {
                 module.setProperty("native", "true");
             }
             module.store(context.next().resolve(BuildStep.MODULE));

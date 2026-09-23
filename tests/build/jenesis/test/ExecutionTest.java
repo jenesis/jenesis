@@ -176,12 +176,12 @@ public class ExecutionTest {
                 .tests(false);
         int code = Execution.ofEnvironment(Environment.NONE, project).execute();
         assertThat(code)
-                .as("the library is granted by the application, and the application, which asks for nothing, is not")
+                .as("the library is granted by the application, and the application, which names only the library, is not")
                 .isEqualTo(0);
     }
 
     @Test
-    public void strict_native_access_fails_a_build_that_does_not_grant_what_a_dependency_signals() throws IOException {
+    public void strict_native_access_fails_a_build_that_does_not_redeclare_what_a_dependency_names() throws IOException {
         writeNativeModules(false);
         Project project = Project.ofEnvironment(new Environment(Map.of("dependency.native", "strict")::get), root)
                 .target(Files.createDirectory(root.resolve("target")))
@@ -189,8 +189,7 @@ public class ExecutionTest {
                 .layout(Project.Layout.MODULAR)
                 .tests(false);
         assertThatThrownBy(() -> Execution.ofEnvironment(Environment.NONE, project).execute())
-                .hasStackTraceContaining("need native access")
-                .hasStackTraceContaining("module demo.library");
+                .hasStackTraceContaining("demo.middle names demo.library");
     }
 
     @Test
@@ -214,7 +213,7 @@ public class ExecutionTest {
                     <groupId>sample</groupId>
                     <artifactId>sample</artifactId>
                     <version>1</version>
-                    <!--jenesis.native-->
+                    <!--jenesis.native sample/sample-->
                     <properties>
                         <mainClass>sample.Sample</mainClass>
                     </properties>
@@ -232,9 +231,6 @@ public class ExecutionTest {
     private void writeNativeModules(boolean granted) throws IOException {
         Path library = Files.createDirectories(root.resolve("library/demo/library"));
         Files.writeString(library.resolve("../../module-info.java"), """
-                /**
-                 * @jenesis.native
-                 */
                 module demo.library {
                     exports demo.library;
                 }
@@ -249,6 +245,15 @@ public class ExecutionTest {
                     }
                 }
                 """);
+        Files.createDirectories(root.resolve("middle"));
+        Files.writeString(root.resolve("middle/module-info.java"), """
+                /**
+                 * @jenesis.native demo.library
+                 */
+                module demo.middle {
+                    requires transitive demo.library;
+                }
+                """);
         Path application = Files.createDirectories(root.resolve("application/demo/application"));
         Files.writeString(application.resolve("../../module-info.java"), """
                 /**
@@ -256,7 +261,7 @@ public class ExecutionTest {
                  %s
                  */
                 module demo.application {
-                    requires demo.library;
+                    requires demo.middle;
                 }
                 """.formatted(granted ? "* @jenesis.native demo.library" : ""));
         Files.writeString(application.resolve("Main.java"), """

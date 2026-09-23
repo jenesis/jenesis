@@ -97,7 +97,7 @@ Quick index
 | 46 | [`build-cache`](demo-46-build-cache/README.md)                    | Serve step outputs from a cache shared across builds                         | `java build/jenesis/Make.java`    |
 | 47 | [`docker-isolation`](demo-47-docker-isolation/README.md)          | Confine the build and the program it produces to a container                 | `java build/jenesis/Make.java`    |
 | 48 | [`agents`](demo-48-agents/README.md)                              | Attach a library as a Java agent with `@jenesis.attach`                      | `java build/Demo.java`            |
-| 49 | [`native-access`](demo-49-native-access/README.md)                | Grant native access with `@jenesis.native`, and refuse an ungranted need     | `java build/jenesis/Execute.java` |
+| 49 | [`native-access`](demo-49-native-access/README.md)                | Grant native access with `@jenesis.native`, and discover what to redeclare  | `java build/jenesis/Execute.java` |
 | 50 | [`custom-assembler`](demo-50-custom-assembler/README.md)          | Wrap the assembler to preprocess sources before the regular flow             | `java build/Demo.java`            |
 | 51 | [`custom-jmod`](demo-51-custom-jmod/README.md)                    | Pack extra content into a `.jmod` and carry it into a packaged app           | `java build/Demo.java`            |
 | 52 | [`internal-module`](demo-52-internal-module/README.md)            | Move that preprocessing into a build module loaded from local source         | `java build/Demo.java`            |
@@ -721,20 +721,18 @@ declares the same in a `<!--jenesis.attach ... -->` comment block.
 ## 34. Granting native access - [`native-access`](demo-49-native-access/README.md)
 
 Calling native code through the foreign function API or JNI needs
-`--enable-native-access`, and the grant is the running program's to give, not
-the library's. A library states its need with a bare tag, which marks its jar
-with `Jenesis-Native-Access: true`:
-
-    @jenesis.native
-
-The module that runs it grants it by name, and only that module's own
-declarations count, for its `Execute` run, its tests and what it packages:
+`--enable-native-access`, and whether a program calls it is decided by the
+module that uses the native API, not by the library that offers it. That module
+names the module needing access, and the name is recorded in its jar:
 
     @jenesis.native demo.natives.text
 
-`jenesis.dependency.native=strict` turns an ungranted need into a build failure
-that names the jar. A `pom.xml` project declares the same in a
-`<!--jenesis.native ... -->` comment block.
+A declaration grants access only to the runs of the module that makes it - its
+tests, `Execute` and what it packages - and is never inherited, so an
+application that runs such a module names the same module again.
+`jenesis.dependency.native=warn` reports a name the running module does not
+grant, and `strict` fails the build on it. A `pom.xml` project declares the same
+in a `<!--jenesis.native ... -->` comment block.
 
 ## 35. Customizing the build - [`custom-assembler`](demo-50-custom-assembler/README.md), [`custom-jmod`](demo-51-custom-jmod/README.md)
 

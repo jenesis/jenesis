@@ -150,7 +150,7 @@ public class MavenProjectTest {
     }
 
     @Test
-    public void native_access_of_the_project_is_signalled_by_its_jar_and_granted_to_it_in_its_tests()
+    public void native_access_the_project_names_is_recorded_in_its_jar_and_granted_in_its_tests()
             throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -159,8 +159,7 @@ public class MavenProjectTest {
                     <groupId>group</groupId>
                     <artifactId>artifact</artifactId>
                     <version>1</version>
-                    <!--jenesis.native-->
-                    <!--jenesis.native org.example/jni-->
+                    <!--jenesis.native group/artifact org.example/jni-->
                 </project>
                 """);
         Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
@@ -181,7 +180,8 @@ public class MavenProjectTest {
         try (InputStream input = Files.newInputStream(main.resolve("manifest.mf"))) {
             manifest.read(input);
         }
-        assertThat(manifest.getMainAttributes().getValue(PathPlacement.NATIVE_ACCESS)).isEqualTo("true");
+        assertThat(manifest.getMainAttributes().getValue(PathPlacement.NATIVE_ACCESS))
+                .isEqualTo("group/artifact,org.example/jni");
         assertThat(SequencedProperties.ofFiles(test.resolve(BuildStep.NATIVES)))
                 .as("the tests run the project's jar as a dependency, so they grant it rather than themselves")
                 .containsOnlyKeys("main/native/maven/group/artifact", "main/native/maven/org.example/jni");

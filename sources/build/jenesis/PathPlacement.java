@@ -156,29 +156,26 @@ public enum PathPlacement {
         return layers(declaration, path.toString());
     }
 
-    public static boolean nativeAccess(Path path) throws IOException {
+    public static SequencedSet<String> nativeAccess(Path path) throws IOException {
+        SequencedSet<String> tokens = new LinkedHashSet<>();
         if (Files.isDirectory(path)) {
-            return false;
+            return tokens;
         }
         String declaration;
         try (JarFile jar = new JarFile(path.toFile(), true, ZipFile.OPEN_READ, JarFile.runtimeVersion())) {
             Manifest manifest = jar.getManifest();
             declaration = manifest == null ? null : manifest.getMainAttributes().getValue(NATIVE_ACCESS);
         } catch (ZipException _) {
-            return false;
+            return tokens;
         }
-        if (declaration == null || declaration.isBlank()) {
-            return false;
+        if (declaration != null) {
+            for (String token : declaration.split(",")) {
+                if (!token.isBlank()) {
+                    tokens.add(token.trim());
+                }
+            }
         }
-        return switch (declaration.trim()) {
-            case "true" -> true;
-            case "false" -> false;
-            default -> throw new IllegalArgumentException("Malformed " + NATIVE_ACCESS + " value '"
-                    + declaration.trim()
-                    + "' in "
-                    + path
-                    + ": expected true or false");
-        };
+        return tokens;
     }
 
     public static SequencedMap<String, SequencedSet<String>> overrides(String declaration, String origin) {
