@@ -570,10 +570,12 @@ public record Project(
                     the command line or ~/.jenesis/jenesis.properties may set it. Nothing is installed.
 
                     To adjust the stock build rather than replace it, put a UnaryOperator<Project>
-                    under build/ and pass -Djenesis.project.customizers=build.Build: Make compiles
-                    build/ with the engine and applies each customizer, in order, to the project the
-                    settings configured, so the build keeps every feature of Make. It runs code the
-                    engine does not ship, so only the command line or ~/.jenesis may name one.
+                    under build/custom/ and pass -Djenesis.project.customizers=build.custom.Build:
+                    Make compiles build/custom/ with the engine and applies each customizer, in order,
+                    to the project the settings configured, so the build keeps every feature of Make.
+                    It runs code the engine does not ship, so only the command line or ~/.jenesis may
+                    name one. jenesis-validate checks build/jenesis alone, so a customizer leaves the
+                    vendored engine valid, and the installed jenesis never runs one.
 
                     A project with its own entry point calls `new Make("build.Demo").run(selectors)`,
                     which returns the status to exit with. For a GraalVM native launcher, read the
@@ -1484,7 +1486,7 @@ public record Project(
             } catch (ClassNotFoundException _) {
                 throw new IllegalArgumentException("No class " + customizer + " for jenesis.project.customizers - name"
                         + " a class compiled with the build, which build/jenesis/Make.java does for every source"
-                        + " under build/");
+                        + " under build/custom/");
             } catch (NoSuchMethodException _) {
                 throw new IllegalArgumentException("The customizer " + customizer + " declares no public constructor"
                         + " without arguments - declare one, so the build can create it");
@@ -2270,7 +2272,7 @@ public record Project(
                 project.signatures||Comma-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
-                project.customizers||Comma-separated UnaryOperator<Project> classes, compiled from build/, applied in order to the configured project
+                project.customizers||Comma-separated UnaryOperator<Project> classes, compiled from build/custom/, applied in order to the configured project
                 project.docker|false|Run the whole build inside a container
                 project.docker.image||Image for that container
                 project.docker.mount||Extra read-only container mounts, host[:container],...
