@@ -13,7 +13,7 @@ Run it
 
 From this directory, naming the customizer this demo ships:
 
-    java -Djenesis.project.customizers=build.custom.Substitution build/jenesis/Execute.java
+    java build/jenesis/Execute.java -Djenesis.project.customizers=build.custom.Substitution
 
 which builds the project and then launches the built module, printing the
 greeting the plugin substituted in:
