@@ -15,6 +15,7 @@ import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.ProjectModuleDescriptor;
 import build.jenesis.Environment;
+import build.jenesis.Make;
 
 /**
  * The {@code ExternalModule} counterpart of the {@code ../internal-module} demo.
@@ -41,8 +42,9 @@ import build.jenesis.Environment;
 public class Demo {
 
     static void main(String[] args) throws Exception {
+        Environment environment = new Environment(Make.settings(Path.of(".")).keys());
         Files.createDirectories(Path.of("target"));
-        Path modular = Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
+        Path modular = Project.ofEnvironment(environment, Path.of("."))
                 .root(Path.of("plugin"))
                 .target(Path.of("target", "plugin"))
                 .version("1")
@@ -57,15 +59,15 @@ public class Demo {
                     ? Optional.of(RepositoryItem.ofFile(pluginJar))
                     : Optional.empty();
         };
-        Repository repository = JenesisModuleRepository.ofEnvironment(Environment.SYSTEM, JenesisRepository.Scope.MODULE).prepend(local);
+        Repository repository = JenesisModuleRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE).prepend(local);
 
         // Build the project (the resolved plugin rewrites ${greeting} first) and
         // launch the produced module so its main prints the substituted greeting.
-        Project project = Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
+        Project project = Project.ofEnvironment(environment, Path.of("."))
                 .assembler(new PreprocessingAssembler(
-                        InferredMultiProjectAssembler.ofEnvironment(Environment.SYSTEM),
+                        InferredMultiProjectAssembler.ofEnvironment(environment),
                         Map.of("module", repository),
-                        Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, true))));
+                        Map.of("module", ModularJarResolver.ofEnvironment(environment, true))));
         System.exit(new Execution(project).execute(args));
     }
 

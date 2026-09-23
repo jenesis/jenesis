@@ -244,12 +244,18 @@ public abstract class Java extends ProcessBuildStep {
                 options.add("-Djlayer.classpath." + name + "=" + path(membership.classpath(), pool));
             }
         });
-        List<String> prefixes = options.isEmpty()
-                ? List.of()
-                : List.of("@" + argumentFile(context.supplement().resolve("java.args"), options));
-        return commands(executor, context, arguments).thenApplyAsync(commands -> Stream.concat(
-                prefixes.stream(),
-                commands.stream()).toList(), executor);
+        return commands(executor, context, arguments).thenComposeAsync(commands -> {
+            List<String> invocation = Stream.concat(options.stream(), commands.stream()).toList();
+            if (invocation.isEmpty()) {
+                return CompletableFuture.completedStage(List.of());
+            }
+            try {
+                return CompletableFuture.completedStage(List.of("@"
+                        + argumentFile(context.supplement().resolve("java.args"), invocation)));
+            } catch (IOException e) {
+                return CompletableFuture.failedStage(e);
+            }
+        }, executor);
     }
 
     private static String path(SequencedSet<String> names, SequencedMap<String, Path> pool) {

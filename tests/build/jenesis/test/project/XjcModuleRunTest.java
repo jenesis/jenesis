@@ -143,7 +143,7 @@ public class XjcModuleRunTest {
     }
 
     private XjcModule newModule() {
-        return new XjcModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM)))
+        return new XjcModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)))
                 .pinning(Pinning.STRICT);
     }
 

@@ -49,11 +49,12 @@ How the convenience make is wired
 `Demo.java` creates a `BuildExecutor`, adds the result of
 `MavenProject.make(environment, root, assembler)` as a module, and executes it:
 
+    Environment environment = new Environment(Make.settings(Path.of(".")).keys());
     BuildExecutor root = BuildExecutor.of(Path.of("target"));
-    root.addModule("maven", MavenProject.make(Environment.SYSTEM,
+    root.addModule("maven", MavenProject.make(environment,
             Path.of("."),
             (descriptor, repositories, resolvers) -> new InferredMultiProjectAssembler().apply(
-                    new ProjectModuleDescriptor(descriptor, new LinkedHashSet<>(List.of(Path.of("."))), true, false, false, null, PathPlacement.CLASS_PATH),
+                    new ProjectModuleDescriptor(descriptor).configuration(Path.of(".")).pathPlacement(PathPlacement.CLASS_PATH),
                     repositories,
                     resolvers)));
     root.execute(args);

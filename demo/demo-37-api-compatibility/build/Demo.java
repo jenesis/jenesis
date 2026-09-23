@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.Project;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.Environment;
+import build.jenesis.Make;
 
 /**
  * A compatibility check needs something to compare against, and that something has
@@ -32,8 +33,9 @@ import build.jenesis.Environment;
 public class Demo {
 
     static void main(String[] args) throws Exception {
+        Environment environment = new Environment(Make.settings(Path.of(".")).keys());
         Files.createDirectories(Path.of("target"));
-        Path released = Project.ofEnvironment(Environment.SYSTEM, Path.of("released"))
+        Path released = Project.ofEnvironment(environment, Path.of("released"))
                 .target(Path.of("target", "released"))
                 .build("stage")
                 .get("stage/maven");
@@ -55,8 +57,8 @@ public class Demo {
         System.out.println("Published the previous release into " + released);
         System.out.println();
 
-        Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
-                .repositories(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM).prepend(
+        Project.ofEnvironment(environment, Path.of("."))
+                .repositories(Map.of("maven", MavenDefaultRepository.ofEnvironment(environment).prepend(
                         new MavenDefaultRepository(released.toUri(), null, Map.of(), _ -> {}))))
                 .build(args);
     }

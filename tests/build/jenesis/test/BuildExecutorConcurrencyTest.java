@@ -17,6 +17,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class BuildExecutorConcurrencyTest implements Serializable {
 
+    private final Map<String, String> settings = new HashMap<>();
+
     private static CountDownLatch started;
 
     @TempDir
@@ -111,19 +113,10 @@ public class BuildExecutorConcurrencyTest implements Serializable {
 
     @Test
     public void reads_the_limit_from_the_property_and_overrides_it_with_the_wither() {
-        String previous = System.getProperty("jenesis.executor.concurrency");
-        try {
-            System.clearProperty("jenesis.executor.concurrency");
-            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).concurrency()).isEqualTo(0);
-            System.setProperty("jenesis.executor.concurrency", "3");
-            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).concurrency()).isEqualTo(3);
-            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).concurrency(5).concurrency()).isEqualTo(5);
-        } finally {
-            if (previous == null) {
-                System.clearProperty("jenesis.executor.concurrency");
-            } else {
-                System.setProperty("jenesis.executor.concurrency", previous);
-            }
-        }
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).concurrency()).isEqualTo(0);
+        settings.put("executor.concurrency", "3");
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).concurrency()).isEqualTo(3);
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).concurrency(5).concurrency())
+                .isEqualTo(5);
     }
 }

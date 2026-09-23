@@ -2,6 +2,8 @@ package build.jenesis.test;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.Environment;
+import build.jenesis.Make;
 import build.jenesis.Platform;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -108,39 +110,36 @@ public class PlatformTest {
     @Test
     public void declared_flag_adds_a_token_on_top_of_the_detected_ones() {
         Platform detected = new Platform();
-        System.setProperty("jenesis.platform.fips", "true");
-        try {
-            Platform extended = new Platform();
-            assertThat(extended.tokens()).contains("fips");
-            assertThat(extended.tokens()).containsAll(detected.tokens());
-            assertThat(detected.tokens()).doesNotContain("fips");
-        } finally {
-            System.clearProperty("jenesis.platform.fips");
-        }
+        Platform extended = Platform.ofEnvironment(new Environment(Make.keys(Map.of("jenesis.platform.fips", "true"))));
+        assertThat(extended.tokens()).contains("fips");
+        assertThat(extended.tokens()).containsAll(detected.tokens());
+        assertThat(detected.tokens()).doesNotContain("fips");
     }
 
     @Test
-    public void declared_flag_must_be_true_to_add() {
-        System.setProperty("jenesis.platform.fips", "yes");
-        try {
-            assertThat(new Platform().tokens()).doesNotContain("fips");
-        } finally {
-            System.clearProperty("jenesis.platform.fips");
-        }
+    public void declared_flag_that_is_neither_true_nor_false_is_refused() {
+        Environment environment = new Environment(Make.keys(Map.of("jenesis.platform.fips", "yes")));
+        assertThatThrownBy(() -> Platform.ofEnvironment(environment))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.platform.fips");
     }
 
     @Test
     public void declared_false_flag_removes_a_detected_token() {
         Platform detected = new Platform();
-        assertThat(detected.tokens()).hasSizeGreaterThanOrEqualTo(2);
         String removed = detected.tokens().getFirst();
-        System.setProperty("jenesis.platform." + removed, "false");
-        try {
-            SequencedSet<String> expected = new TreeSet<>(detected.tokens());
-            expected.remove(removed);
-            assertThat(new Platform().tokens()).containsExactlyElementsOf(expected);
-        } finally {
-            System.clearProperty("jenesis.platform." + removed);
-        }
+        SequencedSet<String> expected = new TreeSet<>(detected.tokens());
+        expected.remove(removed);
+        assertThat(Platform.ofEnvironment(new Environment(Make.keys(Map.of("jenesis.platform." + removed, "false"))))
+                .tokens()).containsExactlyElementsOf(expected);
+    }
+
+    @Test
+    public void declared_flag_in_the_project_file_adds_a_token(@TempDir Path root) throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.platform.fips=true\n");
+        Environment environment = new Environment(Make.settings(root, Make.keys(Map.of())).keys());
+        assertThat(Platform.ofEnvironment(environment).tokens())
+                .as("a token set in a file is read like one set on the command line")
+                .contains("fips");
     }
 }

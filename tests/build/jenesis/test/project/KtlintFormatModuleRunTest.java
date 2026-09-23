@@ -121,7 +121,7 @@ public class KtlintFormatModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "ktlint-format",
-                new KtlintFormatModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))).pinning(Pinning.STRICT),
+                new KtlintFormatModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
                 "project");
         return executor;
     }

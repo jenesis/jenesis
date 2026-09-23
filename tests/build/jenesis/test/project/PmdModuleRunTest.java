@@ -161,7 +161,7 @@ public class PmdModuleRunTest {
         executor.addSource("project", project);
         executor.addModule(
                 "pmd",
-                new PmdModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))).pinning(Pinning.STRICT),
+                new PmdModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
                 "project");
         executor.execute();
 

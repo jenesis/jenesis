@@ -138,13 +138,13 @@ public record Project(
                                                          project.pinning(),
                                                          project.licenseFiles(Dependencies.SPDX),
                                                          (descriptor, mergedRepos, mergedResolvers) -> pomAware.apply(
-                                        new ProjectModuleDescriptor(descriptor,
-                                                configurations(descriptor.configurations(), project.configuration(), project.profiles()),
-                                                project.tests(),
-                                                project.sources(),
-                                                project.documentation(),
-                                                project.pinning(),
-                                                PathPlacement.CLASS_PATH),
+                                        new ProjectModuleDescriptor(descriptor)
+                                                .configuration(configurations(descriptor.configurations(), project.configuration(), project.profiles()))
+                                                .test(project.tests())
+                                                .source(project.sources())
+                                                .documentation(project.documentation())
+                                                .pinning(project.pinning())
+                                                .pathPlacement(PathPlacement.CLASS_PATH),
                                         mergedRepos,
                                         mergedResolvers)),
                               mavenDeps);
@@ -171,7 +171,7 @@ public record Project(
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
-                return prefix + "/module-" + BuildExecutorModule.encode(module)
+                return prefix + "/module-" + BuildExecutorModule.encodePath(module)
                         + (slash == -1 ? "" : "/" + name.substring(slash + 1));
             };
         };
@@ -206,16 +206,16 @@ public record Project(
                                                              project.boms(),
                                                              project.signatures(),
                                                              (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
-                                        new ProjectModuleDescriptor(descriptor,
-                                                configurations(
-                                                        modularConfigurationFolder(descriptor.location()),
-                                                        project.configuration(),
-                                                        project.profiles()),
-                                                project.tests(),
-                                                project.sources(),
-                                                project.documentation(),
-                                                project.pinning(),
-                                                PathPlacement.MODULE_PATH),
+                                        new ProjectModuleDescriptor(descriptor)
+                                                .configuration(configurations(
+                                                                modularConfigurationFolder(descriptor.location()),
+                                                                project.configuration(),
+                                                                project.profiles()))
+                                                .test(project.tests())
+                                                .source(project.sources())
+                                                .documentation(project.documentation())
+                                                .pinning(project.pinning())
+                                                .pathPlacement(PathPlacement.MODULE_PATH),
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
@@ -243,7 +243,7 @@ public record Project(
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
-                return prefix + "/module-" + BuildExecutorModule.encode(module)
+                return prefix + "/module-" + BuildExecutorModule.encodePath(module)
                         + (slash == -1 ? "" : "/" + name.substring(slash + 1));
             };
         };
@@ -287,13 +287,12 @@ public record Project(
                                                              project.boms(),
                                                              project.signatures(),
                                                              (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
-                                        new ProjectModuleDescriptor(descriptor,
-                                                configurations(modularConfigurationFolder(descriptor.location()), project.configuration(), project.profiles()),
-                                                project.tests(),
-                                                project.sources(),
-                                                project.documentation(),
-                                                project.pinning(),
-                                                PathPlacement.INFERRED),
+                                        new ProjectModuleDescriptor(descriptor)
+                                                .configuration(configurations(modularConfigurationFolder(descriptor.location()), project.configuration(), project.profiles()))
+                                                .test(project.tests())
+                                                .source(project.sources())
+                                                .documentation(project.documentation())
+                                                .pinning(project.pinning()),
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
@@ -326,7 +325,7 @@ public record Project(
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
-                return prefix + "/module-" + BuildExecutorModule.encode(module)
+                return prefix + "/module-" + BuildExecutorModule.encodePath(module)
                         + (slash == -1 ? "" : "/" + name.substring(slash + 1));
             };
         };
@@ -573,6 +572,14 @@ public record Project(
                     jenesis.toolchain.searchpath, this system's usual JDK folders unless set, and only
                     the command line or ~/.jenesis/jenesis.properties may set it. Nothing is installed.
 
+                    To adjust the stock build rather than replace it, put a UnaryOperator<Project>
+                    under build/custom/ and pass -Djenesis.project.customizers=build.custom.Build:
+                    Make compiles build/custom/ with the engine and applies each customizer, in order,
+                    to the project the settings configured, so the build keeps every feature of Make.
+                    It runs code the engine does not ship, so only the command line or ~/.jenesis may
+                    name one. jenesis-validate checks build/jenesis alone, so a customizer leaves the
+                    vendored engine valid, and the installed jenesis never runs one.
+
                     A project with its own entry point calls `new Make("build.Demo").run(selectors)`,
                     which returns the status to exit with. For a GraalVM native launcher, read the
                     documentation: it needs reachability metadata captured from a real build, a JDK
@@ -619,9 +626,9 @@ public record Project(
                       +<module>/<step>  one step in it, e.g. +foo+bar/compile/dependencies/resolved
                       pin/module-<path> one module's pins. `pin` is an entry point of its own and
                                         always rewrites every module, so `pin +foo` runs both and
-                                        narrows nothing. <path> is the module's source folder,
-                                        URL-encoded because selectors split on /: foo/bar is
-                                        pin/module-foo%2Fbar.
+                                        narrows nothing. <path> is the module's source folder with
+                                        + for /, as in the folder under target/: foo/bar is
+                                        pin/module-foo+bar.
                       :                 one path segment, e.g. build/:/java
                       ::                any depth, e.g. ::/test. Lenient: a typo matches nothing
                                         silently, so confirm a selector ran what you meant.
@@ -979,7 +986,8 @@ public record Project(
                     checksums back into pom.xml (<dependencyManagement> with <!--Checksum/<algo>/<hex>-->
                     and a <!--jenesis.pin ... --> comment) or module-info.java (@jenesis.pin tags),
                     idempotently, refreshing only the lines matching the local platform. It covers the
-                    whole project; to pin one module, name its step rather than adding +<module>.
+                    whole project; to pin one module, name its step (pin/module-foo+bar) rather than
+                    adding +<module>.
                     -Djenesis.pin.file=<path> writes the project's whole closure to that properties
                     file instead of the declarations, in the grammar @jenesis.bom reads, which is how
                     a local bill of materials is refreshed rather than hand-edited. Each
@@ -1128,7 +1136,7 @@ public record Project(
                     if (!Files.isRegularFile(file)) {
                         continue;
                     }
-                    buildExecutor.addStep("module-" + BuildExecutorModule.encode(path),
+                    buildExecutor.addStep("module-" + BuildExecutorModule.encodePath(path),
                             stepFactory.apply(path, file),
                             new LinkedHashSet<>(inherited.sequencedKeySet()));
                 }
@@ -1402,6 +1410,7 @@ public record Project(
         return relative.toString().isEmpty() ? Path.of(".") : relative;
     }
 
+    @SuppressWarnings("unchecked")
     public static Project ofEnvironment(Environment environment, Path root) {
         Project project = new Project(root, environment);
         String configuration = environment.getProperty("project.configuration");
@@ -1484,9 +1493,40 @@ public record Project(
             project = project.tree(tree);
         }
         BuildExecutor.Configuration executor = BuildExecutor.Configuration.ofEnvironment(environment);
-        return project.pinning(Pinning.ofEnvironment(environment))
+        project = project.pinning(Pinning.ofEnvironment(environment))
                 .assembler(InferredMultiProjectAssembler.ofEnvironment(environment))
                 .configurator(() -> executor);
+        List<String> customizers = environment.entries("project.customizers");
+        for (String customizer : customizers == null ? List.<String>of() : customizers) {
+            Object instance;
+            try {
+                instance = Class.forName(customizer, true, Project.class.getClassLoader())
+                        .getConstructor()
+                        .newInstance();
+            } catch (ClassNotFoundException _) {
+                throw new IllegalArgumentException("No class " + customizer + " for jenesis.project.customizers - name"
+                        + " a class compiled with the build, which build/jenesis/Make.java does for every source"
+                        + " under build/custom/");
+            } catch (NoSuchMethodException _) {
+                throw new IllegalArgumentException("The customizer " + customizer + " declares no public constructor"
+                        + " without arguments - declare one, so the build can create it");
+            } catch (InvocationTargetException e) {
+                throw new IllegalStateException("The customizer " + customizer + " failed to construct", e.getCause());
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalArgumentException("Cannot create the customizer " + customizer
+                        + " - make the class and its constructor public", e);
+            }
+            if (!(instance instanceof UnaryOperator<?> operator)) {
+                throw new IllegalArgumentException("The customizer " + customizer + " is not a UnaryOperator<Project>"
+                        + " - implement it, and return the project it is handed or one derived from it");
+            }
+            project = ((UnaryOperator<Project>) operator).apply(project);
+            if (project == null) {
+                throw new IllegalStateException("The customizer " + customizer + " returned no project - return the"
+                        + " project it is handed or one derived from it with its withers");
+            }
+        }
+        return project;
     }
 
     private static SequencedSet<Path> locations(Environment environment, String text, Project project) {
@@ -2252,6 +2292,7 @@ public record Project(
                 project.signatures||Comma-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
+                project.customizers||Comma-separated UnaryOperator<Project> classes, compiled from build/custom/, applied in order to the configured project
                 project.docker|false|Run the whole build inside a container
                 project.docker.image||Image for that container
                 project.docker.mount||Extra read-only container mounts, host[:container],...
@@ -2260,6 +2301,7 @@ public record Project(
                 make.root|.|Folder Make looks for the project in; only settable on the command line
                 make.profiles||Comma-separated profiles layered over jenesis.properties
                 make.global||Folder holding the user-global .jenesis/jenesis.properties; default: the home folder; only settable on the command line
+                make.platforms||The jenesis.platform.<token> settings in force, comma-separated tokens; derived by Make and settable in no file
                 make.provided||Settings that the files a project provides supplied, comma-separated and named without the jenesis. prefix; derived by Make and settable in no file, so that a repository or cache URL a project named is never sent a credential
                 make.compile|true|Compile the build sources once and run from those classes
                 make.classes|.jenesis/classes|Where those classes land, relative to the root
@@ -2500,7 +2542,7 @@ public record Project(
             if (environment.flag("print.docker", true)) {
                 environment.out().accept("Launching build within Docker image: " + docker.image());
             }
-            int code = docker.execute("build/jenesis/Project.java", properties, selectors);
+            int code = docker.execute("build/jenesis/Make.java", properties, selectors);
             if (code != 0) {
                 System.exit(code);
             }
@@ -2545,6 +2587,9 @@ public record Project(
             return perform(environment, root, profiles, selectors) == null ? 1 : 0;
         }
         try {
+            if (mainClass.equals(Execution.class.getName())) {
+                return Execution.run(environment, root, profiles, selectors);
+            }
             Class.forName(mainClass, true, Project.class.getClassLoader())
                     .getMethod("main", String[].class)
                     .invoke(null, (Object) selectors);

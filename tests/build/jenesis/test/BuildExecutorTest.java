@@ -24,6 +24,8 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 
 public class BuildExecutorTest implements Serializable {
 
+    private final Map<String, String> settings = new HashMap<>();
+
     private static final AtomicInteger RUNS = new AtomicInteger();
     private static final AtomicReference<SequencedMap<String, BuildStepArgument>> APPLIED = new AtomicReference<>();
     private static final AtomicReference<SequencedSet<String>> REMOVED = new AtomicReference<>();
@@ -84,6 +86,20 @@ public class BuildExecutorTest implements Serializable {
         Map<String, ?> build = buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(build).containsOnlyKeys("source", "step");
         assertThat(root.resolve("step").resolve("output").resolve("file")).content().isEqualTo("foobar");
+    }
+
+    @Test
+    public void a_step_is_written_to_the_folder_named_like_it_and_selected_by_that_name() throws IOException {
+        buildExecutor.addStep("module-api+client%20v2", (_, context, _) -> {
+            Files.writeString(context.next().resolve("file"), "foo");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        });
+        buildExecutor.addStep("other", (_, _, _) -> {
+            throw new AssertionError("Not selected");
+        });
+        Map<String, ?> build = buildExecutor.execute(Runnable::run, "module-api+client%20v2").toCompletableFuture().join();
+        assertThat(build).containsOnlyKeys("module-api+client%20v2");
+        assertThat(root.resolve("module-api+client%20v2").resolve("output").resolve("file")).content().isEqualTo("foo");
     }
 
     @Test
@@ -297,7 +313,14 @@ public class BuildExecutorTest implements Serializable {
         assertThatThrownBy(() -> buildExecutor.addStep("foo/bar", (_, _, _) -> {
             throw new AssertionError();
         })).isInstanceOf(IllegalArgumentException.class).hasMessageContaining(
-                "foo/bar does not match pattern: [a-zA-Z0-9._%-]+");
+                "foo/bar does not match pattern: [a-zA-Z0-9._%-][a-zA-Z0-9._%+-]*");
+    }
+
+    @Test
+    public void does_not_accept_a_leading_plus_that_a_selector_reads_as_a_module() {
+        assertThatThrownBy(() -> buildExecutor.addStep("+foo", (_, _, _) -> {
+            throw new AssertionError();
+        })).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("+foo does not match pattern");
     }
 
     @Test
@@ -384,29 +407,29 @@ public class BuildExecutorTest implements Serializable {
 
     @Test
     public void aggregate_configuration_defaults_from_property_and_is_overridable() {
-        assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).aggregate()).isFalse();
-        assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).aggregate(true).aggregate()).isTrue();
-        System.setProperty("jenesis.executor.aggregate", "true");
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).aggregate()).isFalse();
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).aggregate(true).aggregate()).isTrue();
+        settings.put("executor.aggregate", "true");
         try {
-            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).aggregate()).isTrue();
+            assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).aggregate()).isTrue();
         } finally {
-            System.clearProperty("jenesis.executor.aggregate");
+            settings.remove("executor.aggregate");
         }
     }
 
     @Test
     public void a_configuration_takes_its_defaults_when_it_is_given_no_provider() {
-        System.setProperty("jenesis.executor.aggregate", "true");
-        System.setProperty("jenesis.executor.digest", "SHA-256");
+        settings.put("executor.aggregate", "true");
+        settings.put("executor.digest", "SHA-256");
         try {
             assertThat(new BuildExecutor.Configuration().aggregate())
                     .as("an embedder that builds its own configuration is never surprised by the environment")
                     .isFalse();
             assertThat(new BuildExecutor.Configuration().digest()).isEqualTo("MD5");
-            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).aggregate()).isTrue();
+            assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).aggregate()).isTrue();
         } finally {
-            System.clearProperty("jenesis.executor.aggregate");
-            System.clearProperty("jenesis.executor.digest");
+            settings.remove("executor.aggregate");
+            settings.remove("executor.digest");
         }
     }
 

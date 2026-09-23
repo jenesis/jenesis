@@ -49,11 +49,12 @@ How the convenience make is wired
 `Demo.java` creates a `BuildExecutor`, adds the result of
 `ModularProject.make(environment, root, assembler)` as a module, and executes it:
 
+    Environment environment = new Environment(Make.settings(Path.of(".")).keys());
     BuildExecutor root = BuildExecutor.of(Path.of("target"));
-    root.addModule("modules", ModularProject.make(Environment.SYSTEM,
+    root.addModule("modules", ModularProject.make(environment,
             Path.of("."),
             (descriptor, repositories, resolvers) -> new InferredMultiProjectAssembler().apply(
-                    new ProjectModuleDescriptor(descriptor, new LinkedHashSet<>(List.of(Path.of("."))), true, false, false, null, PathPlacement.MODULE_PATH),
+                    new ProjectModuleDescriptor(descriptor).configuration(Path.of(".")).pathPlacement(PathPlacement.MODULE_PATH),
                     repositories,
                     resolvers)));
     root.execute(args);

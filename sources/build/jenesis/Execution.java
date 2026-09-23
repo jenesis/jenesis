@@ -222,27 +222,16 @@ public record Execution(Project project, String mainClass, String module, Contai
         return new ProcessBuilder(command).inheritIO().start().waitFor();
     }
 
-    public static void main(String... arguments) {
-        try {
-            Path root = Path.of(Environment.SYSTEM.getProperty("make.root", "."));
-            Environment environment = new Environment(Make.settings(root).keys());
-            Make.Result result = new Make(Project.class.getName()).build(Project.BUILD);
-            if (result.code() != 0) {
-                System.exit(result.code());
-            }
-            Project project = Project.ofEnvironment(environment, root);
-            int code = Execution.ofEnvironment(environment, project).execute(result.outputs(), arguments);
-            if (code != 0) {
-                System.exit(code);
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed using arguments " + List.of(arguments), e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Interrupted while executing", e);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed using arguments " + List.of(arguments), e);
+    public static int run(Environment environment,
+                          Path root,
+                          SequencedSet<Path> profiles,
+                          String... arguments) throws IOException, InterruptedException {
+        SequencedMap<String, Path> outputs = Project.perform(environment, root, profiles, Project.BUILD);
+        if (outputs == null) {
+            return 1;
         }
+        Project project = Project.ofEnvironment(environment, root).profiles(profiles.toArray(Path[]::new));
+        return ofEnvironment(environment, project).execute(outputs, arguments);
     }
 
     private record Candidate(String path,

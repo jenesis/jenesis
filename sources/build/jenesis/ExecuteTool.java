@@ -20,15 +20,9 @@ public final class ExecuteTool extends JenesisTool {
         }
         Path root = root(environment);
         Make.Settings settings = Make.settings(root, environment.keys());
-        Environment layered = environment.keys(settings.keys());
-        SequencedMap<String, Path> outputs = Project.perform(layered,
-                                                             root,
-                                                             settings.profiles(),
-                                                             Project.BUILD);
-        if (outputs == null) {
-            return 1;
-        }
-        return Execution.ofEnvironment(layered, Project.ofEnvironment(layered, root))
-                .execute(outputs, arguments.toArray(String[]::new));
+        return Execution.run(environment.keys(settings.keys()),
+                             root,
+                             settings.profiles(),
+                             arguments.toArray(String[]::new));
     }
 }

@@ -3,6 +3,7 @@ package build;
 import module java.base;
 import build.jenesis.BuildExecutor;
 import build.jenesis.Environment;
+import build.jenesis.Make;
 import build.jenesis.PathPlacement;
 import build.jenesis.module.ModularProject;
 import build.jenesis.project.InferredMultiProjectAssembler;
@@ -34,11 +35,12 @@ import build.jenesis.project.ProjectModuleDescriptor;
 public class Demo {
 
     static void main(String[] args) throws Exception {
+        Environment environment = new Environment(Make.settings(Path.of(".")).keys());
         BuildExecutor root = BuildExecutor.of(Path.of("target"));
-        root.addModule("modules", ModularProject.make(Environment.SYSTEM,
+        root.addModule("modules", ModularProject.make(environment,
                 Path.of("."),
                 (descriptor, repositories, resolvers) -> new InferredMultiProjectAssembler().apply(
-                        new ProjectModuleDescriptor(descriptor, new LinkedHashSet<>(List.of(Path.of("."))), true, false, false, null, PathPlacement.MODULE_PATH),
+                        new ProjectModuleDescriptor(descriptor).configuration(Path.of(".")).pathPlacement(PathPlacement.MODULE_PATH),
                         repositories,
                         resolvers)));
         root.execute(args);

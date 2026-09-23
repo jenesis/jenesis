@@ -76,7 +76,7 @@ public class MavenPomResolverTest {
     public void the_plain_resolver_negotiates_as_maven() throws IOException {
         assertThat(serialize(new MavenPomResolver(MavenDefaultVersionNegotiator.maven())))
                 .as("maven() names what the no-argument constructor already does")
-                .isEqualTo(serialize(MavenPomResolver.ofEnvironment(Environment.SYSTEM)));
+                .isEqualTo(serialize(MavenPomResolver.ofEnvironment(Environment.NONE)));
     }
 
     @Test
@@ -84,7 +84,7 @@ public class MavenPomResolverTest {
         assertThat(serialize(new MavenPomResolver(MavenDefaultVersionNegotiator.latest())))
                 .as("the resolver travels in the step's serialized form, which is its cache key,"
                         + " so a resolution decided differently cannot be served from the cache")
-                .isNotEqualTo(serialize(MavenPomResolver.ofEnvironment(Environment.SYSTEM)));
+                .isNotEqualTo(serialize(MavenPomResolver.ofEnvironment(Environment.NONE)));
     }
 
     @Test

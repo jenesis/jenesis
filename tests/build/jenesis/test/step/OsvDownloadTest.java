@@ -29,7 +29,7 @@ public class OsvDownloadTest {
         SequencedProperties dependencies = new SequencedProperties();
         dependencies.setProperty("main/compile/maven/org.example/lib/1.2.3", "resolved/lib.jar");
         dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
-        OsvDownload step = OsvDownload.ofEnvironment(Environment.SYSTEM).endpoint(URI.create("http://osv.invalid"));
+        OsvDownload step = OsvDownload.ofEnvironment(Environment.NONE).endpoint(URI.create("http://osv.invalid"));
         assertThatThrownBy(() -> step.apply(Runnable::run,
                 new BuildStepContext(root.resolve("previous"), next, root.resolve("supplement")),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(

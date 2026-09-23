@@ -43,7 +43,7 @@ public class JavadocTest {
                 */
                 public class Sample { }
                 """);
-        BuildStepResult result = Javadoc.ofEnvironment(Environment.SYSTEM, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+        BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
@@ -95,7 +95,7 @@ public class JavadocTest {
                 public class Sample { }
                 """);
 
-        BuildStepResult result = Javadoc.ofEnvironment(Environment.SYSTEM, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+        BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
