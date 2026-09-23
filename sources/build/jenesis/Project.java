@@ -2281,6 +2281,7 @@ public record Project(
                 make.root|.|Folder Make looks for the project in; only settable on the command line
                 make.profiles||Comma-separated profiles layered over jenesis.properties
                 make.global||Folder holding the user-global .jenesis/jenesis.properties; default: the home folder; only settable on the command line
+                make.platforms||The jenesis.platform.<token> settings in force, comma-separated tokens; derived by Make and settable in no file
                 make.provided||Settings that the files a project provides supplied, comma-separated and named without the jenesis. prefix; derived by Make and settable in no file, so that a repository or cache URL a project named is never sent a credential
                 make.compile|true|Compile the build sources once and run from those classes
                 make.classes|.jenesis/classes|Where those classes land, relative to the root

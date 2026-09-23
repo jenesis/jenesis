@@ -4,8 +4,6 @@ import module java.base;
 
 public record Platform(SequencedSet<String> tokens) implements Serializable {
 
-    private static final String PREFIX = "jenesis.platform.";
-
     public Platform(SequencedSet<String> tokens) {
         SequencedSet<String> normalized = new TreeSet<>();
         for (String token : tokens) {
@@ -18,13 +16,20 @@ public record Platform(SequencedSet<String> tokens) implements Serializable {
     }
 
     public Platform() {
-        this(Stream.concat(
-                Stream.of(os(System.getProperty("os.name", "")), arch(System.getProperty("os.arch", "")))
-                        .filter(token -> !"false".equalsIgnoreCase(System.getProperty(PREFIX + token, ""))),
-                System.getProperties().stringPropertyNames().stream()
-                        .filter(name -> name.startsWith(PREFIX) && "true".equalsIgnoreCase(System.getProperty(name)))
-                        .map(name -> name.substring(PREFIX.length())))
-                .collect(Collectors.toCollection(TreeSet::new)));
+        this(new TreeSet<>(List.of(os(System.getProperty("os.name", "")), arch(System.getProperty("os.arch", "")))));
+    }
+
+    public static Platform ofEnvironment(Environment environment) {
+        SequencedSet<String> tokens = new TreeSet<>(new Platform().tokens());
+        List<String> declared = environment.entries("make.platforms");
+        for (String token : declared == null ? List.<String>of() : declared) {
+            if (environment.flag("platform." + token)) {
+                tokens.add(token.toLowerCase(Locale.ROOT));
+            } else {
+                tokens.remove(token.toLowerCase(Locale.ROOT));
+            }
+        }
+        return new Platform(tokens);
     }
 
     private static String os(String name) {

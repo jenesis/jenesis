@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.Pinning;
 import build.jenesis.Project;
 import build.jenesis.Environment;
+import build.jenesis.Make;
 
 public class Demo {
 
@@ -25,7 +26,8 @@ public class Demo {
             throws Exception {
         wipe(project);
         try {
-            Project.ofEnvironment(Environment.SYSTEM, Path.of(project)).pinning(pinning).build();
+            Environment environment = new Environment(Make.settings(Path.of(project)).keys());
+            Project.ofEnvironment(environment, Path.of(project)).pinning(pinning).build();
         } catch (Throwable _) {
             if (success) {
                 throw new AssertionError("Expected the build to succeed: " + description);

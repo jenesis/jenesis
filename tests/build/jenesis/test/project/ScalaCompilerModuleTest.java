@@ -43,8 +43,8 @@ public class ScalaCompilerModuleTest {
         executor.addModule(
                 "scala",
                 new ScalaCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
                 "project");
         executor.execute();
 
@@ -96,8 +96,8 @@ public class ScalaCompilerModuleTest {
         executor.addModule(
                 "scala",
                 new ScalaCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
                 "project");
         executor.execute();
 
@@ -131,8 +131,8 @@ public class ScalaCompilerModuleTest {
         executor.addModule(
                 "scala",
                 new ScalaCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM)))
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)))
                         .includeResources(false),
                 "project");
         executor.execute();
@@ -168,8 +168,8 @@ public class ScalaCompilerModuleTest {
         executor.addModule(
                 "scala",
                 new ScalaCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
                 "project");
         executor.execute();
 
@@ -210,8 +210,8 @@ public class ScalaCompilerModuleTest {
         executor.addModule(
                 "scala",
                 new ScalaCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
                 "project");
         executor.execute();
 
@@ -238,8 +238,8 @@ public class ScalaCompilerModuleTest {
         executor.addModule(
                 "scala",
                 new ScalaCompilerModule(
-                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
                 "project");
         executor.execute();
 

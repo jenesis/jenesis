@@ -13,6 +13,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class OpenPgpRepositoryTest {
 
+    private final Map<String, String> settings = new HashMap<>();
+
     private static final String FINGERPRINT = "B4D5C1E7000000000000000000000000000000AA";
 
     @TempDir
@@ -117,17 +119,17 @@ public class OpenPgpRepositoryTest {
     }
 
     private Optional<RepositoryItem> through(String servers) throws IOException {
-        System.setProperty("jenesis.repository.insecure", "true");
-        System.setProperty("jenesis.repository.retries", "0");
-        System.setProperty("jenesis.openpgp.uri", servers);
-        System.setProperty("jenesis.openpgp.local", root.toString());
+        settings.put("repository.insecure", "true");
+        settings.put("repository.retries", "0");
+        settings.put("openpgp.uri", servers);
+        settings.put("openpgp.local", root.toString());
         try {
-            return OpenPgpRepository.ofEnvironment(Environment.SYSTEM).fetch(Runnable::run, FINGERPRINT);
+            return OpenPgpRepository.ofEnvironment(new Environment(settings::get)).fetch(Runnable::run, FINGERPRINT);
         } finally {
-            System.clearProperty("jenesis.openpgp.local");
-            System.clearProperty("jenesis.openpgp.uri");
-            System.clearProperty("jenesis.repository.retries");
-            System.clearProperty("jenesis.repository.insecure");
+            settings.remove("openpgp.local");
+            settings.remove("openpgp.uri");
+            settings.remove("repository.retries");
+            settings.remove("repository.insecure");
         }
     }
 
@@ -178,7 +180,7 @@ public class OpenPgpRepositoryTest {
     @Test
     public void answers_from_the_cache_without_asking_anyone() throws Exception {
         Files.writeString(root.resolve(FINGERPRINT + ".gpg"), "vendored");
-        Optional<RepositoryItem> item = OpenPgpRepository.ofEnvironment(Environment.SYSTEM, URI.create("http://127.0.0.1:1/"))
+        Optional<RepositoryItem> item = OpenPgpRepository.ofEnvironment(new Environment(settings::get), URI.create("http://127.0.0.1:1/"))
                 .local(root)
                 .fetch(Runnable::run, FINGERPRINT);
         assertThat(item)
@@ -188,7 +190,7 @@ public class OpenPgpRepositoryTest {
 
     @Test
     public void refuses_a_key_server_reached_over_plaintext() {
-        assertThatThrownBy(() -> OpenPgpRepository.ofEnvironment(Environment.SYSTEM, URI.create("http://127.0.0.1:1/"))
+        assertThatThrownBy(() -> OpenPgpRepository.ofEnvironment(new Environment(settings::get), URI.create("http://127.0.0.1:1/"))
                 .fetch(Runnable::run, FINGERPRINT))
                 .as("a key server inherits the repository posture on plaintext")
                 .isInstanceOf(IllegalStateException.class)
