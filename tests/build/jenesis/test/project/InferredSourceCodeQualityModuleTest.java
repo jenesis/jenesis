@@ -16,6 +16,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class InferredSourceCodeQualityModuleTest {
 
+    private final Map<String, String> settings = new HashMap<>();
+
     @TempDir
     private Path root, project;
 
@@ -80,7 +82,7 @@ public class InferredSourceCodeQualityModuleTest {
     @Test
     public void wires_every_tool_when_it_is_given_no_provider() throws IOException {
         Files.writeString(project.resolve("checkstyle.xml"), "<module name=\"Checker\"/>");
-        System.setProperty("jenesis.source.checkstyle", "false");
+        settings.put("source.checkstyle", "false");
         try {
             BuildExecutor executor = newExecutor();
             executor.addSource("project", project);
@@ -93,7 +95,7 @@ public class InferredSourceCodeQualityModuleTest {
                     .as("a module a caller builds itself takes its defaults, whatever the environment says")
                     .exists();
         } finally {
-            System.clearProperty("jenesis.source.checkstyle");
+            settings.remove("source.checkstyle");
         }
     }
 

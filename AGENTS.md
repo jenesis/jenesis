@@ -82,10 +82,11 @@ well, so a caller that names no strings configures the same object programmatica
 things a run is given - the `Function<String, String>` that answers a setting, and the `Consumer<String>` for
 its output and for its errors - and it is the single argument every `ofEnvironment` takes. Nothing in the
 engine writes to `System.out` or `System.err`; a line goes to the consumer the run was handed.
-`Environment.SYSTEM` reads the JVM's properties and writes to its streams, `Environment.NONE` answers no
-setting and writes to the same streams, `new Environment(keys)` is a provider with the JVM's streams, and
-`new Environment(keys, out, err)` is a tool's writers. Each component is a wither of its own
-(`Environment.SYSTEM.out(printed::add)`), so a caller sends one run's lines somewhere else without touching
+`Environment.NONE` answers no setting and writes to the JVM's streams, `new Environment(keys)` is a provider
+with the JVM's streams, and `new Environment(keys, out, err)` is a tool's writers. There is deliberately no
+environment that reads the JVM's properties as they stand: code running inside a build - a customizer, an
+annotation processor - could change one between two reads. Each component is a wither of its own
+(`Environment.NONE.out(printed::add)`), so a caller sends one run's lines somewhere else without touching
 the rest. The environment is an argument, never a field: what must keep talking after it was built keeps the
 `Consumer<String>` it resolved, as every step does, and only `Project` and the multi-project assembler hold an
 `Environment`, because they build a module per project module long after the settings were read. `Make`,
@@ -118,13 +119,15 @@ differs, because a run is configured by the provider and the output it is handed
 never collide and none of them touches the JVM's own properties or streams.
 
 A setting is therefore never read again later, and a caller that builds the object itself is never
-surprised by its surroundings: `new Project(root)` is the defaults and nothing else, and only
-`Project.ofEnvironment(Environment.SYSTEM, root)` - which the entry point calls, and nobody else - reads
-the JVM's properties. Every setting is read through the environment's `Function<String, String>` that answers
-one key, never off `System` directly: `Environment.SYSTEM` is the one that reads the JVM's properties, and its
-provider is the one place the shared `jenesis.` prefix is spelt, so a key is named without it everywhere
-else. `Environment.SYSTEM` and `Environment.NONE` are written out where they are used rather than
-static imported, so both stock environments read the same way. `Make` and `Toolchain` are the exception and read a bare `Function<String, String>` with their own parsing,
+surprised by its surroundings: `new Project(root)` is the defaults and nothing else. The JVM's properties are
+read once, by `Make`: it copies every `jenesis.*` property when an entry point starts, lays the command line's
+`-Djenesis.*` arguments over the copy, and hands the result down, so a property set later changes nothing. A
+program of its own reads the same copy through `Make.settings(root).keys()`. Every setting is read through the
+environment's `Function<String, String>` that answers one key, never off `System` directly, and `Make.keys` is
+the one place the shared `jenesis.` prefix is spelt, so a key is named without it everywhere else. A setting
+whose keys cannot be listed in advance - `jenesis.platform.<token>` - is listed for it: `Make` derives
+`make.platforms`, the tokens it saw, the way it derives `make.provided`. `Environment.NONE` is written out
+where it is used rather than static imported. `Make` and `Toolchain` are the exception and read a bare `Function<String, String>` with their own parsing,
 because `MakeClosureTest` holds each of them to compiling alone - naming `Environment` there would drag the
 engine into every build's first step. `Make` therefore hands the engine the provider and `Project.perform`
 and `Project.run` take a `Function<String, String>` of their own that builds the default environment, so the

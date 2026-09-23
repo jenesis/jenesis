@@ -697,11 +697,11 @@ public class MavenProjectTest {
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
-        root.addModule("maven", MavenProject.make(Environment.SYSTEM, project,
+        root.addModule("maven", MavenProject.make(Environment.NONE, project,
                 "main",
                 "maven",
                 Map.of("maven", new MavenDefaultRepository(repository.toUri(), null, Map.of(), null)),
-                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM)),
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)),
                 null,
                 Collections.emptyNavigableSet(),
                 (descriptor, _, _) -> {

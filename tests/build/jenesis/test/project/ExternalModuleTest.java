@@ -99,7 +99,7 @@ public class ExternalModuleTest {
                 Map.of("module", versionInsensitive(Map.of(
                         "test.plugin", pluginJar,
                         "build.jenesis", jenesisJar))),
-                Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, true))));
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps).containsKey("external/marker");
@@ -142,7 +142,7 @@ public class ExternalModuleTest {
                 Map.of("module", versionInsensitive(Map.of(
                         "test.plugin", pluginJar,
                         "build.jenesis", jenesisJar))),
-                Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, true))));
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps.get("external/second").resolve("out.txt")).content().isEqualTo("seen:produced");
@@ -183,7 +183,7 @@ public class ExternalModuleTest {
                 Map.of("module", versionInsensitive(Map.of(
                         "test.plugin", pluginJar,
                         "build.jenesis", jenesisJar))),
-                Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, true))));
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps.get("external/second").resolve("out.txt")).content().isEqualTo("changed:true");
@@ -221,7 +221,7 @@ public class ExternalModuleTest {
                 Map.of("module", versionInsensitive(Map.of(
                         "test.plugin", pluginJar,
                         "build.jenesis", jenesisJar))),
-                Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, true))));
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps.get("external/inner/marker").resolve("out.txt")).content().isEqualTo("nested");
@@ -259,7 +259,7 @@ public class ExternalModuleTest {
                 Map.of("module", versionInsensitive(Map.of(
                         "test.plugin", pluginJar,
                         "build.jenesis", jenesisJar))),
-                Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, true)))
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
                 .buildModuleName("foo"));
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
@@ -290,7 +290,7 @@ public class ExternalModuleTest {
                 Map.of("module", versionInsensitive(Map.of(
                         "test.plugin", pluginJar,
                         "build.jenesis", jenesisJar))),
-                Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, true)))
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
                 .buildModuleName("bar"));
 
         assertThatThrownBy(() -> buildExecutor.execute())
@@ -315,7 +315,7 @@ public class ExternalModuleTest {
                 Map.of("module", versionInsensitive(Map.of(
                         "test.plugin", pluginJar,
                         "build.jenesis", jenesisJar))),
-                Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, true))));
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
 
         assertThatThrownBy(() -> buildExecutor.execute())
                 .rootCause()
@@ -356,7 +356,7 @@ public class ExternalModuleTest {
                 Map.of("module", versionInsensitive(Map.of(
                         "test.plugin", pluginJar,
                         "build.jenesis", jenesisJar))),
-                Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, true))));
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
 
         assertThatThrownBy(() -> buildExecutor.execute())
                 .rootCause()
@@ -399,7 +399,7 @@ public class ExternalModuleTest {
                 Map.of("module", versionInsensitive(Map.of(
                         "test.plugin", pluginJar,
                         "build.jenesis", jenesisJar))),
-                Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, true))), "manifests");
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))), "manifests");
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps.get("external/marker").resolve("out.txt")).content().isEqualTo("hello");
@@ -440,7 +440,7 @@ public class ExternalModuleTest {
                 Map.of("module", versionInsensitive(Map.of(
                         "test.plugin", pluginJar,
                         "build.jenesis", jenesisJar))),
-                Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, true))), "manifests");
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))), "manifests");
 
         assertThatThrownBy(() -> buildExecutor.execute())
                 .rootCause()
@@ -475,7 +475,7 @@ public class ExternalModuleTest {
                 Map.of("module", versionInsensitive(Map.of(
                         "test.plugin", pluginJar,
                         "build.jenesis", newerJenesisJar))),
-                Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, true))));
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
 
         assertThatThrownBy(() -> buildExecutor.execute())
                 .rootCause()

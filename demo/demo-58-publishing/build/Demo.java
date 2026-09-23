@@ -6,6 +6,7 @@ import build.jenesis.RepositoryItem;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenRepository;
 import build.jenesis.Environment;
+import build.jenesis.Make;
 
 public class Demo {
 
@@ -53,7 +54,7 @@ public class Demo {
     private static Path stage(String target) throws IOException {
         // build returns each stage step's output folder; the Maven staging step
         // is keyed "stage/maven" and its output is itself a Maven repository.
-        return Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
+        return Project.ofEnvironment(new Environment(Make.settings(Path.of(".")).keys()), Path.of("."))
                 .target(Path.of(target))
                 .sources(true)
                 .documentation(true)
