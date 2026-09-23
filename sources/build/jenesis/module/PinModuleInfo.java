@@ -42,7 +42,8 @@ public class PinModuleInfo implements BuildStep {
         PinModuleInfo pin = new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction)
                 .checksum(checksumFrom(environment))
                 .flatten(flattenFrom(environment))
-                .permits(Pinning.permits(environment));
+                .permits(Pinning.permits(environment))
+                .platform(Platform.ofEnvironment(environment));
         Boolean pins = environment.flagOrNull("print.pins");
         return pins == null || !pins ? pin : pin.printing(environment.out());
     }

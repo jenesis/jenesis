@@ -673,6 +673,12 @@ public class Dependencies implements BuildExecutorModule {
                                     if (id == null && license.name() != null) {
                                         id = aliases.get(license.name().toLowerCase(Locale.ROOT).trim());
                                     }
+                                    if (id == null && license.url() != null) {
+                                        id = aliases.get(license.url().toLowerCase(Locale.ROOT).trim()
+                                                .replaceFirst("^https?://(www\\.)?", "")
+                                                .replaceFirst("\\.(txt|html?|php|md)$", "")
+                                                .replaceFirst("/+$", ""));
+                                    }
                                     String category = license.category();
                                     if (category == null && id != null) {
                                         category = categories.get(id);
@@ -1213,6 +1219,22 @@ public class Dependencies implements BuildExecutorModule {
     }
 
     private static final Map<String, String> DEFAULT_ALIASES = Map.ofEntries(
+            Map.entry("apache.org/licenses/license-2.0", "Apache-2.0"),
+            Map.entry("opensource.org/licenses/apache-2.0", "Apache-2.0"),
+            Map.entry("opensource.org/licenses/mit", "MIT"),
+            Map.entry("opensource.org/licenses/mit-license", "MIT"),
+            Map.entry("opensource.org/license/mit", "MIT"),
+            Map.entry("opensource.org/licenses/bsd-2-clause", "BSD-2-Clause"),
+            Map.entry("opensource.org/licenses/bsd-3-clause", "BSD-3-Clause"),
+            Map.entry("opensource.org/licenses/bsd-license", "BSD-3-Clause"),
+            Map.entry("eclipse.org/legal/epl-v10", "EPL-1.0"),
+            Map.entry("eclipse.org/legal/epl-2.0", "EPL-2.0"),
+            Map.entry("eclipse.org/legal/epl-v20", "EPL-2.0"),
+            Map.entry("mozilla.org/mpl/2.0", "MPL-2.0"),
+            Map.entry("gnu.org/licenses/lgpl-2.1", "LGPL-2.1-only"),
+            Map.entry("gnu.org/licenses/lgpl-3.0", "LGPL-3.0-only"),
+            Map.entry("gnu.org/licenses/gpl-2.0", "GPL-2.0-only"),
+            Map.entry("gnu.org/licenses/gpl-3.0", "GPL-3.0-only"),
             Map.entry("apache license 2.0", "Apache-2.0"),
             Map.entry("apache license, version 2.0", "Apache-2.0"),
             Map.entry("apache license version 2.0", "Apache-2.0"),

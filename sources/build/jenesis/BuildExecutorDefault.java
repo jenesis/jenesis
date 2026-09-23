@@ -5,8 +5,8 @@ import module java.base;
 class BuildExecutorDefault implements BuildExecutor {
 
     private static final Pattern
-            VALIDATE_ORIGINAL = Pattern.compile("[a-zA-Z0-9._%-]+"),
-            VALIDATE_RESOLVED = Pattern.compile("[a-zA-Z0-9./_%-]+");
+            VALIDATE_ORIGINAL = Pattern.compile("[a-zA-Z0-9._%-][a-zA-Z0-9._%+-]*"),
+            VALIDATE_RESOLVED = Pattern.compile("[a-zA-Z0-9./_%+-]+");
 
     private static final ConcurrentMap<Path, FileChannel> LOCKS = new ConcurrentHashMap<>();
 
@@ -118,7 +118,7 @@ class BuildExecutorDefault implements BuildExecutor {
                     });
                     return CompletableFuture.completedStage(Map.of(identity, Map.of()));
                 }
-                StepFolder previous = StepFolder.of(target.resolve(BuildExecutorModule.encode(identity)));
+                StepFolder previous = StepFolder.of(target.resolve(identity));
                 boolean exists = Files.exists(previous.path());
                 byte[] currentStepHash = stepHash.hash(step);
                 StepRecord record = exists
@@ -149,7 +149,7 @@ class BuildExecutorDefault implements BuildExecutor {
                         new LinkedHashSet<>(summaries.keySet()));
                 boolean cacheRemotely = step.shouldCacheRemotely();
                 if (!consistent || step.shouldRun(arguments)) {
-                    Path next = target.resolve(BuildExecutorModule.encode(identity) + "~");
+                    Path next = target.resolve(identity + "~");
                     if (Files.exists(next)) {
                         Files.walkFileTree(next, new RecursiveFolderDeletion(null));
                     }

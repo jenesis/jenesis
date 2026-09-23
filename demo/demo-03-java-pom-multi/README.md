@@ -178,22 +178,25 @@ pinned into dependency management.
 Printing the dependency graph
 -----------------------------
 
-To see what each module resolves, run the `dependencies` selector. It prints each
-module's resolved dependency graph in one block per module and scope (each block
-headed by `<scope> (<module>)`), with every node carrying its resolved module name
-and declared license:
+To see what each module resolves, run the `dependencies` selector. It prints one
+tree per module and scope, each starting from the module itself - tagged `local`
+with the folder it is built from - with every node carrying its resolved module
+name and declared license:
 
     java build/jenesis/Make.java dependencies
 
-    main/compile (module-app)
-    maven/org.junit.jupiter/junit-jupiter 5.11.3 [compile] (module org.junit.jupiter) {Eclipse Public License v2.0}
-    ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (module org.junit.jupiter.api) {Eclipse Public License v2.0}
-    │  ├─ maven/org.opentest4j/opentest4j 1.3.0 [compile] (module org.opentest4j) {The Apache License, Version 2.0}
-    │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (module org.apiguardian.api) {The Apache License, Version 2.0}
-    └─ maven/org.junit.jupiter/junit-jupiter-engine 5.11.3 [runtime] (module org.junit.jupiter.engine) {Eclipse Public License v2.0}
+    maven/build.jenesis.demo/greeter 1.0.0 [compile] (local ./greeter)
+    └─ maven/org.apache.commons/commons-lang3 3.14.0 [compile] (module org.apache.commons.lang3) {Apache-2.0}
 
-Repeated subtrees are dimmed and marked `(*)`, and a `Resolved dependencies:`
-summary after each block lists the final version chosen for every coordinate.
+    maven/build.jenesis.demo/app 1.0.0 [compile] (local ./app)
+    └─ maven/build.jenesis.demo/greeter 1.0.0 [compile] (local ./greeter)
+       └─ maven/org.apache.commons/commons-lang3 3.14.0 [compile] (module org.apache.commons.lang3) {Apache-2.0}
+
+`app` reaches `greeter` as a module built in the same project, so it is tagged
+`local` with the folder it comes from wherever it appears. The test module of
+`greeter` follows under its own coordinate, `…/greeter/jar/tests`. Repeated
+subtrees are dimmed and marked `(*)`, and a `Resolved dependencies:` summary
+after each tree lists the final version chosen for every coordinate.
 
 Each node shows the property-file key, version, and Maven scope; a dependency
 reached more than once is expanded under its first parent and dimmed with `(*)`

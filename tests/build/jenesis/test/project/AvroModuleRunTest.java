@@ -88,7 +88,7 @@ public class AvroModuleRunTest {
     }
 
     private AvroModule newModule() {
-        return new AvroModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM)))
+        return new AvroModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)))
                 .pinning(Pinning.STRICT);
     }
 

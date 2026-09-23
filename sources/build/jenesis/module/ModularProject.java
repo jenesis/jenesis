@@ -58,7 +58,7 @@ public class ModularProject implements BuildExecutorModule {
     }
 
     public static ModularProject ofEnvironment(Environment environment, String prefix, Path root) {
-        ModularProject project = new ModularProject(prefix, root);
+        ModularProject project = new ModularProject(prefix, root).platform(Platform.ofEnvironment(environment));
         Integer segments = environment.numberOrNull("maven.segments");
         return segments == null ? project : project.segments(segments);
     }
@@ -694,7 +694,7 @@ public class ModularProject implements BuildExecutorModule {
             Path parent = file.getParent(), location = root.relativize(parent);
             if (filter.test(location)) {
                 String relative = location.toString().replace(File.separatorChar, '/');
-                buildExecutor.addModule(SIBLING_MODULE_PREFIX + BuildExecutorModule.encode(relative), (module, modInherited) -> {
+                buildExecutor.addModule(SIBLING_MODULE_PREFIX + BuildExecutorModule.encodePath(relative), (module, modInherited) -> {
                     module.addSource("sources", Bind.asSources(), parent);
                     SequencedSet<String> manifestDeps = new LinkedHashSet<>();
                     manifestDeps.add("sources");

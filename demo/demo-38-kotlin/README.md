@@ -34,7 +34,7 @@ sources out under one package:
     |       `-- pure
     |           `-- Pure.kt        a pure-Kotlin package, exported with no Java type
     `-- test
-        |-- module-info.java       open module sample.kotlin.test (@jenesis.test sample.kotlin)
+        |-- module-info.java       module sample.kotlin.test (@jenesis.test sample.kotlin)
         `-- sampletest/SampleTest.java   asserts the greeting comes from the resource
 
 How Jenesis builds it

@@ -9,18 +9,24 @@ public final class DependencyTreeReport {
 
     private final Consumer<String> out;
     private final boolean compact;
+    private final Map<String, String> locations;
 
     public DependencyTreeReport(Consumer<String> out) {
-        this(out, false);
+        this(out, false, Map.of());
     }
 
-    private DependencyTreeReport(Consumer<String> out, boolean compact) {
+    private DependencyTreeReport(Consumer<String> out, boolean compact, Map<String, String> locations) {
         this.out = out;
         this.compact = compact;
+        this.locations = locations;
     }
 
     public DependencyTreeReport compact(boolean compact) {
-        return new DependencyTreeReport(out, compact);
+        return new DependencyTreeReport(out, compact, locations);
+    }
+
+    public DependencyTreeReport locations(Map<String, String> locations) {
+        return new DependencyTreeReport(out, compact, locations);
     }
 
     public void render(Resolver.Resolution resolution) {
@@ -28,22 +34,47 @@ public final class DependencyTreeReport {
     }
 
     public void render(Resolver.Resolution resolution, String title) {
-        List<Resolver.Edge> edges = resolution.edges();
-        if (edges.isEmpty()) {
+        if (!resolution.edges().isEmpty()) {
+            render(title, resolution.edges(), resolution.vertices(), resolution.vertices());
+        }
+    }
+
+    public void render(Resolver.Resolution resolution, String key, String scope, Resolver.Vertex root) {
+        if (resolution.edges().isEmpty()) {
             return;
         }
-        SequencedMap<String, Resolver.Vertex> nodes = resolution.vertices();
-        StringBuilder builder = new StringBuilder();
-        builder.append(System.lineSeparator())
-                .append(BuildExecutorCallback.YELLOW).append(title).append(BuildExecutorCallback.RESET)
-                .append(System.lineSeparator())
-                .append(render(edges, nodes));
-        if (!nodes.isEmpty()) {
+        String version = root.resolvedVersion(), coordinate = version == null ? key : key + "/" + version;
+        List<Resolver.Edge> edges = new ArrayList<>();
+        edges.add(new Resolver.Edge(null, coordinate, version, scope, true));
+        for (Resolver.Edge edge : resolution.edges()) {
+            if (edge.parent() != null) {
+                edges.add(edge);
+            } else if (edge.followed()) {
+                edges.add(new Resolver.Edge(coordinate, edge.coordinate(), edge.version(), edge.scope(), true));
+            }
+        }
+        SequencedMap<String, Resolver.Vertex> nodes = new LinkedHashMap<>();
+        nodes.put(key, root);
+        nodes.putAll(resolution.vertices());
+        render(null, edges, nodes, resolution.vertices());
+    }
+
+    private void render(String title,
+                        List<Resolver.Edge> edges,
+                        SequencedMap<String, Resolver.Vertex> nodes,
+                        SequencedMap<String, Resolver.Vertex> resolved) {
+        StringBuilder builder = new StringBuilder(System.lineSeparator());
+        if (title != null) {
+            builder.append(BuildExecutorCallback.YELLOW).append(title).append(BuildExecutorCallback.RESET)
+                    .append(System.lineSeparator());
+        }
+        builder.append(render(edges, nodes));
+        if (!resolved.isEmpty()) {
             builder.append(System.lineSeparator())
                     .append(BuildExecutorCallback.YELLOW).append("Resolved dependencies:").append(BuildExecutorCallback.RESET)
                     .append(System.lineSeparator());
             int[] external = {0};
-            nodes.forEach((coordinate, node) -> {
+            resolved.forEach((coordinate, node) -> {
                 if (compact && !node.internal()) {
                     external[0]++;
                     return;
@@ -332,7 +363,8 @@ public final class DependencyTreeReport {
                 meta.append("automatic module");
             }
             if (node.internal()) {
-                meta.append(meta.isEmpty() ? "local" : ", local");
+                String location = locations.get(key);
+                meta.append(meta.isEmpty() ? "local" : ", local").append(location == null ? "" : " " + location);
             }
             if (!meta.isEmpty()) {
                 line.append(' ').append(paint(node.internal() ? 84 : 109, "(" + meta + ")"));

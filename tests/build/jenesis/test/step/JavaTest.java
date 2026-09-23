@@ -124,7 +124,7 @@ public class JavaTest {
     }
 
     @Test
-    public void the_paths_always_move_into_an_argument_file() throws IOException {
+    public void the_whole_invocation_moves_into_an_argument_file() throws IOException {
         Path folder = Files.createDirectories(classes.resolve(Javac.CLASSES + "sample"));
         try (InputStream input = Sample.class.getResourceAsStream(Sample.class.getSimpleName() + ".class")) {
             Files.copy(requireNonNull(input), folder.resolve("Sample.class"));
@@ -155,13 +155,14 @@ public class JavaTest {
                 .join();
         assertThat(result.next()).isTrue();
         assertThat(captured.get())
-                .as("the path options are handed over as an @-file rather than as one enormous argument")
-                .doesNotContain("--class-path", "--module-path")
-                .anySatisfy(argument -> assertThat(argument).startsWith("@").endsWith("java.args"));
+                .as("the invocation is handed over as an @-file rather than as one enormous command line")
+                .containsExactly("@" + supplement.resolve("java.args"));
         assertThat(supplement.resolve("java.args"))
+                .as("the file holds the paths and the main class, so it reproduces the run on its own")
                 .content()
                 .startsWith("\"--class-path\"\n\"")
-                .contains("a-jar-with-a-name-long-enough-to-add-up-119.jar");
+                .contains("a-jar-with-a-name-long-enough-to-add-up-119.jar")
+                .endsWith("\"sample.Sample\"\n");
         assertThat(supplement.resolve("output")).content().isEqualTo("Hello world!");
     }
 

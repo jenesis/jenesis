@@ -84,7 +84,7 @@ it also `requires`:
      * @jenesis.attach org.mockito
      * ...
      */
-    open module demo.agents.test {
+    module demo.agents.test {
         requires demo.agents;
         requires org.junit.jupiter;
         requires org.mockito;

@@ -3,7 +3,6 @@ package build.jenesis.test.project;
 import module java.base;
 import module org.junit.jupiter.api;
 import build.jenesis.BuildExecutor;
-import build.jenesis.PathPlacement;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
@@ -395,7 +394,11 @@ public class InferredMultiProjectAssemblerTest {
                 return Collections.emptyNavigableSet();
             }
         };
-        ProjectModuleDescriptor descriptor = new ProjectModuleDescriptor(base, new LinkedHashSet<>(List.of(profile, configuration)), tests, source, documentation, null, PathPlacement.INFERRED);
+        ProjectModuleDescriptor descriptor = new ProjectModuleDescriptor(base)
+                .configuration(profile, configuration)
+                .test(tests)
+                .source(source)
+                .documentation(documentation);
         return new Fixture(descriptor, build, manifests, sources, artifacts, configuration, profile);
     }
 

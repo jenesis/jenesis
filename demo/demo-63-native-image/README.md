@@ -108,7 +108,7 @@ Layout
     |       |-- Sample.java       main; loads the greeter reflectively by a run-time name
     |       `-- Greeter.java      the reflective target (reached only via Class.forName)
     `-- test/
-        |-- module-info.java     open module demo.graal.image.test (@jenesis.test demo.graal.image)
+        |-- module-info.java     module demo.graal.image.test (@jenesis.test demo.graal.image)
         `-- imagetest/SampleTest.java   exercises the reflection so the agent records it
 
 With a `module-info.java` and no `pom.xml`, Jenesis auto-detects the
