@@ -35,17 +35,14 @@ public class MavenRepositoryStaging implements BuildStep {
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
         Collected collected = collectModules(arguments);
-        Pairings pairings = pairTests(collected.mainsByArtifactId(),
-                collected.testModules(),
-                collected.abstractArtifactIds());
-        stageModules(context.next(), collected.mainsByArtifactId(), pairings);
+        Pairings pairings = pairTests(collected.stagedByArtifactId(), collected.testModules());
+        stageModules(context.next(), collected.stagedByArtifactId(), pairings);
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
     private Collected collectModules(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
-        SequencedMap<String, Module> mainsByArtifactId = new LinkedHashMap<>();
+        SequencedMap<String, Module> stagedByArtifactId = new LinkedHashMap<>();
         List<Module> testModules = new ArrayList<>();
-        SequencedSet<String> abstractArtifactIds = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -61,8 +58,8 @@ public class MavenRepositoryStaging implements BuildStep {
                 continue;
             }
             Coordinates coordinates = parseCoordinates(pom);
-            if (inventory.flag(prefix + ".abstract")) {
-                abstractArtifactIds.add(coordinates.artifactId());
+            boolean abstractTest = inventory.flag(prefix + ".abstract");
+            if (abstractTest && !includeTests) {
                 continue;
             }
             Path artifact = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".artifacts"),
@@ -74,10 +71,10 @@ public class MavenRepositoryStaging implements BuildStep {
             Path sbom = sbomReport(inventory, argument.folder(), prefix);
             String testsOf = inventory.getProperty(prefix + ".test");
             Module module = new Module(prefix, coordinates, artifact, sources, javadoc, pom, testsOf, sbom);
-            if (testsOf == null) {
-                Module previous = mainsByArtifactId.putIfAbsent(coordinates.artifactId(), module);
+            if (testsOf == null || abstractTest) {
+                Module previous = stagedByArtifactId.putIfAbsent(coordinates.artifactId(), module);
                 if (previous != null) {
-                    throw new IllegalStateException("Duplicate main artifactId '"
+                    throw new IllegalStateException("Duplicate staged artifactId '"
                             + coordinates.artifactId()
                             + "' declared by inventories '"
                             + previous.prefix()
@@ -101,16 +98,19 @@ public class MavenRepositoryStaging implements BuildStep {
                 testModules.add(module);
             }
         }
-        return new Collected(mainsByArtifactId, testModules, abstractArtifactIds);
+        return new Collected(stagedByArtifactId, testModules);
     }
 
-    private static Pairings pairTests(SequencedMap<String, Module> mainsByArtifactId,
-                                      List<Module> testModules,
-                                      Set<String> abstractArtifactIds) throws IOException {
+    private static Pairings pairTests(SequencedMap<String, Module> stagedByArtifactId,
+                                      List<Module> testModules) throws IOException {
+        SequencedMap<String, Module> mainsByArtifactId = new LinkedHashMap<>();
+        stagedByArtifactId.forEach((artifactId, module) -> {
+            if (module.testsOf() == null) {
+                mainsByArtifactId.put(artifactId, module);
+            }
+        });
         SequencedMap<String, Module> testByMain = new LinkedHashMap<>();
         SequencedMap<String, List<DependencyEntry>> testDepsByMain = new LinkedHashMap<>();
-        Set<String> unstagedArtifactIds = new LinkedHashSet<>(mainsByArtifactId.keySet());
-        unstagedArtifactIds.addAll(abstractArtifactIds);
         for (Module test : testModules) {
             Module main;
             if (test.testsOf().isEmpty()) {
@@ -131,27 +131,29 @@ public class MavenRepositoryStaging implements BuildStep {
                 }
                 main = mainsByArtifactId.values().iterator().next();
             } else {
-                main = mainsByArtifactId.get(test.testsOf());
+                main = stagedByArtifactId.get(test.testsOf());
                 if (main == null) {
                     throw new IllegalStateException("Test module '"
                             + test.prefix()
-                            + "' references unknown main '"
+                            + "' references unknown module '"
                             + test.testsOf()
-                            + "' (known mains: "
-                            + mainsByArtifactId.keySet()
+                            + "' (known modules: "
+                            + stagedByArtifactId.keySet()
                             + ")");
                 }
             }
             Module previous = testByMain.putIfAbsent(main.coordinates().artifactId(), test);
             if (previous != null) {
-                throw new IllegalStateException("Multiple test modules name main '"
+                throw new IllegalStateException("Multiple test modules name '"
                         + main.coordinates().artifactId()
                         + "' as the module they test (would collide on the '-tests' classifier): "
                         + List.of(previous.prefix(), test.prefix()));
             }
             if (test.pom() != null) {
+                Set<String> excluded = new HashSet<>(mainsByArtifactId.keySet());
+                excluded.add(main.coordinates().artifactId());
                 collectDependencies(test.pom(),
-                        unstagedArtifactIds,
+                        excluded,
                         testDepsByMain.computeIfAbsent(main.coordinates().artifactId(), _ -> new ArrayList<>()));
             }
         }
@@ -159,9 +161,9 @@ public class MavenRepositoryStaging implements BuildStep {
     }
 
     private static void stageModules(Path target,
-                                     SequencedMap<String, Module> mainsByArtifactId,
+                                     SequencedMap<String, Module> stagedByArtifactId,
                                      Pairings pairings) throws IOException {
-        for (Module main : mainsByArtifactId.values()) {
+        for (Module main : stagedByArtifactId.values()) {
             Coordinates coordinates = main.coordinates();
             SAFE_SEGMENT.accept("groupId", coordinates.groupId());
             SAFE_SEGMENT.accept("artifactId", coordinates.artifactId());
@@ -201,9 +203,7 @@ public class MavenRepositoryStaging implements BuildStep {
         }
     }
 
-    private record Collected(SequencedMap<String, Module> mainsByArtifactId,
-                             List<Module> testModules,
-                             SequencedSet<String> abstractArtifactIds) {
+    private record Collected(SequencedMap<String, Module> stagedByArtifactId, List<Module> testModules) {
     }
 
     private record Pairings(SequencedMap<String, Module> testByMain,

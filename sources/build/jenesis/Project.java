@@ -689,7 +689,7 @@ public record Project(
                       @jenesis.main <class>  main class
                       @jenesis.test [<module>|abstract]
                           Test variant of <module>. `abstract` supplies infrastructure only: declares
-                          no tests, runs none, is never staged.
+                          no tests, runs none, is staged only with the test modules.
                       @jenesis.pin <token> <ver> [<algo>/<hex>] [(<guard>)]
                           Pin a version and optionally a content checksum.
                       @jenesis.signature <algo>/<hex> | Sigstore/<host>/<path> <token>... | [<group>/]signature-<name>.properties

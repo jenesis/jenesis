@@ -161,7 +161,20 @@ public class ModularStagingTest {
     }
 
     @Test
-    public void abstract_test_module_is_not_staged_when_tests_are_included() throws IOException {
+    public void abstract_test_module_is_not_staged_without_tests() throws IOException {
+        run(false, abstractTestModule());
+
+        assertThat(next.resolve("foo.testing")).doesNotExist();
+    }
+
+    @Test
+    public void abstract_test_module_is_staged_when_tests_are_included() throws IOException {
+        run(true, abstractTestModule());
+
+        assertThat(next.resolve("foo.testing/foo.testing.jar")).hasContent("jar");
+    }
+
+    private Path abstractTestModule() throws IOException {
         Path folder = Files.createDirectory(source.resolve("testing"));
         SequencedProperties inventory = new SequencedProperties();
         inventory.setProperty("module-testing.module", "foo.testing");
@@ -170,10 +183,7 @@ public class ModularStagingTest {
         inventory.setProperty("module-testing.artifacts.0", "artifacts/classes.jar");
         inventory.store(folder.resolve(Inventory.INVENTORY));
         Files.writeString(Files.createDirectory(folder.resolve("artifacts")).resolve("classes.jar"), "jar");
-
-        run(true, folder);
-
-        assertThat(next.resolve("foo.testing")).doesNotExist();
+        return folder;
     }
 
     @Test

@@ -135,7 +135,20 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
-    public void abstract_test_module_is_never_staged() throws IOException {
+    public void abstract_test_module_is_not_staged_without_tests() throws IOException {
+        Path main = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
+        writeArtifact(main, "classes.jar", "main");
+        Path fixtures = abstractInventory("foo-testing", "com.example", "foo-testing", "1.2.3",
+                List.of(), "classes.jar");
+        writeArtifact(fixtures, "classes.jar", "testing");
+
+        run(false, main, fixtures);
+
+        assertThat(next.resolve("com/example/foo-testing")).doesNotExist();
+    }
+
+    @Test
+    public void abstract_test_module_is_staged_as_an_artifact_of_its_own_with_tests() throws IOException {
         Path main = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
         writeArtifact(main, "classes.jar", "main");
         Path fixtures = abstractInventory("foo-testing", "com.example", "foo-testing", "1.2.3",
@@ -144,20 +157,40 @@ public class MavenRepositoryStagingTest {
 
         run(true, main, fixtures);
 
-        assertThat(next.resolve("com/example/foo-testing")).doesNotExist();
+        assertThat(next.resolve("com/example/foo-testing/1.2.3/foo-testing-1.2.3.jar")).hasContent("testing");
+        assertThat(next.resolve("com/example/foo-testing/1.2.3/foo-testing-1.2.3.pom")).exists();
         assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-tests.jar"))
                 .as("an abstract module is not the test variant of the single main")
                 .doesNotExist();
     }
 
     @Test
-    public void dependency_on_an_abstract_test_module_is_excluded_from_the_merged_pom() throws IOException {
+    public void dependency_on_an_abstract_test_module_is_kept_in_the_merged_pom() throws IOException {
         Path main = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
         writeArtifact(main, "classes.jar", "main");
         Path fixtures = abstractInventory("foo-testing", "com.example", "foo-testing", "1.2.3",
                 List.of(), "classes.jar");
         writeArtifact(fixtures, "classes.jar", "testing");
         Path test = testInventory("foo-test", "com.example", "foo.test", "1.2.3", "foo",
+                List.of(new Dep("com.example", "foo-testing", "1.2.3")),
+                "classes.jar");
+        writeArtifact(test, "classes.jar", "test");
+
+        run(true, main, fixtures, test);
+
+        assertThat(Files.readString(next.resolve("com/example/foo/1.2.3/foo-1.2.3.pom")))
+                .as("the tests jar requires the abstract module, which is staged beside it")
+                .contains("<artifactId>foo-testing</artifactId>");
+    }
+
+    @Test
+    public void test_module_of_an_abstract_test_module_is_its_tests_classifier() throws IOException {
+        Path main = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
+        writeArtifact(main, "classes.jar", "main");
+        Path fixtures = abstractInventory("foo-testing", "com.example", "foo-testing", "1.2.3",
+                List.of(), "classes.jar");
+        writeArtifact(fixtures, "classes.jar", "testing");
+        Path test = testInventory("foo-testing-test", "com.example", "foo.testing.test", "1.2.3", "foo-testing",
                 List.of(
                         new Dep("com.example", "foo-testing", "1.2.3"),
                         new Dep("org.junit.jupiter", "junit-jupiter", "5.11.3")),
@@ -166,8 +199,11 @@ public class MavenRepositoryStagingTest {
 
         run(true, main, fixtures, test);
 
-        String pom = Files.readString(next.resolve("com/example/foo/1.2.3/foo-1.2.3.pom"));
-        assertThat(pom).doesNotContain("<artifactId>foo-testing</artifactId>");
+        assertThat(next.resolve("com/example/foo-testing/1.2.3/foo-testing-1.2.3-tests.jar")).hasContent("test");
+        String pom = Files.readString(next.resolve("com/example/foo-testing/1.2.3/foo-testing-1.2.3.pom"));
+        assertThat(pom.lines().filter(line -> line.trim().equals("<artifactId>foo-testing</artifactId>")).count())
+                .as("the module does not depend on itself")
+                .isEqualTo(1);
         assertThat(pom).contains("<artifactId>junit-jupiter</artifactId>");
     }
 
@@ -247,7 +283,7 @@ public class MavenRepositoryStagingTest {
 
         assertThatThrownBy(() -> run(true, main, testA, testB))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Multiple test modules name main 'foo'")
+                .hasMessageContaining("Multiple test modules name 'foo'")
                 .hasMessageContaining("'-tests' classifier")
                 .hasMessageContaining("module-foo-test-a")
                 .hasMessageContaining("module-foo-test-b");
@@ -264,7 +300,7 @@ public class MavenRepositoryStagingTest {
         assertThatThrownBy(() -> run(true, main, test))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Test module 'module-foo-test'")
-                .hasMessageContaining("references unknown main 'typo'")
+                .hasMessageContaining("references unknown module 'typo'")
                 .hasMessageContaining("[foo]");
     }
 
@@ -309,7 +345,7 @@ public class MavenRepositoryStagingTest {
 
         assertThatThrownBy(() -> run(true, mainA, mainB))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Duplicate main artifactId 'foo'")
+                .hasMessageContaining("Duplicate staged artifactId 'foo'")
                 .hasMessageContaining("module-foo-a")
                 .hasMessageContaining("com.example.a:foo:1.2.3")
                 .hasMessageContaining("module-foo-b")

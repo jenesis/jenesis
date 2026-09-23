@@ -120,11 +120,14 @@ than tests of its own:
 
 The `abstract` form of the tag marks a test module that declares no tests, so it
 is compiled and read by `greeter-test` like any other module, but no test run is
-wired for it and it is never staged - not even under `-Djenesis.stage.tests=true`,
-which does publish `greeter-test` as the `-tests` classifier of `demo.greeter`.
-Because the module is never published, it is also dropped from the test-scoped
-dependencies that `-Djenesis.stage.tests=true` merges into `demo.greeter`'s POM,
-which would otherwise point at an artifact that does not exist.
+wired for it and a plain `stage` leaves it out. Under `-Djenesis.stage.tests=true`,
+which publishes `greeter-test` as the `-tests` classifier of `demo.greeter`, it is
+staged as well, as an artifact of its own rather than as the test variant of any
+module, because the published test module requires it: `demo.greeter.testing`
+appears beside `demo.greeter`, and `demo.greeter`'s POM names it among the
+test-scoped dependencies it merges in. Infrastructure can be tested like any
+other module: a module tagged `@jenesis.test demo.greeter.testing` is run as
+`greeter-test` is, and staged as the `-tests` classifier of `demo.greeter.testing`.
 
 `abstract` is a reserved Java keyword and so can never be a module name, which
 keeps the value slot of the tag unambiguous: absent or a module name marks the
