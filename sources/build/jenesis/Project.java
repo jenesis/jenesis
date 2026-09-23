@@ -2306,7 +2306,7 @@ public record Project(
                 print.fetch|false|Each artifact downloaded from a repository
                 print.cache|false|Each step served from or written to the build cache
                 print.signatures|false|Each verified dependency with its signer, and each one no declaration covers
-                print.pins|false|Each pin a refresh kept that no closure resolves, so it carries no checksum
+                print.pins|false|Each pin a refresh kept although no closure resolved it
                 print.divergence|false|Each coordinate the project pins at more than one version
                 print.aliases|false|Each module alias whose target already declares that name
                 print.docker|true|The image notice when a build or run is containerized
@@ -2319,6 +2319,7 @@ public record Project(
                 pin.concurrency|(processor count)|Rewrite at most this many modules' pins at once; 0 is unbounded
                 pin.checksum|true|Record content checksums in the pins that the pin selector writes
                 pin.bom|keep|keep|flatten: whether pinning keeps BOM references or resolves them away
+                pin.retain|groups|groups|all|none: which pins no closure resolved a refresh keeps - those of groups it did not resolve, all, or none
                 platform.<token>||true adds a platform token and false removes one, selecting guarded pins
                 repository.insecure|false|Allow plaintext http:// repository fetches; only the command line or ~/.jenesis/jenesis.properties may allow it, never a file a project provides
                 repository.retries|2|Retries after a failed fetch; 0 disables

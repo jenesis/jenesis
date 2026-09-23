@@ -463,12 +463,13 @@ public class PinModuleInfoTest {
     }
 
     @Test
-    public void preserves_manual_pins_absent_from_the_closure() throws IOException {
+    public void drops_unreached_pins_of_a_resolved_group_and_keeps_those_of_other_groups() throws IOException {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """
                 /**
-                 * @jenesis.pin org.junit.jupiter.api 6.1.0
+                 * @jenesis.pin dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/dadada
                  * @jenesis.pin org.opentest4j 1.3.0
+                 * @jenesis.pin org.opentest4j/opentest4j 1.3.0
                  * @jenesis.pin bar 0.9
                  */
                 module foo {
@@ -477,10 +478,65 @@ public class PinModuleInfoTest {
                 """);
         writeResolved(Map.of("module/bar", "1.0 SHA-256/cafebabe"));
         String result = run(file);
-        assertInsideJavadoc(result, "@jenesis.pin org.junit.jupiter.api 6.1.0");
+        assertInsideJavadoc(result, "@jenesis.pin dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/dadada");
+        assertThat(result)
+                .as("a group no closure resolved may belong to a build this run did not configure,"
+                        + " while an unreached pin of a resolved group is obsolete")
+                .doesNotContain("org.opentest4j")
+                .contains("@jenesis.pin bar 1.0 SHA-256/cafebabe")
+                .doesNotContain("@jenesis.pin bar 0.9");
+    }
+
+    @Test
+    public void keeps_every_unreached_pin_when_retaining_all() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.pin dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/dadada
+                 * @jenesis.pin org.opentest4j 1.3.0
+                 * @jenesis.pin org.opentest4j/opentest4j 1.3.0
+                 * @jenesis.pin bar 0.9
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        writeResolved(Map.of("module/bar", "1.0 SHA-256/cafebabe"));
+        String result = run(file, pin -> pin.retain(PinModuleInfo.Retain.ALL));
+        assertInsideJavadoc(result, "@jenesis.pin dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/dadada");
         assertInsideJavadoc(result, "@jenesis.pin org.opentest4j 1.3.0");
-        assertThat(result).contains("@jenesis.pin bar 1.0 SHA-256/cafebabe");
-        assertThat(result).doesNotContain("@jenesis.pin bar 0.9");
+        assertInsideJavadoc(result, "@jenesis.pin org.opentest4j/opentest4j 1.3.0");
+        assertThat(result).contains("@jenesis.pin bar 1.0 SHA-256/cafebabe").doesNotContain("@jenesis.pin bar 0.9");
+    }
+
+    @Test
+    public void drops_every_unreached_pin_when_retaining_none() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.pin dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/dadada
+                 * @jenesis.pin org.opentest4j 1.3.0
+                 * @jenesis.pin org.opentest4j/opentest4j 1.3.0
+                 * @jenesis.pin bar 0.9
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        writeResolved(Map.of("module/bar", "1.0 SHA-256/cafebabe"));
+        String result = run(file, pin -> pin.retain(PinModuleInfo.Retain.NONE));
+        assertThat(result)
+                .doesNotContain("dokka")
+                .doesNotContain("org.opentest4j")
+                .contains("@jenesis.pin bar 1.0 SHA-256/cafebabe");
+    }
+
+    @Test
+    public void refuses_an_unknown_retention() {
+        assertThatThrownBy(() -> PinModuleInfo.ofEnvironment(new Environment(Map.of("pin.retain", "some")::get),
+                "module", "", List.of(), new HashDigestFunction("SHA-256")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown pin retention: some (expected groups, all or none)");
     }
 
     @Test
@@ -508,12 +564,12 @@ public class PinModuleInfoTest {
     }
 
     @Test
-    public void reports_a_preserved_pin_that_carries_no_checksum() throws IOException {
+    public void reports_each_kept_pin() throws IOException {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """
                 /**
-                 * @jenesis.pin org.junit.jupiter.api 6.1.0
-                 * @jenesis.pin org.opentest4j 1.3.0 SHA-256/cafebabe
+                 * @jenesis.pin dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/dadada
+                 * @jenesis.pin org.opentest4j 1.3.0
                  * @jenesis.pin bar 0.9
                  */
                 module foo {
@@ -522,21 +578,21 @@ public class PinModuleInfoTest {
                 """);
         writeResolved(Map.of("module/bar", "1.0 SHA-256/cafebabe"));
         StringBuilder captured = new StringBuilder();
-        String result = run(file, pin -> pin.printing(line -> captured.append(line).append('\n')));
-        assertInsideJavadoc(result, "@jenesis.pin org.junit.jupiter.api 6.1.0");
+        run(file, pin -> pin.printing(line -> captured.append(line).append('\n')));
         assertThat(captured.toString())
-                .as("strict mode accepts a bare line for a coordinate it never resolves, so nothing"
-                        + " else would ever mention it, and jenesis.print.pins is what asks")
-                .contains("org.junit.jupiter.api 6.1.0")
-                .doesNotContain("org.opentest4j");
+                .as("a kept line is either a pin for a closure this run did not resolve or a leftover,"
+                        + " and jenesis.print.pins is what names it")
+                .contains("dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/dadada")
+                .doesNotContain("org.opentest4j")
+                .doesNotContain("bar");
     }
 
     @Test
-    public void preserved_manual_pin_survives_a_second_run() throws IOException {
+    public void kept_pin_survives_a_second_run() throws IOException {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """
                 /**
-                 * @jenesis.pin org.junit.jupiter.api 6.1.0
+                 * @jenesis.pin dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/dadada
                  */
                 module foo {
                   requires bar;
@@ -546,7 +602,7 @@ public class PinModuleInfoTest {
         String afterFirst = run(file);
         String afterSecond = run(file);
         assertThat(afterSecond).isEqualTo(afterFirst);
-        assertThat(afterSecond).contains("@jenesis.pin org.junit.jupiter.api 6.1.0");
+        assertThat(afterSecond).contains("@jenesis.pin dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/dadada");
     }
 
     @Test
