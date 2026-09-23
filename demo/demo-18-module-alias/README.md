@@ -155,7 +155,7 @@ runtime that knows about exactly four modules:
 
     target/stage/runtime/output/module-sources/bin/java --list-modules
 
-    demo.cli@1-SNAPSHOT
+    demo.cli
     java.base@25.0.3
     java.xml@25.0.3
     org.kohsuke.args4j@2.33 open

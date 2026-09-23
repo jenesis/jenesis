@@ -579,7 +579,6 @@ public class ModularProject implements BuildExecutorModule {
             String moduleName = info.coordinate();
             metadata.setProperty("project", MavenModuleRepository.groupId(moduleName, segments));
             metadata.setProperty("artifact", moduleName);
-            metadata.setProperty("version", "1-SNAPSHOT");
             if (info.name() != null) {
                 metadata.setProperty("name", info.name());
             }
