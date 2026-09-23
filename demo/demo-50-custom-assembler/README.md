@@ -16,6 +16,11 @@ From this directory:
 
     java build/jenesis/Make.java
 
+Run it with `Make.java` rather than the installed `jenesis` command. `Make.java`
+compiles the customizer under `build/custom/` with the engine; the installed
+command runs the released engine, compiles nothing there, and stops with an error
+that names the customizer it cannot find.
+
 You should see the build graph resolve and run, with a line reporting the
 substitution as the `preprocess` step rewrites the source:
 

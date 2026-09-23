@@ -1441,7 +1441,9 @@ public record Project(
         } catch (ClassNotFoundException _) {
             throw new IllegalArgumentException("No class " + customizer + " for jenesis.project.customizer - name"
                     + " a class compiled with the build, which build/jenesis/Make.java does for every source"
-                    + " under build/custom/");
+                    + " under build/custom/. The installed jenesis command runs the released engine and compiles"
+                    + " nothing under build/custom/, so build a project with a customizer with"
+                    + " java build/jenesis/Make.java, and run what it built with java build/jenesis/Execute.java");
         } catch (NoSuchMethodException _) {
             throw new IllegalArgumentException("The customizer " + customizer + " declares no public constructor"
                     + " without arguments - declare one, so the build can create it");
