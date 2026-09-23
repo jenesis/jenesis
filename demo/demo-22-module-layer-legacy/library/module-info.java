@@ -4,8 +4,8 @@
  * drags behind it, which name themselves nowhere either.
  *
  * @jenesis.release 25
- * @jenesis.pin build.jenesis.launcher 0.5.0 SHA-256/a130e105cbb1b04df47249edb65c6b4f03139cae0de174a02b2c218a3b9a3d47
- * @jenesis.pin build.jenesis/build.jenesis.launcher 0.5.0 SHA-256/a130e105cbb1b04df47249edb65c6b4f03139cae0de174a02b2c218a3b9a3d47
+ * @jenesis.pin build.jenesis.launcher 0.5.1 SHA-256/b9db437eccaeaef7ee04a6a00a8e330bc69542614012fa6485079f41e3c9edfb
+ * @jenesis.pin build.jenesis/build.jenesis.launcher 0.5.1 SHA-256/b9db437eccaeaef7ee04a6a00a8e330bc69542614012fa6485079f41e3c9edfb
  * @jenesis.pin layer:beans/maven/commons-beanutils/commons-beanutils 1.9.4 SHA-256/7d938c81789028045c08c065e94be75fc280527620d5bd62b519d5838532368a
  * @jenesis.pin layer:beans/maven/commons-collections/commons-collections 3.2.2 SHA-256/eeeae917917144a68a741d4c0dff66aa5c5c5fd85593ff217bced3fc8ca783b8
  * @jenesis.pin layer:beans/maven/commons-logging/commons-logging 1.2 SHA-256/daddea1ea0be0f56978ab3006b8ac92834afeefbd9b7e4e6316fca57df0fa636

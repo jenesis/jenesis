@@ -7,8 +7,8 @@
  * @jenesis.layer strings api demo.strings.spi
  * @jenesis.layer strings provider module/demo.strings.text
  * @jenesis.native demo.strings.library layer:strings/module/demo.strings.text
- * @jenesis.pin build.jenesis.launcher 0.5.0 SHA-256/a130e105cbb1b04df47249edb65c6b4f03139cae0de174a02b2c218a3b9a3d47
- * @jenesis.pin build.jenesis/build.jenesis.launcher 0.5.0 SHA-256/a130e105cbb1b04df47249edb65c6b4f03139cae0de174a02b2c218a3b9a3d47
+ * @jenesis.pin build.jenesis.launcher 0.5.1 SHA-256/b9db437eccaeaef7ee04a6a00a8e330bc69542614012fa6485079f41e3c9edfb
+ * @jenesis.pin build.jenesis/build.jenesis.launcher 0.5.1 SHA-256/b9db437eccaeaef7ee04a6a00a8e330bc69542614012fa6485079f41e3c9edfb
  */
 module demo.strings.library {
     requires build.jenesis.launcher;
