@@ -14,7 +14,7 @@ import build.jenesis.HashDigestFunction;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class BuildExecutorCacheTest implements Serializable {
+public class BuildExecutorCacheTest {
 
     @TempDir
     private Path root, source;
