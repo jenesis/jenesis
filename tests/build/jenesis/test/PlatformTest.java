@@ -118,7 +118,8 @@ public class PlatformTest {
 
     @Test
     public void declared_flag_that_is_neither_true_nor_false_is_refused() {
-        assertThatThrownBy(() -> Platform.ofEnvironment(new Environment(Make.keys(Map.of("jenesis.platform.fips", "yes")))))
+        Environment environment = new Environment(Make.keys(Map.of("jenesis.platform.fips", "yes")));
+        assertThatThrownBy(() -> Platform.ofEnvironment(environment))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("jenesis.platform.fips");
     }

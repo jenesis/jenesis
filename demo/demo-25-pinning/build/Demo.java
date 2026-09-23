@@ -26,7 +26,8 @@ public class Demo {
             throws Exception {
         wipe(project);
         try {
-            Project.ofEnvironment(new Environment(Make.settings(Path.of(project)).keys()), Path.of(project)).pinning(pinning).build();
+            Environment environment = new Environment(Make.settings(Path.of(project)).keys());
+            Project.ofEnvironment(environment, Path.of(project)).pinning(pinning).build();
         } catch (Throwable _) {
             if (success) {
                 throw new AssertionError("Expected the build to succeed: " + description);
