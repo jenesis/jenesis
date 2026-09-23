@@ -23,15 +23,9 @@ public class ProjectModuleDescriptor implements ProjectModule {
     private final Pinning pinning;
     private final PathPlacement pathPlacement;
 
-    public ProjectModuleDescriptor(ProjectModule base,
-                                   SequencedSet<Path> configuration,
-                                   boolean test,
-                                   boolean source,
-                                   boolean documentation,
-                                   Pinning pinning,
-                                   PathPlacement pathPlacement) {
+    public ProjectModuleDescriptor(ProjectModule base) {
         this(base.name(),
-                configuration,
+                Collections.emptyNavigableSet(),
                 immutable(base.dependencies()),
                 immutable(base.sources()),
                 immutable(base.resources()),
@@ -40,10 +34,11 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 immutable(base.artifacts()),
                 immutable(base.spdx()),
                 Collections.emptyNavigableSet(),
-                test,
-                source,
-                documentation,
-                pinning, pathPlacement);
+                true,
+                false,
+                false,
+                null,
+                PathPlacement.INFERRED);
     }
 
     private ProjectModuleDescriptor(String name,
@@ -82,6 +77,28 @@ public class ProjectModuleDescriptor implements ProjectModule {
         return configuration;
     }
 
+    public ProjectModuleDescriptor configuration(SequencedSet<Path> configuration) {
+        return new ProjectModuleDescriptor(name,
+                immutable(configuration),
+                dependencies,
+                sources,
+                resources,
+                manifests,
+                coordinates,
+                artifacts,
+                spdx,
+                content,
+                test,
+                source,
+                documentation,
+                pinning,
+                pathPlacement);
+    }
+
+    public ProjectModuleDescriptor configuration(Path... configuration) {
+        return configuration(new LinkedHashSet<>(List.of(configuration)));
+    }
+
     public ProjectModuleDescriptor toInherited() {
         return new ProjectModuleDescriptor(name,
                 configuration,
@@ -96,7 +113,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 test,
                 source,
                 documentation,
-                pinning, pathPlacement);
+                pinning,
+                pathPlacement);
     }
 
     @Override
@@ -425,7 +443,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 pathPlacement);
     }
 
-    private static SequencedSet<String> immutable(SequencedSet<String> values) {
+    private static <T> SequencedSet<T> immutable(SequencedSet<T> values) {
         return Collections.unmodifiableSequencedSet(new LinkedHashSet<>(values));
     }
 
