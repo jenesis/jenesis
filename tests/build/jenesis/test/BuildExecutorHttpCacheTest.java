@@ -192,7 +192,7 @@ public class BuildExecutorHttpCacheTest {
                 } catch (IOException | InterruptedException _) {
                 }
             });
-            BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(new Environment(Map.of("cache.read", "PT0.5S")::get), 
+            BuildExecutorHttpCache cache = BuildExecutorHttpCache.ofEnvironment(new Environment(Map.of("cache.read", "PT0.5S")), 
                     URI.create("http://localhost:" + hanging.getLocalPort() + "/cache"))
                     .key("team-alpha").project("demo");
             long started = System.nanoTime();

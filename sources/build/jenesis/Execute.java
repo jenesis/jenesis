@@ -8,7 +8,7 @@ public final class Execute {
         SequencedMap<String, String> named = new LinkedHashMap<>();
         String[] remaining = Make.partitioned(arguments, named);
         List<String> options = Make.options(named);
-        Function<String, String> ambient = Make.ambient(named);
+        Map<String, String> ambient = Make.ambient(named);
         Make make = new Make("build.jenesis.Execution", ambient).daemon(false);
         Integer code = Make.relaunched(Execute.class, ambient, options, remaining);
         System.exit(code == null ? make.run(remaining) : code);

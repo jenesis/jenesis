@@ -185,7 +185,7 @@ public class LauncherTest {
         application.setProperty("mainClass", "sample.Sample");
         application.store(input.resolve("launcher.properties"));
         Launcher launcher;
-        launcher = Launcher.ofEnvironment(new Environment(Map.of("archive.timestamp", "")::get), "launcher", PathPlacement.INFERRED);
+        launcher = Launcher.ofEnvironment(new Environment(Map.of("archive.timestamp", "")), "launcher", PathPlacement.INFERRED);
 
         BuildStepResult result = launcher.apply(
                 Runnable::run,

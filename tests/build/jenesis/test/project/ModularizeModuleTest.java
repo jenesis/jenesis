@@ -162,7 +162,7 @@ public class ModularizeModuleTest {
                 modularized.resolve(Dependencies.MODULAR_PATH + "demo.automatic.jar").toFile())) {
             assertThat(jar.stream().map(ZipEntry::getTimeLocal))
                     .as("the time the dependency was packed at is dropped, as it would be converted to local time")
-                    .containsOnly(BuildStep.timestamp(new Environment(settings::get)).toLocalDateTime());
+                    .containsOnly(BuildStep.timestamp(new Environment(settings)).toLocalDateTime());
         }
     }
 
@@ -208,7 +208,7 @@ public class ModularizeModuleTest {
                 BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         buildExecutor.addSource("closure", closure);
         buildExecutor.addModule("modules",
-                ModularizeModule.ofEnvironment(new Environment(settings::get), ProcessHandler.Factory.TOOL, synthetic),
+                ModularizeModule.ofEnvironment(new Environment(settings), ProcessHandler.Factory.TOOL, synthetic),
                 "closure");
         SequencedMap<String, Path> steps = buildExecutor.execute();
         return steps.get("modules");

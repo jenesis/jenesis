@@ -700,7 +700,7 @@ public class MavenDefaultRepositoryTest {
                 repository.resolve("first").toUri() + "," + repository.resolve("second").toUri());
         settings.put("maven.local", local.toString());
         try {
-            Optional<RepositoryItem> item = MavenDefaultRepository.ofEnvironment(new Environment(settings::get)).fetch(Runnable::run,
+            Optional<RepositoryItem> item = MavenDefaultRepository.ofEnvironment(new Environment(settings)).fetch(Runnable::run,
                     "group",
                     "artifact",
                     "1",
@@ -727,7 +727,7 @@ public class MavenDefaultRepositoryTest {
                 repository.resolve("first").toUri() + "," + repository.resolve("second").toUri());
         settings.put("maven.local", local.toString());
         try {
-            Optional<RepositoryItem> item = MavenDefaultRepository.ofEnvironment(new Environment(settings::get)).fetch(Runnable::run,
+            Optional<RepositoryItem> item = MavenDefaultRepository.ofEnvironment(new Environment(settings)).fetch(Runnable::run,
                     "group",
                     "artifact",
                     "1",
@@ -762,7 +762,7 @@ public class MavenDefaultRepositoryTest {
                 repository.resolve("first").toUri() + "|special," + repository.resolve("second").toUri());
         settings.put("maven.local", local.toString());
         try {
-            MavenRepository merged = MavenDefaultRepository.ofEnvironment(new Environment(settings::get));
+            MavenRepository merged = MavenDefaultRepository.ofEnvironment(new Environment(settings));
             try (InputStream stream = merged.fetch(Runnable::run, "special", "artifact", "1", "jar", null, null)
                     .orElseThrow().toInputStream()) {
                 assertThat(new String(stream.readAllBytes())).isEqualTo("first-special");
@@ -795,7 +795,7 @@ public class MavenDefaultRepositoryTest {
                 repository.resolve("first").toUri() + "|special," + repository.resolve("second").toUri());
         settings.put("maven.local", local.toString());
         try {
-            MavenRepository merged = MavenDefaultRepository.ofEnvironment(new Environment(settings::get));
+            MavenRepository merged = MavenDefaultRepository.ofEnvironment(new Environment(settings));
             try (InputStream stream = merged.fetch(Runnable::run, "special.sub", "artifact", "1", "jar", null, null)
                     .orElseThrow().toInputStream()) {
                 assertThat(new String(stream.readAllBytes())).isEqualTo("first-sub");
@@ -823,7 +823,7 @@ public class MavenDefaultRepositoryTest {
                 repository.resolve("first").toUri() + "," + repository.resolve("second").toUri());
         settings.put("maven.local", local.toString());
         try {
-            Optional<RepositoryItem> item = MavenDefaultRepository.ofEnvironment(new Environment(settings::get)).fetch(Runnable::run,
+            Optional<RepositoryItem> item = MavenDefaultRepository.ofEnvironment(new Environment(settings)).fetch(Runnable::run,
                     "group",
                     "artifact",
                     "1",
@@ -857,7 +857,7 @@ public class MavenDefaultRepositoryTest {
         settings.put("corp.test.mirrors", repository.resolve("first").toUri().toString());
         settings.put("maven.local", local.toString());
         try {
-            MavenRepository merged = MavenDefaultRepository.ofEnvironment(new Environment(settings::get));
+            MavenRepository merged = MavenDefaultRepository.ofEnvironment(new Environment(settings));
             try (InputStream stream = merged.fetch(Runnable::run, "special", "artifact", "1", "jar", null, null)
                     .orElseThrow().toInputStream()) {
                 assertThat(new String(stream.readAllBytes())).isEqualTo("first-special");
@@ -881,7 +881,7 @@ public class MavenDefaultRepositoryTest {
         settings.put("maven.uri", repository.resolve("first").toUri() + ",@");
         settings.put("maven.local", local.toString());
         try {
-            Optional<RepositoryItem> item = MavenDefaultRepository.ofEnvironment(new Environment(settings::get)).fetch(Runnable::run,
+            Optional<RepositoryItem> item = MavenDefaultRepository.ofEnvironment(new Environment(settings)).fetch(Runnable::run,
                     "group",
                     "artifact",
                     "1",
@@ -903,7 +903,7 @@ public class MavenDefaultRepositoryTest {
         settings.put("maven.uri", "@corp.test.unset");
         settings.put("maven.local", local.toString());
         try {
-            assertThatThrownBy(() -> MavenDefaultRepository.ofEnvironment(new Environment(settings::get)))
+            assertThatThrownBy(() -> MavenDefaultRepository.ofEnvironment(new Environment(settings)))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Unresolved repository reference: @corp.test.unset");
         } finally {
@@ -919,7 +919,7 @@ public class MavenDefaultRepositoryTest {
         settings.put("corp.test.right", "@corp.test.left");
         settings.put("maven.local", local.toString());
         try {
-            assertThatThrownBy(() -> MavenDefaultRepository.ofEnvironment(new Environment(settings::get)))
+            assertThatThrownBy(() -> MavenDefaultRepository.ofEnvironment(new Environment(settings)))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Circular repository reference: @corp.test.left");
         } finally {

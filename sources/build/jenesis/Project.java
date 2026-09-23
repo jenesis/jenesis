@@ -2313,7 +2313,6 @@ public record Project(
                 make.root|.|Folder Make looks for the project in; only settable on the command line
                 make.profiles||Comma-separated profiles layered over jenesis.properties
                 make.global||Folder holding the user-global .jenesis/jenesis.properties; default: the home folder; only settable on the command line
-                make.platforms||The jenesis.platform.<token> settings in force, comma-separated tokens; derived by Make and settable in no file
                 make.provided||Settings that the files a project provides supplied, comma-separated and named without the jenesis. prefix; derived by Make and settable in no file, so that a repository or cache URL a project named is never sent a credential
                 make.compile|true|Compile the build sources once and run from those classes
                 make.classes|.jenesis/classes|Where those classes land, relative to the root
@@ -2436,13 +2435,7 @@ public record Project(
 
     private static SortedMap<String, String> settings(Environment environment) {
         SortedMap<String, String> settings = new TreeMap<>();
-        for (String line : CATALOGUE.lines().toList()) {
-            String key = line.split("\\|", 3)[0];
-            String value = environment.getProperty(key);
-            if (value != null) {
-                settings.put("jenesis." + key, value);
-            }
-        }
+        environment.keys().forEach((key, value) -> settings.put("jenesis." + key, value));
         return settings;
     }
 
@@ -2470,16 +2463,6 @@ public record Project(
         if (environment.flag("project.docker")) {
             SortedMap<String, String> properties = new TreeMap<>(settings(environment));
             properties.keySet().removeIf(name -> name.startsWith("jenesis.project.docker"));
-            Path plugins = this.root().resolve("jenesis-plugins.properties");
-            if (Files.isRegularFile(plugins)) {
-                for (String key : SequencedProperties.ofFiles(plugins).stringPropertyNames()) {
-                    String name = "plugin." + (key.indexOf('+') == -1 ? key : key.substring(0, key.indexOf('+')));
-                    String value = environment.getProperty(name);
-                    if (value != null) {
-                        properties.put("jenesis." + name, value);
-                    }
-                }
-            }
             String image = environment.getProperty("project.docker.image");
             Path root = this.root().toAbsolutePath().normalize();
             DockerizedJava docker = image == null ? new DockerizedJava(root) : new DockerizedJava(root, image);
@@ -2575,7 +2558,7 @@ public record Project(
         return this.build(selectors);
     }
 
-    public static SequencedMap<String, Path> perform(Function<String, String> keys,
+    public static SequencedMap<String, Path> perform(Map<String, String> keys,
                                                      Path root,
                                                      SequencedSet<Path> profiles,
                                                      String... selectors) {
@@ -2594,7 +2577,7 @@ public record Project(
         }
     }
 
-    public static int run(Function<String, String> keys,
+    public static int run(Map<String, String> keys,
                           String mainClass,
                           Path root,
                           SequencedSet<Path> profiles,

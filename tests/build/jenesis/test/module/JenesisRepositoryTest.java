@@ -118,7 +118,7 @@ public class JenesisRepositoryTest {
     private Environment environment(Map<String, String> settings) {
         Map<String, String> all = new HashMap<>(settings);
         all.put("module.local", local.toString());
-        return new Environment(all::get);
+        return new Environment(all);
     }
 
     private void writeIndex(String module, String... rows) throws IOException {

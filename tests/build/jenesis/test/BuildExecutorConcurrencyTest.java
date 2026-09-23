@@ -113,10 +113,10 @@ public class BuildExecutorConcurrencyTest {
 
     @Test
     public void reads_the_limit_from_the_property_and_overrides_it_with_the_wither() {
-        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).concurrency()).isEqualTo(0);
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings)).concurrency()).isEqualTo(0);
         settings.put("executor.concurrency", "3");
-        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).concurrency()).isEqualTo(3);
-        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).concurrency(5).concurrency())
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings)).concurrency()).isEqualTo(3);
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings)).concurrency(5).concurrency())
                 .isEqualTo(5);
     }
 }

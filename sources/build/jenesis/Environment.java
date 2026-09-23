@@ -2,19 +2,23 @@ package build.jenesis;
 
 import module java.base;
 
-public record Environment(Function<String, String> keys, Consumer<String> out, Consumer<String> err) {
+public record Environment(Map<String, String> keys, Consumer<String> out, Consumer<String> err) {
 
-    public static final Environment NONE = new Environment(_ -> null);
+    public static final Environment NONE = new Environment(Map.of());
 
-    public Environment(Function<String, String> keys) {
+    public Environment {
+        keys = Map.copyOf(keys);
+    }
+
+    public Environment(Map<String, String> keys) {
         this(keys, System.out::println, System.err::println);
     }
 
-    public Environment(Function<String, String> keys, PrintWriter out, PrintWriter err) {
+    public Environment(Map<String, String> keys, PrintWriter out, PrintWriter err) {
         this(keys, out::println, err::println);
     }
 
-    public Environment keys(Function<String, String> keys) {
+    public Environment keys(Map<String, String> keys) {
         return new Environment(keys, out, err);
     }
 
@@ -27,20 +31,20 @@ public record Environment(Function<String, String> keys, Consumer<String> out, C
     }
 
     public String getProperty(String key) {
-        return keys.apply(key);
+        return keys.get(key);
     }
 
     public String getProperty(String key, String defaultValue) {
-        String value = keys.apply(key);
+        String value = keys.get(key);
         return value == null ? defaultValue : value;
     }
 
     public String value(String key) {
-        return trimmed(keys.apply(key));
+        return trimmed(keys.get(key));
     }
 
     public String value(String key, String defaultValue) {
-        String value = trimmed(keys.apply(key));
+        String value = trimmed(keys.get(key));
         return value == null ? defaultValue : value;
     }
 
@@ -54,7 +58,7 @@ public record Environment(Function<String, String> keys, Consumer<String> out, C
     }
 
     public Boolean flagOrNull(String key) {
-        return Make.parsed("jenesis." + key, keys.apply(key));
+        return Make.parsed("jenesis." + key, keys.get(key));
     }
 
     public int number(String key, int defaultValue) {

@@ -56,7 +56,7 @@ public class JenesisModuleRepositoryTest {
             settings.put("module.uri",
                     "http://localhost:" + first.getAddress().getPort() + "/,"
                             + "http://localhost:" + second.getAddress().getPort() + "/");
-            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE)
+            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
             assertThat(read(item)).isEqualTo("classes");
@@ -87,7 +87,7 @@ public class JenesisModuleRepositoryTest {
         server.start();
         try {
             URI base = URI.create("http://localhost:" + server.getAddress().getPort() + "/");
-            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), base)
+            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings), base)
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
             assertThat(read(item)).isEqualTo("classes");
@@ -108,7 +108,7 @@ public class JenesisModuleRepositoryTest {
         HttpServer server = serving(requests);
         server.start();
         try {
-            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), 
+            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings), 
                     URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
@@ -128,7 +128,7 @@ public class JenesisModuleRepositoryTest {
         HttpServer server = serving(requests);
         server.start();
         try {
-            JenesisModuleRepository.ofEnvironment(new Environment(settings::get), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+            JenesisModuleRepository.ofEnvironment(new Environment(settings), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
                     .maven(null)
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
@@ -150,7 +150,7 @@ public class JenesisModuleRepositoryTest {
         HttpServer server = serving(requests);
         server.start();
         try {
-            JenesisModuleRepository.ofEnvironment(new Environment(settings::get), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+            JenesisModuleRepository.ofEnvironment(new Environment(settings), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
             assertThat(requests)
@@ -171,7 +171,7 @@ public class JenesisModuleRepositoryTest {
         HttpServer server = serving(requests);
         server.start();
         try {
-            JenesisModuleRepository.ofEnvironment(new Environment(settings::get), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+            JenesisModuleRepository.ofEnvironment(new Environment(settings), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
             assertThat(requests).containsExactly(Map.of());
@@ -190,7 +190,7 @@ public class JenesisModuleRepositoryTest {
         HttpServer server = serving(requests);
         server.start();
         try {
-            JenesisModuleRepository.ofEnvironment(new Environment(settings::get), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+            JenesisModuleRepository.ofEnvironment(new Environment(settings), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
                     .maven(null)
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
@@ -212,7 +212,7 @@ public class JenesisModuleRepositoryTest {
         HttpServer server = serving(requests);
         server.start();
         try {
-            JenesisModuleRepository.ofEnvironment(new Environment(settings::get), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+            JenesisModuleRepository.ofEnvironment(new Environment(settings), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
                     .maven(null)
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
@@ -233,7 +233,7 @@ public class JenesisModuleRepositoryTest {
         HttpServer server = serving(requests);
         server.start();
         try {
-            JenesisModuleRepository.ofEnvironment(new Environment(settings::get), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+            JenesisModuleRepository.ofEnvironment(new Environment(settings), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
                     .maven(URI.create("https://repo.example.com/maven2/"))
                     .prerelease(true)
                     .speculative(false)
@@ -258,7 +258,7 @@ public class JenesisModuleRepositoryTest {
         HttpServer server = serving(requests);
         server.start();
         try {
-            JenesisModuleRepository.ofEnvironment(new Environment(settings::get), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+            JenesisModuleRepository.ofEnvironment(new Environment(settings), URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
                     .maven(null)
                     .prerelease(null)
                     .fetch(Runnable::run, "build.jenesis")
@@ -290,7 +290,7 @@ public class JenesisModuleRepositoryTest {
         });
         index.start();
         try {
-            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), 
+            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings), 
                     URI.create("http://localhost:" + index.getAddress().getPort() + "/"))
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
@@ -336,7 +336,7 @@ public class JenesisModuleRepositoryTest {
                 .resolve("build.jenesis.jar"), "remote");
         settings.put("module.uri", root.resolve("remote").toUri().toString());
         try {
-            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE)
+            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "build.jenesis/1.0")
                     .orElseThrow();
 
@@ -355,7 +355,7 @@ public class JenesisModuleRepositoryTest {
                 .resolve("build.jenesis.jar"), "remote");
         settings.put("module.uri", root.resolve("remote").toUri().toString());
         try {
-            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE)
+            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "build.jenesis/1.0")
                     .orElseThrow();
 
@@ -376,7 +376,7 @@ public class JenesisModuleRepositoryTest {
         Path moduleDir = Files.createDirectories(root.resolve("build.jenesis"));
         Files.writeString(moduleDir.resolve("build.jenesis.jar"), "classes");
 
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri()).fetch(Runnable::run, "build.jenesis");
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri()).fetch(Runnable::run, "build.jenesis");
 
         assertThat(item).isPresent();
         try (InputStream stream = item.orElseThrow().toInputStream()) {
@@ -389,7 +389,7 @@ public class JenesisModuleRepositoryTest {
         Path versionDir = Files.createDirectories(root.resolve("build.jenesis/1.0.0"));
         Files.writeString(versionDir.resolve("build.jenesis.jar"), "v1-classes");
 
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build.jenesis/1.0.0");
 
         assertThat(item).isPresent();
@@ -403,7 +403,7 @@ public class JenesisModuleRepositoryTest {
         Path moduleDir = Files.createDirectories(root.resolve("build.jenesis"));
         Path jar = Files.writeString(moduleDir.resolve("build.jenesis.jar"), "classes");
 
-        RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build.jenesis")
                 .orElseThrow();
 
@@ -412,7 +412,7 @@ public class JenesisModuleRepositoryTest {
 
     @Test
     public void returns_empty_when_unversioned_module_is_missing() throws IOException {
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri()).fetch(Runnable::run, "build.jenesis");
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri()).fetch(Runnable::run, "build.jenesis");
 
         assertThat(item).isEmpty();
     }
@@ -421,7 +421,7 @@ public class JenesisModuleRepositoryTest {
     public void returns_empty_when_versioned_module_is_missing() throws IOException {
         Files.createDirectories(root.resolve("build.jenesis"));
 
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build.jenesis/1.0.0");
 
         assertThat(item).isEmpty();
@@ -433,7 +433,7 @@ public class JenesisModuleRepositoryTest {
         Files.writeString(moduleDir.resolve("build.jenesis.jar"), "classes");
         URI rootWithoutSlash = URI.create(root.toUri().toString().replaceAll("/$", ""));
 
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), rootWithoutSlash).fetch(Runnable::run, "build.jenesis");
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), rootWithoutSlash).fetch(Runnable::run, "build.jenesis");
 
         assertThat(item).isPresent();
     }
@@ -444,7 +444,7 @@ public class JenesisModuleRepositoryTest {
         Path otherDir = Files.createDirectories(root.resolve("build.jenesis.extras"));
         Files.writeString(otherDir.resolve("build.jenesis.extras.jar"), "extras");
 
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri()).fetch(Runnable::run, "build.jenesis");
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri()).fetch(Runnable::run, "build.jenesis");
 
         assertThat(item).isEmpty();
     }
@@ -454,7 +454,7 @@ public class JenesisModuleRepositoryTest {
         Path moduleDir = Files.createDirectories(root.resolve("build.jenesis"));
         Files.writeString(moduleDir.resolve("build.jenesis.pom"), "pom-bytes");
 
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build.jenesis:pom");
 
         assertThat(item).isPresent();
@@ -468,7 +468,7 @@ public class JenesisModuleRepositoryTest {
         Path versionDir = Files.createDirectories(root.resolve("build.jenesis/1.0.0"));
         Files.writeString(versionDir.resolve("build.jenesis.pom"), "v1-pom-bytes");
 
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build.jenesis/1.0.0:pom");
 
         assertThat(item).isPresent();
@@ -482,7 +482,7 @@ public class JenesisModuleRepositoryTest {
         Path moduleDir = Files.createDirectories(root.resolve("build.jenesis"));
         Files.writeString(moduleDir.resolve("pom.xml"), "legacy-pom");
 
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build.jenesis:pom");
 
         assertThat(item).isEmpty();
@@ -493,7 +493,7 @@ public class JenesisModuleRepositoryTest {
         Path moduleDir = Files.createDirectories(root.resolve("build.jenesis"));
         Files.writeString(moduleDir.resolve("build.jenesis.jar"), "classes");
 
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build.jenesis:pom");
 
         assertThat(item).isEmpty();
@@ -504,7 +504,7 @@ public class JenesisModuleRepositoryTest {
         Path moduleDir = Files.createDirectories(root.resolve("build.jenesis"));
         Files.writeString(moduleDir.resolve("build.jenesis.jmod"), "jmod-bytes");
 
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build.jenesis:jmod");
 
         assertThat(item).isPresent();
@@ -518,7 +518,7 @@ public class JenesisModuleRepositoryTest {
         Path versionDir = Files.createDirectories(root.resolve("build.jenesis/1.0.0"));
         Files.writeString(versionDir.resolve("build.jenesis-windows-x86_64.jar"), "native-classes");
 
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build.jenesis-windows-x86_64/1.0.0");
 
         assertThat(item).isPresent();
@@ -532,7 +532,7 @@ public class JenesisModuleRepositoryTest {
         Path moduleDir = Files.createDirectories(root.resolve("build.jenesis"));
         Files.writeString(moduleDir.resolve("build.jenesis-win.jar"), "native-classes");
 
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build.jenesis-win");
 
         assertThat(item).isPresent();
@@ -546,7 +546,7 @@ public class JenesisModuleRepositoryTest {
         Path versionDir = Files.createDirectories(root.resolve("build.jenesis/1.0.0"));
         Files.writeString(versionDir.resolve("build.jenesis-win.pom"), "classified-pom");
 
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build.jenesis-win/1.0.0:pom");
 
         assertThat(item).isPresent();
@@ -560,7 +560,7 @@ public class JenesisModuleRepositoryTest {
         Path moduleDir = Files.createDirectories(root.resolve("build.jenesis"));
         Files.writeString(moduleDir.resolve("build.jenesis.jar"), "classes");
 
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build.jenesis-win");
 
         assertThat(item).isEmpty();
@@ -568,7 +568,7 @@ public class JenesisModuleRepositoryTest {
 
     @Test
     public void rejects_blank_classifier() {
-        assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build.jenesis-"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("classifier");
@@ -578,7 +578,7 @@ public class JenesisModuleRepositoryTest {
     public void rejects_version_segment_containing_path_traversal() throws IOException {
         Path outside = Files.writeString(root.resolve("secret.jar"), "secret");
 
-        assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.resolve("module").toUri())
+        assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings), root.resolve("module").toUri())
                 .fetch(Runnable::run, "build.jenesis/../../secret"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("traversal");
@@ -588,14 +588,14 @@ public class JenesisModuleRepositoryTest {
 
     @Test
     public void rejects_version_with_unsafe_character() {
-        assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build.jenesis/..%2f..%2fsecret"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     public void rejects_module_name_with_path_separator() {
-        assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build\\jenesis"))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -605,7 +605,7 @@ public class JenesisModuleRepositoryTest {
         Path moduleDir = Files.createDirectories(root.resolve("build.jenesis"));
         Files.writeString(moduleDir.resolve("build.jenesis.jar"), "classes");
 
-        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), root.toUri())
+        Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), root.toUri())
                 .fetch(Runnable::run, "build.jenesis:jmod");
 
         assertThat(item).isPresent();
@@ -625,7 +625,7 @@ public class JenesisModuleRepositoryTest {
         settings.put("module.uri",
                 root.resolve("first").toUri() + "," + root.resolve("second").toUri());
         try {
-            Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE).fetch(Runnable::run, "build.jenesis");
+            Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE).fetch(Runnable::run, "build.jenesis");
 
             assertThat(item).isPresent();
             try (InputStream stream = item.orElseThrow().toInputStream()) {
@@ -644,7 +644,7 @@ public class JenesisModuleRepositoryTest {
         settings.put("module.uri",
                 root.resolve("first").toUri() + "," + root.resolve("second").toUri());
         try {
-            Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE).fetch(Runnable::run, "build.jenesis");
+            Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE).fetch(Runnable::run, "build.jenesis");
 
             assertThat(item).isPresent();
             try (InputStream stream = item.orElseThrow().toInputStream()) {
@@ -672,7 +672,7 @@ public class JenesisModuleRepositoryTest {
         settings.put("module.uri",
                 root.resolve("first").toUri() + "|corp.mod," + root.resolve("second").toUri());
         try {
-            Repository merged = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE);
+            Repository merged = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE);
             try (InputStream stream = merged.fetch(Runnable::run, "corp.mod").orElseThrow().toInputStream()) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("first-corp");
             }
@@ -701,7 +701,7 @@ public class JenesisModuleRepositoryTest {
         settings.put("module.uri",
                 root.resolve("first").toUri() + "|corp|team.mod," + root.resolve("second").toUri());
         try {
-            Repository merged = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE);
+            Repository merged = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE);
             try (InputStream stream = merged.fetch(Runnable::run, "corp.mod.inner").orElseThrow().toInputStream()) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("first-inner");
             }
@@ -728,7 +728,7 @@ public class JenesisModuleRepositoryTest {
         settings.put("module.uri",
                 "maven:" + root.resolve("company").toUri() + "|com.corp," + root.resolve("public").toUri());
         try {
-            Repository merged = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE);
+            Repository merged = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE);
             try (InputStream stream = merged.fetch(Runnable::run, "com.corp.mod/1.0.0").orElseThrow().toInputStream()) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("company-classes");
             }
@@ -748,7 +748,7 @@ public class JenesisModuleRepositoryTest {
         settings.put("corp.test.modules", root.resolve("company").toUri().toString());
         settings.put("module.uri", "maven:@corp.test.modules");
         try {
-            Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE)
+            Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "com.corp.mod/1.0.0");
 
             assertThat(item).isPresent();
@@ -771,7 +771,7 @@ public class JenesisModuleRepositoryTest {
                 + root.resolve("flat").toUri()
                 + "|org.tools");
         try {
-            Repository merged = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE);
+            Repository merged = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE);
             try (InputStream stream = merged.fetch(Runnable::run, "com.corp.deep.mod/1.0.0")
                     .orElseThrow()
                     .toInputStream()) {
@@ -795,7 +795,7 @@ public class JenesisModuleRepositoryTest {
     public void factory_rejects_a_segment_count_below_one() {
         settings.put("module.uri", "maven:0:https://repo.example.com/");
         try {
-            assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE))
+            assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("at least one group id segment");
         } finally {
@@ -807,7 +807,7 @@ public class JenesisModuleRepositoryTest {
     public void factory_rejects_a_segment_count_on_a_module_entry() {
         settings.put("module.uri", "module:3:https://repo.example.com/");
         try {
-            assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE))
+            assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("applies only to a 'maven' entry");
         } finally {
@@ -819,7 +819,7 @@ public class JenesisModuleRepositoryTest {
     public void factory_rejects_an_unknown_repository_type() {
         settings.put("module.uri", "nexus:https://repo.example.com/");
         try {
-            assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE))
+            assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("nexus:https://repo.example.com/")
                     .hasMessageContaining("expected 'module' or 'maven'");
@@ -832,7 +832,7 @@ public class JenesisModuleRepositoryTest {
     public void factory_rejects_a_typed_entry_without_a_uri() {
         settings.put("module.uri", "maven:");
         try {
-            assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE))
+            assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("No URI in Jenesis module repository entry: maven:");
         } finally {
@@ -859,7 +859,7 @@ public class JenesisModuleRepositoryTest {
         settings.put("module.uri", "http://localhost:" + server.getAddress().getPort() + "/");
         settings.put("make.provided", "module.uri");
         try {
-            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE)
+            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "build.jenesis")
                     .orElseThrow();
 
@@ -885,7 +885,7 @@ public class JenesisModuleRepositoryTest {
         settings.put("maven.token", "Bearer secret");
         settings.put("module.uri", "maven:http://localhost:" + server.getAddress().getPort() + "/");
         try {
-            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE)
+            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "com.corp.mod/1.0.0")
                     .orElseThrow();
 
@@ -911,7 +911,7 @@ public class JenesisModuleRepositoryTest {
         settings.put("module.uri", Files.createDirectories(root.resolve("empty")).toUri()
                 + ",maven:http://localhost:" + server.getAddress().getPort() + "/");
         try {
-            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE)
+            RepositoryItem item = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "com.corp.mod/1.0.0")
                     .orElseThrow();
 
@@ -969,7 +969,7 @@ public class JenesisModuleRepositoryTest {
                 .resolve("build.jenesis.jar"), "artifact-classes");
         settings.put("module.uri", root.resolve("first").toUri().toString());
         try {
-            Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.ARTIFACT)
+            Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.ARTIFACT)
                     .fetch(Runnable::run, "build.jenesis");
 
             assertThat(item).isPresent();
@@ -989,7 +989,7 @@ public class JenesisModuleRepositoryTest {
         settings.put("module.uri", "@corp.test.modules");
         settings.put("corp.test.modules", root.resolve("first").toUri().toString());
         try {
-            Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE)
+            Optional<RepositoryItem> item = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE)
                     .fetch(Runnable::run, "build.jenesis");
 
             assertThat(item).isPresent();
@@ -1019,7 +1019,7 @@ public class JenesisModuleRepositoryTest {
         settings.put("module.uri",
                 root.resolve("first").toUri() + "|corp," + root.resolve("second").toUri());
         try {
-            Repository merged = JenesisModuleRepository.ofEnvironment(new Environment(settings::get), JenesisRepository.Scope.MODULE);
+            Repository merged = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE);
             try (InputStream stream = merged.fetch(Runnable::run, "corp.mod/1.0").orElseThrow().toInputStream()) {
                 assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("first-corp");
             }
