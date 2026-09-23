@@ -8,8 +8,8 @@
  * reaches this one.
  *
  * @jenesis.release 25
- * @jenesis.pin build.jenesis.launcher 0.5.0 SHA-256/a130e105cbb1b04df47249edb65c6b4f03139cae0de174a02b2c218a3b9a3d47
- * @jenesis.pin build.jenesis/build.jenesis.launcher 0.5.0 SHA-256/a130e105cbb1b04df47249edb65c6b4f03139cae0de174a02b2c218a3b9a3d47
+ * @jenesis.pin build.jenesis.launcher 0.5.1 SHA-256/b9db437eccaeaef7ee04a6a00a8e330bc69542614012fa6485079f41e3c9edfb
+ * @jenesis.pin build.jenesis/build.jenesis.launcher 0.5.1 SHA-256/b9db437eccaeaef7ee04a6a00a8e330bc69542614012fa6485079f41e3c9edfb
  * @jenesis.pin com.fasterxml.jackson.core 2.15.4 SHA-256/8dc9210dd285db366f45f518dd1e6a9ccfeb0f1a8e184a899fe96d29edf1fd94
  * @jenesis.pin com.fasterxml.jackson.core/jackson-core 2.15.4 SHA-256/8dc9210dd285db366f45f518dd1e6a9ccfeb0f1a8e184a899fe96d29edf1fd94
  * @jenesis.pin layer:inner/maven/com.fasterxml.jackson.core/jackson-core 2.13.5 SHA-256/48f36a025311d0464ad8dda4512a20c79e279a9550f63f3179d731d94482474b
