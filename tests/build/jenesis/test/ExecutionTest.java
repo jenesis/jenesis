@@ -166,6 +166,39 @@ public class ExecutionTest {
     }
 
     @Test
+    public void runs_the_program_with_the_settings_the_entry_point_hands_over() throws IOException {
+        Path source = Files.createDirectories(root.resolve("src/main/java/sample"));
+        Files.writeString(source.resolve("Sample.java"), """
+                package sample;
+
+                public class Sample {
+
+                    public static void main(String[] args) {
+                    }
+                }
+                """);
+        Files.writeString(root.resolve("pom.xml"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        int code = Project.run(new Environment(Map.of("project.layout", "maven",
+                        "project.target", root.resolve("target").toString(),
+                        "project.artifacts", root.resolve("artifacts").toString(),
+                        "test.skip", "true",
+                        "execute.mainClass", "sample.Sample")::get),
+                Execution.class.getName(),
+                root,
+                new LinkedHashSet<>());
+        assertThat(code)
+                .as("the main class is named only by the settings handed over, which Execution must read")
+                .isEqualTo(0);
+    }
+
+    @Test
     public void execute_honours_explicit_main_class_override() throws IOException, InterruptedException {
         Path target = Files.createDirectory(root.resolve("target"));
         Path alpha = Files.createDirectory(root.resolve("alpha-inventory"));
