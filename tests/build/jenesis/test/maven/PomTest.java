@@ -13,7 +13,6 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.maven.Pom;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class PomTest {
 
@@ -318,18 +317,24 @@ public class PomTest {
     }
 
     @Test
-    public void missing_metadata_version_throws() throws IOException {
+    public void a_project_that_names_no_version_emits_the_placeholder() throws IOException {
         SequencedProperties metadata = new SequencedProperties();
         metadata.setProperty("project", "build.jenesis");
         metadata.setProperty("artifact", "jenesis");
         metadata.store(argument.resolve(BuildStep.METADATA));
-        assertThatThrownBy(() -> new Pom().apply(Runnable::run,
+
+        new Pom().apply(Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                         argument,
-                        Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED)))))))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("Missing 'version'");
+                        Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+
+        assertThat(Files.readString(next.resolve(Pom.POM)))
+                .as("a POM cannot omit a version, so an unversioned module publishes one that sorts below"
+                        + " every release")
+                .contains("<version>0-SNAPSHOT</version>");
     }
 
     @Test

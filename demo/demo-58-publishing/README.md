@@ -90,8 +90,9 @@ duplicated:
   `developer.<id>.name|email`, and the `scm.connection|developerConnection|url`
   block.
 
-The version is stamped by `Project.version("1.0.0")` (otherwise it defaults to
-`1-SNAPSHOT`). If you ever need a coordinate that does not follow from the module
+The version is stamped by `Project.version("1.0.0")`. Without one, the module is
+published unversioned and its POM, which cannot omit a version, carries
+`0-SNAPSHOT`. If you ever need a coordinate that does not follow from the module
 name, `project=...` / `artifact=...` in `project.properties` override the derived
 values - but the point here is that you usually do not have to.
 
