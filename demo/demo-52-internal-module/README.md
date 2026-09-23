@@ -28,7 +28,7 @@ Layout
     demo/demo-52-internal-module
     |-- build/jenesis            symlink to ../../../sources/build/jenesis
     |-- build/custom/Substitution.java   the customizer: wires the plugin into the assembler
-    |-- jenesis.properties       jenesis.project.customizers=build.custom.Substitution
+    |-- jenesis.properties       jenesis.project.customizer=build.custom.Substitution
     |-- plugin/
     |   |-- .jenesis.skip       marks plugin/ as its own build root, so the
     |   |                        project's module discovery skips it

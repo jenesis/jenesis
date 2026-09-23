@@ -5,14 +5,17 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Project;
+import build.jenesis.project.InferredMultiProjectAssembler;
+import build.jenesis.project.MultiProjectAssembler;
+import build.jenesis.project.ProjectModuleDescriptor;
 
-public class Preprocessing implements UnaryOperator<Project>, Serializable {
+public class Preprocessing implements Project.Customizer {
 
     @Override
-    public Project apply(Project project) {
-        return project.assembler((descriptor, repositories, resolvers) -> project.assembler()
+    public MultiProjectAssembler<? super ProjectModuleDescriptor> apply(InferredMultiProjectAssembler assembler) {
+        return (descriptor, repositories, resolvers) -> assembler
                 .apply(descriptor.sources("preprocess"), repositories, resolvers)
-                .mapBuild(inner -> (sub, inherited) -> {
+                .mapBuild(stock -> (sub, inherited) -> {
                     sub.addStep("preprocess", (executor, context, arguments) -> {
                         Path target = context.next().resolve(BuildStep.SOURCES);
                         for (BuildStepArgument argument : arguments.values()) {
@@ -23,19 +26,12 @@ public class Preprocessing implements UnaryOperator<Project>, Serializable {
                             if (!Files.isDirectory(sources)) {
                                 continue;
                             }
-                            Files.walkFileTree(sources, new SimpleFileVisitor<Path>() {
-                                @Override
-                                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes)
-                                        throws IOException {
-                                    Files.createDirectories(target.resolve(sources.relativize(directory)));
-                                    return FileVisitResult.CONTINUE;
-                                }
-
-                                @Override
-                                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes)
-                                        throws IOException {
+                            try (Stream<Path> files = Files.walk(sources)) {
+                                for (Path file : files.toList()) {
                                     Path destination = target.resolve(sources.relativize(file));
-                                    if (file.toString().endsWith(".java")) {
+                                    if (Files.isDirectory(file)) {
+                                        Files.createDirectories(destination);
+                                    } else if (file.toString().endsWith(".java")) {
                                         String content = Files.readString(file);
                                         String substituted = content.replace("${greeting}",
                                                 "Hello from a source preprocessed by a custom assembler!");
@@ -47,13 +43,12 @@ public class Preprocessing implements UnaryOperator<Project>, Serializable {
                                     } else {
                                         BuildStep.linkOrCopy(destination, file);
                                     }
-                                    return FileVisitResult.CONTINUE;
                                 }
-                            });
+                            }
                         }
                         return CompletableFuture.completedStage(new BuildStepResult(true));
                     }, descriptor.sources().stream());
-                    inner.accept(sub, inherited);
-                }));
+                    stock.accept(sub, inherited);
+                });
     }
 }

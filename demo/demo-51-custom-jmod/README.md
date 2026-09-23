@@ -75,7 +75,7 @@ Layout
     demo/demo-51-custom-jmod
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- build/custom/ConfigJmod.java   the customizer: adds the config step to the assembler
-    |-- jenesis.properties   jenesis.project.customizers=build.custom.ConfigJmod
+    |-- jenesis.properties   jenesis.project.customizer=build.custom.ConfigJmod
     `-- sources/
         |-- module-info.java     module demo.config { requires org.slf4j; exports sample; }
         `-- sample/Sample.java   reads <java.home>/conf/app.properties, logs via slf4j, prints it
@@ -89,14 +89,14 @@ lambda. `jmod`, `jlink`, and packaging
 are selected by the committed `packaging.properties` in this directory, which
 Jenesis reads from the configuration location:
 
-    return project.assembler((descriptor, repositories, resolvers) -> project.assembler()
+    return (descriptor, repositories, resolvers) -> assembler
             .apply(descriptor.content("config"), repositories, resolvers)
-            .mapBuild(inner -> (sub, inherited) -> {
+            .mapBuild(stock -> (sub, inherited) -> {
                 sub.addStep("config", (executor, context, arguments) -> {
                     ... // write jmodconfig/app.properties into context.next()
                 });
-                inner.accept(sub, inherited);
-            }));
+                stock.accept(sub, inherited);
+            });
 
     packaging.properties:  jmod=true
                          jlink=true
@@ -109,7 +109,7 @@ that. It adds exactly one thing, the extra input, and lets the stock pipeline
 consume it:
 
     sub.addStep("config", ...);      // produces jmodconfig/app.properties
-    inner.accept(sub, inherited);    // the stock java -> jmod -> jlink -> jpackage pipeline
+    stock.accept(sub, inherited);    // the stock java -> jmod -> jlink -> jpackage pipeline
 
 The link between the two is the module descriptor's `content` set. The wrapper
 calls `descriptor.content("config")` before delegating, and the stock `jmod`

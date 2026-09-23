@@ -594,35 +594,41 @@ public class ProjectTest {
     }
 
     @Test
-    public void applies_each_customizer_in_order_to_the_configured_project() {
-        Project project = Project.ofEnvironment(new Environment(Map.of("project.version", "1",
-                "project.customizers", Versioning.class.getName() + ", " + Tagging.class.getName())::get), root);
-        assertThat(project.version()).isEqualTo("1.1");
-        assertThat(project.tag()).as("the second customizer sees what the first one set").isEqualTo("v1.1");
+    public void applies_the_customizer_to_the_configured_assembler() {
+        Project project = Project.ofEnvironment(new Environment(Map.of("project.customizer",
+                Checkless.class.getName())::get), root);
+        assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
+                assembler -> assertThat(assembler.check()).isNull());
     }
 
     @Test
-    public void leaves_customizers_to_the_container_when_the_build_runs_in_docker() {
-        Project project = Project.ofEnvironment(new Environment(Map.of("project.version", "1",
-                "project.docker", "true",
-                "project.customizers", Versioning.class.getName())::get), root);
-        assertThat(project.version()).as("the container applies the customizer, never the host").isEqualTo("1");
+    public void applies_a_customizer_to_the_default_assembler() {
+        assertThat(new Project(root, new Checkless()).assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
+                assembler -> assertThat(assembler.check()).isNull());
     }
 
     @Test
-    public void refuses_a_customizer_that_is_no_unary_operator() {
-        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.customizers",
+    public void leaves_the_customizer_to_the_container_when_the_build_runs_in_docker() {
+        Project project = Project.ofEnvironment(new Environment(Map.of("project.docker", "true",
+                "project.customizer", Checkless.class.getName())::get), root);
+        assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
+                assembler -> assertThat(assembler.check()).as("the container applies the customizer, never the host").isNotNull());
+    }
+
+    @Test
+    public void refuses_a_customizer_that_is_no_function() {
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.customizer",
                 ProjectTest.class.getName())::get), root))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining(ProjectTest.class.getName() + " is not a UnaryOperator<Project>");
+                .hasMessageContaining(ProjectTest.class.getName() + " is not a Project.Customizer");
     }
 
     @Test
-    public void refuses_a_customizer_that_returns_no_project() {
-        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.customizers",
+    public void refuses_a_customizer_that_returns_no_assembler() {
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.customizer",
                 Discarding.class.getName())::get), root))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining(Discarding.class.getName() + " returned no project");
+                .hasMessageContaining("The customizer returned no assembler");
     }
 
     @Test
@@ -749,9 +755,9 @@ public class ProjectTest {
     }
 
     @Test
-    public void the_layered_settings_accepts_customizers_in_the_project_file() throws IOException {
-        Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.customizers=build.Build\n");
-        assertThat(Make.settings(root, Map.<String, String>of()::get).keys().apply("project.customizers"))
+    public void the_layered_settings_accepts_a_customizer_in_the_project_file() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.customizer=build.Build\n");
+        assertThat(Make.settings(root, Map.<String, String>of()::get).keys().apply("project.customizer"))
                 .as("a customizer runs the project's code as its tests do, so the project may name one")
                 .isEqualTo("build.Build");
     }
@@ -784,12 +790,12 @@ public class ProjectTest {
     }
 
     @Test
-    public void the_layered_settings_accepts_customizers_in_the_user_global_file() throws IOException {
+    public void the_layered_settings_accepts_a_customizer_in_the_user_global_file() throws IOException {
         Path home = Files.createDirectories(root.resolve("home/.jenesis"));
-        Files.writeString(home.resolve("jenesis.properties"), "jenesis.project.customizers=build.Build\n");
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.project.customizer=build.Build\n");
         assertThat(Make.settings(root, Map.of("make.global", root.resolve("home").toString())::get)
                 .keys()
-                .apply("project.customizers")).isEqualTo("build.Build");
+                .apply("project.customizer")).isEqualTo("build.Build");
     }
 
     @Test
@@ -884,26 +890,18 @@ public class ProjectTest {
         assertThat(project.cache()).isNull();
     }
 
-    public static class Versioning implements UnaryOperator<Project> {
+    public static class Checkless implements Project.Customizer {
 
         @Override
-        public Project apply(Project project) {
-            return project.version(project.version() + ".1");
+        public MultiProjectAssembler<? super ProjectModuleDescriptor> apply(InferredMultiProjectAssembler assembler) {
+            return assembler.check(null);
         }
     }
 
-    public static class Tagging implements UnaryOperator<Project> {
+    public static class Discarding implements Project.Customizer {
 
         @Override
-        public Project apply(Project project) {
-            return project.tag("v" + project.version());
-        }
-    }
-
-    public static class Discarding implements UnaryOperator<Project> {
-
-        @Override
-        public Project apply(Project project) {
+        public MultiProjectAssembler<? super ProjectModuleDescriptor> apply(InferredMultiProjectAssembler assembler) {
             return null;
         }
     }
