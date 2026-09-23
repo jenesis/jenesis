@@ -40,6 +40,7 @@ public class InternalModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final String group;
     private final Platform platform;
+    private final SequencedMap<String, String> properties;
 
     public InternalModule(String prefix, String group, Path source) {
         this(prefix,
@@ -62,7 +63,8 @@ public class InternalModule implements BuildExecutorModule {
                 null,
                 null,
                 group,
-                new Platform());
+                new Platform(),
+                Collections.emptyNavigableMap());
     }
 
     public static InternalModule ofEnvironment(Environment environment,
@@ -78,21 +80,47 @@ public class InternalModule implements BuildExecutorModule {
                 null,
                 null,
                 group == null ? "main" : group,
-                Platform.ofEnvironment(environment));
+                Platform.ofEnvironment(environment),
+                Collections.emptyNavigableMap());
     }
 
     public InternalModule repositories(Map<String, Repository> repositories) {
-        return new InternalModule(prefix, source, dependencyModule.repositories(repositories),
-                javacStep, additionalDependencies, buildModuleName, pinning, group, platform);
+        return new InternalModule(prefix,
+                source,
+                dependencyModule.repositories(repositories),
+                javacStep,
+                additionalDependencies,
+                buildModuleName,
+                pinning,
+                group,
+                platform,
+                properties);
     }
 
     public InternalModule resolvers(Map<String, Resolver> resolvers) {
-        return new InternalModule(prefix, source, dependencyModule.resolvers(resolvers),
-                javacStep, additionalDependencies, buildModuleName, pinning, group, platform);
+        return new InternalModule(prefix,
+                source,
+                dependencyModule.resolvers(resolvers),
+                javacStep,
+                additionalDependencies,
+                buildModuleName,
+                pinning,
+                group,
+                platform,
+                properties);
     }
 
     public InternalModule group(String group) {
-        return new InternalModule(prefix, source, dependencyModule, javacStep, additionalDependencies, buildModuleName, pinning, group, platform);
+        return new InternalModule(prefix,
+                source,
+                dependencyModule,
+                javacStep,
+                additionalDependencies,
+                buildModuleName,
+                pinning,
+                group,
+                platform,
+                properties);
     }
 
     private InternalModule(String prefix,
@@ -103,7 +131,8 @@ public class InternalModule implements BuildExecutorModule {
                            String buildModuleName,
                            Pinning pinning,
                            String group,
-                           Platform platform) {
+                           Platform platform,
+                           SequencedMap<String, String> properties) {
         this.prefix = prefix;
         this.source = source;
         this.dependencyModule = dependencyModule;
@@ -113,24 +142,46 @@ public class InternalModule implements BuildExecutorModule {
         this.pinning = pinning;
         this.group = group;
         this.platform = platform;
+        this.properties = properties;
     }
 
     public InternalModule dependencies(String... dependencies) {
-        return new InternalModule(prefix, source, dependencyModule, javacStep, new LinkedHashSet<>(List.of(dependencies)),
+        return new InternalModule(prefix,
+                source,
+                dependencyModule,
+                javacStep,
+                new LinkedHashSet<>(List.of(dependencies)),
                 buildModuleName,
                 pinning,
-                group, platform);
+                group,
+                platform,
+                properties);
     }
 
     public InternalModule dependencies(SequencedSet<String> dependencies) {
-        return new InternalModule(prefix, source, dependencyModule, javacStep, new LinkedHashSet<>(dependencies),
+        return new InternalModule(prefix,
+                source,
+                dependencyModule,
+                javacStep,
+                new LinkedHashSet<>(dependencies),
                 buildModuleName,
                 pinning,
-                group, platform);
+                group,
+                platform,
+                properties);
     }
 
     public InternalModule buildModuleName(String name) {
-        return new InternalModule(prefix, source, dependencyModule, javacStep, additionalDependencies, name, pinning, group, platform);
+        return new InternalModule(prefix,
+                source,
+                dependencyModule,
+                javacStep,
+                additionalDependencies,
+                name,
+                pinning,
+                group,
+                platform,
+                properties);
     }
 
     public InternalModule platform(Platform platform) {
@@ -142,11 +193,34 @@ public class InternalModule implements BuildExecutorModule {
                 buildModuleName,
                 pinning,
                 group,
-                platform);
+                platform,
+                properties);
     }
 
     public InternalModule pinning(Pinning pinning) {
-        return new InternalModule(prefix, source, dependencyModule, javacStep, additionalDependencies, buildModuleName, pinning, group, platform);
+        return new InternalModule(prefix,
+                source,
+                dependencyModule,
+                javacStep,
+                additionalDependencies,
+                buildModuleName,
+                pinning,
+                group,
+                platform,
+                properties);
+    }
+
+    public InternalModule properties(SequencedMap<String, String> properties) {
+        return new InternalModule(prefix,
+                source,
+                dependencyModule,
+                javacStep,
+                additionalDependencies,
+                buildModuleName,
+                pinning,
+                group,
+                platform,
+                properties);
     }
 
     @Override
@@ -190,7 +264,7 @@ public class InternalModule implements BuildExecutorModule {
             Object foreignModule;
             try {
                 bridge = new JenesisClassLoaderBridge(artifacts);
-                foreignModule = bridge.findProvider(buildModuleName);
+                foreignModule = bridge.findProvider(buildModuleName, properties);
             } catch (Exception e) {
                 throw new IllegalStateException("Failed to resolve internal build execution module " + source, e);
             }

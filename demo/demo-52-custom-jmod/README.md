@@ -14,9 +14,10 @@ Run it
 
 From this directory:
 
-    java build/jenesis/Make.java stage
+    java build/Demo.java
 
-It builds the module, packs `classes/` plus `jmodconfig/` into `demo.config.jmod`,
+It builds the `stage` target of the project, as `java build/jenesis/Make.java stage`
+would, with one extra step wired in. It builds the module, packs `classes/` plus `jmodconfig/` into `demo.config.jmod`,
 links that jmod into a runtime image, and wraps the runtime into a `demo.config`
 application image under `target/stage/packages/output/`. Launch it -
 `demo.config/bin/demo.config` on Linux, `demo.config/demo.config.exe` on Windows,
@@ -74,8 +75,7 @@ Layout
 
     demo/demo-52-custom-jmod
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
-    |-- build/custom/ConfigJmod.java   the customizer: adds the config step to the assembler
-    |-- jenesis.properties   jenesis.project.customizer=build.custom.ConfigJmod
+    |-- build/Demo.java      the entry point: adds the config step to the assembler, builds stage
     `-- sources/
         |-- module-info.java     module demo.config { requires org.slf4j; exports sample; }
         `-- sample/Sample.java   reads <java.home>/conf/app.properties, logs via slf4j, prints it
@@ -83,20 +83,19 @@ Layout
 How the wrapping works
 ----------------------
 
-`ConfigJmod` is a customizer, named in `jenesis.properties` as in the
-`custom-assembler` demo: it wraps the assembler the settings configured in a
-lambda. `jmod`, `jlink`, and packaging
+`build/Demo.java` is an entry point, as in the `custom-assembler` demo: it wraps
+the stock assembler in a lambda and builds `stage`. `jmod`, `jlink`, and packaging
 are selected by the committed `packaging.properties` in this directory, which
 Jenesis reads from the configuration location:
 
-    return (descriptor, repositories, resolvers) -> assembler
+    Project.ofEnvironment(environment, Path.of(".")).assembler((descriptor, repositories, resolvers) -> assembler
             .apply(descriptor.content("config"), repositories, resolvers)
             .mapBuild(stock -> (sub, inherited) -> {
                 sub.addStep("config", (executor, context, arguments) -> {
                     ... // write jmodconfig/app.properties into context.next()
                 });
                 stock.accept(sub, inherited);
-            });
+            })).build("stage");
 
     packaging.properties:  jmod=true
                          jlink=true

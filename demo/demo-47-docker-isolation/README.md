@@ -126,8 +126,8 @@ untouched.
 
 All of the project's code runs in that container. On the host, Jenesis only
 reads the settings and starts the container. It runs no test there, and none of
-the build code a project can add under `build/custom/`, until the container is up
-and the isolation is in place. The engine that does this has to be the trusted
+the plugins a project names in `jenesis-plugins.properties`, until the container
+is up and the isolation is in place. The engine that does this has to be the trusted
 one, as the last section of this page explains.
 
 The project also cannot undo the isolation. Its `jenesis.properties` and its
@@ -199,9 +199,12 @@ host rights the moment you launch it - before any dependency, test, or artifact
 What breaks the cycle is that a standard Jenesis project carries **no build logic
 to execute at all**. The build is described declaratively - a `pom.xml` or
 `module-info.java` giving the project structure and its dependency coordinates -
-and nothing in that description runs code. Build code a project adds under
-`build/custom/` is the one exception: the installed `jenesis` never runs it, and
-`jenesis.project.docker` runs it only inside the container. So an *untrusted* project can be built
+and nothing in that description runs code. The plugins a project names in
+`jenesis-plugins.properties` are the exception: they are build code, compiled from
+the project's own sources or resolved by a module name the project chooses, and
+every Jenesis that builds the project runs them, so build a project that names
+plugins you have not reviewed with `jenesis.project.docker`, which runs them only
+inside the container. Without plugins, an *untrusted* project can be built
 by a *trusted, external* Jenesis that you already have. Installed through SDKMAN,
 `jenesis` runs the SDK's own copy of `Project.main(...)` against the current
 directory and never executes the project's `build/` sources:
@@ -251,8 +254,8 @@ the installed Jenesis that the vendored engine is the released one:
 
     jenesis-validate
 
-Then build the project inside the container, where its tests and any build code
-it adds under `build/custom/` run only after the isolation is in place:
+Then build the project inside the container, where its tests and any plugins it
+names run only after the isolation is in place:
 
     java -Djenesis.project.docker=true build/jenesis/Make.java
 

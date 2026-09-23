@@ -235,6 +235,57 @@ public class InferredJavaToolchainModule implements BuildExecutorModule {
                 custom);
     }
 
+    public InferredJavaToolchainModule generatorModule(InferredSourceGenerationModule generatorModule) {
+        return new InferredJavaToolchainModule(configuration,
+                pinning,
+                pathPlacement,
+                generatorModule,
+                compilerModule,
+                validatorModule,
+                signerStep,
+                generator,
+                compiler,
+                validator,
+                transformer,
+                archiver,
+                signer,
+                custom);
+    }
+
+    public InferredJavaToolchainModule compilerModule(InferredCompilerChainModule compilerModule) {
+        return new InferredJavaToolchainModule(configuration,
+                pinning,
+                pathPlacement,
+                generatorModule,
+                compilerModule,
+                validatorModule,
+                signerStep,
+                generator,
+                compiler,
+                validator,
+                transformer,
+                archiver,
+                signer,
+                custom);
+    }
+
+    public InferredJavaToolchainModule validatorModule(InferredByteCodeQualityModule validatorModule) {
+        return new InferredJavaToolchainModule(configuration,
+                pinning,
+                pathPlacement,
+                generatorModule,
+                compilerModule,
+                validatorModule,
+                signerStep,
+                generator,
+                compiler,
+                validator,
+                transformer,
+                archiver,
+                signer,
+                custom);
+    }
+
     public InferredJavaToolchainModule custom(SequencedMap<String, BuildExecutorModule> custom) {
         return new InferredJavaToolchainModule(configuration,
                 pinning,

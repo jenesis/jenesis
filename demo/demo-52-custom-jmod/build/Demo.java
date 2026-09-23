@@ -1,18 +1,19 @@
-package build.custom;
+package build;
 
 import module java.base;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
+import build.jenesis.Make;
 import build.jenesis.Project;
 import build.jenesis.project.InferredMultiProjectAssembler;
-import build.jenesis.project.MultiProjectAssembler;
-import build.jenesis.project.ProjectModuleDescriptor;
 import build.jenesis.step.JMod;
 
-public class ConfigJmod implements Project.Customizer {
+public class Demo {
 
-    @Override
-    public MultiProjectAssembler<? super ProjectModuleDescriptor> apply(InferredMultiProjectAssembler assembler) {
-        return (descriptor, repositories, resolvers) -> assembler
+    static void main(String[] args) throws Exception {
+        Environment environment = new Environment(Make.settings(Path.of(".")).keys());
+        InferredMultiProjectAssembler assembler = InferredMultiProjectAssembler.ofEnvironment(environment);
+        Project.ofEnvironment(environment, Path.of(".")).assembler((descriptor, repositories, resolvers) -> assembler
                 .apply(descriptor.content("config"), repositories, resolvers)
                 .mapBuild(stock -> (sub, inherited) -> {
                     sub.addStep("config", (executor, context, arguments) -> {
@@ -22,6 +23,6 @@ public class ConfigJmod implements Project.Customizer {
                         return CompletableFuture.completedStage(new BuildStepResult(true));
                     });
                     stock.accept(sub, inherited);
-                });
+                })).build("stage");
     }
 }

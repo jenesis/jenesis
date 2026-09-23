@@ -84,7 +84,7 @@ its output and for its errors - and it is the single argument every `ofEnvironme
 engine writes to `System.out` or `System.err`; a line goes to the consumer the run was handed.
 `Environment.NONE` answers no setting and writes to the JVM's streams, `new Environment(keys)` is a provider
 with the JVM's streams, and `new Environment(keys, out, err)` is a tool's writers. There is deliberately no
-environment that reads the JVM's properties as they stand: code running inside a build - a customizer, an
+environment that reads the JVM's properties as they stand: code running inside a build - a plugin, an
 annotation processor - could change one between two reads. Each component is a wither of its own
 (`Environment.NONE.out(printed::add)`), so a caller sends one run's lines somewhere else without touching
 the rest. The environment is an argument, never a field: what must keep talking after it was built keeps the
@@ -190,18 +190,23 @@ before it is chosen. The search path decides what the build executes, so `Make.s
 every file a project provides: a new way to read properties keeps that rule, and the relaunch
 never takes a JVM option that configuration could supply.
 
-**`jenesis.project.customizer` adjusts the stock build.** It names one
-`Project.Customizer` class - a function from the `InferredMultiProjectAssembler` to the assembler to build with - that
-`Project.ofEnvironment` applies to the assembler it configured, so every entry point that builds a project from
-settings - `Make`, `Execute`, the daemon, the tools, a container - builds with the adjusted one. A caller that
-builds the project itself hands the same function to `new Project(root, customizer)` or
-`Project.ofEnvironment(environment, root, customizer)`. `Make` compiles `build/custom/` with the engine for that reason, beside the folder of
-the file it launches, while that file still names nothing but itself. A customizer runs the project's code, as its
-tests and annotation processors do, so a project names it in its own `jenesis.properties` like any other setting:
-refusing the key there would guard nothing a build does not already hand the project. What isolates an untrusted
-project is `jenesis.project.docker`, so under it the host applies no customizer and runs no build, `watch` included,
-before the container is up, and `Make.settings` refuses every `jenesis.project.docker*` and `jenesis.execute.docker*`
-key in a file the project provides, so a project can neither switch the isolation off nor widen it.
+**`jenesis-plugins.properties` adds to the stock build.** It sits beside `jenesis.properties` and names one plugin
+per line, `<name>+<slot>=<module>`, or `<name>=<module>` for the module build itself: a value starting with `./`
+or `../` is a folder compiled from source by an `InternalModule`, anything else a module name an `ExternalModule`
+resolves as `module/<name>` through the Jenesis module repository, whatever the project's layout, with its closure
+pinned in the group `plugin-<name>`; either may end in `@<provider>` to select the provider annotated
+`@BuildModuleName` with that name. `Project.ofEnvironment` reads the file, so every entry point that builds a
+project from settings builds with its plugins, and the assembler wires a plugin into the `custom` slot the key
+names, in a module only where `plugin-<name>.properties` is found in that module's configuration locations; a
+provider is created with that file's values through a public constructor taking a `SequencedMap` of them, with
+its no-argument constructor when the file is empty, and a file with values for a provider without that
+constructor fails the build. A plugin adds and
+never replaces: a build that changes what the stock steps do is an entry point of its own that wires its
+assembler in code. A plugin runs the project's code, as its tests and annotation processors do, so the project
+names it itself; what isolates an untrusted project is `jenesis.project.docker`, under which the host runs no
+build, `watch` included, before the container is up, and `Make.settings` refuses every `jenesis.project.docker*`
+and `jenesis.execute.docker*` key in a file the project provides, so a project can neither switch the isolation
+off nor widen it.
 
 **Configuration files are read through `SequencedProperties`.** A file is read with the type's own accessors -
 `value`, `value(key, default)`, `flag`, `flag(key, default)`, `flagOrNull`, `entries` for a comma-separated
@@ -256,7 +261,7 @@ configurator on its own parent, never a new component on the assembler. Beside i
 `Inferred*Module`, and the assembler's module build, holds `custom`, a `SequencedMap<String, BuildExecutorModule>`
 of additional children it wires inside one sub-module named `custom`, each handed the inputs the module itself
 reads. No module names a child of its own `custom`, so an added name never collides with a stock one, and a
-customizer adds a module without wrapping or replacing another. Beside the wither that sets the map,
+plugin or an entry point adds a module without wrapping or replacing another. Beside the wither that sets the map,
 `custom(name, module)` and `custom(name, step)` add one entry - a step as `step.asModule(name)` - and refuse a
 name that is taken already.
 

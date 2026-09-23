@@ -6,6 +6,8 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
+import build.jenesis.BuildStepContext;
+import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.BuildExecutorModule;
@@ -452,6 +454,65 @@ public class InferredMultiProjectAssemblerTest {
                 .anySatisfy(input -> assertThat(input).endsWith("manifests"))
                 .anySatisfy(input -> assertThat(input).endsWith("sources"))
                 .anySatisfy(input -> assertThat(input).endsWith("artifacts"));
+    }
+
+    @Test
+    public void wires_a_plugin_whose_properties_file_is_found_and_hands_it_the_values() throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("plugin-lint.properties"), "level=strict\n");
+        List<SequencedMap<String, String>> received = new ArrayList<>();
+        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("lint+check", properties -> {
+            received.add(properties);
+            return new MarkerStep().asModule("lint");
+        });
+        SequencedMap<String, Path> outputs = fixture.execute(new InferredMultiProjectAssembler().plugins(plugins),
+                "sub/check/custom/lint");
+        assertThat(received).containsExactly(new LinkedHashMap<>(Map.of("level", "strict")));
+        assertThat(outputs.get("sub/check/custom/lint").resolve("marker.txt")).exists();
+    }
+
+    @Test
+    public void does_not_wire_a_plugin_whose_properties_file_is_missing() throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
+        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("lint+check", _ -> new MarkerStep().asModule("lint"));
+        fixture.execute(new InferredMultiProjectAssembler().plugins(plugins), "sub/check");
+        assertThat(fixture.build().resolve("sub").resolve("check").resolve("custom"))
+                .as("a plugin runs only where plugin-lint.properties is found")
+                .doesNotExist();
+    }
+
+    @Test
+    public void wires_a_plugin_into_a_nested_slot() throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("plugin-greeting.properties"), "");
+        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("greeting+binary/generated", _ -> new MarkerStep().asModule("greeting"));
+        SequencedMap<String, Path> outputs = fixture.execute(new InferredMultiProjectAssembler().plugins(plugins),
+                "sub/binary/generated/custom/greeting");
+        assertThat(outputs.get("sub/binary/generated/custom/greeting").resolve("marker.txt")).exists();
+    }
+
+    @Test
+    public void refuses_a_plugin_in_an_unknown_slot() {
+        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("lint+binary/unknown", _ -> (_, _) -> {});
+        assertThatThrownBy(() -> new InferredMultiProjectAssembler().plugins(plugins))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot add the plugin lint+binary/unknown")
+                .hasMessageContaining("binary/generated");
+    }
+
+    private record MarkerStep() implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Files.writeString(context.next().resolve("marker.txt"), "");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
     }
 
     @Test

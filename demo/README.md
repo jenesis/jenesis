@@ -750,12 +750,15 @@ never for the module in its layer.
 
 ## 36. Customizing the build - [`custom-assembler`](demo-51-custom-assembler/README.md), [`custom-jmod`](demo-52-custom-jmod/README.md)
 
-The next demos open up the template. `custom-assembler` keeps the standard flow
-but names a customizer, a function from the stock assembler to the one to build
-with, which wraps it so every module's sources pass through a preprocessing step
-before compile, jar and test run unchanged:
+The next demos open up the template, and each is launched with
+`java build/Demo.java`. `custom-assembler` keeps the standard flow but wraps the
+stock assembler in code, so every module's sources pass through a preprocessing
+step before compile, jar and test run unchanged:
 
-    jenesis.project.customizer=build.custom.Preprocessing
+    Project.ofEnvironment(environment, Path.of("."))
+            .assembler((descriptor, repositories, resolvers) -> stock
+                    .apply(descriptor.sources("preprocess"), repositories, resolvers)
+                    .mapBuild(...))
 
 Any step that produces a `sources/` tree fits the same shape: template expansion,
 code generation, license headers.
@@ -766,16 +769,24 @@ and adds a step that emits a configuration directory, which travels with the jmo
 into the linked runtime and into the packaged application, where the program
 reads it back from its own `<java.home>/conf/` - content a jar cannot carry.
 
-## 37. Build logic as a module - [`internal-module`](demo-53-internal-module/README.md), [`external-module`](demo-54-external-module/README.md)
+## 37. Plugins - [`internal-module`](demo-53-internal-module/README.md), [`external-module`](demo-54-external-module/README.md)
 
-`internal-module` does the same preprocessing, but from a build module in its own
-`plugin/` project, compiled from local source and loaded as a service - it even
-has a dependency of its own. A `.jenesis.skip` marker keeps the plugin project
-out of the host project's module discovery.
+A plugin adds to the stock build without an entry point of its own. It is named in
+one line of `jenesis-plugins.properties`, beside `jenesis.properties`, with the
+module of the build it joins and where it comes from, and it runs in a module
+only where `plugin-<name>.properties` is found:
 
-`external-module` is identical except that the same build module is resolved as a
-published coordinate instead of compiled from source. Build logic is just another
-module: written inline, loaded from source, or consumed as a versioned artifact.
+    greeting+binary/generated=./plugin
+
+`internal-module` compiles its plugin from a `plugin/` project of its own - a
+build module loaded as a service, with a dependency of its own and a `.jenesis.skip`
+marker that keeps it out of the host project's module discovery. The plugin
+generates a class from the text its properties file configures.
+
+`external-module` is identical except that the plugin is named by its module
+name and resolved from a repository instead of compiled from source. Build logic
+is just another module: written inline, loaded from source, or consumed as a
+published one.
 
 ## 38. Driving the build without `Project` - [`custom-maven`](demo-55-custom-maven/README.md), [`custom-modular`](demo-56-custom-modular/README.md)
 
