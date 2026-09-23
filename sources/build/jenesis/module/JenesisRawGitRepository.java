@@ -1,6 +1,7 @@
 package build.jenesis.module;
 
 import module java.base;
+import build.jenesis.BuildExecutorCallback;
 import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -21,6 +22,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
     private final Repository.Connection connection;
     private final Boolean prerelease;
     private final Boolean speculative;
+    private final Consumer<String> printing;
     private final Map<String, Optional<String>> tsvCache = new ConcurrentHashMap<>();
 
     public JenesisRawGitRepository(Scope scope, URI data, URI repository) {
@@ -51,7 +53,8 @@ public class JenesisRawGitRepository implements JenesisRepository {
              _ -> true,
              Repository.Connection.ofEnvironment(environment),
              environment.flagOrNull("module.prerelease"),
-             environment.flagOrNull("module.speculative"));
+             environment.flagOrNull("module.speculative"),
+             environment.flag("print.fetch") ? environment.out() : null);
     }
 
     private JenesisRawGitRepository(Scope scope,
@@ -61,7 +64,8 @@ public class JenesisRawGitRepository implements JenesisRepository {
                                     Predicate<String> predicate,
                                     Repository.Connection connection,
                                     Boolean prerelease,
-                                    Boolean speculative) {
+                                    Boolean speculative,
+                                    Consumer<String> printing) {
         this.scope = scope;
         this.data = data;
         this.repository = repository;
@@ -70,26 +74,32 @@ public class JenesisRawGitRepository implements JenesisRepository {
         this.connection = connection;
         this.prerelease = prerelease;
         this.speculative = speculative;
+        this.printing = printing;
     }
 
     public JenesisRawGitRepository groups(Predicate<String> predicate) {
         return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection,
-                prerelease, speculative);
+                prerelease, speculative, printing);
     }
 
     public JenesisRawGitRepository connection(Repository.Connection connection) {
         return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection,
-                prerelease, speculative);
+                prerelease, speculative, printing);
     }
 
     public JenesisRawGitRepository prerelease(Boolean prerelease) {
         return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection,
-                prerelease, speculative);
+                prerelease, speculative, printing);
     }
 
     public JenesisRawGitRepository speculative(Boolean speculative) {
         return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection,
-                prerelease, speculative);
+                prerelease, speculative, printing);
+    }
+
+    public JenesisRawGitRepository printing(Consumer<String> printing) {
+        return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection,
+                prerelease, speculative, printing);
     }
 
     public static JenesisRepository of(Scope scope) {
@@ -260,6 +270,12 @@ public class JenesisRawGitRepository implements JenesisRepository {
             throw new IllegalArgumentException("Resolved location " + location + " escapes repository root " + repository);
         }
         return open(connection, location, token).map(stream -> {
+            if (printing != null) {
+                printing.accept("%s%-11s%s %s".formatted(BuildExecutorCallback.YELLOW,
+                        "[FETCHED]",
+                        BuildExecutorCallback.RESET,
+                        location));
+            }
             AtomicReference<InputStream> first = new AtomicReference<>(stream);
             return (RepositoryItem) () -> {
                 InputStream reopened = first.getAndSet(null);

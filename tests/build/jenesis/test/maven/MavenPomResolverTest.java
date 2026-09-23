@@ -2238,6 +2238,49 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void can_resolve_release_version_through_a_cached_repository() throws IOException {
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>transitive</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>RELEASE</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("transitive", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                </project>
+                """);
+        Files.writeString(Files
+                .createDirectories(repository.resolve("transitive/artifact/"))
+                .resolve("maven-metadata.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <metadata modelVersion="1.1.0">
+                  <versioning>
+                    <release>1</release>
+                  </versioning>
+                </metadata>
+                """);
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+                Runnable::run,
+                mavenRepository.cached(Files.createDirectory(repository.resolve("cache"))),
+                "group",
+                "artifact",
+                "1",
+                null);
+        assertThat(dependencies).containsExactly(Map.entry(
+                new MavenDependencyKey("transitive", "artifact", "jar", null),
+                new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
+    }
+
+    @Test
     public void can_resolve_release_version_with_legacy_metadata_modelversion() throws IOException {
         addToRepository("group", "artifact", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>

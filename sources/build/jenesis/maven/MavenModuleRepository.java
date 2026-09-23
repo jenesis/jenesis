@@ -28,7 +28,7 @@ public class MavenModuleRepository implements JenesisRepository {
     }
 
     public static MavenModuleRepository ofEnvironment(Environment environment, MavenRepository repository) {
-        return new MavenModuleRepository(repository).segments(segments(environment));
+        return new MavenModuleRepository(repository).segments(environment.number("maven.segments", DEFAULT_SEGMENTS));
     }
 
     private MavenModuleRepository(MavenRepository repository,
@@ -58,10 +58,6 @@ public class MavenModuleRepository implements JenesisRepository {
 
     public static int segments() {
         return DEFAULT_SEGMENTS;
-    }
-
-    public static int segments(Environment environment) {
-        return checkedSegments(environment.number("maven.segments", DEFAULT_SEGMENTS));
     }
 
     public static int checkedSegments(int segments) {

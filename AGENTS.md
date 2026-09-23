@@ -89,7 +89,10 @@ annotation processor - could change one between two reads. Each component is a w
 (`Environment.NONE.out(printed::add)`), so a caller sends one run's lines somewhere else without touching
 the rest. The environment is an argument, never a field: what must keep talking after it was built keeps the
 `Consumer<String>` it resolved, as every step does, and only `Project` and the multi-project assembler hold an
-`Environment`, because they build a module per project module long after the settings were read. `Make`,
+`Environment`, because they build a module per project module long after the settings were read. It is an
+argument of construction alone - an `ofEnvironment` factory and an entry point take one, a wither, a decorator
+such as `Repository.cached` or a step never does - so what an object does never depends on which overload built
+it. `Make`,
 `Toolchain` and the daemon are the exception to the streams rule, because they are the process boundary rather
 than the build.
 

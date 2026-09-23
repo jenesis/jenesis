@@ -121,7 +121,7 @@ public record Project(
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
                 repositories.putIfAbsent("maven",
                         MavenDefaultRepository.ofEnvironment(project.environment())
-                                .cached(project.environment(), project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                                .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
                 repositories.putIfAbsent("OpenPGP", OpenPgpRepository.ofEnvironment(project.environment()));
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
                 resolvers.putIfAbsent("maven", MavenPomResolver.ofEnvironment(project.environment()));
@@ -185,7 +185,7 @@ public record Project(
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
                 repositories.putIfAbsent("module",
                         JenesisRepository.ofEnvironment(project.environment(), JenesisRepository.Scope.MODULE)
-                                .cached(project.environment(), project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                                .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
                 repositories.putIfAbsent("OpenPGP", OpenPgpRepository.ofEnvironment(project.environment()));
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
                 resolvers.putIfAbsent("module", ModularJarResolver.ofEnvironment(project.environment(), false));
@@ -261,10 +261,10 @@ public record Project(
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
                 repositories.putIfAbsent("maven",
                         MavenDefaultRepository.ofEnvironment(project.environment())
-                                .cached(project.environment(), project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                                .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
                 repositories.putIfAbsent("module",
                         JenesisRepository.ofEnvironment(project.environment(), JenesisRepository.Scope.ARTIFACT)
-                                .cached(project.environment(), project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
+                                .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
                 repositories.putIfAbsent("OpenPGP", OpenPgpRepository.ofEnvironment(project.environment()));
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
                 resolvers.putIfAbsent("maven", MavenPomResolver.ofEnvironment(project.environment()));
