@@ -58,7 +58,7 @@ public class ModularProject implements BuildExecutorModule {
     }
 
     public static ModularProject ofEnvironment(Environment environment, String prefix, Path root) {
-        ModularProject project = new ModularProject(prefix, root);
+        ModularProject project = new ModularProject(prefix, root).platform(Platform.ofEnvironment(environment));
         Integer segments = environment.numberOrNull("maven.segments");
         return segments == null ? project : project.segments(segments);
     }

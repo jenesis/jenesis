@@ -16,7 +16,11 @@ public final class DaemonServer {
     private volatile ServerSocket retiring;
 
     public DaemonServer(Path root, String digest) {
-        this(root, digest, Duration.ofSeconds(Environment.SYSTEM.number("daemon.idle", 10_800L)));
+        this(root, digest, Duration.ofSeconds(10_800L));
+    }
+
+    public static DaemonServer ofEnvironment(Environment environment, Path root, String digest) {
+        return new DaemonServer(root, digest, Duration.ofSeconds(environment.number("daemon.idle", 10_800L)));
     }
 
     private DaemonServer(Path root, String digest, Duration idle) {
@@ -34,7 +38,8 @@ public final class DaemonServer {
             throw new IllegalArgumentException("Expected a project root and an engine fingerprint, but got "
                     + List.of(arguments) + " - this class is started by build/jenesis/Make.java, not by hand");
         }
-        new DaemonServer(Path.of(arguments[0]), arguments[1]).serve();
+        Path root = Path.of(arguments[0]);
+        ofEnvironment(new Environment(Make.settings(root).keys()), root, arguments[1]).serve();
     }
 
     private void serve() throws IOException {
@@ -226,7 +231,7 @@ public final class DaemonServer {
         anchored.putIfAbsent("jenesis.project.target", root.resolve("target").toString());
         anchored.putIfAbsent("jenesis.project.artifacts",
                 root.resolve(".jenesis").resolve("artifacts").toString());
-        return key -> anchored.get("jenesis." + key);
+        return Make.keys(anchored);
     }
 
     private static final class Frames extends OutputStream {

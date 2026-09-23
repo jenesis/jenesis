@@ -126,14 +126,14 @@ public class ErrorProneRunTest {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
         executor.addModule("dependencies",
-                new Dependencies(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))).group("javac"),
+                new Dependencies(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).group("javac"),
                 "project");
         executor.addModule("chain",
                 new InferredCompilerChainModule(
                         new LinkedHashSet<>(Set.of(configuration)),
-                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)),
-                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))),
+                        Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))),
                 "project", "dependencies");
         executor.execute();
     }

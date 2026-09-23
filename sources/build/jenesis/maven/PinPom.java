@@ -38,7 +38,9 @@ public class PinPom implements BuildStep {
                                        String path,
                                        List<Path> pomFiles,
                                        HashDigestFunction hashFunction) {
-        return new PinPom(prefix, path, pomFiles, hashFunction).permits(Pinning.permits(environment));
+        return new PinPom(prefix, path, pomFiles, hashFunction)
+                .permits(Pinning.permits(environment))
+                .platform(Platform.ofEnvironment(environment));
     }
 
     private PinPom(String prefix,

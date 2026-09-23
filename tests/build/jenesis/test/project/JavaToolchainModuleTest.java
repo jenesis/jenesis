@@ -216,7 +216,7 @@ public class JavaToolchainModuleTest {
                         null,
                         Map.of(),
                         null)),
-                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))), "output", "input");
+                Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))), "output", "input");
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps).containsKeys("output/classes", "output/artifacts", "output-test/executed");
         assertThat(steps.get("output/classes").resolve(BuildStep.CLASSES).resolve("other/SampleTest.class")).exists();
