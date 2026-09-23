@@ -868,7 +868,7 @@ public class TestModule implements BuildExecutorModule {
                     commands.add("--add-modules");
                     commands.add(moduleName);
                     ModuleDescriptor tested = null;
-                    SequencedSet<String> targets = new LinkedHashSet<>();
+                    SequencedSet<String> targets = new TreeSet<>();
                     Set<String> reflecting = resolved.reflectingModules();
                     for (BuildStepArgument argument : arguments.values()) {
                         if (argument.removed()) {
