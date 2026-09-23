@@ -2,6 +2,7 @@ package build;
 
 import module java.base;
 import build.jenesis.BuildExecutor;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 import build.jenesis.maven.MavenProject;
 import build.jenesis.project.InferredMultiProjectAssembler;
@@ -11,7 +12,7 @@ import build.jenesis.project.ProjectModuleDescriptor;
  * A "custom but not so custom" build: it does not go through {@code Project} (no
  * layout, no goals, no `java build/jenesis/Make.java`), yet it does not wire
  * every step by hand either. Instead it uses the convenience
- * {@code MavenProject.make(root, assembler)} overload, which discovers the
+ * {@code MavenProject.make(environment, root, assembler)} overload, which discovers the
  * multi-module Maven project under {@code root} and supplies sane defaults for
  * the repositories, resolvers, and digest a normal build would configure.
  *
@@ -32,7 +33,8 @@ public class Demo {
 
     static void main(String[] args) throws Exception {
         BuildExecutor root = BuildExecutor.of(Path.of("target"));
-        root.addModule("maven", MavenProject.make(Path.of("."),
+        root.addModule("maven", MavenProject.make(Environment.SYSTEM,
+                Path.of("."),
                 (descriptor, repositories, resolvers) -> new InferredMultiProjectAssembler().apply(
                         new ProjectModuleDescriptor(descriptor, new LinkedHashSet<>(List.of(Path.of("."))), true, false, false, null, PathPlacement.CLASS_PATH),
                         repositories,

@@ -40,24 +40,25 @@ It sits between `../demo-03-java-pom-multi` (the same shape of project driven by
 "custom but not so custom" build that reuses the stock toolchain through one
 convenience call. The launcher avoids going through `Project` - no layout, no goals,
 no `java build/jenesis/Make.java` - yet without wiring every step by hand either,
-because `MavenProject.make(root, assembler)` supplies sane defaults for the
+because `MavenProject.make(environment, root, assembler)` supplies sane defaults for the
 repositories, resolvers, and digest a normal build would configure.
 
 How the convenience make is wired
 ---------------------------------
 
 `Demo.java` creates a `BuildExecutor`, adds the result of
-`MavenProject.make(root, assembler)` as a module, and executes it:
+`MavenProject.make(environment, root, assembler)` as a module, and executes it:
 
     BuildExecutor root = BuildExecutor.of(Path.of("target"));
-    root.addModule("maven", MavenProject.make(Path.of("."),
+    root.addModule("maven", MavenProject.make(Environment.SYSTEM,
+            Path.of("."),
             (descriptor, repositories, resolvers) -> new InferredMultiProjectAssembler().apply(
                     new ProjectModuleDescriptor(descriptor, new LinkedHashSet<>(List.of(Path.of("."))), true, false, false, null, PathPlacement.CLASS_PATH),
                     repositories,
                     resolvers)));
     root.execute(args);
 
-The two-argument `make` is the convenience form: it discovers the Maven modules
+The three-argument `make` is the convenience form: it discovers the Maven modules
 under the root and fills in a Maven Central repository, a Maven POM resolver, and
 a digest, so the only thing left to provide is the assembler. The assembler here
 is the stock `InferredMultiProjectAssembler`; each discovered module arrives as a

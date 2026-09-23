@@ -112,15 +112,16 @@ public class ModularProject implements BuildExecutorModule {
                 MavenModuleRepository.checkedSegments(segments));
     }
 
-    public static BuildExecutorModule make(Path root,
+    public static BuildExecutorModule make(Environment environment,
+                                           Path root,
                                            MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
-        return make(Environment.NONE,
+        return make(environment,
                 root,
                 "main",
                 "module",
                 _ -> true,
-                Map.of("module", JenesisRepository.ofEnvironment(Environment.NONE, JenesisRepository.Scope.MODULE)),
-                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, false)),
+                Map.of("module", JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE)),
+                Map.of("module", ModularJarResolver.ofEnvironment(environment, false)),
                 null,
                 true,
                 Collections.emptyNavigableSet(),

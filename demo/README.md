@@ -770,11 +770,11 @@ These two drive a multi-module build from a hand-written `build/Demo.java`, with
 no layout and no goals, while reusing the whole standard toolchain:
 
     BuildExecutor root = BuildExecutor.of(Path.of("target"));
-    root.addModule("maven", MavenProject.make(Path.of("."), assembler));
+    root.addModule("maven", MavenProject.make(Environment.SYSTEM, Path.of("."), assembler));
     root.execute(args);
 
 `custom-maven` does it for Maven modules, `custom-modular` for
-`module-info.java` modules. The two-argument `make` discovers the modules and
+`module-info.java` modules. The three-argument `make` discovers the modules and
 supplies the defaults a normal build would configure.
 
 ## 38. Dropping the template entirely - [`custom-build`](demo-56-custom-build/README.md)
