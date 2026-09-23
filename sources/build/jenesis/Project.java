@@ -796,9 +796,10 @@ public record Project(
                           layer may declare one of its own; each layer is a child of its caller's, and a
                           test JVM is handed jlayer.modulepath.<name> like any deployment. That is a
                           jlayer.* key rather than a jenesis.* one: it configures no build, it is read by
-                          the application a build produced. Any code can rewrite it before the layer is
-                          defined, and so place its own jars in another module's layer; a layer inside an
-                          executable jar (launcher=true) is read from the jar instead.
+                          the application a build produced. The JVM lets any code overwrite a system
+                          property at any time, so code that runs before the layer is defined can place
+                          its own jars in another module's layer; a layer inside an executable jar
+                          (launcher=true) is read from the jar instead.
                           A layer splits a module path and a class path as the application does: what
                           carries a module identity - a module-info, an Automatic-Module-Name, or a name
                           given in modules.properties - is resolved, and the long tail a legacy library
