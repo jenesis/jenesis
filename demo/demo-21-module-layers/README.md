@@ -170,6 +170,12 @@ copies the same file into its image, and a run through `Execute` passes the same
 An executable jar (`launcher=true`) needs no such option: the layer travels inside the jar and the
 launcher reads it from there, never unpacking anything.
 
+A layer that is not bundled in an executable jar is defined from the `jlayer.*` system properties
+when a module first asks for it. Any code can rewrite system properties while the JVM runs, so code
+that runs earlier - in the application or in an outer layer - can change which jars that layer
+holds, and so place its own code in another module's layer, outside the encapsulation that layer was
+declared for. A layer bundled in an executable jar is read from the jar and is not affected.
+
 Nesting needs no further mechanism: `Launcher.layer` parents a layer on its *caller's*, so a module
 inside one layer that asks for another gets a child of the first, and the API module they share
 resolves from there rather than from the application.

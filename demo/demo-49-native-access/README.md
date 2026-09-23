@@ -113,14 +113,6 @@ defines the layer. It grants it on behalf of the module that asks for the layer,
 through the `MethodHandles.lookup()` that module passes, so the JDK only allows
 it if that module has native access itself: name it as well.
 
-System properties can be rewritten while the JVM runs, and the launcher reads a
-layer's `jlayer.*` properties only when it defines the layer. Code that runs
-before then - in the application or in an outer layer - can therefore change
-which jars an inner layer holds and which of its modules are granted native
-access, though never beyond what the module asking for the layer could grant
-itself. A layer bundled in an executable jar is read from the jar and is not
-affected.
-
 Discovering what to grant
 -------------------------
 

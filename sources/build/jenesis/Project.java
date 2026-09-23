@@ -796,7 +796,9 @@ public record Project(
                           layer may declare one of its own; each layer is a child of its caller's, and a
                           test JVM is handed jlayer.modulepath.<name> like any deployment. That is a
                           jlayer.* key rather than a jenesis.* one: it configures no build, it is read by
-                          the application a build produced.
+                          the application a build produced. Any code can rewrite it before the layer is
+                          defined, and so place its own jars in another module's layer; a layer inside an
+                          executable jar (launcher=true) is read from the jar instead.
                           A layer splits a module path and a class path as the application does: what
                           carries a module identity - a module-info, an Automatic-Module-Name, or a name
                           given in modules.properties - is resolved, and the long tail a legacy library
@@ -839,10 +841,8 @@ public record Project(
                           layers is named the same way, or as layer:<name>/<repo>/..., and reaches
                           the launcher as jlayer.enableNativeAccess.<name>; the launcher grants it
                           through the Lookup the module asking for the layer passes, so that module
-                          needs native access itself and is named too. Code that runs earlier, in the
-                          application or an outer layer, can rewrite that property, as it can every
-                          jlayer.* one. MAVEN modules declare tokens in a <!--jenesis.native ... -->
-                          comment.
+                          needs native access itself and is named too. MAVEN modules declare tokens in
+                          a <!--jenesis.native ... --> comment.
 
                     ## 9. Activate a tool by dropping in its configuration file
 
