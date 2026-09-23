@@ -349,7 +349,7 @@ public class TestModuleTest {
 
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
-        assertThat(supplement.resolve("command")).content().contains("--select-class=sample.TestSample");
+        assertThat(supplement.resolve("java.args")).content().contains("--select-class=sample.TestSample");
     }
 
     @Test
@@ -380,7 +380,7 @@ public class TestModuleTest {
         executor.execute();
 
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
-        assertThat(supplement.resolve("command")).content()
+        assertThat(supplement.resolve("java.args")).content()
                 .contains("--select-class=sample.TestSample")
                 .doesNotContain("AbstractTestSample");
     }
@@ -406,7 +406,7 @@ public class TestModuleTest {
 
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
-        assertThat(supplement.resolve("command")).content().contains("--select-method=sample.TestSample#test");
+        assertThat(supplement.resolve("java.args")).content().contains("--select-method=sample.TestSample#test");
     }
 
     @Test
