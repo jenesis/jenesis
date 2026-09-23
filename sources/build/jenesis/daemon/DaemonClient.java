@@ -4,7 +4,6 @@ import module java.base;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.SequencedProperties;
 import build.jenesis.Environment;
-import static build.jenesis.Environment.SYSTEM;
 
 public final class DaemonClient {
 

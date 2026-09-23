@@ -18,6 +18,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class PinModuleInfoTest {
 
+    private final Map<String, String> settings = new HashMap<>();
+
     @TempDir
     private Path root;
     private Path previous, next, supplement, input;
@@ -91,7 +93,7 @@ public class PinModuleInfoTest {
     }
 
     private String run(Path moduleInfo, Platform platform, UnaryOperator<PinModuleInfo> configurator) throws IOException {
-        configurator.apply(PinModuleInfo.ofEnvironment(Environment.SYSTEM, "module", "", List.of(moduleInfo), new HashDigestFunction("SHA-256"))
+        configurator.apply(PinModuleInfo.ofEnvironment(new Environment(settings::get), "module", "", List.of(moduleInfo), new HashDigestFunction("SHA-256"))
                         .platform(platform))
                 .apply(Runnable::run,
                         new BuildStepContext(previous, next, supplement),
@@ -549,7 +551,7 @@ public class PinModuleInfoTest {
                 }
                 """);
         writeResolved(Map.of("module/bar", "1.0 SHA-256/cafebabe"));
-        System.setProperty("jenesis.pin.concurrency", "-1");
+        settings.put("pin.concurrency", "-1");
         try {
             assertThatThrownBy(() -> run(file))
                     .as("a pin run fans out one step per module and each holds a whole closure,"
@@ -557,7 +559,7 @@ public class PinModuleInfoTest {
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("Pin concurrency must not be negative: -1");
         } finally {
-            System.clearProperty("jenesis.pin.concurrency");
+            settings.remove("pin.concurrency");
         }
     }
 

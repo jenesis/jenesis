@@ -44,7 +44,7 @@ public class LauncherTest {
         application.setProperty("name", "app");
         application.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = Launcher.ofEnvironment(Environment.SYSTEM, "launcher", PathPlacement.INFERRED).apply(
+        BuildStepResult result = Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.INFERRED).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -87,7 +87,7 @@ public class LauncherTest {
         application.setProperty("name", "sample");
         application.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = Launcher.ofEnvironment(Environment.SYSTEM, "launcher", PathPlacement.INFERRED).apply(
+        BuildStepResult result = Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.INFERRED).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -119,7 +119,7 @@ public class LauncherTest {
         application.setProperty("name", "sample");
         application.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = Launcher.ofEnvironment(Environment.SYSTEM, "launcher", PathPlacement.CLASS_PATH).apply(
+        BuildStepResult result = Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.CLASS_PATH).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -149,7 +149,7 @@ public class LauncherTest {
         application.setProperty("mainClass", "sample.Sample");
         application.store(input.resolve("launcher.properties"));
 
-        BuildStepResult result = Launcher.ofEnvironment(Environment.SYSTEM, "launcher", PathPlacement.INFERRED).apply(
+        BuildStepResult result = Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.INFERRED).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
@@ -162,7 +162,7 @@ public class LauncherTest {
         try (ZipFile jar = new ZipFile(next.resolve(Launcher.LAUNCHER).resolve("application.jar").toFile())) {
             assertThat(jar.stream().map(ZipEntry::getTimeLocal))
                     .as("a launcher created at another moment carries the same bytes")
-                    .containsOnly(BuildStep.timestamp(Environment.SYSTEM).toLocalDateTime());
+                    .containsOnly(BuildStep.timestamp(Environment.NONE).toLocalDateTime());
         }
     }
 

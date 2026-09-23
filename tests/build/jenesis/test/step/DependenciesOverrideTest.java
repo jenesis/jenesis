@@ -76,7 +76,7 @@ public class DependenciesOverrideTest {
         try (ZipFile jar = new ZipFile(next.resolve(Dependencies.RESOLVED + "lib.shaded.jar").toFile())) {
             assertThat(jar.stream().map(ZipEntry::getTimeLocal))
                     .as("a module placed at another moment carries the same bytes")
-                    .containsOnly(BuildStep.timestamp(Environment.SYSTEM).toLocalDateTime());
+                    .containsOnly(BuildStep.timestamp(Environment.NONE).toLocalDateTime());
         }
     }
 
@@ -113,7 +113,7 @@ public class DependenciesOverrideTest {
         declare(Map.of("lib.shaded", "lib.carrier"), "lib.carrier");
         assertThatThrownBy(() -> execute(new Dependencies(
                 Map.of("module", discovery()),
-                Map.of("module", ModularJarResolver.ofEnvironment(Environment.SYSTEM, false)))))
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, false)))))
                 .as("only a layout that maps module names onto Maven coordinates can drop the shaded artifact")
                 .hasStackTraceContaining(IllegalArgumentException.class.getName())
                 .hasStackTraceContaining("Cannot override [lib.shaded]")

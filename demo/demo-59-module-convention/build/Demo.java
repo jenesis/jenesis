@@ -10,6 +10,7 @@ import build.jenesis.maven.MavenRepository;
 import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisRepository;
 import build.jenesis.Environment;
+import build.jenesis.Make;
 
 /**
  * Resolving a module from a plain Maven repository by the coordinate convention
@@ -34,8 +35,9 @@ import build.jenesis.Environment;
 public class Demo {
 
     static void main(String[] args) throws Exception {
+        Environment environment = new Environment(Make.settings(Path.of(".")).keys());
         Files.createDirectories(Path.of("target"));
-        Path published = Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
+        Path published = Project.ofEnvironment(environment, Path.of("."))
                 .root(Path.of("greeter"))
                 .target(Path.of("target", "greeter"))
                 .version("1.0.0")
@@ -60,7 +62,7 @@ public class Demo {
         Map<String, Repository> repositories = Map.of("module", new MavenModuleRepository(maven), "maven", maven);
 
         // Build the consumer, which requires the library by its module name.
-        Path modular = Project.ofEnvironment(Environment.SYSTEM, Path.of("."))
+        Path modular = Project.ofEnvironment(environment, Path.of("."))
                 .repositories(repositories)
                 .boms(boms)
                 .version("1.0.0")
@@ -100,17 +102,13 @@ public class Demo {
 
         Path modules = Files.createDirectories(Path.of("target", "modules", "module", "demo.other", "1.0.0"));
         Files.copy(jar, modules.resolve("demo.other.jar"), StandardCopyOption.REPLACE_EXISTING);
-        System.setProperty("jenesis.module.uri", "maven:2:" + published.toUri() + "|demo.convention,"
-                + Path.of("target", "modules").toUri());
-        try {
-            JenesisRepository chain = JenesisModuleRepository.ofEnvironment(Environment.SYSTEM, JenesisRepository.Scope.MODULE);
-            System.out.println();
-            System.out.println("Resolving through the configured chain, with no repository in code:");
-            report(chain, module, "the company repository, by the Maven convention");
-            report(chain, "demo.other", "the regular module repository");
-        } finally {
-            System.clearProperty("jenesis.module.uri");
-        }
+        String chained = "maven:2:" + published.toUri() + "|demo.convention," + Path.of("target", "modules").toUri();
+        Environment configured = new Environment(Map.of("module.uri", chained)::get);
+        JenesisRepository chain = JenesisModuleRepository.ofEnvironment(configured, JenesisRepository.Scope.MODULE);
+        System.out.println();
+        System.out.println("Resolving through the configured chain, with no repository in code:");
+        report(chain, module, "the company repository, by the Maven convention");
+        report(chain, "demo.other", "the regular module repository");
     }
 
     private static void report(JenesisRepository chain, String module, String source) throws IOException {

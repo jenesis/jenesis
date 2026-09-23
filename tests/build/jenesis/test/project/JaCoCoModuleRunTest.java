@@ -103,14 +103,14 @@ public class JaCoCoModuleRunTest {
         executor.addSource("sources", sources);
         executor.addModule(
                 "test",
-                new TestModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM)))
+                new TestModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE)))
                         .observe(new JaCoCo())
                         .isTest(candidate -> candidate.endsWith("CoveredTest"))
                         .jarsOnly(false),
                 "dependencies", "classes");
         executor.addModule(
                 "coverage",
-                new JaCoCoModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.SYSTEM)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.SYSTEM))).pinning(Pinning.STRICT),
+                new JaCoCoModule(Map.of("maven", MavenDefaultRepository.ofEnvironment(Environment.NONE)), Map.of("maven", MavenPomResolver.ofEnvironment(Environment.NONE))).pinning(Pinning.STRICT),
                 "test", "classes", "sources", "dependencies");
         executor.execute();
 

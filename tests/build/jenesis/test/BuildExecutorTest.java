@@ -24,6 +24,8 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 
 public class BuildExecutorTest implements Serializable {
 
+    private final Map<String, String> settings = new HashMap<>();
+
     private static final AtomicInteger RUNS = new AtomicInteger();
     private static final AtomicReference<SequencedMap<String, BuildStepArgument>> APPLIED = new AtomicReference<>();
     private static final AtomicReference<SequencedSet<String>> REMOVED = new AtomicReference<>();
@@ -405,29 +407,29 @@ public class BuildExecutorTest implements Serializable {
 
     @Test
     public void aggregate_configuration_defaults_from_property_and_is_overridable() {
-        assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).aggregate()).isFalse();
-        assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).aggregate(true).aggregate()).isTrue();
-        System.setProperty("jenesis.executor.aggregate", "true");
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).aggregate()).isFalse();
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).aggregate(true).aggregate()).isTrue();
+        settings.put("executor.aggregate", "true");
         try {
-            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).aggregate()).isTrue();
+            assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).aggregate()).isTrue();
         } finally {
-            System.clearProperty("jenesis.executor.aggregate");
+            settings.remove("executor.aggregate");
         }
     }
 
     @Test
     public void a_configuration_takes_its_defaults_when_it_is_given_no_provider() {
-        System.setProperty("jenesis.executor.aggregate", "true");
-        System.setProperty("jenesis.executor.digest", "SHA-256");
+        settings.put("executor.aggregate", "true");
+        settings.put("executor.digest", "SHA-256");
         try {
             assertThat(new BuildExecutor.Configuration().aggregate())
                     .as("an embedder that builds its own configuration is never surprised by the environment")
                     .isFalse();
             assertThat(new BuildExecutor.Configuration().digest()).isEqualTo("MD5");
-            assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.SYSTEM).aggregate()).isTrue();
+            assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(settings::get)).aggregate()).isTrue();
         } finally {
-            System.clearProperty("jenesis.executor.aggregate");
-            System.clearProperty("jenesis.executor.digest");
+            settings.remove("executor.aggregate");
+            settings.remove("executor.digest");
         }
     }
 
