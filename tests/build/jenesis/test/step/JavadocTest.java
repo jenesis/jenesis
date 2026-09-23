@@ -61,7 +61,7 @@ public class JavadocTest {
         Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"),
                 "package sample; /** Documented. */ public class Sample { }\n");
         Javadoc javadoc = Javadoc.ofEnvironment(empty
-                        ? new Environment(Map.of("archive.timestamp", "")::get)
+                        ? new Environment(Map.of("archive.timestamp", ""))
                         : Environment.NONE,
                 ProcessHandler.Factory.TOOL);
         javadoc.apply(

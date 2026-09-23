@@ -103,7 +103,7 @@ public class Demo {
         Path modules = Files.createDirectories(Path.of("target", "modules", "module", "demo.other", "1.0.0"));
         Files.copy(jar, modules.resolve("demo.other.jar"), StandardCopyOption.REPLACE_EXISTING);
         String chained = "maven:2:" + published.toUri() + "|demo.convention," + Path.of("target", "modules").toUri();
-        Environment configured = new Environment(Map.of("module.uri", chained)::get);
+        Environment configured = new Environment(Map.of("module.uri", chained));
         JenesisRepository chain = JenesisModuleRepository.ofEnvironment(configured, JenesisRepository.Scope.MODULE);
         System.out.println();
         System.out.println("Resolving through the configured chain, with no repository in code:");

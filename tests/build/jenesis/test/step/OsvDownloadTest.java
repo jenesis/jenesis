@@ -67,7 +67,7 @@ public class OsvDownloadTest {
             dependencies.setProperty("main/compile/maven/org.example/lib/1.2.3", "resolved/lib.jar");
             dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
             URI endpoint = URI.create("http://localhost:" + server.getAddress().getPort());
-            BuildStepResult result = OsvDownload.ofEnvironment(new Environment(Map.of("repository.insecure", "true")::get)).endpoint(endpoint).apply(Runnable::run,
+            BuildStepResult result = OsvDownload.ofEnvironment(new Environment(Map.of("repository.insecure", "true"))).endpoint(endpoint).apply(Runnable::run,
                     new BuildStepContext(root.resolve("retry-previous"), next, root.resolve("retry-supplement")),
                     new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                             argument,

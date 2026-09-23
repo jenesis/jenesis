@@ -79,11 +79,11 @@ scan discovers, long after the settings were read. Every setting a child resolve
 well, so a caller that names no strings configures the same object programmatically.
 
 **One `Environment` says what a run reads and where it talks.** `Environment` is the record of the three
-things a run is given - the `Function<String, String>` that answers a setting, and the `Consumer<String>` for
+things a run is given - the immutable `Map<String, String>` of the settings in force, and the `Consumer<String>` for
 its output and for its errors - and it is the single argument every `ofEnvironment` takes. Nothing in the
 engine writes to `System.out` or `System.err`; a line goes to the consumer the run was handed.
-`Environment.NONE` answers no setting and writes to the JVM's streams, `new Environment(keys)` is a provider
-with the JVM's streams, and `new Environment(keys, out, err)` is a tool's writers. There is deliberately no
+`Environment.NONE` holds no setting and writes to the JVM's streams, `new Environment(keys)` is a map of
+settings with the JVM's streams, and `new Environment(keys, out, err)` is a tool's writers. There is deliberately no
 environment that reads the JVM's properties as they stand: code running inside a build - a plugin, an
 annotation processor - could change one between two reads. Each component is a wither of its own
 (`Environment.NONE.out(printed::add)`), so a caller sends one run's lines somewhere else without touching
@@ -100,7 +100,8 @@ A process the build hands a command line to - a container, the daemon - is given
 read the JVM, because a setting a `jenesis.properties` or a profile supplied was never in the JVM to begin with.
 `Make.Settings` therefore names the keys its layers declare, the daemon is handed their values with every request
 and keys its fingerprint on the JVM it would otherwise have to fork rather than on them, and what `Project`
-forwards into a container is the catalogue behind the `configuration` selector, read through the environment.
+forwards into a container is every setting the environment holds, save the `jenesis.project.docker*` keys that
+start the container.
 
 **A command line can live in a file.** `Make`, `Execute`, `Jpx` and the three tools read `@<file>` as the
 arguments it holds and `@@<text>` as an argument starting with an `@`, with `#` to the end of a line a comment
@@ -126,15 +127,16 @@ surprised by its surroundings: `new Project(root)` is the defaults and nothing e
 read once, by `Make`: it copies every `jenesis.*` property when an entry point starts, lays the command line's
 `-Djenesis.*` arguments over the copy, and hands the result down, so a property set later changes nothing. A
 program of its own reads the same copy through `Make.settings(root).keys()`. Every setting is read through the
-environment's `Function<String, String>` that answers one key, never off `System` directly, and `Make.keys` is
-the one place the shared `jenesis.` prefix is spelt, so a key is named without it everywhere else. A setting
-whose keys cannot be listed in advance - `jenesis.platform.<token>` - is listed for it: `Make` derives
-`make.platforms`, the tokens it saw, the way it derives `make.provided`. `Environment.NONE` is written out
-where it is used rather than static imported. `Make` and `Toolchain` are the exception and read a bare `Function<String, String>` with their own parsing,
-because `MakeClosureTest` holds each of them to compiling alone - naming `Environment` there would drag the
-engine into every build's first step. `Make` therefore hands the engine the provider and `Project.perform`
-and `Project.run` take a `Function<String, String>` of their own that builds the default environment, so the
-reflective handoff names JDK types alone. Where the rule itself must not differ, `Make` holds it and
+environment's map, never off `System` directly, and `Make.keys` is the one place the shared `jenesis.` prefix is
+spelt, so a key is named without it everywhere else. Because the map holds every setting in force, a setting
+whose keys cannot be named in advance - `jenesis.platform.<token>`, `jenesis.plugin.<name>` - is found by
+listing the keys rather than by a list derived for it; only `make.provided`, which records where a value came
+from, is derived. `Environment.NONE` is written out where it is used rather than static imported. `Make` and
+`Toolchain` are the exception and read a bare `Map<String, String>` with their own parsing, because
+`MakeClosureTest` holds each of them to compiling alone - naming `Environment` there would drag the engine into
+every build's first step. `Make` therefore hands the engine the map and `Project.perform` and `Project.run`
+take a `Map<String, String>` of their own that builds the default environment, so the reflective handoff names
+JDK types alone. Where the rule itself must not differ, `Make` holds it and
 `Environment` calls `Make`, rather than either side keeping a copy.
 The accessors are `environment.getProperty(key)` and `getProperty(key, default)` for the raw value, `value`
 for the trimmed one that reads a blank as absent, `flag`, `flagOrNull`, `number`, `entries` and `words` -
@@ -279,7 +281,7 @@ silently falls back, and a lenient wildcard selector is the one deliberate excep
   anonymous class, which would capture the test. A test whose step lambdas use its own fields (a `@TempDir`)
   implements `Serializable` so they can be hashed; state a step must not capture (a latch, a socket) lives in
   a static field.
-- A test names the settings it needs in `new Environment(Map.of(…)::get)` and collects what a run prints by
+- A test names the settings it needs in `new Environment(Map.of(…))` and collects what a run prints by
   giving that environment a consumer of its own (`.out(printed::add)`). Setting a system property or swapping
   `System.out` is what the environment exists to avoid, and it survives only where the test is about the JVM's
   own properties (`EnvironmentTest`) or proves that a build ignores them.

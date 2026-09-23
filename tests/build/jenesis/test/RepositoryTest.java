@@ -83,7 +83,7 @@ public class RepositoryTest {
     @Test
     public void a_credential_reads_a_setting_before_the_environment() {
         Repository.Credential credential = Repository.Credential.of(
-                new Environment(Map.of("test.credential", "Bearer property")::get),
+                new Environment(Map.of("test.credential", "Bearer property")),
                 "test.credential",
                 "JENESIS_TEST_CREDENTIAL_THAT_IS_NOT_SET");
 
@@ -93,7 +93,7 @@ public class RepositoryTest {
 
     @Test
     public void an_origin_names_the_settings_a_project_supplied() {
-        Environment environment = new Environment(Map.of("make.provided", "module.uri, test.sample")::get);
+        Environment environment = new Environment(Map.of("make.provided", "module.uri, test.sample"));
         assertThat(Repository.Origin.of(environment, "module.uri")).isEqualTo(Repository.Origin.PROJECT);
         assertThat(Repository.Origin.of(environment, "test.sample")).isEqualTo(Repository.Origin.PROJECT);
         assertThat(Repository.Origin.of(environment, "maven.uri")).isEqualTo(Repository.Origin.USER);
@@ -101,12 +101,12 @@ public class RepositoryTest {
 
     @Test
     public void an_origin_is_the_user_where_no_project_file_supplied_a_setting() {
-        assertThat(Repository.Origin.of(new Environment(Map.<String, String>of()::get), "maven.uri"))
+        assertThat(Repository.Origin.of(new Environment(Map.of()), "maven.uri"))
                 .isEqualTo(Repository.Origin.USER);
     }
 
     private Repository.Connection connection() {
-        return Repository.Connection.ofEnvironment(new Environment(settings::get));
+        return Repository.Connection.ofEnvironment(new Environment(settings));
     }
 
     private HttpServer serve(IntFunction<Integer> statusOfHit, Map<String, String> headers, AtomicInteger hits) throws IOException {
@@ -308,11 +308,11 @@ public class RepositoryTest {
 
     @Test
     public void connection_defaults_read_the_keys_they_are_given() {
-        assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read.timeout", "5000")::get)))
+        assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read.timeout", "5000"))))
                 .isEqualTo(new Repository.Connection(7, Duration.ofMillis(9), false, 10_000, 5_000));
-        assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read.timeout", "5000")::get)).retries(1))
+        assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read.timeout", "5000"))).retries(1))
                 .isEqualTo(new Repository.Connection(1, Duration.ofMillis(9), false, 10_000, 5_000));
-        assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read.timeout", "5000")::get)).backoff(Duration.ofMillis(2)))
+        assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read.timeout", "5000"))).backoff(Duration.ofMillis(2)))
                 .isEqualTo(new Repository.Connection(7, Duration.ofMillis(2), false, 10_000, 5_000));
     }
 
@@ -364,7 +364,7 @@ public class RepositoryTest {
     @Test
     public void ofUris_without_version_resolver_does_not_attempt_fallback() throws IOException {
         URI bare = URI.create("https://example.test/other/foo.jar");
-        Repository repository = Repository.ofUris(Map.of("foo", bare), null, Repository.Connection.ofEnvironment(new Environment(settings::get)), null);
+        Repository repository = Repository.ofUris(Map.of("foo", bare), null, Repository.Connection.ofEnvironment(new Environment(settings)), null);
         assertThat(repository.fetch(Runnable::run, "foo/9.9")).isEmpty();
     }
 
@@ -373,7 +373,7 @@ public class RepositoryTest {
         URI bare = URI.create("https://example.test/other/foo.jar");
         Repository repository = Repository.ofUris(Map.of("foo", bare),
                 (BiFunction<URI, String, Optional<URI>> & Serializable) (uri, _) -> Optional.of(uri),
-                Repository.Connection.ofEnvironment(new Environment(settings::get)),
+                Repository.Connection.ofEnvironment(new Environment(settings)),
                 null);
         Optional<RepositoryItem> item = repository.fetch(Runnable::run, "foo/9.9");
         assertThat(item).isPresent();
@@ -384,7 +384,7 @@ public class RepositoryTest {
         URI bare = URI.create("https://example.test/other/foo.jar");
         Repository repository = Repository.ofUris(Map.of("foo", bare),
                 (BiFunction<URI, String, Optional<URI>> & Serializable) (_, _) -> Optional.empty(),
-                Repository.Connection.ofEnvironment(new Environment(settings::get)),
+                Repository.Connection.ofEnvironment(new Environment(settings)),
                 null);
         assertThat(repository.fetch(Runnable::run, "foo/9.9")).isEmpty();
     }

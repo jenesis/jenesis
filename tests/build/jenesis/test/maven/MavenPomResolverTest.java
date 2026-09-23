@@ -52,7 +52,7 @@ public class MavenPomResolverTest {
                 "fail", new MavenPomResolver(MavenDefaultVersionNegotiator.fail()),
                 "managed", new MavenPomResolver(MavenDefaultVersionNegotiator.managed()));
         for (Map.Entry<String, MavenPomResolver> entry : cases.entrySet()) {
-            assertThat(serialize(MavenPomResolver.ofEnvironment(new Environment(Map.of("resolver.maven", entry.getKey())::get))))
+            assertThat(serialize(MavenPomResolver.ofEnvironment(new Environment(Map.of("resolver.maven", entry.getKey())))))
                     .as("strategy=%s", entry.getKey())
                     .isEqualTo(serialize(entry.getValue()));
         }
@@ -60,13 +60,13 @@ public class MavenPomResolverTest {
 
     @Test
     public void system_property_is_read_case_insensitively() throws IOException {
-        assertThat(serialize(MavenPomResolver.ofEnvironment(new Environment(Map.of("resolver.maven", "LaTeSt")::get))))
+        assertThat(serialize(MavenPomResolver.ofEnvironment(new Environment(Map.of("resolver.maven", "LaTeSt")))))
                 .isEqualTo(serialize(new MavenPomResolver(MavenDefaultVersionNegotiator.latest())));
     }
 
     @Test
     public void system_property_rejects_an_unknown_strategy() {
-        assertThatThrownBy(() -> MavenPomResolver.ofEnvironment(new Environment(Map.of("resolver.maven", "nonsense")::get)))
+        assertThatThrownBy(() -> MavenPomResolver.ofEnvironment(new Environment(Map.of("resolver.maven", "nonsense"))))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Unknown jenesis.resolver.maven 'nonsense',"
                         + " expected one of: maven, latest, release, stable, closest, fail, managed");

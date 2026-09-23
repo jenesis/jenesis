@@ -93,7 +93,7 @@ public class PinModuleInfoTest {
     }
 
     private String run(Path moduleInfo, Platform platform, UnaryOperator<PinModuleInfo> configurator) throws IOException {
-        configurator.apply(PinModuleInfo.ofEnvironment(new Environment(settings::get), "module", "", List.of(moduleInfo), new HashDigestFunction("SHA-256"))
+        configurator.apply(PinModuleInfo.ofEnvironment(new Environment(settings), "module", "", List.of(moduleInfo), new HashDigestFunction("SHA-256"))
                         .platform(platform))
                 .apply(Runnable::run,
                         new BuildStepContext(previous, next, supplement),
@@ -533,7 +533,7 @@ public class PinModuleInfoTest {
 
     @Test
     public void refuses_an_unknown_retention() {
-        assertThatThrownBy(() -> PinModuleInfo.ofEnvironment(new Environment(Map.of("pin.retain", "some")::get),
+        assertThatThrownBy(() -> PinModuleInfo.ofEnvironment(new Environment(Map.of("pin.retain", "some")),
                 "module", "", List.of(), new HashDigestFunction("SHA-256")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown pin retention: some (expected groups, all or none)");

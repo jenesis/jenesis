@@ -260,7 +260,7 @@ public class JarTest {
     public void passes_no_date_when_the_archive_timestamp_is_empty(boolean process) throws IOException {
         Files.createDirectory(classes.resolve(Javac.CLASSES));
         Jar jar;
-        jar = Jar.ofEnvironment(new Environment(Map.of("archive.timestamp", "")::get), process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES);
+        jar = Jar.ofEnvironment(new Environment(Map.of("archive.timestamp", "")), process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL, Jar.Sort.CLASSES);
         jar.apply(Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(classes, Map.of()))))
