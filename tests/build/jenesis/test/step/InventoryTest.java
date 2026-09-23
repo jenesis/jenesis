@@ -258,6 +258,12 @@ public class InventoryTest {
     @Test
     public void grants_native_access_to_a_module_in_one_of_its_layers() throws IOException {
         Path manifests = manifests();
+        SequencedProperties module = SequencedProperties.ofFiles(manifests.resolve(BuildStep.MODULE));
+        module.setProperty("module", "org.example.app");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        SequencedProperties layers = new SequencedProperties();
+        layers.setProperty("render", "org.example.app org.example.api");
+        layers.store(manifests.resolve(BuildStep.LAYERS));
         SequencedProperties natives = new SequencedProperties();
         natives.setProperty("layer:render/native/maven/org.example/jni", "");
         natives.store(manifests.resolve(BuildStep.NATIVES));
@@ -281,6 +287,92 @@ public class InventoryTest {
                 args("manifests", manifests, "runtime", runtime)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("org.example.words names org.example.jni");
+    }
+
+    @Test
+    public void grants_what_a_granted_module_delegates_to_in_its_own_layer() throws IOException {
+        Path manifests = granting("main/native/module/org.example.words");
+        Path runtime = layering("layer:render/module/org.example.jni");
+
+        run(new Inventory().nativeAccess(Inventory.NativeAccess.STRICT), args("manifests", manifests, "runtime", runtime));
+
+        assertThat(Inventory.nativeAccess(next)).containsExactly(
+                runtime.resolve("dependencies/words-1.0.jar").toAbsolutePath().normalize(),
+                runtime.resolve("dependencies/jni-1.0.jar").toAbsolutePath().normalize());
+    }
+
+    @Test
+    public void grants_nothing_a_module_delegates_to_before_it_is_granted_itself() throws IOException {
+        Path manifests = manifests();
+        Path runtime = layering("layer:render/module/org.example.jni");
+
+        run(args("manifests", manifests, "runtime", runtime));
+
+        assertThat(Inventory.nativeAccess(next)).isEmpty();
+    }
+
+    @Test
+    public void grants_nothing_a_module_names_outside_its_own_layers() throws IOException {
+        Path manifests = granting("main/native/module/org.example.words");
+        Path runtime = layering("org.example.words,org.example.other");
+        jar(runtime.resolve("dependencies/other-1.0.jar"), Map.of("Automatic-Module-Name", "org.example.other"));
+        SequencedProperties index = SequencedProperties.ofFiles(runtime.resolve(BuildStep.DEPENDENCIES));
+        index.setProperty("main/runtime/maven/org.example/other/1.0", "dependencies/other-1.0.jar");
+        index.store(runtime.resolve(BuildStep.DEPENDENCIES));
+
+        run(args("manifests", manifests, "runtime", runtime));
+
+        assertThat(Inventory.nativeAccess(next)).containsExactly(
+                runtime.resolve("dependencies/words-1.0.jar").toAbsolutePath().normalize());
+    }
+
+    @Test
+    public void refuses_a_native_access_grant_for_a_module_in_another_modules_layer() throws IOException {
+        Path manifests = granting("layer:render/native/module/org.example.jni");
+        Path runtime = layering("layer:render/module/org.example.jni");
+
+        assertThatThrownBy(() -> run(args("manifests", manifests, "runtime", runtime)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("@jenesis.native grants layer:render/module/org.example.jni native access,"
+                        + " but foo does not resolve it at run time");
+    }
+
+    @Test
+    public void strict_native_access_asks_for_the_module_that_delegates_in_its_layer() throws IOException {
+        Path manifests = manifests();
+        Path runtime = layering("layer:render/module/org.example.jni");
+
+        assertThatThrownBy(() -> run(new Inventory().nativeAccess(Inventory.NativeAccess.STRICT),
+                args("manifests", manifests, "runtime", runtime)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("org.example.words names layer:render/module/org.example.jni in its layer render,"
+                        + " which org.example.words grants once granted itself");
+    }
+
+    private Path granting(String key) throws IOException {
+        Path manifests = manifests();
+        SequencedProperties natives = new SequencedProperties();
+        natives.setProperty(key, "");
+        natives.store(manifests.resolve(BuildStep.NATIVES));
+        return manifests;
+    }
+
+    private Path layering(String named) throws IOException {
+        Path runtime = Files.createDirectory(root.resolve("runtime"));
+        Path dependencies = Files.createDirectory(runtime.resolve("dependencies"));
+        jar(dependencies.resolve("jni-1.0.jar"), Map.of("Automatic-Module-Name", "org.example.jni"));
+        jar(dependencies.resolve("words-1.0.jar"), Map.of(
+                "Automatic-Module-Name", "org.example.words",
+                PathPlacement.LAYERS, "render=org.example.api module/org.example.jni",
+                PathPlacement.NATIVE_ACCESS, named));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/runtime/maven/org.example/words/1.0", "dependencies/words-1.0.jar");
+        index.setProperty("layer:render/runtime/maven/org.example/jni/1.0", "dependencies/jni-1.0.jar");
+        index.store(runtime.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties layers = new SequencedProperties();
+        layers.setProperty("render", "org.example.words org.example.api");
+        layers.store(runtime.resolve(BuildStep.LAYERS));
+        return runtime;
     }
 
     private Path manifests() throws IOException {
