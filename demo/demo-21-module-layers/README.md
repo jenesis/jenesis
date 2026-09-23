@@ -39,7 +39,7 @@ The four modules
 Only `library/module-info.java` says anything about layers:
 
     @jenesis.layer render api      demo.layers.spi
-    @jenesis.layer render provider module/demo.layers.impl
+    @jenesis.layer render provider demo.layers.impl
 
 The first line names the API module. The second names what the layer isolates - resolved in a
 dependency group of its own, `layer:render`, which resolves, verifies and reports like any other
@@ -47,9 +47,10 @@ group. A group is the top isolation axis of a coordinate, so a layer needs no gr
 `layer:render/maven/<groupId>/<artifactId>` addresses its contents wherever a coordinate is
 written.
 
-The library then asks for its layer by name:
+The library then asks for its layer by name, passing its own lookup: the layer belongs to the
+module that asks for it, and every module that asks is given a layer of its own.
 
-    Report r = Launcher.instance("render", Report.class);
+    Report r = Launcher.instance(MethodHandles.lookup(), "render", Report.class);
 
 `app/module-info.java` has none of this. It requires the library and a different `jackson-core`,
 and that is all.

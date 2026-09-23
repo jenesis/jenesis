@@ -261,6 +261,45 @@ public class ExecutionTest {
         assertThat(code).isEqualTo(0);
     }
 
+    @Test
+    public void execute_passes_the_java_process_options_of_a_configuration_folder()
+            throws IOException, InterruptedException {
+        Path source = Files.createDirectories(root.resolve("src/main/java/sample"));
+        Files.writeString(source.resolve("Sample.java"), """
+                package sample;
+
+                public class Sample {
+
+                    public static void main(String[] args) {
+                        System.exit("yes".equals(System.getProperty("sample.option")) ? 0 : 3);
+                    }
+                }
+                """);
+        Files.writeString(root.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <mainClass>sample.Sample</mainClass>
+                    </properties>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("process-java.properties"),
+                "-Dsample.option\\=yes\n");
+        Project project = Project.ofEnvironment(Environment.NONE, root)
+                .target(Files.createDirectory(root.resolve("target")))
+                .artifacts(Files.createDirectory(root.resolve("artifacts")))
+                .layout(Project.Layout.MAVEN)
+                .tests(false);
+        int code = Execution.ofEnvironment(Environment.NONE, project).execute();
+        assertThat(code)
+                .as("process-java.properties applies to every forked java process, the program Execute runs included")
+                .isEqualTo(0);
+    }
+
     private void writeNativeModules(boolean granted) throws IOException {
         Path library = Files.createDirectories(root.resolve("library/demo/library"));
         Files.writeString(library.resolve("../../module-info.java"), """

@@ -134,6 +134,16 @@ public record Execution(Project project, String mainClass, String module, Contai
             jars.add(resolved.toString());
         }
         List<String> javaArgs = new ArrayList<>();
+        for (Path file : Inventory.paths(merged, candidate.folder, selected.getKey() + ".process")) {
+            SequencedProperties.ofFiles(file).forEachProperty((option, values) -> {
+                for (String value : values.split("\n")) {
+                    javaArgs.add(option);
+                    if (!value.isEmpty()) {
+                        javaArgs.add(value);
+                    }
+                }
+            });
+        }
         for (int index = 0; ; index++) {
             String agent = merged.getProperty(selected.getKey() + ".agent." + index);
             if (agent == null) {
