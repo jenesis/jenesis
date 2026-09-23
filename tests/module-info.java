@@ -39,5 +39,6 @@ module build.jenesis.test {
     requires org.junit.jupiter;
     requires org.assertj.core;
 
+    exports build.jenesis.test to build.jenesis;
     exports build.jenesis.test.daemon to build.jenesis;
 }

@@ -12,9 +12,9 @@ verbatim.
 Run it
 ------
 
-From this directory:
+From this directory, naming the customizer this demo ships:
 
-    java build/Demo.java
+    java build/jenesis/Make.java -Djenesis.project.customizers=build.Preprocessing
 
 You should see the build graph resolve and run, with a line reporting the
 substitution as the `preprocess` step rewrites the source:
@@ -40,7 +40,7 @@ Layout
 
     demo/demo-49-custom-assembler
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
-    |-- build/Demo.java    the launcher: wires the wrapping assembler, builds, runs
+    |-- build/Preprocessing.java   the customizer: wraps the assembler of the project
     `-- sources/
         |-- module-info.java     module demo.custom { exports sample; } (@jenesis.main)
         `-- sample/Sample.java    defines GREETING = "${greeting}", prints its substituted value
@@ -52,14 +52,31 @@ as the `java-modular` demo does. The only difference is the assembler.
 How the wrapping works
 ----------------------
 
+`Preprocessing` is a customizer: a `UnaryOperator<Project>` under `build/` that is
+handed the project the build would otherwise run and returns the one to run
+instead.
+
+        public class Preprocessing implements UnaryOperator<Project> {
+
+            @Override
+            public Project apply(Project project) {
+                return project.assembler(new PreprocessingAssembler(project.assembler()));
+            }
+        }
+
+`jenesis.project.customizers` names such classes, separated by commas, and the
+build applies them in order. Everything else is the stock build: the project a
+customizer receives is configured by `jenesis.properties`, the profiles and the
+`-Djenesis.*` arguments, and the build it returns runs on the JDK, in the daemon
+or in Docker as those settings ask. A customizer runs code of the project's own,
+so a file the project provides cannot name one: pass it on the command line, in
+an `@<file>` argument, or in your own `~/.jenesis/jenesis.properties`.
+
 The preprocessing is delivered by a custom assembler that wraps the stock one.
 `Project.assembler(...)` accepts any
-`MultiProjectAssembler<? super ProjectModuleDescriptor>`. The default is
-`InferredMultiProjectAssembler`; this demo passes a `PreprocessingAssembler` that
-holds the stock assembler as a delegate:
-
-        new Project(Path.of("."))
-                .assembler(new PreprocessingAssembler(new InferredMultiProjectAssembler()))
+`MultiProjectAssembler<? super ProjectModuleDescriptor>`, and `project.assembler()`
+is the `InferredMultiProjectAssembler` the settings configured, which
+`PreprocessingAssembler` holds as a delegate.
 
 For each module the wrapper does three things:
 
@@ -83,7 +100,6 @@ Java toolchain, it only interposes a source transformation in front of it. Any
 preprocessing that produces a `sources/` tree (template expansion, code
 generation, license-header stamping) fits the same shape.
 
-`Demo.java` only runs the build; running the produced jar is left to you (see
-above). Note that the companion `build/jenesis/Execute.java` launcher would
-build with the *stock* `Project` configuration rather than this custom one, so
-it would not apply the preprocessing.
+Running the produced jar is left to you (see above). The companion
+`build/jenesis/Execute.java` applies the same customizer when it is given the
+same setting, so the program it runs is built from the preprocessed sources.
