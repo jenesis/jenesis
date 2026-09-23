@@ -205,6 +205,25 @@ public class InventoryTest {
     }
 
     @Test
+    public void records_the_licenses_the_project_declares() throws IOException {
+        Path manifests = Files.createDirectory(root.resolve("manifests"));
+        SequencedProperties module = new SequencedProperties();
+        module.setProperty("path", "foo");
+        module.store(manifests.resolve(BuildStep.MODULE));
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("license.0.name", "Apache-2.0");
+        metadata.setProperty("license.0.url", "https://www.apache.org/licenses/LICENSE-2.0");
+        metadata.setProperty("license.1.url", "https://opensource.org/license/mit");
+        metadata.store(manifests.resolve(BuildStep.METADATA));
+
+        run(args("manifests", manifests));
+
+        SequencedProperties inventory = read(next.resolve(Inventory.INVENTORY));
+        assertThat(inventory.getProperty("module-foo.license.0")).isEqualTo("Apache-2.0");
+        assertThat(inventory.getProperty("module-foo.license.1")).isEqualTo("https://opensource.org/license/mit");
+    }
+
+    @Test
     public void records_the_release_the_module_compiles_against() throws IOException {
         Path manifests = Files.createDirectory(root.resolve("manifests"));
         SequencedProperties module = new SequencedProperties();
