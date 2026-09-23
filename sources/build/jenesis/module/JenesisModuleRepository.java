@@ -52,7 +52,10 @@ public class JenesisModuleRepository implements JenesisRepository {
         if (repository == null) {
             throw new IllegalStateException("No Jenesis module repository is configured by: " + text);
         }
-        return repository.prepend(ofLocalEnvironment(environment));
+        String local = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
+        return repository.prepend(ofEnvironment(environment, (local == null
+                ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
+                : Path.of(local)).toUri()));
     }
 
     private static JenesisRepository chain(Environment environment,
@@ -316,17 +319,6 @@ public class JenesisModuleRepository implements JenesisRepository {
         return headers;
     }
 
-    public static JenesisModuleRepository ofLocal() {
-        return ofLocalEnvironment(Environment.NONE);
-    }
-
-    public static JenesisModuleRepository ofLocalEnvironment(Environment environment) {
-        String override = environment.getProperty("module.local", System.getenv("JENESIS_REPOSITORY_LOCAL"));
-        Path path = override == null
-                ? Path.of(System.getProperty("user.home")).resolve(".jenesis")
-                : Path.of(override);
-        return ofEnvironment(environment, path.toUri());
-    }
 
     @Override
     public Optional<RepositoryItem> fetch(Executor executor,
