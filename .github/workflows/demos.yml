@@ -101,7 +101,7 @@ jobs:
           - { name: build-cache, dir: demo-46-build-cache, entry: build/jenesis/Make.java, flags: -Djenesis.project.cache, verify: 'find target -name classes.jar -print -quit | grep -q . && find .jenesis/cache -type d -print -quit | grep -q .' }
           - { name: docker-isolation, dir: demo-47-docker-isolation, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: agents, dir: demo-48-agents, entry: build/Demo.java, verify: 'find target -name classes.jar | grep -q . && unzip -p "$(find target -name bundle.zip | head -1)" application.unix.args | grep -q -- "-javaagent:jars/"' }
-          - { name: custom-assembler, dir: demo-49-custom-assembler, entry: build/jenesis/Make.java, flags: -Djenesis.project.customizers=build.Preprocessing, verify: 'java --module-path target/build/modules/compose/module/module-sources/produce/assemble/binary/artifacts/jar/output/artifacts/classes.jar --module demo.custom | grep -q "preprocessed by a custom assembler"' }
+          - { name: custom-assembler, dir: demo-49-custom-assembler, entry: build/jenesis/Make.java, flags: -Djenesis.project.customizers=build.custom.Preprocessing, verify: 'java --module-path target/build/modules/compose/module/module-sources/produce/assemble/binary/artifacts/jar/output/artifacts/classes.jar --module demo.custom | grep -q "preprocessed by a custom assembler"' }
           - { name: custom-jmod, dir: demo-50-custom-jmod, entry: build/Demo.java }
           - { name: internal-module, dir: demo-51-internal-module, entry: build/Demo.java }
           - { name: external-module, dir: demo-52-external-module, entry: build/Demo.java }
