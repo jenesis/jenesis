@@ -78,28 +78,63 @@ public class JenesisRawGitRepository implements JenesisRepository {
     }
 
     public JenesisRawGitRepository groups(Predicate<String> predicate) {
-        return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection,
-                prerelease, speculative, printing);
+        return new JenesisRawGitRepository(scope,
+                                           data,
+                                           repository,
+                                           token,
+                                           predicate,
+                                           connection,
+                                           prerelease,
+                                           speculative,
+                                           printing);
     }
 
     public JenesisRawGitRepository connection(Repository.Connection connection) {
-        return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection,
-                prerelease, speculative, printing);
+        return new JenesisRawGitRepository(scope,
+                                           data,
+                                           repository,
+                                           token,
+                                           predicate,
+                                           connection,
+                                           prerelease,
+                                           speculative,
+                                           printing);
     }
 
     public JenesisRawGitRepository prerelease(Boolean prerelease) {
-        return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection,
-                prerelease, speculative, printing);
+        return new JenesisRawGitRepository(scope,
+                                           data,
+                                           repository,
+                                           token,
+                                           predicate,
+                                           connection,
+                                           prerelease,
+                                           speculative,
+                                           printing);
     }
 
     public JenesisRawGitRepository speculative(Boolean speculative) {
-        return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection,
-                prerelease, speculative, printing);
+        return new JenesisRawGitRepository(scope,
+                                           data,
+                                           repository,
+                                           token,
+                                           predicate,
+                                           connection,
+                                           prerelease,
+                                           speculative,
+                                           printing);
     }
 
     public JenesisRawGitRepository printing(Consumer<String> printing) {
-        return new JenesisRawGitRepository(scope, data, repository, token, predicate, connection,
-                prerelease, speculative, printing);
+        return new JenesisRawGitRepository(scope,
+                                           data,
+                                           repository,
+                                           token,
+                                           predicate,
+                                           connection,
+                                           prerelease,
+                                           speculative,
+                                           printing);
     }
 
     public static JenesisRepository of(Scope scope) {

@@ -64,12 +64,13 @@ public abstract class ProcessBuildStep implements BuildStep {
             }
             boolean streamed = environment.flag("print." + command,
                     environment.flag("print.process", printing));
+            Consumer<String> out = environment.out();
             return new Terms(streamed
-                    ? (error, line) -> environment.out().accept("\033[38;5;" + (error ? 131 : 244) + "m"
+                    ? (error, line) -> out.accept("\033[38;5;" + (error ? 131 : 244) + "m"
                             + command + " >>>> " + line + BuildExecutorCallback.RESET)
                     : null,
                     concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Semaphore::new),
-                    environment.flag("print.command") ? environment.out() : null);
+                    environment.flag("print.command") ? out : null);
         }
 
         public Terms printing(BiConsumer<Boolean, String> printing) {

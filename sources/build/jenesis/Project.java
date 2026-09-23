@@ -159,11 +159,11 @@ public record Project(
             executor.addModule(EXPORT, (export, _) -> export.addStep(
                     "maven", MavenRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/maven"), STAGE);
             String prefix = BUILD + "/maven/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
-            executor.addModule(PIN, new PinModule(project.root(),
+            executor.addModule(PIN, PinModule.ofEnvironment(project.environment(),
+                    project.root(),
                     "pom.xml",
                     (path, file) -> PinPom.ofEnvironment(project.environment(), "maven", path, List.of(file), project.hashFunction()),
-                    project.hashFunction(),
-                    project.environment()), BUILD);
+                    project.hashFunction()), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", Tree.ofEnvironment(project.environment()), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
@@ -232,10 +232,9 @@ public record Project(
             executor.addModule(EXPORT, (export, _) -> export.addStep(
                     "modular", JenesisModuleRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/modular"), STAGE);
             String prefix = BUILD + "/modules/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
-            executor.addModule(PIN, new PinModule(project.root(), "module-info.java",
+            executor.addModule(PIN, PinModule.ofEnvironment(project.environment(), project.root(), "module-info.java",
                     (path, file) -> PinModuleInfo.ofEnvironment(project.environment(), "module", path, List.of(file), project.hashFunction()),
-                    project.hashFunction(),
-                    project.environment()), BUILD);
+                    project.hashFunction()), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", Tree.ofEnvironment(project.environment()), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
@@ -313,11 +312,11 @@ public record Project(
             }, STAGE);
             String prefix = BUILD + "/modules/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
             executor.addModule(PIN,
-                    new PinModule(project.root(),
+                    PinModule.ofEnvironment(project.environment(),
+                            project.root(),
                             "module-info.java",
                             (path, file) -> PinModuleInfo.ofEnvironment(project.environment(), "module", path, List.of(file), project.hashFunction()),
-                            project.hashFunction(),
-                            project.environment()),
+                            project.hashFunction()),
                     BUILD);
             executor.addStep(DEPENDENCIES, Tree.ofEnvironment(project.environment()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
@@ -1077,37 +1076,26 @@ public record Project(
                              Consumer<String> printing)
             implements BuildExecutorModule {
 
-        private PinModule(Path root,
-                          String fileName,
-                          BiFunction<String, Path, BuildStep> stepFactory,
-                          HashDigestFunction hashFunction,
-                          Environment environment) {
-            this(root,
-                 fileName,
-                 stepFactory,
-                 fileFromKeys(environment, root),
-                 providedFromKeys(environment, root),
-                 hashFunction,
-                 environment.flag("print.divergence") ? environment.out() : null);
-        }
-
-        private static Path fileFromKeys(Environment environment, Path root) {
-            String value = environment.getProperty("pin.file");
-            return value == null ? null : root.resolve(value).normalize();
-        }
-
-        private static SequencedSet<Path> providedFromKeys(Environment environment, Path root) {
+        static PinModule ofEnvironment(Environment environment,
+                                       Path root,
+                                       String fileName,
+                                       BiFunction<String, Path, BuildStep> stepFactory,
+                                       HashDigestFunction hashFunction) {
+            String file = environment.value("pin.file");
+            List<String> entries = environment.entries("pin.provided");
             SequencedSet<Path> provided = new LinkedHashSet<>();
-            String value = environment.getProperty("pin.provided");
-            if (value != null) {
-                for (String entry : value.split(",")) {
-                    String candidate = entry.trim();
-                    if (!candidate.isEmpty()) {
-                        provided.add(root.resolve(candidate).normalize());
-                    }
+            if (entries != null) {
+                for (String entry : entries) {
+                    provided.add(root.resolve(entry).normalize());
                 }
             }
-            return provided;
+            return new PinModule(root,
+                                 fileName,
+                                 stepFactory,
+                                 file == null ? null : root.resolve(file).normalize(),
+                                 provided,
+                                 hashFunction,
+                                 environment.flag("print.divergence") ? environment.out() : null);
         }
 
         PinModule file(Path file) {
