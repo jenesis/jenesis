@@ -99,7 +99,7 @@ is:
 Layout
 ------
 
-    demo/demo-63-native-image
+    demo/demo-64-native-image
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- graal.properties     marker file; presence enables the GraalVM tracing agent
     |-- sources/
