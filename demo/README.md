@@ -737,13 +737,12 @@ in a `<!--jenesis.native ... -->` comment block.
 
 ## 35. Customizing the build - [`custom-assembler`](demo-50-custom-assembler/README.md), [`custom-jmod`](demo-51-custom-jmod/README.md)
 
-The next demos open up the template, and each is launched with
-`java build/Demo.java`. `custom-assembler` keeps the standard flow but wraps the
-stock assembler so every module's sources pass through a preprocessing step
+The next demos open up the template. `custom-assembler` keeps the standard flow
+but names a customizer, a function from the stock assembler to the one to build
+with, which wraps it so every module's sources pass through a preprocessing step
 before compile, jar and test run unchanged:
 
-    new Project(Path.of("."))
-            .assembler(new PreprocessingAssembler(new InferredMultiProjectAssembler()))
+    jenesis.project.customizer=build.custom.Preprocessing
 
 Any step that produces a `sources/` tree fits the same shape: template expansion,
 code generation, license headers.

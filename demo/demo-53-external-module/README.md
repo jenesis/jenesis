@@ -66,7 +66,8 @@ source, `main` first stages the build module to stand in for that artifact:
    `module/demo.plugin` by a small `Repository`, placed ahead of the default
    Jenesis repository (which resolves the module's `build.jenesis` and `org.json`
    dependencies).
-3. **Resolve as external.** The custom `Project`'s `PreprocessingAssembler` wires
+3. **Resolve as external.** The `PreprocessingAssembler` that `build/Demo.java`
+   hands `Project.ofEnvironment` in place of the stock assembler wires
    that coordinate as an `ExternalModule`. `ExternalModule` writes the
    coordinate, resolves and downloads its dependency closure, loads the
    `BuildExecutorModule` service provider, and runs it - reading the project's

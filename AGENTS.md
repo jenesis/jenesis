@@ -187,10 +187,12 @@ before it is chosen. The search path decides what the build executes, so `Make.s
 every file a project provides: a new way to read properties keeps that rule, and the relaunch
 never takes a JVM option that configuration could supply.
 
-**`jenesis.project.customizers` adjusts the stock build.** It lists
-`UnaryOperator<Project>` classes that `Project.ofEnvironment` applies, in order, to the project it configured, so
-every entry point that builds a project from settings - `Make`, `Execute`, the daemon, the tools, a container -
-builds the adjusted one. `Make` compiles `build/custom/` with the engine for that reason, beside the folder of
+**`jenesis.project.customizer` adjusts the stock build.** It names one
+`Project.Customizer` class - a function from the `InferredMultiProjectAssembler` to the assembler to build with - that
+`Project.ofEnvironment` applies to the assembler it configured, so every entry point that builds a project from
+settings - `Make`, `Execute`, the daemon, the tools, a container - builds with the adjusted one. A caller that
+builds the project itself hands the same function to `new Project(root, customizer)` or
+`Project.ofEnvironment(environment, root, customizer)`. `Make` compiles `build/custom/` with the engine for that reason, beside the folder of
 the file it launches, while that file still names nothing but itself. A customizer runs the project's code, as its
 tests and annotation processors do, so a project names it in its own `jenesis.properties` like any other setting:
 refusing the key there would guard nothing a build does not already hand the project. What isolates an untrusted
