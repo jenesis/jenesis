@@ -137,13 +137,13 @@ public record Project(
                                                          project.pinning(),
                                                          project.licenseFiles(Dependencies.SPDX),
                                                          (descriptor, mergedRepos, mergedResolvers) -> pomAware.apply(
-                                        new ProjectModuleDescriptor(descriptor,
-                                                configurations(descriptor.configurations(), project.configuration(), project.profiles()),
-                                                project.tests(),
-                                                project.sources(),
-                                                project.documentation(),
-                                                project.pinning(),
-                                                PathPlacement.CLASS_PATH),
+                                        new ProjectModuleDescriptor(descriptor)
+                                                .configuration(configurations(descriptor.configurations(), project.configuration(), project.profiles()))
+                                                .test(project.tests())
+                                                .source(project.sources())
+                                                .documentation(project.documentation())
+                                                .pinning(project.pinning())
+                                                .pathPlacement(PathPlacement.CLASS_PATH),
                                         mergedRepos,
                                         mergedResolvers)),
                               mavenDeps);
@@ -204,16 +204,16 @@ public record Project(
                                                              project.boms(),
                                                              project.signatures(),
                                                              (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
-                                        new ProjectModuleDescriptor(descriptor,
-                                                configurations(
-                                                        modularConfigurationFolder(descriptor.location()),
-                                                        project.configuration(),
-                                                        project.profiles()),
-                                                project.tests(),
-                                                project.sources(),
-                                                project.documentation(),
-                                                project.pinning(),
-                                                PathPlacement.MODULE_PATH),
+                                        new ProjectModuleDescriptor(descriptor)
+                                                .configuration(configurations(
+                                                                modularConfigurationFolder(descriptor.location()),
+                                                                project.configuration(),
+                                                                project.profiles()))
+                                                .test(project.tests())
+                                                .source(project.sources())
+                                                .documentation(project.documentation())
+                                                .pinning(project.pinning())
+                                                .pathPlacement(PathPlacement.MODULE_PATH),
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
@@ -284,13 +284,12 @@ public record Project(
                                                              project.boms(),
                                                              project.signatures(),
                                                              (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
-                                        new ProjectModuleDescriptor(descriptor,
-                                                configurations(modularConfigurationFolder(descriptor.location()), project.configuration(), project.profiles()),
-                                                project.tests(),
-                                                project.sources(),
-                                                project.documentation(),
-                                                project.pinning(),
-                                                PathPlacement.INFERRED),
+                                        new ProjectModuleDescriptor(descriptor)
+                                                .configuration(configurations(modularConfigurationFolder(descriptor.location()), project.configuration(), project.profiles()))
+                                                .test(project.tests())
+                                                .source(project.sources())
+                                                .documentation(project.documentation())
+                                                .pinning(project.pinning()),
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
