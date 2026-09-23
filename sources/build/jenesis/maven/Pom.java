@@ -107,11 +107,7 @@ public class Pom implements BuildStep {
             throw new IllegalStateException(
                     "Missing 'artifact' (artifactId) in metadata.properties for " + groupId);
         }
-        String version = metadata.getProperty("version");
-        if (version == null) {
-            throw new IllegalStateException(
-                    "Missing 'version' in metadata.properties for " + groupId + ":" + artifactId);
-        }
+        String version = metadata.getProperty("version", "0-SNAPSHOT");
         SequencedMap<MavenDependencyKey, MavenDependencyValue> deps = new LinkedHashMap<>();
         for (Map.Entry<String, SequencedSet<String>> scopedEntry : coordinateScopes.entrySet()) {
             String name = scopedEntry.getKey();

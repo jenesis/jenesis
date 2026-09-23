@@ -146,7 +146,7 @@ the modular-package format that - unlike a jar - can also carry native libraries
 legal files, and `bin/`/`conf/` content. It is staged beside the modular jar in the
 module-repository layout:
 
-    target/stage/modular/output/demo.modular.executable/1-SNAPSHOT/
+    target/stage/modular/output/demo.modular.executable/
     |-- demo.modular.executable.jar
     `-- demo.modular.executable.jmod
 

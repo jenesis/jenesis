@@ -227,7 +227,7 @@ node carrying its resolved module name and declared license:
     java build/jenesis/Make.java dependencies
 
     main/compile (module-greeter-test)
-    maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (module demo.greeter, local)
+    maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local)
     └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT}
     maven/org.junit.jupiter/junit-jupiter 5.11.3 [compile] (module org.junit.jupiter) {EPL-2.0}
     ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (module org.junit.jupiter.api) {EPL-2.0}
@@ -265,7 +265,7 @@ external dependencies into counts:
     java -Djenesis.tree.format=compact build/jenesis/Make.java dependencies
 
     main/compile (module-greeter-test)
-    maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (module demo.greeter, local)
+    maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local)
     └─ 1 external dependency
     1 external dependency
 
@@ -281,7 +281,7 @@ project releases, and it does so under either format:
     java -Djenesis.tree.format=compact -Djenesis.tree.tests=false build/jenesis/Make.java dependencies
 
     main/compile (module-app)
-    maven/demo.greeter/demo.greeter 1-SNAPSHOT [compile] (module demo.greeter, local)
+    maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local)
     └─ 1 external dependency
 
 `greeter-test` declares `@jenesis.test demo.greeter` and `greeter-testing`
