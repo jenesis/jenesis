@@ -39,7 +39,7 @@ The four modules
 Only `library/module-info.java` says anything about layers:
 
     @jenesis.layer render api      demo.layers.spi
-    @jenesis.layer render provider module/demo.layers.impl
+    @jenesis.layer render provider demo.layers.impl
 
 The first line names the API module. The second names what the layer isolates - resolved in a
 dependency group of its own, `layer:render`, which resolves, verifies and reports like any other

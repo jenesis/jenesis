@@ -373,7 +373,7 @@ public class Inventory implements BuildStep {
             granted.addAll(artifacts);
         }
         for (String key : natives) {
-            Path jar = located(key, closureJars, reachable);
+            Path jar = located(key, closureJars, key.startsWith("layer:") ? reachable : runtime);
             if (jar != null && layered.containsKey(jar) && !declaring.contains(layered.get(jar))) {
                 jar = null;
             }
@@ -413,9 +413,12 @@ public class Inventory implements BuildStep {
                     if (!granted.contains(delegated ? jar : named)) {
                         ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
                         String name = descriptor == null ? jar.getFileName().toString() : descriptor.name();
-                        violations.add(name + " names " + token + (delegated
-                                ? " in its layer " + layered.get(named) + ", which " + name + " grants once granted itself"
-                                : ""));
+                        String coordinate = token.substring(token.indexOf('/') + 1);
+                        violations.add(delegated
+                                ? name + " passes native access on to "
+                                        + (coordinate.startsWith("module/") ? coordinate.substring(7) : coordinate)
+                                        + " in its layer " + layered.get(named) + ", once granted itself"
+                                : name + " names " + token);
                     }
                 }
             }

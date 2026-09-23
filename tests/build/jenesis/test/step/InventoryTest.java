@@ -345,8 +345,8 @@ public class InventoryTest {
         assertThatThrownBy(() -> run(new Inventory().nativeAccess(Inventory.NativeAccess.STRICT),
                 args("manifests", manifests, "runtime", runtime)))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("org.example.words names layer:render/module/org.example.jni in its layer render,"
-                        + " which org.example.words grants once granted itself");
+                .hasMessageContaining("org.example.words passes native access on to org.example.jni in its layer render,"
+                        + " once granted itself");
     }
 
     private Path granting(String key) throws IOException {
