@@ -191,6 +191,12 @@ Java module name). Force it from the command line with the layout override:
 Use MODULAR when the modules are only ever consumed as Java modules; keep the default
 MODULAR_TO_MAVEN when you also want Maven-publishable coordinates.
 
+The two layouts pin a dependency the tests reach through JUnit differently: MODULAR by
+its module name, MODULAR_TO_MAVEN by its Maven coordinate. A `pin` run writes the pins
+of the layout it resolves in and by default removes a pin that layout does not produce.
+This demo is built in both, so its `jenesis.properties` sets `jenesis.pin.retain=all`,
+and a refresh keeps the other layout's pins.
+
 Pinned dependency
 -----------------
 

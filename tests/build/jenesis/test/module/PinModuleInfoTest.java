@@ -461,7 +461,7 @@ public class PinModuleInfoTest {
     }
 
     @Test
-    public void keeps_coordinate_pins_absent_from_the_closure_and_drops_module_names() throws IOException {
+    public void drops_unreached_pins_of_a_resolved_group_and_keeps_those_of_other_groups() throws IOException {
         Path file = root.resolve("module-info.java");
         Files.writeString(file, """
                 /**
@@ -477,13 +477,64 @@ public class PinModuleInfoTest {
         writeResolved(Map.of("module/bar", "1.0 SHA-256/cafebabe"));
         String result = run(file);
         assertInsideJavadoc(result, "@jenesis.pin dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/dadada");
-        assertInsideJavadoc(result, "@jenesis.pin org.opentest4j/opentest4j 1.3.0");
         assertThat(result)
-                .as("a coordinate may belong to a closure only some builds resolve, while a module name"
-                        + " pins a requires, which every pin run resolves")
-                .doesNotContain("@jenesis.pin org.opentest4j 1.3.0")
+                .as("a group no closure resolved may belong to a build this run did not configure,"
+                        + " while an unreached pin of a resolved group is obsolete")
+                .doesNotContain("org.opentest4j")
                 .contains("@jenesis.pin bar 1.0 SHA-256/cafebabe")
                 .doesNotContain("@jenesis.pin bar 0.9");
+    }
+
+    @Test
+    public void keeps_every_unreached_pin_when_retaining_all() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.pin dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/dadada
+                 * @jenesis.pin org.opentest4j 1.3.0
+                 * @jenesis.pin org.opentest4j/opentest4j 1.3.0
+                 * @jenesis.pin bar 0.9
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        writeResolved(Map.of("module/bar", "1.0 SHA-256/cafebabe"));
+        String result = run(file, pin -> pin.retain(PinModuleInfo.Retain.ALL));
+        assertInsideJavadoc(result, "@jenesis.pin dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/dadada");
+        assertInsideJavadoc(result, "@jenesis.pin org.opentest4j 1.3.0");
+        assertInsideJavadoc(result, "@jenesis.pin org.opentest4j/opentest4j 1.3.0");
+        assertThat(result).contains("@jenesis.pin bar 1.0 SHA-256/cafebabe").doesNotContain("@jenesis.pin bar 0.9");
+    }
+
+    @Test
+    public void drops_every_unreached_pin_when_retaining_none() throws IOException {
+        Path file = root.resolve("module-info.java");
+        Files.writeString(file, """
+                /**
+                 * @jenesis.pin dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/dadada
+                 * @jenesis.pin org.opentest4j 1.3.0
+                 * @jenesis.pin org.opentest4j/opentest4j 1.3.0
+                 * @jenesis.pin bar 0.9
+                 */
+                module foo {
+                  requires bar;
+                }
+                """);
+        writeResolved(Map.of("module/bar", "1.0 SHA-256/cafebabe"));
+        String result = run(file, pin -> pin.retain(PinModuleInfo.Retain.NONE));
+        assertThat(result)
+                .doesNotContain("dokka")
+                .doesNotContain("org.opentest4j")
+                .contains("@jenesis.pin bar 1.0 SHA-256/cafebabe");
+    }
+
+    @Test
+    public void refuses_an_unknown_retention() {
+        assertThatThrownBy(() -> PinModuleInfo.ofEnvironment(new Environment(Map.of("pin.retain", "some")::get),
+                "module", "", List.of(), new HashDigestFunction("SHA-256")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown pin retention: some (expected groups, all or none)");
     }
 
     @Test
@@ -516,8 +567,7 @@ public class PinModuleInfoTest {
         Files.writeString(file, """
                 /**
                  * @jenesis.pin dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/dadada
-                 * @jenesis.pin org.opentest4j/opentest4j 1.3.0
-                 * @jenesis.pin org.junit.jupiter.api 6.1.0
+                 * @jenesis.pin org.opentest4j 1.3.0
                  * @jenesis.pin bar 0.9
                  */
                 module foo {
@@ -531,8 +581,7 @@ public class PinModuleInfoTest {
                 .as("a kept line is either a pin for a closure this run did not resolve or a leftover,"
                         + " and jenesis.print.pins is what names it")
                 .contains("dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/dadada")
-                .contains("org.opentest4j/opentest4j 1.3.0")
-                .doesNotContain("org.junit.jupiter.api")
+                .doesNotContain("org.opentest4j")
                 .doesNotContain("bar");
     }
 
