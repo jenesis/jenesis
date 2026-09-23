@@ -32,7 +32,7 @@ public enum PathPlacement {
     };
 
     public static final String ALIASES = "Jenesis-Aliases", OVERRIDES = "Jenesis-Overrides",
-            LAYERS = "Jenesis-Layer";
+            LAYERS = "Jenesis-Layer", NATIVE_ACCESS = "Jenesis-Native-Access";
     private static final Pattern DERIVED_VERSION = Pattern.compile("\\d+(\\..*)?");
 
     private final boolean modular;
@@ -154,6 +154,28 @@ public enum PathPlacement {
             return Collections.emptyNavigableMap();
         }
         return layers(declaration, path.toString());
+    }
+
+    public static SequencedSet<String> nativeAccess(Path path) throws IOException {
+        SequencedSet<String> tokens = new LinkedHashSet<>();
+        if (Files.isDirectory(path)) {
+            return tokens;
+        }
+        String declaration;
+        try (JarFile jar = new JarFile(path.toFile(), true, ZipFile.OPEN_READ, JarFile.runtimeVersion())) {
+            Manifest manifest = jar.getManifest();
+            declaration = manifest == null ? null : manifest.getMainAttributes().getValue(NATIVE_ACCESS);
+        } catch (ZipException _) {
+            return tokens;
+        }
+        if (declaration != null) {
+            for (String token : declaration.split(",")) {
+                if (!token.isBlank()) {
+                    tokens.add(token.trim());
+                }
+            }
+        }
+        return tokens;
     }
 
     public static SequencedMap<String, SequencedSet<String>> overrides(String declaration, String origin) {

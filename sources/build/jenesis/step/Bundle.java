@@ -66,6 +66,7 @@ public class Bundle implements BuildStep {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         SequencedMap<String, Path> jars = new TreeMap<>();
+        SequencedSet<Path> granted = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -81,6 +82,7 @@ public class Bundle implements BuildStep {
             for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
                 jars.putIfAbsent(file.getFileName().toString(), file);
             }
+            granted.addAll(Inventory.nativeAccess(argument.folder()));
         }
         if (jars.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
@@ -88,11 +90,10 @@ public class Bundle implements BuildStep {
         SequencedMap<String, Path> classpath = new LinkedHashMap<>(), modulepath = new LinkedHashMap<>();
         ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
-            if (mainModule != null) {
-                (graph.place(PathPlacement.INFERRED, entry.getValue()) ? modulepath : classpath)
-                        .put(entry.getKey(), entry.getValue());
-            } else {
-                classpath.put(entry.getKey(), entry.getValue());
+            boolean placed = mainModule != null && graph.place(PathPlacement.INFERRED, entry.getValue());
+            (placed ? modulepath : classpath).put(entry.getKey(), entry.getValue());
+            if (granted.contains(entry.getValue().toAbsolutePath().normalize())) {
+                graph.enableNativeAccess(entry.getValue(), placed);
             }
         }
         SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
@@ -119,6 +120,8 @@ public class Bundle implements BuildStep {
                 }
             }
         }
+        layers.forEach((layer, membership) -> membership.nativeAccess(jars, granted)
+                .forEach((jar, module) -> graph.enableNativeAccess(layer, jar, module)));
         agents.keySet().retainAll(jars.sequencedKeySet());
         SequencedMap<String, Path> descriptors = new LinkedHashMap<>();
         for (Map.Entry<String, String> platform : List.of(
@@ -179,6 +182,7 @@ public class Bundle implements BuildStep {
             command.add(path(classpath, separator));
         }
         if (modulepath.isEmpty()) {
+            command.addAll(relaxations);
             command.add(mainClass);
         } else {
             command.add("--module-path");

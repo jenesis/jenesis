@@ -163,6 +163,36 @@ public class JpxTest {
     }
 
     @Test
+    public void grants_the_native_access_the_launched_program_names() throws IOException, InterruptedException {
+        Path named = work.resolve("named.jar");
+        try (JarFile source = new JarFile(toolJar.toFile())) {
+            Manifest manifest = new Manifest();
+            manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+            manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, "tool.lib");
+            try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(named), manifest)) {
+                for (JarEntry entry : Collections.list(source.entries())) {
+                    output.putNextEntry(new JarEntry(entry.getName()));
+                    try (InputStream input = source.getInputStream(entry)) {
+                        input.transferTo(output);
+                    }
+                    output.closeEntry();
+                }
+            }
+        }
+        Files.move(named, toolJar, StandardCopyOption.REPLACE_EXISTING);
+        addMavenTool();
+        addDiscoveryPom(null);
+
+        Jpx.Installation installation = jpx().install("tool.main");
+
+        assertThat(installation.properties().getProperty(ModuleGraph.JAVA_OPTIONS))
+                .as("the program that runs names what it needs, and a dependency's own names are not read")
+                .isEqualTo("--enable-native-access=tool.lib");
+        Path marker = work.resolve("marker.txt");
+        assertThat(installation.launch(List.of(marker.toString()))).isEqualTo(7);
+    }
+
+    @Test
     public void module_name_infers_the_placement_of_every_jar() throws IOException, InterruptedException {
         addMavenTool();
         addPlainTool("1.0");

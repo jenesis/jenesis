@@ -203,9 +203,7 @@ public record Jpx(Path storage,
             } else {
                 command.addAll(ProcessBuildStep.argumentFile(argumentFile, options));
             }
-            if (modulepath != null) {
-                command.addAll(ModuleGraph.load(properties));
-            }
+            command.addAll(ModuleGraph.load(properties));
             String mainModule = properties.getProperty("mainModule");
             if (mainModule != null) {
                 command.add("-m");
@@ -549,9 +547,31 @@ public record Jpx(Path storage,
                 : descriptor.mainClass().get();
         List<String> modulepath = new ArrayList<>(), classpath = new ArrayList<>();
         ModuleGraph graph = new ModuleGraph();
+        SequencedMap<String, Boolean> placed = new LinkedHashMap<>();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
-            boolean placed = graph.place(placement, folder.resolve(entry.getKey()));
-            (placed ? modulepath : classpath).add(entry.getKey());
+            boolean module = graph.place(placement, folder.resolve(entry.getKey()));
+            (module ? modulepath : classpath).add(entry.getKey());
+            placed.put(entry.getKey(), module);
+        }
+        for (String token : PathPlacement.nativeAccess(root)) {
+            int slash = token.indexOf('/');
+            String name = null;
+            if (slash < 0) {
+                for (String candidate : jars.sequencedKeySet()) {
+                    ModuleDescriptor named = PathPlacement.moduleDescriptor(folder.resolve(candidate));
+                    if (name == null && named != null && named.name().equals(token)) {
+                        name = candidate;
+                    }
+                }
+            } else {
+                String dependency = tokens.get(token.indexOf('/', slash + 1) < 0
+                        ? "maven/" + token
+                        : token.substring(slash + 1));
+                name = dependency == null ? null : names.get(dependency);
+            }
+            if (name != null && placed.containsKey(name)) {
+                graph.enableNativeAccess(folder.resolve(name), placed.get(name));
+            }
         }
         SequencedProperties properties = new SequencedProperties();
         properties.setProperty("name", command.name());

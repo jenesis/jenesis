@@ -577,6 +577,7 @@ public class MavenPomResolver implements MavenResolver {
                     managedDependencies,
                     pom.qualifiedDependencies(),
                     pom.attachments(),
+                    pom.natives(),
                     pom.plugins(),
                     pom.signatures(),
                     property(pom.properties().get("mainClass"), pom.properties())));
@@ -752,6 +753,9 @@ public class MavenPomResolver implements MavenResolver {
                                 ? toAttachments(document.getDocumentElement())
                                 : Collections.emptyNavigableMap(),
                         extended
+                                ? toNatives(document.getDocumentElement())
+                                : Collections.emptyNavigableSet(),
+                        extended
                                 ? toPlugins(document.getDocumentElement())
                                 : Collections.emptyNavigableMap(),
                         extended
@@ -797,6 +801,7 @@ public class MavenPomResolver implements MavenResolver {
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
+                            Collections.emptyNavigableSet(),
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
                             List.of());
@@ -1255,6 +1260,46 @@ public class MavenPomResolver implements MavenResolver {
         return entries;
     }
 
+    private static SequencedSet<String> toNatives(Node node) {
+        SequencedSet<String> entries = new LinkedHashSet<>();
+        toChildren(node)
+                .filter(child -> child.getNodeType() == Node.COMMENT_NODE)
+                .map(Node::getNodeValue)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(text -> text.startsWith("jenesis.native"))
+                .forEach(text -> {
+                    String declaration = text.substring("jenesis.native".length()).trim();
+                    if (declaration.isEmpty()) {
+                        throw new IllegalArgumentException("A jenesis.native comment names no module:"
+                                + " name each module or <groupId>/<artifactId> granted native access,"
+                                + " the project's own included");
+                    }
+                    for (String token : declaration.split("\\s+")) {
+                        if (token.startsWith("java.") || token.startsWith("jdk.")) {
+                            throw new IllegalArgumentException("Illegal jenesis.native token '"
+                                    + token
+                                    + "': platform modules cannot be granted native access");
+                        }
+                        int firstSlash = token.indexOf('/');
+                        int secondSlash = firstSlash < 0 ? -1 : token.indexOf('/', firstSlash + 1);
+                        if (firstSlash < 0) {
+                            entries.add("main/module/" + token);
+                        } else if (secondSlash < 0 && firstSlash > 0 && firstSlash < token.length() - 1) {
+                            entries.add("main/maven/" + token);
+                        } else if (secondSlash > firstSlash + 1 && firstSlash > 0 && secondSlash < token.length() - 1) {
+                            entries.add(token);
+                        } else {
+                            throw new IllegalArgumentException("Malformed jenesis.native token '"
+                                    + token
+                                    + "': expected <module>, <groupId>/<artifactId>,"
+                                    + " or <group>/<repository>/<coordinate>");
+                        }
+                    }
+                });
+        return entries;
+    }
+
     private static String property(String text, Map<String, String> properties) {
         return property(text, properties, Set.of());
     }
@@ -1391,6 +1436,7 @@ public class MavenPomResolver implements MavenResolver {
                                  SequencedMap<DependencyKey, DependencyValue> dependencies,
                                  SequencedMap<String, String> qualifiedDependencies,
                                  SequencedMap<String, String> attachments,
+                                 SequencedSet<String> natives,
                                  SequencedMap<String, String> plugins,
                                  SequencedMap<String, String> signatures,
                                  List<License> licenses) {

@@ -5,6 +5,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
+import build.jenesis.SequencedProperties;
 
 public abstract class Java extends ProcessBuildStep {
 
@@ -124,6 +125,8 @@ public abstract class Java extends ProcessBuildStep {
         List<String> classPath = new ArrayList<>(), modulePath = new ArrayList<>();
         SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
         SequencedMap<String, Path> pool = new LinkedHashMap<>();
+        SequencedMap<Path, Boolean> placed = new LinkedHashMap<>();
+        SequencedSet<String> natives = new LinkedHashSet<>();
         ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
             BuildStepArgument argument = entry.getValue();
@@ -147,7 +150,20 @@ public abstract class Java extends ProcessBuildStep {
                 }
             }
             for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
-                graph.place(pathPlacement, file, modulePath, classPath);
+                boolean module = graph.place(pathPlacement, file);
+                (module ? modulePath : classPath).add(file.toString());
+                placed.putIfAbsent(file, module);
+            }
+            Path moduleFile = argument.folder().resolve(MODULE);
+            if (Files.isRegularFile(moduleFile)) {
+                SequencedProperties module = SequencedProperties.ofFiles(moduleFile);
+                if (module.flag("native")) {
+                    graph.enableNativeAccess(pathPlacement.modular() ? module.value("module") : null);
+                }
+            }
+            Path nativesFile = argument.folder().resolve(NATIVES);
+            if (Files.isRegularFile(nativesFile)) {
+                natives.addAll(SequencedProperties.ofFiles(nativesFile).stringPropertyNames());
             }
             for (Path jar : Dependencies.all(argument.folder())) {
                 pool.putIfAbsent(jar.getFileName().toString(), jar);
@@ -178,6 +194,38 @@ public abstract class Java extends ProcessBuildStep {
         }
         if (layers.values().stream().anyMatch(membership -> !membership.classpath().isEmpty())) {
             graph.unnamed();
+        }
+        for (String key : natives) {
+            Path jar = null;
+            for (BuildStepArgument argument : arguments.values()) {
+                if (jar == null && !argument.removed()) {
+                    jar = Dependencies.runtime(argument.folder(), key);
+                }
+            }
+            int second = key.indexOf('/', key.indexOf('/') + 1);
+            if (jar == null && key.startsWith("module/", second + 1)) {
+                for (Path candidate : Stream.concat(placed.sequencedKeySet().stream(), pool.values().stream()).toList()) {
+                    ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(candidate);
+                    if (jar == null && descriptor != null && descriptor.name().equals(key.substring(second + 8))) {
+                        jar = candidate;
+                    }
+                }
+            }
+            String layer = null;
+            for (Map.Entry<String, Layers.Membership> membership : layers.entrySet()) {
+                if (jar != null && membership.getValue().all().contains(jar.getFileName().toString())) {
+                    layer = membership.getKey();
+                }
+            }
+            if (layer != null) {
+                graph.enableNativeAccess(layer, jar, layers.get(layer).modulepath().contains(jar.getFileName().toString()));
+            } else if (jar != null && placed.containsKey(jar)) {
+                graph.enableNativeAccess(jar, placed.get(jar));
+            } else {
+                throw new IllegalStateException("@jenesis.native grants "
+                        + key.substring(0, key.indexOf('/')) + key.substring(second)
+                        + " native access, but this run holds it neither on its path nor in a layer");
+            }
         }
         List<String> options = new ArrayList<>();
         for (Map.Entry<String, List<String>> path : List.of(

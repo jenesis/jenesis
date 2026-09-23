@@ -112,14 +112,11 @@ public class ModularProject implements BuildExecutorModule {
                 MavenModuleRepository.checkedSegments(segments));
     }
 
-    public static BuildExecutorModule make(Path root,
-                                           MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
-        return make(Environment.NONE, root, assembler);
-    }
-
     public static BuildExecutorModule make(Environment environment,
-                                           Path root, MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
-        return make(environment, root,
+                                           Path root,
+                                           MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
+        return make(environment,
+                root,
                 "main",
                 "module",
                 _ -> true,
@@ -220,7 +217,7 @@ public class ModularProject implements BuildExecutorModule {
                             MultiProjectModule.IDENTIFIER_PATH + name + "/" + COORDINATES,
                             PRODUCE);
                     buildExecutor.addStep(MultiProjectModule.INVENTORY,
-                            new Inventory(),
+                            Inventory.ofEnvironment(environment),
                             MultiProjectModule.IDENTIFIER_PATH + name + "/" + MANIFESTS,
                             ASSIGN,
                             PRODUCE,
@@ -385,6 +382,26 @@ public class ModularProject implements BuildExecutorModule {
                 });
                 attachments.store(context.next().resolve(BuildStep.ATTACHMENTS));
             }
+            String self = group + "/module/" + info.coordinate();
+            SequencedProperties natives = new SequencedProperties();
+            List<String> named = new ArrayList<>();
+            for (String key : info.natives()) {
+                int slash = key.indexOf('/');
+                String coordinate = key.substring(slash + 1);
+                named.add(!key.startsWith(group + "/")
+                        ? key
+                        : coordinate.startsWith("module/")
+                                ? coordinate.substring(7)
+                                : coordinate.startsWith("maven/") && coordinate.indexOf('/', 6) == coordinate.lastIndexOf('/')
+                                        ? coordinate.substring(6)
+                                        : key);
+                if (!key.equals(self)) {
+                    natives.setProperty(key.substring(0, slash) + "/native/" + coordinate, "");
+                }
+            }
+            if (!natives.isEmpty()) {
+                natives.store(context.next().resolve(BuildStep.NATIVES));
+            }
             if (!targets.isEmpty()) {
                 SequencedProperties aliases = new SequencedProperties();
                 for (Map.Entry<String, String> entry : targets.entrySet()) {
@@ -400,9 +417,12 @@ public class ModularProject implements BuildExecutorModule {
                 }
                 overrides.store(context.next().resolve(BuildStep.OVERRIDES));
             }
-            if (!targets.isEmpty() || !info.overrides().isEmpty() || !info.layers().isEmpty()) {
+            if (!targets.isEmpty() || !info.overrides().isEmpty() || !info.layers().isEmpty() || !named.isEmpty()) {
                 Manifest manifest = new Manifest();
                 manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+                if (!named.isEmpty()) {
+                    manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, String.join(",", named));
+                }
                 if (!targets.isEmpty()) {
                     List<String> declarations = new ArrayList<>();
                     targets.forEach((alias, target) -> declarations.add(alias + "=" + target));
@@ -573,6 +593,9 @@ public class ModularProject implements BuildExecutorModule {
             }
             if (info.main() != null) {
                 module.setProperty("main", info.main());
+            }
+            if (info.natives().contains(self)) {
+                module.setProperty("native", "true");
             }
             module.store(context.next().resolve(BuildStep.MODULE));
             SequencedProperties metadata = new SequencedProperties();
