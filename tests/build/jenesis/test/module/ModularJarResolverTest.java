@@ -12,6 +12,7 @@ import build.jenesis.module.ModularJarResolver;
 import build.jenesis.module.ModuleVersionNegotiator;
 import build.jenesis.step.Dependencies;
 import build.jenesis.Environment;
+import build.jenesis.License;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -291,6 +292,81 @@ public class ModularJarResolverTest {
 
     private static ModuleRequireInfo require(String name, int flags, String compiledVersion) {
         return ModuleRequireInfo.of(ModuleDesc.of(name), flags, compiledVersion);
+    }
+
+    @Test
+    public void reads_the_licenses_a_bundle_manifest_declares() throws IOException {
+        RepositoryItem jar = toLicensedJar("root", Map.of("Bundle-License",
+                "http://www.opensource.org/licenses/mit-license.php, \"Apache-2.0\";link=\"https://www.apache.org/licenses/LICENSE-2.0\""), Map.of());
+        assertThat(licensesOf(jar)).containsExactly(
+                new License(null, null, null, "http://www.opensource.org/licenses/mit-license.php"),
+                new License(null, null, "Apache-2.0", "https://www.apache.org/licenses/LICENSE-2.0"));
+    }
+
+    @Test
+    public void prefers_the_licenses_of_an_embedded_sbom() throws IOException {
+        RepositoryItem jar = toLicensedJar("root", Map.of(
+                "Sbom-Location", "META-INF/sbom/root.json",
+                "Bundle-License", "https://opensource.org/license/mit"), Map.of(
+                "META-INF/sbom/root.json", """
+                        {"metadata": {"component": {"licenses": [{"license": {"id": "Apache-2.0"}}]}}}
+                        """));
+        assertThat(licensesOf(jar)).containsExactly(new License("Apache-2.0", null, null, null));
+    }
+
+    @Test
+    public void reads_only_the_component_an_xml_sbom_describes() throws IOException {
+        RepositoryItem jar = toLicensedJar("root", Map.of("Sbom-Location", "META-INF/sbom/root.xml"), Map.of(
+                "META-INF/sbom/root.xml", """
+                        <bom xmlns="http://cyclonedx.org/schema/bom/1.6">
+                          <metadata>
+                            <tools><components><component><licenses><license><id>MIT</id></license></licenses></component></components></tools>
+                            <component>
+                              <licenses><license><name>Apache License 2.0</name><url>https://www.apache.org/licenses/LICENSE-2.0</url></license></licenses>
+                            </component>
+                          </metadata>
+                        </bom>
+                        """));
+        assertThat(licensesOf(jar)).containsExactly(
+                new License(null, null, "Apache License 2.0", "https://www.apache.org/licenses/LICENSE-2.0"));
+    }
+
+    @Test
+    public void falls_back_to_the_bundle_license_when_the_embedded_sbom_is_unreadable() throws IOException {
+        RepositoryItem jar = toLicensedJar("root", Map.of(
+                "Sbom-Location", "META-INF/sbom/root.json",
+                "Bundle-License", "Apache-2.0"), Map.of("META-INF/sbom/root.json", "{"));
+        assertThat(licensesOf(jar)).containsExactly(new License(null, null, "Apache-2.0", null));
+    }
+
+    private List<License> licensesOf(RepositoryItem jar) throws IOException {
+        return ModularJarResolver.ofEnvironment(Environment.SYSTEM, false).dependencies(
+                Runnable::run,
+                "foo",
+                Map.of("foo", (_, coordinate, _) -> Optional.ofNullable(coordinate.equals("root") ? jar : null)),
+                new LinkedHashMap<>(Map.of("root", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE).vertices().get("foo/root").licenses();
+    }
+
+    private RepositoryItem toLicensedJar(String module, Map<String, String> attributes, Map<String, String> entries) throws IOException {
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        attributes.forEach(manifest.getMainAttributes()::putValue);
+        Path file = Files.createTempFile(jars, module, ".jar");
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(file), manifest)) {
+            output.putNextEntry(new JarEntry("module-info.class"));
+            output.write(ClassFile.of().buildModule(ModuleAttribute.of(
+                    ModuleDesc.of(module),
+                    builder -> builder.requires(ModuleRequireInfo.of(ModuleDesc.of("java.base"), 0, null)))));
+            output.closeEntry();
+            for (Map.Entry<String, String> entry : entries.entrySet()) {
+                output.putNextEntry(new JarEntry(entry.getKey()));
+                output.write(entry.getValue().getBytes(StandardCharsets.UTF_8));
+                output.closeEntry();
+            }
+        }
+        return RepositoryItem.ofFile(file);
     }
 
     private RepositoryItem toJar(String module, ModuleRequireInfo... requires) throws IOException {
