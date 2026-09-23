@@ -129,7 +129,8 @@ public record Project(
                 inherited.sequencedKeySet().stream()
                         .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + METADATA + "/"))
                         .forEach(mavenDeps::add);
-                sub.addModule("maven", MavenProject.make(project.environment(), project.root(),
+                sub.addModule("maven", MavenProject.make(project.environment(),
+                                                         project.root(),
                                                          "main",
                                                          "maven",
                                                          Collections.unmodifiableMap(repositories),
@@ -192,7 +193,8 @@ public record Project(
                 inherited.sequencedKeySet().stream()
                         .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + METADATA + "/"))
                         .forEach(modulesDeps::add);
-                sub.addModule("modules", ModularProject.make(project.environment(), project.root(),
+                sub.addModule("modules", ModularProject.make(project.environment(),
+                                                             project.root(),
                                                              "main",
                                                              "module",
                                                              _ -> true,
@@ -272,7 +274,8 @@ public record Project(
                 inherited.sequencedKeySet().stream()
                         .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + METADATA + "/"))
                         .forEach(modulesDeps::add);
-                sub.addModule("modules", ModularProject.make(project.environment(), project.root(),
+                sub.addModule("modules", ModularProject.make(project.environment(),
+                                                             project.root(),
                                                              "main",
                                                              "module",
                                                              _ -> true,

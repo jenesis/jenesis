@@ -114,17 +114,13 @@ public class ModularProject implements BuildExecutorModule {
 
     public static BuildExecutorModule make(Path root,
                                            MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
-        return make(Environment.NONE, root, assembler);
-    }
-
-    public static BuildExecutorModule make(Environment environment,
-                                           Path root, MultiProjectAssembler<? super ModularModuleDescriptor> assembler) {
-        return make(environment, root,
+        return make(Environment.NONE,
+                root,
                 "main",
                 "module",
                 _ -> true,
-                Map.of("module", JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE)),
-                Map.of("module", ModularJarResolver.ofEnvironment(environment, false)),
+                Map.of("module", JenesisRepository.ofEnvironment(Environment.NONE, JenesisRepository.Scope.MODULE)),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, false)),
                 null,
                 true,
                 Collections.emptyNavigableSet(),
