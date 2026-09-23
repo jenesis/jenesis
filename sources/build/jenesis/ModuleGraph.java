@@ -8,7 +8,7 @@ public class ModuleGraph {
     private static final String SELF_CONTAINED = "selfContainedModuleGraph";
     private static final String ADD_MODULES = "--add-modules", ROOTS = "ALL-MODULE-PATH,ALL-DEFAULT",
             ENABLE_NATIVE_ACCESS = "--enable-native-access", ALL_UNNAMED = "ALL-UNNAMED",
-            LAYER_NATIVE_ACCESS = "-Djlayer.enableNativeAccess.", LAUNCHER = "build.jenesis.launcher";
+            LAYER_NATIVE_ACCESS = "-Djlayer.enableNativeAccess.";
 
     private final SequencedSet<String> nativeAccess = new LinkedHashSet<>();
     private final SequencedMap<String, SequencedSet<String>> layerAccess = new TreeMap<>();
@@ -69,13 +69,9 @@ public class ModuleGraph {
     }
 
     private List<String> nativeAccessOptions() {
-        SequencedSet<String> granted = new LinkedHashSet<>(nativeAccess);
-        if (!layerAccess.isEmpty()) {
-            granted.add(modular ? LAUNCHER : ALL_UNNAMED);
-        }
         List<String> options = new ArrayList<>();
-        if (!granted.isEmpty()) {
-            options.add(ENABLE_NATIVE_ACCESS + "=" + String.join(",", granted));
+        if (!nativeAccess.isEmpty()) {
+            options.add(ENABLE_NATIVE_ACCESS + "=" + String.join(",", nativeAccess));
         }
         layerAccess.forEach((layer, modules) -> options.add(LAYER_NATIVE_ACCESS + layer + "=" + String.join(",", modules)));
         return options;

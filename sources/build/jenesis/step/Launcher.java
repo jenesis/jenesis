@@ -141,7 +141,6 @@ public class Launcher implements BuildStep {
         if (!nativeAccess.isEmpty()) {
             application.setProperty("enableNativeAccess", String.join(",", nativeAccess));
         }
-        boolean layered = false;
         for (Map.Entry<String, Layers.Membership> layer : layers.entrySet()) {
             application.setProperty("modulepath." + layer.getKey(),
                     String.join(",", layer.getValue().modulepath()));
@@ -151,7 +150,6 @@ public class Launcher implements BuildStep {
             }
             SequencedSet<String> modules = new LinkedHashSet<>();
             for (Map.Entry<Path, Boolean> member : layer.getValue().nativeAccess(isolated, granted).entrySet()) {
-                layered = true;
                 if (member.getValue()) {
                     ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(member.getKey());
                     if (descriptor == null) {
@@ -185,7 +183,7 @@ public class Launcher implements BuildStep {
         Manifest manifest = new Manifest();
         manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
         manifest.getMainAttributes().put(Attributes.Name.MAIN_CLASS, MAIN_CLASS);
-        if (layered || jars.values().stream().anyMatch(jar -> granted.contains(jar.toAbsolutePath().normalize()))) {
+        if (jars.values().stream().anyMatch(jar -> granted.contains(jar.toAbsolutePath().normalize()))) {
             manifest.getMainAttributes().putValue("Enable-Native-Access", "ALL-UNNAMED");
         }
         Path jar = Files.createDirectory(context.next().resolve(LAUNCHER))
