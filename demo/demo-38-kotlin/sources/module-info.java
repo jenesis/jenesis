@@ -19,7 +19,6 @@
  * @jenesis.pin dokka/maven/org.jetbrains/annotations 13.0 SHA-256/ace2a10dc8e2d5fd34925ecac03e4988b2c0f851650c94b8cef49ba1bd111478
  * @jenesis.pin dokka/maven/org.jetbrains/markdown-jvm 0.7.3 SHA-256/893abb31f15b6216f74dc704c0c6bf1e567dcf2b62cca29cf42e4f53153637ac
  * @jenesis.pin dokka/maven/org.jsoup/jsoup 1.16.1 SHA-256/1f115726540ddf71958c14bc517ebfc49cf481e91cd917b0face84f01272e901
- * @jenesis.pin kotlin.stdlib 1.9.10
  * @jenesis.pin kotlinc/maven/org.jetbrains.kotlin/kotlin-build-tools-api 2.4.0-RC2 SHA-256/ca5f829936a739cb90146359159a8ecdfe2f1a0ae21f8e2da5868b6413320a1d
  * @jenesis.pin kotlinc/maven/org.jetbrains.kotlin/kotlin-compiler-embeddable 2.4.0-RC2 SHA-256/923181ab0d2dc773b36d526081567bd7755f06e26d32c0f8a6537a31cf0a0229
  * @jenesis.pin kotlinc/maven/org.jetbrains.kotlin/kotlin-daemon-embeddable 2.4.0-RC2 SHA-256/2fc1f1ee5f7fccda091bf34473c6cee44f131ea1b7da9f600a706fdc68716dba

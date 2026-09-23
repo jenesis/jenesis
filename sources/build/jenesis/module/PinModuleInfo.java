@@ -27,11 +27,12 @@ public class PinModuleInfo implements BuildStep {
     private final Platform platform;
     private final boolean checksum;
     private final boolean flatten;
+    private final Retain retain;
     private final transient Consumer<String> printing;
 
     public PinModuleInfo(String prefix, String path, List<Path> moduleInfoFiles, HashDigestFunction hashFunction) {
         this(prefix, path, moduleInfoFiles, hashFunction, new Platform(),
-                true, false, Pinning.permits(), null);
+                true, false, Retain.GROUPS, Pinning.permits(), null);
     }
 
     public static PinModuleInfo ofEnvironment(Environment environment,
@@ -42,6 +43,7 @@ public class PinModuleInfo implements BuildStep {
         PinModuleInfo pin = new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction)
                 .checksum(checksumFrom(environment))
                 .flatten(flattenFrom(environment))
+                .retain(retainFrom(environment))
                 .permits(Pinning.permits(environment))
                 .platform(Platform.ofEnvironment(environment));
         Boolean pins = environment.flagOrNull("print.pins");
@@ -55,6 +57,7 @@ public class PinModuleInfo implements BuildStep {
                           Platform platform,
                           boolean checksum,
                           boolean flatten,
+                          Retain retain,
                           Semaphore permits,
                           Consumer<String> printing) {
         this.permits = permits;
@@ -65,27 +68,32 @@ public class PinModuleInfo implements BuildStep {
         this.platform = platform;
         this.checksum = checksum;
         this.flatten = flatten;
+        this.retain = retain;
         this.printing = printing;
     }
 
     public PinModuleInfo permits(Semaphore permits) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, permits, printing);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing);
     }
 
     public PinModuleInfo platform(Platform platform) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, permits, printing);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing);
     }
 
     public PinModuleInfo checksum(boolean checksum) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, permits, printing);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing);
     }
 
     public PinModuleInfo flatten(boolean flatten) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, permits, printing);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing);
+    }
+
+    public PinModuleInfo retain(Retain retain) {
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing);
     }
 
     public PinModuleInfo printing(Consumer<String> printing) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, permits, printing);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing);
     }
 
     private static boolean checksumFrom(Environment environment) {
@@ -108,6 +116,16 @@ public class PinModuleInfo implements BuildStep {
             return true;
         }
         throw new IllegalArgumentException("Unknown pin BOM mode: " + value + " (expected keep or flatten)");
+    }
+
+    private static Retain retainFrom(Environment environment) {
+        String value = environment.value("pin.retain", "groups");
+        return switch (value) {
+            case "groups" -> Retain.GROUPS;
+            case "all" -> Retain.ALL;
+            case "none" -> Retain.NONE;
+            default -> throw new IllegalArgumentException("Unknown pin retention: " + value + " (expected groups, all or none)");
+        };
     }
 
     @Override
@@ -167,15 +185,24 @@ public class PinModuleInfo implements BuildStep {
                 references.putIfAbsent(reference.getKey(), reference.getValue());
             }
         }
+        Set<String> groups = new HashSet<>();
+        for (Inventory.Dependency dependency : closure.values()) {
+            groups.add(dependency.group());
+        }
+        Predicate<String> retained = switch (retain) {
+            case GROUPS -> key -> !groups.contains(key.substring(0, key.indexOf('/')));
+            case ALL -> _ -> true;
+            case NONE -> _ -> false;
+        };
         for (Path file : moduleInfoFiles) {
             SequencedSet<String> carried = new TreeSet<>();
-            updateModuleInfo(file, entries, covered, references, flatten, platform, carried);
+            updateModuleInfo(file, entries, covered, retained, references, flatten, platform, carried);
             if (printing != null && !carried.isEmpty()) {
                 printing.accept("%s%-11s%s %s".formatted(
                         BuildExecutorCallback.YELLOW,
-                        "[UNPINNED]",
+                        "[KEPT]",
                         BuildExecutorCallback.RESET,
-                        file + ": kept without a checksum, resolved by no closure: "
+                        file + ": kept, resolved by no closure: "
                                 + String.join(", ", carried)));
             }
         }
@@ -268,6 +295,7 @@ public class PinModuleInfo implements BuildStep {
     private static void updateModuleInfo(Path file,
                                          SequencedMap<String, String> entries,
                                          Set<String> covered,
+                                         Predicate<String> retained,
                                          SequencedMap<String, String> references,
                                          boolean flatten,
                                          Platform platform,
@@ -294,6 +322,7 @@ public class PinModuleInfo implements BuildStep {
                             comment.tags(),
                             entries,
                             covered,
+                            retained,
                             references,
                             flatten,
                             platform,
@@ -370,6 +399,7 @@ public class PinModuleInfo implements BuildStep {
                                          List<Tag> located,
                                          SequencedMap<String, String> entries,
                                          Set<String> covered,
+                                         Predicate<String> retained,
                                          SequencedMap<String, String> references,
                                          boolean flatten,
                                          Platform platform,
@@ -463,11 +493,10 @@ public class PinModuleInfo implements BuildStep {
                 if (insertAt < 0) {
                     insertAt = kept.size();
                 }
-                if (!regenerated.contains(expand(tag.token()))) {
+                String coordinate = expand(tag.token());
+                if (!regenerated.contains(coordinate) && retained.test(coordinate)) {
                     merged.putIfAbsent(tag.token(), tag.rest());
-                    if (!tag.rest().contains("/")) {
-                        carried.add(tag.token() + " " + tag.rest());
-                    }
+                    carried.add(tag.token() + " " + tag.rest());
                 }
                 continue;
             }
@@ -586,5 +615,9 @@ public class PinModuleInfo implements BuildStep {
         }
         sb.append(" */");
         return sb.toString();
+    }
+
+    public enum Retain {
+        GROUPS, ALL, NONE
     }
 }
