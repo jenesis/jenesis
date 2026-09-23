@@ -170,7 +170,7 @@ public record Project(
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
-                return prefix + "/module-" + BuildExecutorModule.encode(module)
+                return prefix + "/module-" + BuildExecutorModule.encodePath(module)
                         + (slash == -1 ? "" : "/" + name.substring(slash + 1));
             };
         };
@@ -241,7 +241,7 @@ public record Project(
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
-                return prefix + "/module-" + BuildExecutorModule.encode(module)
+                return prefix + "/module-" + BuildExecutorModule.encodePath(module)
                         + (slash == -1 ? "" : "/" + name.substring(slash + 1));
             };
         };
@@ -323,7 +323,7 @@ public record Project(
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
-                return prefix + "/module-" + BuildExecutorModule.encode(module)
+                return prefix + "/module-" + BuildExecutorModule.encodePath(module)
                         + (slash == -1 ? "" : "/" + name.substring(slash + 1));
             };
         };
@@ -616,9 +616,9 @@ public record Project(
                       +<module>/<step>  one step in it, e.g. +foo+bar/compile/dependencies/resolved
                       pin/module-<path> one module's pins. `pin` is an entry point of its own and
                                         always rewrites every module, so `pin +foo` runs both and
-                                        narrows nothing. <path> is the module's source folder,
-                                        URL-encoded because selectors split on /: foo/bar is
-                                        pin/module-foo%2Fbar.
+                                        narrows nothing. <path> is the module's source folder with
+                                        + for /, as in the folder under target/: foo/bar is
+                                        pin/module-foo+bar.
                       :                 one path segment, e.g. build/:/java
                       ::                any depth, e.g. ::/test. Lenient: a typo matches nothing
                                         silently, so confirm a selector ran what you meant.
@@ -960,7 +960,8 @@ public record Project(
                     checksums back into pom.xml (<dependencyManagement> with <!--Checksum/<algo>/<hex>-->
                     and a <!--jenesis.pin ... --> comment) or module-info.java (@jenesis.pin tags),
                     idempotently, refreshing only the lines matching the local platform. It covers the
-                    whole project; to pin one module, name its step rather than adding +<module>.
+                    whole project; to pin one module, name its step (pin/module-foo+bar) rather than
+                    adding +<module>.
                     -Djenesis.pin.file=<path> writes the project's whole closure to that properties
                     file instead of the declarations, in the grammar @jenesis.bom reads, which is how
                     a local bill of materials is refreshed rather than hand-edited. Each
@@ -1108,7 +1109,7 @@ public record Project(
                     if (!Files.isRegularFile(file)) {
                         continue;
                     }
-                    buildExecutor.addStep("module-" + BuildExecutorModule.encode(path),
+                    buildExecutor.addStep("module-" + BuildExecutorModule.encodePath(path),
                             stepFactory.apply(path, file),
                             new LinkedHashSet<>(inherited.sequencedKeySet()));
                 }

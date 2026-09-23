@@ -5,8 +5,10 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.SequencedMap;
+import java.util.stream.Collectors;
 
 @FunctionalInterface
 public interface BuildExecutorModule {
@@ -17,6 +19,12 @@ public interface BuildExecutorModule {
         return URLEncoder.encode(value, StandardCharsets.UTF_8)
                 .replace("+", "%20")
                 .replace("*", "%2A");
+    }
+
+    static String encodePath(String path) {
+        return Arrays.stream(path.split("/", -1))
+                .map(BuildExecutorModule::encode)
+                .collect(Collectors.joining("+"));
     }
 
     static String decode(String value) {

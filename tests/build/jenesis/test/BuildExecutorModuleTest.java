@@ -108,4 +108,19 @@ public class BuildExecutorModuleTest {
     public void preserves_unreserved_characters() {
         assertThat(BuildExecutorModule.encode("abcXYZ0123-_.")).isEqualTo("abcXYZ0123-_.");
     }
+
+    @Test
+    public void encodes_a_path_as_its_encoded_segments_joined_by_plus() {
+        assertThat(BuildExecutorModule.encodePath("api/client")).isEqualTo("api+client");
+    }
+
+    @Test
+    public void encodes_a_plus_within_a_path_segment_so_it_never_reads_as_a_separator() {
+        assertThat(BuildExecutorModule.encodePath("a+b/c d")).isEqualTo("a%2Bb+c%20d");
+    }
+
+    @Test
+    public void encodes_the_root_path_as_empty() {
+        assertThat(BuildExecutorModule.encodePath("")).isEmpty();
+    }
 }

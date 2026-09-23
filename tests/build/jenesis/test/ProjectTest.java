@@ -482,6 +482,7 @@ public class ProjectTest {
                 new InferredMultiProjectAssembler());
         assertThat(resolver.apply("sources")).isEqualTo("build/modules/compose/module/module-sources");
         assertThat(resolver.apply("")).isEqualTo("build/modules/compose/module/module-");
+        assertThat(resolver.apply("api+client/compile")).isEqualTo("build/modules/compose/module/module-api+client/compile");
     }
 
     @Test

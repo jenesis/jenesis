@@ -87,6 +87,20 @@ public class BuildExecutorTest implements Serializable {
     }
 
     @Test
+    public void a_step_is_written_to_the_folder_named_like_it_and_selected_by_that_name() throws IOException {
+        buildExecutor.addStep("module-api+client%20v2", (_, context, _) -> {
+            Files.writeString(context.next().resolve("file"), "foo");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        });
+        buildExecutor.addStep("other", (_, _, _) -> {
+            throw new AssertionError("Not selected");
+        });
+        Map<String, ?> build = buildExecutor.execute(Runnable::run, "module-api+client%20v2").toCompletableFuture().join();
+        assertThat(build).containsOnlyKeys("module-api+client%20v2");
+        assertThat(root.resolve("module-api+client%20v2").resolve("output").resolve("file")).content().isEqualTo("foo");
+    }
+
+    @Test
     public void the_same_jvm_may_build_the_same_target_repeatedly() throws IOException {
         BuildExecutor second = BuildExecutor.of(root,
                 Duration.ZERO,
@@ -297,7 +311,14 @@ public class BuildExecutorTest implements Serializable {
         assertThatThrownBy(() -> buildExecutor.addStep("foo/bar", (_, _, _) -> {
             throw new AssertionError();
         })).isInstanceOf(IllegalArgumentException.class).hasMessageContaining(
-                "foo/bar does not match pattern: [a-zA-Z0-9._%-]+");
+                "foo/bar does not match pattern: [a-zA-Z0-9._%-][a-zA-Z0-9._%+-]*");
+    }
+
+    @Test
+    public void does_not_accept_a_leading_plus_that_a_selector_reads_as_a_module() {
+        assertThatThrownBy(() -> buildExecutor.addStep("+foo", (_, _, _) -> {
+            throw new AssertionError();
+        })).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("+foo does not match pattern");
     }
 
     @Test
