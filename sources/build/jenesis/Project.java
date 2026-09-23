@@ -569,6 +569,12 @@ public record Project(
                     jenesis.toolchain.searchpath, this system's usual JDK folders unless set, and only
                     the command line or ~/.jenesis/jenesis.properties may set it. Nothing is installed.
 
+                    To adjust the stock build rather than replace it, put a UnaryOperator<Project>
+                    under build/ and pass -Djenesis.project.customizers=build.Build: Make compiles
+                    build/ with the engine and applies each customizer, in order, to the project the
+                    settings configured, so the build keeps every feature of Make. It runs code the
+                    engine does not ship, so only the command line or ~/.jenesis may name one.
+
                     A project with its own entry point calls `new Make("build.Demo").run(selectors)`,
                     which returns the status to exit with. For a GraalVM native launcher, read the
                     documentation: it needs reachability metadata captured from a real build, a JDK
@@ -1382,6 +1388,7 @@ public record Project(
         return relative.toString().isEmpty() ? Path.of(".") : relative;
     }
 
+    @SuppressWarnings("unchecked")
     public static Project ofEnvironment(Environment environment, Path root) {
         Project project = new Project(root, environment);
         String configuration = environment.getProperty("project.configuration");
@@ -1464,9 +1471,40 @@ public record Project(
             project = project.tree(tree);
         }
         BuildExecutor.Configuration executor = BuildExecutor.Configuration.ofEnvironment(environment);
-        return project.pinning(Pinning.ofEnvironment(environment))
+        project = project.pinning(Pinning.ofEnvironment(environment))
                 .assembler(InferredMultiProjectAssembler.ofEnvironment(environment))
                 .configurator(() -> executor);
+        List<String> customizers = environment.entries("project.customizers");
+        for (String customizer : customizers == null ? List.<String>of() : customizers) {
+            Object instance;
+            try {
+                instance = Class.forName(customizer, true, Project.class.getClassLoader())
+                        .getConstructor()
+                        .newInstance();
+            } catch (ClassNotFoundException _) {
+                throw new IllegalArgumentException("No class " + customizer + " for jenesis.project.customizers - name"
+                        + " a class compiled with the build, which build/jenesis/Make.java does for every source"
+                        + " under build/");
+            } catch (NoSuchMethodException _) {
+                throw new IllegalArgumentException("The customizer " + customizer + " declares no public constructor"
+                        + " without arguments - declare one, so the build can create it");
+            } catch (InvocationTargetException e) {
+                throw new IllegalStateException("The customizer " + customizer + " failed to construct", e.getCause());
+            } catch (ReflectiveOperationException e) {
+                throw new IllegalArgumentException("Cannot create the customizer " + customizer
+                        + " - make the class and its constructor public", e);
+            }
+            if (!(instance instanceof UnaryOperator<?> operator)) {
+                throw new IllegalArgumentException("The customizer " + customizer + " is not a UnaryOperator<Project>"
+                        + " - implement it, and return the project it is handed or one derived from it");
+            }
+            project = ((UnaryOperator<Project>) operator).apply(project);
+            if (project == null) {
+                throw new IllegalStateException("The customizer " + customizer + " returned no project - return the"
+                        + " project it is handed or one derived from it with its withers");
+            }
+        }
+        return project;
     }
 
     private static SequencedSet<Path> locations(Environment environment, String text, Project project) {
@@ -2232,6 +2270,7 @@ public record Project(
                 project.signatures||Comma-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
+                project.customizers||Comma-separated UnaryOperator<Project> classes, compiled from build/, applied in order to the configured project
                 project.docker|false|Run the whole build inside a container
                 project.docker.image||Image for that container
                 project.docker.mount||Extra read-only container mounts, host[:container],...
@@ -2479,7 +2518,7 @@ public record Project(
             if (environment.flag("print.docker", true)) {
                 environment.out().accept("Launching build within Docker image: " + docker.image());
             }
-            int code = docker.execute("build/jenesis/Project.java", properties, selectors);
+            int code = docker.execute("build/jenesis/Make.java", properties, selectors);
             if (code != 0) {
                 System.exit(code);
             }

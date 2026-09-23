@@ -283,6 +283,12 @@ public final class Make {
             return invoke(Make.class.getClassLoader(), collected, selectors);
         }
         Path build = location.getParent();
+        while (build != null && !Files.isRegularFile(build.resolve("jenesis").resolve("Make.java"))) {
+            build = build.getParent();
+        }
+        if (build == null) {
+            build = location.getParent();
+        }
         String seed = fingerprint(build, files(build, ".java"), classes.toString());
         Path folder = precompiled(build, seed);
         try (URLClassLoader loader = new URLClassLoader(
@@ -542,6 +548,12 @@ public final class Make {
             throw new IllegalStateException("jenesis.make.global cannot be set in " + file
                     + ": it locates your own user-global settings, which no file may move, least of all one a"
                     + " project provides (pass -Djenesis.make.global on the command line instead)");
+        }
+        if (!trusted && properties.getProperty("jenesis.project.customizers") != null) {
+            throw new IllegalStateException("jenesis.project.customizers cannot be set in " + file
+                    + ": a customizer runs code the engine does not ship, so only the command line or your own"
+                    + " ~/.jenesis/jenesis.properties may name one, never a file the project provides"
+                    + " (pass -Djenesis.project.customizers instead)");
         }
         if (!trusted && properties.getProperty("jenesis.toolchain.searchpath") != null) {
             throw new IllegalStateException("jenesis.toolchain.searchpath cannot be set in " + file
