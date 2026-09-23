@@ -17,6 +17,7 @@ import build.jenesis.ChecksumStatus;
 class JenesisClassLoaderBridge implements AutoCloseable {
 
     private ModuleLayer layer;
+    private ModuleLayer.Controller controller;
     private ClassLoader loader;
 
     private Class<?> foreignBuildExecutorModule;
@@ -47,7 +48,7 @@ class JenesisClassLoaderBridge implements AutoCloseable {
         }
         Configuration config = ModuleLayer.boot().configuration()
                 .resolveAndBind(finder, ModuleFinder.of(), roots);
-        ModuleLayer.Controller controller = ModuleLayer.defineModulesWithOneLoader(
+        controller = ModuleLayer.defineModulesWithOneLoader(
                 config, List.of(ModuleLayer.boot()), ClassLoader.getPlatformClassLoader());
         layer = controller.layer();
         loader = layer.findLoader(roots.iterator().next());
@@ -96,6 +97,7 @@ class JenesisClassLoaderBridge implements AutoCloseable {
     @Override
     public void close() {
         layer = null;
+        controller = null;
         loader = null;
         foreignBuildExecutorModule = null;
         foreignAccept = null;
@@ -111,13 +113,13 @@ class JenesisClassLoaderBridge implements AutoCloseable {
         foreignChecksums = null;
     }
 
-    Object findProvider(String name) {
+    Object findProvider(String name, SequencedMap<String, String> properties) throws ReflectiveOperationException {
         if (loader == null) {
             throw new IllegalStateException("Build module class loader bridge was already closed");
         }
-        Object match = null;
-        for (Object provider : ServiceLoader.load(layer, foreignBuildExecutorModule)) {
-            Annotation annotation = provider.getClass().getAnnotation(foreignBuildModuleName);
+        ServiceLoader.Provider<?> match = null;
+        for (ServiceLoader.Provider<?> provider : ServiceLoader.load(layer, foreignBuildExecutorModule).stream().toList()) {
+            Annotation annotation = provider.type().getAnnotation(foreignBuildModuleName);
             String providerName;
             if (annotation == null) {
                 providerName = null;
@@ -145,7 +147,24 @@ class JenesisClassLoaderBridge implements AutoCloseable {
                     ? "No unnamed BuildExecutorModule service provider found in layer"
                     : "No BuildExecutorModule service provider named " + name + " found in layer");
         }
-        return match;
+        if (properties.isEmpty()) {
+            return match.get();
+        }
+        Constructor<?> constructor;
+        try {
+            constructor = match.type().getConstructor(SequencedMap.class);
+        } catch (NoSuchMethodException _) {
+            throw new IllegalStateException("The build module " + match.type().getName() + " takes no properties, but "
+                    + properties.sequencedKeySet() + " are given - declare a public constructor taking a"
+                    + " SequencedMap<String, String> of them, or leave its properties file empty");
+        }
+        controller.addOpens(match.type().getModule(), match.type().getPackageName(), JenesisClassLoaderBridge.class.getModule());
+        try {
+            return constructor.newInstance(Collections.unmodifiableSequencedMap(new LinkedHashMap<>(properties)));
+        } catch (InvocationTargetException e) {
+            throw new IllegalStateException("The build module " + match.type().getName()
+                    + " failed to construct from its properties", e.getCause());
+        }
     }
 
     void accept(Object foreignModule, BuildExecutor hostExecutor, SequencedMap<String, Path> inherited) throws IOException {

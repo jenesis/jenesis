@@ -24,16 +24,19 @@ public class ExternalModule implements BuildExecutorModule {
     private final String buildModuleName;
     private final Pinning pinning;
     private final String group;
+    private final SequencedMap<String, String> properties;
 
     public ExternalModule(String coordinate,
                           String group,
                           Map<String, Repository> repositories,
                           Map<String, Resolver> resolvers) {
-        this(coordinate, new Dependencies(repositories, resolvers),
-             Collections.emptyNavigableSet(),
-             null,
-             null,
-             group == null ? "main" : group);
+        this(coordinate,
+                new Dependencies(repositories, resolvers),
+                Collections.emptyNavigableSet(),
+                null,
+                null,
+                group == null ? "main" : group,
+                Collections.emptyNavigableMap());
     }
 
     public static ExternalModule ofEnvironment(Environment environment,
@@ -41,11 +44,13 @@ public class ExternalModule implements BuildExecutorModule {
                                                String group,
                                                Map<String, Repository> repositories,
                                                Map<String, Resolver> resolvers) {
-        return new ExternalModule(coordinate, Dependencies.ofEnvironment(environment, repositories, resolvers),
+        return new ExternalModule(coordinate,
+                Dependencies.ofEnvironment(environment, repositories, resolvers),
                 Collections.emptyNavigableSet(),
                 null,
                 null,
-                group == null ? "main" : group);
+                group == null ? "main" : group,
+                Collections.emptyNavigableMap());
     }
 
     private ExternalModule(String coordinate,
@@ -53,13 +58,15 @@ public class ExternalModule implements BuildExecutorModule {
                            SequencedSet<String> additionalDependencies,
                            String buildModuleName,
                            Pinning pinning,
-                           String group) {
+                           String group,
+                           SequencedMap<String, String> properties) {
         this.coordinate = coordinate;
         this.dependencyModule = dependencyModule;
         this.additionalDependencies = additionalDependencies;
         this.buildModuleName = buildModuleName;
         this.pinning = pinning;
         this.group = group;
+        this.properties = properties;
     }
 
     public ExternalModule dependencies(String... dependencies) {
@@ -67,19 +74,53 @@ public class ExternalModule implements BuildExecutorModule {
     }
 
     public ExternalModule dependencies(SequencedSet<String> dependencies) {
-        return new ExternalModule(coordinate, dependencyModule, dependencies, buildModuleName, pinning, group);
+        return new ExternalModule(coordinate,
+                dependencyModule,
+                dependencies,
+                buildModuleName,
+                pinning,
+                group,
+                properties);
     }
 
     public ExternalModule buildModuleName(String name) {
-        return new ExternalModule(coordinate, dependencyModule, additionalDependencies, name, pinning, group);
+        return new ExternalModule(coordinate,
+                dependencyModule,
+                additionalDependencies,
+                name,
+                pinning,
+                group,
+                properties);
     }
 
     public ExternalModule pinning(Pinning pinning) {
-        return new ExternalModule(coordinate, dependencyModule, additionalDependencies, buildModuleName, pinning, group);
+        return new ExternalModule(coordinate,
+                dependencyModule,
+                additionalDependencies,
+                buildModuleName,
+                pinning,
+                group,
+                properties);
     }
 
     public ExternalModule group(String group) {
-        return new ExternalModule(coordinate, dependencyModule, additionalDependencies, buildModuleName, pinning, group);
+        return new ExternalModule(coordinate,
+                dependencyModule,
+                additionalDependencies,
+                buildModuleName,
+                pinning,
+                group,
+                properties);
+    }
+
+    public ExternalModule properties(SequencedMap<String, String> properties) {
+        return new ExternalModule(coordinate,
+                dependencyModule,
+                additionalDependencies,
+                buildModuleName,
+                pinning,
+                group,
+                properties);
     }
 
     @Override
@@ -115,7 +156,7 @@ public class ExternalModule implements BuildExecutorModule {
             Object foreignModule;
             try {
                 bridge = new JenesisClassLoaderBridge(artifacts);
-                foreignModule = bridge.findProvider(buildModuleName);
+                foreignModule = bridge.findProvider(buildModuleName, properties);
             } catch (Exception e) {
                 throw new IllegalStateException("Failed to resolve external build execution module " + coordinate, e);
             }

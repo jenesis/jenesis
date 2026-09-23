@@ -103,6 +103,115 @@ public class InternalModuleTest {
     }
 
     @Test
+    public void hands_its_properties_to_the_constructor_of_a_plugin_that_takes_them() throws IOException {
+        Path source = writeModuleSource(work.resolve("plugin"),
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                Map.of("test/plugin/Plugin.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutor;
+                        import build.jenesis.BuildExecutorModule;
+                        import build.jenesis.BuildStepResult;
+                        import java.nio.file.Files;
+                        import java.nio.file.Path;
+                        import java.util.Collections;
+                        import java.util.SequencedMap;
+                        import java.util.concurrent.CompletableFuture;
+                        public class Plugin implements BuildExecutorModule {
+                            private final String greeting;
+                            public Plugin() {
+                                this(Collections.emptyNavigableMap());
+                            }
+                            public Plugin(SequencedMap<String, String> properties) {
+                                greeting = properties.get("greeting");
+                            }
+                            public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
+                                String text = greeting;
+                                executor.addStep("marker", (_, context, _) -> {
+                                    Files.writeString(context.next().resolve("out.txt"), text);
+                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                });
+                            }
+                        }
+                        """));
+        SequencedMap<String, String> properties = new LinkedHashMap<>();
+        properties.put("greeting", "configured");
+
+        buildExecutor.addModule("internal", new InternalModule(
+                "module",
+                null,
+                source)
+                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
+                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
+                .properties(properties));
+
+        assertThat(buildExecutor.execute().get("internal/marker").resolve("out.txt")).content().isEqualTo("configured");
+    }
+
+    @Test
+    public void creates_a_plugin_without_a_properties_constructor_as_without_properties() throws IOException {
+        Path source = writeModuleSource(work.resolve("plugin"),
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                Map.of("test/plugin/Plugin.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutor;
+                        import build.jenesis.BuildExecutorModule;
+                        import build.jenesis.BuildStepResult;
+                        import java.nio.file.Files;
+                        import java.nio.file.Path;
+                        import java.util.SequencedMap;
+                        import java.util.concurrent.CompletableFuture;
+                        public class Plugin implements BuildExecutorModule {
+                            public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
+                                executor.addStep("marker", (_, context, _) -> {
+                                    Files.writeString(context.next().resolve("out.txt"), "hello");
+                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                });
+                            }
+                        }
+                        """));
+
+        buildExecutor.addModule("internal", new InternalModule(
+                "module",
+                null,
+                source)
+                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
+                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
+                .properties(new LinkedHashMap<>()));
+
+        assertThat(buildExecutor.execute().get("internal/marker").resolve("out.txt")).content().isEqualTo("hello");
+    }
+
+    @Test
+    public void refuses_properties_for_a_plugin_that_takes_none() throws IOException {
+        Path source = writeModuleSource(work.resolve("plugin"),
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                Map.of("test/plugin/Plugin.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutor;
+                        import build.jenesis.BuildExecutorModule;
+                        import java.nio.file.Path;
+                        import java.util.SequencedMap;
+                        public class Plugin implements BuildExecutorModule {
+                            public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) { }
+                        }
+                        """));
+        SequencedMap<String, String> properties = new LinkedHashMap<>();
+        properties.put("greeting", "configured");
+
+        buildExecutor.addModule("internal", new InternalModule(
+                "module",
+                null,
+                source)
+                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
+                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
+                .properties(properties));
+
+        assertThatThrownBy(buildExecutor::execute)
+                .rootCause()
+                .hasMessageContaining("test.plugin.Plugin takes no properties, but [greeting] are given");
+    }
+
+    @Test
     public void plugin_step_can_read_predecessor_argument_folder() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
                 "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
