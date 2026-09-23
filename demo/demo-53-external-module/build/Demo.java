@@ -11,7 +11,6 @@ import build.jenesis.module.JenesisRepository;
 import build.jenesis.module.ModularJarResolver;
 import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.ExternalModule;
-import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.ProjectModuleDescriptor;
 import build.jenesis.Environment;
@@ -63,11 +62,10 @@ public class Demo {
 
         // Build the project (the resolved plugin rewrites ${greeting} first) and
         // launch the produced module so its main prints the substituted greeting.
-        Project project = Project.ofEnvironment(environment, Path.of("."))
-                .assembler(new PreprocessingAssembler(
-                        InferredMultiProjectAssembler.ofEnvironment(environment),
-                        Map.of("module", repository),
-                        Map.of("module", ModularJarResolver.ofEnvironment(environment, true))));
+        Project project = Project.ofEnvironment(environment, Path.of("."), assembler -> new PreprocessingAssembler(
+                assembler,
+                Map.of("module", repository),
+                Map.of("module", ModularJarResolver.ofEnvironment(environment, true))));
         System.exit(new Execution(project).execute(args));
     }
 

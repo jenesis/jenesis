@@ -21,12 +21,14 @@ public class InferredComplianceModule implements BuildExecutorModule {
     private final OsvDownload osv;
     private final Function<BuildExecutorModule, BuildExecutorModule> license;
     private final Function<BuildExecutorModule, BuildExecutorModule> vulnerability;
+    private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredComplianceModule(SequencedSet<Path> configuration) {
         this(configuration,
-             new OsvDownload(),
-             value -> value,
-             value -> value);
+                new OsvDownload(),
+                value -> value,
+                value -> value,
+                Collections.emptyNavigableMap());
     }
 
     public static InferredComplianceModule ofEnvironment(Environment environment,
@@ -34,7 +36,8 @@ public class InferredComplianceModule implements BuildExecutorModule {
         InferredComplianceModule module = new InferredComplianceModule(configuration,
                 OsvDownload.ofEnvironment(environment),
                 value -> value,
-                value -> value);
+                value -> value,
+                Collections.emptyNavigableMap());
         Boolean license = environment.flagOrNull("compliance");
         if (license != null) {
             module = module.license(license ? value -> value : null);
@@ -49,19 +52,51 @@ public class InferredComplianceModule implements BuildExecutorModule {
     private InferredComplianceModule(SequencedSet<Path> configuration,
                                      OsvDownload osv,
                                      Function<BuildExecutorModule, BuildExecutorModule> license,
-                                     Function<BuildExecutorModule, BuildExecutorModule> vulnerability) {
+                                     Function<BuildExecutorModule, BuildExecutorModule> vulnerability,
+                                     SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
         this.osv = osv;
         this.license = license;
         this.vulnerability = vulnerability;
+        this.custom = custom;
     }
 
     public InferredComplianceModule license(Function<BuildExecutorModule, BuildExecutorModule> license) {
-        return new InferredComplianceModule(configuration, osv, license, vulnerability);
+        return new InferredComplianceModule(configuration,
+                osv,
+                license,
+                vulnerability,
+                custom);
     }
 
     public InferredComplianceModule vulnerability(Function<BuildExecutorModule, BuildExecutorModule> vulnerability) {
-        return new InferredComplianceModule(configuration, osv, license, vulnerability);
+        return new InferredComplianceModule(configuration,
+                osv,
+                license,
+                vulnerability,
+                custom);
+    }
+
+    public InferredComplianceModule custom(SequencedMap<String, BuildExecutorModule> custom) {
+        return new InferredComplianceModule(configuration,
+                osv,
+                license,
+                vulnerability,
+                custom);
+    }
+
+    public InferredComplianceModule custom(String name, BuildExecutorModule module) {
+        if (custom.containsKey(name)) {
+            throw new IllegalArgumentException("A custom module named " + name + " is added already - give this one"
+                    + " another name");
+        }
+        SequencedMap<String, BuildExecutorModule> added = new LinkedHashMap<>(custom);
+        added.put(name, module);
+        return custom(added);
+    }
+
+    public InferredComplianceModule custom(String name, BuildStep step) {
+        return custom(name, step.asModule(name));
     }
 
     @Override
@@ -87,6 +122,10 @@ public class InferredComplianceModule implements BuildExecutorModule {
                                 Stream.concat(nestedInherited.sequencedKeySet().stream(), Stream.of("osv")));
                     };
                 });
+        if (!custom.isEmpty()) {
+            buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->
+                    nested.addModule(name, module, nestedInherited.sequencedKeySet())), inherited.sequencedKeySet());
+        }
     }
 
     private static LicenseCheck licenseCheck(SequencedProperties properties) {
