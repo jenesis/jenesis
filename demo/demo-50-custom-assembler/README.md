@@ -12,9 +12,9 @@ verbatim.
 Run it
 ------
 
-From this directory, naming the customizer this demo ships:
+From this directory:
 
-    java build/jenesis/Make.java -Djenesis.project.customizers=build.custom.Preprocessing
+    java build/jenesis/Make.java
 
 You should see the build graph resolve and run, with a line reporting the
 substitution as the `preprocess` step rewrites the source:
@@ -41,6 +41,7 @@ Layout
     demo/demo-50-custom-assembler
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- build/custom/Preprocessing.java   the customizer: wraps the assembler of the project
+    |-- jenesis.properties   jenesis.project.customizers=build.custom.Preprocessing
     `-- sources/
         |-- module-info.java     module demo.custom { exports sample; } (@jenesis.main)
         `-- sample/Sample.java    defines GREETING = "${greeting}", prints its substituted value
@@ -76,14 +77,21 @@ serialised into the key its output is cached under, so the class whose lambda
 becomes a step implements `Serializable`.
 
 `jenesis.project.customizers` names such classes, separated by commas, and the
-build applies them in order. Everything else is the stock build: the project a
-customizer receives is configured by `jenesis.properties`, the profiles and the
-`-Djenesis.*` arguments, and the build it returns runs on the JDK, in the daemon
-or in Docker as those settings ask. A customizer runs code of the project's own,
-so a file the project provides cannot name one: pass it on the command line, in
-an `@<file>` argument, or in your own `~/.jenesis/jenesis.properties`. The
-customizer lies outside `build/jenesis`, so `jenesis-validate` still finds the
-vendored engine unchanged.
+build applies them in order. This demo names its customizer in
+`jenesis.properties`, so a plain `Make` run applies it; the same key on the
+command line or in a profile works as well. Everything else is the stock build:
+the project a customizer receives is configured by `jenesis.properties`, the
+profiles and the `-Djenesis.*` arguments, and the build it returns runs on the
+JDK, in the daemon or in Docker as those settings ask. The customizer lies
+outside `build/jenesis`, so `jenesis-validate` still finds the vendored engine
+unchanged.
+
+> [!NOTE]
+> A customizer runs the project's own code, just as its tests do. Before you build
+> a project you do not trust, run the build in a container with
+> `-Djenesis.project.docker=true`. As the `docker-isolation` demo explains, the
+> customizer is then applied inside the container and never on your machine, and
+> the project cannot switch Docker off.
 
 The preprocessing is delivered by an assembler that wraps the stock one.
 `Project.assembler(...)` accepts any
@@ -115,5 +123,5 @@ preprocessing that produces a `sources/` tree (template expansion, code
 generation, license-header stamping) fits the same shape.
 
 Running the produced jar is left to you (see above). The companion
-`build/jenesis/Execute.java` applies the same customizer when it is given the
-same setting, so the program it runs is built from the preprocessed sources.
+`build/jenesis/Execute.java` reads the same `jenesis.properties` and applies the
+same customizer, so the program it runs is built from the preprocessed sources.

@@ -12,9 +12,9 @@ runtime needs it.
 Run it
 ------
 
-From this directory, naming the customizer this demo ships:
+From this directory:
 
-    java build/jenesis/Make.java -Djenesis.project.customizers=build.custom.ConfigJmod stage
+    java build/jenesis/Make.java stage
 
 It builds the module, packs `classes/` plus `jmodconfig/` into `demo.config.jmod`,
 links that jmod into a runtime image, and wraps the runtime into a `demo.config`
@@ -75,6 +75,7 @@ Layout
     demo/demo-51-custom-jmod
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- build/custom/ConfigJmod.java   the customizer: adds the config step to the assembler
+    |-- jenesis.properties   jenesis.project.customizers=build.custom.ConfigJmod
     `-- sources/
         |-- module-info.java     module demo.config { requires org.slf4j; exports sample; }
         `-- sample/Sample.java   reads <java.home>/conf/app.properties, logs via slf4j, prints it
@@ -82,8 +83,9 @@ Layout
 How the wrapping works
 ----------------------
 
-`ConfigJmod` is a customizer, as in the `custom-assembler` demo: it wraps the
-assembler the settings configured in a lambda. `jmod`, `jlink`, and packaging
+`ConfigJmod` is a customizer, named in `jenesis.properties` as in the
+`custom-assembler` demo: it wraps the assembler the settings configured in a
+lambda. `jmod`, `jlink`, and packaging
 are selected by the committed `packaging.properties` in this directory, which
 Jenesis reads from the configuration location:
 
