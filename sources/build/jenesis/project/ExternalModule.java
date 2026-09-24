@@ -27,7 +27,7 @@ public class ExternalModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final String group;
     private final SequencedMap<String, String> properties;
-    private final SequencedMap<String, Bind.Input> inputs;
+    private final SequencedMap<String, Map.Entry<Path, Path>> inputs;
 
     public ExternalModule(String coordinate,
                           String group,
@@ -65,7 +65,7 @@ public class ExternalModule implements BuildExecutorModule {
                            Pinning pinning,
                            String group,
                            SequencedMap<String, String> properties,
-                           SequencedMap<String, Bind.Input> inputs) {
+                           SequencedMap<String, Map.Entry<Path, Path>> inputs) {
         this.coordinate = coordinate;
         this.dependencyModule = dependencyModule;
         this.additionalDependencies = additionalDependencies;
@@ -135,7 +135,7 @@ public class ExternalModule implements BuildExecutorModule {
                 inputs);
     }
 
-    public ExternalModule inputs(SequencedMap<String, Bind.Input> inputs) {
+    public ExternalModule inputs(SequencedMap<String, Map.Entry<Path, Path>> inputs) {
         return new ExternalModule(coordinate,
                 dependencyModule,
                 additionalDependencies,
@@ -179,8 +179,8 @@ public class ExternalModule implements BuildExecutorModule {
         resolution().accept(buildExecutor, inherited);
         if (!inputs.isEmpty()) {
             buildExecutor.addModule(INPUTS, (bound, _) -> inputs.forEach((name, input) -> bound.addSource(name,
-                    new Bind(Map.of(Path.of(""), input.target())),
-                    input.path())));
+                    new Bind(Map.of(Path.of(""), input.getValue())),
+                    input.getKey())));
         }
         buildExecutor.addModule(DELEGATE, (delegateExecutor, delegated) -> {
             List<Path> artifacts = new ArrayList<>(

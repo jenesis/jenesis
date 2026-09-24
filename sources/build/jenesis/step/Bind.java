@@ -11,9 +11,6 @@ import build.jenesis.SequencedProperties;
 
 public class Bind implements BuildStep {
 
-    public record Input(Path path, Path target) {
-    }
-
     private final Map<Path, Path> paths;
     private final Set<String> extensions;
 
