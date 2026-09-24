@@ -11,7 +11,7 @@ import build.jenesis.SequencedProperties;
 
 public class NativeImage extends ProcessBuildStep {
 
-    public static final String NATIVE = "native/", METADATA = "nativeimage/";
+    public static final String NATIVE = "native/", METADATA = "nativeimage/", LICENSES = "licenses";
 
     private final PathPlacement pathPlacement;
     private final String group;
@@ -62,6 +62,7 @@ public class NativeImage extends ProcessBuildStep {
         ModuleGraph graph = new ModuleGraph();
         String launcher = null, name = null;
         List<String> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
+        List<Path> notices = new ArrayList<>();
         Path config = null;
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -99,6 +100,10 @@ public class NativeImage extends ProcessBuildStep {
             if (Files.isDirectory(candidate)) {
                 config = candidate;
             }
+            Path legal = argument.folder().resolve(Legal.LEGAL);
+            if (Files.isDirectory(legal)) {
+                notices.add(legal);
+            }
         }
         if (launcher == null || (modulePath.isEmpty() && classPath.isEmpty())) {
             return CompletableFuture.completedStage(null);
@@ -122,10 +127,20 @@ public class NativeImage extends ProcessBuildStep {
         if (config != null) {
             commands.add("-H:ConfigurationFileDirectories=" + config);
         }
+        Path output = Files.createDirectories(context.next().resolve(NATIVE));
+        for (Path legal : notices) {
+            try (Stream<Path> files = Files.walk(legal)) {
+                for (Path file : files.filter(Files::isRegularFile).toList()) {
+                    Path target = output.resolve(LICENSES).resolve(legal.relativize(file).toString());
+                    Files.createDirectories(target.getParent());
+                    if (!Files.exists(target)) {
+                        BuildStep.linkOrCopy(target, file);
+                    }
+                }
+            }
+        }
         commands.add("-o");
-        commands.add(Files.createDirectories(context.next().resolve(NATIVE))
-                .resolve(name == null ? "image" : name)
-                .toString());
+        commands.add(output.resolve(name == null ? "image" : name).toString());
         if (!modulePath.isEmpty()) {
             commands.add("--module-path");
             commands.add(String.join(File.pathSeparator, modulePath));

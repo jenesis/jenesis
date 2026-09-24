@@ -96,6 +96,12 @@ is:
 `stage` collects the produced binary into `stage/native/output/`, beside
 `stage/packages` for a `jpackage` image and `stage/runtime` for a `jlink` runtime.
 
+A binary compiles the jars it was built from away, and their licence files with
+them, so a `licenses/` folder travels beside it: the legal notices of the module's
+own jar at its root, and those of every jar it needs at run time in a folder named
+after that jar. `-Djenesis.legal.notices` names the entries taken, as it does for
+the `legal/` folder of a linked runtime.
+
 Layout
 ------
 

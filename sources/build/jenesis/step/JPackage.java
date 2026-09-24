@@ -6,6 +6,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Environment;
 import build.jenesis.ModuleGraph;
+import build.jenesis.PathPlacement;
 
 public class JPackage extends ProcessBuildStep {
 
@@ -105,6 +106,18 @@ public class JPackage extends ProcessBuildStep {
                 granted.addAll(Inventory.nativeAccess(argument.folder()));
             }
         }
+        SequencedMap<String, Path> jmods = new LinkedHashMap<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            Path folder = argument.removed() ? null : argument.folder().resolve(JMod.JMODS);
+            if (modular && folder != null && Files.isDirectory(folder)) {
+                try (DirectoryStream<Path> files = Files.newDirectoryStream(folder, "*.jmod")) {
+                    for (Path file : files) {
+                        String name = file.getFileName().toString();
+                        jmods.put(name.substring(0, name.length() - ".jmod".length()), file);
+                    }
+                }
+            }
+        }
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -120,8 +133,10 @@ public class JPackage extends ProcessBuildStep {
             }
             jars.addAll(Dependencies.select(argument.folder(), group, "runtime"));
             for (Path file : jars) {
-                String name = file.getFileName().toString();
-                Path previous = staged.putIfAbsent(name, file);
+                ModuleDescriptor descriptor = modular ? PathPlacement.moduleDescriptor(file) : null;
+                Path linked = descriptor == null ? file : jmods.getOrDefault(descriptor.name(), file);
+                String name = linked.getFileName().toString();
+                Path previous = staged.putIfAbsent(name, linked);
                 if (previous != null) {
                     throw new IllegalStateException("Cannot stage two jars with the same file name '"
                             + name + "' into a single jpackage input: " + previous + " and " + file);
@@ -132,7 +147,7 @@ public class JPackage extends ProcessBuildStep {
                 if (granted.contains(file.toAbsolutePath().normalize())) {
                     graph.enableNativeAccess(file, modular);
                 }
-                BuildStep.linkOrCopy(input.resolve(name), file);
+                BuildStep.linkOrCopy(input.resolve(name), linked);
             }
         }
         if (staged.isEmpty()) {
