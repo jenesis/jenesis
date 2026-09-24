@@ -42,7 +42,6 @@ public class InternalModule implements BuildExecutorModule {
     private final String group;
     private final Platform platform;
     private final SequencedMap<String, String> properties;
-    private final boolean delegate;
     private final SequencedMap<String, Bind.Input> inputs;
 
     public InternalModule(String prefix, String group, Path source) {
@@ -68,7 +67,6 @@ public class InternalModule implements BuildExecutorModule {
                 group,
                 new Platform(),
                 Collections.emptyNavigableMap(),
-                true,
                 Collections.emptyNavigableMap());
     }
 
@@ -87,7 +85,6 @@ public class InternalModule implements BuildExecutorModule {
                 group == null ? "main" : group,
                 Platform.ofEnvironment(environment),
                 Collections.emptyNavigableMap(),
-                true,
                 Collections.emptyNavigableMap());
     }
 
@@ -102,7 +99,6 @@ public class InternalModule implements BuildExecutorModule {
                 group,
                 platform,
                 properties,
-                delegate,
                 inputs);
     }
 
@@ -117,7 +113,6 @@ public class InternalModule implements BuildExecutorModule {
                 group,
                 platform,
                 properties,
-                delegate,
                 inputs);
     }
 
@@ -132,7 +127,6 @@ public class InternalModule implements BuildExecutorModule {
                 group,
                 platform,
                 properties,
-                delegate,
                 inputs);
     }
 
@@ -146,7 +140,6 @@ public class InternalModule implements BuildExecutorModule {
                            String group,
                            Platform platform,
                            SequencedMap<String, String> properties,
-                           boolean delegate,
                            SequencedMap<String, Bind.Input> inputs) {
         this.prefix = prefix;
         this.source = source;
@@ -158,7 +151,6 @@ public class InternalModule implements BuildExecutorModule {
         this.group = group;
         this.platform = platform;
         this.properties = properties;
-        this.delegate = delegate;
         this.inputs = inputs;
     }
 
@@ -173,7 +165,6 @@ public class InternalModule implements BuildExecutorModule {
                 group,
                 platform,
                 properties,
-                delegate,
                 inputs);
     }
 
@@ -188,7 +179,6 @@ public class InternalModule implements BuildExecutorModule {
                 group,
                 platform,
                 properties,
-                delegate,
                 inputs);
     }
 
@@ -203,7 +193,6 @@ public class InternalModule implements BuildExecutorModule {
                 group,
                 platform,
                 properties,
-                delegate,
                 inputs);
     }
 
@@ -218,7 +207,6 @@ public class InternalModule implements BuildExecutorModule {
                 group,
                 platform,
                 properties,
-                delegate,
                 inputs);
     }
 
@@ -233,7 +221,6 @@ public class InternalModule implements BuildExecutorModule {
                 group,
                 platform,
                 properties,
-                delegate,
                 inputs);
     }
 
@@ -248,22 +235,6 @@ public class InternalModule implements BuildExecutorModule {
                 group,
                 platform,
                 properties,
-                delegate,
-                inputs);
-    }
-
-    public InternalModule delegate(boolean delegate) {
-        return new InternalModule(prefix,
-                source,
-                dependencyModule,
-                javacStep,
-                additionalDependencies,
-                buildModuleName,
-                pinning,
-                group,
-                platform,
-                properties,
-                delegate,
                 inputs);
     }
 
@@ -278,7 +249,6 @@ public class InternalModule implements BuildExecutorModule {
                 group,
                 platform,
                 properties,
-                delegate,
                 inputs);
     }
 
@@ -296,18 +266,21 @@ public class InternalModule implements BuildExecutorModule {
         return Optional.empty();
     }
 
+    public BuildExecutorModule resolution() {
+        return (buildExecutor, inherited) -> {
+            buildExecutor.addSource(SOURCE, Bind.asSources(), source);
+            buildExecutor.addStep(REQUIRES,
+                    new ParseModuleInfo(group, prefix, additionalDependencies, platform),
+                    Stream.concat(Stream.of(SOURCE), inherited.sequencedKeySet().stream()));
+            buildExecutor.addModule(DEPENDENCIES,
+                    dependencyModule.pinning(pinning),
+                    REQUIRES);
+        };
+    }
+
     @Override
-    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        buildExecutor.addSource(SOURCE, Bind.asSources(), source);
-        buildExecutor.addStep(REQUIRES,
-                new ParseModuleInfo(group, prefix, additionalDependencies, platform),
-                Stream.concat(Stream.of(SOURCE), inherited.sequencedKeySet().stream()));
-        buildExecutor.addModule(DEPENDENCIES,
-                dependencyModule.pinning(pinning),
-                REQUIRES);
-        if (!delegate) {
-            return;
-        }
+    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+        resolution().accept(buildExecutor, inherited);
         buildExecutor.addModule(JAVA,
                 new JavaToolchainModule().compiler(javacStep.group(group).asModule("javac")),
                 SOURCE,

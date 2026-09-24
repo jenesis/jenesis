@@ -198,7 +198,7 @@ public class ExternalModuleTest {
     }
 
     @Test
-    public void resolves_a_plugin_without_running_it_when_it_does_not_delegate() throws IOException {
+    public void resolves_a_plugin_without_running_it() throws IOException {
         Path pluginJar = compileModule(work.resolve("plugin"),
                 work.resolve("plugin.jar"),
                 "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
@@ -222,10 +222,10 @@ public class ExternalModuleTest {
                         "test.plugin", pluginJar,
                         "build.jenesis", jenesisJar))),
                 Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
-                .delegate(false));
+                .resolution());
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
-        assertThat(steps).containsKey("external/dependencies");
+        assertThat(steps.keySet()).anyMatch(key -> key.startsWith("external/dependencies"));
         assertThat(steps.keySet()).noneMatch(key -> key.startsWith("external/delegate"));
     }
 
