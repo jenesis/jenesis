@@ -2564,6 +2564,8 @@ public record Project(
                 executor.aggregate|false|Collect independent step failures into one report
                 process.concurrency|0|Run at most this many JDK tool runs at once; 0 is unbounded
                 process.factory|tool|tool|fork; fork runs a JDK tool in a process of its own
+                jmod.legal|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries a jmod carries as legal notices, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
+                jmod.strict|false|Fail the jmod of a module whose jar or runtime dependency carries none of the jmod.legal entries
                 archive.timestamp|1980-02-01T00:00:00Z|ISO-8601 date-time with an offset recorded on every entry of the jars, jmods and zips the build writes; empty keeps the times the tools record and makes the archives unreproducible
                 print.progress|true|The build progress lines
                 print.process|false|Stream each external tool's command line and output as it runs

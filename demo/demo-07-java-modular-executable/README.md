@@ -171,6 +171,20 @@ launch with `java -m`. All three steps can also be chained -
 `jmod -> jlink -> jpackage` - so that extra content packed into the `.jmod` rides
 through the linked runtime into the final app.
 
+The runtime also redistributes `org.slf4j`, so it carries that library's licence.
+The `.jmod` takes the legal notices of the module's own jar and of every jar it
+needs at run time, and `jlink` places them under the runtime's `legal/` folder, in
+a folder named after each jar:
+
+    target/stage/runtime/output/module-sources/legal/demo.modular.executable/
+    `-- org.slf4j-2.0.16/LICENSE.txt
+
+`-Djenesis.jmod.legal` names the jar entries taken as notices - by default
+`META-INF/NOTICE`, `META-INF/LICENSE`, the `META-INF/license/` and
+`META-INF/licenses/` folders, a root `LICENSE` and `about.html`, in any case and
+with any extension. Many jars carry none of them; `-Djenesis.jmod.strict=true`
+fails the build on such a jar rather than linking it without its notices.
+
 Bundle the jars for a JRE-based image
 -------------------------------------
 
