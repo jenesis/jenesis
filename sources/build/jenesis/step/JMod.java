@@ -10,6 +10,8 @@ public class JMod extends ProcessBuildStep {
 
     public static final String JMODS = "jmods/", CONFIG = "jmodconfig/", LIBRARIES = "jmodlibs/",
             COMMANDS = "jmodcmds/";
+    private static final SequencedSet<String> LEGAL = Collections.unmodifiableSequencedSet(new LinkedHashSet<>(List.of(
+            "META-INF/NOTICE", "META-INF/LICENSE", "META-INF/license/", "META-INF/licenses/", "LICENSE", "about.html")));
 
     private final OffsetDateTime timestamp;
     private final String group;
@@ -20,7 +22,7 @@ public class JMod extends ProcessBuildStep {
         this(factory.apply("jmod", "bin/jmod"),
              BuildStep.timestamp(),
              "main",
-             new LinkedHashSet<>(List.of("META-INF/NOTICE", "META-INF/LICENSE", "META-INF/license/", "META-INF/licenses/", "LICENSE", "about.html")),
+             LEGAL,
              false,
              Terms.of("jmod"));
     }
@@ -31,7 +33,7 @@ public class JMod extends ProcessBuildStep {
         return new JMod(factory.apply("jmod", "bin/jmod"),
                 BuildStep.timestamp(environment),
                 "main",
-                new LinkedHashSet<>(legal == null ? List.of("META-INF/NOTICE", "META-INF/LICENSE", "META-INF/license/", "META-INF/licenses/", "LICENSE", "about.html") : legal),
+                legal == null ? LEGAL : new LinkedHashSet<>(legal),
                 environment.flag("jmod.strict", false),
                 Terms.ofEnvironment(environment, "jmod"));
     }
