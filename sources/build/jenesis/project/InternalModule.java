@@ -42,7 +42,7 @@ public class InternalModule implements BuildExecutorModule {
     private final String group;
     private final Platform platform;
     private final SequencedMap<String, String> properties;
-    private final SequencedMap<String, Map.Entry<Path, Path>> inputs;
+    private final SequencedMap<String, SequencedMap<Path, Path>> inputs;
 
     public InternalModule(String prefix, String group, Path source) {
         this(prefix,
@@ -140,7 +140,7 @@ public class InternalModule implements BuildExecutorModule {
                            String group,
                            Platform platform,
                            SequencedMap<String, String> properties,
-                           SequencedMap<String, Map.Entry<Path, Path>> inputs) {
+                           SequencedMap<String, SequencedMap<Path, Path>> inputs) {
         this.prefix = prefix;
         this.source = source;
         this.dependencyModule = dependencyModule;
@@ -238,7 +238,7 @@ public class InternalModule implements BuildExecutorModule {
                 inputs);
     }
 
-    public InternalModule inputs(SequencedMap<String, Map.Entry<Path, Path>> inputs) {
+    public InternalModule inputs(SequencedMap<String, SequencedMap<Path, Path>> inputs) {
         return new InternalModule(prefix,
                 source,
                 dependencyModule,
@@ -286,9 +286,7 @@ public class InternalModule implements BuildExecutorModule {
                 SOURCE,
                 DEPENDENCIES);
         if (!inputs.isEmpty()) {
-            buildExecutor.addModule(INPUTS, (bound, _) -> inputs.forEach((name, input) -> bound.addSource(name,
-                    new Bind(Map.of(Path.of(""), input.getValue())),
-                    input.getKey())));
+            buildExecutor.addModule(INPUTS, Bind.asInputs(inputs));
         }
         buildExecutor.addModule(DELEGATE, (delegateExecutor, delegated) -> {
             Path mainArtifacts = delegated.get(PREVIOUS + MAIN_ARTIFACTS).resolve(BuildStep.ARTIFACTS);

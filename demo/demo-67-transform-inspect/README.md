@@ -103,10 +103,18 @@ an input. A key starting with `@` names one instead of a value:
 
 binds the project's `legal/` folder into an input named `legal`, which the plugin
 reads as the folder `../inputs/legal`: this demo's notice takes its licence line
-from `legal/HEADER.txt`. Editing the file runs the transform again. `@<input>=<path>:<target>`
-places what is bound at `<target>` inside the input rather than at its root, and a
-single file keeps its name unless a target renames it. A value whose key starts with
-`@` is written with two: `@@name=value` hands the plugin `@name=value`.
+from `legal/HEADER.txt`. Editing the file runs the transform again.
+
+A target after the input's name places what is bound inside the input rather than
+at its root, and one input takes a key per target, so it can gather several files
+and folders of the project:
+
+    jenesis.plugin.notice.@legal=legal
+    jenesis.plugin.notice.@legal/third-party/NOTICE.txt=vendor/NOTICE.txt
+
+A single file keeps its name unless a target renames it, and two bindings that
+place their files at one target fail the build. A value whose key starts with `@` is
+written with two: `@@name=value` hands the plugin `@name=value`.
 
 A path is resolved against the project root here, and against the module's own
 folder in a module's `plugin-<name>.properties`. Either way it has to stay within

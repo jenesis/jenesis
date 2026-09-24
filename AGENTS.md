@@ -202,11 +202,13 @@ project from settings builds with its plugins, and the assembler wires a plugin 
 names, in a module only where `plugin-<name>.properties` is found in that module's configuration locations; a
 provider is created with that file's values through a public constructor taking a `SequencedMap` of them, with
 its no-argument constructor when the file is empty, and a file with values for a provider without that
-constructor fails the build. A key `@<input>=<path>[:<target>]` among those values is not handed over as one:
-it binds a file or folder of the project, resolved against the module's own folder, into a source named after the
-input, placed at `<target>` inside it, which the plugin receives beside what its slot reads as `../inputs/<input>`;
-`@@<key>` is the value `@<key>`. `:` never appears in either path, so the first one splits them, and a path is
-refused unless it resolves, through any symbolic link, to the project itself - as a plugin's own `./<folder>` is.
+constructor fails the build. A key `@<input>[/<target>]=<path>` among those values is not handed over as one:
+it binds a file or folder of the project, resolved against the module's own folder, into the input named before
+the first `/`, placed at `<target>` inside it or at its root, and the plugin receives the input beside what its slot
+reads as `../inputs/<input>`. The same input takes one key per target, which `Bind.asInputs` binds as a source each
+and merges into one folder, so a plugin module holds its inputs as a map from name to target to source; `@@<key>`
+is the value `@<key>`, and a path is refused unless it resolves, through any symbolic link, to the project itself -
+as a plugin's own `./<folder>` is.
 The slots `transform` and `inspect` are not modules of a project module but
 `build/transform` and `build/inspect`, which every layout registers inside `build` after its project module, so
 that everything depending on `build` sees their additions and nothing runs past a failed inspection; an
