@@ -594,7 +594,7 @@ public record Project(
                     -Djenesis.project.docker=true.
 
                     The slots transform and inspect run a plugin once over every module built, in
-                    the verify goal that stage, export, release and Execute run first. Such a plugin
+                    the verify goal that stage, export and release run first. Such a plugin
                     reads jenesis.plugin.<name>.<key> settings rather than a file, and pin writes its
                     pins to jenesis-plugins-pin.properties. A transform adds files to a module by
                     naming them in an inventory.properties of its own, as <module>.attachment.<classifier>
