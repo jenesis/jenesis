@@ -457,6 +457,24 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void binds_the_project_resources_into_every_module() throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
+        Path notice = Files.writeString(root.resolve("NOTICE"), "notice");
+        Path legal = Files.createDirectories(root.resolve("legal"));
+        Files.writeString(legal.resolve("THIRD-PARTY.txt"), "third party");
+        SequencedMap<Path, Path> resources = new LinkedHashMap<>();
+        resources.put(Path.of("META-INF/NOTICE"), notice);
+        resources.put(Path.of("META-INF/legal"), legal);
+        SequencedMap<String, Path> outputs = fixture.execute(new InferredMultiProjectAssembler().resources(resources),
+                "sub/include");
+        Path included = outputs.get("sub/include/resources").resolve(BuildStep.RESOURCES);
+        assertThat(included.resolve("META-INF/NOTICE")).hasContent("notice");
+        assertThat(included.resolve("META-INF/legal/THIRD-PARTY.txt"))
+                .as("a folder is placed as a folder at its target")
+                .hasContent("third party");
+    }
+
+    @Test
     public void wires_a_plugin_whose_properties_file_is_found_and_hands_it_the_values() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("plugin-lint.properties"), "level=strict\n");
