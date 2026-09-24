@@ -15,35 +15,27 @@ public class Legal implements BuildStep {
 
     private final String group;
     private final SequencedSet<String> notices;
-    private final boolean strict;
 
     public Legal() {
-        this("main", NOTICES, false);
+        this("main", NOTICES);
     }
 
     public static Legal ofEnvironment(Environment environment) {
         List<String> notices = environment.entries("legal.notices");
-        return new Legal("main",
-                notices == null ? NOTICES : new LinkedHashSet<>(notices),
-                environment.flag("legal.strict", false));
+        return new Legal("main", notices == null ? NOTICES : new LinkedHashSet<>(notices));
     }
 
-    private Legal(String group, SequencedSet<String> notices, boolean strict) {
+    private Legal(String group, SequencedSet<String> notices) {
         this.group = group;
         this.notices = notices;
-        this.strict = strict;
     }
 
     public Legal group(String group) {
-        return new Legal(group, notices, strict);
+        return new Legal(group, notices);
     }
 
     public Legal notices(SequencedSet<String> notices) {
-        return new Legal(group, notices, strict);
-    }
-
-    public Legal strict(boolean strict) {
-        return new Legal(group, notices, strict);
+        return new Legal(group, notices);
     }
 
     @Override
@@ -69,7 +61,6 @@ public class Legal implements BuildStep {
             }
         }
         for (Map.Entry<Path, Path> jar : jars.entrySet()) {
-            boolean found = false;
             try (JarFile file = new JarFile(jar.getKey().toFile())) {
                 for (JarEntry entry : (Iterable<JarEntry>) file.stream()::iterator) {
                     String name = entry.getName(), lower = name.toLowerCase(Locale.ROOT);
@@ -94,13 +85,7 @@ public class Legal implements BuildStep {
                             Files.copy(in, target);
                         }
                     }
-                    found = true;
                 }
-            }
-            if (!found && strict) {
-                throw new IllegalStateException(jar.getKey().getFileName() + " carries none of " + notices
-                        + " - add them to it, name the entries it carries with -Djenesis.legal.notices, or build"
-                        + " with -Djenesis.legal.strict=false");
             }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
