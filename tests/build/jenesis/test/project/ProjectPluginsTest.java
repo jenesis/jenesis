@@ -165,15 +165,56 @@ public class ProjectPluginsTest {
     }
 
     @Test
+    public void hands_a_transform_the_values_its_arguments_file_names() throws IOException {
+        Path arguments = Files.writeString(root.resolve("jenesis-plugins-arguments.properties"), "licenses.holder=Example\n");
+        List<SequencedMap<String, String>> received = new ArrayList<>();
+        wire(new ProjectPlugins().arguments(arguments).transforms(new LinkedHashMap<>(Map.of("licenses", values -> {
+            received.add(values);
+            return new Attach("licenses", "module-app").asModule("licenses");
+        }))));
+
+        buildExecutor.execute("inspect");
+
+        assertThat(received).containsExactly(new TreeMap<>(Map.of("holder", "Example")));
+    }
+
+    @Test
+    public void lets_the_arguments_of_an_active_profile_win() throws IOException {
+        Path arguments = Files.writeString(root.resolve("jenesis-plugins-arguments.properties"), "licenses.holder=Example\n");
+        Files.writeString(root.resolve("jenesis-plugins-arguments-release.properties"), "licenses.holder=Release\n");
+        List<SequencedMap<String, String>> received = new ArrayList<>();
+        wire(new ProjectPlugins().arguments(arguments).transforms(new LinkedHashMap<>(Map.of("licenses", values -> {
+            received.add(values);
+            return new Attach("licenses", "module-app").asModule("licenses");
+        }))), Path.of("release"));
+
+        buildExecutor.execute("inspect");
+
+        assertThat(received).containsExactly(new TreeMap<>(Map.of("holder", "Release")));
+    }
+
+    @Test
+    public void refuses_an_argument_for_a_plugin_it_does_not_declare() throws IOException {
+        Path arguments = Files.writeString(root.resolve("jenesis-plugins-arguments.properties"), "other.holder=Example\n");
+        wire(new ProjectPlugins().arguments(arguments).transform("licenses", new Attach("licenses", "module-app")));
+
+        assertThatThrownBy(() -> buildExecutor.execute("inspect"))
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The argument other.holder")
+                .hasMessageContaining("names no plugin of transform or inspect");
+    }
+
+    @Test
     public void refuses_a_transform_named_like_a_step_of_its_own() {
         assertThatThrownBy(() -> new ProjectPlugins().transform("additions", new Attach("licenses", "module-app")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Cannot add a transform named additions");
     }
 
-    private void wire(ProjectPlugins plugins) {
-        buildExecutor.addModule("transform", plugins.transformModule(), "build");
-        buildExecutor.addModule("inspect", plugins.inspectModule(), "build", "transform");
+    private void wire(ProjectPlugins plugins, Path... profiles) {
+        buildExecutor.addModule("transform", plugins.transformModule(new LinkedHashSet<>(List.of(profiles))), "build");
+        buildExecutor.addModule("inspect", plugins.inspectModule(new LinkedHashSet<>(List.of(profiles))), "build", "transform");
     }
 
     private record Attach(String classifier, String prefix) implements BuildStep {
