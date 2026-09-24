@@ -83,16 +83,16 @@ public class ModularStaging implements BuildStep {
             link(pom, target.resolve(moduleName + ".pom"));
             link(bom, target.resolve(moduleName + ".properties"));
             for (Map.Entry<String, Path> attachment : attachments.getOrDefault(prefix, Collections.emptyNavigableMap()).entrySet()) {
-                String classifier = attachment.getKey();
-                SAFE_SEGMENT.accept("classifier", classifier);
-                if (Set.of("sources", "javadoc").contains(classifier)) {
-                    throw new IllegalArgumentException("Cannot attach " + attachment.getValue() + " to " + moduleName
-                            + " as " + classifier + " - the build stages its own file under that classifier, so give"
-                            + " the attachment another one");
-                }
+                SAFE_SEGMENT.accept("classifier", attachment.getKey());
                 String name = attachment.getValue().getFileName().toString();
-                int dot = name.lastIndexOf('.');
-                link(attachment.getValue(), target.resolve(moduleName + "-" + classifier + (dot < 0 ? "" : name.substring(dot))));
+                Path staged = target.resolve(moduleName + "-" + attachment.getKey()
+                        + (name.lastIndexOf('.') < 0 ? "" : name.substring(name.lastIndexOf('.'))));
+                if (Files.exists(staged)) {
+                    throw new IllegalArgumentException("Cannot attach " + attachment.getValue() + " to " + moduleName
+                            + " as " + attachment.getKey() + " - " + staged.getFileName() + " is staged already, so give"
+                            + " the attachment another classifier or switch off what stages that file");
+                }
+                BuildStep.linkOrCopy(staged, attachment.getValue());
             }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
