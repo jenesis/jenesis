@@ -39,7 +39,7 @@ public class AuditModule implements BuildExecutorModule {
             modules.keySet().removeAll(noticed);
             if (!modules.isEmpty()) {
                 throw new IllegalStateException("No notice is attached to " + String.join(", ", modules.values())
-                        + " - add notice+transform to jenesis.plugins.properties, or switch it back on");
+                        + " - add notice+postprocess/transform to jenesis.plugins.properties, or switch it back on");
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }

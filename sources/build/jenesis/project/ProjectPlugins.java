@@ -17,28 +17,14 @@ public record ProjectPlugins(Path pins,
                              SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> inspections,
                              SequencedMap<String, BuildExecutorModule> resolutions) {
 
-    public static final String TRANSFORM = "transform",
+    public static final String POSTPROCESS = "postprocess",
+            TRANSFORM = "transform",
             INSPECT = "inspect",
             PINS = "pins",
             ADDITIONS = "additions",
             SEALED = "sealed",
             UNCHANGED = "unchanged",
             RESOLVED = "resolved";
-
-    public ProjectPlugins {
-        for (String name : transforms.keySet()) {
-            if (List.of(PINS, ADDITIONS).contains(name)) {
-                throw new IllegalArgumentException("Cannot add a transform named " + name + " - the build names a"
-                        + " step of transform that way, so give the transform another name");
-            }
-        }
-        for (String name : inspections.keySet()) {
-            if (List.of(PINS, SEALED, UNCHANGED).contains(name)) {
-                throw new IllegalArgumentException("Cannot add an inspection named " + name + " - the build names a"
-                        + " step of inspect that way, so give the inspection another name");
-            }
-        }
-    }
 
     public ProjectPlugins() {
         this(null, null, Collections.emptyNavigableMap(), Collections.emptyNavigableMap(), Collections.emptyNavigableMap());
@@ -101,7 +87,7 @@ public record ProjectPlugins(Path pins,
         };
     }
 
-    public BuildExecutorModule transformModule(SequencedSet<Path> profiles) {
+    public BuildExecutorModule postprocess(SequencedSet<Path> profiles) {
         return new BuildExecutorModule() {
             @Override
             public Optional<String> resolve(String path) {
@@ -110,66 +96,60 @@ public record ProjectPlugins(Path pins,
 
             @Override
             public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-                if (transforms.isEmpty()) {
+                if (transforms.isEmpty() && inspections.isEmpty()) {
                     return;
                 }
-                SequencedSet<String> prefixes = new LinkedHashSet<>();
-                for (Path folder : inherited.values()) {
-                    Path file = folder.resolve(Inventory.INVENTORY);
-                    if (Files.isRegularFile(file)) {
-                        for (String key : SequencedProperties.ofFiles(file).stringPropertyNames()) {
-                            if (key.indexOf('.') > 0 && key.endsWith(".path")) {
-                                prefixes.add(key.substring(0, key.indexOf('.')));
+                SequencedMap<String, SequencedMap<String, String>> values = arguments(profiles);
+                SequencedSet<String> inputs = pinned(buildExecutor);
+                inputs.addAll(inherited.sequencedKeySet());
+                SequencedSet<String> inspected = new LinkedHashSet<>(inherited.sequencedKeySet());
+                if (!transforms.isEmpty()) {
+                    SequencedSet<String> prefixes = new LinkedHashSet<>();
+                    for (Path folder : inherited.values()) {
+                        Path file = folder.resolve(Inventory.INVENTORY);
+                        if (Files.isRegularFile(file)) {
+                            for (String key : SequencedProperties.ofFiles(file).stringPropertyNames()) {
+                                if (key.indexOf('.') > 0 && key.endsWith(".path")) {
+                                    prefixes.add(key.substring(0, key.indexOf('.')));
+                                }
                             }
                         }
                     }
+                    buildExecutor.addModule(TRANSFORM, (transform, given) -> {
+                        SequencedSet<String> previous = new LinkedHashSet<>(given.sequencedKeySet());
+                        for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> entry : transforms.entrySet()) {
+                            transform.addModule(entry.getKey(),
+                                    entry.getValue().apply(values.getOrDefault(entry.getKey(), Collections.emptyNavigableMap())),
+                                    previous);
+                            previous.add(entry.getKey());
+                        }
+                    }, inputs);
+                    buildExecutor.addModule(ADDITIONS, (additions, produced) -> {
+                        for (String prefix : prefixes) {
+                            additions.addStep(BuildExecutorModule.encodePath(prefix),
+                                    new Additions(prefix, prefixes),
+                                    produced.sequencedKeySet());
+                        }
+                    }, TRANSFORM);
+                    inspected.add(ADDITIONS);
                 }
-                SequencedMap<String, SequencedMap<String, String>> values = arguments(profiles);
-                SequencedSet<String> previous = pinned(buildExecutor);
-                previous.addAll(inherited.sequencedKeySet());
-                for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> entry : transforms.entrySet()) {
-                    buildExecutor.addModule(entry.getKey(),
-                            entry.getValue().apply(values.getOrDefault(entry.getKey(), Collections.emptyNavigableMap())),
-                            previous);
-                    previous.add(entry.getKey());
+                if (!inspections.isEmpty()) {
+                    buildExecutor.addStep(SEALED, new Sealed(), inspected);
+                    SequencedSet<String> available = new LinkedHashSet<>(inputs);
+                    available.addAll(inspected);
+                    available.add(SEALED);
+                    buildExecutor.addModule(INSPECT, (inspect, given) -> {
+                        for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> entry : inspections.entrySet()) {
+                            inspect.addModule(entry.getKey(),
+                                    entry.getValue().apply(values.getOrDefault(entry.getKey(), Collections.emptyNavigableMap())),
+                                    given.sequencedKeySet());
+                        }
+                    }, available);
+                    SequencedSet<String> compared = new LinkedHashSet<>(inspected);
+                    compared.add(SEALED);
+                    compared.add(INSPECT);
+                    buildExecutor.addStep(UNCHANGED, new Unchanged(), compared);
                 }
-                buildExecutor.addModule(ADDITIONS, (additions, produced) -> {
-                    for (String prefix : prefixes) {
-                        additions.addStep(BuildExecutorModule.encodePath(prefix),
-                                new Additions(prefix, prefixes),
-                                produced.sequencedKeySet());
-                    }
-                }, transforms.sequencedKeySet());
-            }
-        };
-    }
-
-    public BuildExecutorModule inspectModule(SequencedSet<Path> profiles) {
-        return new BuildExecutorModule() {
-            @Override
-            public Optional<String> resolve(String path) {
-                return Optional.empty();
-            }
-
-            @Override
-            public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-                if (inspections.isEmpty()) {
-                    return;
-                }
-                SequencedMap<String, SequencedMap<String, String>> values = arguments(profiles);
-                buildExecutor.addStep(SEALED, new Sealed(), inherited.sequencedKeySet());
-                SequencedSet<String> available = pinned(buildExecutor);
-                available.addAll(inherited.sequencedKeySet());
-                available.add(SEALED);
-                for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> entry : inspections.entrySet()) {
-                    buildExecutor.addModule(entry.getKey(),
-                            entry.getValue().apply(values.getOrDefault(entry.getKey(), Collections.emptyNavigableMap())),
-                            available);
-                }
-                SequencedSet<String> compared = new LinkedHashSet<>(inherited.sequencedKeySet());
-                compared.add(SEALED);
-                compared.addAll(inspections.sequencedKeySet());
-                buildExecutor.addStep(UNCHANGED, new Unchanged(new LinkedHashSet<>(inspections.sequencedKeySet())), compared);
             }
         };
     }
@@ -197,7 +177,7 @@ public record ProjectPlugins(Path pins,
                 if (dot <= 0 || dot == key.length() - 1 || !resolutions.containsKey(plugin)
                         && !transforms.containsKey(plugin) && !inspections.containsKey(plugin)) {
                     throw new IllegalArgumentException("The argument " + key + " in " + file + " names no plugin of "
-                            + TRANSFORM + " or " + INSPECT + " - write <plugin>.<key>=<value> for one of "
+                            + POSTPROCESS + " - write <plugin>.<key>=<value> for one of "
                             + Stream.of(resolutions.keySet(), transforms.keySet(), inspections.keySet())
                                     .flatMap(Set::stream)
                                     .collect(Collectors.toCollection(TreeSet::new)));
@@ -312,7 +292,7 @@ public record ProjectPlugins(Path pins,
         }
     }
 
-    private record Unchanged(SequencedSet<String> inspections) implements BuildStep {
+    private record Unchanged() implements BuildStep {
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
@@ -321,8 +301,7 @@ public record ProjectPlugins(Path pins,
                 throws IOException {
             SequencedMap<String, BuildStepArgument> inspected = new LinkedHashMap<>(arguments);
             BuildStepArgument seal = inspected.remove(SEALED);
-            inspected.keySet().removeIf(key -> inspections.contains(key)
-                    || inspections.stream().anyMatch(name -> key.startsWith(name + "/")));
+            inspected.keySet().removeIf(key -> key.equals(INSPECT) || key.startsWith(INSPECT + "/"));
             SequencedProperties sealed = SequencedProperties.ofFiles(seal.folder().resolve("sealed.properties"));
             SequencedMap<String, String> expected = new TreeMap<>();
             sealed.forEachProperty(expected::put);
