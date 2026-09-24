@@ -705,7 +705,7 @@ public class ProjectTest {
 
     @Test
     public void refuses_an_input_given_as_an_absolute_path_outside_the_project() {
-        assertThatThrownBy(() -> plugin("@schemas", elsewhere.toAbsolutePath().toString()))
+        assertThatThrownBy(() -> plugin("@schemas", "/"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("lies outside the project");
     }
@@ -731,7 +731,15 @@ public class ProjectTest {
         Files.createDirectories(root.resolve("contracts"));
         assertThatThrownBy(() -> plugin("@schemas", "contracts:../xjc"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("name a folder inside the input, without ..");
+                .hasMessageContaining("name a relative folder inside the input, without ..");
+    }
+
+    @Test
+    public void refuses_an_input_whose_target_starts_at_a_root() throws IOException {
+        Files.createDirectories(root.resolve("contracts"));
+        assertThatThrownBy(() -> plugin("@schemas", "contracts:/xjc"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("name a relative folder inside the input, without ..");
     }
 
     @Test
