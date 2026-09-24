@@ -628,6 +628,60 @@ public class ProjectTest {
     }
 
     @Test
+    public void hands_the_plugins_of_transform_and_inspect_to_verify() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+                greeting+binary/generated=demo.greeting
+                licenses+transform=./licenses
+                audit+inspect=demo.audit@audit
+                """);
+        Project project = Project.ofEnvironment(new Environment(settings), root);
+        assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
+                assembler -> assertThat(assembler.plugins()).containsOnlyKeys("greeting+binary/generated"));
+        assertThat(project.verify().transforms()).containsOnlyKeys("licenses");
+        assertThat(project.verify().inspections()).containsOnlyKeys("audit");
+        assertThat(project.verify().resolutions()).containsOnlyKeys("licenses", "audit");
+        assertThat(project.verify().pins()).isEqualTo(root.resolve("jenesis-plugins-pin.properties"));
+    }
+
+    @Test
+    public void still_resolves_a_plugin_of_verify_its_setting_switches_off() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+                licenses+transform=./licenses
+                audit+inspect=demo.audit
+                """);
+        Project project = Project.ofEnvironment(new Environment(Map.of("plugin.audit", "false")), root);
+        assertThat(project.verify().transforms()).containsOnlyKeys("licenses");
+        assertThat(project.verify().inspections()).isEmpty();
+        assertThat(project.verify().resolutions())
+                .as("pin must capture a plugin that only a profile switches on")
+                .containsOnlyKeys("licenses", "audit");
+    }
+
+    @Test
+    public void refuses_a_plugin_of_verify_that_shares_its_name_with_a_module_plugin() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+                audit+check=./audit
+                audit+inspect=./audit
+                """);
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The plugin audit")
+                .hasMessageContaining("takes a name of its own");
+    }
+
+    @Test
+    public void refuses_a_plugin_named_for_both_transform_and_inspect() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+                audit+transform=./audit
+                audit+inspect=./audit
+                """);
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot add the plugin audit+inspect")
+                .hasMessageContaining("takes a name of its own");
+    }
+
+    @Test
     public void refuses_a_plugin_that_selects_a_provider_without_a_name() throws IOException {
         Files.writeString(root.resolve("jenesis-plugins.properties"), "lint+check=./lint@\n");
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))

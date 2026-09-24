@@ -36,7 +36,7 @@ public class MavenRepositoryStaging implements BuildStep {
             throws IOException {
         Collected collected = collectModules(arguments);
         Pairings pairings = pairTests(collected.stagedByArtifactId(), collected.testModules());
-        stageModules(context.next(), collected.stagedByArtifactId(), pairings);
+        stageModules(context.next(), collected.stagedByArtifactId(), pairings, Inventory.attachments(arguments.values()));
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
@@ -162,7 +162,8 @@ public class MavenRepositoryStaging implements BuildStep {
 
     private static void stageModules(Path target,
                                      SequencedMap<String, Module> stagedByArtifactId,
-                                     Pairings pairings) throws IOException {
+                                     Pairings pairings,
+                                     SequencedMap<String, SequencedMap<String, Path>> attachments) throws IOException {
         for (Module main : stagedByArtifactId.values()) {
             Coordinates coordinates = main.coordinates();
             SAFE_SEGMENT.accept("groupId", coordinates.groupId());
@@ -193,6 +194,18 @@ public class MavenRepositoryStaging implements BuildStep {
                 String name = main.sbom().getFileName().toString();
                 int dot = name.lastIndexOf('.');
                 link(main.sbom(), baseDir.resolve(prefix + "-cyclonedx" + (dot < 0 ? "" : name.substring(dot))));
+            }
+            for (Map.Entry<String, Path> attachment : attachments.getOrDefault(main.prefix(), Collections.emptyNavigableMap()).entrySet()) {
+                String classifier = attachment.getKey();
+                SAFE_SEGMENT.accept("classifier", classifier);
+                if (Set.of("sources", "javadoc", "cyclonedx", "tests", "tests-sources", "tests-javadoc").contains(classifier)) {
+                    throw new IllegalArgumentException("Cannot attach " + attachment.getValue() + " to " + main.prefix()
+                            + " as " + classifier + " - the build stages its own file under that classifier, so give"
+                            + " the attachment another one");
+                }
+                String name = attachment.getValue().getFileName().toString();
+                int dot = name.lastIndexOf('.');
+                link(attachment.getValue(), baseDir.resolve(prefix + "-" + classifier + (dot < 0 ? "" : name.substring(dot))));
             }
             Module test = pairings.testByMain().get(coordinates.artifactId());
             if (test != null) {

@@ -627,6 +627,34 @@ public class Inventory implements BuildStep {
         return paths;
     }
 
+    public static SequencedMap<String, SequencedMap<String, Path>> attachments(Iterable<BuildStepArgument> arguments)
+            throws IOException {
+        SequencedMap<String, SequencedMap<String, Path>> attachments = new LinkedHashMap<>();
+        for (BuildStepArgument argument : arguments) {
+            if (argument.removed()) {
+                continue;
+            }
+            Path inventoryFile = argument.folder().resolve(INVENTORY);
+            if (!Files.isRegularFile(inventoryFile)) {
+                continue;
+            }
+            SequencedProperties inventory = SequencedProperties.ofFiles(inventoryFile);
+            for (String key : inventory.stringPropertyNames()) {
+                int dot = key.indexOf('.');
+                if (dot <= 0 || !key.startsWith("attachment.", dot + 1)) {
+                    continue;
+                }
+                String prefix = key.substring(0, dot), classifier = key.substring(dot + 1 + "attachment.".length());
+                Path file = argument.folder().resolve(inventory.getProperty(key)).normalize();
+                if (attachments.computeIfAbsent(prefix, _ -> new LinkedHashMap<>()).putIfAbsent(classifier, file) != null) {
+                    throw new IllegalStateException("More than one file is attached to " + prefix + " as " + classifier
+                            + " - give each attachment a classifier of its own");
+                }
+            }
+        }
+        return attachments;
+    }
+
     public static SequencedMap<String, Path> bomReferences(Iterable<BuildStepArgument> arguments, String path)
             throws IOException {
         SequencedMap<String, Path> references = new LinkedHashMap<>();

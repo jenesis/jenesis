@@ -62,6 +62,42 @@ public class ModularStagingTest {
     }
 
     @Test
+    public void stages_a_file_another_inventory_attaches_to_the_module() throws IOException {
+        Path folder = Files.createDirectory(source.resolve("foo"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-foo.module", "demo.foo");
+        inventory.setProperty("module-foo.artifacts.0", "classes.jar");
+        inventory.store(folder.resolve(Inventory.INVENTORY));
+        Files.writeString(folder.resolve("classes.jar"), "jar");
+        Path additions = Files.createDirectory(source.resolve("additions"));
+        SequencedProperties attached = new SequencedProperties();
+        attached.setProperty("module-foo.attachment.licenses", "attachment/licenses/LICENSES.zip");
+        attached.store(additions.resolve(Inventory.INVENTORY));
+        Files.writeString(Files.createDirectories(additions.resolve("attachment/licenses")).resolve("LICENSES.zip"), "zip");
+
+        run(false, folder, additions);
+
+        assertThat(next.resolve("demo.foo/demo.foo.jar")).hasContent("jar");
+        assertThat(next.resolve("demo.foo/demo.foo-licenses.zip")).hasContent("zip");
+    }
+
+    @Test
+    public void refuses_an_attachment_under_a_classifier_the_build_stages_itself() throws IOException {
+        Path folder = Files.createDirectory(source.resolve("foo"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-foo.module", "demo.foo");
+        inventory.setProperty("module-foo.artifacts.0", "classes.jar");
+        inventory.setProperty("module-foo.attachment.sources", "other.jar");
+        inventory.store(folder.resolve(Inventory.INVENTORY));
+        Files.writeString(folder.resolve("classes.jar"), "jar");
+        Files.writeString(folder.resolve("other.jar"), "other");
+
+        assertThatThrownBy(() -> run(false, folder))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("as sources");
+    }
+
+    @Test
     public void resolves_pom_that_navigates_to_a_sibling_step_output() throws IOException {
         Path module = source.resolve("mod");
         Path inventoryDir = Files.createDirectories(module.resolve("inventory/output"));
