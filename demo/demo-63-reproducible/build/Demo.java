@@ -19,7 +19,7 @@ import build.jenesis.Make;
  */
 public class Demo {
 
-    private static final String EXPECTED = "9ffd4b090652995f57c15b8aa2f8080b8192d067811e28a46477eb3c8b275df1";
+    private static final String EXPECTED = "e90d68a2bc7492b27c031c2235123e3a20a732cc8e5564f9a2d143d36f8a534a";
 
     static void main(String[] args) throws Exception {
         if (new Make("build.jenesis.Project").build().code() != 0) {
