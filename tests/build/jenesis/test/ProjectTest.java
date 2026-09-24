@@ -726,7 +726,7 @@ public class ProjectTest {
     @Test
     public void binds_an_input_a_plugin_names_inside_the_project() throws IOException {
         Files.createDirectories(root.resolve("contracts"));
-        assertThat(plugin("@schemas", "contracts:xjc")).isNotNull();
+        assertThat(plugin("@schemas/xjc", "contracts")).isNotNull();
     }
 
     @Test
@@ -770,7 +770,7 @@ public class ProjectTest {
     @Test
     public void refuses_an_input_whose_target_leaves_the_input() throws IOException {
         Files.createDirectories(root.resolve("contracts"));
-        assertThatThrownBy(() -> plugin("@schemas", "contracts:../xjc"))
+        assertThatThrownBy(() -> plugin("@schemas/../xjc", "contracts"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("name a relative folder inside the input, without ..");
     }
@@ -778,25 +778,33 @@ public class ProjectTest {
     @Test
     public void refuses_an_input_whose_target_starts_at_a_root() throws IOException {
         Files.createDirectories(root.resolve("contracts"));
-        assertThatThrownBy(() -> plugin("@schemas", "contracts:/xjc"))
+        assertThatThrownBy(() -> plugin("@schemas//xjc", "contracts"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("name a relative folder inside the input, without ..");
     }
 
     @Test
-    public void refuses_an_input_with_a_second_colon() throws IOException {
+    public void binds_several_files_into_one_input() throws IOException {
         Files.createDirectories(root.resolve("contracts"));
-        assertThatThrownBy(() -> plugin("@schemas", "contracts:xjc:more"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("bind <path> or <path>:<target>, where neither holds a :");
+        Files.writeString(root.resolve("catalog.xml"), "<catalog/>");
+        assertThat(plugin("@schemas", "contracts", "@schemas/xjc/catalog.xml", "catalog.xml")).isNotNull();
     }
 
     @Test
-    public void refuses_an_input_whose_name_holds_a_slash() throws IOException {
+    public void refuses_two_bindings_of_an_input_at_one_target() throws IOException {
         Files.createDirectories(root.resolve("contracts"));
-        assertThatThrownBy(() -> plugin("@schemas/xsd", "contracts"))
+        Files.createDirectories(root.resolve("more"));
+        assertThatThrownBy(() -> plugin("@schemas", "contracts", "@schemas/.", "more"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("is not a name");
+                .hasMessageContaining("places its files where another binding of @schemas places its own");
+    }
+
+    @Test
+    public void refuses_an_input_whose_key_does_not_start_with_a_name() throws IOException {
+        Files.createDirectories(root.resolve("contracts"));
+        assertThatThrownBy(() -> plugin("@sch:emas", "contracts"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not start with a name");
     }
 
     @Test
@@ -808,12 +816,16 @@ public class ProjectTest {
                 .hasMessageContaining("lies outside the project");
     }
 
-    private BuildExecutorModule plugin(String key, String value) throws IOException {
+    private BuildExecutorModule plugin(String... declarations) throws IOException {
         Files.createDirectories(root.resolve("gen"));
         Files.writeString(root.resolve("jenesis-plugins.properties"), "gen+check=./gen\n");
         InferredMultiProjectAssembler assembler = (InferredMultiProjectAssembler) Project.ofEnvironment(new Environment(settings), root)
                 .assembler();
-        return assembler.plugins().get("gen+check").apply(root, new LinkedHashMap<>(Map.of(key, value)));
+        SequencedMap<String, String> values = new LinkedHashMap<>();
+        for (int index = 0; index < declarations.length; index += 2) {
+            values.put(declarations[index], declarations[index + 1]);
+        }
+        return assembler.plugins().get("gen+check").apply(root, values);
     }
 
     @Test

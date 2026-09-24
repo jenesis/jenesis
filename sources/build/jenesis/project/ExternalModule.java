@@ -27,7 +27,7 @@ public class ExternalModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final String group;
     private final SequencedMap<String, String> properties;
-    private final SequencedMap<String, Map.Entry<Path, Path>> inputs;
+    private final SequencedMap<String, SequencedMap<Path, Path>> inputs;
 
     public ExternalModule(String coordinate,
                           String group,
@@ -65,7 +65,7 @@ public class ExternalModule implements BuildExecutorModule {
                            Pinning pinning,
                            String group,
                            SequencedMap<String, String> properties,
-                           SequencedMap<String, Map.Entry<Path, Path>> inputs) {
+                           SequencedMap<String, SequencedMap<Path, Path>> inputs) {
         this.coordinate = coordinate;
         this.dependencyModule = dependencyModule;
         this.additionalDependencies = additionalDependencies;
@@ -135,7 +135,7 @@ public class ExternalModule implements BuildExecutorModule {
                 inputs);
     }
 
-    public ExternalModule inputs(SequencedMap<String, Map.Entry<Path, Path>> inputs) {
+    public ExternalModule inputs(SequencedMap<String, SequencedMap<Path, Path>> inputs) {
         return new ExternalModule(coordinate,
                 dependencyModule,
                 additionalDependencies,
@@ -178,9 +178,7 @@ public class ExternalModule implements BuildExecutorModule {
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
         resolution().accept(buildExecutor, inherited);
         if (!inputs.isEmpty()) {
-            buildExecutor.addModule(INPUTS, (bound, _) -> inputs.forEach((name, input) -> bound.addSource(name,
-                    new Bind(Map.of(Path.of(""), input.getValue())),
-                    input.getKey())));
+            buildExecutor.addModule(INPUTS, Bind.asInputs(inputs));
         }
         buildExecutor.addModule(DELEGATE, (delegateExecutor, delegated) -> {
             List<Path> artifacts = new ArrayList<>(

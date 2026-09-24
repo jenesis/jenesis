@@ -593,10 +593,10 @@ public record Project(
                     runs in a module only where plugin-<name>.properties is found in its configuration
                     locations; a provider is created with that file's values when it declares a
                     public constructor taking a SequencedMap of them, and with its no-argument one when
-                    the file is empty. A key @<input>=<path>[:<target>] binds a file or folder of the
+                    the file is empty. A key @<input>[/<target>]=<path> binds a file or folder of the
                     project, relative to the module, into an input the plugin reads as ../inputs/<input>,
-                    placed at <target> inside it; @@<key> is the value @<key>. A path must stay within
-                    the project. A plugin adds to its module and replaces nothing; a build that
+                    placed at <target> inside it; one input takes a key per target, and @@<key> is the
+                    value @<key>. A path must stay within the project. A plugin adds to its module and replaces nothing; a build that
                     changes what the stock steps do is an entry point of its own. A plugin runs the
                     project's code, as its tests do, so build an untrusted project with
                     -Djenesis.project.docker=true.
@@ -1569,7 +1569,7 @@ public record Project(
                 BuildExecutorModule resolution = folder ? internal.resolution() : external.resolution();
                 BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule> plugin = (base, given) -> {
                     SequencedMap<String, String> values = new LinkedHashMap<>();
-                    SequencedMap<String, Map.Entry<Path, Path>> inputs = new LinkedHashMap<>();
+                    SequencedMap<String, SequencedMap<Path, Path>> inputs = new LinkedHashMap<>();
                     given.forEach((declaration, declaredValue) -> {
                         if (declaration.startsWith("@@")) {
                             values.put(declaration.substring(1), declaredValue);
@@ -1578,20 +1578,20 @@ public record Project(
                             values.put(declaration, declaredValue);
                             return;
                         }
-                        String input = declaration.substring(1), origin = "The input " + declaration + " of the plugin " + name;
+                        int slash = declaration.indexOf('/');
+                        String input = declaration.substring(1, slash == -1 ? declaration.length() : slash);
+                        String target = slash == -1 ? null : declaration.substring(slash + 1);
+                        String origin = "The input " + declaration + " of the plugin " + name;
                         if (!INPUT_NAME.matcher(input).matches()) {
-                            throw new IllegalArgumentException(origin + " is not a name - name an input with letters,"
-                                    + " digits, ., _ and -, or write @@" + input + " for a value whose key starts with @");
+                            throw new IllegalArgumentException(origin + " does not start with a name - name an input"
+                                    + " with letters, digits, ., _ and -, as @<input> or @<input>/<target>, or write @@"
+                                    + declaration.substring(1) + " for a value whose key starts with @");
                         }
-                        String bound = declaredValue.trim();
-                        int colon = bound.indexOf(':');
-                        String path = (colon == -1 ? bound : bound.substring(0, colon)).trim();
-                        String target = colon == -1 ? null : bound.substring(colon + 1).trim();
-                        if (path.isEmpty() || target != null && (target.isEmpty() || target.contains(":"))) {
-                            throw new IllegalArgumentException(origin + " binds " + (bound.isEmpty() ? "nothing" : bound)
-                                    + " - bind <path> or <path>:<target>, where neither holds a :");
+                        if (declaredValue.isBlank()) {
+                            throw new IllegalArgumentException(origin + " binds nothing - name a file or folder of the"
+                                    + " project");
                         }
-                        Path source = contained(root, (base == null ? root : base).resolve(path), origin);
+                        Path source = contained(root, (base == null ? root : base).resolve(declaredValue.trim()), origin);
                         if (!Files.exists(source)) {
                             throw new IllegalArgumentException(origin + " binds " + source + ", which does not exist");
                         }
@@ -1602,7 +1602,10 @@ public record Project(
                             throw new IllegalArgumentException(origin + " places its files at " + target
                                     + " - name a relative folder inside the input, without ..");
                         }
-                        inputs.put(input, Map.entry(source, placed));
+                        if (inputs.computeIfAbsent(input, _ -> new LinkedHashMap<>()).putIfAbsent(placed, source) != null) {
+                            throw new IllegalArgumentException(origin + " places its files where another binding of @"
+                                    + input + " places its own - give each binding a target of its own");
+                        }
                     });
                     return folder
                             ? internal.properties(values).inputs(inputs)
