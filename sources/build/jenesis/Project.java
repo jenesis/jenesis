@@ -1640,6 +1640,32 @@ public record Project(
             assembler = assembler.plugins(plugins);
             projectPlugins = new ProjectPlugins(root.resolve("jenesis-plugins-pin.properties"), transforms, inspections, resolutions);
         }
+        List<String> included = environment.entries("project.resources");
+        if (included != null) {
+            SequencedMap<Path, Path> resources = new LinkedHashMap<>();
+            for (String entry : included) {
+                int colon = entry.indexOf(':');
+                String origin = "The resource " + entry + " of jenesis.project.resources";
+                if (colon <= 0 || colon == entry.length() - 1) {
+                    throw new IllegalArgumentException(origin + " does not name a file and where to place it - write"
+                            + " <path>:<target>");
+                }
+                Path source = contained(root, root.resolve(entry.substring(0, colon).trim()), origin);
+                if (!Files.exists(source)) {
+                    throw new IllegalArgumentException(origin + " names " + source + ", which does not exist");
+                }
+                Path target = Path.of(entry.substring(colon + 1).trim()).normalize();
+                if (target.getRoot() != null || target.startsWith("..") || target.toString().isEmpty()) {
+                    throw new IllegalArgumentException(origin + " places its file at " + target + " - name a relative"
+                            + " path among the resources, without ..");
+                }
+                if (resources.putIfAbsent(target, source) != null) {
+                    throw new IllegalArgumentException(origin + " places its file at " + target + ", where another"
+                            + " resource of jenesis.project.resources is placed already");
+                }
+            }
+            assembler = assembler.resources(resources);
+        }
         Project project = new Project(root, assembler, environment).plugins(projectPlugins);
         String configuration = environment.getProperty("project.configuration");
         if (configuration != null) {
@@ -2539,6 +2565,7 @@ public record Project(
                 project.boms||Comma-separated locations of local pin-<name>.properties; default: the configuration folders
                 project.signatures||Comma-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
+                project.resources||Comma-separated <path>:<target> pairs of project files or folders placed among the resources of every module, as NOTICE:META-INF/NOTICE,LICENSE:META-INF/LICENSE
                 project.plugins|true|false leaves out every plugin that jenesis-plugins.properties names, while pin still pins those of transform and inspect
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
                 project.docker|false|Run the whole build inside a container

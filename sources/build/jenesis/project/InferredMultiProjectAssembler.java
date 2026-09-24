@@ -11,6 +11,7 @@ import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Bind;
 import build.jenesis.step.Bundle;
 import build.jenesis.step.Docker;
 import build.jenesis.step.Inventory;
@@ -33,6 +34,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                             Function<InferredDocumentationModule, BuildExecutorModule> documentation,
                                             SequencedMap<String, BuildExecutorModule> custom,
                                             SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins,
+                                            SequencedMap<Path, Path> resources,
                                             Environment environment) implements MultiProjectAssembler<ProjectModuleDescriptor> {
 
     private static final List<String> PLUGIN_SLOTS = List.of("",
@@ -62,6 +64,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 module -> module,
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
                 environment);
     }
 
@@ -79,6 +82,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 documentation,
                 custom,
                 plugins,
+                resources,
                 environment);
     }
 
@@ -92,6 +96,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 documentation,
                 custom,
                 plugins,
+                resources,
                 environment);
     }
 
@@ -105,6 +110,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 documentation,
                 custom,
                 plugins,
+                resources,
                 environment);
     }
 
@@ -118,6 +124,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 documentation,
                 custom,
                 plugins,
+                resources,
                 environment);
     }
 
@@ -131,6 +138,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 documentation,
                 custom,
                 plugins,
+                resources,
                 environment);
     }
 
@@ -144,6 +152,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 documentation,
                 custom,
                 plugins,
+                resources,
                 environment);
     }
 
@@ -157,6 +166,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 documentation,
                 custom,
                 plugins,
+                resources,
                 environment);
     }
 
@@ -170,6 +180,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 documentation,
                 custom,
                 plugins,
+                resources,
                 environment);
     }
 
@@ -193,6 +204,21 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 documentation,
                 custom,
                 plugins,
+                resources,
+                environment);
+    }
+
+    public InferredMultiProjectAssembler resources(SequencedMap<Path, Path> resources) {
+        return new InferredMultiProjectAssembler(check,
+                format,
+                compliance,
+                toolchain,
+                artifact,
+                observe,
+                documentation,
+                custom,
+                plugins,
+                resources,
                 environment);
     }
 
@@ -303,12 +329,18 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         repositories,
                         resolvers).custom(slots.get("binary/validate")));
             }
+            if (!resources.isEmpty()) {
+                SequencedMap<Path, Path> bound = new LinkedHashMap<>();
+                resources.forEach((target, source) -> bound.put(Path.of(BuildStep.RESOURCES).resolve(target), source));
+                sub.addModule("include", Bind.asInputs(new LinkedHashMap<>(Map.of("resources", bound))));
+            }
             sub.addModule("binary", toolchain.apply(toolchainModule),
                     Stream.of(
                             Stream.of("prepare"),
                             inputs(descriptor, closure),
                             descriptor.resources().stream(),
-                            sbom == null ? Stream.<String>empty() : Stream.of("sbom"))
+                            sbom == null ? Stream.<String>empty() : Stream.of("sbom"),
+                            resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"))
                             .flatMap(Function.identity()));
             sub.addModule("artifact",
                     artifact.apply(
