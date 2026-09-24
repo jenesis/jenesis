@@ -191,7 +191,7 @@ public class ExternalModuleTest {
                         "test.plugin", pluginJar,
                         "build.jenesis", jenesisJar))),
                 Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
-                .inputs(new LinkedHashMap<>(Map.of("schemas", new Bind.Input(contracts, Path.of("xjc"))))));
+                .inputs(new LinkedHashMap<>(Map.of("schemas", Map.entry(contracts, Path.of("xjc"))))));
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps.get("external/seen").resolve("out.txt")).content().isEqualTo("../inputs/schemas=<schema/>");

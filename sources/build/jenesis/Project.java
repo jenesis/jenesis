@@ -77,6 +77,7 @@ public record Project(
             SKILL = "skill",
             PROPERTIES = "properties",
             CONFIGURATION = "configuration";
+    private static final Pattern INPUT_NAME = Pattern.compile("[A-Za-z0-9._-]+");
 
     @FunctionalInterface
     public interface Layout {
@@ -1548,28 +1549,26 @@ public record Project(
                             + " from source, followed by @<name> to select the provider annotated with that"
                             + " @BuildModuleName");
                 }
-                InternalModule internal = null;
-                ExternalModule external = null;
-                if (location.startsWith("./") || location.startsWith("../")) {
-                    internal = InternalModule.ofEnvironment(environment,
-                                    "module",
-                                    group,
-                                    contained(root, root.resolve(location), "The plugin " + key + " in " + file))
-                            .buildModuleName(provider);
-                } else {
-                    external = ExternalModule.ofEnvironment(environment,
-                                    "module/" + location,
-                                    group,
-                                    Map.of("module", JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE)),
-                                    Map.of("module", ModularJarResolver.ofEnvironment(environment, true)))
-                            .buildModuleName(provider);
-                }
-                BuildExecutorModule resolution = internal == null ? external.resolution() : internal.resolution();
-                InternalModule compiled = internal;
-                ExternalModule resolved = external;
+                boolean folder = location.startsWith("./") || location.startsWith("../");
+                InternalModule internal = folder
+                        ? InternalModule.ofEnvironment(environment,
+                                        "module",
+                                        group,
+                                        contained(root, root.resolve(location), "The plugin " + key + " in " + file))
+                                .buildModuleName(provider)
+                        : null;
+                ExternalModule external = folder
+                        ? null
+                        : ExternalModule.ofEnvironment(environment,
+                                        "module/" + location,
+                                        group,
+                                        Map.of("module", JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE)),
+                                        Map.of("module", ModularJarResolver.ofEnvironment(environment, true)))
+                                .buildModuleName(provider);
+                BuildExecutorModule resolution = folder ? internal.resolution() : external.resolution();
                 BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule> plugin = (base, given) -> {
                     SequencedMap<String, String> values = new LinkedHashMap<>();
-                    SequencedMap<String, Bind.Input> inputs = new LinkedHashMap<>();
+                    SequencedMap<String, Map.Entry<Path, Path>> inputs = new LinkedHashMap<>();
                     given.forEach((declaration, declaredValue) -> {
                         if (declaration.startsWith("@@")) {
                             values.put(declaration.substring(1), declaredValue);
@@ -1579,7 +1578,7 @@ public record Project(
                             return;
                         }
                         String input = declaration.substring(1), origin = "The input " + declaration + " of the plugin " + name;
-                        if (!input.matches("[A-Za-z0-9._-]+")) {
+                        if (!INPUT_NAME.matcher(input).matches()) {
                             throw new IllegalArgumentException(origin + " is not a name - name an input with letters,"
                                     + " digits, ., _ and -, or write @@" + input + " for a value whose key starts with @");
                         }
@@ -1602,11 +1601,11 @@ public record Project(
                             throw new IllegalArgumentException(origin + " places its files at " + target
                                     + " - name a relative folder inside the input, without ..");
                         }
-                        inputs.put(input, new Bind.Input(source, placed));
+                        inputs.put(input, Map.entry(source, placed));
                     });
-                    return compiled == null
-                            ? resolved.properties(values).inputs(inputs)
-                            : compiled.properties(values).inputs(inputs);
+                    return folder
+                            ? internal.properties(values).inputs(inputs)
+                            : external.properties(values).inputs(inputs);
                 };
                 if (!projectWide) {
                     plugins.put(key, plugin);
