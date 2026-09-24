@@ -203,13 +203,14 @@ names, in a module only where `plugin-<name>.properties` is found in that module
 provider is created with that file's values through a public constructor taking a `SequencedMap` of them, with
 its no-argument constructor when the file is empty, and a file with values for a provider without that
 constructor fails the build. The slots `transform` and `inspect` are not modules of
-a project module but of the `verify` goal, which `stage`, `export`, `release` and `Execute` run first: such a
+a project module but of the `verify` goal, which `stage`, `export` and `release` run first and `build` and
+`Execute` never do, because it can be expensive: such a
 plugin runs once over the inventory of every module, is switched on by its line alone and configured by the
 `jenesis.plugin.<name>.<key>` settings, so profiles reach it, and `pin` resolves every one of them, a switched-off
 one included, into `jenesis-plugins-pin.properties` rather than into a module's declaration. A transform adds a
 file to a module by naming it in an `inventory.properties` of its own as `<module>.attachment.<classifier>` or
-`<module>.report.<name>`, which `verify` collects per module and exports as the only outputs `stage` and
-`Execute` see beside the build's; an inspection fails the build by throwing, and `verify` fails it as well when
+`<module>.report.<name>`, which `verify` collects per module and exports as the only outputs `stage` sees
+beside the build's; an inspection fails the build by throwing, and `verify` fails it as well when
 an inspection changed a file it was handed. A plugin adds and
 never replaces: a build that changes what the stock steps do is an entry point of its own that wires its
 assembler in code. A plugin runs the project's code, as its tests and annotation processors do, so the project

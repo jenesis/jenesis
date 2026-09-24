@@ -994,8 +994,8 @@ installation directed at its own `target/` so your home directory is left alone.
 
 The plugins of the `internal-module` demo join one module of the build. A plugin
 named under `transform` or `inspect` instead runs once over everything the build
-produced, in the `verify` goal that `stage`, `export`, `release` and `Execute` run
-first:
+produced, in the `verify` goal that `stage`, `export` and `release` run first, and
+that `build` and `Execute` leave out:
 
     notice+transform=./notice
     audit+inspect=./audit
