@@ -126,7 +126,7 @@ untouched.
 
 All of the project's code runs in that container. On the host, Jenesis only
 reads the settings and starts the container. It runs no test there, and none of
-the plugins a project names in `jenesis-plugins.properties`, until the container
+the plugins a project names in `jenesis.plugins.properties`, until the container
 is up and the isolation is in place. The engine that does this has to be the trusted
 one, as the last section of this page explains.
 
@@ -200,7 +200,7 @@ What breaks the cycle is that a standard Jenesis project carries **no build logi
 to execute at all**. The build is described declaratively - a `pom.xml` or
 `module-info.java` giving the project structure and its dependency coordinates -
 and nothing in that description runs code. The plugins a project names in
-`jenesis-plugins.properties` are the exception: they are build code, compiled from
+`jenesis.plugins.properties` are the exception: they are build code, compiled from
 the project's own sources or resolved by a module name the project chooses, and
 every Jenesis that builds the project runs them, so build a project that names
 plugins you have not reviewed with `jenesis.project.docker`, which runs them only

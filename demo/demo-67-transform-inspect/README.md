@@ -33,29 +33,29 @@ Switch the transform off and the inspection refuses the build:
 
     java -Djenesis.plugin.notice=false build/jenesis/Make.java stage
 
-    No notice is attached to demo.app - add notice+transform to jenesis-plugins.properties, or switch it back on
+    No notice is attached to demo.app - add notice+transform to jenesis.plugins.properties, or switch it back on
 
 Layout
 ------
 
     demo/demo-67-transform-inspect
-    |-- build/jenesis                      symlink to ../../../sources/build/jenesis
-    |-- legal/HEADER.txt                   the licence line the notice carries
-    |-- jenesis-plugins.properties         notice+transform=./notice
-    |                                      audit+inspect=./audit
-    |-- jenesis-plugins-arguments.properties  notice.holder=Example Corp.
-    |                                      notice.@legal=legal
-    |-- jenesis-plugins-pin.properties     written by the pin goal
-    |-- notice/                            the transform, compiled from source
-    |-- audit/                             the inspection, compiled from source
+    |-- build/jenesis                          symlink to ../../../sources/build/jenesis
+    |-- legal/HEADER.txt                       the licence line the notice carries
+    |-- jenesis.plugins.properties             notice+transform=./notice
+    |                                          audit+inspect=./audit
+    |-- jenesis.plugins.arguments.properties   notice.holder=Example Corp.
+    |                                          notice.@legal=legal
+    |-- jenesis.plugins.pin.properties         written by the pin goal
+    |-- notice/                                the transform, compiled from source
+    |-- audit/                                 the inspection, compiled from source
     `-- sources/
-        |-- module-info.java               module demo.app { requires org.json; }
+        |-- module-info.java                   module demo.app { requires org.json; }
         `-- sample/Sample.java
 
 Naming the plugins
 ------------------
 
-The plugins are named in `jenesis-plugins.properties`, as the `internal-module`
+The plugins are named in `jenesis.plugins.properties`, as the `internal-module`
 demo names its generator, but under one of two slots of the project's build:
 
     notice+transform=./notice
@@ -70,17 +70,17 @@ Configuring the plugins
 -----------------------
 
 A plugin of `transform` or `inspect` reads its values from
-`jenesis-plugins-arguments.properties` beside `jenesis-plugins.properties`, one line
+`jenesis.plugins.arguments.properties` beside `jenesis.plugins.properties`, one line
 per value as `<plugin>.<key>`. This demo's holds
 
     notice.holder=Example Corp.
     notice.@legal=legal
 
 and `holder=Example Corp.` reaches the plugin's `SequencedMap` constructor. A profile
-brings values of its own in `jenesis-plugins-arguments-<profile>.properties`, which
+brings values of its own in `jenesis.plugins.arguments-<profile>.properties`, which
 win over the file without a profile:
 
-    # jenesis-plugins-arguments-release.properties, active with -Djenesis.make.profiles=release
+    # jenesis.plugins.arguments-release.properties, active with -Djenesis.make.profiles=release
     notice.holder=Example Corp., all rights reserved
 
 The values come from these files alone, never from the command line.
@@ -127,7 +127,7 @@ A path is resolved against the project root here, and against the module's own
 folder in a module's `plugin-<name>.properties`. Either way it has to stay within
 the project, symbolic links included:
 
-    # jenesis-plugins-arguments-outside.properties
+    # jenesis.plugins.arguments-outside.properties
     notice.@legal=../..
 
     java -Djenesis.make.profiles=outside build/jenesis/Make.java stage
@@ -159,7 +159,7 @@ Pinning the plugins
 -------------------
 
 The plugins of `transform` and `inspect` belong to no module, so their pins live beside the file
-that names them, in `jenesis-plugins-pin.properties`, one line for each module in
+that names them, in `jenesis.plugins.pin.properties`, one line for each module in
 each plugin's closure:
 
     plugin-audit/module/build.jenesis=0.14.0 SHA-256/...

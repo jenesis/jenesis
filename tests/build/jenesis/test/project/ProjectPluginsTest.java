@@ -166,7 +166,7 @@ public class ProjectPluginsTest {
 
     @Test
     public void hands_a_transform_the_values_its_arguments_file_names() throws IOException {
-        Path arguments = Files.writeString(root.resolve("jenesis-plugins-arguments.properties"), "licenses.holder=Example\n");
+        Path arguments = Files.writeString(root.resolve("jenesis.plugins.arguments.properties"), "licenses.holder=Example\n");
         List<SequencedMap<String, String>> received = new ArrayList<>();
         wire(new ProjectPlugins().arguments(arguments).transforms(new LinkedHashMap<>(Map.of("licenses", values -> {
             received.add(values);
@@ -180,8 +180,8 @@ public class ProjectPluginsTest {
 
     @Test
     public void lets_the_arguments_of_an_active_profile_win() throws IOException {
-        Path arguments = Files.writeString(root.resolve("jenesis-plugins-arguments.properties"), "licenses.holder=Example\n");
-        Files.writeString(root.resolve("jenesis-plugins-arguments-release.properties"), "licenses.holder=Release\n");
+        Path arguments = Files.writeString(root.resolve("jenesis.plugins.arguments.properties"), "licenses.holder=Example\n");
+        Files.writeString(root.resolve("jenesis.plugins.arguments-release.properties"), "licenses.holder=Release\n");
         List<SequencedMap<String, String>> received = new ArrayList<>();
         wire(new ProjectPlugins().arguments(arguments).transforms(new LinkedHashMap<>(Map.of("licenses", values -> {
             received.add(values);
@@ -195,7 +195,7 @@ public class ProjectPluginsTest {
 
     @Test
     public void refuses_an_argument_for_a_plugin_it_does_not_declare() throws IOException {
-        Path arguments = Files.writeString(root.resolve("jenesis-plugins-arguments.properties"), "other.holder=Example\n");
+        Path arguments = Files.writeString(root.resolve("jenesis.plugins.arguments.properties"), "other.holder=Example\n");
         wire(new ProjectPlugins().arguments(arguments).transform("licenses", new Attach("licenses", "module-app")));
 
         assertThatThrownBy(() -> buildExecutor.execute("inspect"))
