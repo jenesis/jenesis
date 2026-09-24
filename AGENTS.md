@@ -214,8 +214,11 @@ The slots `transform` and `inspect` are not modules of a project module but
 that everything depending on `build` sees their additions and nothing runs past a failed inspection; an
 expensive one is switched off by its setting, in a profile if need be, and `jenesis.project.plugins=false` leaves
 out every plugin the file names, while `pin` still resolves those of `transform` and `inspect`: such a plugin runs
-once over the inventory of every module, is switched on by its line alone and configured by the
-`jenesis.plugin.<name>.<key>` settings, so profiles reach it and its inputs resolve against the project root, and `pin` resolves every one of them, a switched-off
+once over the inventory of every module, is switched on by its line alone and configured, never from the command
+line, by the `<name>.<key>` lines of `jenesis-plugins-arguments.properties` and of a
+`jenesis-plugins-arguments-<profile>.properties` per active profile, read when the layout knows the profiles, so an
+earlier profile wins over a later one and each over the file itself; its inputs resolve against the project root,
+and `pin` resolves every one of them, a switched-off
 one included, into `jenesis-plugins-pin.properties` rather than into a module's declaration. A transform adds a
 file to a module by naming it in an `inventory.properties` of its own as `<module>.attachment.<classifier>` or
 `<module>.report.<name>`, which `transform` collects per module and exports as its only outputs; an inspection

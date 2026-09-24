@@ -40,11 +40,11 @@ Layout
 
     demo/demo-67-transform-inspect
     |-- build/jenesis                      symlink to ../../../sources/build/jenesis
-    |-- jenesis.properties                 jenesis.plugin.notice.holder=Example Corp.
-    |                                      jenesis.plugin.notice.@legal=legal
     |-- legal/HEADER.txt                   the licence line the notice carries
     |-- jenesis-plugins.properties         notice+transform=./notice
     |                                      audit+inspect=./audit
+    |-- jenesis-plugins-arguments.properties  notice.holder=Example Corp.
+    |                                      notice.@legal=legal
     |-- jenesis-plugins-pin.properties     written by the pin goal
     |-- notice/                            the transform, compiled from source
     |-- audit/                             the inspection, compiled from source
@@ -69,14 +69,21 @@ it added, and the inspections run after all of them.
 Configuring the plugins
 -----------------------
 
-A plugin of `transform` or `inspect` reads its values from settings named
-`jenesis.plugin.<name>.<key>`, so they come from `jenesis.properties`, a profile, your
-own `~/.jenesis/jenesis.properties` or the command line, like any other setting. This
-demo's `jenesis.properties` holds
+A plugin of `transform` or `inspect` reads its values from
+`jenesis-plugins-arguments.properties` beside `jenesis-plugins.properties`, one line
+per value as `<plugin>.<key>`. This demo's holds
 
-    jenesis.plugin.notice.holder=Example Corp.
+    notice.holder=Example Corp.
+    notice.@legal=legal
 
-which reaches the plugin's `SequencedMap` constructor as `holder=Example Corp.`.
+and `holder=Example Corp.` reaches the plugin's `SequencedMap` constructor. A profile
+brings values of its own in `jenesis-plugins-arguments-<profile>.properties`, which
+win over the file without a profile:
+
+    # jenesis-plugins-arguments-release.properties, active with -Djenesis.make.profiles=release
+    notice.holder=Example Corp., all rights reserved
+
+The values come from these files alone, never from the command line.
 `-Djenesis.plugin.<name>=false` leaves a plugin out, and a profile can switch one
 back on. As the plugins run with every build, one that takes long is best switched
 off in `jenesis.properties` and on in the profile that ships:
@@ -99,7 +106,7 @@ Binding project files
 A plugin reads only what the build hands it, so a file of the project reaches it as
 an input. A key starting with `@` names one instead of a value:
 
-    jenesis.plugin.notice.@legal=legal
+    notice.@legal=legal
 
 binds the project's `legal/` folder into an input named `legal`, which the plugin
 reads as the folder `../inputs/legal`: this demo's notice takes its licence line
@@ -109,8 +116,8 @@ A target after the input's name places what is bound inside the input rather tha
 at its root, and one input takes a key per target, so it can gather several files
 and folders of the project:
 
-    jenesis.plugin.notice.@legal=legal
-    jenesis.plugin.notice.@legal/third-party/NOTICE.txt=vendor/NOTICE.txt
+    notice.@legal=legal
+    notice.@legal/third-party/NOTICE.txt=vendor/NOTICE.txt
 
 A single file keeps its name unless a target renames it, and two bindings that
 place their files at one target fail the build. A value whose key starts with `@` is
@@ -120,7 +127,10 @@ A path is resolved against the project root here, and against the module's own
 folder in a module's `plugin-<name>.properties`. Either way it has to stay within
 the project, symbolic links included:
 
-    java "-Djenesis.plugin.notice.@legal=../.." build/jenesis/Make.java stage
+    # jenesis-plugins-arguments-outside.properties
+    notice.@legal=../..
+
+    java -Djenesis.make.profiles=outside build/jenesis/Make.java stage
 
     The input @legal of the plugin notice names ..., which lies outside the project ... - name a folder the project holds
 

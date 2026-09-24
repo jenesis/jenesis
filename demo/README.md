@@ -1002,7 +1002,7 @@ produced, as `build/transform` and `build/inspect`, before anything is staged:
 A transform adds files to the modules - here a notice listing what each module
 includes, staged beside its jar - and an inspection fails the build when the
 result is wrong. Both see every module with the jars it resolved, both read their
-values from `jenesis.plugin.<name>.<key>` settings, and `pin` records their own
+values from `jenesis-plugins-arguments.properties`, and `pin` records their own
 closures in `jenesis-plugins-pin.properties`.
 
 Cross-cutting concepts

@@ -712,6 +712,14 @@ public class ProjectTest {
     }
 
     @Test
+    public void refuses_a_plugin_of_transform_whose_name_holds_a_dot() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), "the.licenses+transform=./licenses\n");
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("holding no /, . or +");
+    }
+
+    @Test
     public void refuses_a_plugin_named_for_both_transform_and_inspect() throws IOException {
         Files.writeString(root.resolve("jenesis-plugins.properties"), """
                 audit+transform=./audit
