@@ -82,7 +82,25 @@ public class ModularStagingTest {
     }
 
     @Test
-    public void refuses_an_attachment_under_a_classifier_the_build_stages_itself() throws IOException {
+    public void refuses_an_attachment_whose_file_the_build_stages_already() throws IOException {
+        Path folder = Files.createDirectory(source.resolve("foo"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module-foo.module", "demo.foo");
+        inventory.setProperty("module-foo.artifacts.0", "classes.jar");
+        inventory.setProperty("module-foo.sources.0", "sources.jar");
+        inventory.setProperty("module-foo.attachment.sources", "other.jar");
+        inventory.store(folder.resolve(Inventory.INVENTORY));
+        Files.writeString(folder.resolve("classes.jar"), "jar");
+        Files.writeString(folder.resolve("sources.jar"), "sources");
+        Files.writeString(folder.resolve("other.jar"), "other");
+
+        assertThatThrownBy(() -> run(false, folder))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("demo.foo-sources.jar is staged already");
+    }
+
+    @Test
+    public void stages_an_attachment_under_a_classifier_the_build_leaves_unused() throws IOException {
         Path folder = Files.createDirectory(source.resolve("foo"));
         SequencedProperties inventory = new SequencedProperties();
         inventory.setProperty("module-foo.module", "demo.foo");
@@ -92,9 +110,9 @@ public class ModularStagingTest {
         Files.writeString(folder.resolve("classes.jar"), "jar");
         Files.writeString(folder.resolve("other.jar"), "other");
 
-        assertThatThrownBy(() -> run(false, folder))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("as sources");
+        run(false, folder);
+
+        assertThat(next.resolve("demo.foo/demo.foo-sources.jar")).hasContent("other");
     }
 
     @Test

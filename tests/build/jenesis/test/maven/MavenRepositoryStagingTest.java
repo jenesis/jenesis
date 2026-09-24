@@ -88,7 +88,23 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
-    public void refuses_an_attachment_under_a_classifier_the_build_stages_itself() throws IOException {
+    public void refuses_an_attachment_whose_file_the_build_stages_already() throws IOException {
+        Path inv = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar", "sources.jar");
+        writeArtifact(inv, "classes.jar", "c");
+        writeArtifact(inv, "sources.jar", "s");
+        Path additions = Files.createDirectory(source.resolve("additions"));
+        SequencedProperties attached = new SequencedProperties();
+        attached.setProperty("module-foo.attachment.sources", "other-sources.jar");
+        attached.store(additions.resolve(Inventory.INVENTORY));
+        Files.writeString(additions.resolve("other-sources.jar"), "other");
+
+        assertThatThrownBy(() -> run(true, inv, additions))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("foo-1.2.3-sources.jar is staged already");
+    }
+
+    @Test
+    public void stages_an_attachment_under_a_classifier_the_build_leaves_unused() throws IOException {
         Path inv = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
         writeArtifact(inv, "classes.jar", "c");
         Path additions = Files.createDirectory(source.resolve("additions"));
@@ -97,9 +113,11 @@ public class MavenRepositoryStagingTest {
         attached.store(additions.resolve(Inventory.INVENTORY));
         Files.writeString(additions.resolve("sbom.json"), "{}");
 
-        assertThatThrownBy(() -> run(true, inv, additions))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("as cyclonedx");
+        run(true, inv, additions);
+
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-cyclonedx.json"))
+                .as("without the stock SBOM, a transform may stage its own")
+                .hasContent("{}");
     }
 
     @Test
