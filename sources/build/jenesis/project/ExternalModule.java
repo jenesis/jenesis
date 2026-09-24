@@ -137,17 +137,23 @@ public class ExternalModule implements BuildExecutorModule {
         return Optional.empty();
     }
 
+    public BuildExecutorModule resolution() {
+        return (buildExecutor, inherited) -> {
+            List<String> coordinates = new ArrayList<>(additionalDependencies.size() + 1);
+            coordinates.add(coordinate);
+            coordinates.addAll(additionalDependencies);
+            buildExecutor.addStep(COORDINATE,
+                    new WriteCoordinates(group, coordinates),
+                    inherited.sequencedKeySet().stream());
+            buildExecutor.addModule(DEPENDENCIES,
+                    dependencyModule.pinning(pinning),
+                    COORDINATE);
+        };
+    }
+
     @Override
-    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        List<String> coordinates = new ArrayList<>(additionalDependencies.size() + 1);
-        coordinates.add(coordinate);
-        coordinates.addAll(additionalDependencies);
-        buildExecutor.addStep(COORDINATE,
-                new WriteCoordinates(group, coordinates),
-                inherited.sequencedKeySet().stream());
-        buildExecutor.addModule(DEPENDENCIES,
-                dependencyModule.pinning(pinning),
-                COORDINATE);
+    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+        resolution().accept(buildExecutor, inherited);
         buildExecutor.addModule(DELEGATE, (delegateExecutor, delegated) -> {
             List<Path> artifacts = new ArrayList<>(
                     Dependencies.select(delegated.get(PREVIOUS + DEPENDENCIES), group, "runtime"));

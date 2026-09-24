@@ -149,6 +149,38 @@ public class ExternalModuleTest {
     }
 
     @Test
+    public void resolves_a_plugin_without_running_it() throws IOException {
+        Path pluginJar = compileModule(work.resolve("plugin"),
+                work.resolve("plugin.jar"),
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                Map.of("test/plugin/Plugin.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutor;
+                        import build.jenesis.BuildExecutorModule;
+                        import java.nio.file.Path;
+                        import java.util.SequencedMap;
+                        public class Plugin implements BuildExecutorModule {
+                            public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
+                                throw new IllegalStateException("must not be loaded");
+                            }
+                        }
+                        """));
+
+        buildExecutor.addModule("external", new ExternalModule(
+                "module/test.plugin",
+                null,
+                Map.of("module", versionInsensitive(Map.of(
+                        "test.plugin", pluginJar,
+                        "build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
+                .resolution());
+
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        assertThat(steps.keySet()).anyMatch(key -> key.startsWith("external/dependencies"));
+        assertThat(steps.keySet()).noneMatch(key -> key.startsWith("external/delegate"));
+    }
+
+    @Test
     public void plugin_step_can_query_predecessor_argument_change_status() throws IOException {
         Path pluginJar = compileModule(work.resolve("plugin"),
                 work.resolve("plugin.jar"),

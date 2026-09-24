@@ -18,6 +18,7 @@ import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.ProjectModuleDescriptor;
+import build.jenesis.project.ProjectPlugins;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -160,6 +161,29 @@ public class ProjectTest {
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root).target(root.resolve("target")).build())
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("No build descriptor found");
+    }
+
+    @Test
+    public void runs_transform_and_inspect_without_a_plugin_in_each_concrete_layout() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
+        Files.writeString(root.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>demo</groupId>
+                    <artifactId>empty</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        for (Project.Layout layout : List.of(Project.Layout.MAVEN, Project.Layout.MODULAR, Project.Layout.MODULAR_TO_MAVEN)) {
+            SequencedMap<String, Path> outputs = Project.ofEnvironment(new Environment(settings), root)
+                    .target(root.resolve("target-" + layout.hashCode()))
+                    .layout(layout)
+                    .build(Project.BUILD + "/" + ProjectPlugins.INSPECT);
+            assertThat(outputs.keySet())
+                    .as("build/inspect is a selector of every layout, and adds nothing without a transform or an inspection")
+                    .noneMatch(key -> key.startsWith(Project.BUILD + "/" + ProjectPlugins.TRANSFORM + "/")
+                            || key.startsWith(Project.BUILD + "/" + ProjectPlugins.INSPECT + "/"));
+        }
     }
 
     @Test
@@ -625,6 +649,77 @@ public class ProjectTest {
         Project project = Project.ofEnvironment(new Environment(Map.of("plugin.lint", "false")), root);
         assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
                 assembler -> assertThat(assembler.plugins()).containsOnlyKeys("greeting+binary/generated"));
+    }
+
+    @Test
+    public void hands_the_plugins_of_transform_and_inspect_to_the_project() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+                greeting+binary/generated=demo.greeting
+                licenses+transform=./licenses
+                audit+inspect=demo.audit@audit
+                """);
+        Project project = Project.ofEnvironment(new Environment(settings), root);
+        assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
+                assembler -> assertThat(assembler.plugins()).containsOnlyKeys("greeting+binary/generated"));
+        assertThat(project.plugins().transforms()).containsOnlyKeys("licenses");
+        assertThat(project.plugins().inspections()).containsOnlyKeys("audit");
+        assertThat(project.plugins().resolutions()).containsOnlyKeys("licenses", "audit");
+        assertThat(project.plugins().pins()).isEqualTo(root.resolve("jenesis-plugins-pin.properties"));
+    }
+
+    @Test
+    public void still_resolves_a_plugin_of_transform_or_inspect_its_setting_switches_off() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+                licenses+transform=./licenses
+                audit+inspect=demo.audit
+                """);
+        Project project = Project.ofEnvironment(new Environment(Map.of("plugin.audit", "false")), root);
+        assertThat(project.plugins().transforms()).containsOnlyKeys("licenses");
+        assertThat(project.plugins().inspections()).isEmpty();
+        assertThat(project.plugins().resolutions())
+                .as("pin must capture a plugin that only a profile switches on")
+                .containsOnlyKeys("licenses", "audit");
+    }
+
+    @Test
+    public void leaves_out_every_plugin_when_plugins_are_switched_off() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+                greeting+binary/generated=demo.greeting
+                licenses+transform=./licenses
+                audit+inspect=demo.audit
+                """);
+        Project project = Project.ofEnvironment(new Environment(Map.of("project.plugins", "false")), root);
+        assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
+                assembler -> assertThat(assembler.plugins()).isEmpty());
+        assertThat(project.plugins().transforms()).isEmpty();
+        assertThat(project.plugins().inspections()).isEmpty();
+        assertThat(project.plugins().resolutions())
+                .as("pin still pins the plugins it leaves out")
+                .containsOnlyKeys("licenses", "audit");
+    }
+
+    @Test
+    public void refuses_a_plugin_of_inspect_that_shares_its_name_with_a_module_plugin() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+                audit+check=./audit
+                audit+inspect=./audit
+                """);
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The plugin audit")
+                .hasMessageContaining("takes a name of its own");
+    }
+
+    @Test
+    public void refuses_a_plugin_named_for_both_transform_and_inspect() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+                audit+transform=./audit
+                audit+inspect=./audit
+                """);
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot add the plugin audit+inspect")
+                .hasMessageContaining("takes a name of its own");
     }
 
     @Test

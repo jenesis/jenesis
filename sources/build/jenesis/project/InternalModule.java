@@ -237,15 +237,21 @@ public class InternalModule implements BuildExecutorModule {
         return Optional.empty();
     }
 
+    public BuildExecutorModule resolution() {
+        return (buildExecutor, inherited) -> {
+            buildExecutor.addSource(SOURCE, Bind.asSources(), source);
+            buildExecutor.addStep(REQUIRES,
+                    new ParseModuleInfo(group, prefix, additionalDependencies, platform),
+                    Stream.concat(Stream.of(SOURCE), inherited.sequencedKeySet().stream()));
+            buildExecutor.addModule(DEPENDENCIES,
+                    dependencyModule.pinning(pinning),
+                    REQUIRES);
+        };
+    }
+
     @Override
-    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        buildExecutor.addSource(SOURCE, Bind.asSources(), source);
-        buildExecutor.addStep(REQUIRES,
-                new ParseModuleInfo(group, prefix, additionalDependencies, platform),
-                Stream.concat(Stream.of(SOURCE), inherited.sequencedKeySet().stream()));
-        buildExecutor.addModule(DEPENDENCIES,
-                dependencyModule.pinning(pinning),
-                REQUIRES);
+    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+        resolution().accept(buildExecutor, inherited);
         buildExecutor.addModule(JAVA,
                 new JavaToolchainModule().compiler(javacStep.group(group).asModule("javac")),
                 SOURCE,
