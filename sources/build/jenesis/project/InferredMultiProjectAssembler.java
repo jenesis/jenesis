@@ -19,6 +19,7 @@ import build.jenesis.step.JMod;
 import build.jenesis.step.JPackage;
 import build.jenesis.step.Jar;
 import build.jenesis.step.Layers;
+import build.jenesis.step.Legal;
 import build.jenesis.step.NativeImage;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
@@ -363,11 +364,13 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         documentation.apply(documentationModule),
                         Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             }
+            if (packaging.jmod() || packaging.jlink() || packaging.jpackage() != null || packaging.nativeImage()) {
+                sub.addStep("legal", Legal.ofEnvironment(environment), Stream.concat(Stream.of("binary"), closure.stream()));
+            }
             if (packaging.jmod()) {
                 sub.addStep("jmod",
                         JMod.ofEnvironment(environment, factory),
-                        Stream.of(Stream.of("binary"), descriptor.content().stream(), closure.stream())
-                                .flatMap(Function.identity()));
+                        Stream.of(Stream.of("binary", "legal"), descriptor.content().stream()).flatMap(Function.identity()));
             }
             if (!slots.get("").isEmpty()) {
                 sub.addModule("custom", (nested, nestedInherited) -> slots.get("").forEach((name, module) ->
@@ -384,14 +387,19 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             .collect(Collectors.toCollection(LinkedHashSet::new));
                     inputs.removeIf(key -> replaced.contains(local(key)));
                 }
+                SequencedSet<String> linked = new LinkedHashSet<>(inputs);
+                if (!packaging.jmod() && (packaging.jlink() || packaging.jpackage() != null)) {
+                    sub.addStep("jmod", JMod.ofEnvironment(environment, factory), inputs);
+                    linked.add("jmod");
+                }
                 if (packaging.jlink()) {
-                    sub.addStep("jlink", JLink.ofEnvironment(environment, factory), inputs);
+                    sub.addStep("jlink", JLink.ofEnvironment(environment, factory), linked);
                     images.add("jlink");
                 }
                 if (packaging.jpackage() != null) {
                     sub.addStep("jpackage", JPackage.ofEnvironment(environment, factory).type(packaging.jpackage()), packaging.jlink()
-                                ? Stream.concat(Stream.of("jlink"), inputs.stream())
-                                : inputs.stream());
+                                ? Stream.concat(Stream.of("jlink"), linked.stream())
+                                : linked.stream());
                     images.add("jpackage");
                 }
                 if (packaging.bundle()) {
