@@ -129,7 +129,6 @@ jobs:
           - { name: verify, dir: demo-67-verify, entry: build/jenesis/Make.java stage, verify: 'grep -q "Copyright Example Corp." target/stage/modular/output/demo.verify/demo.verify-notice.txt && grep -q "Apache License" target/stage/modular/output/demo.verify/demo.verify-notice.txt && find target/stage/maven -name "demo.verify-*-notice.txt" | grep -q .' }
           - { name: verify-refused, dir: demo-67-verify, entry: build/jenesis/Make.java, verify: '! java -Djenesis.plugin.notice=false build/jenesis/Make.java stage > target/refused.txt 2>&1 && grep -q "No notice is attached to demo.verify" target/refused.txt' }
           - { name: verify-outside, dir: demo-67-verify, entry: build/jenesis/Make.java, verify: '! java "-Djenesis.plugin.notice.@legal=../.." build/jenesis/Make.java stage > target/outside.txt 2>&1 && grep -q "lies outside the project" target/outside.txt' }
-          - { name: verify-execute, dir: demo-67-verify, entry: build/jenesis/Execute.java, verify: 'java build/jenesis/Execute.java | grep -q "\"verified\":true"' }
     runs-on: ${{ inputs.os }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3

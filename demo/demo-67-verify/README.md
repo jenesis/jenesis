@@ -4,7 +4,10 @@ Verify demo
 Run plugins over everything the build produced, after every module is built and
 before anything is staged: a `transform` plugin adds files to the modules, and an
 `inspect` plugin checks the result and fails the build when it is wrong. Both run in
-the `verify` goal, which `stage`, `export`, `release` and `Execute` run first.
+the `verify` goal, which `stage`, `export` and `release` run first. `build` and
+`java build/jenesis/Execute.java` leave it out, since verifying can take time the
+edit-and-run loop does not need; `java build/jenesis/Make.java verify` runs it on
+its own.
 
 Run it
 ------
@@ -32,9 +35,6 @@ Switch the transform off and the inspection refuses the build:
     java -Djenesis.plugin.notice=false build/jenesis/Make.java stage
 
     No notice is attached to demo.verify - add notice+transform to jenesis-plugins.properties, or switch it back on
-
-`java build/jenesis/Execute.java` runs `verify` as well, so the program only
-starts once its inspections pass.
 
 Layout
 ------

@@ -164,6 +164,28 @@ public class ProjectTest {
     }
 
     @Test
+    public void runs_verify_without_a_plugin_in_each_concrete_layout() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
+        Files.writeString(root.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>demo</groupId>
+                    <artifactId>empty</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        for (Project.Layout layout : List.of(Project.Layout.MAVEN, Project.Layout.MODULAR, Project.Layout.MODULAR_TO_MAVEN)) {
+            SequencedMap<String, Path> outputs = Project.ofEnvironment(new Environment(settings), root)
+                    .target(root.resolve("target-" + layout.hashCode()))
+                    .layout(layout)
+                    .build(Project.VERIFY);
+            assertThat(outputs.keySet())
+                    .as("verify is a selector of every layout, and adds nothing without a transform or an inspection")
+                    .noneMatch(key -> key.startsWith(Project.VERIFY + "/"));
+        }
+    }
+
+    @Test
     public void layout_setter_round_trips_each_concrete_layout() {
         for (Project.Layout layout : List.of(Project.Layout.MAVEN, Project.Layout.MODULAR, Project.Layout.MODULAR_TO_MAVEN)) {
             assertThat(Project.ofEnvironment(new Environment(settings), Path.of(".")).layout(layout).layout()).isSameAs(layout);
