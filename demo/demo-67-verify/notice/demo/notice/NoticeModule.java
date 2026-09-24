@@ -27,6 +27,10 @@ public class NoticeModule implements BuildExecutorModule {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
+            BuildStepArgument legal = arguments.get("../inputs/legal");
+            String header = legal == null || legal.removed()
+                    ? null
+                    : Files.readString(legal.folder().resolve("HEADER.txt")).strip();
             SequencedProperties additions = new SequencedProperties();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
@@ -44,6 +48,9 @@ public class NoticeModule implements BuildExecutorModule {
                     String prefix = key.substring(0, key.length() - ".module".length());
                     List<String> lines = new ArrayList<>();
                     lines.add(inventory.getProperty(key) + " - Copyright " + holder);
+                    if (header != null) {
+                        lines.add(header);
+                    }
                     for (String dependency : inventory.stringPropertyNames()) {
                         String index = dependency.substring(Math.min(dependency.length(), prefix.length() + ".dependency.".length()));
                         if (dependency.startsWith(prefix + ".dependency.") && index.matches("[0-9]+")
