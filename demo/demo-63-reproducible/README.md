@@ -19,7 +19,7 @@ From this directory:
 
 which builds the module and prints
 
-    classes.jar has the recorded SHA-256 9ffd4b090652995f57c15b8aa2f8080b8192d067811e28a46477eb3c8b275df1
+    classes.jar has the recorded SHA-256 e90d68a2bc7492b27c031c2235123e3a20a732cc8e5564f9a2d143d36f8a534a
 
 Layout
 ------
@@ -47,9 +47,9 @@ What keeps the bytes the same
   module declares `@jenesis.release 25`, so it records `25` on every update and
   vendor of JDK 25; a module that declares no release compiles for the release of
   the JDK running the build, with the same effect.
-- **Generated entries.** The manifest, `META-INF/NOTICE` and the embedded SBOM
-  carry no time and no machine name, and are written with the same line endings
-  on every operating system.
+- **Generated entries.** The manifest and the embedded SBOM carry no time and no
+  machine name, and are written with the same line endings on every operating
+  system.
 
 Changing the recorded time
 --------------------------
@@ -66,7 +66,7 @@ When the digest does not match
 ------------------------------
 
 A deliberate change changes the digest: to the sources, to the module's
-documentation comment (its first sentence becomes the NOTICE, the rest the SBOM's
+documentation comment after its first sentence (which becomes the SBOM's
 description), or to what Jenesis writes into a jar. Record the new digest in `build/Demo.java`. A
 mismatch on only one runner means something about that runner reached the jar;
 `unzip -Z -v` of the jar from two machines, side by side, shows which entry
