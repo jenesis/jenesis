@@ -604,11 +604,12 @@ public record Project(
                     The slots transform and inspect run a plugin once over every module built, as
                     build/transform and build/inspect, after the modules and before anything is
                     staged; switch an expensive one off with -Djenesis.plugin.<name>=false or in a
-                    profile, and every plugin with -Djenesis.project.plugins=false. Such a plugin reads jenesis.plugin.<name>.<key> settings rather than a
-                    file, and pin writes its pins to jenesis-plugins-pin.properties. A transform adds files to a
-                    module by naming them in an inventory.properties of its own, as
-                    <module>.attachment.<classifier> or <module>.report.<name>; an inspection fails the
-                    build by throwing and changes nothing it was handed.
+                    profile, and every plugin with -Djenesis.project.plugins=false. Such a plugin
+                    reads jenesis.plugin.<name>.<key> settings rather than a file, and pin writes its
+                    pins to jenesis-plugins-pin.properties. A transform adds files to a module by
+                    naming them in an inventory.properties of its own, as
+                    <module>.attachment.<classifier> or <module>.report.<name>; an inspection fails
+                    the build by throwing and changes nothing it was handed.
 
                     A project with its own entry point calls `new Make("build.Demo").run(selectors)`,
                     which returns the status to exit with. For a GraalVM native launcher, read the
