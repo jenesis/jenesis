@@ -1595,9 +1595,9 @@ public record Project(
                         Path placed = target == null
                                 ? Files.isDirectory(source) ? Path.of("") : source.getFileName()
                                 : Path.of(target).normalize();
-                        if (placed.isAbsolute() || placed.startsWith("..")) {
+                        if (placed.getRoot() != null || placed.startsWith("..")) {
                             throw new IllegalArgumentException(origin + " places its files at " + target
-                                    + " - name a folder inside the input, without ..");
+                                    + " - name a relative folder inside the input, without ..");
                         }
                         inputs.put(input, new Bind.Input(source, placed));
                     });
