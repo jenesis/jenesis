@@ -98,10 +98,6 @@ public class VerifyModule implements BuildExecutorModule {
         return inspect(name, step.asModule(name));
     }
 
-    public boolean isEmpty() {
-        return transforms.isEmpty() && inspections.isEmpty();
-    }
-
     public BuildExecutorModule resolution() {
         return (buildExecutor, _) -> {
             SequencedSet<String> inputs = pinned(buildExecutor);
@@ -118,7 +114,7 @@ public class VerifyModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-        if (isEmpty()) {
+        if (transforms.isEmpty() && inspections.isEmpty()) {
             return;
         }
         SequencedSet<String> inputs = pinned(buildExecutor);
