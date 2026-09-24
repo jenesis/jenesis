@@ -28,6 +28,7 @@ import build.jenesis.project.MultiProjectModule;
 import build.jenesis.project.ProjectModuleDescriptor;
 import build.jenesis.project.ReleaseModule;
 import build.jenesis.project.ProjectWatch;
+import build.jenesis.project.ProjectPlugins;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Bom;
 import build.jenesis.step.Dependencies;
@@ -61,6 +62,7 @@ public record Project(
         Supplier<BuildExecutor.Configuration> configurator,
         Map<String, Repository> repositories,
         Map<String, Resolver> resolvers,
+        ProjectPlugins plugins,
         Environment environment) {
 
     public static final String BUILD = "build",
@@ -150,6 +152,8 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               mavenDeps);
+                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(), "maven");
+                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(), "maven", ProjectPlugins.TRANSFORM);
             }, METADATA);
             executor.addModule(STAGE, (stage, inherited) -> {
                 stage.addStep("maven", MavenRepositoryStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
@@ -165,7 +169,7 @@ public record Project(
                     project.root(),
                     "pom.xml",
                     (path, file) -> PinPom.ofEnvironment(project.environment(), "maven", path, List.of(file), project.hashFunction()),
-                    project.hashFunction()), BUILD);
+                    project.hashFunction()).plugins(project.plugins()), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", Tree.ofEnvironment(project.environment()), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
@@ -221,6 +225,8 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
+                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(), "modules");
+                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(), "modules", ProjectPlugins.TRANSFORM);
             }, METADATA);
             executor.addModule(STAGE, (stage, inherited) -> {
                 stage.addStep("modular", ModularStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
@@ -236,7 +242,7 @@ public record Project(
             String prefix = BUILD + "/modules/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
             executor.addModule(PIN, PinModule.ofEnvironment(project.environment(), project.root(), "module-info.java",
                     (path, file) -> PinModuleInfo.ofEnvironment(project.environment(), "module", path, List.of(file), project.hashFunction()),
-                    project.hashFunction()), BUILD);
+                    project.hashFunction()).plugins(project.plugins()), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", Tree.ofEnvironment(project.environment()), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
@@ -297,6 +303,8 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
+                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(), "modules");
+                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(), "modules", ProjectPlugins.TRANSFORM);
             }, METADATA);
             executor.addModule(STAGE, (stage, inherited) -> {
                 stage.addStep("maven", MavenRepositoryStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
@@ -318,7 +326,7 @@ public record Project(
                             project.root(),
                             "module-info.java",
                             (path, file) -> PinModuleInfo.ofEnvironment(project.environment(), "module", path, List.of(file), project.hashFunction()),
-                            project.hashFunction()),
+                            project.hashFunction()).plugins(project.plugins()),
                     BUILD);
             executor.addStep(DEPENDENCIES, Tree.ofEnvironment(project.environment()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
@@ -585,6 +593,16 @@ public record Project(
                     changes what the stock steps do is an entry point of its own. A plugin runs the
                     project's code, as its tests do, so build an untrusted project with
                     -Djenesis.project.docker=true.
+
+                    The slots transform and inspect run a plugin once over every module built, as
+                    build/transform and build/inspect, after the modules and before anything is
+                    staged; switch an expensive one off with -Djenesis.plugin.<name>=false or in a
+                    profile, and every plugin with -Djenesis.project.plugins=false. Such a plugin
+                    reads jenesis.plugin.<name>.<key> settings rather than a file, and pin writes its
+                    pins to jenesis-plugins-pin.properties. A transform adds files to a module by
+                    naming them in an inventory.properties of its own, as
+                    <module>.attachment.<classifier> or <module>.report.<name>; an inspection fails
+                    the build by throwing and changes nothing it was handed.
 
                     A project with its own entry point calls `new Make("build.Demo").run(selectors)`,
                     which returns the status to exit with. For a GraalVM native launcher, read the
@@ -1018,7 +1036,7 @@ public record Project(
 
                     ## 13. Copy a demo: they are the recipe book
 
-                    66 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    67 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -1064,7 +1082,8 @@ public record Project(
                       Extending it       51 custom-assembler, 52 custom-jmod, 53 internal-module,
                                          54 external-module, 55 custom-maven, 56 custom-modular,
                                          57 custom-build (no Project at all),
-                                         58 tools-api (a build inside another program's JVM)
+                                         58 tools-api (a build inside another program's JVM),
+                                         67 transform-inspect (add to and inspect every module built)
 
                     ## 14. When stuck, read the source
 
@@ -1083,7 +1102,8 @@ public record Project(
                              Path file,
                              SequencedSet<Path> provided,
                              HashDigestFunction hashFunction,
-                             Consumer<String> printing)
+                             Consumer<String> printing,
+                             ProjectPlugins plugins)
             implements BuildExecutorModule {
 
         static PinModule ofEnvironment(Environment environment,
@@ -1105,15 +1125,20 @@ public record Project(
                                  file == null ? null : root.resolve(file).normalize(),
                                  provided,
                                  hashFunction,
-                                 environment.flag("print.divergence") ? environment.out() : null);
+                                 environment.flag("print.divergence") ? environment.out() : null,
+                                 new ProjectPlugins());
         }
 
         PinModule file(Path file) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing);
+            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, plugins);
         }
 
         PinModule provided(SequencedSet<Path> provided) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing);
+            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, plugins);
+        }
+
+        PinModule plugins(ProjectPlugins plugins) {
+            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, plugins);
         }
 
         @Override
@@ -1149,6 +1174,56 @@ public record Project(
             buildExecutor.addStep("divergence",
                     new Divergence(paths, printing),
                     new LinkedHashSet<>(inherited.sequencedKeySet()));
+            if (!plugins.resolutions().isEmpty()) {
+                SequencedSet<String> groups = new LinkedHashSet<>();
+                plugins.resolutions().keySet().forEach(name -> groups.add("plugin-" + name));
+                buildExecutor.addModule("plugins", (pinned, _) -> {
+                    pinned.addModule(ProjectPlugins.RESOLVED, plugins.resolution());
+                    pinned.addStep("file", new PluginPins(plugins.pins(), groups, hashFunction), ProjectPlugins.RESOLVED);
+                });
+            }
+        }
+    }
+
+    private record PluginPins(Path file, SequencedSet<String> groups, HashDigestFunction hashFunction) implements BuildStep {
+
+        @Override
+        public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
+            return true;
+        }
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            SequencedMap<String, String> pins = new TreeMap<>();
+            for (BuildStepArgument argument : arguments.values()) {
+                Path resolved = argument.folder().resolve(BuildStep.DEPENDENCIES);
+                if (argument.removed() || !Files.isRegularFile(resolved)) {
+                    continue;
+                }
+                SequencedProperties dependencies = SequencedProperties.ofFiles(resolved);
+                for (String key : dependencies.stringPropertyNames()) {
+                    String[] segments = key.split("/", 3);
+                    int version = segments.length < 3 ? -1 : segments[2].lastIndexOf('/');
+                    if (version <= 0 || !groups.contains(segments[0])) {
+                        continue;
+                    }
+                    String value = dependencies.getProperty(key).trim();
+                    int space = value.indexOf(' ');
+                    Path jar = argument.folder().resolve(space < 0 ? value : value.substring(0, space));
+                    String checksum = Files.isRegularFile(jar)
+                            ? hashFunction.encodedHash(jar)
+                            : space < 0 ? null : value.substring(space + 1).trim();
+                    pins.putIfAbsent(segments[0] + "/" + segments[2].substring(0, version),
+                            segments[2].substring(version + 1) + (checksum == null ? "" : " " + checksum));
+                }
+            }
+            SequencedProperties written = new SequencedProperties();
+            pins.forEach(written::setProperty);
+            written.store(file);
+            return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }
 
@@ -1395,6 +1470,7 @@ public record Project(
                 BuildExecutor.Configuration::new,
                 Map.of(),
                 Map.of(),
+                new ProjectPlugins(),
                 environment);
     }
 
@@ -1413,18 +1489,30 @@ public record Project(
 
     public static Project ofEnvironment(Environment environment, Path root) {
         InferredMultiProjectAssembler assembler = InferredMultiProjectAssembler.ofEnvironment(environment);
+        ProjectPlugins projectPlugins = new ProjectPlugins();
         Path file = root.resolve("jenesis-plugins.properties");
         if (Files.isRegularFile(file)) {
             SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+            SequencedMap<String, BuildExecutorModule> transforms = new LinkedHashMap<>(),
+                    inspections = new LinkedHashMap<>(),
+                    resolutions = new LinkedHashMap<>();
+            SequencedSet<String> modulePlugins = new LinkedHashSet<>();
             SequencedProperties declared;
             try {
                 declared = SequencedProperties.ofFiles(file);
             } catch (IOException e) {
                 throw new UncheckedIOException("Cannot read " + file, e);
             }
+            boolean switchedOn = environment.flag("project.plugins", true);
             declared.forEachProperty((key, value) -> {
                 String name = key.indexOf('+') == -1 ? key : key.substring(0, key.indexOf('+'));
-                if (!environment.flag("plugin." + name, true)) {
+                String slot = key.indexOf('+') == -1 ? "" : key.substring(key.indexOf('+') + 1);
+                boolean projectWide = slot.equals(ProjectPlugins.TRANSFORM) || slot.equals(ProjectPlugins.INSPECT);
+                if (!projectWide) {
+                    modulePlugins.add(name);
+                }
+                boolean enabled = switchedOn && environment.flag("plugin." + name, true);
+                if (!projectWide && !enabled) {
                     return;
                 }
                 String group = "plugin-" + name;
@@ -1438,27 +1526,53 @@ public record Project(
                             + " from source, followed by @<name> to select the provider annotated with that"
                             + " @BuildModuleName");
                 }
+                Function<SequencedMap<String, String>, BuildExecutorModule> plugin;
+                BuildExecutorModule resolution;
                 if (location.startsWith("./") || location.startsWith("../")) {
-                    Path source = root.resolve(location).normalize();
-                    plugins.put(key, properties -> InternalModule.ofEnvironment(environment, "module", group, source)
-                            .buildModuleName(provider)
-                            .properties(properties));
+                    InternalModule internal = InternalModule.ofEnvironment(environment, "module", group, root.resolve(location).normalize())
+                            .buildModuleName(provider);
+                    plugin = internal::properties;
+                    resolution = internal.resolution();
                 } else {
-                    Map<String, Repository> repositories = Map.of("module",
-                            JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE));
-                    Map<String, Resolver> resolvers = Map.of("module", ModularJarResolver.ofEnvironment(environment, true));
-                    plugins.put(key, properties -> ExternalModule.ofEnvironment(environment,
+                    ExternalModule external = ExternalModule.ofEnvironment(environment,
                                     "module/" + location,
                                     group,
-                                    repositories,
-                                    resolvers)
-                            .buildModuleName(provider)
-                            .properties(properties));
+                                    Map.of("module", JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE)),
+                                    Map.of("module", ModularJarResolver.ofEnvironment(environment, true)))
+                            .buildModuleName(provider);
+                    plugin = external::properties;
+                    resolution = external.resolution();
+                }
+                if (!projectWide) {
+                    plugins.put(key, plugin);
+                    return;
+                }
+                if (name.isEmpty() || name.contains("/") || resolutions.putIfAbsent(name, resolution) != null) {
+                    throw new IllegalArgumentException("Cannot add the plugin " + key + " in " + file + " - a plugin"
+                            + " of " + ProjectPlugins.TRANSFORM + " or " + ProjectPlugins.INSPECT + " takes a name of its"
+                            + " own, holding no / or +");
+                }
+                if (enabled) {
+                    SequencedMap<String, String> properties = new TreeMap<>();
+                    environment.keys().forEach((setting, configured) -> {
+                        if (setting.startsWith("plugin." + name + ".")) {
+                            properties.put(setting.substring(("plugin." + name + ".").length()), configured);
+                        }
+                    });
+                    (slot.equals(ProjectPlugins.TRANSFORM) ? transforms : inspections).put(name, plugin.apply(properties));
                 }
             });
+            for (String name : resolutions.keySet()) {
+                if (modulePlugins.contains(name)) {
+                    throw new IllegalArgumentException("The plugin " + name + " in " + file + " is named both for"
+                            + " a module slot and for " + ProjectPlugins.TRANSFORM + " or " + ProjectPlugins.INSPECT
+                            + " - a plugin of transform or inspect takes a name of its own");
+                }
+            }
             assembler = assembler.plugins(plugins);
+            projectPlugins = new ProjectPlugins(root.resolve("jenesis-plugins-pin.properties"), transforms, inspections, resolutions);
         }
-        Project project = new Project(root, assembler, environment);
+        Project project = new Project(root, assembler, environment).plugins(projectPlugins);
         String configuration = environment.getProperty("project.configuration");
         if (configuration != null) {
             project = project.configuration(locations(environment, configuration, project).toArray(Path[]::new));
@@ -1605,6 +1719,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -1633,6 +1748,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -1661,6 +1777,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -1689,6 +1806,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -1717,6 +1835,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -1745,6 +1864,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -1773,6 +1893,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -1801,6 +1922,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -1829,6 +1951,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -1857,6 +1980,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -1885,6 +2009,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -1913,6 +2038,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -1941,6 +2067,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -1969,6 +2096,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -1997,6 +2125,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -2025,6 +2154,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -2053,6 +2183,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -2081,6 +2212,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -2109,6 +2241,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -2137,6 +2270,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -2165,6 +2299,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -2193,6 +2328,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -2221,6 +2357,36 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
+                environment);
+    }
+
+    public Project plugins(ProjectPlugins plugins) {
+        return new Project(root,
+                target,
+                artifacts,
+                metadata,
+                configuration,
+                boms,
+                signatures,
+                profiles,
+                cache,
+                hashFunction,
+                layout,
+                tests,
+                sources,
+                documentation,
+                pinning,
+                version,
+                tag,
+                revision,
+                tree,
+                defaultTarget,
+                assembler,
+                configurator,
+                repositories,
+                resolvers,
+                plugins,
                 environment);
     }
 
@@ -2249,6 +2415,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
+                plugins,
                 environment);
     }
 
@@ -2304,6 +2471,7 @@ public record Project(
                 project.boms||Comma-separated locations of local pin-<name>.properties; default: the configuration folders
                 project.signatures||Comma-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
+                project.plugins|true|false leaves out every plugin that jenesis-plugins.properties names, while pin still pins those of transform and inspect
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
                 project.docker|false|Run the whole build inside a container
                 project.docker.image||Image for that container
@@ -2354,6 +2522,7 @@ public record Project(
                 pin.retain|groups|groups|all|none: which pins no closure resolved a refresh keeps - those of groups it did not resolve, all, or none
                 platform.<token>||true adds a platform token and false removes one, selecting guarded pins
                 plugin.<name>|true|false leaves out the plugin <name> that jenesis-plugins.properties names
+                plugin.<name>.<key>||The value of <key> handed to the plugin <name> of transform or inspect that jenesis-plugins.properties names
                 repository.insecure|false|Allow plaintext http:// repository fetches; only the command line or ~/.jenesis/jenesis.properties may allow it, never a file a project provides
                 repository.retries|2|Retries after a failed fetch; 0 disables
                 repository.backoff|125|Initial retry backoff in milliseconds, doubling per attempt

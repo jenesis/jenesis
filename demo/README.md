@@ -115,6 +115,7 @@ Quick index
 | 64 | [`toolchain`](demo-64-toolchain/README.md)                        | Name the JDK the build runs on, and relaunch on it                           | `java build/jenesis/Execute.java` |
 | 65 | [`native-image`](demo-65-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
 | 66 | [`jpx`](demo-66-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
+| 67 | [`transform-inspect`](demo-67-transform-inspect/README.md)        | Add files to every module built, and inspect the result before it is staged  | `java build/jenesis/Make.java stage`|
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -989,6 +990,21 @@ be pointed at a mirror with `JENESIS_REPOSITORY_URI` and `MAVEN_REPOSITORY_URI`.
 The demo runs those same commands from `java build/Demo.java`, with the
 installation directed at its own `target/` so your home directory is left alone.
 
+## 49. Checking what a build produced - [`transform-inspect`](demo-67-transform-inspect/README.md)
+
+The plugins of the `internal-module` demo join one module of the build. A plugin
+named under `transform` or `inspect` instead runs once over everything the build
+produced, as `build/transform` and `build/inspect`, before anything is staged:
+
+    notice+transform=./notice
+    audit+inspect=./audit
+
+A transform adds files to the modules - here a notice listing what each module
+includes, staged beside its jar - and an inspection fails the build when the
+result is wrong. Both see every module with the jars it resolved, both read their
+values from `jenesis.plugin.<name>.<key>` settings, and `pin` records their own
+closures in `jenesis-plugins-pin.properties`.
+
 Cross-cutting concepts
 ----------------------
 
@@ -1002,7 +1018,8 @@ A subtree rooted at a `.jenesis.skip` marker is left out of discovery.
 
 **Goals.** `build` (the default) compiles, jars and tests; `pin` records resolved
 versions and checksums back into the sources; `stage` lays the artifacts out as
-local Maven and module repositories; `export` publishes them; `dependencies`
+local Maven and module repositories, including what the transform plugins added;
+`export` publishes them; `dependencies`
 prints the resolved graph; `ide` writes IntelliJ, Eclipse and VS Code project
 files; `configuration` prints every setting with the value in force.
 `java build/jenesis/Execute.java` builds and then runs the entry point, with

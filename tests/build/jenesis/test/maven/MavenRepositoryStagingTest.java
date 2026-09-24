@@ -72,6 +72,55 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
+    public void stages_a_file_another_inventory_attaches_under_its_classifier() throws IOException {
+        Path inv = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
+        writeArtifact(inv, "classes.jar", "c");
+        Path additions = Files.createDirectory(source.resolve("additions"));
+        SequencedProperties attached = new SequencedProperties();
+        attached.setProperty("module-foo.attachment.licenses", "attachment/licenses/LICENSES.zip");
+        attached.store(additions.resolve(Inventory.INVENTORY));
+        Files.writeString(Files.createDirectories(additions.resolve("attachment/licenses")).resolve("LICENSES.zip"), "zip");
+
+        run(true, inv, additions);
+
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).hasContent("c");
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-licenses.zip")).hasContent("zip");
+    }
+
+    @Test
+    public void refuses_an_attachment_whose_file_the_build_stages_already() throws IOException {
+        Path inv = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar", "sources.jar");
+        writeArtifact(inv, "classes.jar", "c");
+        writeArtifact(inv, "sources.jar", "s");
+        Path additions = Files.createDirectory(source.resolve("additions"));
+        SequencedProperties attached = new SequencedProperties();
+        attached.setProperty("module-foo.attachment.sources", "other-sources.jar");
+        attached.store(additions.resolve(Inventory.INVENTORY));
+        Files.writeString(additions.resolve("other-sources.jar"), "other");
+
+        assertThatThrownBy(() -> run(true, inv, additions))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("foo-1.2.3-sources.jar is staged already");
+    }
+
+    @Test
+    public void stages_an_attachment_under_a_classifier_the_build_leaves_unused() throws IOException {
+        Path inv = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
+        writeArtifact(inv, "classes.jar", "c");
+        Path additions = Files.createDirectory(source.resolve("additions"));
+        SequencedProperties attached = new SequencedProperties();
+        attached.setProperty("module-foo.attachment.cyclonedx", "sbom.json");
+        attached.store(additions.resolve(Inventory.INVENTORY));
+        Files.writeString(additions.resolve("sbom.json"), "{}");
+
+        run(true, inv, additions);
+
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-cyclonedx.json"))
+                .as("without the stock SBOM, a transform may stage its own")
+                .hasContent("{}");
+    }
+
+    @Test
     public void only_existing_artifacts_are_linked() throws IOException {
         Path inv = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
         writeArtifact(inv, "classes.jar", "c");

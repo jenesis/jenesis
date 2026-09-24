@@ -36,7 +36,7 @@ public class MavenRepositoryStaging implements BuildStep {
             throws IOException {
         Collected collected = collectModules(arguments);
         Pairings pairings = pairTests(collected.stagedByArtifactId(), collected.testModules());
-        stageModules(context.next(), collected.stagedByArtifactId(), pairings);
+        stageModules(context.next(), collected.stagedByArtifactId(), pairings, Inventory.attachments(arguments.values()));
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
@@ -162,7 +162,8 @@ public class MavenRepositoryStaging implements BuildStep {
 
     private static void stageModules(Path target,
                                      SequencedMap<String, Module> stagedByArtifactId,
-                                     Pairings pairings) throws IOException {
+                                     Pairings pairings,
+                                     SequencedMap<String, SequencedMap<String, Path>> attachments) throws IOException {
         for (Module main : stagedByArtifactId.values()) {
             Coordinates coordinates = main.coordinates();
             SAFE_SEGMENT.accept("groupId", coordinates.groupId());
@@ -199,6 +200,18 @@ public class MavenRepositoryStaging implements BuildStep {
                 link(test.artifact(), baseDir.resolve(prefix + "-tests.jar"));
                 link(test.sources(), baseDir.resolve(prefix + "-tests-sources.jar"));
                 link(test.javadoc(), baseDir.resolve(prefix + "-tests-javadoc.jar"));
+            }
+            for (Map.Entry<String, Path> attachment : attachments.getOrDefault(main.prefix(), Collections.emptyNavigableMap()).entrySet()) {
+                SAFE_SEGMENT.accept("classifier", attachment.getKey());
+                String name = attachment.getValue().getFileName().toString();
+                Path staged = baseDir.resolve(prefix + "-" + attachment.getKey()
+                        + (name.lastIndexOf('.') < 0 ? "" : name.substring(name.lastIndexOf('.'))));
+                if (Files.exists(staged)) {
+                    throw new IllegalArgumentException("Cannot attach " + attachment.getValue() + " to " + main.prefix()
+                            + " as " + attachment.getKey() + " - " + staged.getFileName() + " is staged already, so give"
+                            + " the attachment another classifier or switch off what stages that file");
+                }
+                BuildStep.linkOrCopy(staged, attachment.getValue());
             }
         }
     }
