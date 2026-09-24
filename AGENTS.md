@@ -202,15 +202,16 @@ project from settings builds with its plugins, and the assembler wires a plugin 
 names, in a module only where `plugin-<name>.properties` is found in that module's configuration locations; a
 provider is created with that file's values through a public constructor taking a `SequencedMap` of them, with
 its no-argument constructor when the file is empty, and a file with values for a provider without that
-constructor fails the build. The slots `transform` and `inspect` are not modules of
-a project module but of the `verify` goal, which `stage`, `export` and `release` run first and `build` and
-`Execute` never do, because it can be expensive: such a
-plugin runs once over the inventory of every module, is switched on by its line alone and configured by the
+constructor fails the build. The slots `transform` and `inspect` are not modules of a project module but
+`build/transform` and `build/inspect`, which every layout registers inside `build` after its project module, so
+that everything depending on `build` sees their additions and nothing runs past a failed inspection; an
+expensive one is switched off by its setting, in a profile if need be: such a plugin runs once over the inventory
+of every module, is switched on by its line alone and configured by the
 `jenesis.plugin.<name>.<key>` settings, so profiles reach it, and `pin` resolves every one of them, a switched-off
 one included, into `jenesis-plugins-pin.properties` rather than into a module's declaration. A transform adds a
 file to a module by naming it in an `inventory.properties` of its own as `<module>.attachment.<classifier>` or
-`<module>.report.<name>`, which `verify` collects per module and exports as the only outputs `stage` sees
-beside the build's; an inspection fails the build by throwing, and `verify` fails it as well when
+`<module>.report.<name>`, which `transform` collects per module and exports as its only outputs; an inspection
+fails the build by throwing, and `inspect` fails it as well when
 an inspection changed a file it was handed. A plugin adds and
 never replaces: a build that changes what the stock steps do is an entry point of its own that wires its
 assembler in code. A plugin runs the project's code, as its tests and annotation processors do, so the project
