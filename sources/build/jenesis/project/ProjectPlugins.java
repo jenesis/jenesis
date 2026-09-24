@@ -12,8 +12,9 @@ import build.jenesis.step.Bind;
 import build.jenesis.step.Inventory;
 
 public record ProjectPlugins(Path pins,
-                             SequencedMap<String, BuildExecutorModule> transforms,
-                             SequencedMap<String, BuildExecutorModule> inspections,
+                             Path arguments,
+                             SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> transforms,
+                             SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> inspections,
                              SequencedMap<String, BuildExecutorModule> resolutions) {
 
     public static final String TRANSFORM = "transform",
@@ -40,23 +41,27 @@ public record ProjectPlugins(Path pins,
     }
 
     public ProjectPlugins() {
-        this(null, Collections.emptyNavigableMap(), Collections.emptyNavigableMap(), Collections.emptyNavigableMap());
+        this(null, null, Collections.emptyNavigableMap(), Collections.emptyNavigableMap(), Collections.emptyNavigableMap());
     }
 
     public ProjectPlugins pins(Path pins) {
-        return new ProjectPlugins(pins, transforms, inspections, resolutions);
+        return new ProjectPlugins(pins, arguments, transforms, inspections, resolutions);
     }
 
-    public ProjectPlugins transforms(SequencedMap<String, BuildExecutorModule> transforms) {
-        return new ProjectPlugins(pins, transforms, inspections, resolutions);
+    public ProjectPlugins arguments(Path arguments) {
+        return new ProjectPlugins(pins, arguments, transforms, inspections, resolutions);
     }
 
-    public ProjectPlugins inspections(SequencedMap<String, BuildExecutorModule> inspections) {
-        return new ProjectPlugins(pins, transforms, inspections, resolutions);
+    public ProjectPlugins transforms(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> transforms) {
+        return new ProjectPlugins(pins, arguments, transforms, inspections, resolutions);
+    }
+
+    public ProjectPlugins inspections(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> inspections) {
+        return new ProjectPlugins(pins, arguments, transforms, inspections, resolutions);
     }
 
     public ProjectPlugins resolutions(SequencedMap<String, BuildExecutorModule> resolutions) {
-        return new ProjectPlugins(pins, transforms, inspections, resolutions);
+        return new ProjectPlugins(pins, arguments, transforms, inspections, resolutions);
     }
 
     public ProjectPlugins transform(String name, BuildExecutorModule module) {
@@ -64,8 +69,8 @@ public record ProjectPlugins(Path pins,
             throw new IllegalArgumentException("A transform named " + name + " is added already - give this one"
                     + " another name");
         }
-        SequencedMap<String, BuildExecutorModule> added = new LinkedHashMap<>(transforms);
-        added.put(name, module);
+        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> added = new LinkedHashMap<>(transforms);
+        added.put(name, _ -> module);
         return transforms(added);
     }
 
@@ -78,8 +83,8 @@ public record ProjectPlugins(Path pins,
             throw new IllegalArgumentException("An inspection named " + name + " is added already - give this one"
                     + " another name");
         }
-        SequencedMap<String, BuildExecutorModule> added = new LinkedHashMap<>(inspections);
-        added.put(name, module);
+        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> added = new LinkedHashMap<>(inspections);
+        added.put(name, _ -> module);
         return inspections(added);
     }
 
@@ -96,7 +101,7 @@ public record ProjectPlugins(Path pins,
         };
     }
 
-    public BuildExecutorModule transformModule() {
+    public BuildExecutorModule transformModule(SequencedSet<Path> profiles) {
         return new BuildExecutorModule() {
             @Override
             public Optional<String> resolve(String path) {
@@ -119,10 +124,13 @@ public record ProjectPlugins(Path pins,
                         }
                     }
                 }
+                SequencedMap<String, SequencedMap<String, String>> values = arguments(profiles);
                 SequencedSet<String> previous = pinned(buildExecutor);
                 previous.addAll(inherited.sequencedKeySet());
-                for (Map.Entry<String, BuildExecutorModule> entry : transforms.entrySet()) {
-                    buildExecutor.addModule(entry.getKey(), entry.getValue(), previous);
+                for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> entry : transforms.entrySet()) {
+                    buildExecutor.addModule(entry.getKey(),
+                            entry.getValue().apply(values.getOrDefault(entry.getKey(), Collections.emptyNavigableMap())),
+                            previous);
                     previous.add(entry.getKey());
                 }
                 buildExecutor.addModule(ADDITIONS, (additions, produced) -> {
@@ -136,7 +144,7 @@ public record ProjectPlugins(Path pins,
         };
     }
 
-    public BuildExecutorModule inspectModule() {
+    public BuildExecutorModule inspectModule(SequencedSet<Path> profiles) {
         return new BuildExecutorModule() {
             @Override
             public Optional<String> resolve(String path) {
@@ -144,16 +152,19 @@ public record ProjectPlugins(Path pins,
             }
 
             @Override
-            public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
+            public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
                 if (inspections.isEmpty()) {
                     return;
                 }
+                SequencedMap<String, SequencedMap<String, String>> values = arguments(profiles);
                 buildExecutor.addStep(SEALED, new Sealed(), inherited.sequencedKeySet());
                 SequencedSet<String> available = pinned(buildExecutor);
                 available.addAll(inherited.sequencedKeySet());
                 available.add(SEALED);
-                for (Map.Entry<String, BuildExecutorModule> entry : inspections.entrySet()) {
-                    buildExecutor.addModule(entry.getKey(), entry.getValue(), available);
+                for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> entry : inspections.entrySet()) {
+                    buildExecutor.addModule(entry.getKey(),
+                            entry.getValue().apply(values.getOrDefault(entry.getKey(), Collections.emptyNavigableMap())),
+                            available);
                 }
                 SequencedSet<String> compared = new LinkedHashSet<>(inherited.sequencedKeySet());
                 compared.add(SEALED);
@@ -161,6 +172,40 @@ public record ProjectPlugins(Path pins,
                 buildExecutor.addStep(UNCHANGED, new Unchanged(new LinkedHashSet<>(inspections.sequencedKeySet())), compared);
             }
         };
+    }
+
+    private SequencedMap<String, SequencedMap<String, String>> arguments(SequencedSet<Path> profiles) throws IOException {
+        SequencedMap<String, SequencedMap<String, String>> values = new TreeMap<>();
+        if (arguments == null) {
+            return values;
+        }
+        List<Path> files = new ArrayList<>();
+        for (Path profile : profiles) {
+            String name = arguments.getFileName().toString();
+            files.add(arguments.resolveSibling(name.substring(0, name.length() - ".properties".length())
+                    + "-" + profile + ".properties"));
+        }
+        files.add(arguments);
+        for (Path file : files) {
+            if (!Files.isRegularFile(file)) {
+                continue;
+            }
+            SequencedProperties declared = SequencedProperties.ofFiles(file);
+            for (String key : declared.stringPropertyNames()) {
+                int dot = key.indexOf('.');
+                String plugin = dot == -1 ? key : key.substring(0, dot);
+                if (dot <= 0 || dot == key.length() - 1 || !resolutions.containsKey(plugin)
+                        && !transforms.containsKey(plugin) && !inspections.containsKey(plugin)) {
+                    throw new IllegalArgumentException("The argument " + key + " in " + file + " names no plugin of "
+                            + TRANSFORM + " or " + INSPECT + " - write <plugin>.<key>=<value> for one of "
+                            + Stream.of(resolutions.keySet(), transforms.keySet(), inspections.keySet())
+                                    .flatMap(Set::stream)
+                                    .collect(Collectors.toCollection(TreeSet::new)));
+                }
+                values.computeIfAbsent(plugin, _ -> new TreeMap<>()).putIfAbsent(key.substring(dot + 1), declared.getProperty(key));
+            }
+        }
+        return values;
     }
 
     private SequencedSet<String> pinned(BuildExecutor buildExecutor) {

@@ -154,8 +154,8 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               mavenDeps);
-                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(), "maven");
-                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(), "maven", ProjectPlugins.TRANSFORM);
+                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(project.profiles()), "maven");
+                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(project.profiles()), "maven", ProjectPlugins.TRANSFORM);
             }, METADATA);
             executor.addModule(STAGE, (stage, inherited) -> {
                 stage.addStep("maven", MavenRepositoryStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
@@ -228,8 +228,8 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
-                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(), "modules");
-                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(), "modules", ProjectPlugins.TRANSFORM);
+                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(project.profiles()), "modules");
+                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(project.profiles()), "modules", ProjectPlugins.TRANSFORM);
             }, METADATA);
             executor.addModule(STAGE, (stage, inherited) -> {
                 stage.addStep("modular", ModularStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
@@ -307,8 +307,8 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
-                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(), "modules");
-                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(), "modules", ProjectPlugins.TRANSFORM);
+                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(project.profiles()), "modules");
+                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(project.profiles()), "modules", ProjectPlugins.TRANSFORM);
             }, METADATA);
             executor.addModule(STAGE, (stage, inherited) -> {
                 stage.addStep("maven", MavenRepositoryStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
@@ -585,7 +585,7 @@ public record Project(
                     jenesis.toolchain.searchpath, this system's usual JDK folders unless set, and only
                     the command line or ~/.jenesis/jenesis.properties may set it. Nothing is installed.
 
-                    To add to the stock build, name plugins in jenesis-plugins.properties beside
+                    To add to the stock build, name plugins in jenesis.plugins.properties beside
                     jenesis.properties, one line each: <name>+<slot>=<module name>, or =./<folder> for
                     a plugin compiled from source, where the slot is a module of the build (check,
                     binary/generated, artifact, ...) or left out for the module build itself, and
@@ -605,8 +605,9 @@ public record Project(
                     build/transform and build/inspect, after the modules and before anything is
                     staged; switch an expensive one off with -Djenesis.plugin.<name>=false or in a
                     profile, and every plugin with -Djenesis.project.plugins=false. Such a plugin
-                    reads jenesis.plugin.<name>.<key> settings rather than a file, and pin writes its
-                    pins to jenesis-plugins-pin.properties. A transform adds files to a module by
+                    reads its values as <name>.<key> from jenesis.plugins.arguments.properties, and
+                    from a jenesis.plugins.arguments-<profile>.properties per active profile, and pin
+                    writes its pins to jenesis.plugins.pin.properties. A transform adds files to a module by
                     naming them in an inventory.properties of its own, as
                     <module>.attachment.<classifier> or <module>.report.<name>; an inspection fails
                     the build by throwing and changes nothing it was handed.
@@ -1514,12 +1515,12 @@ public record Project(
     public static Project ofEnvironment(Environment environment, Path root) {
         InferredMultiProjectAssembler assembler = InferredMultiProjectAssembler.ofEnvironment(environment);
         ProjectPlugins projectPlugins = new ProjectPlugins();
-        Path file = root.resolve("jenesis-plugins.properties");
+        Path file = root.resolve("jenesis.plugins.properties");
         if (Files.isRegularFile(file)) {
             SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
-            SequencedMap<String, BuildExecutorModule> transforms = new LinkedHashMap<>(),
-                    inspections = new LinkedHashMap<>(),
-                    resolutions = new LinkedHashMap<>();
+            SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> transforms = new LinkedHashMap<>(),
+                    inspections = new LinkedHashMap<>();
+            SequencedMap<String, BuildExecutorModule> resolutions = new LinkedHashMap<>();
             SequencedSet<String> modulePlugins = new LinkedHashSet<>();
             SequencedProperties declared;
             try {
@@ -1615,19 +1616,13 @@ public record Project(
                     plugins.put(key, plugin);
                     return;
                 }
-                if (name.isEmpty() || name.contains("/") || resolutions.putIfAbsent(name, resolution) != null) {
+                if (name.isEmpty() || name.contains("/") || name.contains(".") || resolutions.putIfAbsent(name, resolution) != null) {
                     throw new IllegalArgumentException("Cannot add the plugin " + key + " in " + file + " - a plugin"
                             + " of " + ProjectPlugins.TRANSFORM + " or " + ProjectPlugins.INSPECT + " takes a name of its"
-                            + " own, holding no / or +");
+                            + " own, holding no /, . or +");
                 }
                 if (enabled) {
-                    SequencedMap<String, String> properties = new TreeMap<>();
-                    environment.keys().forEach((setting, configured) -> {
-                        if (setting.startsWith("plugin." + name + ".")) {
-                            properties.put(setting.substring(("plugin." + name + ".").length()), configured);
-                        }
-                    });
-                    (slot.equals(ProjectPlugins.TRANSFORM) ? transforms : inspections).put(name, plugin.apply(root, properties));
+                    (slot.equals(ProjectPlugins.TRANSFORM) ? transforms : inspections).put(name, values -> plugin.apply(root, values));
                 }
             });
             for (String name : resolutions.keySet()) {
@@ -1638,7 +1633,11 @@ public record Project(
                 }
             }
             assembler = assembler.plugins(plugins);
-            projectPlugins = new ProjectPlugins(root.resolve("jenesis-plugins-pin.properties"), transforms, inspections, resolutions);
+            projectPlugins = new ProjectPlugins(root.resolve("jenesis.plugins.pin.properties"),
+                    root.resolve("jenesis.plugins.arguments.properties"),
+                    transforms,
+                    inspections,
+                    resolutions);
         }
         Project project = new Project(root, assembler, environment).plugins(projectPlugins);
         String configuration = environment.getProperty("project.configuration");
@@ -2539,7 +2538,7 @@ public record Project(
                 project.boms||Comma-separated locations of local pin-<name>.properties; default: the configuration folders
                 project.signatures||Comma-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
-                project.plugins|true|false leaves out every plugin that jenesis-plugins.properties names, while pin still pins those of transform and inspect
+                project.plugins|true|false leaves out every plugin that jenesis.plugins.properties names, while pin still pins those of transform and inspect
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
                 project.docker|false|Run the whole build inside a container
                 project.docker.image||Image for that container
@@ -2591,8 +2590,7 @@ public record Project(
                 pin.bom|keep|keep|flatten: whether pinning keeps BOM references or resolves them away
                 pin.retain|groups|groups|all|none: which pins no closure resolved a refresh keeps - those of groups it did not resolve, all, or none
                 platform.<token>||true adds a platform token and false removes one, selecting guarded pins
-                plugin.<name>|true|false leaves out the plugin <name> that jenesis-plugins.properties names
-                plugin.<name>.<key>||The value of <key> handed to the plugin <name> of transform or inspect that jenesis-plugins.properties names
+                plugin.<name>|true|false leaves out the plugin <name> that jenesis.plugins.properties names
                 repository.insecure|false|Allow plaintext http:// repository fetches; only the command line or ~/.jenesis/jenesis.properties may allow it, never a file a project provides
                 repository.retries|2|Retries after a failed fetch; 0 disables
                 repository.backoff|125|Initial retry backoff in milliseconds, doubling per attempt
