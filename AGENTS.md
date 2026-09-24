@@ -192,7 +192,7 @@ before it is chosen. The search path decides what the build executes, so `Make.s
 every file a project provides: a new way to read properties keeps that rule, and the relaunch
 never takes a JVM option that configuration could supply.
 
-**`jenesis-plugins.properties` adds to the stock build.** It sits beside `jenesis.properties` and names one plugin
+**`jenesis.plugins.properties` adds to the stock build.** It sits beside `jenesis.properties` and names one plugin
 per line, `<name>+<slot>=<module>`, or `<name>=<module>` for the module build itself: a value starting with `./`
 is a folder of the project compiled from source by an `InternalModule`, anything else a module name an `ExternalModule`
 resolves as `module/<name>` through the Jenesis module repository, whatever the project's layout, with its closure
@@ -214,9 +214,12 @@ The slots `transform` and `inspect` are not modules of a project module but
 that everything depending on `build` sees their additions and nothing runs past a failed inspection; an
 expensive one is switched off by its setting, in a profile if need be, and `jenesis.project.plugins=false` leaves
 out every plugin the file names, while `pin` still resolves those of `transform` and `inspect`: such a plugin runs
-once over the inventory of every module, is switched on by its line alone and configured by the
-`jenesis.plugin.<name>.<key>` settings, so profiles reach it and its inputs resolve against the project root, and `pin` resolves every one of them, a switched-off
-one included, into `jenesis-plugins-pin.properties` rather than into a module's declaration. A transform adds a
+once over the inventory of every module, is switched on by its line alone and configured, never from the command
+line, by the `<name>.<key>` lines of `jenesis.plugins.arguments.properties` and of a
+`jenesis.plugins.arguments-<profile>.properties` per active profile, read when the layout knows the profiles, so an
+earlier profile wins over a later one and each over the file itself; its inputs resolve against the project root,
+and `pin` resolves every one of them, a switched-off
+one included, into `jenesis.plugins.pin.properties` rather than into a module's declaration. A transform adds a
 file to a module by naming it in an `inventory.properties` of its own as `<module>.attachment.<classifier>` or
 `<module>.report.<name>`, which `transform` collects per module and exports as its only outputs; an inspection
 fails the build by throwing, and `inspect` fails it as well when

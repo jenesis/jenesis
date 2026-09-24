@@ -632,7 +632,7 @@ public class ProjectTest {
 
     @Test
     public void reads_the_plugins_named_beside_jenesis_properties() throws IOException {
-        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+        Files.writeString(root.resolve("jenesis.plugins.properties"), """
                 lint+check=./lint@lint
                 greeting+binary/generated=demo.greeting
                 """);
@@ -643,7 +643,7 @@ public class ProjectTest {
 
     @Test
     public void leaves_out_a_plugin_its_setting_switches_off() throws IOException {
-        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+        Files.writeString(root.resolve("jenesis.plugins.properties"), """
                 lint+check=./lint
                 greeting+binary/generated=demo.greeting
                 """);
@@ -654,7 +654,7 @@ public class ProjectTest {
 
     @Test
     public void hands_the_plugins_of_transform_and_inspect_to_the_project() throws IOException {
-        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+        Files.writeString(root.resolve("jenesis.plugins.properties"), """
                 greeting+binary/generated=demo.greeting
                 licenses+transform=./licenses
                 audit+inspect=demo.audit@audit
@@ -665,12 +665,12 @@ public class ProjectTest {
         assertThat(project.plugins().transforms()).containsOnlyKeys("licenses");
         assertThat(project.plugins().inspections()).containsOnlyKeys("audit");
         assertThat(project.plugins().resolutions()).containsOnlyKeys("licenses", "audit");
-        assertThat(project.plugins().pins()).isEqualTo(root.resolve("jenesis-plugins-pin.properties"));
+        assertThat(project.plugins().pins()).isEqualTo(root.resolve("jenesis.plugins.pin.properties"));
     }
 
     @Test
     public void still_resolves_a_plugin_of_transform_or_inspect_its_setting_switches_off() throws IOException {
-        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+        Files.writeString(root.resolve("jenesis.plugins.properties"), """
                 licenses+transform=./licenses
                 audit+inspect=demo.audit
                 """);
@@ -684,7 +684,7 @@ public class ProjectTest {
 
     @Test
     public void leaves_out_every_plugin_when_plugins_are_switched_off() throws IOException {
-        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+        Files.writeString(root.resolve("jenesis.plugins.properties"), """
                 greeting+binary/generated=demo.greeting
                 licenses+transform=./licenses
                 audit+inspect=demo.audit
@@ -701,7 +701,7 @@ public class ProjectTest {
 
     @Test
     public void refuses_a_plugin_of_inspect_that_shares_its_name_with_a_module_plugin() throws IOException {
-        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+        Files.writeString(root.resolve("jenesis.plugins.properties"), """
                 audit+check=./audit
                 audit+inspect=./audit
                 """);
@@ -712,8 +712,16 @@ public class ProjectTest {
     }
 
     @Test
+    public void refuses_a_plugin_of_transform_whose_name_holds_a_dot() throws IOException {
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "the.licenses+transform=./licenses\n");
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("holding no /, . or +");
+    }
+
+    @Test
     public void refuses_a_plugin_named_for_both_transform_and_inspect() throws IOException {
-        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+        Files.writeString(root.resolve("jenesis.plugins.properties"), """
                 audit+transform=./audit
                 audit+inspect=./audit
                 """);
@@ -809,7 +817,7 @@ public class ProjectTest {
 
     @Test
     public void refuses_a_plugin_compiled_from_a_folder_outside_the_project() throws IOException {
-        Files.writeString(root.resolve("jenesis-plugins.properties"), "gen+check=../gen\n");
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "gen+check=../gen\n");
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The plugin gen+check")
@@ -818,7 +826,7 @@ public class ProjectTest {
 
     private BuildExecutorModule plugin(String... declarations) throws IOException {
         Files.createDirectories(root.resolve("gen"));
-        Files.writeString(root.resolve("jenesis-plugins.properties"), "gen+check=./gen\n");
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "gen+check=./gen\n");
         InferredMultiProjectAssembler assembler = (InferredMultiProjectAssembler) Project.ofEnvironment(new Environment(settings), root)
                 .assembler();
         SequencedMap<String, String> values = new LinkedHashMap<>();
@@ -830,7 +838,7 @@ public class ProjectTest {
 
     @Test
     public void refuses_a_plugin_that_selects_a_provider_without_a_name() throws IOException {
-        Files.writeString(root.resolve("jenesis-plugins.properties"), "lint+check=./lint@\n");
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "lint+check=./lint@\n");
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The plugin lint+check")
@@ -839,7 +847,7 @@ public class ProjectTest {
 
     @Test
     public void refuses_a_plugin_that_names_nothing() throws IOException {
-        Files.writeString(root.resolve("jenesis-plugins.properties"), "lint+check=\n");
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "lint+check=\n");
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The plugin lint+check")
