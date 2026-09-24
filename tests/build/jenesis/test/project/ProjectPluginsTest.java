@@ -13,13 +13,13 @@ import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.SequencedProperties;
-import build.jenesis.project.VerifyModule;
+import build.jenesis.project.ProjectPlugins;
 import build.jenesis.step.Inventory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class VerifyModuleTest {
+public class ProjectPluginsTest {
 
     @TempDir
     private Path root;
@@ -45,11 +45,11 @@ public class VerifyModuleTest {
 
     @Test
     public void adds_what_a_transform_attaches_to_the_inventory_of_its_module() throws IOException {
-        buildExecutor.addModule("verify", new VerifyModule().transform("licenses", new Attach("licenses", "module-app")), "build");
+        wire(new ProjectPlugins().transform("licenses", new Attach("licenses", "module-app")));
 
-        SequencedMap<String, Path> result = buildExecutor.execute("verify");
+        SequencedMap<String, Path> result = buildExecutor.execute("inspect");
 
-        Path additions = result.get("verify/additions/module-app");
+        Path additions = result.get("transform/additions/module-app");
         assertThat(additions).isNotNull();
         assertThat(SequencedProperties.ofFiles(additions.resolve(Inventory.INVENTORY)).getProperty("module-app.attachment.licenses"))
                 .isEqualTo("attachment/licenses/licenses.txt");
@@ -58,32 +58,32 @@ public class VerifyModuleTest {
 
     @Test
     public void exports_nothing_but_the_additions() {
-        buildExecutor.addModule("verify", new VerifyModule()
+        wire(new ProjectPlugins()
                 .transform("licenses", new Attach("licenses", "module-app"))
-                .inspect("audit", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true))), "build");
+                .inspect("audit", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true))));
 
-        SequencedMap<String, Path> result = buildExecutor.execute("verify");
+        SequencedMap<String, Path> result = buildExecutor.execute("inspect");
 
-        assertThat(result.keySet().stream().filter(key -> key.startsWith("verify/")))
-                .containsExactly("verify/additions/module-app");
+        assertThat(result.keySet().stream().filter(key -> key.startsWith("transform/") || key.startsWith("inspect/")))
+                .containsExactly("transform/additions/module-app");
     }
 
     @Test
     public void runs_each_transform_after_the_ones_declared_before_it() throws IOException {
-        buildExecutor.addModule("verify", new VerifyModule()
+        wire(new ProjectPlugins()
                 .transform("licenses", new Attach("licenses", "module-app"))
-                .transform("notice", new AttachAfter("notice", "licenses.txt")), "build");
+                .transform("notice", new AttachAfter("notice", "licenses.txt")));
 
-        SequencedMap<String, Path> result = buildExecutor.execute("verify");
+        SequencedMap<String, Path> result = buildExecutor.execute("inspect");
 
-        assertThat(result.get("verify/additions/module-app").resolve("attachment/notice/notice.txt")).hasContent("notice");
+        assertThat(result.get("transform/additions/module-app").resolve("attachment/notice/notice.txt")).hasContent("notice");
     }
 
     @Test
     public void refuses_an_addition_for_a_module_the_build_does_not_have() {
-        buildExecutor.addModule("verify", new VerifyModule().transform("licenses", new Attach("licenses", "module-other")), "build");
+        wire(new ProjectPlugins().transform("licenses", new Attach("licenses", "module-other")));
 
-        assertThatThrownBy(() -> buildExecutor.execute("verify"))
+        assertThatThrownBy(() -> buildExecutor.execute("inspect"))
                 .isInstanceOf(BuildExecutorException.class)
                 .rootCause()
                 .isInstanceOf(IllegalArgumentException.class)
@@ -92,15 +92,15 @@ public class VerifyModuleTest {
 
     @Test
     public void refuses_an_addition_that_is_neither_an_attachment_nor_a_report() {
-        buildExecutor.addModule("verify", new VerifyModule().transform("runtime", (_, context, _) -> {
+        wire(new ProjectPlugins().transform("runtime", (_, context, _) -> {
             Files.writeString(context.next().resolve("extra.jar"), "jar");
             SequencedProperties inventory = new SequencedProperties();
             inventory.setProperty("module-app.runtime.1", "extra.jar");
             inventory.store(context.next().resolve(Inventory.INVENTORY));
             return CompletableFuture.completedStage(new BuildStepResult(true));
-        }), "build");
+        }));
 
-        assertThatThrownBy(() -> buildExecutor.execute("verify"))
+        assertThatThrownBy(() -> buildExecutor.execute("inspect"))
                 .isInstanceOf(BuildExecutorException.class)
                 .rootCause()
                 .isInstanceOf(IllegalArgumentException.class)
@@ -109,11 +109,11 @@ public class VerifyModuleTest {
 
     @Test
     public void fails_the_build_when_an_inspection_fails() {
-        buildExecutor.addModule("verify", new VerifyModule().inspect("audit", (_, _, _) -> {
+        wire(new ProjectPlugins().inspect("audit", (_, _, _) -> {
             throw new IllegalStateException("no licence for app");
-        }), "build");
+        }));
 
-        assertThatThrownBy(() -> buildExecutor.execute("verify"))
+        assertThatThrownBy(() -> buildExecutor.execute("inspect"))
                 .isInstanceOf(BuildExecutorException.class)
                 .rootCause()
                 .hasMessage("no licence for app");
@@ -121,16 +121,16 @@ public class VerifyModuleTest {
 
     @Test
     public void inspects_the_additions_of_the_transforms() {
-        buildExecutor.addModule("verify", new VerifyModule()
+        wire(new ProjectPlugins()
                 .transform("licenses", new Attach("licenses", "module-app"))
-                .inspect("audit", new RequireFile("licenses.txt")), "build");
+                .inspect("audit", new RequireFile("licenses.txt")));
 
-        assertThat(buildExecutor.execute("verify")).containsKey("verify/additions/module-app");
+        assertThat(buildExecutor.execute("inspect")).containsKey("transform/additions/module-app");
     }
 
     @Test
     public void fails_the_build_when_an_inspection_changes_what_it_inspects() {
-        buildExecutor.addModule("verify", new VerifyModule().inspect("audit", (_, _, arguments) -> {
+        wire(new ProjectPlugins().inspect("audit", (_, _, arguments) -> {
             for (BuildStepArgument argument : arguments.values()) {
                 Path jar = argument.folder().resolve("app.jar");
                 if (Files.isRegularFile(jar)) {
@@ -138,9 +138,9 @@ public class VerifyModuleTest {
                 }
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
-        }), "build");
+        }));
 
-        assertThatThrownBy(() -> buildExecutor.execute("verify"))
+        assertThatThrownBy(() -> buildExecutor.execute("inspect"))
                 .isInstanceOf(BuildExecutorException.class)
                 .rootCause()
                 .isInstanceOf(IllegalStateException.class)
@@ -150,18 +150,30 @@ public class VerifyModuleTest {
 
     @Test
     public void adds_nothing_without_a_transform_or_an_inspection() {
-        buildExecutor.addModule("verify", new VerifyModule(), "build");
+        wire(new ProjectPlugins());
 
-        assertThat(buildExecutor.execute("verify").keySet().stream().filter(key -> key.startsWith("verify/"))).isEmpty();
+        assertThat(buildExecutor.execute("inspect").keySet().stream().filter(key -> key.startsWith("transform/") || key.startsWith("inspect/"))).isEmpty();
     }
 
     @Test
     public void refuses_a_second_transform_of_the_same_name() {
-        VerifyModule verify = new VerifyModule().transform("licenses", new Attach("licenses", "module-app"));
+        ProjectPlugins plugins = new ProjectPlugins().transform("licenses", new Attach("licenses", "module-app"));
 
-        assertThatThrownBy(() -> verify.transform("licenses", new Attach("notice", "module-app")))
+        assertThatThrownBy(() -> plugins.transform("licenses", new Attach("notice", "module-app")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("A transform named licenses is added already");
+    }
+
+    @Test
+    public void refuses_a_transform_named_like_a_step_of_its_own() {
+        assertThatThrownBy(() -> new ProjectPlugins().transform("additions", new Attach("licenses", "module-app")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Cannot add a transform named additions");
+    }
+
+    private void wire(ProjectPlugins plugins) {
+        buildExecutor.addModule("transform", plugins.transformModule(), "build");
+        buildExecutor.addModule("inspect", plugins.inspectModule(), "build", "transform");
     }
 
     private record Attach(String classifier, String prefix) implements BuildStep {
