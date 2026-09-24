@@ -129,7 +129,9 @@ and naming them in an `inventory.properties` there, under the module's prefix:
 `<module>.attachment.<classifier>` is staged beside the module's jar under that
 classifier, and `<module>.report.<name>` is staged with the module's reports. A
 transform adds and never replaces: an inventory naming anything else, or a module
-the build does not have, fails the build.
+the build does not have, fails the build, and so does an attachment whose file the
+build stages already. A transform that brings its own SBOM, say, attaches it as
+`cyclonedx` once `-Djenesis.sbom.cyclonedx=false` has switched off the stock one.
 
 An inspection reads the same inventories plus what the transforms added, and
 fails the build by throwing. It writes only into its own output: one that

@@ -195,23 +195,23 @@ public class MavenRepositoryStaging implements BuildStep {
                 int dot = name.lastIndexOf('.');
                 link(main.sbom(), baseDir.resolve(prefix + "-cyclonedx" + (dot < 0 ? "" : name.substring(dot))));
             }
-            for (Map.Entry<String, Path> attachment : attachments.getOrDefault(main.prefix(), Collections.emptyNavigableMap()).entrySet()) {
-                String classifier = attachment.getKey();
-                SAFE_SEGMENT.accept("classifier", classifier);
-                if (Set.of("sources", "javadoc", "cyclonedx", "tests", "tests-sources", "tests-javadoc").contains(classifier)) {
-                    throw new IllegalArgumentException("Cannot attach " + attachment.getValue() + " to " + main.prefix()
-                            + " as " + classifier + " - the build stages its own file under that classifier, so give"
-                            + " the attachment another one");
-                }
-                String name = attachment.getValue().getFileName().toString();
-                int dot = name.lastIndexOf('.');
-                link(attachment.getValue(), baseDir.resolve(prefix + "-" + classifier + (dot < 0 ? "" : name.substring(dot))));
-            }
             Module test = pairings.testByMain().get(coordinates.artifactId());
             if (test != null) {
                 link(test.artifact(), baseDir.resolve(prefix + "-tests.jar"));
                 link(test.sources(), baseDir.resolve(prefix + "-tests-sources.jar"));
                 link(test.javadoc(), baseDir.resolve(prefix + "-tests-javadoc.jar"));
+            }
+            for (Map.Entry<String, Path> attachment : attachments.getOrDefault(main.prefix(), Collections.emptyNavigableMap()).entrySet()) {
+                SAFE_SEGMENT.accept("classifier", attachment.getKey());
+                String name = attachment.getValue().getFileName().toString();
+                Path staged = baseDir.resolve(prefix + "-" + attachment.getKey()
+                        + (name.lastIndexOf('.') < 0 ? "" : name.substring(name.lastIndexOf('.'))));
+                if (Files.exists(staged)) {
+                    throw new IllegalArgumentException("Cannot attach " + attachment.getValue() + " to " + main.prefix()
+                            + " as " + attachment.getKey() + " - " + staged.getFileName() + " is staged already, so give"
+                            + " the attachment another classifier or switch off what stages that file");
+                }
+                BuildStep.linkOrCopy(staged, attachment.getValue());
             }
         }
     }
