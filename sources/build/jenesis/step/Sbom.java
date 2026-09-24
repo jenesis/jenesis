@@ -169,7 +169,6 @@ public class Sbom implements BuildStep {
         try (OutputStream out = Files.newOutputStream(context.next().resolve(Versions.MANIFEST))) {
             manifest.write(out);
         }
-        Files.writeString(context.next().resolve(RESOURCES).resolve("META-INF").resolve("NOTICE"), notice(metadata));
         Path standalone = Files.createDirectories(context.next().resolve(REPORTS + "sbom"));
         Files.writeString(standalone.resolve(base + (version == null ? "" : "-" + version) + "." + format.extension()), document);
         return CompletableFuture.completedStage(new BuildStepResult(true));
@@ -365,26 +364,6 @@ public class Sbom implements BuildStep {
             }
         }
         return references;
-    }
-
-    private static String notice(SequencedProperties metadata) {
-        String name = metadata.getProperty("name");
-        StringBuilder builder = new StringBuilder(name == null
-                ? metadata.getProperty("project") + ":" + metadata.getProperty("artifact")
-                : name);
-        builder.append("\n");
-        String url = metadata.getProperty("url");
-        if (url != null) {
-            builder.append(url).append("\n");
-        }
-        for (License license : ownLicenses(metadata)) {
-            builder.append("\nLicensed under ").append(license.name() == null ? "" : license.name());
-            if (license.url() != null) {
-                builder.append(" (").append(license.url()).append(")");
-            }
-            builder.append("\n");
-        }
-        return builder.toString();
     }
 
     private static String swhid(List<Path> roots) throws IOException {
