@@ -22,6 +22,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
     private final boolean documentation;
     private final Pinning pinning;
     private final PathPlacement pathPlacement;
+    private final Path location;
 
     public ProjectModuleDescriptor(ProjectModule base) {
         this(base.name(),
@@ -38,7 +39,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 false,
                 false,
                 null,
-                PathPlacement.INFERRED);
+                PathPlacement.INFERRED,
+                null);
     }
 
     private ProjectModuleDescriptor(String name,
@@ -55,7 +57,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                                     boolean source,
                                     boolean documentation,
                                     Pinning pinning,
-                                    PathPlacement pathPlacement) {
+                                    PathPlacement pathPlacement,
+                                    Path location) {
         this.name = name;
         this.configuration = configuration;
         this.dependencies = dependencies;
@@ -71,6 +74,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
         this.documentation = documentation;
         this.pinning = pinning;
         this.pathPlacement = pathPlacement;
+        this.location = location;
     }
 
     public SequencedSet<Path> configuration() {
@@ -92,7 +96,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 source,
                 documentation,
                 pinning,
-                pathPlacement);
+                pathPlacement,
+                location);
     }
 
     public ProjectModuleDescriptor configuration(Path... configuration) {
@@ -114,7 +119,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 source,
                 documentation,
                 pinning,
-                pathPlacement);
+                pathPlacement,
+                location);
     }
 
     @Override
@@ -137,7 +143,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 source,
                 documentation,
                 pinning,
-                pathPlacement);
+                pathPlacement,
+                location);
     }
 
     @Override
@@ -160,7 +167,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 source,
                 documentation,
                 pinning,
-                pathPlacement);
+                pathPlacement,
+                location);
     }
 
     public ProjectModuleDescriptor dependencies(String... dependencies) {
@@ -187,7 +195,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 source,
                 documentation,
                 pinning,
-                pathPlacement);
+                pathPlacement,
+                location);
     }
 
     public ProjectModuleDescriptor sources(String... sources) {
@@ -214,7 +223,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 source,
                 documentation,
                 pinning,
-                pathPlacement);
+                pathPlacement,
+                location);
     }
 
     public ProjectModuleDescriptor resources(String... resources) {
@@ -241,7 +251,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 source,
                 documentation,
                 pinning,
-                pathPlacement);
+                pathPlacement,
+                location);
     }
 
     public ProjectModuleDescriptor manifests(String... manifests) {
@@ -268,7 +279,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 source,
                 documentation,
                 pinning,
-                pathPlacement);
+                pathPlacement,
+                location);
     }
 
     public ProjectModuleDescriptor coordinates(String... coordinates) {
@@ -300,7 +312,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 source,
                 documentation,
                 pinning,
-                pathPlacement);
+                pathPlacement,
+                location);
     }
 
     public ProjectModuleDescriptor artifacts(String... artifacts) {
@@ -326,7 +339,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 source,
                 documentation,
                 pinning,
-                pathPlacement);
+                pathPlacement,
+                location);
     }
 
     public ProjectModuleDescriptor content(String... content) {
@@ -352,7 +366,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 source,
                 documentation,
                 pinning,
-                pathPlacement);
+                pathPlacement,
+                location);
     }
 
     public boolean source() {
@@ -374,7 +389,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 source,
                 documentation,
                 pinning,
-                pathPlacement);
+                pathPlacement,
+                location);
     }
 
     public boolean documentation() {
@@ -396,7 +412,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 source,
                 documentation,
                 pinning,
-                pathPlacement);
+                pathPlacement,
+                location);
     }
 
     public Pinning pinning() {
@@ -418,11 +435,35 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 source,
                 documentation,
                 pinning,
-                pathPlacement);
+                pathPlacement,
+                location);
     }
 
     public PathPlacement pathPlacement() {
         return pathPlacement;
+    }
+
+    public Path location() {
+        return location;
+    }
+
+    public ProjectModuleDescriptor location(Path location) {
+        return new ProjectModuleDescriptor(name,
+                configuration,
+                dependencies,
+                sources,
+                resources,
+                manifests,
+                coordinates,
+                artifacts,
+                spdx,
+                content,
+                test,
+                source,
+                documentation,
+                pinning,
+                pathPlacement,
+                location);
     }
 
     public ProjectModuleDescriptor pathPlacement(PathPlacement pathPlacement) {
@@ -440,7 +481,8 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 source,
                 documentation,
                 pinning,
-                pathPlacement);
+                pathPlacement,
+                location);
     }
 
     private static <T> SequencedSet<T> immutable(SequencedSet<T> values) {

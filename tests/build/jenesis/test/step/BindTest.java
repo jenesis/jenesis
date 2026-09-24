@@ -2,11 +2,16 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.BuildExecutor;
+import build.jenesis.BuildExecutorCache;
+import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.BuildStepHashFunction;
+import build.jenesis.HashDigestFunction;
 import build.jenesis.step.Bind;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -23,6 +28,27 @@ public class BindTest {
         next = Files.createDirectory(root.resolve("next"));
         supplement = Files.createDirectory(root.resolve("supplement"));
         original = Files.createDirectory(root.resolve("original"));
+    }
+
+    @Test
+    public void binds_several_sources_into_one_input_at_their_targets() throws IOException {
+        Path schemas = Files.createDirectory(root.resolve("schemas"));
+        Files.writeString(schemas.resolve("order.xsd"), "<order/>");
+        Path catalog = Files.writeString(root.resolve("catalog.xml"), "<catalog/>");
+        SequencedMap<Path, Path> bindings = new LinkedHashMap<>();
+        bindings.put(Path.of(""), schemas);
+        bindings.put(Path.of("xjc/catalog.xml"), catalog);
+        BuildExecutor buildExecutor = BuildExecutor.of(root.resolve("target"),
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+        buildExecutor.addModule("inputs", Bind.asInputs(new LinkedHashMap<>(Map.of("contracts", bindings))));
+
+        Path input = buildExecutor.execute().get("inputs/contracts");
+
+        assertThat(input.resolve("order.xsd")).content().isEqualTo("<order/>");
+        assertThat(input.resolve("xjc/catalog.xml")).content().isEqualTo("<catalog/>");
     }
 
     @Test

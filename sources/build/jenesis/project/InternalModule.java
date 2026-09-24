@@ -27,7 +27,8 @@ public class InternalModule implements BuildExecutorModule {
 
     public static final String SOURCE = "source",
             JAVA = "java",
-            DELEGATE = "delegate";
+            DELEGATE = "delegate",
+            INPUTS = "inputs";
     private static final String DEPENDENCIES = "dependencies", REQUIRES = "requires";
     private static final String MAIN_ARTIFACTS = JAVA + "/" + JavaToolchainModule.ARTIFACTS;
 
@@ -41,6 +42,7 @@ public class InternalModule implements BuildExecutorModule {
     private final String group;
     private final Platform platform;
     private final SequencedMap<String, String> properties;
+    private final SequencedMap<String, SequencedMap<Path, Path>> inputs;
 
     public InternalModule(String prefix, String group, Path source) {
         this(prefix,
@@ -64,6 +66,7 @@ public class InternalModule implements BuildExecutorModule {
                 null,
                 group,
                 new Platform(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap());
     }
 
@@ -81,6 +84,7 @@ public class InternalModule implements BuildExecutorModule {
                 null,
                 group == null ? "main" : group,
                 Platform.ofEnvironment(environment),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap());
     }
 
@@ -94,7 +98,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                inputs);
     }
 
     public InternalModule resolvers(Map<String, Resolver> resolvers) {
@@ -107,7 +112,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                inputs);
     }
 
     public InternalModule group(String group) {
@@ -120,7 +126,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                inputs);
     }
 
     private InternalModule(String prefix,
@@ -132,7 +139,8 @@ public class InternalModule implements BuildExecutorModule {
                            Pinning pinning,
                            String group,
                            Platform platform,
-                           SequencedMap<String, String> properties) {
+                           SequencedMap<String, String> properties,
+                           SequencedMap<String, SequencedMap<Path, Path>> inputs) {
         this.prefix = prefix;
         this.source = source;
         this.dependencyModule = dependencyModule;
@@ -143,6 +151,7 @@ public class InternalModule implements BuildExecutorModule {
         this.group = group;
         this.platform = platform;
         this.properties = properties;
+        this.inputs = inputs;
     }
 
     public InternalModule dependencies(String... dependencies) {
@@ -155,7 +164,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                inputs);
     }
 
     public InternalModule dependencies(SequencedSet<String> dependencies) {
@@ -168,7 +178,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                inputs);
     }
 
     public InternalModule buildModuleName(String name) {
@@ -181,7 +192,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                inputs);
     }
 
     public InternalModule platform(Platform platform) {
@@ -194,7 +206,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                inputs);
     }
 
     public InternalModule pinning(Pinning pinning) {
@@ -207,7 +220,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                inputs);
     }
 
     public InternalModule properties(SequencedMap<String, String> properties) {
@@ -220,7 +234,22 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                inputs);
+    }
+
+    public InternalModule inputs(SequencedMap<String, SequencedMap<Path, Path>> inputs) {
+        return new InternalModule(prefix,
+                source,
+                dependencyModule,
+                javacStep,
+                additionalDependencies,
+                buildModuleName,
+                pinning,
+                group,
+                platform,
+                properties,
+                inputs);
     }
 
     @Override
@@ -256,6 +285,9 @@ public class InternalModule implements BuildExecutorModule {
                 new JavaToolchainModule().compiler(javacStep.group(group).asModule("javac")),
                 SOURCE,
                 DEPENDENCIES);
+        if (!inputs.isEmpty()) {
+            buildExecutor.addModule(INPUTS, Bind.asInputs(inputs));
+        }
         buildExecutor.addModule(DELEGATE, (delegateExecutor, delegated) -> {
             Path mainArtifacts = delegated.get(PREVIOUS + MAIN_ARTIFACTS).resolve(BuildStep.ARTIFACTS);
             List<Path> artifacts = new ArrayList<>();
@@ -278,7 +310,8 @@ public class InternalModule implements BuildExecutorModule {
             forwarded.remove(PREVIOUS + MAIN_ARTIFACTS);
             forwarded.remove(PREVIOUS + DEPENDENCIES);
             bridge.accept(foreignModule, delegateExecutor, forwarded);
-        }, Stream.concat(Stream.of(MAIN_ARTIFACTS, DEPENDENCIES), inherited.sequencedKeySet().stream()));
+        }, Stream.of(Stream.of(MAIN_ARTIFACTS, DEPENDENCIES), inputs.isEmpty() ? Stream.<String>empty() : Stream.of(INPUTS), inherited.sequencedKeySet().stream())
+                .flatMap(Function.identity()));
     }
 
     private record ParseModuleInfo(String group,

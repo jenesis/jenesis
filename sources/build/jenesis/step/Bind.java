@@ -11,6 +11,8 @@ import build.jenesis.SequencedProperties;
 
 public class Bind implements BuildStep {
 
+    private static final String BOUND = "bound";
+
     private final Map<Path, Path> paths;
     private final Set<String> extensions;
 
@@ -45,6 +47,30 @@ public class Bind implements BuildStep {
 
     public static Bind asMetadata() {
         return new Bind(Map.of(Path.of(""), Path.of(METADATA)));
+    }
+
+    public static BuildExecutorModule asInputs(SequencedMap<String, SequencedMap<Path, Path>> inputs) {
+        return (buildExecutor, _) -> {
+            for (Map.Entry<String, SequencedMap<Path, Path>> input : inputs.entrySet()) {
+                buildExecutor.addModule(input.getKey(), new BuildExecutorModule() {
+                    @Override
+                    public Optional<String> resolve(String path) {
+                        return path.equals(BOUND) ? Optional.of("") : Optional.empty();
+                    }
+
+                    @Override
+                    public void accept(BuildExecutor bound, SequencedMap<String, Path> inherited) {
+                        SequencedSet<String> sources = new LinkedHashSet<>();
+                        for (Map.Entry<Path, Path> binding : input.getValue().entrySet()) {
+                            String source = "source-" + sources.size();
+                            bound.addSource(source, new Bind(Map.of(Path.of(""), binding.getKey())), binding.getValue());
+                            sources.add(source);
+                        }
+                        bound.addStep(BOUND, new Bind(Map.of(Path.of(""), Path.of(""))), sources);
+                    }
+                });
+            }
+        };
     }
 
     public static <M extends BuildExecutorModule> void configured(BuildExecutor buildExecutor,

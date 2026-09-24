@@ -12,11 +12,13 @@ import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
 
 public class ExternalModule implements BuildExecutorModule {
 
-    public static final String COORDINATE = "coordinate", DEPENDENCIES = "dependencies", DELEGATE = "delegate";
+    public static final String COORDINATE = "coordinate", DEPENDENCIES = "dependencies", DELEGATE = "delegate",
+            INPUTS = "inputs";
 
     private final String coordinate;
     private final Dependencies dependencyModule;
@@ -25,6 +27,7 @@ public class ExternalModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final String group;
     private final SequencedMap<String, String> properties;
+    private final SequencedMap<String, SequencedMap<Path, Path>> inputs;
 
     public ExternalModule(String coordinate,
                           String group,
@@ -36,6 +39,7 @@ public class ExternalModule implements BuildExecutorModule {
                 null,
                 null,
                 group == null ? "main" : group,
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap());
     }
 
@@ -50,6 +54,7 @@ public class ExternalModule implements BuildExecutorModule {
                 null,
                 null,
                 group == null ? "main" : group,
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap());
     }
 
@@ -59,7 +64,8 @@ public class ExternalModule implements BuildExecutorModule {
                            String buildModuleName,
                            Pinning pinning,
                            String group,
-                           SequencedMap<String, String> properties) {
+                           SequencedMap<String, String> properties,
+                           SequencedMap<String, SequencedMap<Path, Path>> inputs) {
         this.coordinate = coordinate;
         this.dependencyModule = dependencyModule;
         this.additionalDependencies = additionalDependencies;
@@ -67,6 +73,7 @@ public class ExternalModule implements BuildExecutorModule {
         this.pinning = pinning;
         this.group = group;
         this.properties = properties;
+        this.inputs = inputs;
     }
 
     public ExternalModule dependencies(String... dependencies) {
@@ -80,7 +87,8 @@ public class ExternalModule implements BuildExecutorModule {
                 buildModuleName,
                 pinning,
                 group,
-                properties);
+                properties,
+                inputs);
     }
 
     public ExternalModule buildModuleName(String name) {
@@ -90,7 +98,8 @@ public class ExternalModule implements BuildExecutorModule {
                 name,
                 pinning,
                 group,
-                properties);
+                properties,
+                inputs);
     }
 
     public ExternalModule pinning(Pinning pinning) {
@@ -100,7 +109,8 @@ public class ExternalModule implements BuildExecutorModule {
                 buildModuleName,
                 pinning,
                 group,
-                properties);
+                properties,
+                inputs);
     }
 
     public ExternalModule group(String group) {
@@ -110,7 +120,8 @@ public class ExternalModule implements BuildExecutorModule {
                 buildModuleName,
                 pinning,
                 group,
-                properties);
+                properties,
+                inputs);
     }
 
     public ExternalModule properties(SequencedMap<String, String> properties) {
@@ -120,7 +131,19 @@ public class ExternalModule implements BuildExecutorModule {
                 buildModuleName,
                 pinning,
                 group,
-                properties);
+                properties,
+                inputs);
+    }
+
+    public ExternalModule inputs(SequencedMap<String, SequencedMap<Path, Path>> inputs) {
+        return new ExternalModule(coordinate,
+                dependencyModule,
+                additionalDependencies,
+                buildModuleName,
+                pinning,
+                group,
+                properties,
+                inputs);
     }
 
     @Override
@@ -154,6 +177,9 @@ public class ExternalModule implements BuildExecutorModule {
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
         resolution().accept(buildExecutor, inherited);
+        if (!inputs.isEmpty()) {
+            buildExecutor.addModule(INPUTS, Bind.asInputs(inputs));
+        }
         buildExecutor.addModule(DELEGATE, (delegateExecutor, delegated) -> {
             List<Path> artifacts = new ArrayList<>(
                     Dependencies.select(delegated.get(PREVIOUS + DEPENDENCIES), group, "runtime"));
@@ -169,7 +195,8 @@ public class ExternalModule implements BuildExecutorModule {
             SequencedMap<String, Path> forwarded = new LinkedHashMap<>(delegated);
             forwarded.remove(PREVIOUS + DEPENDENCIES);
             bridge.accept(foreignModule, delegateExecutor, forwarded);
-        }, Stream.concat(Stream.of(DEPENDENCIES), inherited.sequencedKeySet().stream()));
+        }, Stream.of(Stream.of(DEPENDENCIES), inputs.isEmpty() ? Stream.<String>empty() : Stream.of(INPUTS), inherited.sequencedKeySet().stream())
+                .flatMap(Function.identity()));
     }
 
     private record WriteCoordinates(String group, List<String> coordinates) implements BuildStep {

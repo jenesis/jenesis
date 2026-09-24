@@ -14,6 +14,7 @@ import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.module.ModularJarResolver;
 import build.jenesis.project.ExternalModule;
+import build.jenesis.step.Bind;
 import build.jenesis.Environment;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -146,6 +147,54 @@ public class ExternalModuleTest {
 
         SequencedMap<String, Path> steps = buildExecutor.execute();
         assertThat(steps.get("external/second").resolve("out.txt")).content().isEqualTo("seen:produced");
+    }
+
+    @Test
+    public void plugin_reads_the_folder_an_input_binds() throws IOException {
+        Path pluginJar = compileModule(work.resolve("plugin"),
+                work.resolve("plugin.jar"),
+                "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",
+                Map.of("test/plugin/Plugin.java", """
+                        package test.plugin;
+                        import build.jenesis.BuildExecutor;
+                        import build.jenesis.BuildExecutorModule;
+                        import build.jenesis.BuildStepArgument;
+                        import build.jenesis.BuildStepResult;
+                        import java.nio.file.Files;
+                        import java.nio.file.Path;
+                        import java.util.Map;
+                        import java.util.SequencedMap;
+                        import java.util.concurrent.CompletableFuture;
+                        public class Plugin implements BuildExecutorModule {
+                            public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
+                                executor.addStep("seen", (_, context, args) -> {
+                                    StringBuilder seen = new StringBuilder();
+                                    for (Map.Entry<String, BuildStepArgument> arg : args.entrySet()) {
+                                        Path schema = arg.getValue().folder().resolve("xjc/schema.xsd");
+                                        if (Files.isRegularFile(schema)) {
+                                            seen.append(arg.getKey()).append('=').append(Files.readString(schema));
+                                        }
+                                    }
+                                    Files.writeString(context.next().resolve("out.txt"), seen);
+                                    return CompletableFuture.completedStage(new BuildStepResult(true));
+                                }, inherited.sequencedKeySet());
+                            }
+                        }
+                        """));
+        Path contracts = Files.createDirectories(work.resolve("contracts"));
+        Files.writeString(contracts.resolve("schema.xsd"), "<schema/>");
+
+        buildExecutor.addModule("external", new ExternalModule(
+                "module/test.plugin",
+                null,
+                Map.of("module", versionInsensitive(Map.of(
+                        "test.plugin", pluginJar,
+                        "build.jenesis", jenesisJar))),
+                Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true)))
+                .inputs(new LinkedHashMap<>(Map.of("schemas", new LinkedHashMap<>(Map.of(Path.of("xjc"), contracts))))));
+
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        assertThat(steps.get("external/seen").resolve("out.txt")).content().isEqualTo("../inputs/schemas=<schema/>");
     }
 
     @Test

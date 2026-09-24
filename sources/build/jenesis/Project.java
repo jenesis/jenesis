@@ -77,6 +77,7 @@ public record Project(
             SKILL = "skill",
             PROPERTIES = "properties",
             CONFIGURATION = "configuration";
+    private static final Pattern INPUT_NAME = Pattern.compile("[A-Za-z0-9._-]+");
 
     @FunctionalInterface
     public interface Layout {
@@ -143,6 +144,7 @@ public record Project(
                                                          project.licenseFiles(Dependencies.SPDX),
                                                          (descriptor, mergedRepos, mergedResolvers) -> pomAware.apply(
                                         new ProjectModuleDescriptor(descriptor)
+                                                .location(descriptor.location())
                                                 .configuration(configurations(descriptor.configurations(), project.configuration(), project.profiles()))
                                                 .test(project.tests())
                                                 .source(project.sources())
@@ -213,6 +215,7 @@ public record Project(
                                                              project.signatures(),
                                                              (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
                                         new ProjectModuleDescriptor(descriptor)
+                                                .location(descriptor.location())
                                                 .configuration(configurations(
                                                                 modularConfigurationFolder(descriptor.location()),
                                                                 project.configuration(),
@@ -295,6 +298,7 @@ public record Project(
                                                              project.signatures(),
                                                              (descriptor, mergedRepos, mergedResolvers) -> bomAware.apply(
                                         new ProjectModuleDescriptor(descriptor)
+                                                .location(descriptor.location())
                                                 .configuration(configurations(modularConfigurationFolder(descriptor.location()), project.configuration(), project.profiles()))
                                                 .test(project.tests())
                                                 .source(project.sources())
@@ -589,7 +593,10 @@ public record Project(
                     runs in a module only where plugin-<name>.properties is found in its configuration
                     locations; a provider is created with that file's values when it declares a
                     public constructor taking a SequencedMap of them, and with its no-argument one when
-                    the file is empty. A plugin adds to its module and replaces nothing; a build that
+                    the file is empty. A key @<input>[/<target>]=<path> binds a file or folder of the
+                    project, relative to the module, into an input the plugin reads as ../inputs/<input>,
+                    placed at <target> inside it; one input takes a key per target, and @@<key> is the
+                    value @<key>. A path must stay within the project. A plugin adds to its module and replaces nothing; a build that
                     changes what the stock steps do is an entry point of its own. A plugin runs the
                     project's code, as its tests do, so build an untrusted project with
                     -Djenesis.project.docker=true.
@@ -1487,12 +1494,29 @@ public record Project(
         return relative.toString().isEmpty() ? Path.of(".") : relative;
     }
 
+    private static Path contained(Path root, Path path, String origin) {
+        Path project = root.toAbsolutePath().normalize(), located = path.toAbsolutePath().normalize();
+        boolean inside = located.startsWith(project);
+        if (inside && Files.exists(located)) {
+            try {
+                inside = located.toRealPath().startsWith(project.toRealPath());
+            } catch (IOException e) {
+                throw new UncheckedIOException("Cannot resolve " + located, e);
+            }
+        }
+        if (!inside) {
+            throw new IllegalArgumentException(origin + " names " + located + ", which lies outside the project "
+                    + project + " - name a folder the project holds");
+        }
+        return located;
+    }
+
     public static Project ofEnvironment(Environment environment, Path root) {
         InferredMultiProjectAssembler assembler = InferredMultiProjectAssembler.ofEnvironment(environment);
         ProjectPlugins projectPlugins = new ProjectPlugins();
         Path file = root.resolve("jenesis-plugins.properties");
         if (Files.isRegularFile(file)) {
-            SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+            SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
             SequencedMap<String, BuildExecutorModule> transforms = new LinkedHashMap<>(),
                     inspections = new LinkedHashMap<>(),
                     resolutions = new LinkedHashMap<>();
@@ -1526,23 +1550,67 @@ public record Project(
                             + " from source, followed by @<name> to select the provider annotated with that"
                             + " @BuildModuleName");
                 }
-                Function<SequencedMap<String, String>, BuildExecutorModule> plugin;
-                BuildExecutorModule resolution;
-                if (location.startsWith("./") || location.startsWith("../")) {
-                    InternalModule internal = InternalModule.ofEnvironment(environment, "module", group, root.resolve(location).normalize())
-                            .buildModuleName(provider);
-                    plugin = internal::properties;
-                    resolution = internal.resolution();
-                } else {
-                    ExternalModule external = ExternalModule.ofEnvironment(environment,
-                                    "module/" + location,
-                                    group,
-                                    Map.of("module", JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE)),
-                                    Map.of("module", ModularJarResolver.ofEnvironment(environment, true)))
-                            .buildModuleName(provider);
-                    plugin = external::properties;
-                    resolution = external.resolution();
-                }
+                boolean folder = location.startsWith("./") || location.startsWith("../");
+                InternalModule internal = folder
+                        ? InternalModule.ofEnvironment(environment,
+                                        "module",
+                                        group,
+                                        contained(root, root.resolve(location), "The plugin " + key + " in " + file))
+                                .buildModuleName(provider)
+                        : null;
+                ExternalModule external = folder
+                        ? null
+                        : ExternalModule.ofEnvironment(environment,
+                                        "module/" + location,
+                                        group,
+                                        Map.of("module", JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE)),
+                                        Map.of("module", ModularJarResolver.ofEnvironment(environment, true)))
+                                .buildModuleName(provider);
+                BuildExecutorModule resolution = folder ? internal.resolution() : external.resolution();
+                BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule> plugin = (base, given) -> {
+                    SequencedMap<String, String> values = new LinkedHashMap<>();
+                    SequencedMap<String, SequencedMap<Path, Path>> inputs = new LinkedHashMap<>();
+                    given.forEach((declaration, declaredValue) -> {
+                        if (declaration.startsWith("@@")) {
+                            values.put(declaration.substring(1), declaredValue);
+                            return;
+                        } else if (!declaration.startsWith("@")) {
+                            values.put(declaration, declaredValue);
+                            return;
+                        }
+                        int slash = declaration.indexOf('/');
+                        String input = declaration.substring(1, slash == -1 ? declaration.length() : slash);
+                        String target = slash == -1 ? null : declaration.substring(slash + 1);
+                        String origin = "The input " + declaration + " of the plugin " + name;
+                        if (!INPUT_NAME.matcher(input).matches()) {
+                            throw new IllegalArgumentException(origin + " does not start with a name - name an input"
+                                    + " with letters, digits, ., _ and -, as @<input> or @<input>/<target>, or write @@"
+                                    + declaration.substring(1) + " for a value whose key starts with @");
+                        }
+                        if (declaredValue.isBlank()) {
+                            throw new IllegalArgumentException(origin + " binds nothing - name a file or folder of the"
+                                    + " project");
+                        }
+                        Path source = contained(root, (base == null ? root : base).resolve(declaredValue.trim()), origin);
+                        if (!Files.exists(source)) {
+                            throw new IllegalArgumentException(origin + " binds " + source + ", which does not exist");
+                        }
+                        Path placed = target == null
+                                ? Files.isDirectory(source) ? Path.of("") : source.getFileName()
+                                : Path.of(target).normalize();
+                        if (placed.getRoot() != null || placed.startsWith("..")) {
+                            throw new IllegalArgumentException(origin + " places its files at " + target
+                                    + " - name a relative folder inside the input, without ..");
+                        }
+                        if (inputs.computeIfAbsent(input, _ -> new LinkedHashMap<>()).putIfAbsent(placed, source) != null) {
+                            throw new IllegalArgumentException(origin + " places its files where another binding of @"
+                                    + input + " places its own - give each binding a target of its own");
+                        }
+                    });
+                    return folder
+                            ? internal.properties(values).inputs(inputs)
+                            : external.properties(values).inputs(inputs);
+                };
                 if (!projectWide) {
                     plugins.put(key, plugin);
                     return;
@@ -1559,7 +1627,7 @@ public record Project(
                             properties.put(setting.substring(("plugin." + name + ".").length()), configured);
                         }
                     });
-                    (slot.equals(ProjectPlugins.TRANSFORM) ? transforms : inspections).put(name, plugin.apply(properties));
+                    (slot.equals(ProjectPlugins.TRANSFORM) ? transforms : inspections).put(name, plugin.apply(root, properties));
                 }
             });
             for (String name : resolutions.keySet()) {
