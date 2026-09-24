@@ -366,7 +366,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             if (packaging.jmod()) {
                 sub.addStep("jmod",
                         JMod.ofEnvironment(environment, factory),
-                        Stream.concat(Stream.of("binary"), descriptor.content().stream()));
+                        Stream.of(Stream.of("binary"), descriptor.content().stream(), closure.stream())
+                                .flatMap(Function.identity()));
             }
             if (!slots.get("").isEmpty()) {
                 sub.addModule("custom", (nested, nestedInherited) -> slots.get("").forEach((name, module) ->
