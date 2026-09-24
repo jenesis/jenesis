@@ -1561,7 +1561,7 @@ public record Project(
                                     Map.of("module", ModularJarResolver.ofEnvironment(environment, true)))
                             .buildModuleName(provider);
                 }
-                BuildExecutorModule resolution = internal == null ? external.delegate(false) : internal.delegate(false);
+                BuildExecutorModule resolution = internal == null ? external.resolution() : internal.resolution();
                 InternalModule compiled = internal;
                 ExternalModule resolved = external;
                 BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule> plugin = (base, given) -> {

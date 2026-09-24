@@ -27,7 +27,6 @@ public class ExternalModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final String group;
     private final SequencedMap<String, String> properties;
-    private final boolean delegate;
     private final SequencedMap<String, Bind.Input> inputs;
 
     public ExternalModule(String coordinate,
@@ -41,7 +40,6 @@ public class ExternalModule implements BuildExecutorModule {
                 null,
                 group == null ? "main" : group,
                 Collections.emptyNavigableMap(),
-                true,
                 Collections.emptyNavigableMap());
     }
 
@@ -57,7 +55,6 @@ public class ExternalModule implements BuildExecutorModule {
                 null,
                 group == null ? "main" : group,
                 Collections.emptyNavigableMap(),
-                true,
                 Collections.emptyNavigableMap());
     }
 
@@ -68,7 +65,6 @@ public class ExternalModule implements BuildExecutorModule {
                            Pinning pinning,
                            String group,
                            SequencedMap<String, String> properties,
-                           boolean delegate,
                            SequencedMap<String, Bind.Input> inputs) {
         this.coordinate = coordinate;
         this.dependencyModule = dependencyModule;
@@ -77,7 +73,6 @@ public class ExternalModule implements BuildExecutorModule {
         this.pinning = pinning;
         this.group = group;
         this.properties = properties;
-        this.delegate = delegate;
         this.inputs = inputs;
     }
 
@@ -93,7 +88,6 @@ public class ExternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 properties,
-                delegate,
                 inputs);
     }
 
@@ -105,7 +99,6 @@ public class ExternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 properties,
-                delegate,
                 inputs);
     }
 
@@ -117,7 +110,6 @@ public class ExternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 properties,
-                delegate,
                 inputs);
     }
 
@@ -129,7 +121,6 @@ public class ExternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 properties,
-                delegate,
                 inputs);
     }
 
@@ -141,19 +132,6 @@ public class ExternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 properties,
-                delegate,
-                inputs);
-    }
-
-    public ExternalModule delegate(boolean delegate) {
-        return new ExternalModule(coordinate,
-                dependencyModule,
-                additionalDependencies,
-                buildModuleName,
-                pinning,
-                group,
-                properties,
-                delegate,
                 inputs);
     }
 
@@ -165,7 +143,6 @@ public class ExternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 properties,
-                delegate,
                 inputs);
     }
 
@@ -183,20 +160,23 @@ public class ExternalModule implements BuildExecutorModule {
         return Optional.empty();
     }
 
+    public BuildExecutorModule resolution() {
+        return (buildExecutor, inherited) -> {
+            List<String> coordinates = new ArrayList<>(additionalDependencies.size() + 1);
+            coordinates.add(coordinate);
+            coordinates.addAll(additionalDependencies);
+            buildExecutor.addStep(COORDINATE,
+                    new WriteCoordinates(group, coordinates),
+                    inherited.sequencedKeySet().stream());
+            buildExecutor.addModule(DEPENDENCIES,
+                    dependencyModule.pinning(pinning),
+                    COORDINATE);
+        };
+    }
+
     @Override
-    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        List<String> coordinates = new ArrayList<>(additionalDependencies.size() + 1);
-        coordinates.add(coordinate);
-        coordinates.addAll(additionalDependencies);
-        buildExecutor.addStep(COORDINATE,
-                new WriteCoordinates(group, coordinates),
-                inherited.sequencedKeySet().stream());
-        buildExecutor.addModule(DEPENDENCIES,
-                dependencyModule.pinning(pinning),
-                COORDINATE);
-        if (!delegate) {
-            return;
-        }
+    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
+        resolution().accept(buildExecutor, inherited);
         if (!inputs.isEmpty()) {
             buildExecutor.addModule(INPUTS, (bound, _) -> inputs.forEach((name, input) -> bound.addSource(name,
                     new Bind(Map.of(Path.of(""), input.target())),
