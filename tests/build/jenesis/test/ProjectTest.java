@@ -6,6 +6,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildExecutorFileCache;
+import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
@@ -28,7 +29,7 @@ public class ProjectTest {
     private final Map<String, String> settings = new HashMap<>();
 
     @TempDir
-    private Path root;
+    private Path root, elsewhere;
 
     @Test
     public void reads_the_tag_revision_and_tree_from_their_properties_and_keeps_empty_ones() {
@@ -720,6 +721,111 @@ public class ProjectTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Cannot add the plugin audit+inspect")
                 .hasMessageContaining("takes a name of its own");
+    }
+
+    @Test
+    public void binds_an_input_a_plugin_names_inside_the_project() throws IOException {
+        Files.createDirectories(root.resolve("contracts"));
+        assertThat(plugin("@schemas/xjc", "contracts")).isNotNull();
+    }
+
+    @Test
+    public void reads_a_key_escaped_with_two_at_signs_as_a_value() throws IOException {
+        assertThat(plugin("@@header", "@generated"))
+                .as("@@header is the value @header, not an input that must exist")
+                .isNotNull();
+    }
+
+    @Test
+    public void refuses_an_input_that_leaves_the_project() throws IOException {
+        assertThatThrownBy(() -> plugin("@schemas", root.relativize(elsewhere).toString()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The input @schemas of the plugin gen")
+                .hasMessageContaining("lies outside the project");
+    }
+
+    @Test
+    public void refuses_an_input_given_as_an_absolute_path_outside_the_project() {
+        assertThatThrownBy(() -> plugin("@schemas", "/"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("lies outside the project");
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    public void refuses_an_input_that_leaves_the_project_through_a_symbolic_link() throws IOException {
+        Files.createSymbolicLink(root.resolve("contracts"), elsewhere);
+        assertThatThrownBy(() -> plugin("@schemas", "contracts"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("lies outside the project");
+    }
+
+    @Test
+    public void refuses_an_input_that_does_not_exist() {
+        assertThatThrownBy(() -> plugin("@schemas", "contracts"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("which does not exist");
+    }
+
+    @Test
+    public void refuses_an_input_whose_target_leaves_the_input() throws IOException {
+        Files.createDirectories(root.resolve("contracts"));
+        assertThatThrownBy(() -> plugin("@schemas/../xjc", "contracts"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("name a relative folder inside the input, without ..");
+    }
+
+    @Test
+    public void refuses_an_input_whose_target_starts_at_a_root() throws IOException {
+        Files.createDirectories(root.resolve("contracts"));
+        assertThatThrownBy(() -> plugin("@schemas//xjc", "contracts"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("name a relative folder inside the input, without ..");
+    }
+
+    @Test
+    public void binds_several_files_into_one_input() throws IOException {
+        Files.createDirectories(root.resolve("contracts"));
+        Files.writeString(root.resolve("catalog.xml"), "<catalog/>");
+        assertThat(plugin("@schemas", "contracts", "@schemas/xjc/catalog.xml", "catalog.xml")).isNotNull();
+    }
+
+    @Test
+    public void refuses_two_bindings_of_an_input_at_one_target() throws IOException {
+        Files.createDirectories(root.resolve("contracts"));
+        Files.createDirectories(root.resolve("more"));
+        assertThatThrownBy(() -> plugin("@schemas", "contracts", "@schemas/.", "more"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("places its files where another binding of @schemas places its own");
+    }
+
+    @Test
+    public void refuses_an_input_whose_key_does_not_start_with_a_name() throws IOException {
+        Files.createDirectories(root.resolve("contracts"));
+        assertThatThrownBy(() -> plugin("@sch:emas", "contracts"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("does not start with a name");
+    }
+
+    @Test
+    public void refuses_a_plugin_compiled_from_a_folder_outside_the_project() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), "gen+check=../gen\n");
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The plugin gen+check")
+                .hasMessageContaining("lies outside the project");
+    }
+
+    private BuildExecutorModule plugin(String... declarations) throws IOException {
+        Files.createDirectories(root.resolve("gen"));
+        Files.writeString(root.resolve("jenesis-plugins.properties"), "gen+check=./gen\n");
+        InferredMultiProjectAssembler assembler = (InferredMultiProjectAssembler) Project.ofEnvironment(new Environment(settings), root)
+                .assembler();
+        SequencedMap<String, String> values = new LinkedHashMap<>();
+        for (int index = 0; index < declarations.length; index += 2) {
+            values.put(declarations[index], declarations[index + 1]);
+        }
+        return assembler.plugins().get("gen+check").apply(root, values);
     }
 
     @Test

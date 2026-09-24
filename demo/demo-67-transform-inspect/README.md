@@ -25,6 +25,7 @@ staged beside the module's jar:
 holding
 
     demo.app - Copyright Example Corp.
+    Licensed under the Apache License, Version 2.0.
       includes maven/org.json/json/20260814
       includes module/org.json/20260814
 
@@ -40,6 +41,8 @@ Layout
     demo/demo-67-transform-inspect
     |-- build/jenesis                      symlink to ../../../sources/build/jenesis
     |-- jenesis.properties                 jenesis.plugin.notice.holder=Example Corp.
+    |                                      jenesis.plugin.notice.@legal=legal
+    |-- legal/HEADER.txt                   the licence line the notice carries
     |-- jenesis-plugins.properties         notice+transform=./notice
     |                                      audit+inspect=./audit
     |-- jenesis-plugins-pin.properties     written by the pin goal
@@ -89,6 +92,37 @@ module's build included. The plugins run with everything that builds, `pin` amon
 it, so an inspection that fails stops `pin` as well; this pins without running any:
 
     java -Djenesis.project.plugins=false build/jenesis/Make.java pin
+
+Binding project files
+---------------------
+
+A plugin reads only what the build hands it, so a file of the project reaches it as
+an input. A key starting with `@` names one instead of a value:
+
+    jenesis.plugin.notice.@legal=legal
+
+binds the project's `legal/` folder into an input named `legal`, which the plugin
+reads as the folder `../inputs/legal`: this demo's notice takes its licence line
+from `legal/HEADER.txt`. Editing the file runs the transform again.
+
+A target after the input's name places what is bound inside the input rather than
+at its root, and one input takes a key per target, so it can gather several files
+and folders of the project:
+
+    jenesis.plugin.notice.@legal=legal
+    jenesis.plugin.notice.@legal/third-party/NOTICE.txt=vendor/NOTICE.txt
+
+A single file keeps its name unless a target renames it, and two bindings that
+place their files at one target fail the build. A value whose key starts with `@` is
+written with two: `@@name=value` hands the plugin `@name=value`.
+
+A path is resolved against the project root here, and against the module's own
+folder in a module's `plugin-<name>.properties`. Either way it has to stay within
+the project, symbolic links included:
+
+    java "-Djenesis.plugin.notice.@legal=../.." build/jenesis/Make.java stage
+
+    The input @legal of the plugin notice names ..., which lies outside the project ... - name a folder the project holds
 
 What a plugin sees
 ------------------

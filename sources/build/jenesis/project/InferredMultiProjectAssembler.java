@@ -32,7 +32,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                             Function<InferredTestObservationModule, BuildExecutorModule> observe,
                                             Function<InferredDocumentationModule, BuildExecutorModule> documentation,
                                             SequencedMap<String, BuildExecutorModule> custom,
-                                            SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins,
+                                            SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins,
                                             Environment environment) implements MultiProjectAssembler<ProjectModuleDescriptor> {
 
     private static final List<String> PLUGIN_SLOTS = List.of("",
@@ -173,7 +173,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 environment);
     }
 
-    public InferredMultiProjectAssembler plugins(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins) {
+    public InferredMultiProjectAssembler plugins(SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins) {
         for (String key : plugins.keySet()) {
             int plus = key.indexOf('+');
             String name = plus == -1 ? key : key.substring(0, plus);
@@ -223,7 +223,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         ProcessHandler.Factory factory = ProcessHandler.Factory.ofEnvironment(environment);
         SequencedMap<String, SequencedMap<String, BuildExecutorModule>> slots = new LinkedHashMap<>();
         slots.put("", new LinkedHashMap<>(custom));
-        for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugin : plugins.entrySet()) {
+        for (Map.Entry<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugin : plugins.entrySet()) {
             int plus = plugin.getKey().indexOf('+');
             String name = plus == -1 ? plugin.getKey() : plugin.getKey().substring(0, plus);
             Path file = BuildStep.locate(descriptor.configuration(), "plugin-" + name + ".properties");
@@ -235,7 +235,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             SequencedMap<String, BuildExecutorModule> slot = slots.computeIfAbsent(plus == -1
                     ? ""
                     : plugin.getKey().substring(plus + 1), _ -> new LinkedHashMap<>());
-            if (slot.putIfAbsent(name, plugin.getValue().apply(properties)) != null) {
+            if (slot.putIfAbsent(name, plugin.getValue().apply(descriptor.location(), properties)) != null) {
                 throw new IllegalArgumentException("The plugin " + plugin.getKey() + " takes the name of a custom module"
                         + " that is added already - give the plugin another name");
             }
