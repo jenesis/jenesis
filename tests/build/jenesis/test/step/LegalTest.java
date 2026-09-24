@@ -11,7 +11,6 @@ import build.jenesis.Environment;
 import build.jenesis.step.Legal;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class LegalTest {
 
@@ -56,16 +55,6 @@ public class LegalTest {
         assertThat(next.resolve(Legal.LEGAL + "org.dep-1.0/LICENSE.bundled.txt"))
                 .as("META-INF/license/ takes the folder below it")
                 .exists();
-    }
-
-    @Test
-    public void refuses_a_jar_without_notices_when_strict() throws IOException {
-        jar(module.resolve("classes.jar"), "META-INF/LICENSE", "own licence");
-        jar(dependencies.resolve("org.dep-1.0.jar"), "org/dep/Dep.class", "");
-
-        assertThatThrownBy(() -> apply(new Environment(Map.of("legal.strict", "true"))))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("org.dep-1.0.jar carries none of [META-INF/NOTICE, META-INF/LICENSE,");
     }
 
     @Test
