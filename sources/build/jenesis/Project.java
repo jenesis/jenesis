@@ -28,7 +28,7 @@ import build.jenesis.project.MultiProjectModule;
 import build.jenesis.project.ProjectModuleDescriptor;
 import build.jenesis.project.ReleaseModule;
 import build.jenesis.project.ProjectWatch;
-import build.jenesis.project.VerifyModule;
+import build.jenesis.project.ProjectPlugins;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Bom;
 import build.jenesis.step.Dependencies;
@@ -62,11 +62,10 @@ public record Project(
         Supplier<BuildExecutor.Configuration> configurator,
         Map<String, Repository> repositories,
         Map<String, Resolver> resolvers,
-        VerifyModule verify,
+        ProjectPlugins plugins,
         Environment environment) {
 
     public static final String BUILD = "build",
-            VERIFY = "verify",
             STAGE = "stage",
             EXPORT = "export",
             RELEASE = "release",
@@ -154,15 +153,16 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               mavenDeps);
+                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(), "maven");
+                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(), "maven", ProjectPlugins.TRANSFORM);
             }, METADATA);
-            executor.addModule(VERIFY, project.verify(), BUILD);
             executor.addModule(STAGE, (stage, inherited) -> {
                 stage.addStep("maven", MavenRepositoryStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
                 stage.addStep("packages", new ImageStaging("package").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("native", new ImageStaging("native").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("docker", new ImageStaging("docker"), inherited.sequencedKeySet());
                 stage.addStep("reports", new ReportStaging(), inherited.sequencedKeySet());
-            }, BUILD, VERIFY);
+            }, BUILD);
             executor.addModule(EXPORT, (export, _) -> export.addStep(
                     "maven", MavenRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/maven"), STAGE);
             String prefix = BUILD + "/maven/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
@@ -170,7 +170,7 @@ public record Project(
                     project.root(),
                     "pom.xml",
                     (path, file) -> PinPom.ofEnvironment(project.environment(), "maven", path, List.of(file), project.hashFunction()),
-                    project.hashFunction()).verify(project.verify()), BUILD);
+                    project.hashFunction()).plugins(project.plugins()), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", Tree.ofEnvironment(project.environment()), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
@@ -227,8 +227,9 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
+                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(), "modules");
+                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(), "modules", ProjectPlugins.TRANSFORM);
             }, METADATA);
-            executor.addModule(VERIFY, project.verify(), BUILD);
             executor.addModule(STAGE, (stage, inherited) -> {
                 stage.addStep("modular", ModularStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
                 stage.addStep("packages", new ImageStaging("package").noFolder(true), inherited.sequencedKeySet());
@@ -237,13 +238,13 @@ public record Project(
                 stage.addStep("native", new ImageStaging("native").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("docker", new ImageStaging("docker"), inherited.sequencedKeySet());
                 stage.addStep("reports", new ReportStaging(), inherited.sequencedKeySet());
-            }, BUILD, VERIFY);
+            }, BUILD);
             executor.addModule(EXPORT, (export, _) -> export.addStep(
                     "modular", JenesisModuleRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/modular"), STAGE);
             String prefix = BUILD + "/modules/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
             executor.addModule(PIN, PinModule.ofEnvironment(project.environment(), project.root(), "module-info.java",
                     (path, file) -> PinModuleInfo.ofEnvironment(project.environment(), "module", path, List.of(file), project.hashFunction()),
-                    project.hashFunction()).verify(project.verify()), BUILD);
+                    project.hashFunction()).plugins(project.plugins()), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
                     "tree", Tree.ofEnvironment(project.environment()), inherited.sequencedKeySet()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
@@ -305,8 +306,9 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
+                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(), "modules");
+                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(), "modules", ProjectPlugins.TRANSFORM);
             }, METADATA);
-            executor.addModule(VERIFY, project.verify(), BUILD);
             executor.addModule(STAGE, (stage, inherited) -> {
                 stage.addStep("maven", MavenRepositoryStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
                 stage.addStep("modular", ModularStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
@@ -316,7 +318,7 @@ public record Project(
                 stage.addStep("native", new ImageStaging("native").noFolder(true), inherited.sequencedKeySet());
                 stage.addStep("docker", new ImageStaging("docker"), inherited.sequencedKeySet());
                 stage.addStep("reports", new ReportStaging(), inherited.sequencedKeySet());
-            }, BUILD, VERIFY);
+            }, BUILD);
             executor.addModule(EXPORT, (export, _) -> {
                 export.addStep("maven", MavenRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/maven");
                 export.addStep("modular", JenesisModuleRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/modular");
@@ -327,7 +329,7 @@ public record Project(
                             project.root(),
                             "module-info.java",
                             (path, file) -> PinModuleInfo.ofEnvironment(project.environment(), "module", path, List.of(file), project.hashFunction()),
-                            project.hashFunction()).verify(project.verify()),
+                            project.hashFunction()).plugins(project.plugins()),
                     BUILD);
             executor.addStep(DEPENDENCIES, Tree.ofEnvironment(project.environment()), BUILD);
             executor.addModule(IDE, new Ide(project.root()), BUILD);
@@ -465,7 +467,6 @@ public record Project(
 
                     %{header}Selectors:%{reset}
                       %{name}build%{reset}         Resolve, compile, package, and test every module
-                      %{name}verify%{reset}        Run the transform and inspect plugins over every module built
                       %{name}stage%{reset}         Stage produced artifacts into a local repository
                       %{name}export%{reset}        Export the staged repository as the build deliverable
                       %{name}pin%{reset}           Rewrite version/checksum pins into pom.xml or module-info.java
@@ -599,13 +600,14 @@ public record Project(
                     project's code, as its tests do, so build an untrusted project with
                     -Djenesis.project.docker=true.
 
-                    The slots transform and inspect run a plugin once over every module built, in
-                    the verify goal that stage, export and release run first. Such a plugin
-                    reads jenesis.plugin.<name>.<key> settings rather than a file, and pin writes its
-                    pins to jenesis-plugins-pin.properties. A transform adds files to a module by
-                    naming them in an inventory.properties of its own, as <module>.attachment.<classifier>
-                    or <module>.report.<name>; an inspection fails the build by throwing and changes
-                    nothing it was handed.
+                    The slots transform and inspect run a plugin once over every module built, as
+                    build/transform and build/inspect, after the modules and before anything is
+                    staged; switch an expensive one off with -Djenesis.plugin.<name>=false or in a
+                    profile. Such a plugin reads jenesis.plugin.<name>.<key> settings rather than a
+                    file, and pin writes its pins to jenesis-plugins-pin.properties. A transform adds files to a
+                    module by naming them in an inventory.properties of its own, as
+                    <module>.attachment.<classifier> or <module>.report.<name>; an inspection fails the
+                    build by throwing and changes nothing it was handed.
 
                     A project with its own entry point calls `new Make("build.Demo").run(selectors)`,
                     which returns the status to exit with. For a GraalVM native launcher, read the
@@ -645,7 +647,7 @@ public record Project(
 
                     ## 5. Address the graph
 
-                      build verify stage export pin dependencies ide metadata configuration properties help skill
+                      build stage export pin dependencies ide metadata configuration properties help skill
                           Top-level entry points; ide[/idea|/vscode|/eclipse] drills into one tool.
                       +<module>         module subgraph inside `build` (not stage/export/pin).
                                         <module> is the source folder holding its pom.xml or
@@ -1086,7 +1088,7 @@ public record Project(
                                          54 external-module, 55 custom-maven, 56 custom-modular,
                                          57 custom-build (no Project at all),
                                          58 tools-api (a build inside another program's JVM),
-                                         67 verify (transform and inspect every module built)
+                                         67 transform-inspect (add to and inspect every module built)
 
                     ## 14. When stuck, read the source
 
@@ -1106,7 +1108,7 @@ public record Project(
                              SequencedSet<Path> provided,
                              HashDigestFunction hashFunction,
                              Consumer<String> printing,
-                             VerifyModule verify)
+                             ProjectPlugins plugins)
             implements BuildExecutorModule {
 
         static PinModule ofEnvironment(Environment environment,
@@ -1129,19 +1131,19 @@ public record Project(
                                  provided,
                                  hashFunction,
                                  environment.flag("print.divergence") ? environment.out() : null,
-                                 new VerifyModule());
+                                 new ProjectPlugins());
         }
 
         PinModule file(Path file) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, verify);
+            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, plugins);
         }
 
         PinModule provided(SequencedSet<Path> provided) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, verify);
+            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, plugins);
         }
 
-        PinModule verify(VerifyModule verify) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, verify);
+        PinModule plugins(ProjectPlugins plugins) {
+            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, plugins);
         }
 
         @Override
@@ -1177,12 +1179,12 @@ public record Project(
             buildExecutor.addStep("divergence",
                     new Divergence(paths, printing),
                     new LinkedHashSet<>(inherited.sequencedKeySet()));
-            if (!verify.resolutions().isEmpty()) {
+            if (!plugins.resolutions().isEmpty()) {
                 SequencedSet<String> groups = new LinkedHashSet<>();
-                verify.resolutions().keySet().forEach(name -> groups.add("plugin-" + name));
-                buildExecutor.addModule("plugins", (plugins, _) -> {
-                    plugins.addModule(VerifyModule.RESOLVED, verify.resolution());
-                    plugins.addStep("file", new PluginPins(verify.pins(), groups, hashFunction), VerifyModule.RESOLVED);
+                plugins.resolutions().keySet().forEach(name -> groups.add("plugin-" + name));
+                buildExecutor.addModule("plugins", (pinned, _) -> {
+                    pinned.addModule(ProjectPlugins.RESOLVED, plugins.resolution());
+                    pinned.addStep("file", new PluginPins(plugins.pins(), groups, hashFunction), ProjectPlugins.RESOLVED);
                 });
             }
         }
@@ -1473,7 +1475,7 @@ public record Project(
                 BuildExecutor.Configuration::new,
                 Map.of(),
                 Map.of(),
-                new VerifyModule(),
+                new ProjectPlugins(),
                 environment);
     }
 
@@ -1509,7 +1511,7 @@ public record Project(
 
     public static Project ofEnvironment(Environment environment, Path root) {
         InferredMultiProjectAssembler assembler = InferredMultiProjectAssembler.ofEnvironment(environment);
-        VerifyModule verify = new VerifyModule();
+        ProjectPlugins projectPlugins = new ProjectPlugins();
         Path file = root.resolve("jenesis-plugins.properties");
         if (Files.isRegularFile(file)) {
             SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
@@ -1526,12 +1528,12 @@ public record Project(
             declared.forEachProperty((key, value) -> {
                 String name = key.indexOf('+') == -1 ? key : key.substring(0, key.indexOf('+'));
                 String slot = key.indexOf('+') == -1 ? "" : key.substring(key.indexOf('+') + 1);
-                boolean verifying = slot.equals(VerifyModule.TRANSFORM) || slot.equals(VerifyModule.INSPECT);
-                if (!verifying) {
+                boolean projectWide = slot.equals(ProjectPlugins.TRANSFORM) || slot.equals(ProjectPlugins.INSPECT);
+                if (!projectWide) {
                     modulePlugins.add(name);
                 }
                 boolean enabled = environment.flag("plugin." + name, true);
-                if (!verifying && !enabled) {
+                if (!projectWide && !enabled) {
                     return;
                 }
                 String group = "plugin-" + name;
@@ -1605,13 +1607,13 @@ public record Project(
                             ? resolved.properties(values).inputs(inputs)
                             : compiled.properties(values).inputs(inputs);
                 };
-                if (!verifying) {
+                if (!projectWide) {
                     plugins.put(key, plugin);
                     return;
                 }
                 if (name.isEmpty() || name.contains("/") || resolutions.putIfAbsent(name, resolution) != null) {
                     throw new IllegalArgumentException("Cannot add the plugin " + key + " in " + file + " - a plugin"
-                            + " of " + VerifyModule.TRANSFORM + " or " + VerifyModule.INSPECT + " takes a name of its"
+                            + " of " + ProjectPlugins.TRANSFORM + " or " + ProjectPlugins.INSPECT + " takes a name of its"
                             + " own, holding no / or +");
                 }
                 if (enabled) {
@@ -1621,20 +1623,20 @@ public record Project(
                             properties.put(setting.substring(("plugin." + name + ".").length()), configured);
                         }
                     });
-                    (slot.equals(VerifyModule.TRANSFORM) ? transforms : inspections).put(name, plugin.apply(root, properties));
+                    (slot.equals(ProjectPlugins.TRANSFORM) ? transforms : inspections).put(name, plugin.apply(root, properties));
                 }
             });
             for (String name : resolutions.keySet()) {
                 if (modulePlugins.contains(name)) {
                     throw new IllegalArgumentException("The plugin " + name + " in " + file + " is named both for"
-                            + " a module slot and for " + VerifyModule.TRANSFORM + " or " + VerifyModule.INSPECT
-                            + " - a plugin of verify takes a name of its own");
+                            + " a module slot and for " + ProjectPlugins.TRANSFORM + " or " + ProjectPlugins.INSPECT
+                            + " - a plugin of transform or inspect takes a name of its own");
                 }
             }
             assembler = assembler.plugins(plugins);
-            verify = new VerifyModule(root.resolve("jenesis-plugins-pin.properties"), transforms, inspections, resolutions);
+            projectPlugins = new ProjectPlugins(root.resolve("jenesis-plugins-pin.properties"), transforms, inspections, resolutions);
         }
-        Project project = new Project(root, assembler, environment).verify(verify);
+        Project project = new Project(root, assembler, environment).plugins(projectPlugins);
         String configuration = environment.getProperty("project.configuration");
         if (configuration != null) {
             project = project.configuration(locations(environment, configuration, project).toArray(Path[]::new));
@@ -1781,7 +1783,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -1810,7 +1812,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -1839,7 +1841,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -1868,7 +1870,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -1897,7 +1899,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -1926,7 +1928,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -1955,7 +1957,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -1984,7 +1986,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2013,7 +2015,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2042,7 +2044,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2071,7 +2073,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2100,7 +2102,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2129,7 +2131,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2158,7 +2160,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2187,7 +2189,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2216,7 +2218,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2245,7 +2247,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2274,7 +2276,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2303,7 +2305,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2332,7 +2334,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2361,7 +2363,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2390,7 +2392,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2419,11 +2421,11 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
-    public Project verify(VerifyModule verify) {
+    public Project plugins(ProjectPlugins plugins) {
         return new Project(root,
                 target,
                 artifacts,
@@ -2448,7 +2450,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 
@@ -2477,7 +2479,7 @@ public record Project(
                 configurator,
                 repositories,
                 resolvers,
-                verify,
+                plugins,
                 environment);
     }
 

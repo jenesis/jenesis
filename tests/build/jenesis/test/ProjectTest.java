@@ -19,6 +19,7 @@ import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.ProjectModuleDescriptor;
+import build.jenesis.project.ProjectPlugins;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -164,7 +165,7 @@ public class ProjectTest {
     }
 
     @Test
-    public void runs_verify_without_a_plugin_in_each_concrete_layout() throws IOException {
+    public void runs_transform_and_inspect_without_a_plugin_in_each_concrete_layout() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
         Files.writeString(root.resolve("pom.xml"), """
                 <project>
@@ -178,10 +179,11 @@ public class ProjectTest {
             SequencedMap<String, Path> outputs = Project.ofEnvironment(new Environment(settings), root)
                     .target(root.resolve("target-" + layout.hashCode()))
                     .layout(layout)
-                    .build(Project.VERIFY);
+                    .build(Project.BUILD + "/" + ProjectPlugins.INSPECT);
             assertThat(outputs.keySet())
-                    .as("verify is a selector of every layout, and adds nothing without a transform or an inspection")
-                    .noneMatch(key -> key.startsWith(Project.VERIFY + "/"));
+                    .as("build/inspect is a selector of every layout, and adds nothing without a transform or an inspection")
+                    .noneMatch(key -> key.startsWith(Project.BUILD + "/" + ProjectPlugins.TRANSFORM + "/")
+                            || key.startsWith(Project.BUILD + "/" + ProjectPlugins.INSPECT + "/"));
         }
     }
 
@@ -651,7 +653,7 @@ public class ProjectTest {
     }
 
     @Test
-    public void hands_the_plugins_of_transform_and_inspect_to_verify() throws IOException {
+    public void hands_the_plugins_of_transform_and_inspect_to_the_project() throws IOException {
         Files.writeString(root.resolve("jenesis-plugins.properties"), """
                 greeting+binary/generated=demo.greeting
                 licenses+transform=./licenses
@@ -660,28 +662,28 @@ public class ProjectTest {
         Project project = Project.ofEnvironment(new Environment(settings), root);
         assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
                 assembler -> assertThat(assembler.plugins()).containsOnlyKeys("greeting+binary/generated"));
-        assertThat(project.verify().transforms()).containsOnlyKeys("licenses");
-        assertThat(project.verify().inspections()).containsOnlyKeys("audit");
-        assertThat(project.verify().resolutions()).containsOnlyKeys("licenses", "audit");
-        assertThat(project.verify().pins()).isEqualTo(root.resolve("jenesis-plugins-pin.properties"));
+        assertThat(project.plugins().transforms()).containsOnlyKeys("licenses");
+        assertThat(project.plugins().inspections()).containsOnlyKeys("audit");
+        assertThat(project.plugins().resolutions()).containsOnlyKeys("licenses", "audit");
+        assertThat(project.plugins().pins()).isEqualTo(root.resolve("jenesis-plugins-pin.properties"));
     }
 
     @Test
-    public void still_resolves_a_plugin_of_verify_its_setting_switches_off() throws IOException {
+    public void still_resolves_a_plugin_of_transform_or_inspect_its_setting_switches_off() throws IOException {
         Files.writeString(root.resolve("jenesis-plugins.properties"), """
                 licenses+transform=./licenses
                 audit+inspect=demo.audit
                 """);
         Project project = Project.ofEnvironment(new Environment(Map.of("plugin.audit", "false")), root);
-        assertThat(project.verify().transforms()).containsOnlyKeys("licenses");
-        assertThat(project.verify().inspections()).isEmpty();
-        assertThat(project.verify().resolutions())
+        assertThat(project.plugins().transforms()).containsOnlyKeys("licenses");
+        assertThat(project.plugins().inspections()).isEmpty();
+        assertThat(project.plugins().resolutions())
                 .as("pin must capture a plugin that only a profile switches on")
                 .containsOnlyKeys("licenses", "audit");
     }
 
     @Test
-    public void refuses_a_plugin_of_verify_that_shares_its_name_with_a_module_plugin() throws IOException {
+    public void refuses_a_plugin_of_inspect_that_shares_its_name_with_a_module_plugin() throws IOException {
         Files.writeString(root.resolve("jenesis-plugins.properties"), """
                 audit+check=./audit
                 audit+inspect=./audit
