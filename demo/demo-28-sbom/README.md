@@ -29,6 +29,8 @@ Layout
 
     demo/demo-28-sbom
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
+    |-- LICENSE                    a placeholder license text, placed in every jar
+    |-- jenesis.properties         jenesis.project.resources=LICENSE:META-INF/LICENSE
     |-- pom.xml                    project metadata (name, license, developers, scm) + pins commons-lang3
     |-- sbom.properties            format=json (also xml, or none to disable)
     `-- sources
@@ -76,6 +78,22 @@ The document also carries a `serialNumber` (`urn:uuid:...`) derived
 deterministically from the document's own content, so a reproducible build
 reproduces the exact same SBOM, serial number included. No creation `timestamp`
 is written, because that cannot be made deterministic.
+
+The license text in the jar
+---------------------------
+
+The SBOM names the project's license; the text of the license travels as a file.
+`jenesis.project.resources` places files of the project among the resources of every
+module, each at the path after its colon, so one line puts this demo's `LICENSE` into
+every jar it builds:
+
+    jenesis.project.resources=LICENSE:META-INF/LICENSE
+
+The jar then carries `META-INF/LICENSE` beside `META-INF/sbom/`, and editing
+`LICENSE` builds the jars again. More files follow with commas, and a folder is
+placed as a folder: `NOTICE:META-INF/NOTICE,licenses:META-INF/licenses`. A module
+that brings a resource of its own at the same path fails the build rather than
+losing one of the two.
 
 Pinning
 -------
