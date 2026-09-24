@@ -184,8 +184,7 @@ This holds without `jmod=true` as well: the `.jmod` is then built for linking
 alone and not staged. `-Djenesis.legal.notices` names the jar entries taken as
 notices - by default `META-INF/NOTICE`, `META-INF/LICENSE`, the `META-INF/license/`
 and `META-INF/licenses/` folders, a root `LICENSE` and `about.html`, in any case and
-with any extension. Many jars carry none of them; `-Djenesis.legal.strict=true`
-fails the build on such a jar rather than shipping it without its notices.
+with any extension.
 
 Bundle the jars for a JRE-based image
 -------------------------------------
