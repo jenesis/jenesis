@@ -11,7 +11,10 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Inventory;
 
-public class ProjectPlugins {
+public record ProjectPlugins(Path pins,
+                             SequencedMap<String, BuildExecutorModule> transforms,
+                             SequencedMap<String, BuildExecutorModule> inspections,
+                             SequencedMap<String, BuildExecutorModule> resolutions) {
 
     public static final String TRANSFORM = "transform",
             INSPECT = "inspect",
@@ -21,49 +24,23 @@ public class ProjectPlugins {
             UNCHANGED = "unchanged",
             RESOLVED = "resolved";
 
-    private final Path pins;
-    private final SequencedMap<String, BuildExecutorModule> transforms, inspections, resolutions;
-
-    public ProjectPlugins() {
-        this(null, Collections.emptyNavigableMap(), Collections.emptyNavigableMap(), Collections.emptyNavigableMap());
-    }
-
-    public ProjectPlugins(Path pins,
-                          SequencedMap<String, BuildExecutorModule> transforms,
-                          SequencedMap<String, BuildExecutorModule> inspections,
-                          SequencedMap<String, BuildExecutorModule> resolutions) {
+    public ProjectPlugins {
         for (String name : transforms.keySet()) {
             if (List.of(PINS, ADDITIONS).contains(name)) {
                 throw new IllegalArgumentException("Cannot add a transform named " + name + " - the build names a"
-                        + " step of transform so, give the transform another name");
+                        + " step of transform that way, so give the transform another name");
             }
         }
         for (String name : inspections.keySet()) {
             if (List.of(PINS, SEALED, UNCHANGED).contains(name)) {
                 throw new IllegalArgumentException("Cannot add an inspection named " + name + " - the build names a"
-                        + " step of inspect so, give the inspection another name");
+                        + " step of inspect that way, so give the inspection another name");
             }
         }
-        this.pins = pins;
-        this.transforms = transforms;
-        this.inspections = inspections;
-        this.resolutions = resolutions;
     }
 
-    public Path pins() {
-        return pins;
-    }
-
-    public SequencedMap<String, BuildExecutorModule> transforms() {
-        return transforms;
-    }
-
-    public SequencedMap<String, BuildExecutorModule> inspections() {
-        return inspections;
-    }
-
-    public SequencedMap<String, BuildExecutorModule> resolutions() {
-        return resolutions;
+    public ProjectPlugins() {
+        this(null, Collections.emptyNavigableMap(), Collections.emptyNavigableMap(), Collections.emptyNavigableMap());
     }
 
     public ProjectPlugins pins(Path pins) {
