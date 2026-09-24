@@ -4296,10 +4296,10 @@ public class MavenPomResolverTest {
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
         assertThat(pom.managedDependencies()).containsExactly(
                 Map.entry(
-                        new MavenDependencyKey("other", "parent", "jar", null),
+                        new MavenDependencyKey("other", "artifact", "jar", null),
                         new MavenDependencyValue("1", null, null, null, null)),
                 Map.entry(
-                        new MavenDependencyKey("other", "artifact", "jar", null),
+                        new MavenDependencyKey("other", "parent", "jar", null),
                         new MavenDependencyValue("1", null, null, null, null)));
     }
 
@@ -4375,10 +4375,10 @@ public class MavenPomResolverTest {
                         new MavenDependencyValue("1", MavenDependencyScope.COMPILE, null, null, null)));
         assertThat(pom.managedDependencies()).containsExactly(
                 Map.entry(
-                        new MavenDependencyKey("other", "parent", "jar", null),
+                        new MavenDependencyKey("other", "artifact", "jar", null),
                         new MavenDependencyValue("1", null, null, null, null)),
                 Map.entry(
-                        new MavenDependencyKey("other", "artifact", "jar", null),
+                        new MavenDependencyKey("other", "parent", "jar", null),
                         new MavenDependencyValue("1", null, null, null, null)));
     }
 
@@ -5253,6 +5253,124 @@ public class MavenPomResolverTest {
         assertThat(deps.get(new MavenDependencyKey("shared", "artifact", "jar", null)).version())
                 .as("the first-declared imported BOM manages the version")
                 .isEqualTo("1");
+    }
+
+    @Test
+    public void own_imported_bom_wins_over_inherited_imported_bom() throws IOException {
+        addToRepository("unscoped", "bom", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>unscoped</groupId>
+                    <artifactId>bom</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>testing</groupId>
+                                <artifactId>artifact</artifactId>
+                                <version>1</version>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        addToRepository("scoped", "bom", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>scoped</groupId>
+                    <artifactId>bom</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>testing</groupId>
+                                <artifactId>artifact</artifactId>
+                                <version>1</version>
+                                <scope>test</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        addToRepository("parent", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>parent</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>unscoped</groupId>
+                                <artifactId>bom</artifactId>
+                                <version>1</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        addToRepository("group", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <parent>
+                        <groupId>parent</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                    </parent>
+                    <artifactId>artifact</artifactId>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>scoped</groupId>
+                                <artifactId>bom</artifactId>
+                                <version>1</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>testing</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("consumer", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <dependencies>
+                        <dependency>
+                            <groupId>group</groupId>
+                            <artifactId>artifact</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("testing", "artifact", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                </project>
+                """);
+        SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = mavenPomResolver.dependencies(
+                Runnable::run, mavenRepository, "consumer", "artifact", "1", null);
+        assertThat(dependencies)
+                .as("the POM's own import manages the scope before its parent's import, so the test dependency stays out")
+                .containsOnlyKeys(new MavenDependencyKey("group", "artifact", "jar", null));
     }
 
     @Test

@@ -618,6 +618,7 @@ public class MavenPomResolver implements MavenResolver {
                         .orElse(null);
                 Map<String, String> properties = new HashMap<>();
                 Map<DependencyKey, DependencyValue> managedDependencies = new LinkedHashMap<>();
+                Map<DependencyKey, DependencyValue> inheritedManagedDependencies = new LinkedHashMap<>();
                 SequencedMap<DependencyKey, DependencyValue> dependencies = new LinkedHashMap<>();
                 List<License> parentLicenses = List.of();
                 String groupId = null, artifactId = null, version = null;
@@ -678,7 +679,7 @@ public class MavenPomResolver implements MavenResolver {
                             properties.put("project.parent." + property, value);
                         }
                     }
-                    managedDependencies.putAll(resolution.managedDependencies());
+                    inheritedManagedDependencies.putAll(resolution.managedDependencies());
                     dependencies.putAll(resolution.dependencies());
                     parentLicenses = resolution.licenses();
                 }
@@ -701,6 +702,7 @@ public class MavenPomResolver implements MavenResolver {
                         .flatMap(node -> toChildren400(node, "dependency"))
                         .map(node -> toDependency400(node, trusted))
                         .forEach(entry -> managedDependencies.put(entry.getKey(), entry.getValue()));
+                inheritedManagedDependencies.forEach(managedDependencies::putIfAbsent);
                 toChildren400(document.getDocumentElement(), "dependencies")
                         .limit(1)
                         .flatMap(node -> toChildren400(node, "dependency"))
