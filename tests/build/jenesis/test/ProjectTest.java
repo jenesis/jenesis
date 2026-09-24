@@ -682,6 +682,23 @@ public class ProjectTest {
     }
 
     @Test
+    public void leaves_out_every_plugin_when_plugins_are_switched_off() throws IOException {
+        Files.writeString(root.resolve("jenesis-plugins.properties"), """
+                greeting+binary/generated=demo.greeting
+                licenses+transform=./licenses
+                audit+inspect=demo.audit
+                """);
+        Project project = Project.ofEnvironment(new Environment(Map.of("project.plugins", "false")), root);
+        assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
+                assembler -> assertThat(assembler.plugins()).isEmpty());
+        assertThat(project.plugins().transforms()).isEmpty();
+        assertThat(project.plugins().inspections()).isEmpty();
+        assertThat(project.plugins().resolutions())
+                .as("pin still pins the plugins it leaves out")
+                .containsOnlyKeys("licenses", "audit");
+    }
+
+    @Test
     public void refuses_a_plugin_of_inspect_that_shares_its_name_with_a_module_plugin() throws IOException {
         Files.writeString(root.resolve("jenesis-plugins.properties"), """
                 audit+check=./audit
