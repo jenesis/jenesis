@@ -461,8 +461,8 @@ public class InferredMultiProjectAssemblerTest {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("plugin-lint.properties"), "level=strict\n");
         List<SequencedMap<String, String>> received = new ArrayList<>();
-        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
-        plugins.put("lint+check", properties -> {
+        SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("lint+check", (_, properties) -> {
             received.add(properties);
             return new MarkerStep().asModule("lint");
         });
@@ -473,10 +473,32 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void hands_a_plugin_the_folder_of_its_module_to_resolve_inputs_against() throws IOException {
+        Fixture base = setUp("main=com.example.Entry\n", false, false, false);
+        Files.writeString(base.configuration().resolve("plugin-lint.properties"), "@rules=rules\n");
+        Path location = base.sources().resolveSibling("module");
+        Fixture fixture = new Fixture(base.descriptor().location(location),
+                base.build(),
+                base.manifests(),
+                base.sources(),
+                base.artifacts(),
+                base.configuration(),
+                base.profile());
+        List<Path> received = new ArrayList<>();
+        SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("lint+check", (folder, _) -> {
+            received.add(folder);
+            return new MarkerStep().asModule("lint");
+        });
+        fixture.execute(new InferredMultiProjectAssembler().plugins(plugins), "sub/check/custom/lint");
+        assertThat(received).containsExactly(location);
+    }
+
+    @Test
     public void does_not_wire_a_plugin_whose_properties_file_is_missing() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
-        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
-        plugins.put("lint+check", _ -> new MarkerStep().asModule("lint"));
+        SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("lint+check", (_, _) -> new MarkerStep().asModule("lint"));
         fixture.execute(new InferredMultiProjectAssembler().plugins(plugins), "sub/check");
         assertThat(fixture.build().resolve("sub").resolve("check").resolve("custom"))
                 .as("a plugin runs only where plugin-lint.properties is found")
@@ -487,8 +509,8 @@ public class InferredMultiProjectAssemblerTest {
     public void wires_a_plugin_into_a_nested_slot() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("plugin-greeting.properties"), "");
-        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
-        plugins.put("greeting+binary/generated", _ -> new MarkerStep().asModule("greeting"));
+        SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("greeting+binary/generated", (_, _) -> new MarkerStep().asModule("greeting"));
         SequencedMap<String, Path> outputs = fixture.execute(new InferredMultiProjectAssembler().plugins(plugins),
                 "sub/binary/generated/custom/greeting");
         assertThat(outputs.get("sub/binary/generated/custom/greeting").resolve("marker.txt")).exists();
@@ -496,8 +518,8 @@ public class InferredMultiProjectAssemblerTest {
 
     @Test
     public void refuses_a_plugin_in_an_unknown_slot() {
-        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
-        plugins.put("lint+binary/unknown", _ -> (_, _) -> {});
+        SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("lint+binary/unknown", (_, _) -> (_, _) -> {});
         assertThatThrownBy(() -> new InferredMultiProjectAssembler().plugins(plugins))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Cannot add the plugin lint+binary/unknown")

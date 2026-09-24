@@ -194,7 +194,7 @@ never takes a JVM option that configuration could supply.
 
 **`jenesis-plugins.properties` adds to the stock build.** It sits beside `jenesis.properties` and names one plugin
 per line, `<name>+<slot>=<module>`, or `<name>=<module>` for the module build itself: a value starting with `./`
-or `../` is a folder compiled from source by an `InternalModule`, anything else a module name an `ExternalModule`
+is a folder of the project compiled from source by an `InternalModule`, anything else a module name an `ExternalModule`
 resolves as `module/<name>` through the Jenesis module repository, whatever the project's layout, with its closure
 pinned in the group `plugin-<name>`; either may end in `@<provider>` to select the provider annotated
 `@BuildModuleName` with that name. `Project.ofEnvironment` reads the file, so every entry point that builds a
@@ -202,10 +202,15 @@ project from settings builds with its plugins, and the assembler wires a plugin 
 names, in a module only where `plugin-<name>.properties` is found in that module's configuration locations; a
 provider is created with that file's values through a public constructor taking a `SequencedMap` of them, with
 its no-argument constructor when the file is empty, and a file with values for a provider without that
-constructor fails the build. The slots `transform` and `inspect` are not modules of
+constructor fails the build. A key `@<input>=<path>[:<target>]` among those values is not handed over as one:
+it binds a file or folder of the project, resolved against the module's own folder, into a source named after the
+input, placed at `<target>` inside it, which the plugin receives beside what its slot reads as `../inputs/<input>`;
+`@@<key>` is the value `@<key>`. `:` never appears in either path, so the first one splits them, and a path is
+refused unless it resolves, through any symbolic link, to the project itself - as a plugin's own `./<folder>` is.
+The slots `transform` and `inspect` are not modules of
 a project module but of the `verify` goal, which `stage`, `export`, `release` and `Execute` run first: such a
 plugin runs once over the inventory of every module, is switched on by its line alone and configured by the
-`jenesis.plugin.<name>.<key>` settings, so profiles reach it, and `pin` resolves every one of them, a switched-off
+`jenesis.plugin.<name>.<key>` settings, so profiles reach it and its inputs resolve against the project root, and `pin` resolves every one of them, a switched-off
 one included, into `jenesis-plugins-pin.properties` rather than into a module's declaration. A transform adds a
 file to a module by naming it in an `inventory.properties` of its own as `<module>.attachment.<classifier>` or
 `<module>.report.<name>`, which `verify` collects per module and exports as the only outputs `stage` and
