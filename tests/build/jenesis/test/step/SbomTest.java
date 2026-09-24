@@ -110,7 +110,8 @@ public class SbomTest {
         assertThat(manifest.getProperty("Sbom-Location")).isEqualTo("META-INF/sbom/demo.cdx.json");
 
         assertThat(next.resolve("resources").resolve("META-INF").resolve("NOTICE"))
-                .content().contains("Demo").contains("Apache-2.0");
+                .as("the SBOM names the project's licenses, so no NOTICE repeats them")
+                .doesNotExist();
         assertThat(next.resolve("reports").resolve("sbom").resolve("demo-1.0.0.cdx.json")).isNotEmptyFile();
     }
 
