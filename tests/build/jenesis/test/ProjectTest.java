@@ -837,6 +837,59 @@ public class ProjectTest {
     }
 
     @Test
+    public void places_the_project_resources_it_is_told_to_include() throws IOException {
+        Files.writeString(root.resolve("NOTICE"), "notice");
+        Files.writeString(root.resolve("LICENSE"), "licence");
+        Project project = Project.ofEnvironment(new Environment(Map.of("project.resources",
+                "NOTICE:META-INF/NOTICE, LICENSE:META-INF/LICENSE")), root);
+        assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
+                assembler -> assertThat(assembler.resources()).containsExactly(
+                        Map.entry(Path.of("META-INF/NOTICE"), root.toAbsolutePath().normalize().resolve("NOTICE")),
+                        Map.entry(Path.of("META-INF/LICENSE"), root.toAbsolutePath().normalize().resolve("LICENSE"))));
+    }
+
+    @Test
+    public void refuses_a_project_resource_without_a_target() throws IOException {
+        Files.writeString(root.resolve("NOTICE"), "notice");
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.resources", "NOTICE")), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("write <path>:<target>");
+    }
+
+    @Test
+    public void refuses_a_project_resource_outside_the_project() {
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.resources",
+                root.relativize(elsewhere) + ":META-INF/NOTICE")), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("lies outside the project");
+    }
+
+    @Test
+    public void refuses_a_project_resource_that_does_not_exist() {
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.resources", "NOTICE:META-INF/NOTICE")), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("which does not exist");
+    }
+
+    @Test
+    public void refuses_a_project_resource_placed_outside_the_resources() throws IOException {
+        Files.writeString(root.resolve("NOTICE"), "notice");
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.resources", "NOTICE:../NOTICE")), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("name a relative path among the resources");
+    }
+
+    @Test
+    public void refuses_two_project_resources_at_one_target() throws IOException {
+        Files.writeString(root.resolve("NOTICE"), "notice");
+        Files.writeString(root.resolve("OTHER"), "other");
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(Map.of("project.resources",
+                "NOTICE:META-INF/NOTICE,OTHER:META-INF/NOTICE")), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("where another resource of jenesis.project.resources is placed already");
+    }
+
+    @Test
     public void refuses_a_plugin_that_selects_a_provider_without_a_name() throws IOException {
         Files.writeString(root.resolve("jenesis.plugins.properties"), "lint+check=./lint@\n");
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
