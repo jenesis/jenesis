@@ -1,13 +1,12 @@
-Verify demo
-===========
+Transform and inspect demo
+==========================
 
 Run plugins over everything the build produced, after every module is built and
 before anything is staged: a `transform` plugin adds files to the modules, and an
-`inspect` plugin checks the result and fails the build when it is wrong. Both run in
-the `verify` goal, which `stage`, `export` and `release` run first. `build` and
-`java build/jenesis/Execute.java` leave it out, since verifying can take time the
-edit-and-run loop does not need; `java build/jenesis/Make.java verify` runs it on
-its own.
+`inspect` plugin checks the result and fails the build when it is wrong. Both run as
+part of `build`, as `build/transform` and `build/inspect`, so everything after it -
+`stage`, `export`, `release` and `java build/jenesis/Execute.java` - sees what they
+added and never runs past a failed inspection.
 
 Run it
 ------
@@ -20,12 +19,12 @@ The `notice` plugin writes a notice for each module, listing what the module
 includes, and the `audit` plugin checks that every module carries one. The notice is
 staged beside the module's jar:
 
-    target/stage/modular/output/demo.verify/demo.verify-notice.txt
-    target/stage/maven/output/demo/verify/demo.verify/0-SNAPSHOT/demo.verify-0-SNAPSHOT-notice.txt
+    target/stage/modular/output/demo.app/demo.app-notice.txt
+    target/stage/maven/output/demo/app/demo.app/0-SNAPSHOT/demo.app-0-SNAPSHOT-notice.txt
 
 holding
 
-    demo.verify - Copyright Example Corp.
+    demo.app - Copyright Example Corp.
     Licensed under the Apache License, Version 2.0.
       includes maven/org.json/json/20260814
       includes module/org.json/20260814
@@ -34,12 +33,12 @@ Switch the transform off and the inspection refuses the build:
 
     java -Djenesis.plugin.notice=false build/jenesis/Make.java stage
 
-    No notice is attached to demo.verify - add notice+transform to jenesis-plugins.properties, or switch it back on
+    No notice is attached to demo.app - add notice+transform to jenesis-plugins.properties, or switch it back on
 
 Layout
 ------
 
-    demo/demo-67-verify
+    demo/demo-67-transform-inspect
     |-- build/jenesis                      symlink to ../../../sources/build/jenesis
     |-- jenesis.properties                 jenesis.plugin.notice.holder=Example Corp.
     |                                      jenesis.plugin.notice.@legal=legal
@@ -50,19 +49,19 @@ Layout
     |-- notice/                            the transform, compiled from source
     |-- audit/                             the inspection, compiled from source
     `-- sources/
-        |-- module-info.java               module demo.verify { requires org.json; }
+        |-- module-info.java               module demo.app { requires org.json; }
         `-- sample/Sample.java
 
 Naming the plugins
 ------------------
 
 The plugins are named in `jenesis-plugins.properties`, as the `internal-module`
-demo names its generator, but under one of the two slots of `verify`:
+demo names its generator, but under one of two slots of the project's build:
 
     notice+transform=./notice
     audit+inspect=./audit
 
-A plugin of `verify` runs once for the whole build rather than once per module, so
+A plugin of `transform` or `inspect` runs once for the whole build rather than once per module, so
 no `plugin-<name>.properties` switches it on in a module: the line itself does.
 Transforms run in the order the file names them, each seeing what the ones before
 it added, and the inspections run after all of them.
@@ -70,7 +69,7 @@ it added, and the inspections run after all of them.
 Configuring the plugins
 -----------------------
 
-A plugin of `verify` reads its values from settings named
+A plugin of `transform` or `inspect` reads its values from settings named
 `jenesis.plugin.<name>.<key>`, so they come from `jenesis.properties`, a profile, your
 own `~/.jenesis/jenesis.properties` or the command line, like any other setting. This
 demo's `jenesis.properties` holds
@@ -79,7 +78,14 @@ demo's `jenesis.properties` holds
 
 which reaches the plugin's `SequencedMap` constructor as `holder=Example Corp.`.
 `-Djenesis.plugin.<name>=false` leaves a plugin out, and a profile can switch one
-back on.
+back on. As the plugins run with every build, one that takes long is best switched
+off in `jenesis.properties` and on in the profile that ships:
+
+    # jenesis.properties
+    jenesis.plugin.audit=false
+
+    # jenesis-release.properties, active with -Djenesis.make.profiles=release
+    jenesis.plugin.audit=true
 
 Binding project files
 ---------------------
@@ -126,7 +132,7 @@ changes a file it was handed fails the build as well.
 Pinning the plugins
 -------------------
 
-The plugins of `verify` belong to no module, so their pins live beside the file
+The plugins of `transform` and `inspect` belong to no module, so their pins live beside the file
 that names them, in `jenesis-plugins-pin.properties`, one line for each module in
 each plugin's closure:
 
