@@ -10,8 +10,8 @@ import build.jenesis.Environment;
 public class Legal implements BuildStep {
 
     public static final String LEGAL = "legal/";
-    private static final SequencedSet<String> NOTICES = Collections.unmodifiableSequencedSet(new LinkedHashSet<>(List.of(
-            "META-INF/NOTICE", "META-INF/LICENSE", "META-INF/license/", "META-INF/licenses/", "LICENSE", "about.html")));
+    private static final SequencedSet<String> NOTICES = new LinkedHashSet<>(List.of(
+            "META-INF/NOTICE", "META-INF/LICENSE", "META-INF/license/", "META-INF/licenses/", "LICENSE", "about.html"));
 
     private final String group;
     private final SequencedSet<String> notices;
