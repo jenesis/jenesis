@@ -585,7 +585,7 @@ public record Project(
                     jenesis.toolchain.searchpath, this system's usual JDK folders unless set, and only
                     the command line or ~/.jenesis/jenesis.properties may set it. Nothing is installed.
 
-                    To add to the stock build, name plugins in jenesis-plugins.properties beside
+                    To add to the stock build, name plugins in jenesis.plugins.properties beside
                     jenesis.properties, one line each: <name>+<slot>=<module name>, or =./<folder> for
                     a plugin compiled from source, where the slot is a module of the build (check,
                     binary/generated, artifact, ...) or left out for the module build itself, and
@@ -605,9 +605,9 @@ public record Project(
                     build/transform and build/inspect, after the modules and before anything is
                     staged; switch an expensive one off with -Djenesis.plugin.<name>=false or in a
                     profile, and every plugin with -Djenesis.project.plugins=false. Such a plugin
-                    reads its values as <name>.<key> from jenesis-plugins-arguments.properties, and
-                    from a jenesis-plugins-arguments-<profile>.properties per active profile, and pin
-                    writes its pins to jenesis-plugins-pin.properties. A transform adds files to a module by
+                    reads its values as <name>.<key> from jenesis.plugins.arguments.properties, and
+                    from a jenesis.plugins.arguments-<profile>.properties per active profile, and pin
+                    writes its pins to jenesis.plugins.pin.properties. A transform adds files to a module by
                     naming them in an inventory.properties of its own, as
                     <module>.attachment.<classifier> or <module>.report.<name>; an inspection fails
                     the build by throwing and changes nothing it was handed.
@@ -1515,7 +1515,7 @@ public record Project(
     public static Project ofEnvironment(Environment environment, Path root) {
         InferredMultiProjectAssembler assembler = InferredMultiProjectAssembler.ofEnvironment(environment);
         ProjectPlugins projectPlugins = new ProjectPlugins();
-        Path file = root.resolve("jenesis-plugins.properties");
+        Path file = root.resolve("jenesis.plugins.properties");
         if (Files.isRegularFile(file)) {
             SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
             SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> transforms = new LinkedHashMap<>(),
@@ -1633,8 +1633,8 @@ public record Project(
                 }
             }
             assembler = assembler.plugins(plugins);
-            projectPlugins = new ProjectPlugins(root.resolve("jenesis-plugins-pin.properties"),
-                    root.resolve("jenesis-plugins-arguments.properties"),
+            projectPlugins = new ProjectPlugins(root.resolve("jenesis.plugins.pin.properties"),
+                    root.resolve("jenesis.plugins.arguments.properties"),
                     transforms,
                     inspections,
                     resolutions);
@@ -2538,7 +2538,7 @@ public record Project(
                 project.boms||Comma-separated locations of local pin-<name>.properties; default: the configuration folders
                 project.signatures||Comma-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
-                project.plugins|true|false leaves out every plugin that jenesis-plugins.properties names, while pin still pins those of transform and inspect
+                project.plugins|true|false leaves out every plugin that jenesis.plugins.properties names, while pin still pins those of transform and inspect
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
                 project.docker|false|Run the whole build inside a container
                 project.docker.image||Image for that container
@@ -2588,7 +2588,7 @@ public record Project(
                 pin.bom|keep|keep|flatten: whether pinning keeps BOM references or resolves them away
                 pin.retain|groups|groups|all|none: which pins no closure resolved a refresh keeps - those of groups it did not resolve, all, or none
                 platform.<token>||true adds a platform token and false removes one, selecting guarded pins
-                plugin.<name>|true|false leaves out the plugin <name> that jenesis-plugins.properties names
+                plugin.<name>|true|false leaves out the plugin <name> that jenesis.plugins.properties names
                 repository.insecure|false|Allow plaintext http:// repository fetches; only the command line or ~/.jenesis/jenesis.properties may allow it, never a file a project provides
                 repository.retries|2|Retries after a failed fetch; 0 disables
                 repository.backoff|125|Initial retry backoff in milliseconds, doubling per attempt

@@ -773,7 +773,7 @@ reads it back from its own `<java.home>/conf/` - content a jar cannot carry.
 ## 37. Plugins - [`internal-module`](demo-53-internal-module/README.md), [`external-module`](demo-54-external-module/README.md)
 
 A plugin adds to the stock build without an entry point of its own. It is named in
-one line of `jenesis-plugins.properties`, beside `jenesis.properties`, with the
+one line of `jenesis.plugins.properties`, beside `jenesis.properties`, with the
 module of the build it joins and where it comes from, and it runs in a module
 only where `plugin-<name>.properties` is found:
 
@@ -1002,8 +1002,8 @@ produced, as `build/transform` and `build/inspect`, before anything is staged:
 A transform adds files to the modules - here a notice listing what each module
 includes, staged beside its jar - and an inspection fails the build when the
 result is wrong. Both see every module with the jars it resolved, both read their
-values from `jenesis-plugins-arguments.properties`, and `pin` records their own
-closures in `jenesis-plugins-pin.properties`.
+values from `jenesis.plugins.arguments.properties`, and `pin` records their own
+closures in `jenesis.plugins.pin.properties`.
 
 Cross-cutting concepts
 ----------------------
