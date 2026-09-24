@@ -62,6 +62,10 @@ public class LauncherTest {
                 .as("the launcher classes are shaded into the root, without its module-info or manifest")
                 .contains("build/jenesis/launcher/Launcher.class")
                 .doesNotContain("module-info.class", "build/jenesis/launcher/module-info.class");
+        assertThat(entries)
+                .as("the launcher's own licence and notice come with its classes, nothing else of its META-INF does")
+                .contains("META-INF/LICENSE", "META-INF/NOTICE")
+                .doesNotContain("META-INF/sbom/build.jenesis.launcher.cdx.json");
         assertThat(entries).contains(
                 "application.properties",
                 "jars/app.jar/sample/Sample.class",
@@ -206,6 +210,9 @@ public class LauncherTest {
         try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(path))) {
             entry(jar, "module-info.class");
             entry(jar, "build/jenesis/launcher/Launcher.class");
+            entry(jar, "META-INF/LICENSE");
+            entry(jar, "META-INF/NOTICE");
+            entry(jar, "META-INF/sbom/build.jenesis.launcher.cdx.json");
         }
     }
 
