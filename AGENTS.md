@@ -209,11 +209,12 @@ reads as `../inputs/<input>`. The same input takes one key per target, which `Bi
 and merges into one folder, so a plugin module holds its inputs as a map from name to target to source; `@@<key>`
 is the value `@<key>`, and a path is refused unless it resolves, through any symbolic link, to the project itself -
 as a plugin's own `./<folder>` is.
-The slots `transform` and `inspect` are not modules of a project module but
-`build/transform` and `build/inspect`, which every layout registers inside `build` after its project module, so
-that everything depending on `build` sees their additions and nothing runs past a failed inspection; an
+The slots `postprocess/transform` and `postprocess/inspect` are not modules of a project module but of
+`build/postprocess`, which every layout registers inside `build` after its project module and which keeps the
+transforms under `transform/` and the inspections under `inspect/`, apart from its own steps, so that no plugin name
+is taken; so that everything depending on `build` sees their additions and nothing runs past a failed inspection; an
 expensive one is switched off by its setting, in a profile if need be, and `jenesis.project.plugins=false` leaves
-out every plugin the file names, while `pin` still resolves those of `transform` and `inspect`: such a plugin runs
+out every plugin the file names, while `pin` still resolves those of `postprocess`: such a plugin runs
 once over the inventory of every module, is switched on by its line alone and configured, never from the command
 line, by the `<name>.<key>` lines of `jenesis.plugins.arguments.properties` and of a
 `jenesis.plugins.arguments-<profile>.properties` per active profile, read when the layout knows the profiles, so an

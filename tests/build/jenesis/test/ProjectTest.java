@@ -179,11 +179,10 @@ public class ProjectTest {
             SequencedMap<String, Path> outputs = Project.ofEnvironment(new Environment(settings), root)
                     .target(root.resolve("target-" + layout.hashCode()))
                     .layout(layout)
-                    .build(Project.BUILD + "/" + ProjectPlugins.INSPECT);
+                    .build(Project.BUILD + "/" + ProjectPlugins.POSTPROCESS);
             assertThat(outputs.keySet())
-                    .as("build/inspect is a selector of every layout, and adds nothing without a transform or an inspection")
-                    .noneMatch(key -> key.startsWith(Project.BUILD + "/" + ProjectPlugins.TRANSFORM + "/")
-                            || key.startsWith(Project.BUILD + "/" + ProjectPlugins.INSPECT + "/"));
+                    .as("build/postprocess is a selector of every layout, and adds nothing without a transform or an inspection")
+                    .noneMatch(key -> key.startsWith(Project.BUILD + "/" + ProjectPlugins.POSTPROCESS + "/"));
         }
     }
 
@@ -656,8 +655,8 @@ public class ProjectTest {
     public void hands_the_plugins_of_transform_and_inspect_to_the_project() throws IOException {
         Files.writeString(root.resolve("jenesis.plugins.properties"), """
                 greeting+binary/generated=demo.greeting
-                licenses+transform=./licenses
-                audit+inspect=demo.audit@audit
+                licenses+postprocess/transform=./licenses
+                audit+postprocess/inspect=demo.audit@audit
                 """);
         Project project = Project.ofEnvironment(new Environment(settings), root);
         assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
@@ -671,8 +670,8 @@ public class ProjectTest {
     @Test
     public void still_resolves_a_plugin_of_transform_or_inspect_its_setting_switches_off() throws IOException {
         Files.writeString(root.resolve("jenesis.plugins.properties"), """
-                licenses+transform=./licenses
-                audit+inspect=demo.audit
+                licenses+postprocess/transform=./licenses
+                audit+postprocess/inspect=demo.audit
                 """);
         Project project = Project.ofEnvironment(new Environment(Map.of("plugin.audit", "false")), root);
         assertThat(project.plugins().transforms()).containsOnlyKeys("licenses");
@@ -686,8 +685,8 @@ public class ProjectTest {
     public void leaves_out_every_plugin_when_plugins_are_switched_off() throws IOException {
         Files.writeString(root.resolve("jenesis.plugins.properties"), """
                 greeting+binary/generated=demo.greeting
-                licenses+transform=./licenses
-                audit+inspect=demo.audit
+                licenses+postprocess/transform=./licenses
+                audit+postprocess/inspect=demo.audit
                 """);
         Project project = Project.ofEnvironment(new Environment(Map.of("project.plugins", "false")), root);
         assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
@@ -703,7 +702,7 @@ public class ProjectTest {
     public void refuses_a_plugin_of_inspect_that_shares_its_name_with_a_module_plugin() throws IOException {
         Files.writeString(root.resolve("jenesis.plugins.properties"), """
                 audit+check=./audit
-                audit+inspect=./audit
+                audit+postprocess/inspect=./audit
                 """);
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -713,7 +712,7 @@ public class ProjectTest {
 
     @Test
     public void refuses_a_plugin_of_transform_whose_name_holds_a_dot() throws IOException {
-        Files.writeString(root.resolve("jenesis.plugins.properties"), "the.licenses+transform=./licenses\n");
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "the.licenses+postprocess/transform=./licenses\n");
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("holding no /, . or +");
@@ -722,12 +721,12 @@ public class ProjectTest {
     @Test
     public void refuses_a_plugin_named_for_both_transform_and_inspect() throws IOException {
         Files.writeString(root.resolve("jenesis.plugins.properties"), """
-                audit+transform=./audit
-                audit+inspect=./audit
+                audit+postprocess/transform=./audit
+                audit+postprocess/inspect=./audit
                 """);
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Cannot add the plugin audit+inspect")
+                .hasMessageContaining("Cannot add the plugin audit+postprocess/inspect")
                 .hasMessageContaining("takes a name of its own");
     }
 
@@ -817,11 +816,20 @@ public class ProjectTest {
 
     @Test
     public void refuses_a_plugin_compiled_from_a_folder_outside_the_project() throws IOException {
-        Files.writeString(root.resolve("jenesis.plugins.properties"), "gen+check=../gen\n");
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "gen+check=./../gen\n");
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The plugin gen+check")
                 .hasMessageContaining("lies outside the project");
+    }
+
+    @Test
+    public void refuses_a_plugin_location_that_is_neither_a_module_nor_a_folder() throws IOException {
+        Files.writeString(root.resolve("jenesis.plugins.properties"), "gen+check=../gen\n");
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The plugin gen+check")
+                .hasMessageContaining("neither a module name nor a folder of the project");
     }
 
     private BuildExecutorModule plugin(String... declarations) throws IOException {

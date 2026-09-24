@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import javax.lang.model.SourceVersion;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenModuleResolver;
@@ -154,8 +155,7 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               mavenDeps);
-                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(project.profiles()), "maven");
-                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(project.profiles()), "maven", ProjectPlugins.TRANSFORM);
+                sub.addModule(ProjectPlugins.POSTPROCESS, project.plugins().postprocess(project.profiles()), "maven");
             }, METADATA);
             executor.addModule(STAGE, (stage, inherited) -> {
                 stage.addStep("maven", MavenRepositoryStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
@@ -228,8 +228,7 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
-                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(project.profiles()), "modules");
-                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(project.profiles()), "modules", ProjectPlugins.TRANSFORM);
+                sub.addModule(ProjectPlugins.POSTPROCESS, project.plugins().postprocess(project.profiles()), "modules");
             }, METADATA);
             executor.addModule(STAGE, (stage, inherited) -> {
                 stage.addStep("modular", ModularStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
@@ -307,8 +306,7 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
-                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(project.profiles()), "modules");
-                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(project.profiles()), "modules", ProjectPlugins.TRANSFORM);
+                sub.addModule(ProjectPlugins.POSTPROCESS, project.plugins().postprocess(project.profiles()), "modules");
             }, METADATA);
             executor.addModule(STAGE, (stage, inherited) -> {
                 stage.addStep("maven", MavenRepositoryStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
@@ -601,14 +599,15 @@ public record Project(
                     project's code, as its tests do, so build an untrusted project with
                     -Djenesis.project.docker=true.
 
-                    The slots transform and inspect run a plugin once over every module built, as
-                    build/transform and build/inspect, after the modules and before anything is
+                    The slots postprocess/transform and postprocess/inspect run a plugin once over
+                    every module built, as build/postprocess/transform/<name> and
+                    build/postprocess/inspect/<name>, after the modules and before anything is
                     staged; switch an expensive one off with -Djenesis.plugin.<name>=false or in a
                     profile, and every plugin with -Djenesis.project.plugins=false. Such a plugin
                     reads its values as <name>.<key> from jenesis.plugins.arguments.properties, and
                     from a jenesis.plugins.arguments-<profile>.properties per active profile, and pin
-                    writes its pins to jenesis.plugins.pin.properties. A transform adds files to a module by
-                    naming them in an inventory.properties of its own, as
+                    writes its pins to jenesis.plugins.pin.properties. A transform adds files to a
+                    module by naming them in an inventory.properties of its own, as
                     <module>.attachment.<classifier> or <module>.report.<name>; an inspection fails
                     the build by throwing and changes nothing it was handed.
 
@@ -1007,7 +1006,7 @@ public record Project(
                     than the JVM, so two runs in one program never clash; everything after them is
                     what the command line would take. A setting that replaces the process a build
                     runs in - toolchain.version, project.docker, execute.docker - is refused by name
-                    there, and demo-58-tools-api shows the whole contract.
+                    there, and demo-60-tools-api shows the whole contract.
 
                     Every command line here, the commands and the tools alike, reads @<file> as the
                     arguments that file holds - settings and selectors, # to the end of a line being
@@ -1054,44 +1053,45 @@ public record Project(
                     https://github.com/jenesis/jenesis/tree/main/demo.
 
                       Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
-                                         04 java-modular-multi, 19 module-layout (forcing MODULAR)
+                                         04 java-modular-multi, 20 module-layout (forcing MODULAR)
                       Starting a build   05 startup (what launching costs, and the daemon),
-                                         64 toolchain (the JDK the build runs on)
-                      Runnable output    06, 07 java-*-executable (jpackage), 08 bundle (jars for a
-                                         stock JRE), 09 java-multi-release, 65 native-image (GraalVM)
-                      Compiler control   10 javac-arguments (process-javac.properties),
-                                         11 annotations (an annotation processor via @jenesis.plugin),
-                                         12 error-prone (a javac plugin)
-                      Generated sources  13 data-formats (xjc, protoc, avro),
-                                         14 service-contracts (wsimport, OpenAPI),
-                                         15 antlr (a grammar)
-                      Dependencies       16 maven-exclusions, 17 bom, 18 module-alias,
-                                         20 module-override, 21, 22 module-layers (a private
-                                         dependency), 23, 24 platform-guard (classified and
+                                         06 toolchain (the JDK the build runs on)
+                      Runnable output    07, 08 java-*-executable (jpackage), 09 bundle (jars for a
+                                         stock JRE), 10 java-multi-release, 66 native-image (GraalVM)
+                      Compiler control   11 javac-arguments (process-javac.properties),
+                                         12 annotations (an annotation processor via @jenesis.plugin),
+                                         13 error-prone (a javac plugin)
+                      Generated sources  14 data-formats (xjc, protoc, avro),
+                                         15 service-contracts (wsimport, OpenAPI),
+                                         16 antlr (a grammar)
+                      Dependencies       17 maven-exclusions, 18 bom, 19 module-alias,
+                                         21 module-override, 22, 23 module-layers (a private
+                                         dependency), 24, 25 platform-guard (classified and
                                          per-platform variants)
-                      Trusting them      25 pinning (versions and checksums), 26 openpgp (a declared
-                                         key), 27 sigstore (a declared identity, no key at all),
-                                         28 sbom, 29 compliance (licenses), 30 vulnerabilities (OSV)
-                      Quality gates      31 java-quality, 37 api-compatibility (japicmp),
-                                         39 kotlin-quality, 42 scala-quality, 44 groovy-quality
-                      Tests              32 test-framework (what the tests are written against),
-                                         33 code-coverage (JaCoCo), 34 test-selection (incremental),
-                                         35 pitest (mutation), 36 jmh (benchmark harness)
-                      Other languages    38 kotlin, 40 kotlin-plugin, 41 scala, 43 groovy
-                      Operating it       45 profiles, 46 build-cache, 47 docker-isolation,
-                                         48 agents (@jenesis.attach),
-                                         49 native-access (@jenesis.native),
-                                         50 native-access-layer (passed on to a layer)
-                      Shipping it        59 code-signing (jarsigner), 60 export (into the local repositories),
-                                         61 publishing (Maven Central),
-                                         62 module-convention (resolving what you published),
-                                         63 reproducible (a jar checked against a recorded digest),
-                                         66 jpx (run a released program without building)
-                      Extending it       51 custom-assembler, 52 custom-jmod, 53 internal-module,
-                                         54 external-module, 55 custom-maven, 56 custom-modular,
-                                         57 custom-build (no Project at all),
-                                         58 tools-api (a build inside another program's JVM),
-                                         67 transform-inspect (add to and inspect every module built)
+                      Trusting them      26 pinning (versions and checksums), 27 openpgp (a declared
+                                         key), 28 sigstore (a declared identity, no key at all),
+                                         29 sbom, 30 compliance (licenses), 31 vulnerabilities (OSV)
+                      Quality gates      32 java-quality, 38 api-compatibility (japicmp),
+                                         40 kotlin-quality, 43 scala-quality, 45 groovy-quality
+                      Tests              33 test-framework (what the tests are written against),
+                                         34 code-coverage (JaCoCo), 35 test-selection (incremental),
+                                         36 pitest (mutation), 37 jmh (benchmark harness)
+                      Other languages    39 kotlin, 41 kotlin-plugin, 42 scala, 44 groovy
+                      Operating it       46 profiles, 47 build-cache, 48 docker-isolation,
+                                         49 agents (@jenesis.attach),
+                                         50 native-access (@jenesis.native),
+                                         51 native-access-layer (passed on to a layer)
+                      Shipping it        61 code-signing (jarsigner), 62 export (into the local repositories),
+                                         63 publishing (Maven Central),
+                                         64 module-convention (resolving what you published),
+                                         65 reproducible (a jar checked against a recorded digest),
+                                         67 jpx (run a released program without building)
+                      Extending it       52 custom-assembler, 53 custom-jmod, 54 internal-module,
+                                         55 external-module,
+                                         56 transform-inspect (add to and inspect every module built),
+                                         57 custom-maven, 58 custom-modular,
+                                         59 custom-build (no Project at all),
+                                         60 tools-api (a build inside another program's JVM)
 
                     ## 14. When stuck, read the source
 
@@ -1532,7 +1532,9 @@ public record Project(
             declared.forEachProperty((key, value) -> {
                 String name = key.indexOf('+') == -1 ? key : key.substring(0, key.indexOf('+'));
                 String slot = key.indexOf('+') == -1 ? "" : key.substring(key.indexOf('+') + 1);
-                boolean projectWide = slot.equals(ProjectPlugins.TRANSFORM) || slot.equals(ProjectPlugins.INSPECT);
+                String transform = ProjectPlugins.POSTPROCESS + "/" + ProjectPlugins.TRANSFORM,
+                        inspect = ProjectPlugins.POSTPROCESS + "/" + ProjectPlugins.INSPECT;
+                boolean projectWide = slot.equals(transform) || slot.equals(inspect);
                 if (!projectWide) {
                     modulePlugins.add(name);
                 }
@@ -1551,7 +1553,12 @@ public record Project(
                             + " from source, followed by @<name> to select the provider annotated with that"
                             + " @BuildModuleName");
                 }
-                boolean folder = location.startsWith("./") || location.startsWith("../");
+                boolean folder = location.startsWith("./");
+                if (!folder && !SourceVersion.isName(location)) {
+                    throw new IllegalArgumentException("The plugin " + key + " in " + file + " names " + location
+                            + ", which is neither a module name nor a folder of the project - name the module that"
+                            + " provides it, or its folder as ./<folder>");
+                }
                 InternalModule internal = folder
                         ? InternalModule.ofEnvironment(environment,
                                         "module",
@@ -1618,18 +1625,18 @@ public record Project(
                 }
                 if (name.isEmpty() || name.contains("/") || name.contains(".") || resolutions.putIfAbsent(name, resolution) != null) {
                     throw new IllegalArgumentException("Cannot add the plugin " + key + " in " + file + " - a plugin"
-                            + " of " + ProjectPlugins.TRANSFORM + " or " + ProjectPlugins.INSPECT + " takes a name of its"
+                            + " of " + transform + " or " + inspect + " takes a name of its"
                             + " own, holding no /, . or +");
                 }
                 if (enabled) {
-                    (slot.equals(ProjectPlugins.TRANSFORM) ? transforms : inspections).put(name, values -> plugin.apply(root, values));
+                    (slot.equals(transform) ? transforms : inspections).put(name, values -> plugin.apply(root, values));
                 }
             });
             for (String name : resolutions.keySet()) {
                 if (modulePlugins.contains(name)) {
                     throw new IllegalArgumentException("The plugin " + name + " in " + file + " is named both for"
-                            + " a module slot and for " + ProjectPlugins.TRANSFORM + " or " + ProjectPlugins.INSPECT
-                            + " - a plugin of transform or inspect takes a name of its own");
+                            + " a module slot and for " + ProjectPlugins.POSTPROCESS + " - a plugin of "
+                            + ProjectPlugins.POSTPROCESS + " takes a name of its own");
                 }
             }
             assembler = assembler.plugins(plugins);
@@ -2565,7 +2572,7 @@ public record Project(
                 project.signatures||Comma-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.resources||Comma-separated <path>:<target> pairs of project files or folders placed among the resources of every module, as NOTICE:META-INF/NOTICE,LICENSE:META-INF/LICENSE
-                project.plugins|true|false leaves out every plugin that jenesis.plugins.properties names, while pin still pins those of transform and inspect
+                project.plugins|true|false leaves out every plugin that jenesis.plugins.properties names, while pin still pins those of postprocess
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
                 project.docker|false|Run the whole build inside a container
                 project.docker.image||Image for that container
