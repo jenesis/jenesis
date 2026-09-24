@@ -993,11 +993,11 @@ installation directed at its own `target/` so your home directory is left alone.
 ## 49. Checking what a build produced - [`transform-inspect`](demo-67-transform-inspect/README.md)
 
 The plugins of the `internal-module` demo join one module of the build. A plugin
-named under `transform` or `inspect` instead runs once over everything the build
-produced, as `build/transform` and `build/inspect`, before anything is staged:
+named under `postprocess/transform` or `postprocess/inspect` instead runs once over
+everything the build produced, in `build/postprocess`, before anything is staged:
 
-    notice+transform=./notice
-    audit+inspect=./audit
+    notice+postprocess/transform=./notice
+    audit+postprocess/inspect=./audit
 
 A transform adds files to the modules - here a notice listing what each module
 includes, staged beside its jar - and an inspection fails the build when the

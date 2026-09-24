@@ -47,9 +47,9 @@ public class ProjectPluginsTest {
     public void adds_what_a_transform_attaches_to_the_inventory_of_its_module() throws IOException {
         wire(new ProjectPlugins().transform("licenses", new Attach("licenses", "module-app")));
 
-        SequencedMap<String, Path> result = buildExecutor.execute("inspect");
+        SequencedMap<String, Path> result = buildExecutor.execute("postprocess");
 
-        Path additions = result.get("transform/additions/module-app");
+        Path additions = result.get("postprocess/additions/module-app");
         assertThat(additions).isNotNull();
         assertThat(SequencedProperties.ofFiles(additions.resolve(Inventory.INVENTORY)).getProperty("module-app.attachment.licenses"))
                 .isEqualTo("attachment/licenses/licenses.txt");
@@ -62,10 +62,10 @@ public class ProjectPluginsTest {
                 .transform("licenses", new Attach("licenses", "module-app"))
                 .inspect("audit", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true))));
 
-        SequencedMap<String, Path> result = buildExecutor.execute("inspect");
+        SequencedMap<String, Path> result = buildExecutor.execute("postprocess");
 
-        assertThat(result.keySet().stream().filter(key -> key.startsWith("transform/") || key.startsWith("inspect/")))
-                .containsExactly("transform/additions/module-app");
+        assertThat(result.keySet().stream().filter(key -> key.startsWith("postprocess/")))
+                .containsExactly("postprocess/additions/module-app");
     }
 
     @Test
@@ -74,16 +74,16 @@ public class ProjectPluginsTest {
                 .transform("licenses", new Attach("licenses", "module-app"))
                 .transform("notice", new AttachAfter("notice", "licenses.txt")));
 
-        SequencedMap<String, Path> result = buildExecutor.execute("inspect");
+        SequencedMap<String, Path> result = buildExecutor.execute("postprocess");
 
-        assertThat(result.get("transform/additions/module-app").resolve("attachment/notice/notice.txt")).hasContent("notice");
+        assertThat(result.get("postprocess/additions/module-app").resolve("attachment/notice/notice.txt")).hasContent("notice");
     }
 
     @Test
     public void refuses_an_addition_for_a_module_the_build_does_not_have() {
         wire(new ProjectPlugins().transform("licenses", new Attach("licenses", "module-other")));
 
-        assertThatThrownBy(() -> buildExecutor.execute("inspect"))
+        assertThatThrownBy(() -> buildExecutor.execute("postprocess"))
                 .isInstanceOf(BuildExecutorException.class)
                 .rootCause()
                 .isInstanceOf(IllegalArgumentException.class)
@@ -100,7 +100,7 @@ public class ProjectPluginsTest {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }));
 
-        assertThatThrownBy(() -> buildExecutor.execute("inspect"))
+        assertThatThrownBy(() -> buildExecutor.execute("postprocess"))
                 .isInstanceOf(BuildExecutorException.class)
                 .rootCause()
                 .isInstanceOf(IllegalArgumentException.class)
@@ -113,7 +113,7 @@ public class ProjectPluginsTest {
             throw new IllegalStateException("no licence for app");
         }));
 
-        assertThatThrownBy(() -> buildExecutor.execute("inspect"))
+        assertThatThrownBy(() -> buildExecutor.execute("postprocess"))
                 .isInstanceOf(BuildExecutorException.class)
                 .rootCause()
                 .hasMessage("no licence for app");
@@ -125,7 +125,7 @@ public class ProjectPluginsTest {
                 .transform("licenses", new Attach("licenses", "module-app"))
                 .inspect("audit", new RequireFile("licenses.txt")));
 
-        assertThat(buildExecutor.execute("inspect")).containsKey("transform/additions/module-app");
+        assertThat(buildExecutor.execute("postprocess")).containsKey("postprocess/additions/module-app");
     }
 
     @Test
@@ -140,7 +140,7 @@ public class ProjectPluginsTest {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }));
 
-        assertThatThrownBy(() -> buildExecutor.execute("inspect"))
+        assertThatThrownBy(() -> buildExecutor.execute("postprocess"))
                 .isInstanceOf(BuildExecutorException.class)
                 .rootCause()
                 .isInstanceOf(IllegalStateException.class)
@@ -152,7 +152,7 @@ public class ProjectPluginsTest {
     public void adds_nothing_without_a_transform_or_an_inspection() {
         wire(new ProjectPlugins());
 
-        assertThat(buildExecutor.execute("inspect").keySet().stream().filter(key -> key.startsWith("transform/") || key.startsWith("inspect/"))).isEmpty();
+        assertThat(buildExecutor.execute("postprocess").keySet().stream().filter(key -> key.startsWith("postprocess/"))).isEmpty();
     }
 
     @Test
@@ -173,7 +173,7 @@ public class ProjectPluginsTest {
             return new Attach("licenses", "module-app").asModule("licenses");
         }))));
 
-        buildExecutor.execute("inspect");
+        buildExecutor.execute("postprocess");
 
         assertThat(received).containsExactly(new TreeMap<>(Map.of("holder", "Example")));
     }
@@ -188,7 +188,7 @@ public class ProjectPluginsTest {
             return new Attach("licenses", "module-app").asModule("licenses");
         }))), Path.of("release"));
 
-        buildExecutor.execute("inspect");
+        buildExecutor.execute("postprocess");
 
         assertThat(received).containsExactly(new TreeMap<>(Map.of("holder", "Release")));
     }
@@ -198,23 +198,22 @@ public class ProjectPluginsTest {
         Path arguments = Files.writeString(root.resolve("jenesis.plugins.arguments.properties"), "other.holder=Example\n");
         wire(new ProjectPlugins().arguments(arguments).transform("licenses", new Attach("licenses", "module-app")));
 
-        assertThatThrownBy(() -> buildExecutor.execute("inspect"))
+        assertThatThrownBy(() -> buildExecutor.execute("postprocess"))
                 .rootCause()
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The argument other.holder")
-                .hasMessageContaining("names no plugin of transform or inspect");
+                .hasMessageContaining("names no plugin of postprocess");
     }
 
     @Test
-    public void refuses_a_transform_named_like_a_step_of_its_own() {
-        assertThatThrownBy(() -> new ProjectPlugins().transform("additions", new Attach("licenses", "module-app")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Cannot add a transform named additions");
+    public void lets_a_transform_take_a_name_the_build_gives_a_step_of_its_own() {
+        wire(new ProjectPlugins().transform("additions", new Attach("licenses", "module-app")));
+
+        assertThat(buildExecutor.execute("postprocess")).containsKey("postprocess/additions/module-app");
     }
 
     private void wire(ProjectPlugins plugins, Path... profiles) {
-        buildExecutor.addModule("transform", plugins.transformModule(new LinkedHashSet<>(List.of(profiles))), "build");
-        buildExecutor.addModule("inspect", plugins.inspectModule(new LinkedHashSet<>(List.of(profiles))), "build", "transform");
+        buildExecutor.addModule("postprocess", plugins.postprocess(new LinkedHashSet<>(List.of(profiles))), "build");
     }
 
     private record Attach(String classifier, String prefix) implements BuildStep {

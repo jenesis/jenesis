@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import javax.lang.model.SourceVersion;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenModuleResolver;
@@ -154,8 +155,7 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               mavenDeps);
-                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(project.profiles()), "maven");
-                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(project.profiles()), "maven", ProjectPlugins.TRANSFORM);
+                sub.addModule(ProjectPlugins.POSTPROCESS, project.plugins().postprocess(project.profiles()), "maven");
             }, METADATA);
             executor.addModule(STAGE, (stage, inherited) -> {
                 stage.addStep("maven", MavenRepositoryStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
@@ -228,8 +228,7 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
-                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(project.profiles()), "modules");
-                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(project.profiles()), "modules", ProjectPlugins.TRANSFORM);
+                sub.addModule(ProjectPlugins.POSTPROCESS, project.plugins().postprocess(project.profiles()), "modules");
             }, METADATA);
             executor.addModule(STAGE, (stage, inherited) -> {
                 stage.addStep("modular", ModularStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
@@ -307,8 +306,7 @@ public record Project(
                                         mergedRepos,
                                         mergedResolvers)),
                               modulesDeps);
-                sub.addModule(ProjectPlugins.TRANSFORM, project.plugins().transformModule(project.profiles()), "modules");
-                sub.addModule(ProjectPlugins.INSPECT, project.plugins().inspectModule(project.profiles()), "modules", ProjectPlugins.TRANSFORM);
+                sub.addModule(ProjectPlugins.POSTPROCESS, project.plugins().postprocess(project.profiles()), "modules");
             }, METADATA);
             executor.addModule(STAGE, (stage, inherited) -> {
                 stage.addStep("maven", MavenRepositoryStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
@@ -601,14 +599,15 @@ public record Project(
                     project's code, as its tests do, so build an untrusted project with
                     -Djenesis.project.docker=true.
 
-                    The slots transform and inspect run a plugin once over every module built, as
-                    build/transform and build/inspect, after the modules and before anything is
+                    The slots postprocess/transform and postprocess/inspect run a plugin once over
+                    every module built, as build/postprocess/transform/<name> and
+                    build/postprocess/inspect/<name>, after the modules and before anything is
                     staged; switch an expensive one off with -Djenesis.plugin.<name>=false or in a
                     profile, and every plugin with -Djenesis.project.plugins=false. Such a plugin
                     reads its values as <name>.<key> from jenesis.plugins.arguments.properties, and
                     from a jenesis.plugins.arguments-<profile>.properties per active profile, and pin
-                    writes its pins to jenesis.plugins.pin.properties. A transform adds files to a module by
-                    naming them in an inventory.properties of its own, as
+                    writes its pins to jenesis.plugins.pin.properties. A transform adds files to a
+                    module by naming them in an inventory.properties of its own, as
                     <module>.attachment.<classifier> or <module>.report.<name>; an inspection fails
                     the build by throwing and changes nothing it was handed.
 
@@ -1532,7 +1531,9 @@ public record Project(
             declared.forEachProperty((key, value) -> {
                 String name = key.indexOf('+') == -1 ? key : key.substring(0, key.indexOf('+'));
                 String slot = key.indexOf('+') == -1 ? "" : key.substring(key.indexOf('+') + 1);
-                boolean projectWide = slot.equals(ProjectPlugins.TRANSFORM) || slot.equals(ProjectPlugins.INSPECT);
+                String transform = ProjectPlugins.POSTPROCESS + "/" + ProjectPlugins.TRANSFORM,
+                        inspect = ProjectPlugins.POSTPROCESS + "/" + ProjectPlugins.INSPECT;
+                boolean projectWide = slot.equals(transform) || slot.equals(inspect);
                 if (!projectWide) {
                     modulePlugins.add(name);
                 }
@@ -1551,7 +1552,12 @@ public record Project(
                             + " from source, followed by @<name> to select the provider annotated with that"
                             + " @BuildModuleName");
                 }
-                boolean folder = location.startsWith("./") || location.startsWith("../");
+                boolean folder = location.startsWith("./");
+                if (!folder && !SourceVersion.isName(location)) {
+                    throw new IllegalArgumentException("The plugin " + key + " in " + file + " names " + location
+                            + ", which is neither a module name nor a folder of the project - name the module that"
+                            + " provides it, or its folder as ./<folder>");
+                }
                 InternalModule internal = folder
                         ? InternalModule.ofEnvironment(environment,
                                         "module",
@@ -1618,18 +1624,18 @@ public record Project(
                 }
                 if (name.isEmpty() || name.contains("/") || name.contains(".") || resolutions.putIfAbsent(name, resolution) != null) {
                     throw new IllegalArgumentException("Cannot add the plugin " + key + " in " + file + " - a plugin"
-                            + " of " + ProjectPlugins.TRANSFORM + " or " + ProjectPlugins.INSPECT + " takes a name of its"
+                            + " of " + transform + " or " + inspect + " takes a name of its"
                             + " own, holding no /, . or +");
                 }
                 if (enabled) {
-                    (slot.equals(ProjectPlugins.TRANSFORM) ? transforms : inspections).put(name, values -> plugin.apply(root, values));
+                    (slot.equals(transform) ? transforms : inspections).put(name, values -> plugin.apply(root, values));
                 }
             });
             for (String name : resolutions.keySet()) {
                 if (modulePlugins.contains(name)) {
                     throw new IllegalArgumentException("The plugin " + name + " in " + file + " is named both for"
-                            + " a module slot and for " + ProjectPlugins.TRANSFORM + " or " + ProjectPlugins.INSPECT
-                            + " - a plugin of transform or inspect takes a name of its own");
+                            + " a module slot and for " + ProjectPlugins.POSTPROCESS + " - a plugin of "
+                            + ProjectPlugins.POSTPROCESS + " takes a name of its own");
                 }
             }
             assembler = assembler.plugins(plugins);
@@ -2565,7 +2571,7 @@ public record Project(
                 project.signatures||Comma-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.resources||Comma-separated <path>:<target> pairs of project files or folders placed among the resources of every module, as NOTICE:META-INF/NOTICE,LICENSE:META-INF/LICENSE
-                project.plugins|true|false leaves out every plugin that jenesis.plugins.properties names, while pin still pins those of transform and inspect
+                project.plugins|true|false leaves out every plugin that jenesis.plugins.properties names, while pin still pins those of postprocess
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
                 project.docker|false|Run the whole build inside a container
                 project.docker.image||Image for that container

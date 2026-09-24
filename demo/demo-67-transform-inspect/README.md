@@ -4,9 +4,9 @@ Transform and inspect demo
 Run plugins over everything the build produced, after every module is built and
 before anything is staged: a `transform` plugin adds files to the modules, and an
 `inspect` plugin checks the result and fails the build when it is wrong. Both run as
-part of `build`, as `build/transform` and `build/inspect`, so everything after it -
-`stage`, `export`, `release` and `java build/jenesis/Execute.java` - sees what they
-added and never runs past a failed inspection.
+part of `build`, in `build/postprocess`, so everything after it - `stage`, `export`,
+`release` and `java build/jenesis/Execute.java` - sees what they added and never
+runs past a failed inspection.
 
 Run it
 ------
@@ -33,7 +33,7 @@ Switch the transform off and the inspection refuses the build:
 
     java -Djenesis.plugin.notice=false build/jenesis/Make.java stage
 
-    No notice is attached to demo.app - add notice+transform to jenesis.plugins.properties, or switch it back on
+    No notice is attached to demo.app - add notice+postprocess/transform to jenesis.plugins.properties, or switch it back on
 
 Layout
 ------
@@ -41,8 +41,8 @@ Layout
     demo/demo-67-transform-inspect
     |-- build/jenesis                          symlink to ../../../sources/build/jenesis
     |-- legal/HEADER.txt                       the licence line the notice carries
-    |-- jenesis.plugins.properties             notice+transform=./notice
-    |                                          audit+inspect=./audit
+    |-- jenesis.plugins.properties             notice+postprocess/transform=./notice
+    |                                          audit+postprocess/inspect=./audit
     |-- jenesis.plugins.arguments.properties   notice.holder=Example Corp.
     |                                          notice.@legal=legal
     |-- jenesis.plugins.pin.properties         written by the pin goal
@@ -58,10 +58,10 @@ Naming the plugins
 The plugins are named in `jenesis.plugins.properties`, as the `internal-module`
 demo names its generator, but under one of two slots of the project's build:
 
-    notice+transform=./notice
-    audit+inspect=./audit
+    notice+postprocess/transform=./notice
+    audit+postprocess/inspect=./audit
 
-A plugin of `transform` or `inspect` runs once for the whole build rather than once per module, so
+A plugin of `postprocess` runs once for the whole build rather than once per module, so
 no `plugin-<name>.properties` switches it on in a module: the line itself does.
 Transforms run in the order the file names them, each seeing what the ones before
 it added, and the inspections run after all of them.
@@ -69,7 +69,7 @@ it added, and the inspections run after all of them.
 Configuring the plugins
 -----------------------
 
-A plugin of `transform` or `inspect` reads its values from
+A plugin of `postprocess` reads its values from
 `jenesis.plugins.arguments.properties` beside `jenesis.plugins.properties`, one line
 per value as `<plugin>.<key>`. This demo's holds
 
@@ -158,7 +158,7 @@ changes a file it was handed fails the build as well.
 Pinning the plugins
 -------------------
 
-The plugins of `transform` and `inspect` belong to no module, so their pins live beside the file
+The plugins of `postprocess` belong to no module, so their pins live beside the file
 that names them, in `jenesis.plugins.pin.properties`, one line for each module in
 each plugin's closure:
 
