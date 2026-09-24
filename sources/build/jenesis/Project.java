@@ -597,7 +597,7 @@ public record Project(
                     The slots transform and inspect run a plugin once over every module built, as
                     build/transform and build/inspect, after the modules and before anything is
                     staged; switch an expensive one off with -Djenesis.plugin.<name>=false or in a
-                    profile. Such a plugin reads jenesis.plugin.<name>.<key> settings rather than a
+                    profile, and every plugin with -Djenesis.project.plugins=false. Such a plugin reads jenesis.plugin.<name>.<key> settings rather than a
                     file, and pin writes its pins to jenesis-plugins-pin.properties. A transform adds files to a
                     module by naming them in an inventory.properties of its own, as
                     <module>.attachment.<classifier> or <module>.report.<name>; an inspection fails the
@@ -1502,6 +1502,7 @@ public record Project(
             } catch (IOException e) {
                 throw new UncheckedIOException("Cannot read " + file, e);
             }
+            boolean switchedOn = environment.flag("project.plugins", true);
             declared.forEachProperty((key, value) -> {
                 String name = key.indexOf('+') == -1 ? key : key.substring(0, key.indexOf('+'));
                 String slot = key.indexOf('+') == -1 ? "" : key.substring(key.indexOf('+') + 1);
@@ -1509,7 +1510,7 @@ public record Project(
                 if (!projectWide) {
                     modulePlugins.add(name);
                 }
-                boolean enabled = environment.flag("plugin." + name, true);
+                boolean enabled = switchedOn && environment.flag("plugin." + name, true);
                 if (!projectWide && !enabled) {
                     return;
                 }
@@ -2469,6 +2470,7 @@ public record Project(
                 project.boms||Comma-separated locations of local pin-<name>.properties; default: the configuration folders
                 project.signatures||Comma-separated locations of local signature-<name>.properties; default: the configuration folders
                 project.watch|false|Rebuild the selected target whenever a source file changes
+                project.plugins|true|false leaves out every plugin that jenesis-plugins.properties names, while pin still pins those of transform and inspect
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
                 project.docker|false|Run the whole build inside a container
                 project.docker.image||Image for that container

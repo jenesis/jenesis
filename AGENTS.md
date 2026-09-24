@@ -205,8 +205,9 @@ its no-argument constructor when the file is empty, and a file with values for a
 constructor fails the build. The slots `transform` and `inspect` are not modules of a project module but
 `build/transform` and `build/inspect`, which every layout registers inside `build` after its project module, so
 that everything depending on `build` sees their additions and nothing runs past a failed inspection; an
-expensive one is switched off by its setting, in a profile if need be: such a plugin runs once over the inventory
-of every module, is switched on by its line alone and configured by the
+expensive one is switched off by its setting, in a profile if need be, and `jenesis.project.plugins=false` leaves
+out every plugin the file names, while `pin` still resolves those of `transform` and `inspect`: such a plugin runs
+once over the inventory of every module, is switched on by its line alone and configured by the
 `jenesis.plugin.<name>.<key>` settings, so profiles reach it, and `pin` resolves every one of them, a switched-off
 one included, into `jenesis-plugins-pin.properties` rather than into a module's declaration. A transform adds a
 file to a module by naming it in an `inventory.properties` of its own as `<module>.attachment.<classifier>` or

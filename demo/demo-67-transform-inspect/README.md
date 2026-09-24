@@ -84,6 +84,12 @@ off in `jenesis.properties` and on in the profile that ships:
     # jenesis-release.properties, active with -Djenesis.make.profiles=release
     jenesis.plugin.audit=true
 
+`-Djenesis.project.plugins=false` leaves out every plugin at once, those of each
+module's build included. The plugins run with everything that builds, `pin` among
+it, so an inspection that fails stops `pin` as well; this pins without running any:
+
+    java -Djenesis.project.plugins=false build/jenesis/Make.java pin
+
 What a plugin sees
 ------------------
 
