@@ -1528,7 +1528,7 @@ public record Project(
                     InternalModule internal = InternalModule.ofEnvironment(environment, "module", group, root.resolve(location).normalize())
                             .buildModuleName(provider);
                     plugin = internal::properties;
-                    resolution = internal.delegate(false);
+                    resolution = internal.resolution();
                 } else {
                     ExternalModule external = ExternalModule.ofEnvironment(environment,
                                     "module/" + location,
@@ -1537,7 +1537,7 @@ public record Project(
                                     Map.of("module", ModularJarResolver.ofEnvironment(environment, true)))
                             .buildModuleName(provider);
                     plugin = external::properties;
-                    resolution = external.delegate(false);
+                    resolution = external.resolution();
                 }
                 if (!verifying) {
                     plugins.put(key, plugin);
