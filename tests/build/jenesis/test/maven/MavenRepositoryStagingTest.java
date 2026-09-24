@@ -72,6 +72,37 @@ public class MavenRepositoryStagingTest {
     }
 
     @Test
+    public void stages_a_file_another_inventory_attaches_under_its_classifier() throws IOException {
+        Path inv = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
+        writeArtifact(inv, "classes.jar", "c");
+        Path additions = Files.createDirectory(source.resolve("additions"));
+        SequencedProperties attached = new SequencedProperties();
+        attached.setProperty("module-foo.attachment.licenses", "attachment/licenses/LICENSES.zip");
+        attached.store(additions.resolve(Inventory.INVENTORY));
+        Files.writeString(Files.createDirectories(additions.resolve("attachment/licenses")).resolve("LICENSES.zip"), "zip");
+
+        run(true, inv, additions);
+
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3.jar")).hasContent("c");
+        assertThat(next.resolve("com/example/foo/1.2.3/foo-1.2.3-licenses.zip")).hasContent("zip");
+    }
+
+    @Test
+    public void refuses_an_attachment_under_a_classifier_the_build_stages_itself() throws IOException {
+        Path inv = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
+        writeArtifact(inv, "classes.jar", "c");
+        Path additions = Files.createDirectory(source.resolve("additions"));
+        SequencedProperties attached = new SequencedProperties();
+        attached.setProperty("module-foo.attachment.cyclonedx", "sbom.json");
+        attached.store(additions.resolve(Inventory.INVENTORY));
+        Files.writeString(additions.resolve("sbom.json"), "{}");
+
+        assertThatThrownBy(() -> run(true, inv, additions))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("as cyclonedx");
+    }
+
+    @Test
     public void only_existing_artifacts_are_linked() throws IOException {
         Path inv = mainInventory("foo", "com.example", "foo", "1.2.3", "classes.jar");
         writeArtifact(inv, "classes.jar", "c");

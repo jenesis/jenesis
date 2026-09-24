@@ -41,6 +41,7 @@ public class InternalModule implements BuildExecutorModule {
     private final String group;
     private final Platform platform;
     private final SequencedMap<String, String> properties;
+    private final boolean delegate;
 
     public InternalModule(String prefix, String group, Path source) {
         this(prefix,
@@ -64,7 +65,8 @@ public class InternalModule implements BuildExecutorModule {
                 null,
                 group,
                 new Platform(),
-                Collections.emptyNavigableMap());
+                Collections.emptyNavigableMap(),
+                true);
     }
 
     public static InternalModule ofEnvironment(Environment environment,
@@ -81,7 +83,8 @@ public class InternalModule implements BuildExecutorModule {
                 null,
                 group == null ? "main" : group,
                 Platform.ofEnvironment(environment),
-                Collections.emptyNavigableMap());
+                Collections.emptyNavigableMap(),
+                true);
     }
 
     public InternalModule repositories(Map<String, Repository> repositories) {
@@ -94,7 +97,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                delegate);
     }
 
     public InternalModule resolvers(Map<String, Resolver> resolvers) {
@@ -107,7 +111,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                delegate);
     }
 
     public InternalModule group(String group) {
@@ -120,7 +125,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                delegate);
     }
 
     private InternalModule(String prefix,
@@ -132,7 +138,8 @@ public class InternalModule implements BuildExecutorModule {
                            Pinning pinning,
                            String group,
                            Platform platform,
-                           SequencedMap<String, String> properties) {
+                           SequencedMap<String, String> properties,
+                           boolean delegate) {
         this.prefix = prefix;
         this.source = source;
         this.dependencyModule = dependencyModule;
@@ -143,6 +150,7 @@ public class InternalModule implements BuildExecutorModule {
         this.group = group;
         this.platform = platform;
         this.properties = properties;
+        this.delegate = delegate;
     }
 
     public InternalModule dependencies(String... dependencies) {
@@ -155,7 +163,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                delegate);
     }
 
     public InternalModule dependencies(SequencedSet<String> dependencies) {
@@ -168,7 +177,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                delegate);
     }
 
     public InternalModule buildModuleName(String name) {
@@ -181,7 +191,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                delegate);
     }
 
     public InternalModule platform(Platform platform) {
@@ -194,7 +205,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                delegate);
     }
 
     public InternalModule pinning(Pinning pinning) {
@@ -207,7 +219,8 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                delegate);
     }
 
     public InternalModule properties(SequencedMap<String, String> properties) {
@@ -220,7 +233,22 @@ public class InternalModule implements BuildExecutorModule {
                 pinning,
                 group,
                 platform,
-                properties);
+                properties,
+                delegate);
+    }
+
+    public InternalModule delegate(boolean delegate) {
+        return new InternalModule(prefix,
+                source,
+                dependencyModule,
+                javacStep,
+                additionalDependencies,
+                buildModuleName,
+                pinning,
+                group,
+                platform,
+                properties,
+                delegate);
     }
 
     @Override
@@ -246,6 +274,9 @@ public class InternalModule implements BuildExecutorModule {
         buildExecutor.addModule(DEPENDENCIES,
                 dependencyModule.pinning(pinning),
                 REQUIRES);
+        if (!delegate) {
+            return;
+        }
         buildExecutor.addModule(JAVA,
                 new JavaToolchainModule().compiler(javacStep.group(group).asModule("javac")),
                 SOURCE,

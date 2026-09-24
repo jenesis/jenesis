@@ -33,6 +33,7 @@ public class ModularStaging implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
+        SequencedMap<String, SequencedMap<String, Path>> attachments = Inventory.attachments(arguments.values());
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -81,6 +82,18 @@ public class ModularStaging implements BuildStep {
             link(jmod, target.resolve(moduleName + ".jmod"));
             link(pom, target.resolve(moduleName + ".pom"));
             link(bom, target.resolve(moduleName + ".properties"));
+            for (Map.Entry<String, Path> attachment : attachments.getOrDefault(prefix, Collections.emptyNavigableMap()).entrySet()) {
+                String classifier = attachment.getKey();
+                SAFE_SEGMENT.accept("classifier", classifier);
+                if (Set.of("sources", "javadoc").contains(classifier)) {
+                    throw new IllegalArgumentException("Cannot attach " + attachment.getValue() + " to " + moduleName
+                            + " as " + classifier + " - the build stages its own file under that classifier, so give"
+                            + " the attachment another one");
+                }
+                String name = attachment.getValue().getFileName().toString();
+                int dot = name.lastIndexOf('.');
+                link(attachment.getValue(), target.resolve(moduleName + "-" + classifier + (dot < 0 ? "" : name.substring(dot))));
+            }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
