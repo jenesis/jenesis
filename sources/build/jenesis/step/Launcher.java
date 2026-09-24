@@ -190,7 +190,9 @@ public class Launcher implements BuildStep {
                 .resolve((name == null ? "application" : name) + ".jar");
         try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(jar))) {
             writeManifest(out, manifest);
-            explode(out, shaded, "", entry -> entry.startsWith(LAUNCHER_PREFIX) && entry.endsWith(".class"));
+            explode(out, shaded, "", entry -> entry.startsWith(LAUNCHER_PREFIX) && entry.endsWith(".class")
+                    || entry.equals("META-INF/LICENSE")
+                    || entry.equals("META-INF/NOTICE"));
             writeEntry(out, "application.properties", descriptor);
             for (Map.Entry<String, Path> entry : stored.entrySet()) {
                 explode(out, entry.getValue(), "jars/" + entry.getKey() + "/", _ -> true);
