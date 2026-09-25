@@ -135,12 +135,13 @@ and correct, and JReleaser handles *getting it there* safely.
 
 One destination the build does reach by itself is a Jenesis module repository.
 With `jenesis.release.uri` set, `release` puts the jar of each staged module there
-as its `release/jenesis` step, as the export demo shows. A `java` repository of a
-[Jenesis Repository](https://jenesis.build/repository/) serves that layout, and it
-also makes a module available from a Maven publish: a modular jar deployed to its
-Maven layout - by JReleaser, `mvn deploy` or any other tool - is served by its
-module name as well. A project that publishes to Maven therefore keeps JReleaser
-and reaches module consumers with the same upload.
+as its `release/jenesis` step, as the export demo shows. A `jenesis` repository of
+a [Jenesis Repository](https://jenesis.build/repository/) takes exactly that
+release, one put per module. A `java` repository is the other way there: it takes
+Maven publishes only, and serves every modular jar deployed to its Maven layout -
+by JReleaser, `mvn deploy` or any other tool - by its module name as well. A
+project that publishes to Maven therefore keeps JReleaser and reaches module
+consumers with the same upload.
 
 That division is about credentials and signing keys, not about who types the
 command, so the build does offer to run the release tool for you. A `jreleaser.yml`
