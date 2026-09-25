@@ -20,7 +20,7 @@ public class JenesisModuleRepositoryReleaseTest {
 
     @TempDir
     private Path root;
-    private Path staged, repository;
+    private Path staged;
     private HttpServer server;
     private final List<String> requests = new CopyOnWriteArrayList<>();
     private final Map<String, String> received = new ConcurrentHashMap<>();
@@ -29,9 +29,20 @@ public class JenesisModuleRepositoryReleaseTest {
     @BeforeEach
     public void setUp() throws IOException {
         staged = Files.createDirectory(root.resolve("staged"));
-        repository = root.resolve("repository");
         server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         server.createContext("/", exchange -> {
+            if (exchange.getRequestMethod().equals("GET")) {
+                String content = received.get(exchange.getRequestURI().getPath());
+                if (content == null) {
+                    exchange.sendResponseHeaders(404, -1);
+                } else {
+                    byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200, bytes.length);
+                    exchange.getResponseBody().write(bytes);
+                }
+                exchange.close();
+                return;
+            }
             byte[] body = exchange.getRequestBody().readAllBytes();
             requests.add(exchange.getRequestMethod()
                     + " " + exchange.getRequestURI().getPath()
@@ -53,26 +64,27 @@ public class JenesisModuleRepositoryReleaseTest {
     }
 
     @Test
-    public void releases_each_file_under_its_version_and_nothing_else() throws IOException {
+    public void puts_only_the_jar_of_a_module_under_its_version() throws IOException {
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
         stage("demo.greeter", "1.0.0", "demo.greeter-sources.jar", "sources");
+        stage("demo.greeter", "1.0.0", "demo.greeter.pom", "pom");
 
-        BuildStepResult result = run(new JenesisModuleRepositoryRelease(repository.toUri()).printing(null));
+        BuildStepResult result = run(release());
 
         assertThat(result.next()).isTrue();
-        assertThat(repository.resolve("module/demo.greeter/1.0.0/demo.greeter.jar")).hasContent("classes");
-        assertThat(repository.resolve("module/demo.greeter/1.0.0/demo.greeter-sources.jar")).hasContent("sources");
-        assertThat(repository.resolve("module/demo.greeter/demo.greeter.jar")).doesNotExist();
-        assertThat(repository.resolve("module/demo.greeter/demo.greeter-sources.jar")).doesNotExist();
+        assertThat(requests).containsExactly("PUT /repository/releases/module/demo.greeter/1.0.0/demo.greeter.jar null");
+        assertThat(received).containsEntry("/repository/releases/module/demo.greeter/1.0.0/demo.greeter.jar", "classes");
     }
 
     @Test
     public void releases_what_a_module_repository_then_resolves_by_version() throws IOException {
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
 
-        run(new JenesisModuleRepositoryRelease(repository.toUri()).printing(null));
+        run(release());
 
-        JenesisModuleRepository resolved = new JenesisModuleRepository(repository.resolve("module").toUri());
+        JenesisModuleRepository resolved = new JenesisModuleRepository(
+                URI.create("http://localhost:" + server.getAddress().getPort() + "/repository/releases/module/"))
+                .connection(new Repository.Connection().insecure(true));
         try (InputStream versioned = resolved.fetch(Runnable::run, "demo.greeter", null, "1.0.0", "jar")
                 .orElseThrow()
                 .toInputStream()) {
@@ -81,46 +93,40 @@ public class JenesisModuleRepositoryReleaseTest {
     }
 
     @Test
-    public void leaves_a_version_released_with_the_same_content_in_place() throws IOException {
+    public void refuses_a_module_staged_without_a_version_before_it_puts_anything() throws IOException {
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
-        run(new JenesisModuleRepositoryRelease(repository.toUri()).printing(null));
+        Files.createDirectories(staged.resolve("demo.app"));
+        Files.writeString(staged.resolve("demo.app/demo.app.jar"), "app");
 
-        BuildStepResult result = run(new JenesisModuleRepositoryRelease(repository.toUri()).printing(null));
-
-        assertThat(result.next()).isTrue();
-        assertThat(repository.resolve("module/demo.greeter/1.0.0/demo.greeter.jar")).hasContent("classes");
-    }
-
-    @Test
-    public void refuses_to_replace_a_released_version_but_releases_a_new_one() throws IOException {
-        stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
-        run(new JenesisModuleRepositoryRelease(repository.toUri()).printing(null));
-        stage("demo.greeter", "1.0.0", "demo.greeter.jar", "changed");
-
-        assertThatThrownBy(() -> run(new JenesisModuleRepositoryRelease(repository.toUri()).printing(null)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("release under a new version");
-        assertThat(repository.resolve("module/demo.greeter/1.0.0/demo.greeter.jar")).hasContent("classes");
-
-        Files.move(staged.resolve("demo.greeter/1.0.0"), staged.resolve("demo.greeter/1.0.1"));
-        run(new JenesisModuleRepositoryRelease(repository.toUri()).printing(null));
-
-        assertThat(repository.resolve("module/demo.greeter/1.0.1/demo.greeter.jar")).hasContent("changed");
-    }
-
-    @Test
-    public void refuses_a_module_staged_without_a_version() throws IOException {
-        Files.createDirectories(staged.resolve("demo.greeter"));
-        Files.writeString(staged.resolve("demo.greeter/demo.greeter.jar"), "classes");
-
-        assertThatThrownBy(() -> run(new JenesisModuleRepositoryRelease(repository.toUri()).printing(null)))
+        assertThatThrownBy(() -> run(release()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.project.version");
-        assertThat(repository).doesNotExist();
+        assertThat(requests).isEmpty();
     }
 
     @Test
-    public void puts_each_file_under_its_version_with_the_token() throws IOException {
+    public void refuses_a_module_staged_at_more_than_one_version() throws IOException {
+        stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
+        stage("demo.greeter", "1.0.1", "demo.greeter.jar", "classes");
+
+        assertThatThrownBy(() -> run(release()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("exactly one version");
+        assertThat(requests).isEmpty();
+    }
+
+    @Test
+    public void refuses_a_module_whose_jar_is_not_staged() throws IOException {
+        stage("demo.greeter", "1.0.0", "demo.greeter.pom", "pom");
+
+        assertThatThrownBy(() -> run(release()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no demo.greeter.jar");
+        assertThat(requests).isEmpty();
+    }
+
+    @Test
+    public void puts_one_jar_per_module_with_the_token() throws IOException {
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "greeter");
         stage("demo.app", "2.0.0", "demo.app.jar", "app");
 
@@ -136,8 +142,8 @@ public class JenesisModuleRepositoryReleaseTest {
 
     @Test
     public void stops_when_the_repository_holds_a_version_already() throws IOException {
+        stage("demo.app", "2.0.0", "demo.app.jar", "app");
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
-        stage("demo.greeter", "1.0.0", "demo.greeter.pom", "pom");
         statuses.add(409);
 
         assertThatThrownBy(() -> run(release()))
@@ -195,10 +201,10 @@ public class JenesisModuleRepositoryReleaseTest {
     }
 
     @Test
-    public void refuses_a_repository_that_is_not_addressed_by_a_supported_scheme() {
-        assertThatThrownBy(() -> new JenesisModuleRepositoryRelease(URI.create("ftp://example.com/releases")))
+    public void refuses_a_repository_that_is_not_addressed_by_http() {
+        assertThatThrownBy(() -> new JenesisModuleRepositoryRelease(root.toUri()))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("ftp://example.com/releases");
+                .hasMessageContaining(root.toUri().toString());
     }
 
     @Test
@@ -229,11 +235,11 @@ public class JenesisModuleRepositoryReleaseTest {
     }
 
     @Test
-    public void prints_each_released_file_once() throws IOException {
+    public void prints_each_released_module_once() throws IOException {
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
         List<String> printed = new ArrayList<>();
 
-        run(new JenesisModuleRepositoryRelease(repository.toUri()).printing(printed::add));
+        run(release().printing(printed::add));
 
         assertThat(printed).hasSize(1);
         assertThat(printed.getFirst())

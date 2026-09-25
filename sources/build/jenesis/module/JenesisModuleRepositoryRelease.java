@@ -42,13 +42,12 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
     }
 
     private JenesisModuleRepositoryRelease(URI repository,
-                           String token,
-                           Repository.Connection connection,
-                           Consumer<String> printing) {
-        String scheme = repository.getScheme();
-        if (!"https".equals(scheme) && !"http".equals(scheme) && !"file".equals(scheme)) {
+                                           String token,
+                                           Repository.Connection connection,
+                                           Consumer<String> printing) {
+        if (!"https".equals(repository.getScheme()) && !"http".equals(repository.getScheme())) {
             throw new IllegalArgumentException("Cannot release to " + repository
-                    + ": a Jenesis module repository is addressed by an https:, http: or file: URI");
+                    + ": a Jenesis module repository is addressed by an https: or http: URI");
         }
         String text = repository.toString();
         this.repository = text.endsWith("/") ? repository : URI.create(text + "/");
@@ -88,53 +87,44 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
                     + repository
                     + " (set -Djenesis.repository.insecure=true to allow a plaintext repository)");
         }
-        SequencedMap<String, Path> released = new TreeMap<>();
+        SequencedMap<String, Map.Entry<String, Path>> released = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed() || !Files.isDirectory(argument.folder())) {
                 continue;
             }
-            Path folder = argument.folder();
-            try (Stream<Path> files = Files.walk(folder)) {
-                for (Path file : files.filter(Files::isRegularFile).toList()) {
-                    Path relative = folder.relativize(file);
-                    if (relative.getNameCount() != 3) {
-                        throw new IllegalStateException("Cannot release " + relative
-                                + ": a released module is staged as <module>/<version>/<file>, so set"
-                                + " jenesis.project.version to give every module a version");
+            try (Stream<Path> modules = Files.list(argument.folder())) {
+                for (Path module : modules.toList()) {
+                    String name = module.getFileName().toString();
+                    SAFE_SEGMENT.accept("module name", name);
+                    List<Path> versions;
+                    if (Files.isDirectory(module)) {
+                        try (Stream<Path> children = Files.list(module)) {
+                            versions = children.toList();
+                        }
+                    } else {
+                        versions = List.of();
                     }
-                    String module = relative.getName(0).toString(),
-                            version = relative.getName(1).toString(),
-                            name = relative.getName(2).toString();
-                    SAFE_SEGMENT.accept("module name", module);
+                    if (versions.size() != 1 || !Files.isDirectory(versions.getFirst())) {
+                        throw new IllegalStateException("Cannot release " + name
+                                + ": a released module is staged under exactly one version, as"
+                                + " <module>/<version>/<module>.jar, so set jenesis.project.version to give it one");
+                    }
+                    String version = versions.getFirst().getFileName().toString();
                     SAFE_SEGMENT.accept("version", version);
-                    SAFE_SEGMENT.accept("file name", name);
-                    released.put("module/" + module + "/" + version + "/" + name, file);
+                    Path jar = versions.getFirst().resolve(name + ".jar");
+                    if (!Files.isRegularFile(jar)) {
+                        throw new IllegalStateException("Cannot release " + name + " " + version
+                                + ": no " + name + ".jar is staged for it");
+                    }
+                    if (released.put(name, Map.entry("module/" + name + "/" + version + "/" + name + ".jar", jar)) != null) {
+                        throw new IllegalStateException("Cannot release " + name + ": it is staged more than once");
+                    }
                 }
             }
         }
-        for (Map.Entry<String, Path> entry : released.entrySet()) {
+        for (Map.Entry<String, Path> entry : released.sequencedValues()) {
             URI target = repository.resolve(entry.getKey());
-            Path file = entry.getValue();
-            if ("file".equals(target.getScheme())) {
-                Path destination = Path.of(target);
-                if (Files.isRegularFile(destination)) {
-                    if (Files.mismatch(destination, file) != -1) {
-                        throw new IllegalStateException("Cannot release " + file.getFileName() + " to " + target
-                                + ": the repository holds other content at that version, so release under a new version");
-                    }
-                    continue;
-                }
-                Files.createDirectories(destination.getParent());
-                Path temporary = Files.createTempFile(destination.getParent(), "release", ".tmp");
-                try {
-                    Files.copy(file, temporary, StandardCopyOption.REPLACE_EXISTING);
-                    Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE);
-                } finally {
-                    Files.deleteIfExists(temporary);
-                }
-            } else {
-                upload(target, file);
-            }
+            upload(target, entry.getValue());
             if (printing != null) {
                 printing.accept("%s%-11s%s %s".formatted(BuildExecutorCallback.GREEN,
                         "[RELEASED]",
