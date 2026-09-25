@@ -246,6 +246,57 @@ public class RepositoryTest {
     }
 
     @Test
+    public void accepts_a_self_signed_certificate_only_where_insecure_allows_it() throws Exception {
+        char[] password = "test-store-password".toCharArray();
+        Path store = folder.resolve("server.p12");
+        boolean windows = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        int code = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", windows ? "keytool.exe" : "keytool").toString(),
+                "-genkeypair",
+                "-alias", "server",
+                "-keyalg", "RSA",
+                "-keysize", "2048",
+                "-validity", "1",
+                "-dname", "CN=elsewhere.invalid",
+                "-keystore", store.toString(),
+                "-storetype", "PKCS12",
+                "-storepass", new String(password))
+                .redirectErrorStream(true)
+                .start()
+                .waitFor();
+        assertThat(code).as("keytool generated a throwaway key store").isZero();
+        KeyStore keys = KeyStore.getInstance("PKCS12");
+        try (InputStream in = Files.newInputStream(store)) {
+            keys.load(in, password);
+        }
+        KeyManagerFactory managers = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        managers.init(keys, password);
+        SSLContext context = SSLContext.getInstance("TLS");
+        context.init(managers.getKeyManagers(), null, null);
+        HttpsServer server = HttpsServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.setHttpsConfigurator(new HttpsConfigurator(context));
+        server.createContext("/", exchange -> {
+            byte[] body = "jar".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        server.start();
+        try {
+            URI uri = URI.create("https://localhost:" + server.getAddress().getPort() + "/artifact.jar");
+            assertThatThrownBy(() -> Repository.open(new Repository.Connection().retries(0), uri, null).close())
+                    .isInstanceOf(IOException.class)
+                    .hasMessageContaining("jenesis.repository.insecure");
+            try (InputStream in = Repository.open(new Repository.Connection().retries(0).insecure(true), uri, null)) {
+                assertThat(in)
+                        .as("a certificate signed by nobody and naming another host is accepted where insecure allows it")
+                        .hasContent("jar");
+            }
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     public void open_refuses_an_insecure_scheme_without_the_opt_in() {
         URI uri = URI.create("http://localhost:1/artifact.jar");
         assertThatThrownBy(() -> Repository.open(connection().retries(0).backoff(Duration.ofMillis(1)), uri, null).close())
