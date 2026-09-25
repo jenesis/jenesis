@@ -192,6 +192,12 @@ and worth nothing on a small one. It serves one project at a time, and only
 `-Djenesis.*` flags travel with a call - change the build sources, the
 environment or the JVM arguments and the daemon is replaced.
 
+The installed `jenesis` command can start from an ahead-of-time cache of the
+engine instead, trained by the first build and read by every later one, with no
+process kept between builds:
+
+    jenesis.make.aot=true
+
 ## 5. The JDK a build runs on - [`toolchain`](demo-06-toolchain/README.md)
 
 `toolchain` makes the JDK a build runs on part of the project. Its

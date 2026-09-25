@@ -1011,7 +1011,7 @@ public record Project(
                     Two namespaces, split by who reads them. `jenesis.make.*` belongs to the entry
                     point: where the project is (root), which profiles to layer (profiles), where
                     the user-global file lives (global), and how the engine is compiled and reused
-                    (compile, classes, daemon). `jenesis.toolchain.*` is read there too, to pick the
+                    (compile, classes, daemon, aot). `jenesis.toolchain.*` is read there too, to pick the
                     JDK the build runs on. `jenesis.project.*` belongs to the build itself.
                     Only -Djenesis.make.root can say where the project is - a properties file cannot,
                     because the root is what locates that file. Likewise only -Djenesis.make.global
@@ -1099,7 +1099,7 @@ public record Project(
 
                       Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
                                          04 java-modular-multi, 20 module-layout (forcing MODULAR)
-                      Starting a build   05 startup (what launching costs, and the daemon),
+                      Starting a build   05 startup (what launching costs, the daemon, the AOT cache),
                                          06 toolchain (the JDK the build runs on)
                       Runnable output    07, 08 java-*-executable (jpackage), 09 bundle (jars for a
                                          stock JRE), 10 java-multi-release, 66 native-image (GraalVM)
@@ -2646,6 +2646,9 @@ public record Project(
                 make.daemon|false|Hand the build to a reused JVM; --stop as the only selector shuts it down
                 daemon.idle|10800|Seconds an idle daemon waits before exiting
                 daemon.options|-Xmx2g|JVM options for the daemon process itself, whitespace separated; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                make.aot|false|Run the build in a JVM that loads the engine from an ahead-of-time cache, trained on the first build that finds none and reused by every later one; it applies where the engine runs compiled, as the installed CLI runs it, and not in source mode, whose JVM is running before it could be handed a cache; refused beside make.daemon, which keeps that engine loaded instead, and beside make.compile=false, which leaves nothing compiled to cache
+                aot.file|.jenesis/engine.aot|Where that cache lives, relative to the project root, with the engine and the JVM it is trained for hashed into its name, as engine-<hex>.aot, so a build trains a new one when either changes and sweeps the ones that no longer fit; a file the project provides names only a location inside the project
+                aot.lifetime||ISO-8601 age after which the cache is trained again, as PT12H or P7D; empty keeps it until the engine or the JVM changes
                 toolchain.version||JDK the build runs on, as 25, 25.0.3 or 25-temurin: the numbers match as a prefix, every word must be one of the vendor and version words in the JDK's release file, and a pre-release matches only when its word is named; Make and Execute relaunch on a match when the running JVM is none
                 toolchain.searchpath|@|Comma-separated JDK folders searched for toolchain.version, absolute or under ~, * standing for any one folder name; @ splices this system's usual JDK locations and empty only checks the running JVM; settable only on the command line or in ~/.jenesis/jenesis.properties
                 executor.concurrency|0|Run at most this many build steps at once; 0 is unbounded
