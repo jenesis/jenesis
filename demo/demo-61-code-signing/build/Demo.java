@@ -12,7 +12,14 @@ public class Demo {
 
     static void main(String[] args) throws Exception {
         generateKey();
-        if (new Make(Project.class.getName()).run("stage") != 0) {
+        Map<String, String> properties = new HashMap<>();
+        for (String name : System.getProperties().stringPropertyNames()) {
+            properties.put(name, System.getProperty(name));
+        }
+        properties.put("jenesis.jarsigner.keystore", KEYSTORE.toString());
+        properties.put("jenesis.jarsigner.alias", "demo");
+        properties.put("jenesis.jarsigner.storepass", "file " + PASSWORD);
+        if (new Make(Project.class.getName(), Make.keys(properties)).run("stage") != 0) {
             throw new IllegalStateException("The build did not stage the signed jar");
         }
         Path staged = staged();
