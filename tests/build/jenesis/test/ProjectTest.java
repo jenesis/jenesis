@@ -1251,6 +1251,117 @@ public class ProjectTest {
     }
 
     @Test
+    public void the_layered_settings_rejects_a_program_in_the_project_file() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.openpgp.command=./verify.sh\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .as("a program the build runs is the machine's to name, never a file that travels with a clone")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.openpgp.command cannot be set in");
+    }
+
+    @Test
+    public void the_layered_settings_rejects_a_shared_folder_in_the_project_file() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.maven.local=/tmp/shared\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.maven.local cannot be set in");
+    }
+
+    @Test
+    public void the_layered_settings_rejects_a_signing_setting_in_a_profile() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=release\n");
+        Files.writeString(root.resolve("jenesis-release.properties"), "jenesis.jarsigner.alias=release\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.jarsigner.alias cannot be set in");
+    }
+
+    @Test
+    public void the_layered_settings_accepts_a_signing_setting_in_the_user_global_file() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.jarsigner.alias=me\n");
+        settings.put("make.global", root.resolve("home").toString());
+        assertThat(Make.settings(root, settings).keys().get("jarsigner.alias")).isEqualTo("me");
+    }
+
+    @Test
+    public void the_layered_settings_rejects_a_target_outside_the_project() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.target=../elsewhere\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .as("the build writes to and may delete its target, so a project's file keeps it inside the project")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.project.target cannot name '../elsewhere'");
+    }
+
+    @Test
+    public void the_layered_settings_rejects_an_absolute_folder_in_a_profile() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
+        Files.writeString(root.resolve("jenesis-ci.properties"),
+                "jenesis.make.classes=" + elsewhere.toAbsolutePath().toString().replace('\\', '/') + "\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.make.classes cannot name");
+    }
+
+    @Test
+    public void the_layered_settings_accepts_a_folder_inside_the_project() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.target=build/out/../output\n");
+        assertThat(Make.settings(root, settings).keys().get("project.target")).isEqualTo("build/out/../output");
+    }
+
+    @Test
+    public void the_layered_settings_accepts_a_folder_outside_the_project_from_the_command_line() throws IOException {
+        settings.put("project.target", "../elsewhere");
+        assertThat(Make.settings(root, settings).keys().get("project.target")).isEqualTo("../elsewhere");
+    }
+
+    @Test
+    public void the_layered_settings_lets_the_user_global_file_outrank_the_project() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.dependency.pin=strict\n");
+        Files.writeString(root.resolve("jenesis.properties"),
+                "jenesis.make.profiles=lenient\njenesis.dependency.pin=ignore\n");
+        Files.writeString(root.resolve("jenesis-lenient.properties"), "jenesis.dependency.pin=versions\n");
+        settings.put("make.global", root.resolve("home").toString());
+        assertThat(Make.settings(root, settings).keys().get("dependency.pin"))
+                .as("what a machine settles holds for every project it builds, profiles included")
+                .isEqualTo("strict");
+    }
+
+    @Test
+    public void the_layered_settings_lets_a_user_global_profile_outrank_the_user_global_file() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"),
+                "jenesis.make.profiles=mine\njenesis.test.sample.key=fromGlobal\n");
+        Files.writeString(home.resolve("jenesis-mine.properties"), "jenesis.test.sample.key=fromGlobalProfile\n");
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.test.sample.key=fromProject\n");
+        settings.put("make.global", root.resolve("home").toString());
+        assertThat(Make.settings(root, settings).keys().get("test.sample.key")).isEqualTo("fromGlobalProfile");
+    }
+
+    @Test
+    public void the_layered_settings_lets_the_command_line_outrank_the_user_global_file() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.test.sample.key=fromGlobal\n");
+        settings.put("make.global", root.resolve("home").toString());
+        settings.put("test.sample.key", "fromCommandLine");
+        assertThat(Make.settings(root, settings).keys().get("test.sample.key")).isEqualTo("fromCommandLine");
+    }
+
+    @Test
+    public void the_layered_settings_records_nothing_the_user_global_file_outranked() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.maven.uri=https://mine.example/\n");
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.maven.uri=https://project.example/\n");
+        settings.put("make.global", root.resolve("home").toString());
+        Map<String, String> keys = Make.settings(root, settings).keys();
+        assertThat(keys.get("maven.uri")).isEqualTo("https://mine.example/");
+        assertThat(keys.get("make.provided"))
+                .as("the repository in force is the one the user named, so it may be sent the user's token")
+                .isNull();
+    }
+
+    @Test
     public void the_layered_settings_rejects_a_credential_in_a_profile() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
         Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.module.token=Bearer secret\n");
