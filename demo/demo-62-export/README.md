@@ -124,10 +124,11 @@ Releasing into a module repository
 
 `export` reaches this machine only. `release` puts each module of the same
 modular tree into a Jenesis module repository that other machines resolve from,
-as its `release/jenesis` step, once `jenesis.release.uri` names one. A `java`
-repository of a [Jenesis Repository](https://jenesis.build/repository/) serves
-the module layout at the same address a build names in `jenesis.module.uri`, and
-may ask for a key to accept a release:
+as its `release/jenesis` step, once `jenesis.release.uri` names one. A `jenesis`
+repository of a [Jenesis Repository](https://jenesis.build/repository/) takes that
+release and serves the module layout at the same address a build names in
+`jenesis.module.uri`; it may ask for a key to accept one. (A `java` repository
+takes Maven publishes only, and serves the modular jars among them by module name.)
 
     cd ../library
     java -Djenesis.project.version=1.0.0 \
