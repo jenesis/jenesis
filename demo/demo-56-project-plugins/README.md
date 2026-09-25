@@ -92,9 +92,9 @@ demo names its generator:
     complete+stage/inspect=./complete
     lines+plugin=./lines
 
-Eight slots run a plugin once for the whole project rather than once per module:
+Eight hook points run a plugin once for the whole project rather than once per module:
 
-| Slot | Runs as | Runs | Is handed |
+| Hook point | Runs as | Runs | Is handed |
 | --- | --- | --- | --- |
 | `preprocess` | `build/preprocess/custom/<name>` | before any module is built | only what it binds |
 | `postprocess/transform` | `build/postprocess/transform/<name>` | after every module is built | every module's inventory |
@@ -107,8 +107,8 @@ Eight slots run a plugin once for the whole project rather than once per module:
 
 No `plugin-<name>.properties` switches such a plugin on in a module: the line itself
 does. Transforms run in the order the file names them, each seeing what the ones
-before it added, and the inspections run after all of them. `package` is a slot of
-each module instead, like `binary/generated`, and is described below.
+before it added, and the inspections run after all of them. `package` is a hook point
+of each module instead, like `binary/generated`, and is described below.
 
 Configuring the plugins
 -----------------------
@@ -230,7 +230,7 @@ Adding a package
 ----------------
 
 A plugin under `package` joins the packaging of each module where its
-`plugin-<name>.properties` is found, as a plugin of any other module slot does - here
+`plugin-<name>.properties` is found, as a plugin of any other hook point of a module does - here
 `build.jenesis/plugin-zip.properties`, which also names the zip:
 
     name=demo-app

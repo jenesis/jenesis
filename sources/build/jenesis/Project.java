@@ -496,7 +496,7 @@ public record Project(
                       %{name}build%{reset}         Resolve, compile, package, and test every module
                       %{name}stage%{reset}         Stage produced artifacts into a local repository
                       %{name}export%{reset}        Export the staged repository as the build deliverable
-                      %{name}plugin/<name>%{reset} Run a plugin the project names under the slot plugin, on demand
+                      %{name}plugin/<name>%{reset} Run a plugin the project names under the hook point plugin, on demand
                       %{name}pin%{reset}           Rewrite version/checksum pins into pom.xml or module-info.java
                       %{name}dependencies%{reset}  Print each module's resolved dependency graph
                       %{name}ide%{reset}           Generate IntelliJ IDEA, VS Code, and Eclipse project metadata
@@ -613,8 +613,8 @@ public record Project(
                     the command line or ~/.jenesis/jenesis.properties may set it. Nothing is installed.
 
                     To add to the stock build, name plugins in jenesis.plugins.properties beside
-                    jenesis.properties, one line each: <name>+<slot>=<module name>, or =./<folder> for
-                    a plugin compiled from source, where the slot is a module of the build (check,
+                    jenesis.properties, one line each: <name>+<hook point>=<module name>, or =./<folder>
+                    for a plugin compiled from source, where the hook point is a module of the build (check,
                     binary/generated, artifact, package, ...) or left out for the module build itself, and
                     =<module>@<provider> selects the provider annotated @BuildModuleName. A plugin
                     runs in a module only where plugin-<name>.properties is found in its configuration
@@ -628,7 +628,7 @@ public record Project(
                     project's code, as its tests do, so build an untrusted project with
                     -Djenesis.project.docker=true.
 
-                    Eight slots run a plugin once for the whole project. preprocess runs as
+                    Eight hook points run a plugin once for the whole project. preprocess runs as
                     build/preprocess/custom/<name> before any module is built, sees only the inputs it
                     binds and hands the build nothing, so it can only stop it. postprocess/transform
                     and postprocess/inspect run over every module built, as
@@ -1580,10 +1580,12 @@ public record Project(
             boolean switchedOn = environment.flag("project.plugins", true);
             declared.forEachProperty((key, value) -> {
                 String name = key.indexOf('+') == -1 ? key : key.substring(0, key.indexOf('+'));
-                String slot = key.indexOf('+') == -1 ? "" : key.substring(key.indexOf('+') + 1);
-                boolean projectWide = hooks.containsKey(slot);
-                if (!projectWide) {
-                    modulePlugins.add(name);
+                String hook = key.indexOf('+') == -1 ? "" : key.substring(key.indexOf('+') + 1);
+                boolean projectWide = hooks.containsKey(hook);
+                if (!projectWide && !modulePlugins.add(name)) {
+                    throw new IllegalArgumentException("The plugin " + name + " in " + file + " is named for more than"
+                            + " one hook point - a plugin shares its configuration, its pins and its setting with nothing"
+                            + " else, so give each line a name of its own");
                 }
                 boolean enabled = switchedOn && environment.flag("plugin." + name, true);
                 if (!projectWide && !enabled) {
@@ -1676,13 +1678,13 @@ public record Project(
                             + " own, holding no /, . or +");
                 }
                 if (enabled) {
-                    hooks.get(slot).put(name, values -> plugin.apply(root, values));
+                    hooks.get(hook).put(name, values -> plugin.apply(root, values));
                 }
             });
             for (String name : resolutions.keySet()) {
                 if (modulePlugins.contains(name)) {
                     throw new IllegalArgumentException("The plugin " + name + " in " + file + " is named both for"
-                            + " a module slot and for " + String.join(", ", hooks.sequencedKeySet()) + " - a plugin"
+                            + " a hook point of a module and for " + String.join(", ", hooks.sequencedKeySet()) + " - a plugin"
                             + " of those takes a name of its own");
                 }
             }

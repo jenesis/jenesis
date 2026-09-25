@@ -716,7 +716,7 @@ public class ProjectTest {
     }
 
     @Test
-    public void hands_the_plugins_of_every_project_wide_slot_to_the_project() throws IOException {
+    public void hands_the_plugins_of_every_project_hook_point_to_the_project() throws IOException {
         Files.writeString(root.resolve("jenesis.plugins.properties"), """
                 greeting+binary/generated=demo.greeting
                 headers+preprocess=./headers
@@ -785,6 +785,18 @@ public class ProjectTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The plugin audit")
                 .hasMessageContaining("takes a name of its own");
+    }
+
+    @Test
+    public void refuses_a_plugin_named_for_two_hook_points_of_a_module() throws IOException {
+        Files.writeString(root.resolve("jenesis.plugins.properties"), """
+                lint+check=./lint
+                lint+format=./lint
+                """);
+        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("The plugin lint")
+                .hasMessageContaining("is named for more than one hook point");
     }
 
     @Test
