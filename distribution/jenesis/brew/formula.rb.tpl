@@ -26,7 +26,7 @@ class {{brewFormulaName}} < Formula
     libexec.install Dir["*"]
     Dir["#{libexec}/bin/*"].each do |command|
       name = File.basename(command)
-      next if name.end_with?(".bat")
+      next if name.end_with?(".bat") || name == "jenesis-jdk"
       if name == "jenesis-switch"
         # sourced by the calling shell, so it is linked rather than wrapped in an exec
         bin.install_symlink command => name
