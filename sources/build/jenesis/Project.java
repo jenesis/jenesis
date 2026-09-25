@@ -496,7 +496,7 @@ public record Project(
                       %{name}build%{reset}         Resolve, compile, package, and test every module
                       %{name}stage%{reset}         Stage produced artifacts into a local repository
                       %{name}export%{reset}        Export the staged repository as the build deliverable
-                      %{name}plugin/<name>%{reset} Run a plugin the project names under the hook-point plugin, on demand
+                      %{name}plugin/<name>%{reset} Run a plugin the project names under the hook point plugin, on demand
                       %{name}pin%{reset}           Rewrite version/checksum pins into pom.xml or module-info.java
                       %{name}dependencies%{reset}  Print each module's resolved dependency graph
                       %{name}ide%{reset}           Generate IntelliJ IDEA, VS Code, and Eclipse project metadata
@@ -613,8 +613,8 @@ public record Project(
                     the command line or ~/.jenesis/jenesis.properties may set it. Nothing is installed.
 
                     To add to the stock build, name plugins in jenesis.plugins.properties beside
-                    jenesis.properties, one line each: <name>+<hook-point>=<module name>, or =./<folder>
-                    for a plugin compiled from source, where the hook-point is a module of the build (check,
+                    jenesis.properties, one line each: <name>+<hook point>=<module name>, or =./<folder>
+                    for a plugin compiled from source, where the hook point is a module of the build (check,
                     binary/generated, artifact, package, ...) or left out for the module build itself, and
                     =<module>@<provider> selects the provider annotated @BuildModuleName. A plugin
                     runs in a module only where plugin-<name>.properties is found in its configuration
@@ -628,7 +628,7 @@ public record Project(
                     project's code, as its tests do, so build an untrusted project with
                     -Djenesis.project.docker=true.
 
-                    Eight hook-points run a plugin once for the whole project. preprocess runs as
+                    Eight hook points run a plugin once for the whole project. preprocess runs as
                     build/preprocess/custom/<name> before any module is built, sees only the inputs it
                     binds and hands the build nothing, so it can only stop it. postprocess/transform
                     and postprocess/inspect run over every module built, as
