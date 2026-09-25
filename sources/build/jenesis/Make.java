@@ -7,6 +7,7 @@ public final class Make {
     private static final String PROVIDED = "jenesis.make.provided";
     private static final List<String> CREDENTIALS = List.of("jenesis.maven.token",
             "jenesis.module.token",
+            "jenesis.release.token",
             "jenesis.cache.key");
     private static final List<String> PLAINTEXT = List.of("jenesis.repository.insecure", "jenesis.cache.insecure");
 

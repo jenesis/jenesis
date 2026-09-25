@@ -1,6 +1,7 @@
 package build.jenesis.test;
 
 import module java.base;
+import module jdk.httpserver;
 import module org.junit.jupiter.api;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
@@ -613,6 +614,68 @@ public class ProjectTest {
     }
 
     @Test
+    public void releases_the_staged_modular_tree_into_the_module_repository_it_names() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
+        List<String> put = new CopyOnWriteArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            put.add(exchange.getRequestMethod() + " " + exchange.getRequestURI().getPath());
+            exchange.sendResponseHeaders(201, -1);
+            exchange.close();
+        });
+        server.start();
+        try {
+            settings.put("release.uri", "http://localhost:" + server.getAddress().getPort() + "/repository/");
+            settings.put("repository.insecure", "true");
+            for (Project.Layout layout : List.of(Project.Layout.MODULAR, Project.Layout.MODULAR_TO_MAVEN)) {
+                put.clear();
+                List<String> printed = new ArrayList<>();
+                Project.ofEnvironment(new Environment(settings).out(printed::add), root)
+                        .target(root.resolve("target-" + layout.hashCode()))
+                        .version("1.0.0")
+                        .layout(layout)
+                        .build(Project.RELEASE);
+                assertThat(put).containsExactly("PUT /repository/module/demo.empty/1.0.0/demo.empty.jar");
+                assertThat(printed).anyMatch(line -> line.contains("[RELEASED]"));
+            }
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void refuses_to_release_into_a_module_repository_without_a_version() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
+        settings.put("release.uri", "https://repository.invalid/repository/");
+        Project project = Project.ofEnvironment(new Environment(settings), root)
+                .target(root.resolve("target"))
+                .layout(Project.Layout.MODULAR);
+        assertThatThrownBy(() -> project.build(Project.RELEASE))
+                .rootCause()
+                .hasMessageContaining("jenesis.project.version");
+    }
+
+    @Test
+    public void refuses_to_release_into_a_module_repository_from_a_layout_that_stages_no_modular_tree() throws IOException {
+        Files.writeString(root.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>demo</groupId>
+                    <artifactId>empty</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        settings.put("release.uri", "https://repository.invalid/repository/");
+        Project project = Project.ofEnvironment(new Environment(settings), root)
+                .target(root.resolve("target"))
+                .layout(Project.Layout.MAVEN);
+        assertThatThrownBy(() -> project.build(Project.RELEASE))
+                .rootCause()
+                .hasMessageContaining("jenesis.release.uri");
+    }
+
+    @Test
     public void modular_layout_registers_export_step() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
         Project project = Project.ofEnvironment(new Environment(settings), root).target(target);
@@ -1177,6 +1240,14 @@ public class ProjectTest {
         assertThatThrownBy(() -> Make.settings(root, settings))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.maven.token cannot be set in");
+    }
+
+    @Test
+    public void the_layered_settings_rejects_the_release_token_in_a_file_the_project_provides() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.release.token=Bearer secret\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.release.token cannot be set in");
     }
 
     @Test
