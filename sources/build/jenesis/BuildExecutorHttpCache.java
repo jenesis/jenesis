@@ -209,7 +209,7 @@ public final class BuildExecutorHttpCache implements BuildExecutorCache {
                     + target
                     + " (set -Djenesis.cache.insecure=true to allow plaintext)");
         }
-        HttpURLConnection connection = (HttpURLConnection) target.toURL().openConnection();
+        HttpURLConnection connection = (HttpURLConnection) Repository.connect(target, insecure);
         connection.setRequestMethod(method);
         connection.setConnectTimeout((int) Math.min(connectTimeout.toMillis(), Integer.MAX_VALUE));
         connection.setReadTimeout((int) Math.min(readTimeout.toMillis(), Integer.MAX_VALUE));

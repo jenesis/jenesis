@@ -140,7 +140,7 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
             int status;
             String reason;
             try {
-                HttpURLConnection http = (HttpURLConnection) target.toURL().openConnection();
+                HttpURLConnection http = (HttpURLConnection) Repository.connect(target, connection.insecure());
                 try {
                     http.setRequestMethod("PUT");
                     http.setConnectTimeout(connection.connectTimeout());
