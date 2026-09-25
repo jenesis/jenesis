@@ -280,6 +280,12 @@ for CASE in "25 25.0.4-tem" "25.0.3-temurin 25.0.3-tem" "25-zulu 25.0.4+1.1-zulu
     [ "$(cat "$FAKE_SDKMAN/installed")" = "$EXPECTED" ] \
         || dump_and_fail "jenesis-jdk installed $(cat "$FAKE_SDKMAN/installed") for $REQUESTED, not $EXPECTED" "$OUT"
 done
+mkdir -p "$FAKE_SDKMAN/candidates/jenesis/$VERSION"
+cp -R "${SDK_HOME}/bin" "$FAKE_SDKMAN/candidates/jenesis/$VERSION/bin"
+OUT="$(SDKMAN_DIR="$FAKE_SDKMAN" "$FAKE_SDKMAN/candidates/jenesis/$VERSION/bin/jenesis-jdk" 25 2>&1)" \
+    || dump_and_fail "jenesis-jdk installed by SDKMAN did not call SDKMAN back" "$OUT"
+[ "$(cat "$FAKE_SDKMAN/installed")" = "25.0.4-tem" ] \
+    || dump_and_fail "jenesis-jdk installed by SDKMAN installed $(cat "$FAKE_SDKMAN/installed") for 25" "$OUT"
 set +e
 OUT="$(SDKMAN_DIR="$FAKE_SDKMAN" "${SDK_HOME}/bin/jenesis-jdk" --tool=sdkman 25-nosuchvendor 2>&1)"
 RC=$?

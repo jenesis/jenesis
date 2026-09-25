@@ -31,13 +31,16 @@ if [ "${JAVA_MAJOR:-0}" -lt 25 ] 2>/dev/null; then
     exit 1
 fi
 
-case "$JENESIS_HOME/" in
-    "${SDKMAN_DIR:-$HOME/.sdkman}/candidates/jenesis/"* \
-        | "${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/installs/"*)
-        if [ -z "${JENESIS_TOOLCHAIN_INSTALLER+set}" ]; then
-            export JENESIS_TOOLCHAIN_INSTALLER="$SCRIPT_DIR/jenesis-jdk"
-        fi
-        ;;
-esac
+for TOOL_HOME in "${SDKMAN_DIR:-$HOME/.sdkman}/candidates/jenesis" \
+        "${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/installs"; do
+    TOOL_HOME="$(cd "$TOOL_HOME" 2>/dev/null && pwd -P)" || continue
+    case "$JENESIS_HOME/" in
+        "$TOOL_HOME/"*)
+            if [ -z "${JENESIS_TOOLCHAIN_INSTALLER+set}" ]; then
+                export JENESIS_TOOLCHAIN_INSTALLER="$SCRIPT_DIR/jenesis-jdk"
+            fi
+            ;;
+    esac
+done
 
 exec "$JAVA" ${JAVA_OPTS:-} -p "$JENESIS_HOME/lib" -m build.jenesis/build.jenesis.Execute "$@"
