@@ -38,7 +38,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                             SequencedMap<Path, Path> resources,
                                             Environment environment) implements MultiProjectAssembler<ProjectModuleDescriptor> {
 
-    private static final List<String> PLUGIN_SLOTS = List.of("",
+    private static final List<String> HOOK_POINTS = List.of("",
             "check",
             "format",
             "compliance",
@@ -48,6 +48,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             "binary/validate",
             "artifact",
             "observed",
+            "package",
             "documentation",
             "documentation/generate");
 
@@ -189,10 +190,10 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         for (String key : plugins.keySet()) {
             int plus = key.indexOf('+');
             String name = plus == -1 ? key : key.substring(0, plus);
-            if (name.isEmpty() || name.contains("/") || plus != -1 && !PLUGIN_SLOTS.contains(key.substring(plus + 1))
+            if (name.isEmpty() || name.contains("/") || plus != -1 && !HOOK_POINTS.contains(key.substring(plus + 1))
                     || plus == key.length() - 1) {
-                throw new IllegalArgumentException("Cannot add the plugin " + key + " - name a plugin as <name>+<slot>"
-                        + " with a slot of " + PLUGIN_SLOTS.stream().filter(slot -> !slot.isEmpty()).toList()
+                throw new IllegalArgumentException("Cannot add the plugin " + key + " - name a plugin as <name>+<hook point>"
+                        + " with a hook point of " + HOOK_POINTS.stream().filter(hook -> !hook.isEmpty()).toList()
                         + ", or as <name> alone for the module build, where the name holds no / or +");
             }
         }
@@ -248,8 +249,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 : ModularizeModule.configured(BuildStep.locate(descriptor.configuration(), "modules.properties"));
         SequencedMap<String, SequencedMap<String, String>> overrides = overridesOf(descriptor.configuration());
         ProcessHandler.Factory factory = ProcessHandler.Factory.ofEnvironment(environment);
-        SequencedMap<String, SequencedMap<String, BuildExecutorModule>> slots = new LinkedHashMap<>();
-        slots.put("", new LinkedHashMap<>(custom));
+        SequencedMap<String, SequencedMap<String, BuildExecutorModule>> hooks = new LinkedHashMap<>();
+        hooks.put("", new LinkedHashMap<>(custom));
         for (Map.Entry<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugin : plugins.entrySet()) {
             int plus = plugin.getKey().indexOf('+');
             String name = plus == -1 ? plugin.getKey() : plugin.getKey().substring(0, plus);
@@ -259,10 +260,10 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             }
             SequencedMap<String, String> properties = new LinkedHashMap<>();
             SequencedProperties.ofFiles(file).forEachProperty(properties::put);
-            SequencedMap<String, BuildExecutorModule> slot = slots.computeIfAbsent(plus == -1
+            SequencedMap<String, BuildExecutorModule> hooked = hooks.computeIfAbsent(plus == -1
                     ? ""
                     : plugin.getKey().substring(plus + 1), _ -> new LinkedHashMap<>());
-            if (slot.putIfAbsent(name, plugin.getValue().apply(descriptor.location(), properties)) != null) {
+            if (hooked.putIfAbsent(name, plugin.getValue().apply(descriptor.location(), properties)) != null) {
                 throw new IllegalArgumentException("The plugin " + plugin.getKey() + " takes the name of a custom module"
                         + " that is added already - give the plugin another name");
             }
@@ -282,13 +283,13 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             sub.addModule("check",
                     check.apply(InferredSourceCodeQualityModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
                                 .pinning(descriptor.pinning())
-                                .custom(slots.getOrDefault("check", none))),
+                                .custom(hooks.getOrDefault("check", none))),
                     Stream.of(descriptor.sources().stream(), descriptor.spdx().stream(), descriptor.manifests().stream())
                             .flatMap(Function.identity()));
             sub.addModule("format",
                     format.apply(InferredSourceFormattingModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
                                  .pinning(descriptor.pinning())
-                                 .custom(slots.getOrDefault("format", none))),
+                                 .custom(hooks.getOrDefault("format", none))),
                     Stream.of(descriptor.sources().stream(), descriptor.spdx().stream(), descriptor.manifests().stream())
                             .flatMap(Function.identity()));
             Sbom sbom = environment.flag("sbom.cyclonedx", true)
@@ -303,7 +304,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                 .flatMap(Function.identity()));
             }
             sub.addModule("compliance", compliance.apply(InferredComplianceModule.ofEnvironment(environment, descriptor.configuration())
-                            .custom(slots.getOrDefault("compliance", none))),
+                            .custom(hooks.getOrDefault("compliance", none))),
                           Stream.concat(descriptor.manifests().stream(), descriptor.artifacts().stream()));
             InferredJavaToolchainModule toolchainModule = InferredJavaToolchainModule.ofEnvironment(environment,
                             descriptor.configuration(),
@@ -311,24 +312,24 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             resolvers)
                     .pinning(descriptor.pinning())
                     .pathPlacement(descriptor.pathPlacement())
-                    .custom(slots.getOrDefault("binary", none));
-            if (slots.containsKey("binary/generated")) {
+                    .custom(hooks.getOrDefault("binary", none));
+            if (hooks.containsKey("binary/generated")) {
                 toolchainModule = toolchainModule.generatorModule(InferredSourceGenerationModule.ofEnvironment(environment,
                         descriptor.configuration(),
                         repositories,
-                        resolvers).custom(slots.get("binary/generated")));
+                        resolvers).custom(hooks.get("binary/generated")));
             }
-            if (slots.containsKey("binary/compiled")) {
+            if (hooks.containsKey("binary/compiled")) {
                 toolchainModule = toolchainModule.compilerModule(InferredCompilerChainModule.ofEnvironment(environment,
                         descriptor.configuration(),
                         repositories,
-                        resolvers).custom(slots.get("binary/compiled")));
+                        resolvers).custom(hooks.get("binary/compiled")));
             }
-            if (slots.containsKey("binary/validate")) {
+            if (hooks.containsKey("binary/validate")) {
                 toolchainModule = toolchainModule.validatorModule(InferredByteCodeQualityModule.ofEnvironment(environment,
                         descriptor.configuration(),
                         repositories,
-                        resolvers).custom(slots.get("binary/validate")));
+                        resolvers).custom(hooks.get("binary/validate")));
             }
             if (!resources.isEmpty()) {
                 SequencedMap<Path, Path> bound = new LinkedHashMap<>();
@@ -347,7 +348,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     artifact.apply(
                             InferredArtifactQualityModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
                                     .pinning(descriptor.pinning())
-                                    .custom(slots.getOrDefault("artifact", none))),
+                                    .custom(hooks.getOrDefault("artifact", none))),
                     Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             sub.addStep("layers",
                     new Layers(),
@@ -369,7 +370,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                         .pinning(descriptor.pinning())
                                         .pathPlacement(descriptor.pathPlacement())
                                         .moduleName(properties.getProperty("module"))
-                                        .custom(slots.getOrDefault("observed", none))),
+                                        .custom(hooks.getOrDefault("observed", none))),
                                 Stream.concat(Stream.of("prepare", "binary", "layers"),
                                         inputs(descriptor, closure)));
                     }
@@ -386,11 +387,11 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                 repositories,
                                 resolvers)
                         .pinning(descriptor.pinning())
-                        .custom(slots.getOrDefault("documentation", none));
-                if (slots.containsKey("documentation/generate")) {
+                        .custom(hooks.getOrDefault("documentation", none));
+                if (hooks.containsKey("documentation/generate")) {
                     documentationModule = documentationModule.generateModule(InferredDocumentationChainModule.ofEnvironment(environment,
                             repositories,
-                            resolvers).custom(slots.get("documentation/generate")));
+                            resolvers).custom(hooks.get("documentation/generate")));
                 }
                 sub.addModule("documentation",
                         documentation.apply(documentationModule),
@@ -404,12 +405,14 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         JMod.ofEnvironment(environment, factory),
                         Stream.of(Stream.of("binary", "legal"), descriptor.content().stream()).flatMap(Function.identity()));
             }
-            if (!slots.get("").isEmpty()) {
-                sub.addModule("custom", (nested, nestedInherited) -> slots.get("").forEach((name, module) ->
+            if (!hooks.get("").isEmpty()) {
+                sub.addModule("custom", (nested, nestedInherited) -> hooks.get("").forEach((name, module) ->
                         nested.addModule(name, module, nestedInherited.sequencedKeySet())), outerInherited.sequencedKeySet());
             }
         });
-        if (packaging.jlink() || packaging.jpackage() != null || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || packaging.docker() != null) {
+        SequencedMap<String, BuildExecutorModule> packagers = hooks.getOrDefault("package", none);
+        if (packaging.jlink() || packaging.jpackage() != null || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || packaging.docker() != null
+                || !packagers.isEmpty()) {
             assembly = assembly.then("package", (sub, inherited) -> {
                 SequencedSet<String> images = new LinkedHashSet<>();
                 SequencedSet<String> inputs = new LinkedHashSet<>(inherited.sequencedKeySet());
@@ -454,6 +457,24 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                 Stream.concat(inputs.stream(), Stream.of("reachability")));
                     images.add("native-image");
                 }
+                if (!packagers.isEmpty()) {
+                    SequencedSet<String> handed = new LinkedHashSet<>(linked);
+                    handed.addAll(images);
+                    if (packaging.bundle()) {
+                        handed.add("bundle");
+                    }
+                    if (packaging.launcher()) {
+                        handed.add("launcher");
+                    }
+                    sub.addModule("custom", (nested, nestedInherited) -> packagers.forEach((name, module) ->
+                            nested.addModule(name, module, nestedInherited.sequencedKeySet())), handed);
+                    sub.addStep("packaged", new Packaged(), images.contains("jpackage")
+                            ? Stream.of("jpackage", "custom")
+                            : Stream.of("custom"));
+                    images.remove("jpackage");
+                    images.addFirst("packaged");
+                    images.add("custom");
+                }
                 if (!images.isEmpty()) {
                     String named = descriptor.name().endsWith("-")
                             ? descriptor.name().substring(0, descriptor.name().length() - 1)
@@ -463,6 +484,38 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             });
         }
         return assembly;
+    }
+
+    private record Packaged() implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            Path packages = context.next().resolve(JPackage.PACKAGES);
+            for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
+                if (argument.getValue().removed()) {
+                    continue;
+                }
+                Path folder = argument.getValue().folder().resolve(JPackage.PACKAGES);
+                if (!Files.isDirectory(folder)) {
+                    continue;
+                }
+                try (Stream<Path> files = Files.walk(folder)) {
+                    for (Path file : files.filter(Files::isRegularFile).toList()) {
+                        Path target = packages.resolve(folder.relativize(file).toString());
+                        if (Files.exists(target)) {
+                            throw new IllegalStateException(argument.getKey() + " packages " + folder.relativize(file)
+                                    + ", which another packager writes already - give each package a name of its own");
+                        }
+                        Files.createDirectories(target.getParent());
+                        BuildStep.linkOrCopy(target, file);
+                    }
+                }
+            }
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
     }
 
     private record Packaging(boolean jmod,

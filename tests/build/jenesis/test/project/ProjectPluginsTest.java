@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class ProjectPluginsTest {
 
+    private static final Queue<String> RAN = new ConcurrentLinkedQueue<>();
+
     @TempDir
     private Path root;
 
@@ -28,6 +30,7 @@ public class ProjectPluginsTest {
 
     @BeforeEach
     public void setUp() throws Exception {
+        RAN.clear();
         buildExecutor = BuildExecutor.of(root,
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
@@ -65,7 +68,7 @@ public class ProjectPluginsTest {
         SequencedMap<String, Path> result = buildExecutor.execute("postprocess");
 
         assertThat(result.keySet().stream().filter(key -> key.startsWith("postprocess/")))
-                .containsExactly("postprocess/additions/module-app");
+                .containsExactly("postprocess/additions/module-app", "postprocess/project");
     }
 
     @Test
@@ -91,7 +94,7 @@ public class ProjectPluginsTest {
     }
 
     @Test
-    public void refuses_an_addition_that_is_neither_an_attachment_nor_a_report() {
+    public void adds_a_file_under_any_key_a_transform_names() throws IOException {
         wire(new ProjectPlugins().transform("runtime", (_, context, _) -> {
             Files.writeString(context.next().resolve("extra.jar"), "jar");
             SequencedProperties inventory = new SequencedProperties();
@@ -100,11 +103,50 @@ public class ProjectPluginsTest {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }));
 
+        Path additions = buildExecutor.execute("postprocess").get("postprocess/additions/module-app");
+
+        assertThat(SequencedProperties.ofFiles(additions.resolve(Inventory.INVENTORY)).getProperty("module-app.runtime.1"))
+                .isEqualTo("runtime/1/extra.jar");
+    }
+
+    @Test
+    public void refuses_an_addition_whose_key_names_nothing() {
+        wire(new ProjectPlugins().transform("runtime", (_, context, _) -> {
+            Files.writeString(context.next().resolve("extra.jar"), "jar");
+            SequencedProperties inventory = new SequencedProperties();
+            inventory.setProperty("module-app.", "extra.jar");
+            inventory.store(context.next().resolve(Inventory.INVENTORY));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }));
+
         assertThatThrownBy(() -> buildExecutor.execute("postprocess"))
-                .isInstanceOf(BuildExecutorException.class)
                 .rootCause()
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("can only add <module>.attachment.<classifier> or <module>.report.<name>");
+                .hasMessageContaining("name what it adds as <module>.<key>");
+    }
+
+    @Test
+    public void gathers_what_the_transforms_place_in_the_project() throws IOException {
+        wire(new ProjectPlugins()
+                .transform("coverage", new PlaceInProject("reports/coverage/index.html"))
+                .transform("site", new PlaceInProject("site/index.html")));
+
+        Path project = buildExecutor.execute("postprocess").get("postprocess/project");
+
+        assertThat(project.resolve("project/reports/coverage/index.html")).hasContent("reports/coverage/index.html");
+        assertThat(project.resolve("project/site/index.html")).hasContent("site/index.html");
+    }
+
+    @Test
+    public void refuses_a_file_two_transforms_place_in_the_project() {
+        wire(new ProjectPlugins()
+                .transform("coverage", new PlaceInProject("reports/index.html"))
+                .transform("site", new PlaceInProject("reports/index.html")));
+
+        assertThatThrownBy(() -> buildExecutor.execute("postprocess"))
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("places reports/index.html in the project, where another plugin placed it already");
     }
 
     @Test
@@ -202,7 +244,7 @@ public class ProjectPluginsTest {
                 .rootCause()
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("The argument other.holder")
-                .hasMessageContaining("names no plugin of postprocess");
+                .hasMessageContaining("names no plugin of the whole project");
     }
 
     @Test
@@ -210,6 +252,166 @@ public class ProjectPluginsTest {
         wire(new ProjectPlugins().transform("additions", new Attach("licenses", "module-app")));
 
         assertThat(buildExecutor.execute("postprocess")).containsKey("postprocess/additions/module-app");
+    }
+
+    @Test
+    public void runs_a_preprocessor_before_what_depends_on_it() {
+        buildExecutor.addModule("preprocess", new ProjectPlugins().preprocess("headers", (_, _, _) -> {
+            RAN.add("headers");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }).preprocess(new LinkedHashSet<>()));
+        buildExecutor.addStep("compile", (_, _, _) -> {
+            RAN.add("compile");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }, "preprocess");
+
+        buildExecutor.execute("compile");
+
+        assertThat(RAN).containsExactly("headers", "compile");
+    }
+
+    @Test
+    public void stops_what_depends_on_a_preprocessor_that_fails() {
+        buildExecutor.addModule("preprocess", new ProjectPlugins().preprocess("headers", (_, _, _) -> {
+            throw new IllegalStateException("a header is missing");
+        }).preprocess(new LinkedHashSet<>()));
+        buildExecutor.addStep("compile", (_, _, _) -> {
+            RAN.add("compile");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }, "preprocess");
+
+        assertThatThrownBy(() -> buildExecutor.execute("compile"))
+                .rootCause()
+                .hasMessage("a header is missing");
+        assertThat(RAN).isEmpty();
+    }
+
+    @Test
+    public void hands_nothing_a_preprocessor_writes_to_what_depends_on_it() {
+        buildExecutor.addModule("preprocess", new ProjectPlugins().preprocess("headers", (_, context, _) -> {
+            Files.writeString(context.next().resolve("headers.txt"), "checked");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }).preprocess(new LinkedHashSet<>()));
+
+        assertThat(buildExecutor.execute("preprocess").keySet()).noneMatch(key -> key.startsWith("preprocess/"));
+    }
+
+    @Test
+    public void hands_an_exporter_what_its_module_depends_on() {
+        buildExecutor.addModule("export",
+                new ProjectPlugins().export("publish", new RequireFile("app.jar")).export(new LinkedHashSet<>()),
+                "build");
+
+        assertThat(buildExecutor.execute("export").keySet()).anyMatch(key -> key.startsWith("export/custom/publish"));
+    }
+
+    @Test
+    public void hands_a_releaser_what_its_module_depends_on() {
+        buildExecutor.addModule("release",
+                new ProjectPlugins().release("announce", new RequireFile("app.jar")).release(new LinkedHashSet<>()),
+                "build");
+
+        assertThat(buildExecutor.execute("release").keySet()).anyMatch(key -> key.startsWith("release/custom/announce"));
+    }
+
+    @Test
+    public void runs_a_goal_under_its_own_name_even_when_it_takes_the_name_of_the_pins_file() throws IOException {
+        Path pins = Files.writeString(root.resolve("jenesis.plugins.pin.properties"), "");
+        buildExecutor.addModule("plugin",
+                new ProjectPlugins().pins(pins).goal("bench", new RequireFile("app.jar")).goal(new LinkedHashSet<>()),
+                "build");
+
+        assertThat(buildExecutor.execute("plugin/bench").keySet()).anyMatch(key -> key.startsWith("plugin/bench"));
+    }
+
+    @Test
+    public void refuses_a_second_exporter_of_the_same_name() {
+        ProjectPlugins plugins = new ProjectPlugins().export("publish", new RequireFile("app.jar"));
+
+        assertThatThrownBy(() -> plugins.export("publish", new RequireFile("app.jar")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("An exporter named publish is added already");
+    }
+
+    @Test
+    public void lets_a_plugin_take_the_name_of_the_pins_it_resolves_with() throws IOException {
+        Path pins = Files.writeString(root.resolve("jenesis.plugins.pin.properties"), "");
+        buildExecutor.addModule("resolved", new ProjectPlugins().pins(pins).resolutions(new LinkedHashMap<>(Map.of("pins",
+                ((BuildStep) (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true))).asModule("pins"))))
+                .resolution());
+
+        assertThat(buildExecutor.execute("resolved").keySet()).anyMatch(key -> key.startsWith("resolved/custom/pins"));
+    }
+
+    @Test
+    public void stages_each_tree_as_it_is_without_a_plugin_of_stage() {
+        buildExecutor.addModule("stage", new ProjectPlugins().stage(new LinkedHashSet<>(), trees()), "build");
+
+        assertThat(buildExecutor.execute("stage").get("stage/maven").resolve("demo/app.jar")).hasContent("jar");
+    }
+
+    @Test
+    public void merges_what_a_stage_transform_adds_into_the_tree_it_names() {
+        buildExecutor.addModule("stage", new ProjectPlugins().stageTransform("checksums", (_, context, _) -> {
+            Path sum = Files.createDirectories(context.next().resolve("maven/demo")).resolve("app.jar.sha256");
+            Files.writeString(sum, "sum");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }).stage(new LinkedHashSet<>(), trees()), "build");
+
+        Path maven = buildExecutor.execute("stage").get("stage/maven");
+
+        assertThat(maven.resolve("demo/app.jar")).hasContent("jar");
+        assertThat(maven.resolve("demo/app.jar.sha256")).hasContent("sum");
+    }
+
+    @Test
+    public void refuses_a_stage_transform_that_adds_a_file_staged_already() {
+        buildExecutor.addModule("stage", new ProjectPlugins().stageTransform("replace", (_, context, _) -> {
+            Files.writeString(Files.createDirectories(context.next().resolve("maven/demo")).resolve("app.jar"), "other");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }).stage(new LinkedHashSet<>(), trees()), "build");
+
+        assertThatThrownBy(() -> buildExecutor.execute("stage"))
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("adds maven/demo/app.jar, which is staged already");
+    }
+
+    @Test
+    public void fails_the_stage_when_a_stage_inspection_fails() {
+        buildExecutor.addModule("stage", new ProjectPlugins().stageInspect("signed", (_, _, _) -> {
+            throw new IllegalStateException("app.jar is not signed");
+        }).stage(new LinkedHashSet<>(), trees()), "build");
+
+        assertThatThrownBy(() -> buildExecutor.execute("stage"))
+                .rootCause()
+                .hasMessage("app.jar is not signed");
+    }
+
+    @Test
+    public void stages_again_once_a_stage_transform_is_left_out() throws Exception {
+        BuildStep pass = (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true));
+        buildExecutor.addModule("stage", new ProjectPlugins().stageTransform("checksums", (_, context, _) -> {
+            Files.writeString(Files.createDirectories(context.next().resolve("maven/demo")).resolve("app.jar.sha256"), "sum");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }).stageInspect("complete", pass).stage(new LinkedHashSet<>(), trees()), "build");
+        buildExecutor.execute("stage");
+        setUp();
+        buildExecutor.addModule("stage", new ProjectPlugins().stageInspect("complete", pass).stage(new LinkedHashSet<>(), trees()), "build");
+
+        Path maven = buildExecutor.execute("stage").get("stage/maven");
+
+        assertThat(maven.resolve("demo/app.jar")).hasContent("jar");
+        assertThat(maven.resolve("demo/app.jar.sha256")).doesNotExist();
+    }
+
+    private static SequencedMap<String, BuildStep> trees() {
+        SequencedMap<String, BuildStep> trees = new LinkedHashMap<>();
+        trees.put("maven", (_, context, _) -> {
+            Files.writeString(Files.createDirectories(context.next().resolve("demo")).resolve("app.jar"), "jar");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        });
+        return trees;
     }
 
     private void wire(ProjectPlugins plugins, Path... profiles) {
@@ -227,6 +429,20 @@ public class ProjectPluginsTest {
             SequencedProperties inventory = new SequencedProperties();
             inventory.setProperty(prefix + ".attachment." + classifier, classifier + ".txt");
             inventory.store(context.next().resolve(Inventory.INVENTORY));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    private record PlaceInProject(String path) implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            Path file = context.next().resolve("project").resolve(path);
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, path);
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }

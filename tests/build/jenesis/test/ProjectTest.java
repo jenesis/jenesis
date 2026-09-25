@@ -9,6 +9,7 @@ import build.jenesis.BuildExecutorFileCache;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
+import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Make;
 import build.jenesis.Environment;
@@ -183,6 +184,69 @@ public class ProjectTest {
             assertThat(outputs.keySet())
                     .as("build/postprocess is a selector of every layout, and adds nothing without a transform or an inspection")
                     .noneMatch(key -> key.startsWith(Project.BUILD + "/" + ProjectPlugins.POSTPROCESS + "/"));
+        }
+    }
+
+    @Test
+    public void runs_each_hook_of_the_whole_project_where_it_belongs_in_each_concrete_layout() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
+        Files.writeString(root.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>demo</groupId>
+                    <artifactId>empty</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        for (Project.Layout layout : List.of(Project.Layout.MAVEN, Project.Layout.MODULAR, Project.Layout.MODULAR_TO_MAVEN)) {
+            Project project = Project.ofEnvironment(new Environment(settings), root)
+                    .target(root.resolve("target-" + layout.hashCode()))
+                    .layout(layout);
+            assertThatThrownBy(() -> project.plugins(new ProjectPlugins().preprocess("gate", (_, _, _) -> {
+                throw new IllegalStateException("the gate refuses");
+            })).build(Project.BUILD))
+                    .as("a preprocessor runs as part of build and stops it")
+                    .rootCause()
+                    .hasMessage("the gate refuses");
+            SequencedMap<String, Path> outputs = project.plugins(new ProjectPlugins().export("publish", (_, context, arguments) -> {
+                Files.writeString(context.next().resolve("handed.txt"), String.join("\n", arguments.keySet()));
+                return CompletableFuture.completedStage(new BuildStepResult(true));
+            })).build(Project.EXPORT + "/" + ProjectPlugins.CUSTOM);
+            Path published = outputs.entrySet().stream()
+                    .filter(entry -> entry.getKey().startsWith(Project.EXPORT + "/" + ProjectPlugins.CUSTOM + "/publish"))
+                    .map(Map.Entry::getValue)
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(Files.readString(published.resolve("handed.txt")))
+                    .as("an exporter is handed what was staged")
+                    .contains(Project.STAGE + "/");
+            assertThat(project.plugins(new ProjectPlugins().release("announce", (_, _, _) ->
+                    CompletableFuture.completedStage(new BuildStepResult(true)))).build(Project.RELEASE).keySet())
+                    .as("a releaser runs within release")
+                    .anyMatch(key -> key.startsWith(Project.RELEASE + "/" + ProjectPlugins.CUSTOM + "/announce"));
+            SequencedMap<String, Path> staged = project.plugins(new ProjectPlugins().transform("site", (_, context, _) -> {
+                Path page = context.next().resolve("project/site/index.html");
+                Files.createDirectories(page.getParent());
+                Files.writeString(page, "site");
+                return CompletableFuture.completedStage(new BuildStepResult(true));
+            })).build(Project.STAGE);
+            assertThat(staged.get(Project.STAGE + "/" + ProjectPlugins.PROJECT).resolve("site/index.html"))
+                    .as("what a transform places in the project is staged as it stands")
+                    .hasContent("site");
+            Project benched = project.plugins(new ProjectPlugins().goal("bench", (_, _, _) ->
+                    CompletableFuture.completedStage(new BuildStepResult(true))));
+            assertThat(benched.build().keySet())
+                    .as("a goal runs only when it is named")
+                    .noneMatch(key -> key.startsWith(Project.PLUGIN + "/"));
+            SequencedMap<String, Path> summed = project.plugins(new ProjectPlugins().stageTransform("checksums", (_, context, _) -> {
+                Files.writeString(Files.createDirectories(context.next().resolve("project")).resolve("SHA256SUMS"), "sums");
+                return CompletableFuture.completedStage(new BuildStepResult(true));
+            })).build(Project.STAGE);
+            assertThat(summed.get(Project.STAGE + "/" + ProjectPlugins.PROJECT).resolve("SHA256SUMS"))
+                    .as("what a transform of stage adds joins the staged tree it names")
+                    .hasContent("sums");
+            assertThat(benched.build(Project.PLUGIN + "/bench").keySet())
+                    .anyMatch(key -> key.startsWith(Project.PLUGIN + "/bench"));
         }
     }
 
@@ -652,18 +716,31 @@ public class ProjectTest {
     }
 
     @Test
-    public void hands_the_plugins_of_transform_and_inspect_to_the_project() throws IOException {
+    public void hands_the_plugins_of_every_project_hook_point_to_the_project() throws IOException {
         Files.writeString(root.resolve("jenesis.plugins.properties"), """
                 greeting+binary/generated=demo.greeting
+                headers+preprocess=./headers
                 licenses+postprocess/transform=./licenses
                 audit+postprocess/inspect=demo.audit@audit
+                publish+export=demo.publish
+                announce+release=./announce
+                bench+plugin=./bench
+                sums+stage/transform=./sums
+                signed+stage/inspect=./signed
                 """);
         Project project = Project.ofEnvironment(new Environment(settings), root);
         assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
                 assembler -> assertThat(assembler.plugins()).containsOnlyKeys("greeting+binary/generated"));
+        assertThat(project.plugins().preprocessors()).containsOnlyKeys("headers");
         assertThat(project.plugins().transforms()).containsOnlyKeys("licenses");
         assertThat(project.plugins().inspections()).containsOnlyKeys("audit");
-        assertThat(project.plugins().resolutions()).containsOnlyKeys("licenses", "audit");
+        assertThat(project.plugins().exporters()).containsOnlyKeys("publish");
+        assertThat(project.plugins().releasers()).containsOnlyKeys("announce");
+        assertThat(project.plugins().goals()).containsOnlyKeys("bench");
+        assertThat(project.plugins().stageTransforms()).containsOnlyKeys("sums");
+        assertThat(project.plugins().stageInspections()).containsOnlyKeys("signed");
+        assertThat(project.plugins().resolutions())
+                .containsOnlyKeys("headers", "licenses", "audit", "publish", "announce", "bench", "sums", "signed");
         assertThat(project.plugins().pins()).isEqualTo(root.resolve("jenesis.plugins.pin.properties"));
     }
 

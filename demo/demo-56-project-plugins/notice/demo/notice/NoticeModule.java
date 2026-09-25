@@ -32,6 +32,7 @@ public class NoticeModule implements BuildExecutorModule {
                     ? null
                     : Files.readString(legal.folder().resolve("HEADER.txt")).strip();
             SequencedProperties additions = new SequencedProperties();
+            List<String> project = new ArrayList<>();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
@@ -60,10 +61,12 @@ public class NoticeModule implements BuildExecutorModule {
                     }
                     Path notice = Files.createDirectories(context.next().resolve("notices").resolve(prefix)).resolve("NOTICE.txt");
                     Files.write(notice, lines);
+                    project.addAll(lines);
                     additions.setProperty(prefix + ".attachment.notice", "notices/" + prefix + "/NOTICE.txt");
                 }
             }
             additions.store(context.next().resolve(Inventory.INVENTORY));
+            Files.write(Files.createDirectories(context.next().resolve("project")).resolve("NOTICE.txt"), project);
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }
