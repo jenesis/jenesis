@@ -147,7 +147,7 @@ jobs:
         with:
           tag: v${{ steps.version.outputs.version }}
           artifacts: sdk/jenesis-${{ steps.version.outputs.version }}.zip
-          bin: jenesis jenesis-exec jenesis-init jenesis-make jenesis-unsafe jenesis-validate jenesis-version
+          bin: jenesis jenesis-exec jenesis-init jenesis-jdk jenesis-make jenesis-unsafe jenesis-validate jenesis-version
           require: bin:java@25
 
       - name: Publish the jpx packslip for mise

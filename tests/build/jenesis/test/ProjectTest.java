@@ -1179,6 +1179,32 @@ public class ProjectTest {
     }
 
     @Test
+    public void the_layered_settings_rejects_toolchain_installer_in_the_project_file() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.toolchain.installer=/opt/tools/install-jdk\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .as("a project that names the installer would choose a program the build runs")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.toolchain.installer cannot be set in");
+    }
+
+    @Test
+    public void the_layered_settings_rejects_toolchain_installer_in_a_profile() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
+        Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.toolchain.installer=jenesis-jdk\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.toolchain.installer cannot be set in");
+    }
+
+    @Test
+    public void the_layered_settings_accepts_toolchain_installer_in_the_user_global_file() throws IOException {
+        Path home = Files.createDirectories(root.resolve("home/.jenesis"));
+        Files.writeString(home.resolve("jenesis.properties"), "jenesis.toolchain.installer=jenesis-jdk\n");
+        settings.put("make.global", root.resolve("home").toString());
+        assertThat(Make.settings(root, settings).keys().get("toolchain.installer")).isEqualTo("jenesis-jdk");
+    }
+
+    @Test
     public void the_layered_settings_rejects_docker_settings_in_the_project_file() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.project.docker=false\n");
         assertThatThrownBy(() -> Make.settings(root, Map.of()))
