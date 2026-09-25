@@ -53,7 +53,7 @@ public class JenesisModuleRepositoryReleaseTest {
     }
 
     @Test
-    public void releases_each_file_under_its_version_and_as_the_latest_of_its_module() throws IOException {
+    public void releases_each_file_under_its_version_and_nothing_else() throws IOException {
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
         stage("demo.greeter", "1.0.0", "demo.greeter-sources.jar", "sources");
 
@@ -62,12 +62,12 @@ public class JenesisModuleRepositoryReleaseTest {
         assertThat(result.next()).isTrue();
         assertThat(repository.resolve("module/demo.greeter/1.0.0/demo.greeter.jar")).hasContent("classes");
         assertThat(repository.resolve("module/demo.greeter/1.0.0/demo.greeter-sources.jar")).hasContent("sources");
-        assertThat(repository.resolve("module/demo.greeter/demo.greeter.jar")).hasContent("classes");
-        assertThat(repository.resolve("module/demo.greeter/demo.greeter-sources.jar")).hasContent("sources");
+        assertThat(repository.resolve("module/demo.greeter/demo.greeter.jar")).doesNotExist();
+        assertThat(repository.resolve("module/demo.greeter/demo.greeter-sources.jar")).doesNotExist();
     }
 
     @Test
-    public void releases_what_a_module_repository_then_resolves_by_version_and_as_the_latest() throws IOException {
+    public void releases_what_a_module_repository_then_resolves_by_version() throws IOException {
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
 
         run(new JenesisModuleRepositoryRelease(repository.toUri()).printing(null));
@@ -75,12 +75,8 @@ public class JenesisModuleRepositoryReleaseTest {
         JenesisModuleRepository resolved = new JenesisModuleRepository(repository.resolve("module").toUri());
         try (InputStream versioned = resolved.fetch(Runnable::run, "demo.greeter", null, "1.0.0", "jar")
                 .orElseThrow()
-                .toInputStream();
-             InputStream latest = resolved.fetch(Runnable::run, "demo.greeter", null, null, "jar")
-                     .orElseThrow()
-                     .toInputStream()) {
+                .toInputStream()) {
             assertThat(versioned).hasContent("classes");
-            assertThat(latest).hasContent("classes");
         }
     }
 
@@ -96,7 +92,7 @@ public class JenesisModuleRepositoryReleaseTest {
     }
 
     @Test
-    public void refuses_to_replace_a_released_version_but_moves_the_latest_to_a_new_one() throws IOException {
+    public void refuses_to_replace_a_released_version_but_releases_a_new_one() throws IOException {
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
         run(new JenesisModuleRepositoryRelease(repository.toUri()).printing(null));
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "changed");
@@ -110,7 +106,6 @@ public class JenesisModuleRepositoryReleaseTest {
         run(new JenesisModuleRepositoryRelease(repository.toUri()).printing(null));
 
         assertThat(repository.resolve("module/demo.greeter/1.0.1/demo.greeter.jar")).hasContent("changed");
-        assertThat(repository.resolve("module/demo.greeter/demo.greeter.jar")).hasContent("changed");
     }
 
     @Test
@@ -125,7 +120,7 @@ public class JenesisModuleRepositoryReleaseTest {
     }
 
     @Test
-    public void puts_every_version_before_it_moves_a_latest_pointer() throws IOException {
+    public void puts_each_file_under_its_version_with_the_token() throws IOException {
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "greeter");
         stage("demo.app", "2.0.0", "demo.app.jar", "app");
 
@@ -133,17 +128,16 @@ public class JenesisModuleRepositoryReleaseTest {
 
         assertThat(requests).containsExactly(
                 "PUT /repository/releases/module/demo.app/2.0.0/demo.app.jar Bearer secret",
-                "PUT /repository/releases/module/demo.greeter/1.0.0/demo.greeter.jar Bearer secret",
-                "PUT /repository/releases/module/demo.app/demo.app.jar Bearer secret",
-                "PUT /repository/releases/module/demo.greeter/demo.greeter.jar Bearer secret");
+                "PUT /repository/releases/module/demo.greeter/1.0.0/demo.greeter.jar Bearer secret");
         assertThat(received)
-                .containsEntry("/repository/releases/module/demo.greeter/1.0.0/demo.greeter.jar", "greeter")
-                .containsEntry("/repository/releases/module/demo.app/demo.app.jar", "app");
+                .containsEntry("/repository/releases/module/demo.app/2.0.0/demo.app.jar", "app")
+                .containsEntry("/repository/releases/module/demo.greeter/1.0.0/demo.greeter.jar", "greeter");
     }
 
     @Test
-    public void moves_no_latest_pointer_when_the_repository_holds_a_version_already() throws IOException {
+    public void stops_when_the_repository_holds_a_version_already() throws IOException {
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
+        stage("demo.greeter", "1.0.0", "demo.greeter.pom", "pom");
         statuses.add(409);
 
         assertThatThrownBy(() -> run(release()))
@@ -169,7 +163,7 @@ public class JenesisModuleRepositoryReleaseTest {
 
         run(release().connection(new Repository.Connection().insecure(true).retries(1).backoff(Duration.ZERO)));
 
-        assertThat(requests).hasSize(3);
+        assertThat(requests).hasSize(2);
         assertThat(received).containsEntry("/repository/releases/module/demo.greeter/1.0.0/demo.greeter.jar", "classes");
     }
 

@@ -83,7 +83,7 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        SequencedMap<String, Path> versioned = new TreeMap<>(), latest = new TreeMap<>();
+        SequencedMap<String, Path> released = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed() || !Files.isDirectory(argument.folder())) {
                 continue;
@@ -103,51 +103,41 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
                     SAFE_SEGMENT.accept("module name", module);
                     SAFE_SEGMENT.accept("version", version);
                     SAFE_SEGMENT.accept("file name", name);
-                    versioned.put("module/" + module + "/" + version + "/" + name, file);
-                    if (latest.put("module/" + module + "/" + name, file) != null) {
-                        throw new IllegalStateException("Cannot release " + module
-                                + " at more than one version: " + name + " is staged twice");
-                    }
+                    released.put("module/" + module + "/" + version + "/" + name, file);
                 }
             }
         }
-        for (Map.Entry<String, Path> entry : versioned.entrySet()) {
-            publish(entry.getKey(), entry.getValue(), true);
-        }
-        for (Map.Entry<String, Path> entry : latest.entrySet()) {
-            publish(entry.getKey(), entry.getValue(), false);
+        for (Map.Entry<String, Path> entry : released.entrySet()) {
+            URI target = repository.resolve(entry.getKey());
+            Path file = entry.getValue();
+            if ("file".equals(target.getScheme())) {
+                Path destination = Path.of(target);
+                if (Files.isRegularFile(destination)) {
+                    if (Files.mismatch(destination, file) != -1) {
+                        throw new IllegalStateException("Cannot release " + file.getFileName() + " to " + target
+                                + ": the repository holds other content at that version, so release under a new version");
+                    }
+                    continue;
+                }
+                Files.createDirectories(destination.getParent());
+                Path temporary = Files.createTempFile(destination.getParent(), "release", ".tmp");
+                try {
+                    Files.copy(file, temporary, StandardCopyOption.REPLACE_EXISTING);
+                    Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE);
+                } finally {
+                    Files.deleteIfExists(temporary);
+                }
+            } else {
+                upload(target, file);
+            }
+            if (printing != null) {
+                printing.accept("%s%-11s%s %s".formatted(BuildExecutorCallback.GREEN,
+                        "[RELEASED]",
+                        BuildExecutorCallback.RESET,
+                        target));
+            }
         }
         return CompletableFuture.completedStage(new BuildStepResult(true));
-    }
-
-    private void publish(String path, Path file, boolean immutable) throws IOException {
-        URI target = repository.resolve(path);
-        if ("file".equals(target.getScheme())) {
-            Path destination = Path.of(target);
-            if (immutable && Files.isRegularFile(destination)) {
-                if (Files.mismatch(destination, file) != -1) {
-                    throw new IllegalStateException("Cannot release " + file.getFileName() + " to " + target
-                            + ": the repository holds other content at that version, so release under a new version");
-                }
-                return;
-            }
-            Files.createDirectories(destination.getParent());
-            Path temporary = Files.createTempFile(destination.getParent(), "release", ".tmp");
-            try {
-                Files.copy(file, temporary, StandardCopyOption.REPLACE_EXISTING);
-                Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-            } finally {
-                Files.deleteIfExists(temporary);
-            }
-        } else {
-            upload(target, file);
-        }
-        if (immutable && printing != null) {
-            printing.accept("%s%-11s%s %s".formatted(BuildExecutorCallback.GREEN,
-                    "[RELEASED]",
-                    BuildExecutorCallback.RESET,
-                    target));
-        }
     }
 
     private void upload(URI target, Path file) throws IOException {
