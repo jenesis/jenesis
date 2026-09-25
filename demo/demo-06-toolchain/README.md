@@ -81,17 +81,15 @@ mise, or Scoop on Windows.
 Where SDKMAN, mise or Scoop installed Jenesis, the `jenesis` command names its
 `jenesis-jdk` as the installer through the `JENESIS_TOOLCHAIN_INSTALLER` environment
 variable, for the run it starts and nothing else, and `jenesis-jdk` installs the JDK
-with that tool in turn. A run of the installed command asking for a JDK you do not
-have then installs it and runs on it:
+with that tool in turn. A build started from the sources names the installer
+itself, on the command line:
 
-    jenesis-exec -Djenesis.toolchain.version=25-zulu
+    java -Djenesis.toolchain.version=25-zulu -Djenesis.toolchain.installer=jenesis-jdk build/jenesis/Execute.java
 
-A build started from the sources, as `java build/jenesis/Execute.java`, has no
-installing tool to call back, and runs an installer only where you name one, with
-`-Djenesis.toolchain.installer` or in your own `~/.jenesis/jenesis.properties`.
-The installer runs in your home folder, gets the version as its last argument, and
-has to install into a folder on the search path; Jenesis searches again afterwards
-and checks what it finds like any other JDK.
+A build asking for a JDK you do not have then installs it and runs on it. The
+installer runs in your home folder, gets the version as its last argument, and has
+to install into a folder on the search path; Jenesis searches again afterwards and
+checks what it finds like any other JDK.
 
 What a project cannot do
 ------------------------
