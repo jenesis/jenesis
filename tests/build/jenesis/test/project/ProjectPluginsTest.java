@@ -343,6 +343,77 @@ public class ProjectPluginsTest {
         assertThat(buildExecutor.execute("resolved").keySet()).anyMatch(key -> key.startsWith("resolved/custom/pins"));
     }
 
+    @Test
+    public void stages_each_tree_as_it_is_without_a_plugin_of_stage() {
+        buildExecutor.addModule("stage", new ProjectPlugins().stage(new LinkedHashSet<>(), trees()), "build");
+
+        assertThat(buildExecutor.execute("stage").get("stage/maven").resolve("demo/app.jar")).hasContent("jar");
+    }
+
+    @Test
+    public void merges_what_a_stage_transform_adds_into_the_tree_it_names() {
+        buildExecutor.addModule("stage", new ProjectPlugins().stageTransform("checksums", (_, context, _) -> {
+            Path sum = Files.createDirectories(context.next().resolve("maven/demo")).resolve("app.jar.sha256");
+            Files.writeString(sum, "sum");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }).stage(new LinkedHashSet<>(), trees()), "build");
+
+        Path maven = buildExecutor.execute("stage").get("stage/maven");
+
+        assertThat(maven.resolve("demo/app.jar")).hasContent("jar");
+        assertThat(maven.resolve("demo/app.jar.sha256")).hasContent("sum");
+    }
+
+    @Test
+    public void refuses_a_stage_transform_that_adds_a_file_staged_already() {
+        buildExecutor.addModule("stage", new ProjectPlugins().stageTransform("replace", (_, context, _) -> {
+            Files.writeString(Files.createDirectories(context.next().resolve("maven/demo")).resolve("app.jar"), "other");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }).stage(new LinkedHashSet<>(), trees()), "build");
+
+        assertThatThrownBy(() -> buildExecutor.execute("stage"))
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("adds maven/demo/app.jar, which is staged already");
+    }
+
+    @Test
+    public void fails_the_stage_when_a_stage_inspection_fails() {
+        buildExecutor.addModule("stage", new ProjectPlugins().stageInspect("signed", (_, _, _) -> {
+            throw new IllegalStateException("app.jar is not signed");
+        }).stage(new LinkedHashSet<>(), trees()), "build");
+
+        assertThatThrownBy(() -> buildExecutor.execute("stage"))
+                .rootCause()
+                .hasMessage("app.jar is not signed");
+    }
+
+    @Test
+    public void stages_again_once_a_stage_transform_is_left_out() throws Exception {
+        BuildStep pass = (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true));
+        buildExecutor.addModule("stage", new ProjectPlugins().stageTransform("checksums", (_, context, _) -> {
+            Files.writeString(Files.createDirectories(context.next().resolve("maven/demo")).resolve("app.jar.sha256"), "sum");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }).stageInspect("complete", pass).stage(new LinkedHashSet<>(), trees()), "build");
+        buildExecutor.execute("stage");
+        setUp();
+        buildExecutor.addModule("stage", new ProjectPlugins().stageInspect("complete", pass).stage(new LinkedHashSet<>(), trees()), "build");
+
+        Path maven = buildExecutor.execute("stage").get("stage/maven");
+
+        assertThat(maven.resolve("demo/app.jar")).hasContent("jar");
+        assertThat(maven.resolve("demo/app.jar.sha256")).doesNotExist();
+    }
+
+    private static SequencedMap<String, BuildStep> trees() {
+        SequencedMap<String, BuildStep> trees = new LinkedHashMap<>();
+        trees.put("maven", (_, context, _) -> {
+            Files.writeString(Files.createDirectories(context.next().resolve("demo")).resolve("app.jar"), "jar");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        });
+        return trees;
+    }
+
     private void wire(ProjectPlugins plugins, Path... profiles) {
         buildExecutor.addModule("postprocess", plugins.postprocess(new LinkedHashSet<>(List.of(profiles))), "build");
     }

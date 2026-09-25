@@ -31,8 +31,11 @@ public class ProjectFiles implements BuildStep {
             throws IOException {
         Path target = context.next().resolve(folder);
         for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
+            if (argument.getValue().removed()) {
+                continue;
+            }
             Path source = argument.getValue().folder().resolve(PROJECT);
-            if (argument.getValue().removed() || !Files.isDirectory(source)) {
+            if (!Files.isDirectory(source)) {
                 continue;
             }
             try (Stream<Path> files = Files.walk(source)) {

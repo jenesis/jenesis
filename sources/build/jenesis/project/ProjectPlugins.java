@@ -17,6 +17,8 @@ public record ProjectPlugins(Path pins,
                              SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> preprocessors,
                              SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> transforms,
                              SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> inspections,
+                             SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> stageTransforms,
+                             SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> stageInspections,
                              SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> exporters,
                              SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> releasers,
                              SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> goals,
@@ -29,6 +31,7 @@ public record ProjectPlugins(Path pins,
             INSPECT = "inspect",
             PINS = "jenesis.plugins.pin.properties",
             ADDITIONS = "additions",
+            STAGED = "staged",
             PROJECT = "project",
             SEALED = "sealed",
             UNCHANGED = "unchanged",
@@ -43,43 +46,53 @@ public record ProjectPlugins(Path pins,
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
+                Collections.emptyNavigableMap(),
                 Collections.emptyNavigableMap());
     }
 
     public ProjectPlugins pins(Path pins) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
     }
 
     public ProjectPlugins arguments(Path arguments) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
     }
 
     public ProjectPlugins preprocessors(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> preprocessors) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
     }
 
     public ProjectPlugins transforms(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> transforms) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
     }
 
     public ProjectPlugins inspections(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> inspections) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
+    }
+
+    public ProjectPlugins stageTransforms(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> stageTransforms) {
+        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
+    }
+
+    public ProjectPlugins stageInspections(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> stageInspections) {
+        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
     }
 
     public ProjectPlugins exporters(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> exporters) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
     }
 
     public ProjectPlugins releasers(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> releasers) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
     }
 
     public ProjectPlugins goals(SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> goals) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
     }
 
     public ProjectPlugins resolutions(SequencedMap<String, BuildExecutorModule> resolutions) {
-        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, exporters, releasers, goals, resolutions);
+        return new ProjectPlugins(pins, arguments, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals, resolutions);
     }
 
     public ProjectPlugins preprocess(String name, BuildExecutorModule module) {
@@ -122,6 +135,34 @@ public record ProjectPlugins(Path pins,
 
     public ProjectPlugins inspect(String name, BuildStep step) {
         return inspect(name, step.asModule(name));
+    }
+
+    public ProjectPlugins stageTransform(String name, BuildExecutorModule module) {
+        if (stageTransforms.containsKey(name)) {
+            throw new IllegalArgumentException("A stage transform named " + name + " is added already - give this one"
+                    + " another name");
+        }
+        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> added = new LinkedHashMap<>(stageTransforms);
+        added.put(name, _ -> module);
+        return stageTransforms(added);
+    }
+
+    public ProjectPlugins stageTransform(String name, BuildStep step) {
+        return stageTransform(name, step.asModule(name));
+    }
+
+    public ProjectPlugins stageInspect(String name, BuildExecutorModule module) {
+        if (stageInspections.containsKey(name)) {
+            throw new IllegalArgumentException("A stage inspection named " + name + " is added already - give this"
+                    + " one another name");
+        }
+        SequencedMap<String, Function<SequencedMap<String, String>, BuildExecutorModule>> added = new LinkedHashMap<>(stageInspections);
+        added.put(name, _ -> module);
+        return stageInspections(added);
+    }
+
+    public ProjectPlugins stageInspect(String name, BuildStep step) {
+        return stageInspect(name, step.asModule(name));
     }
 
     public ProjectPlugins export(String name, BuildExecutorModule module) {
@@ -184,6 +225,60 @@ public record ProjectPlugins(Path pins,
             @Override
             public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
                 hook(buildExecutor, inherited, preprocessors, profiles);
+            }
+        };
+    }
+
+    public BuildExecutorModule stage(SequencedSet<Path> profiles, SequencedMap<String, BuildStep> trees) {
+        return (buildExecutor, inherited) -> {
+            if (stageTransforms.isEmpty() && stageInspections.isEmpty()) {
+                for (Map.Entry<String, BuildStep> tree : trees.entrySet()) {
+                    buildExecutor.addStep(tree.getKey(), tree.getValue(), inherited.sequencedKeySet());
+                }
+                return;
+            }
+            SequencedMap<String, SequencedMap<String, String>> values = arguments(profiles);
+            SequencedSet<String> inputs = pinned(buildExecutor);
+            buildExecutor.addModule(STAGED, (staged, given) -> {
+                for (Map.Entry<String, BuildStep> tree : trees.entrySet()) {
+                    staged.addStep(tree.getKey(), tree.getValue(), given.sequencedKeySet());
+                }
+            }, inherited.sequencedKeySet());
+            SequencedSet<String> handed = new LinkedHashSet<>(inputs);
+            handed.add(STAGED);
+            if (!stageTransforms.isEmpty()) {
+                buildExecutor.addModule(TRANSFORM, (transform, given) -> {
+                    SequencedSet<String> previous = new LinkedHashSet<>(given.sequencedKeySet());
+                    for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> entry : stageTransforms.entrySet()) {
+                        transform.addModule(entry.getKey(),
+                                entry.getValue().apply(values.getOrDefault(entry.getKey(), Collections.emptyNavigableMap())),
+                                previous);
+                        previous.add(entry.getKey());
+                    }
+                }, handed);
+            }
+            for (String tree : trees.keySet()) {
+                buildExecutor.addStep(tree,
+                        new Merged(tree, STAGED + "/" + tree),
+                        stageTransforms.isEmpty() ? Stream.of(STAGED + "/" + tree) : Stream.of(STAGED + "/" + tree, TRANSFORM));
+            }
+            if (!stageInspections.isEmpty()) {
+                SequencedSet<String> inspected = new LinkedHashSet<>(trees.sequencedKeySet());
+                buildExecutor.addStep(SEALED, new Sealed(), inspected);
+                SequencedSet<String> available = new LinkedHashSet<>(inputs);
+                available.addAll(inspected);
+                available.add(SEALED);
+                buildExecutor.addModule(INSPECT, (inspect, given) -> {
+                    for (Map.Entry<String, Function<SequencedMap<String, String>, BuildExecutorModule>> entry : stageInspections.entrySet()) {
+                        inspect.addModule(entry.getKey(),
+                                entry.getValue().apply(values.getOrDefault(entry.getKey(), Collections.emptyNavigableMap())),
+                                given.sequencedKeySet());
+                    }
+                }, available);
+                SequencedSet<String> compared = new LinkedHashSet<>(inspected);
+                compared.add(SEALED);
+                compared.add(INSPECT);
+                buildExecutor.addStep(UNCHANGED, new Unchanged(), compared);
             }
         };
     }
@@ -320,12 +415,13 @@ public record ProjectPlugins(Path pins,
             for (String key : declared.stringPropertyNames()) {
                 int dot = key.indexOf('.');
                 String plugin = dot == -1 ? key : key.substring(0, dot);
-                if (dot <= 0 || dot == key.length() - 1 || Stream.of(resolutions, preprocessors, transforms, inspections, exporters, releasers, goals)
+                if (dot <= 0 || dot == key.length() - 1 || Stream.of(resolutions, preprocessors, transforms, inspections, stageTransforms, stageInspections, exporters, releasers, goals)
                         .noneMatch(plugins -> plugins.containsKey(plugin))) {
                     throw new IllegalArgumentException("The argument " + key + " in " + file + " names no plugin of "
                             + "the whole project - write <plugin>.<key>=<value> for one of "
                             + Stream.of(resolutions.keySet(), preprocessors.keySet(), transforms.keySet(),
-                                            inspections.keySet(), exporters.keySet(), releasers.keySet(), goals.keySet())
+                                            inspections.keySet(), stageTransforms.keySet(), stageInspections.keySet(),
+                                            exporters.keySet(), releasers.keySet(), goals.keySet())
                                     .flatMap(Set::stream)
                                     .collect(Collectors.toCollection(TreeSet::new)));
                 }
@@ -370,8 +466,11 @@ public record ProjectPlugins(Path pins,
                 throws IOException {
             SequencedProperties additions = new SequencedProperties();
             for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
                 Path file = argument.folder().resolve(Inventory.INVENTORY);
-                if (argument.removed() || !Files.isRegularFile(file)) {
+                if (!Files.isRegularFile(file)) {
                     continue;
                 }
                 SequencedProperties inventory = SequencedProperties.ofFiles(file);
@@ -417,6 +516,48 @@ public record ProjectPlugins(Path pins,
             }
             if (!additions.isEmpty()) {
                 additions.store(context.next().resolve(Inventory.INVENTORY));
+            }
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    private record Merged(String tree, String staged) implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            BuildStepArgument base = arguments.get(staged);
+            if (base != null && !base.removed()) {
+                try (Stream<Path> files = Files.walk(base.folder())) {
+                    for (Path file : files.filter(Files::isRegularFile).toList()) {
+                        Path placed = context.next().resolve(base.folder().relativize(file).toString());
+                        Files.createDirectories(placed.getParent());
+                        BuildStep.linkOrCopy(placed, file);
+                    }
+                }
+            }
+            for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
+                if (argument.getKey().equals(staged) || argument.getValue().removed()) {
+                    continue;
+                }
+                Path folder = argument.getValue().folder().resolve(tree);
+                if (!Files.isDirectory(folder)) {
+                    continue;
+                }
+                try (Stream<Path> files = Files.walk(folder)) {
+                    for (Path file : files.filter(Files::isRegularFile).toList()) {
+                        String relative = folder.relativize(file).toString().replace(File.separatorChar, '/');
+                        Path placed = context.next().resolve(relative);
+                        if (Files.exists(placed)) {
+                            throw new IllegalStateException(argument.getKey() + " adds " + tree + "/" + relative
+                                    + ", which is staged already - a transform of stage adds and never replaces");
+                        }
+                        Files.createDirectories(placed.getParent());
+                        BuildStep.linkOrCopy(placed, file);
+                    }
+                }
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
