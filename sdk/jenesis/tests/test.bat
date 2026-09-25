@@ -44,8 +44,8 @@ set "PROJ=%TMPDIR%\proj"
 mkdir "%PROJ%"
 set "OUTFILE=%TMPDIR%\out.txt"
 
-REM [1/11] jenesis-version on fresh directory: exit 1, reports missing build/jenesis
-echo [1/11] jenesis-version on fresh directory
+REM [1/13] jenesis-version on fresh directory: exit 1, reports missing build/jenesis
+echo [1/13] jenesis-version on fresh directory
 call "%SDK_HOME%\bin\jenesis-version.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
 if not "!RC!"=="1" goto :fail
@@ -53,8 +53,8 @@ findstr /c:"sdk is at version !VERSION!" "%OUTFILE%" >nul || goto :fail
 findstr /c:"no build/jenesis found" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [2/11] jenesis-init: populates build\jenesis and writes jenesis.version
-echo [2/11] jenesis-init
+REM [2/13] jenesis-init: populates build\jenesis and writes jenesis.version
+echo [2/13] jenesis-init
 call "%SDK_HOME%\bin\jenesis-init.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 if errorlevel 1 goto :fail
 if not exist "%PROJ%\build\jenesis\" goto :fail
@@ -64,22 +64,22 @@ for /f "usebackq delims=" %%v in ("%PROJ%\build\jenesis\jenesis.version") do if 
 if not "!RECORDED!"=="!VERSION!" goto :fail
 echo   ok
 
-REM [3/11] jenesis-version on initialised project: exit 0, reports matching version
-echo [3/11] jenesis-version on initialised project
+REM [3/13] jenesis-version on initialised project: exit 0, reports matching version
+echo [3/13] jenesis-version on initialised project
 call "%SDK_HOME%\bin\jenesis-version.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 if errorlevel 1 goto :fail
 findstr /c:"build/jenesis is at version !VERSION!" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [4/11] jenesis-validate: reports zero drift against the bundled sources
-echo [4/11] jenesis-validate
+REM [4/13] jenesis-validate: reports zero drift against the bundled sources
+echo [4/13] jenesis-validate
 call "%SDK_HOME%\bin\jenesis-validate.bat" "%PROJ%" > "%OUTFILE%" 2>&1
 findstr /c:"0 differs, 0 missing, 0 additional" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [5/11] jenesis: a recorded version the floor covers is refused, never installed and
+REM [5/13] jenesis: a recorded version the floor covers is refused, never installed and
 REM never run - the floor version itself as much as one below it
-echo [5/11] jenesis refuses a version that is no longer considered safe
+echo [5/13] jenesis refuses a version that is no longer considered safe
 if not exist "%PROJ%\sources\" mkdir "%PROJ%\sources"
 (echo module sdktest {})> "%PROJ%\sources\module-info.java"
 set "UNSAFE=%TMPDIR%\unsafe"
@@ -105,9 +105,9 @@ if not "!RC!"=="1" goto :fail
 findstr /c:"is at version 0.0.1" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [6/11] jenesis-unsafe: the same version, verified and run, because it carries no floor;
+REM [6/13] jenesis-unsafe: the same version, verified and run, because it carries no floor;
 REM `help` is a print-only goal, so it runs offline once a project descriptor exists.
-echo [6/11] jenesis-unsafe help
+echo [6/13] jenesis-unsafe help
 pushd "%PROJ%"
 call "%SDK_HOME%\bin\jenesis-unsafe.bat" help > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
@@ -116,8 +116,8 @@ if not "!RC!"=="0" goto :fail
 findstr /c:"a Java build tool" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [7/11] jenesis-make: runs the installed version directly, without the version lookup
-echo [7/11] jenesis-make
+REM [7/13] jenesis-make: runs the installed version directly, without the version lookup
+echo [7/13] jenesis-make
 pushd "%PROJ%"
 call "%SDK_HOME%\bin\jenesis-make.bat" help > "%OUTFILE%" 2>&1
 set "RC=!ERRORLEVEL!"
@@ -126,9 +126,9 @@ if not "!RC!"=="0" goto :fail
 findstr /c:"a Java build tool" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [8/11] jenesis: a recorded version above the floor is resolved, verified and dispatched
+REM [8/13] jenesis: a recorded version above the floor is resolved, verified and dispatched
 REM to - here out of a Scoop installation the launcher finds under USERPROFILE
-echo [8/11] jenesis on a version above the floor
+echo [8/13] jenesis on a version above the floor
 set "SAFE_HOME=%TMPDIR%\home"
 mkdir "%SAFE_HOME%\scoop\apps\jenesis"
 xcopy /s /e /y /i /q "%SDK_HOME%" "%SAFE_HOME%\scoop\apps\jenesis\%SAFE%" >nul
@@ -146,8 +146,8 @@ if not "!RC!"=="0" goto :fail
 findstr /c:"a Java build tool" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [9/11] jenesis-unsafe: a patched vendored tree is refused, never run and never built from
-echo [9/11] jenesis-unsafe refuses an engine the vendored sources do not match
+REM [9/13] jenesis-unsafe: a patched vendored tree is refused, never run and never built from
+echo [9/13] jenesis-unsafe refuses an engine the vendored sources do not match
 set "PATCHED=%TMPDIR%\patched"
 xcopy /s /e /y /i /q "%PROJ%" "%PATCHED%" >nul
 echo // local patch>> "%PATCHED%\build\jenesis\Platform.java"
@@ -170,9 +170,9 @@ findstr /c:"that command executes unreviewed code" "%OUTFILE%" >nul || goto :fai
 findstr /c:"run builds from sources you" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [10/11] jenesis: a stamp above the floor naming a version that cannot be installed is
+REM [10/13] jenesis: a stamp above the floor naming a version that cannot be installed is
 REM refused, not built
-echo [10/11] jenesis on an uninstalled stamp
+echo [10/13] jenesis on an uninstalled stamp
 set "UNSTAMPED=%TMPDIR%\unstamped"
 xcopy /s /e /y /i /q "%PROJ%" "%UNSTAMPED%" >nul
 <nul set /p ="99.9.9-ABSENT">"%UNSTAMPED%\build\jenesis\jenesis.version"
@@ -185,9 +185,9 @@ findstr /c:"no installed Jenesis matches" "%OUTFILE%" >nul || goto :fail
 findstr /c:"refusing to run" "%OUTFILE%" >nul || goto :fail
 echo   ok
 
-REM [11/11] jenesis-validate: a class file beside its source is inert and stays unreported,
+REM [11/13] jenesis-validate: a class file beside its source is inert and stays unreported,
 REM one whose source is gone is live code and is named
-echo [11/11] jenesis-validate on locally compiled classes
+echo [11/13] jenesis-validate on locally compiled classes
 set "COMPILED=%TMPDIR%\compiled"
 xcopy /s /e /y /i /q "%PROJ%" "%COMPILED%" >nul
 pushd "%COMPILED%"
@@ -200,6 +200,68 @@ del "%COMPILED%\build\jenesis\BuildExecutorCallback.java"
 call "%SDK_HOME%\bin\jenesis-validate.bat" "%COMPILED%" > "%OUTFILE%" 2>&1
 findstr /c:"build/jenesis/BuildExecutorCallback.class additional" "%OUTFILE%" >nul || goto :fail
 findstr /c:"build/jenesis/BuildExecutorCallback.java missing" "%OUTFILE%" >nul || goto :fail
+echo   ok
+
+REM [12/13] jenesis-jdk: a toolchain version becomes the Scoop package of its vendor and feature
+REM release, and an unknown vendor word or an early-access build is refused
+echo [12/13] jenesis-jdk with Scoop
+set "FAKE_BIN=%TMPDIR%\fake-bin"
+mkdir "%FAKE_BIN%"
+set "SCOOP_LOG=%TMPDIR%\scoop.log"
+> "%FAKE_BIN%\scoop.cmd" echo @echo off
+>> "%FAKE_BIN%\scoop.cmd" echo ^>^> "%SCOOP_LOG%" echo %%*
+>> "%FAKE_BIN%\scoop.cmd" echo if /i "%%~1"=="bucket" if /i "%%~2"=="list" echo java  https://github.com/ScoopInstaller/Java
+>> "%FAKE_BIN%\scoop.cmd" echo if /i "%%~1"=="prefix" exit /b 1
+>> "%FAKE_BIN%\scoop.cmd" echo exit /b 0
+set "SAVED_PATH=%PATH%"
+set "PATH=%FAKE_BIN%;%PATH%"
+call "%SDK_HOME%\bin\jenesis-jdk.bat" 25.0.3-temurin > "%OUTFILE%" 2>&1
+if errorlevel 1 goto :fail
+findstr /x /c:"install java/temurin25-jdk" "%SCOOP_LOG%" >nul || goto :fail
+findstr /c:"installs the newest temurin25-jdk" "%OUTFILE%" >nul || goto :fail
+call "%SDK_HOME%\bin\jenesis-jdk.bat" 25-zulu > "%OUTFILE%" 2>&1
+if errorlevel 1 goto :fail
+findstr /x /c:"install java/zulu25-jdk" "%SCOOP_LOG%" >nul || goto :fail
+call "%SDK_HOME%\bin\jenesis-jdk.bat" 25-nosuchvendor > "%OUTFILE%" 2>&1
+if not "!ERRORLEVEL!"=="2" goto :fail
+call "%SDK_HOME%\bin\jenesis-jdk.bat" 26-ea > "%OUTFILE%" 2>&1
+if not "!ERRORLEVEL!"=="2" goto :fail
+set "PATH=%SAVED_PATH%"
+echo   ok
+
+REM [13/13] jenesis-make and jenesis-exec name their own jenesis-jdk as the toolchain installer
+REM when Scoop installed them, and leave a variable the user set alone
+echo [13/13] the toolchain installer of a Scoop install
+set "FAKE_JAVA=%TMPDIR%\fake-java"
+mkdir "%FAKE_JAVA%"
+> "%FAKE_JAVA%\java.cmd" echo @echo off
+>> "%FAKE_JAVA%\java.cmd" echo if not "%%~1"=="-version" goto :run
+>> "%FAKE_JAVA%\java.cmd" echo echo openjdk version "25" 2025-09-16 1^>^&2
+>> "%FAKE_JAVA%\java.cmd" echo exit /b 0
+>> "%FAKE_JAVA%\java.cmd" echo :run
+>> "%FAKE_JAVA%\java.cmd" echo echo installer=%%JENESIS_TOOLCHAIN_INSTALLER%%
+set "SAVED_PATH=%PATH%"
+set "SAVED_JAVA_HOME=%JAVA_HOME%"
+set "SAVED_SCOOP=%SCOOP%"
+set "PATH=%FAKE_JAVA%;%PATH%"
+set "JAVA_HOME="
+set "JENESIS_TOOLCHAIN_INSTALLER="
+set "SCOOP=%TMPDIR%\scoop-root"
+set "SCOOP_INSTALL=%SCOOP%\apps\jenesis\%VERSION%"
+xcopy /s /e /y /i /q "%SDK_HOME%\bin" "%SCOOP_INSTALL%\bin" >nul
+for %%c in (jenesis-make jenesis-exec) do (
+    call "%SCOOP_INSTALL%\bin\%%c.bat" > "%OUTFILE%" 2>&1
+    findstr /x /c:"installer=%SCOOP_INSTALL%\bin\jenesis-jdk.bat" "%OUTFILE%" >nul || goto :fail
+    set "JENESIS_TOOLCHAIN_INSTALLER=mine"
+    call "%SCOOP_INSTALL%\bin\%%c.bat" > "%OUTFILE%" 2>&1
+    set "JENESIS_TOOLCHAIN_INSTALLER="
+    findstr /x /c:"installer=mine" "%OUTFILE%" >nul || goto :fail
+    call "%SDK_HOME%\bin\%%c.bat" > "%OUTFILE%" 2>&1
+    findstr /x /c:"installer=" "%OUTFILE%" >nul || goto :fail
+)
+set "PATH=%SAVED_PATH%"
+set "JAVA_HOME=%SAVED_JAVA_HOME%"
+set "SCOOP=%SAVED_SCOOP%"
 echo   ok
 
 rmdir /s /q "%TMPDIR%" >nul 2>&1

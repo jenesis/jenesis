@@ -146,8 +146,8 @@ and nothing else, so no reader hand-rolls a parse. A boolean is the setting abse
 for one whose third state is the absence itself. A number refuses a value that is not one the same way.
 `Boolean.getBoolean` and `Integer.getInteger` are not used, because they read `=false` and a bare `-Dkey`
 alike as false and a misspelt value as false or as the default rather than as the mistake it is.
-Environment variables are fallbacks for the repository settings only (`MAVEN_REPOSITORY_URI`,
-`JENESIS_REPOSITORY_TOKEN`, …). `jenesis.properties` at the project root and the profile files are read by
+Environment variables are fallbacks for the repository settings (`MAVEN_REPOSITORY_URI`,
+`JENESIS_REPOSITORY_TOKEN`, …) and for the toolchain installer (`JENESIS_TOOLCHAIN_INSTALLER`) only. `jenesis.properties` at the project root and the profile files are read by
 `Make.settings`, which layers them under whatever the entry point already holds and hands
 the result down as one provider; nothing is ever copied into the JVM's own properties, so
 two builds in one JVM never see each other's settings. A new property is added in three places - the constructor that reads it, the catalogue behind the
@@ -193,12 +193,17 @@ Source mode registers no service, so a program there builds `new MakeTool()` its
 is the same.
 
 **`jenesis.toolchain.*` picks the JVM, and only the user says where to look.** `Toolchain` reads
-`jenesis.toolchain.version` and `jenesis.toolchain.searchpath`. `Make.main` and `Execute.main` reach it by
-reflection, and only when a version is set, so source mode compiles it only then; it depends on `java.base`
-alone, which `MakeClosureTest` holds it to. A JDK is identified by its `release` file and never executed
-before it is chosen. The search path decides what the build executes, so `Make.settings` refuses it in
-every file a project provides: a new way to read properties keeps that rule, and the relaunch
-never takes a JVM option that configuration could supply.
+`jenesis.toolchain.version`, `jenesis.toolchain.searchpath` and `jenesis.toolchain.installer`. `Make.main`
+and `Execute.main` reach it by reflection, and only when a version is set, so source mode compiles it only
+then; it depends on `java.base` alone, which `MakeClosureTest` holds it to. A JDK is identified by its
+`release` file and never executed before it is chosen. The search path and the installer decide what the
+build executes, so `Make.settings` refuses both in every file a project provides: a new way to read
+properties keeps that rule, and the relaunch never takes a JVM option that configuration could supply.
+Jenesis itself installs nothing; the installer is a program the user names, such as the SDK's
+`jenesis-jdk`, which translates a version for the tool that installed Jenesis. The installer falls back to
+`JENESIS_TOOLCHAIN_INSTALLER`, which `jenesis-make` and `jenesis-exec` set, for the one run they start, to their
+own `jenesis-jdk` where SDKMAN, mise or Scoop installed them and the variable is unset, so `jenesis-jdk` calls
+that tool back. Nothing in the tool writes to a file of the user to arrange it.
 
 **`jenesis.plugins.properties` adds to the stock build.** It sits beside `jenesis.properties` and names one plugin
 per line, `<name>+<hook point>=<module>`, or `<name>=<module>` for the module build itself: a value starting with `./`

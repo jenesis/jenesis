@@ -36,5 +36,13 @@ if !JAVA_MAJOR! LSS 25 (
     exit /b 1
 )
 
+if defined JENESIS_TOOLCHAIN_INSTALLER goto :launch
+set "SCOOP_APPS=%USERPROFILE%\scoop\apps\jenesis\"
+if defined SCOOP set "SCOOP_APPS=%SCOOP%\apps\jenesis\"
+set "BELOW_SCOOP=!JENESIS_HOME!\"
+set "BELOW_SCOOP=!BELOW_SCOOP:*%SCOOP_APPS%=!"
+if /i not "!BELOW_SCOOP!"=="!JENESIS_HOME!\" set "JENESIS_TOOLCHAIN_INSTALLER=!JENESIS_HOME!\bin\jenesis-jdk.bat"
+
+:launch
 "!JAVA!" %JAVA_OPTS% -p "!JENESIS_HOME!\lib" -m build.jenesis %*
 exit /b %ERRORLEVEL%
