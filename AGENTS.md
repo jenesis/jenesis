@@ -158,6 +158,14 @@ value in force, so **adding, renaming or removing a property means editing it in
 from the constructor that reads it. `help` and `skill` point at `configuration` rather than listing properties,
 so neither grows for a new property; `help` grows for a new selector.
 
+**A project's own files are untrusted input.** `Make.settings` refuses, in the project's `jenesis.properties`
+and its profiles, every key that names a program the build runs or the options a JVM runs with, a credential,
+a cache, a folder or a trust root this machine shares between projects, the signing key, or the boundary of a
+container; the folders such a file names for the build to write to stay below the project root. Your own
+`~/.jenesis/jenesis.properties` and its profiles outrank a project for every key, and the command line outranks
+both, so what a machine settles a project cannot undo. A new property of any of those kinds joins those lists
+in `Make` in the same commit.
+
 **`jenesis.make.*` and `jenesis.project.*` split by who reads them.** `Make` and the main methods it launches
 read `jenesis.make.*`: where the project is (`root`), which profiles to layer (`profiles`), where the
 user-global file lives (`global`), and how the engine is compiled and reused (`compile`, `classes`, `daemon`).

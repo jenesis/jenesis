@@ -85,18 +85,20 @@ the build is configured, by the `main` launcher:
       jenesis-supply-chain.properties   jenesis.dependency.pin=strict
 
   so selecting `release` also applies `supply-chain`.
-- A user-global `jenesis.properties` is loaded for **every** project as the
-  weakest layer - shared personal defaults. It lives in `~/.jenesis/`;
+- A user-global `jenesis.properties` is loaded for **every** project and outranks
+  what a project sets - your machine's word on how it builds. It lives in `~/.jenesis/`;
   `-Djenesis.make.global` moves that folder (default `$HOME`) or, set to an empty
   string, switches it off, and a missing file is ignored. Only the command line
   sets it, so a project can never choose which file holds your own defaults. It may declare its own
   profiles too, relative to its `.jenesis` folder.
-- **Precedence**, highest first: an explicit `-D` on the command line, then the
-  profiles, then the project `jenesis.properties`, then the user-global
-  `jenesis.properties`. So `-Djenesis.project.sources=false` on a release build
-  switches the source jar back off (the command line always wins), and selecting
-  the `release` profile overrides whatever the project's base `jenesis.properties`
-  set.
+- **Precedence**, highest first: an explicit `-D` on the command line, then your
+  user-global profiles, then your user-global `jenesis.properties`, then the
+  project's profiles, then the project's `jenesis.properties`. So
+  `-Djenesis.project.sources=false` on a release build switches the source jar back
+  off (the command line always wins), selecting the `release` profile overrides
+  whatever the project's base `jenesis.properties` set, and a line in your own file
+  overrides both - which is why a project's file may not set what decides which
+  programs the build runs, what it trusts or what it writes outside itself.
 
 What the release build produces
 -------------------------------

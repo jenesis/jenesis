@@ -539,12 +539,15 @@ public record Project(
                       Every setting is a %{name}-Djenesis.<area>.<name>%{reset} property. Three places set
                       them, each overriding the one before it:
 
-                        %{name}~/.jenesis/jenesis.properties%{reset}  Your own defaults, for every project
                         %{name}jenesis.properties%{reset}             The project's own, committed with it
+                        %{name}~/.jenesis/jenesis.properties%{reset}  Your own, for every project
                         %{name}-Djenesis.<key>=<value>%{reset}        This one run
 
                       So a taste in output lives in your home folder and travels with you,
-                      while a build server that has no such file is unaffected by it. A setting
+                      what your machine settles holds for every project it builds, and a build
+                      server that has no such file is unaffected by it. A project's file may not
+                      name a program the build runs, a credential, a folder this machine shares or
+                      a folder outside the project. A setting
                       may also follow the main class, before the selectors, and a whole command
                       line can live in a file the way the JDK's own tools read one:
 
@@ -1000,9 +1003,10 @@ public record Project(
 
                     Each line reads `jenesis.<key>=<value> [set|default|unset] <what it does>`, so
                     the catalogue and the state of the build come out together. jenesis.properties at
-                    the project root sets the same keys, over your own
-                    ~/.jenesis/jenesis.properties and under a -D; `properties` prints only the ones
-                    that are set.
+                    the project root sets the same keys, under your own
+                    ~/.jenesis/jenesis.properties and a -D, and refuses the keys the catalogue marks
+                    as the command line's or that file's; `properties` prints only the ones that
+                    are set.
 
                     Two namespaces, split by who reads them. `jenesis.make.*` belongs to the entry
                     point: where the project is (root), which profiles to layer (profiles), where
@@ -2605,8 +2609,8 @@ public record Project(
     }
 
     private static final String CATALOGUE = """
-                project.target|target|Folder the build writes its outputs to
-                project.artifacts||Folder resolved dependencies and repository metadata are cached in
+                project.target|target|Folder the build writes its outputs to; a file a project provides names only a folder inside the project
+                project.artifacts||Folder resolved dependencies and repository metadata are cached in; a file a project provides names only a folder inside the project
                 project.layout|auto|auto|maven|modular|modular_to_maven; auto reads the project
                 project.sources|false|Assemble a sources jar for every module
                 project.documentation|false|Assemble a javadoc jar for every module
@@ -2616,10 +2620,10 @@ public record Project(
                 project.tree||Git tree id of the release, recorded in the SBOM as a SWHID; empty for none
                 project.digest|SHA-256|Algorithm for pin and dependency checksums
                 dependency.signature|none|Signatures verified after download: none|declared|strict
-                openpgp.command|gpgv|Binary forked to verify detached OpenPGP signatures; a name is looked up on the PATH, a path is used as given
+                openpgp.command|gpgv|Binary forked to verify detached OpenPGP signatures; a name is looked up on the PATH, a path is used as given; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 openpgp.expiry|signing|An expired signing key: ignored accepts it, signing accepts what it signed before expiring, current rejects it
-                sigstore.uri||URI of the Sigstore trust root; default: the published root of the public instance, carried as source
-                sigstore.issuers|github.com=token.actions.githubusercontent.com|Comma-separated <host>=<issuer> pairs, both named without a scheme, for identity hosts whose OpenID Connect issuer is not the host itself
+                sigstore.uri||URI of the Sigstore trust root; default: the published root of the public instance, carried as source; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                sigstore.issuers|github.com=token.actions.githubusercontent.com|Comma-separated <host>=<issuer> pairs, both named without a scheme, for identity hosts whose OpenID Connect issuer is not the host itself; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 project.metadata||Comma-separated extra metadata files
                 project.configuration|build.jenesis|Comma-separated folders searched for tool configuration files; @ splices the default, and @<name> splices what jenesis.<name> or the environment variable <name> holds
                 project.boms||Comma-separated locations of local pin-<name>.properties; default: the configuration folders
@@ -2627,7 +2631,7 @@ public record Project(
                 project.watch|false|Rebuild the selected target whenever a source file changes
                 project.resources||Comma-separated <path>:<target> pairs of project files or folders placed among the resources of every module, as NOTICE:META-INF/NOTICE,LICENSE:META-INF/LICENSE
                 project.plugins|true|false leaves out every plugin that jenesis.plugins.properties names, while pin still pins those of the whole project
-                project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache
+                project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache; a file a project provides names only a folder inside the project
                 project.docker|false|Run the whole build inside a container
                 project.docker.image||Image for that container
                 project.docker.mount||Extra read-only container mounts, host[:container],...
@@ -2638,10 +2642,10 @@ public record Project(
                 make.global||Folder holding the user-global .jenesis/jenesis.properties; default: the home folder; only settable on the command line
                 make.provided||Settings that the files a project provides supplied, comma-separated and named without the jenesis. prefix; derived by Make and settable in no file, so that a repository or cache URL a project named is never sent a credential
                 make.compile|true|Compile the build sources once and run from those classes
-                make.classes|.jenesis/classes|Where those classes land, relative to the root
+                make.classes|.jenesis/classes|Where those classes land, relative to the root; a file a project provides names only a folder inside the project
                 make.daemon|false|Hand the build to a reused JVM; --stop as the only selector shuts it down
                 daemon.idle|10800|Seconds an idle daemon waits before exiting
-                daemon.options|-Xmx2g|JVM options for the daemon process itself, whitespace separated
+                daemon.options|-Xmx2g|JVM options for the daemon process itself, whitespace separated; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 toolchain.version||JDK the build runs on, as 25, 25.0.3 or 25-temurin: the numbers match as a prefix, every word must be one of the vendor and version words in the JDK's release file, and a pre-release matches only when its word is named; Make and Execute relaunch on a match when the running JVM is none
                 toolchain.searchpath|@|Comma-separated JDK folders searched for toolchain.version, absolute or under ~, * standing for any one folder name; @ splices this system's usual JDK locations and empty only checks the running JVM; settable only on the command line or in ~/.jenesis/jenesis.properties
                 executor.concurrency|0|Run at most this many build steps at once; 0 is unbounded
@@ -2670,7 +2674,7 @@ public record Project(
                 dependency.native|ignore|ignore|warn|strict: what to do when a module runs a jar whose Jenesis-Native-Access names a module it does not grant with @jenesis.native; warn reports it, strict fails the build
                 resolver.maven|maven|maven|closest|latest|release|stable|fail|managed: which version a Maven coordinate resolves to; stable skips pre-release qualifiers, fail rejects a coordinate two dependencies require at different versions, managed rejects that and any version only a dependency's POM names
                 resolver.module|first|first|ignore|fail|managed: what to do with the versions a module-info records; fail rejects two requires that record different versions, managed rejects that and any module only another module's requires names
-                pin.file||Write the whole project's pins to this properties file instead of the module declarations
+                pin.file||Write the whole project's pins to this properties file instead of the module declarations; a file a project provides names only a folder inside the project
                 pin.provided||Comma-separated pin files whose entries this one leaves out, where the version and hash are the same
                 pin.concurrency|(processor count)|Rewrite at most this many modules' pins at once; 0 is unbounded
                 pin.checksum|true|Record content checksums in the pins that the pin selector writes
@@ -2684,19 +2688,19 @@ public record Project(
                 repository.connect.timeout|10000|Connect timeout for a repository fetch, in milliseconds
                 repository.read.timeout|30000|Read timeout for a repository fetch, in milliseconds
                 maven.uri||Maven remotes, comma-separated and queried left to right; a |<groupId> suffix, repeatable, asks a remote only for that group and the groups below it, and @<name> splices the chain that jenesis.<name> or the environment variable <name> holds (env MAVEN_REPOSITORY_URI)
-                maven.local||Local Maven cache folder (env MAVEN_REPOSITORY_LOCAL)
+                maven.local||Local Maven cache folder (env MAVEN_REPOSITORY_LOCAL); only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 maven.token||Authorization header value for the Maven remotes, sent as given, so it names its scheme, as Bearer <token> or Basic <credentials> (env MAVEN_REPOSITORY_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one; a token the environment provides is sent only to the remotes the environment names, a remote a project's own files named is never sent one, and neither is the built-in public repository
                 maven.segments|2|Leading dot-separated segments of a module name that form its Maven groupId, when a module is published or resolved by the coordinate convention; a shorter name becomes the groupId in full
                 module.uri||Jenesis module remotes, likewise, where a |<module> suffix asks a remote only for that module and the modules whose name it prefixes, and a maven:[<segments>:]<uri> entry reads a remote as a Maven repository by the publishing convention, taking that many leading segments of a module name as its groupId where it names a count and jenesis.maven.segments where it does not (env JENESIS_REPOSITORY_URI)
-                module.local||Local module cache folder (env JENESIS_REPOSITORY_LOCAL)
+                module.local||Local module cache folder (env JENESIS_REPOSITORY_LOCAL); only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 module.token||Authorization header value for the module remote, sent as given (env JENESIS_REPOSITORY_TOKEN); likewise, and only the first remote of the chain is sent it, so a fallback mirror never sees it
                 module.source|service|Who resolves a module's coordinates: service asks the repository at jenesis.module.uri, git reads the published index itself and fetches from jenesis.maven.uri
                 module.index||Location of that published index when git resolves it, a folder of per-module TSV files (env JENESIS_INDEX_URI); default: the jenesis-modules data on GitHub
                 module.prerelease||Accept a pre-release when asking the module index for a module's newest version
                 module.speculative||Accept a version the module index has not recorded but guesses exists
                 openpgp.uri|keyserver.ubuntu.com, keys.openpgp.org|HKP key server roots, likewise, and @<name> splices what jenesis.<name> or the environment variable <name> holds; a server speaking another protocol is another repository (env OPENPGP_REPOSITORY_URI)
-                openpgp.local|.jenesis/keys|Local key cache folder, one file per fingerprint (env OPENPGP_REPOSITORY_LOCAL)
-                cache.uri||Build cache: a file:// folder, or an http(s):// cache server
+                openpgp.local|.jenesis/keys|Local key cache folder, one file per fingerprint (env OPENPGP_REPOSITORY_LOCAL); a file a project provides names only a folder inside the project
+                cache.uri||Build cache: a file:// folder, or an http(s):// cache server; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 cache.project||Project name sent to a cache server (env JENESIS_CACHE_PROJECT)
                 cache.key||Access key sent to a cache server (env JENESIS_CACHE_KEY); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and a cache server a project's own files named is not sent it
                 cache.connect|PT1S|Connect timeout for a cache server
@@ -2744,16 +2748,16 @@ public record Project(
                 observe.native|true|native-image reachability agent, activated by a graal.properties
                 mutate.pitest|true|PIT mutation testing, activated by a pitest.properties
                 artifact.japicmp|true|japicmp API comparison, activated by a japicmp.properties
-                jarsigner.keystore||Key store jarsigner signs the produced jar with, in place of the unsigned one; a release machine supplies it, and a build that names any jarsigner setting without it fails rather than shipping unsigned
-                jarsigner.alias||Name of the key within that store
-                jarsigner.storepass||Where that store's password is read from: env <variable>, or file <path>
-                jarsigner.keypass||The same for the key's own password, where it has one of its own
-                jarsigner.storetype||Type of the store, as jarsigner names it: PKCS12, JKS, ...
-                jarsigner.tsa||Timestamp authority to stamp the signature with, so it outlives the certificate
-                jarsigner.arguments||Further jarsigner arguments, whitespace separated
+                jarsigner.keystore||Key store jarsigner signs the produced jar with, in place of the unsigned one; a release machine supplies it, and a build that names any jarsigner setting without it fails rather than shipping unsigned; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                jarsigner.alias||Name of the key within that store; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                jarsigner.storepass||Where that store's password is read from: env <variable>, or file <path>; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                jarsigner.keypass||The same for the key's own password, where it has one of its own; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                jarsigner.storetype||Type of the store, as jarsigner names it: PKCS12, JKS, ...; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                jarsigner.tsa||Timestamp authority to stamp the signature with, so it outlives the certificate; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
+                jarsigner.arguments||Further jarsigner arguments, whitespace separated; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 release.uri||Jenesis module repository a release puts each staged module's jar into, one put per module at module/<module>/<version>/<module>.jar, so every module needs a version; the https address of a Jenesis Repository's java repository, as jenesis.module.uri names it (env JENESIS_RELEASE_URI)
                 release.token||Authorization header value for that repository, sent as given (env JENESIS_RELEASE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and it is never sent to a repository a project's own files named
-                jreleaser.executable|jreleaser|The JReleaser executable a release runs
+                jreleaser.executable|jreleaser|The JReleaser executable a release runs; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 jreleaser.command|full-release|The JReleaser command a release runs
                 jreleaser.config||JReleaser configuration file
                 jreleaser.dryRun|true|Run JReleaser without actually publishing
