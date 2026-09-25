@@ -69,7 +69,15 @@ public final class Toolchain {
         if (this.installer == null) {
             invocation = null;
         } else {
-            List<String> invocation = new ArrayList<>(List.of(this.installer.split("\\s+")));
+            Path whole;
+            try {
+                whole = Path.of(this.installer);
+            } catch (InvalidPathException _) {
+                whole = null;
+            }
+            List<String> invocation = new ArrayList<>(whole != null && whole.isAbsolute() && Files.isRegularFile(whole)
+                    ? List.of(this.installer)
+                    : List.of(this.installer.split("\\s+")));
             String program = invocation.getFirst();
             if (program.equals("~")
                     || program.startsWith("~/")

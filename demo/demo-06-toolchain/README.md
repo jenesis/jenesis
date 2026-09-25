@@ -78,20 +78,17 @@ matches. The Jenesis command-line install ships one, `jenesis-jdk`, which turns 
 version into a request for the tool that installs JDKs on your machine: SDKMAN or
 mise, or Scoop on Windows.
 
-Where SDKMAN installed Jenesis, `jenesis` names its `jenesis-jdk` as the installer
-through the `JENESIS_TOOLCHAIN_INSTALLER` environment variable, and `jenesis-jdk`
-installs the JDK with SDKMAN in turn. Anywhere else, enable it once, for every
-project:
+Where SDKMAN, mise or Scoop installed Jenesis, the `jenesis` command names its
+`jenesis-jdk` as the installer through the `JENESIS_TOOLCHAIN_INSTALLER` environment
+variable, for the run it starts and nothing else, and `jenesis-jdk` installs the JDK
+with that tool in turn. A run of the installed command asking for a JDK you do not
+have then installs it and runs on it:
 
-    jenesis-jdk --enable
+    jenesis-exec -Djenesis.toolchain.version=25-zulu
 
-which adds `jenesis.toolchain.installer=jenesis-jdk` to your
-`~/.jenesis/jenesis.properties`. The setting wins over the environment variable, and
-an empty `-Djenesis.toolchain.installer=` switches the installer off. A build asking
-for a JDK you do not have then installs it and runs on it:
-
-    java -Djenesis.toolchain.version=25-zulu build/jenesis/Execute.java
-
+A build started from the sources, as `java build/jenesis/Execute.java`, has no
+installing tool to call back, and runs an installer only where you name one, with
+`-Djenesis.toolchain.installer` or in your own `~/.jenesis/jenesis.properties`.
 The installer runs in your home folder, gets the version as its last argument, and
 has to install into a folder on the search path; Jenesis searches again afterwards
 and checks what it finds like any other JDK.

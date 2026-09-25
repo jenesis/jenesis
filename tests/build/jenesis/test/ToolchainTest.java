@@ -268,6 +268,29 @@ public class ToolchainTest {
     }
 
     @Test
+    public void runs_an_installer_whose_path_holds_a_space_as_one_program() throws Exception {
+        Path jdks = Files.createDirectories(folder.resolve("jdks"));
+        Path installer = installer(Files.createDirectories(folder.resolve("Program Files")).resolve("install"),
+                "printf '%s\\n' \"$@\" > '" + folder.resolve("arguments") + "'\n"
+                        + "mkdir -p '" + jdks.resolve("installed/bin") + "'\n"
+                        + "printf 'JAVA_RUNTIME_VERSION=\"25.0.9+1\"\\nIMPLEMENTOR=\"Acme Labs\"\\n' > '"
+                        + jdks.resolve("installed/release") + "'\n"
+                        + ": > '" + jdks.resolve("installed/bin/java") + "'\n"
+                        + "chmod -R go-w '" + jdks.resolve("installed") + "'\n");
+
+        Path home = new Toolchain()
+                .version("25-acme")
+                .searchpath(jdks + "/*")
+                .installer(installer.toString())
+                .home();
+
+        assertThat(home).isEqualTo(jdks.resolve("installed"));
+        assertThat(Files.readAllLines(folder.resolve("arguments")))
+                .as("a value naming an existing file is that program, rather than words split at its space")
+                .containsExactly("25-acme");
+    }
+
+    @Test
     public void runs_no_installer_when_a_jdk_matches() throws Exception {
         Path home = jdk(folder.resolve("jdks/found"), "25.0.1+3", "Acme Labs", null);
         Path installer = installer(folder.resolve("install"), ": > '" + folder.resolve("ran") + "'\n");

@@ -293,8 +293,8 @@ set -e
 echo "  ok"
 
 # [16/17] jenesis-jdk: mise gets its vendor names and resolves the newest build itself, and
-# --enable records the installer once in the user-global file
-echo "[16/17] jenesis-jdk with mise, and --enable"
+# without --tool it calls back only the tool that installed Jenesis
+echo "[16/17] jenesis-jdk with mise, and no tool of its own"
 mkdir -p "$TMPDIR/fake-bin"
 printf '#!/bin/sh\necho "$*" > "%s"\n' "$TMPDIR/mise-arguments" > "$TMPDIR/fake-bin/mise"
 chmod +x "$TMPDIR/fake-bin/mise"
@@ -312,22 +312,17 @@ OUT="$(PATH="$TMPDIR/fake-bin:$PATH" "${SDK_HOME}/bin/jenesis-jdk" --tool=mise 2
 RC=$?
 set -e
 [ "$RC" = "2" ] || dump_and_fail "an early-access build with mise did not exit 2, got $RC" "$OUT"
-ENABLED="$TMPDIR/enabled-home"
-mkdir -p "$ENABLED"
-HOME="$ENABLED" "${SDK_HOME}/bin/jenesis-jdk" --enable > /dev/null || dump_and_fail "jenesis-jdk --enable failed"
-HOME="$ENABLED" "${SDK_HOME}/bin/jenesis-jdk" --enable > /dev/null || dump_and_fail "a repeated jenesis-jdk --enable failed"
-[ "$(grep -c '^jenesis.toolchain.installer=jenesis-jdk$' "$ENABLED/.jenesis/jenesis.properties")" = "1" ] \
-    || dump_and_fail "jenesis-jdk --enable did not record the installer exactly once" "$(cat "$ENABLED/.jenesis/jenesis.properties")"
 set +e
-OUT="$(HOME="$ENABLED" "${SDK_HOME}/bin/jenesis-jdk" --tool=mise --enable 2>&1)"
+OUT="$("${SDK_HOME}/bin/jenesis-jdk" 25 2>&1)"
 RC=$?
 set -e
-[ "$RC" = "1" ] || dump_and_fail "jenesis-jdk --enable replaced an installer already named, got $RC" "$OUT"
+[ "$RC" = "1" ] || dump_and_fail "jenesis-jdk outside SDKMAN and mise chose a tool of its own, got $RC" "$OUT"
+printf '%s' "$OUT" | grep -qF -- "--tool=sdkman" || dump_and_fail "jenesis-jdk outside SDKMAN and mise did not name --tool" "$OUT"
 echo "  ok"
 
 # [17/17] jenesis-make and jenesis-exec name their own jenesis-jdk as the toolchain installer
-# when SDKMAN installed them, and leave a variable the user set, even an empty one, alone
-echo "[17/17] the toolchain installer of an SDKMAN install"
+# when SDKMAN or mise installed them, and leave a variable the user set, even an empty one, alone
+echo "[17/17] the toolchain installer of an SDKMAN or mise install"
 FAKE_JAVA="$TMPDIR/fake-java"
 mkdir -p "$FAKE_JAVA/bin"
 cat > "$FAKE_JAVA/bin/java" <<'EOL'
@@ -343,7 +338,14 @@ CANDIDATE="$TMPDIR/sdkman-home/candidates/jenesis/$VERSION"
 mkdir -p "$CANDIDATE"
 cp -R "${SDK_HOME}/bin" "$CANDIDATE/bin"
 CANDIDATE="$(cd "$CANDIDATE" && pwd -P)"
+MISE_INSTALL="$TMPDIR/mise-data/installs/jenesis/$VERSION"
+mkdir -p "$MISE_INSTALL"
+cp -R "${SDK_HOME}/bin" "$MISE_INSTALL/bin"
+MISE_INSTALL="$(cd "$MISE_INSTALL" && pwd -P)"
 for COMMAND in jenesis-make jenesis-exec; do
+    OUT="$(unset JENESIS_TOOLCHAIN_INSTALLER; MISE_DATA_DIR="$TMPDIR/mise-data" JAVA_HOME="$FAKE_JAVA" "$MISE_INSTALL/bin/$COMMAND" 2>&1)"
+    [ "$OUT" = "installer=$MISE_INSTALL/bin/jenesis-jdk" ] \
+        || dump_and_fail "$COMMAND installed by mise did not name its jenesis-jdk" "$OUT"
     OUT="$(unset JENESIS_TOOLCHAIN_INSTALLER; SDKMAN_DIR="$TMPDIR/sdkman-home" JAVA_HOME="$FAKE_JAVA" "$CANDIDATE/bin/$COMMAND" 2>&1)"
     [ "$OUT" = "installer=$CANDIDATE/bin/jenesis-jdk" ] \
         || dump_and_fail "$COMMAND installed by SDKMAN did not name its jenesis-jdk" "$OUT"

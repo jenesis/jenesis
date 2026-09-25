@@ -2,15 +2,9 @@
 setlocal EnableDelayedExpansion
 
 set "VERSION="
-set "ENABLE="
 :arguments
 if "%~1"=="" goto :parsed
 if /i "%~1"=="--help" goto :usage
-if /i "%~1"=="--enable" (
-    set "ENABLE=1"
-    shift
-    goto :arguments
-)
 set "ARGUMENT=%~1"
 if "!ARGUMENT:~0,1!"=="-" goto :misuse
 if defined VERSION goto :misuse
@@ -19,7 +13,6 @@ shift
 goto :arguments
 
 :parsed
-if defined ENABLE goto :enable
 if not defined VERSION goto :misuse
 echo !VERSION!| findstr /r /x "[1-9][0-9.]*[-a-zA-Z]*" >nul
 if errorlevel 1 (
@@ -82,27 +75,6 @@ if errorlevel 1 (
 )
 exit /b 0
 
-:enable
-if defined VERSION goto :misuse
-set "FILE=%USERPROFILE%\.jenesis\jenesis.properties"
-if exist "!FILE!" (
-    findstr /x /c:"jenesis.toolchain.installer=jenesis-jdk" "!FILE!" >nul
-    if not errorlevel 1 (
-        echo jenesis-jdk: !FILE! already names jenesis-jdk as jenesis.toolchain.installer
-        exit /b 0
-    )
-    findstr /r /b /c:"jenesis\.toolchain\.installer" "!FILE!" >nul
-    if not errorlevel 1 (
-        echo jenesis-jdk: !FILE! already names another jenesis.toolchain.installer - edit that line to change it 1>&2
-        exit /b 1
-    )
-    >> "!FILE!" echo.
-)
-if not exist "%USERPROFILE%\.jenesis" mkdir "%USERPROFILE%\.jenesis"
->> "!FILE!" echo jenesis.toolchain.installer=jenesis-jdk
-echo jenesis-jdk: builds now install a missing JDK with jenesis-jdk, as !FILE! records
-exit /b 0
-
 :word
 set "WORD=%~1"
 for %%n in (temurin adoptium eclipse) do if /i "%WORD%"=="%%n" goto :vendor-temurin
@@ -152,16 +124,13 @@ exit /b 0
 
 :usage
 echo Usage: jenesis-jdk ^<version^>
-echo        jenesis-jdk --enable
 echo.
 echo Installs a JDK for a Jenesis toolchain version, as 25, 25.0.3 or 25-temurin, with
 echo Scoop from its java bucket, into the folder Scoop keeps its apps in, which Jenesis
-echo searches by default. A build runs it when jenesis.toolchain.installer or the
-echo JENESIS_TOOLCHAIN_INSTALLER environment variable names it and no installed JDK
-echo matches jenesis.toolchain.version.
+echo searches by default. Where Scoop installed Jenesis, the jenesis command names
+echo jenesis-jdk in JENESIS_TOOLCHAIN_INSTALLER for the run it starts, and that run
+echo calls it back when no installed JDK matches jenesis.toolchain.version.
 echo.
-echo   --enable  let builds install a missing JDK with jenesis-jdk, by adding
-echo             jenesis.toolchain.installer to %%USERPROFILE%%\.jenesis\jenesis.properties
 echo   --help    print this help
 echo.
 echo A word of the version names the vendor: temurin, zulu, corretto, liberica or

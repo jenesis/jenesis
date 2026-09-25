@@ -14,19 +14,16 @@ JENESIS_HOME="$(dirname "$SCRIPT_DIR")"
 usage() {
     cat <<'EOM'
 Usage: jenesis-jdk [--tool=sdkman|mise] <version>
-       jenesis-jdk [--tool=sdkman|mise] --enable
 
 Installs a JDK for a Jenesis toolchain version, as 25, 25.0.3 or 25-temurin, with
-SDKMAN or mise, into the folder that tool keeps its JDKs in, which Jenesis searches
-by default. A build runs it when no installed JDK matches jenesis.toolchain.version
-and jenesis.toolchain.installer or the JENESIS_TOOLCHAIN_INSTALLER environment
-variable names it, as a Jenesis that SDKMAN installed does by itself.
+the tool that installed Jenesis, SDKMAN or mise, into the folder that tool keeps its
+JDKs in, which Jenesis searches by default. Where one of them installed Jenesis, the
+jenesis command names jenesis-jdk in JENESIS_TOOLCHAIN_INSTALLER for the run it
+starts, and that run calls it back when no installed JDK matches
+jenesis.toolchain.version.
 
-  --tool=<tool>  install with sdkman or mise; by default the tool Jenesis was
-                 installed with, otherwise SDKMAN when present, otherwise mise
-  --enable       let builds install a missing JDK with jenesis-jdk where SDKMAN
-                 did not install Jenesis, by adding jenesis.toolchain.installer
-                 to ~/.jenesis/jenesis.properties
+  --tool=<tool>  install with sdkman or mise rather than the tool that installed
+                 Jenesis
   --help         print this help
 
 A word of the version names the vendor: temurin, zulu, corretto, liberica,
@@ -45,14 +42,12 @@ fail() {
 
 TOOL=""
 VERSION=""
-ENABLE=""
 for ARGUMENT in "$@"; do
     case "$ARGUMENT" in
         --help)
             usage
             exit 0
             ;;
-        --enable) ENABLE=1 ;;
         --tool=sdkman | --tool=mise) TOOL="${ARGUMENT#--tool=}" ;;
         -*)
             usage >&2
@@ -67,28 +62,6 @@ for ARGUMENT in "$@"; do
             ;;
     esac
 done
-
-if [ -n "$ENABLE" ]; then
-    [ -z "$VERSION" ] || fail "--enable takes no version" 64
-    INSTALLER="jenesis-jdk${TOOL:+ --tool=$TOOL}"
-    FILE="$HOME/.jenesis/jenesis.properties"
-    if [ -f "$FILE" ]; then
-        EXISTING="$(sed -n 's/^[[:space:]]*jenesis\.toolchain\.installer[[:space:]]*[=:][[:space:]]*//p' "$FILE" | tail -n 1)"
-        if [ "$EXISTING" = "$INSTALLER" ]; then
-            echo "jenesis-jdk: $FILE already names $INSTALLER as jenesis.toolchain.installer"
-            exit 0
-        elif [ -n "$EXISTING" ]; then
-            fail "$FILE already names $EXISTING as jenesis.toolchain.installer - edit that line to change it"
-        fi
-    fi
-    mkdir -p "$HOME/.jenesis"
-    if [ -s "$FILE" ] && [ -n "$(tail -c 1 "$FILE")" ]; then
-        echo >> "$FILE"
-    fi
-    echo "jenesis.toolchain.installer=$INSTALLER" >> "$FILE"
-    echo "jenesis-jdk: builds now install a missing JDK with $INSTALLER, as $FILE records"
-    exit 0
-fi
 
 if [ -z "$VERSION" ]; then
     usage >&2
@@ -150,15 +123,7 @@ if [ -z "$TOOL" ]; then
         "$MISE_HOME/"*) TOOL=mise ;;
     esac
 fi
-if [ -z "$TOOL" ]; then
-    if [ -s "$SDKMAN_HOME/bin/sdkman-init.sh" ]; then
-        TOOL=sdkman
-    elif command -v mise > /dev/null 2>&1; then
-        TOOL=mise
-    else
-        fail "neither SDKMAN nor mise is installed, and jenesis-jdk installs JDKs with one of them - install either, or name a program of your own in jenesis.toolchain.installer"
-    fi
-fi
+[ -n "$TOOL" ] || fail "neither SDKMAN nor mise installed the Jenesis at $JENESIS_HOME, and jenesis-jdk installs a JDK with the tool that installed Jenesis - name one with --tool=sdkman or --tool=mise, or install the JDK yourself"
 
 if [ "$TOOL" = sdkman ]; then
     [ -s "$SDKMAN_HOME/bin/sdkman-init.sh" ] || fail "SDKMAN is not installed at $SDKMAN_HOME"

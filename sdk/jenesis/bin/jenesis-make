@@ -32,7 +32,8 @@ if [ "${JAVA_MAJOR:-0}" -lt 25 ] 2>/dev/null; then
 fi
 
 case "$JENESIS_HOME/" in
-    "${SDKMAN_DIR:-$HOME/.sdkman}/candidates/jenesis/"*)
+    "${SDKMAN_DIR:-$HOME/.sdkman}/candidates/jenesis/"* \
+        | "${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/installs/"*)
         if [ -z "${JENESIS_TOOLCHAIN_INSTALLER+set}" ]; then
             export JENESIS_TOOLCHAIN_INSTALLER="$SCRIPT_DIR/jenesis-jdk"
         fi
