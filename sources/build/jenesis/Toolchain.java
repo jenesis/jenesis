@@ -21,10 +21,10 @@ public final class Toolchain {
     }
 
     public static Toolchain ofKeys(Map<String, String> keys) {
-        String searchpath = keys.get("toolchain.searchpath");
+        String searchpath = keys.get("toolchain.searchpath"), installer = keys.get("toolchain.installer");
         return new Toolchain(keys.get("toolchain.version"),
                 searchpath == null ? "@" : searchpath,
-                keys.get("toolchain.installer"));
+                installer == null ? System.getenv("JENESIS_TOOLCHAIN_INSTALLER") : installer);
     }
 
     private Toolchain(String version, String searchpath, String installer) {
