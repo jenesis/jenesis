@@ -613,6 +613,42 @@ public class ProjectTest {
     }
 
     @Test
+    public void releases_the_staged_modular_tree_into_the_module_repository_it_names() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
+        settings.put("release.uri", elsewhere.toUri().toString());
+        for (Project.Layout layout : List.of(Project.Layout.MODULAR, Project.Layout.MODULAR_TO_MAVEN)) {
+            List<String> printed = new ArrayList<>();
+            Project.ofEnvironment(new Environment(settings).out(printed::add), root)
+                    .target(root.resolve("target-" + layout.hashCode()))
+                    .version("1.0.0")
+                    .layout(layout)
+                    .build(Project.RELEASE);
+            assertThat(elsewhere.resolve("module/demo.empty/1.0.0/demo.empty.jar")).isRegularFile();
+            assertThat(elsewhere.resolve("module/demo.empty/demo.empty.jar")).isRegularFile();
+            assertThat(printed).anyMatch(line -> line.contains("[RELEASED]"));
+        }
+    }
+
+    @Test
+    public void refuses_to_release_into_a_module_repository_from_a_layout_that_stages_no_modular_tree() throws IOException {
+        Files.writeString(root.resolve("pom.xml"), """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>demo</groupId>
+                    <artifactId>empty</artifactId>
+                    <version>1</version>
+                </project>
+                """);
+        settings.put("release.uri", elsewhere.toUri().toString());
+        Project project = Project.ofEnvironment(new Environment(settings), root)
+                .target(root.resolve("target"))
+                .layout(Project.Layout.MAVEN);
+        assertThatThrownBy(() -> project.build(Project.RELEASE))
+                .rootCause()
+                .hasMessageContaining("jenesis.release.uri");
+    }
+
+    @Test
     public void modular_layout_registers_export_step() throws IOException {
         Path target = Files.createDirectory(root.resolve("target"));
         Project project = Project.ofEnvironment(new Environment(settings), root).target(target);
@@ -1177,6 +1213,14 @@ public class ProjectTest {
         assertThatThrownBy(() -> Make.settings(root, settings))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.maven.token cannot be set in");
+    }
+
+    @Test
+    public void the_layered_settings_rejects_the_release_token_in_a_file_the_project_provides() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.release.token=Bearer secret\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.release.token cannot be set in");
     }
 
     @Test
