@@ -48,6 +48,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             "binary/validate",
             "artifact",
             "observed",
+            "package",
             "documentation",
             "documentation/generate");
 
@@ -409,7 +410,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         nested.addModule(name, module, nestedInherited.sequencedKeySet())), outerInherited.sequencedKeySet());
             }
         });
-        if (packaging.jlink() || packaging.jpackage() != null || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || packaging.docker() != null) {
+        SequencedMap<String, BuildExecutorModule> packagers = slots.getOrDefault("package", none);
+        if (packaging.jlink() || packaging.jpackage() != null || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || packaging.docker() != null
+                || !packagers.isEmpty()) {
             assembly = assembly.then("package", (sub, inherited) -> {
                 SequencedSet<String> images = new LinkedHashSet<>();
                 SequencedSet<String> inputs = new LinkedHashSet<>(inherited.sequencedKeySet());
@@ -454,6 +457,24 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                 Stream.concat(inputs.stream(), Stream.of("reachability")));
                     images.add("native-image");
                 }
+                if (!packagers.isEmpty()) {
+                    SequencedSet<String> handed = new LinkedHashSet<>(linked);
+                    handed.addAll(images);
+                    if (packaging.bundle()) {
+                        handed.add("bundle");
+                    }
+                    if (packaging.launcher()) {
+                        handed.add("launcher");
+                    }
+                    sub.addModule("custom", (nested, nestedInherited) -> packagers.forEach((name, module) ->
+                            nested.addModule(name, module, nestedInherited.sequencedKeySet())), handed);
+                    sub.addStep("packaged", new Packaged(), images.contains("jpackage")
+                            ? Stream.of("jpackage", "custom")
+                            : Stream.of("custom"));
+                    images.remove("jpackage");
+                    images.addFirst("packaged");
+                    images.add("custom");
+                }
                 if (!images.isEmpty()) {
                     String named = descriptor.name().endsWith("-")
                             ? descriptor.name().substring(0, descriptor.name().length() - 1)
@@ -463,6 +484,35 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             });
         }
         return assembly;
+    }
+
+    private record Packaged() implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            Path packages = context.next().resolve(JPackage.PACKAGES);
+            for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
+                Path folder = argument.getValue().folder().resolve(JPackage.PACKAGES);
+                if (argument.getValue().removed() || !Files.isDirectory(folder)) {
+                    continue;
+                }
+                try (Stream<Path> files = Files.walk(folder)) {
+                    for (Path file : files.filter(Files::isRegularFile).toList()) {
+                        Path target = packages.resolve(folder.relativize(file).toString());
+                        if (Files.exists(target)) {
+                            throw new IllegalStateException(argument.getKey() + " packages " + folder.relativize(file)
+                                    + ", which another packager writes already - give each package a name of its own");
+                        }
+                        Files.createDirectories(target.getParent());
+                        BuildStep.linkOrCopy(target, file);
+                    }
+                }
+            }
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
     }
 
     private record Packaging(boolean jmod,

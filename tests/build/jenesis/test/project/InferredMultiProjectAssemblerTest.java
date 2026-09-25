@@ -20,6 +20,7 @@ import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.InferredTestObservationModule;
 import build.jenesis.project.ProjectModule;
 import build.jenesis.project.ProjectModuleDescriptor;
+import build.jenesis.step.Inventory;
 import build.jenesis.step.JPackage;
 import build.jenesis.step.ProcessBuildStep;
 
@@ -532,6 +533,44 @@ public class InferredMultiProjectAssemblerTest {
         SequencedMap<String, Path> outputs = fixture.execute(new InferredMultiProjectAssembler().plugins(plugins),
                 "sub/binary/generated/custom/greeting");
         assertThat(outputs.get("sub/binary/generated/custom/greeting").resolve("marker.txt")).exists();
+    }
+
+    @Test
+    public void stages_what_a_packager_writes_into_packages() throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("plugin-appimage.properties"), "");
+        SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("appimage+package", (_, _) -> new PackageStep("app.AppImage").asModule("appimage"));
+        SequencedMap<String, Path> outputs = fixture.execute(new InferredMultiProjectAssembler().plugins(plugins), "package");
+        assertThat(outputs.get("package/packaged").resolve(JPackage.PACKAGES + "app.AppImage")).exists();
+        assertThat(SequencedProperties.ofFiles(outputs.get("package/inventory").resolve(Inventory.INVENTORY)).stringPropertyNames())
+                .as("the package reaches the stage through the module's inventory")
+                .anyMatch(key -> key.endsWith(".package"));
+    }
+
+    @Test
+    public void refuses_two_packagers_that_write_the_same_package() throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("plugin-first.properties"), "");
+        Files.writeString(fixture.configuration().resolve("plugin-second.properties"), "");
+        SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
+        plugins.put("first+package", (_, _) -> new PackageStep("app.AppImage").asModule("first"));
+        plugins.put("second+package", (_, _) -> new PackageStep("app.AppImage").asModule("second"));
+        assertThatThrownBy(() -> fixture.execute(new InferredMultiProjectAssembler().plugins(plugins), "package"))
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("which another packager writes already");
+    }
+
+    private record PackageStep(String name) implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Files.writeString(Files.createDirectories(context.next().resolve(JPackage.PACKAGES)).resolve(name), "package");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
     }
 
     @Test

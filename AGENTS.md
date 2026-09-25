@@ -209,22 +209,32 @@ reads as `../inputs/<input>`. The same input takes one key per target, which `Bi
 and merges into one folder, so a plugin module holds its inputs as a map from name to target to source; `@@<key>`
 is the value `@<key>`, and a path is refused unless it resolves, through any symbolic link, to the project itself -
 as a plugin's own `./<folder>` is.
-The slots `postprocess/transform` and `postprocess/inspect` are not modules of a project module but of
-`build/postprocess`, which every layout registers inside `build` after its project module and which keeps the
-transforms under `transform/` and the inspections under `inspect/`, apart from its own steps, so that no plugin name
-is taken; so that everything depending on `build` sees their additions and nothing runs past a failed inspection; an
-expensive one is switched off by its setting, in a profile if need be, and `jenesis.project.plugins=false` leaves
-out every plugin the file names, while `pin` still resolves those of `postprocess`: such a plugin runs
-once over the inventory of every module, is switched on by its line alone and configured, never from the command
+Six slots are not modules of a project module but of the project: `preprocess`, `postprocess/transform`,
+`postprocess/inspect`, `export`, `release` and `plugin`. Every layout registers `build/preprocess` inside `build` before its
+project module, which depends on it, and `build/postprocess` after it; `export` and `release` wire their plugins
+beside their own steps. Each keeps its plugins in a namespace apart from its own steps - `custom/`, or `transform/`
+and `inspect/` in `postprocess` - so that no plugin name is taken. A preprocessor is handed only what it binds and
+exports nothing, so it orders the build and can stop it but never feeds it; everything depending on `build` sees
+what the transforms added and nothing runs past a failed inspection; an exporter and a releaser are handed
+everything staged. The top-level `plugin` module holds nothing but the plugins of its slot, each as `plugin/<name>`
+beside the source that binds `jenesis.plugins.pin.properties` - a name no plugin can take - and depends on `build`
+and `stage` but on nothing that runs by default, so such a plugin runs only when its selector is named. An
+expensive one is switched off by its setting, in a profile if need be, and
+`jenesis.project.plugins=false` leaves out every plugin the file names, while `pin` still resolves those of the
+project: such a plugin is switched on by its line alone and configured, never from the command
 line, by the `<name>.<key>` lines of `jenesis.plugins.arguments.properties` and of a
 `jenesis.plugins.arguments-<profile>.properties` per active profile, read when the layout knows the profiles, so an
 earlier profile wins over a later one and each over the file itself; its inputs resolve against the project root,
 and `pin` resolves every one of them, a switched-off
 one included, into `jenesis.plugins.pin.properties` rather than into a module's declaration. A transform adds a
-file to a module by naming it in an `inventory.properties` of its own as `<module>.attachment.<classifier>` or
-`<module>.report.<name>`, which `transform` collects per module and exports as its only outputs; an inspection
+file to a module by naming it in an `inventory.properties` of its own under any `<module>.<key>`, which `transform`
+collects per module, and places what belongs to no module in a `project/` folder, which `postprocess/project`
+gathers and `stage/project` copies as it stands; those are its only outputs, and what they hold is the plugin's
+responsibility, refusing only a module that does not exist and a key or path written twice; an inspection
 fails the build by throwing, and `inspect` fails it as well when
-an inspection changed a file it was handed. A plugin adds and
+an inspection changed a file it was handed. The module slot `package` is the one whose output is staged beyond the
+module: what its plugins write into `packages/` is merged with the stock `jpackage` output, refusing a name written
+twice, and staged in `stage/packages/`. A plugin adds and
 never replaces: a build that changes what the stock steps do is an entry point of its own that wires its
 assembler in code. A plugin runs the project's code, as its tests and annotation processors do, so the project
 names it itself; what isolates an untrusted project is `jenesis.project.docker`, under which the host runs no

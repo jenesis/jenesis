@@ -104,7 +104,7 @@ Quick index
 | 53 | [`custom-jmod`](demo-53-custom-jmod/README.md)                    | Pack extra content into a `.jmod` and carry it into a packaged app           | `java build/Demo.java`            |
 | 54 | [`internal-module`](demo-54-internal-module/README.md)            | Move that preprocessing into a build module loaded from local source         | `java build/Demo.java`            |
 | 55 | [`external-module`](demo-55-external-module/README.md)            | Resolve the same build module as a published coordinate                      | `java build/Demo.java`            |
-| 56 | [`transform-inspect`](demo-56-transform-inspect/README.md)        | Add files to every module built, and inspect the result before it is staged  | `java build/jenesis/Make.java stage`|
+| 56 | [`project-plugins`](demo-56-project-plugins/README.md)            | Hook plugins into the build of the whole project, from a first check to release | `java build/jenesis/Make.java stage`|
 | 57 | [`custom-maven`](demo-57-custom-maven/README.md)                  | Drive a multi-module Maven build without `Project`                           | `java build/Demo.java`            |
 | 58 | [`custom-modular`](demo-58-custom-modular/README.md)              | The same for `module-info.java` modules                                      | `java build/Demo.java`            |
 | 59 | [`custom-build`](demo-59-custom-build/README.md)                  | No template at all: wire the build by hand                                   | `java build/Demo.java`            |
@@ -806,18 +806,24 @@ name and resolved from a repository instead of compiled from source. Build logic
 is just another module: written inline, loaded from source, or consumed as a
 published one.
 
-## 39. Checking what a build produced - [`transform-inspect`](demo-56-transform-inspect/README.md)
+## 39. Plugins for the whole project - [`project-plugins`](demo-56-project-plugins/README.md)
 
-The plugins of the `internal-module` demo join one module of the build. A plugin
-named under `postprocess/transform` or `postprocess/inspect` instead runs once over
-everything the build produced, in `build/postprocess`, before anything is staged:
+The plugins of the `internal-module` demo join one module of the build. This demo
+hooks plugins into the build of the whole project instead, one for each point:
 
+    licence+preprocess=./licence
     notice+postprocess/transform=./notice
     audit+postprocess/inspect=./audit
+    zip+package=./zip
+    publish+export=./publish
+    checksums+plugin=./checksums
 
-A transform adds files to the modules - here a notice listing what each module
-includes, staged beside its jar - and an inspection fails the build when the
-result is wrong. Both see every module with the jars it resolved, both read their
+A preprocessor checks the project before any module is built, a transform adds
+files to the modules - here a notice listing what each module includes, staged
+beside its jar - and an inspection fails the build when the result is wrong. A
+packager adds a package of its own beside the stock ones, and an exporter, like a
+releaser, delivers what was staged, and a plugin under `plugin` runs only when it
+is named, as `plugin/checksums`. The plugins of the whole project read their
 values from `jenesis.plugins.arguments.properties`, and `pin` records their own
 closures in `jenesis.plugins.pin.properties`.
 
