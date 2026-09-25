@@ -94,6 +94,10 @@ public abstract class ProcessBuildStep implements BuildStep {
         return factory instanceof ProcessHandler.Staged ? List.of() : List.of(command);
     }
 
+    protected ProcessHandler handler(BuildStepContext context, List<String> commands) throws IOException {
+        return factory.apply(commands);
+    }
+
     protected int execute(ProcessHandler handler, Path output, Path error, ProcessHandler.Tee tee)
             throws IOException, InterruptedException {
         Semaphore permits = terms.permits();
@@ -182,7 +186,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                 List<String> commands = prepended(properties);
                 commands.addAll(processed);
                 Path output = context.supplement().resolve("output"), error = context.supplement().resolve("error");
-                ProcessHandler handler = factory.apply(commands);
+                ProcessHandler handler = handler(context, commands);
                 Files.writeString(context.supplement().resolve("command"), String.join(" ", handler.commands()));
                 ProcessHandler.Tee tee = tee(executor, handler);
                 Consumer<String> announcing = terms.announcing();

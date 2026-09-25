@@ -10,6 +10,8 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
 
     int execute(Path output, Path error, Tee tee) throws IOException;
 
+    boolean external();
+
     record Tee(Executor executor, Consumer<String> out, Consumer<String> err) {
     }
 
@@ -99,6 +101,11 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         @Override
         public List<String> commands() {
             return Stream.concat(Stream.of(toolProvider.name()), commands.stream()).toList();
+        }
+
+        @Override
+        public boolean external() {
+            return false;
         }
 
         @Override
@@ -276,6 +283,11 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         @Override
         public List<String> commands() {
             return commands;
+        }
+
+        @Override
+        public boolean external() {
+            return true;
         }
 
         @Override

@@ -2,6 +2,7 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -109,7 +110,30 @@ public class ProcessHandlerTest {
     }
 
     @Test
-    public void concurrent_image_tool_runs_are_serialized() throws Exception {
+    public void a_forked_process_reads_the_argument_file_it_is_handed() throws Exception {
+        Path source = root.resolve("Echo.java");
+        Files.writeString(source, """
+                public class Echo {
+                    public static void main(String[] args) {
+                        System.out.println(String.join("|", args));
+                    }
+                }
+                """);
+        Path file = root.resolve("echo.args"), output = root.resolve("output"), error = root.resolve("error");
+        ProcessHandler handler = ProcessHandler.OfProcess.ofJavaHome("bin/java").apply(List.of(
+                "@" + ProcessBuildStep.argumentFile(file, List.of(source.toString(), "a b", "c\\d"))));
+        assertThat(handler.external()).isTrue();
+        assertThat(handler.execute(output, error, null)).isZero();
+        assertThat(Files.readString(output).strip()).isEqualTo("a b|c\\d");
+    }
+
+    @Test
+    public void a_tool_runs_within_the_build() {
+        assertThat(ProcessHandler.OfTool.of("jar").apply(List.of("--version")).external()).isFalse();
+    }
+
+    @Test
+    public void concurrent_image_tool_runs_all_succeed() throws Exception {
         List<Callable<Integer>> linkers = new ArrayList<>();
         for (int index = 0; index < 4; index++) {
             Path image = root.resolve("image-" + index);
