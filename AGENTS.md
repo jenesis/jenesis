@@ -185,12 +185,14 @@ Source mode registers no service, so a program there builds `new MakeTool()` its
 is the same.
 
 **`jenesis.toolchain.*` picks the JVM, and only the user says where to look.** `Toolchain` reads
-`jenesis.toolchain.version` and `jenesis.toolchain.searchpath`. `Make.main` and `Execute.main` reach it by
-reflection, and only when a version is set, so source mode compiles it only then; it depends on `java.base`
-alone, which `MakeClosureTest` holds it to. A JDK is identified by its `release` file and never executed
-before it is chosen. The search path decides what the build executes, so `Make.settings` refuses it in
-every file a project provides: a new way to read properties keeps that rule, and the relaunch
-never takes a JVM option that configuration could supply.
+`jenesis.toolchain.version`, `jenesis.toolchain.searchpath` and `jenesis.toolchain.installer`. `Make.main`
+and `Execute.main` reach it by reflection, and only when a version is set, so source mode compiles it only
+then; it depends on `java.base` alone, which `MakeClosureTest` holds it to. A JDK is identified by its
+`release` file and never executed before it is chosen. The search path and the installer decide what the
+build executes, so `Make.settings` refuses both in every file a project provides: a new way to read
+properties keeps that rule, and the relaunch never takes a JVM option that configuration could supply.
+Jenesis itself installs nothing; the installer is a program the user names, such as the SDK's
+`jenesis-jdk`, which translates a version for the tool that installs JDKs on that machine.
 
 **`jenesis.plugins.properties` adds to the stock build.** It sits beside `jenesis.properties` and names one plugin
 per line, `<name>+<hook point>=<module>`, or `<name>=<module>` for the module build itself: a value starting with `./`

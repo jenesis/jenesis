@@ -1,0 +1,247 @@
+#!/usr/bin/env bash
+set -eu
+SCRIPT="$0"
+while [ -L "$SCRIPT" ]; do
+    LINK="$(readlink "$SCRIPT")"
+    case "$LINK" in
+        /*) SCRIPT="$LINK" ;;
+        *) SCRIPT="$(dirname "$SCRIPT")/$LINK" ;;
+    esac
+done
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT")" && pwd -P)"
+JENESIS_HOME="$(dirname "$SCRIPT_DIR")"
+
+usage() {
+    cat <<'EOM'
+Usage: jenesis-jdk [--tool=sdkman|mise] <version>
+       jenesis-jdk [--tool=sdkman|mise] --enable
+
+Installs a JDK for a Jenesis toolchain version, as 25, 25.0.3 or 25-temurin, with
+SDKMAN or mise, into the folder that tool keeps its JDKs in, which Jenesis searches
+by default. A build runs it when jenesis.toolchain.installer names it and no
+installed JDK matches jenesis.toolchain.version.
+
+  --tool=<tool>  install with sdkman or mise; by default the tool Jenesis was
+                 installed with, otherwise SDKMAN when present, otherwise mise
+  --enable       let builds install a missing JDK with jenesis-jdk, by adding
+                 jenesis.toolchain.installer to ~/.jenesis/jenesis.properties
+  --help         print this help
+
+A word of the version names the vendor: temurin, zulu, corretto, liberica,
+microsoft, sapmachine, semeru, graalvm, oracle or jetbrains, and Temurin without
+one. The newest build matching every number is installed, except that mise names
+Zulu builds by Zulu's own version, so it installs the newest Zulu of the feature
+release. With SDKMAN, ea installs an early-access build from jdk.java.net. Jenesis
+checks whatever was installed against the version before it runs it.
+EOM
+}
+
+fail() {
+    echo "jenesis-jdk: $1" >&2
+    exit "${2:-1}"
+}
+
+TOOL=""
+VERSION=""
+ENABLE=""
+for ARGUMENT in "$@"; do
+    case "$ARGUMENT" in
+        --help)
+            usage
+            exit 0
+            ;;
+        --enable) ENABLE=1 ;;
+        --tool=sdkman | --tool=mise) TOOL="${ARGUMENT#--tool=}" ;;
+        -*)
+            usage >&2
+            exit 64
+            ;;
+        *)
+            if [ -n "$VERSION" ]; then
+                usage >&2
+                exit 64
+            fi
+            VERSION="$ARGUMENT"
+            ;;
+    esac
+done
+
+if [ -n "$ENABLE" ]; then
+    [ -z "$VERSION" ] || fail "--enable takes no version" 64
+    INSTALLER="jenesis-jdk${TOOL:+ --tool=$TOOL}"
+    FILE="$HOME/.jenesis/jenesis.properties"
+    if [ -f "$FILE" ]; then
+        EXISTING="$(sed -n 's/^[[:space:]]*jenesis\.toolchain\.installer[[:space:]]*[=:][[:space:]]*//p' "$FILE" | tail -n 1)"
+        if [ "$EXISTING" = "$INSTALLER" ]; then
+            echo "jenesis-jdk: $FILE already names $INSTALLER as jenesis.toolchain.installer"
+            exit 0
+        elif [ -n "$EXISTING" ]; then
+            fail "$FILE already names $EXISTING as jenesis.toolchain.installer - edit that line to change it"
+        fi
+    fi
+    mkdir -p "$HOME/.jenesis"
+    if [ -s "$FILE" ] && [ -n "$(tail -c 1 "$FILE")" ]; then
+        echo >> "$FILE"
+    fi
+    echo "jenesis.toolchain.installer=$INSTALLER" >> "$FILE"
+    echo "jenesis-jdk: builds now install a missing JDK with $INSTALLER, as $FILE records"
+    exit 0
+fi
+
+if [ -z "$VERSION" ]; then
+    usage >&2
+    exit 64
+fi
+PATTERN='^([1-9][0-9]*(\.(0|[1-9][0-9]*))*)((-[A-Za-z]+)*)$'
+[[ "$VERSION" =~ $PATTERN ]] || fail "malformed version '$VERSION' (expected <feature>[.<interim>[.<update>...]][-<word>...], as 25, 25.0.3 or 25-temurin)" 64
+NUMBERS="${BASH_REMATCH[1]}"
+WORDS="${BASH_REMATCH[4]}"
+FEATURE="${NUMBERS%%.*}"
+
+VENDOR=""
+EA=""
+JVMCI=""
+vendor() {
+    if [ -n "$VENDOR" ] && [ "$VENDOR" != "$1" ]; then
+        fail "$VERSION names two vendors, $VENDOR and $1" 2
+    fi
+    VENDOR="$1"
+}
+for WORD in $(printf '%s' "$WORDS" | tr '[:upper:]-' '[:lower:] '); do
+    case "$WORD" in
+        temurin | adoptium | eclipse) vendor temurin ;;
+        zulu | azul) vendor zulu ;;
+        corretto | amazon) vendor corretto ;;
+        liberica | bellsoft) vendor liberica ;;
+        microsoft) vendor microsoft ;;
+        sapmachine | sap) vendor sapmachine ;;
+        semeru | ibm) vendor semeru ;;
+        graalvm | community) vendor graalvm ;;
+        oracle) vendor oracle ;;
+        jetbrains) vendor jetbrains ;;
+        jvmci) JVMCI=1 ;;
+        ea) EA=1 ;;
+        lts | ca | inc | corporation | systems | com | se | b) ;;
+        *) fail "no vendor jenesis-jdk knows answers to '$WORD' in $VERSION" 2 ;;
+    esac
+done
+if [ -n "$JVMCI" ]; then
+    case "$VENDOR" in
+        oracle) VENDOR=oracle-graalvm ;;
+        "" | graalvm) VENDOR=graalvm ;;
+        *) fail "$VERSION names $VENDOR, which builds no JDK with jvmci" 2 ;;
+    esac
+fi
+if [ -n "$EA" ]; then
+    case "$VENDOR" in
+        "" | oracle) VENDOR=openjdk-ea ;;
+        *) fail "$VERSION asks for an early-access build of $VENDOR, and jenesis-jdk installs early-access builds of OpenJDK only" 2 ;;
+    esac
+fi
+VENDOR="${VENDOR:-temurin}"
+
+SDKMAN_HOME="${SDKMAN_DIR:-$HOME/.sdkman}"
+MISE_HOME="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}"
+if [ -z "$TOOL" ]; then
+    case "$JENESIS_HOME/" in
+        "$SDKMAN_HOME/candidates/"*) TOOL=sdkman ;;
+        "$MISE_HOME/"*) TOOL=mise ;;
+    esac
+fi
+if [ -z "$TOOL" ]; then
+    if [ -s "$SDKMAN_HOME/bin/sdkman-init.sh" ]; then
+        TOOL=sdkman
+    elif command -v mise > /dev/null 2>&1; then
+        TOOL=mise
+    else
+        fail "neither SDKMAN nor mise is installed, and jenesis-jdk installs JDKs with one of them - install either, or name a program of your own in jenesis.toolchain.installer"
+    fi
+fi
+
+if [ "$TOOL" = sdkman ]; then
+    [ -s "$SDKMAN_HOME/bin/sdkman-init.sh" ] || fail "SDKMAN is not installed at $SDKMAN_HOME"
+    case "$VENDOR" in
+        temurin) DIST=tem ;;
+        zulu) DIST=zulu ;;
+        corretto) DIST=amzn ;;
+        liberica) DIST=librca ;;
+        microsoft) DIST=ms ;;
+        sapmachine) DIST=sapmchn ;;
+        semeru) DIST=sem ;;
+        graalvm) DIST=graalce ;;
+        oracle-graalvm) DIST=graal ;;
+        oracle) DIST=oracle ;;
+        jetbrains) DIST=jbr ;;
+        openjdk-ea) DIST=open ;;
+    esac
+    sdkman() {
+        (
+            set +eu
+            # shellcheck disable=SC1091
+            . "$SDKMAN_HOME/bin/sdkman-init.sh" > /dev/null 2>&1
+            sdk "$@"
+        )
+    }
+    LISTING="$(sdkman list java 2>&1)" || fail "SDKMAN could not list the Java versions it offers: $LISTING"
+    IDENTIFIER="$(printf '%s\n' "$LISTING" | awk -F'|' -v dist="$DIST" -v numbers="$NUMBERS" -v ea="$EA" '
+        NF >= 4 {
+            id = $NF
+            gsub(/[[:space:]]/, "", id)
+            suffix = "-" dist
+            if (length(id) <= length(suffix) || substr(id, length(id) - length(suffix) + 1) != suffix) {
+                next
+            }
+            version = substr(id, 1, length(id) - length(suffix))
+            if (ea != "") {
+                if (version !~ /^[0-9]+(\.[0-9]+)*(\.ea\.|\+ea\.)[0-9]+$/) {
+                    next
+                }
+            } else if (version !~ /^[0-9]+(\.[0-9]+)*(\+[0-9]+(\.[0-9]+)*)?$/) {
+                next
+            }
+            match(version, /^[0-9]+(\.[0-9]+)*/)
+            wanted = split(numbers, want, ".")
+            offered = split(substr(version, 1, RLENGTH), have, ".")
+            for (i = 1; i <= wanted; i++) {
+                if ((i <= offered ? have[i] + 0 : 0) != want[i] + 0) {
+                    next
+                }
+            }
+            key = ""
+            rest = version
+            for (count = 0; count < 8; count++) {
+                if (match(rest, /[0-9]+/)) {
+                    key = key sprintf("%09d", substr(rest, RSTART, RLENGTH) + 0)
+                    rest = substr(rest, RSTART + RLENGTH)
+                } else {
+                    key = key sprintf("%09d", 0)
+                }
+            }
+            print key "\t" id
+        }' | sort | tail -n 1 | cut -f 2)"
+    [ -n "$IDENTIFIER" ] || fail "SDKMAN offers no Java build for $VERSION among its identifiers ending in -$DIST"
+    if [ "$SDKMAN_HOME" != "$HOME/.sdkman" ]; then
+        echo "jenesis-jdk: SDKMAN keeps its JDKs in $SDKMAN_HOME/candidates/java, which Jenesis searches only when jenesis.toolchain.searchpath names it" >&2
+    fi
+    echo "jenesis-jdk: installing $IDENTIFIER with SDKMAN for $VERSION"
+    printf 'n\n' | sdkman install java "$IDENTIFIER" || fail "SDKMAN failed to install $IDENTIFIER"
+    [ -d "$SDKMAN_HOME/candidates/java/$IDENTIFIER" ] || fail "SDKMAN reported no failure but did not install $IDENTIFIER into $SDKMAN_HOME/candidates/java"
+else
+    command -v mise > /dev/null 2>&1 || fail "mise is not on the PATH"
+    case "$VENDOR" in
+        openjdk-ea) fail "jenesis-jdk installs early-access builds with SDKMAN only - use --tool=sdkman" 2 ;;
+        graalvm) NAME=graalvm-community ;;
+        semeru) NAME=semeru-openj9 ;;
+        *) NAME="$VENDOR" ;;
+    esac
+    REQUEST="$NUMBERS"
+    if [ "$VENDOR" = zulu ] && [ "$NUMBERS" != "$FEATURE" ]; then
+        echo "jenesis-jdk: mise names Zulu builds by Zulu's own version, so it installs the newest Zulu $FEATURE, which Jenesis then checks against $VERSION" >&2
+        REQUEST="$FEATURE"
+    fi
+    if [ "$MISE_HOME" != "$HOME/.local/share/mise" ]; then
+        echo "jenesis-jdk: mise keeps its JDKs in $MISE_HOME/installs/java, which Jenesis searches only when jenesis.toolchain.searchpath names it" >&2
+    fi
+    echo "jenesis-jdk: installing java@$NAME-$REQUEST with mise for $VERSION"
+    mise install "java@$NAME-$REQUEST" || fail "mise failed to install java@$NAME-$REQUEST"
+fi
