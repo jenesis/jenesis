@@ -109,4 +109,15 @@ public class MakeToolTest {
         assertThat(out.toString() + err)
                 .contains("jenesis.toolchain.version cannot be honored by the jenesis-make tool");
     }
+
+    @Test
+    public void refuses_an_ahead_of_time_cache_it_cannot_relaunch_into() {
+        StringWriter out = new StringWriter(), err = new StringWriter();
+        int code = ToolProvider.findFirst("jenesis-make").orElseThrow().run(new PrintWriter(out), new PrintWriter(err),
+                "-Djenesis.make.root=" + root, "-Djenesis.make.aot=true", "configuration");
+        assertThat(code).isEqualTo(1);
+        assertThat(out.toString() + err)
+                .as("a cache is handed to a JVM on its command line, which a tool running in another JVM cannot do")
+                .contains("jenesis.make.aot cannot be honored by the jenesis-make tool");
+    }
 }

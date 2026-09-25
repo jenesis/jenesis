@@ -88,3 +88,50 @@ either way. A daemon serves one project root. A containerized build
 When a build behaves in a way you cannot explain, stopping the daemon is the
 first thing to rule out - `java build/jenesis/Make.java` on its own always runs
 with nothing kept.
+
+Starting from a cache instead
+-----------------------------
+
+A JVM can also start from an ahead-of-time cache: a file holding the engine's
+classes already loaded and linked, trained once and read by every later build.
+It needs no process, no idle timeout and no memory between builds, and it
+survives a reboot. Turn it on in `jenesis.properties` or in
+`~/.jenesis/jenesis.properties`:
+
+    jenesis.make.aot=true
+
+It applies where the engine runs compiled, which is how the installed `jenesis`
+command runs it: the first build trains the cache, and every later one starts
+from it. Source mode is out of its reach - `java build/jenesis/Make.java` runs in
+a JVM that is already running by the time the cache could be handed to it - so
+there the setting changes nothing. The compiled engine the default leaves in
+`.jenesis/classes` shows the effect as well:
+
+    java -cp .jenesis/classes build.jenesis.Make -Djenesis.make.aot=true   # trains the cache
+    java -cp .jenesis/classes build.jenesis.Make -Djenesis.make.aot=true   # starts from it
+
+| no-op build of this demo                  | plain  | cache  |
+|-------------------------------------------|--------|--------|
+| the engine as `jenesis` runs it           | 0.69s  | 0.43s  |
+| the engine from `.jenesis/classes`        | 0.58s  | 0.49s  |
+
+Training costs a build of about two to three seconds and some 22 MB on disk. The
+installed command gains most, because it runs the engine from a jar the cache
+reads directly; from `.jenesis/classes`, the build first packs the classes into
+`.jenesis/engine.jar` and starts a second JVM that can use the cache, which costs
+part of what the cache saves.
+
+The cache lives at `.jenesis/engine-<hex>.aot`, where the hex names the engine
+and the JVM it was trained for, so a changed engine or an upgraded JDK trains a
+new one and the old one is removed. Two settings configure it:
+
+    -Djenesis.aot.file=.jenesis/engine.aot   # where it lives, relative to the project
+    -Djenesis.aot.lifetime=P7D               # train it again once it is this old
+
+`help`, `skill`, `configuration` and `properties` only print, so they never train
+or use a cache. The daemon and the cache are two answers to the same cost, so
+naming both - or the cache beside `-Djenesis.make.compile=false`, which leaves
+nothing compiled to cache - stops the build with a message naming both settings.
+Where builds are frequent and small, or where a machine builds many projects now
+and then, the cache is the better trade; in a tight edit-build loop on a large
+project, the daemon's warm JIT still wins.

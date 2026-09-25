@@ -115,6 +115,7 @@ public final class DaemonClient {
             throw new IllegalStateException(e);
         }
         digest.update(seed.getBytes(StandardCharsets.UTF_8));
+        digest.update(Runtime.version().toString().getBytes(StandardCharsets.UTF_8));
         environment.forEach((name, value) -> {
             digest.update(name.getBytes(StandardCharsets.UTF_8));
             digest.update(value.getBytes(StandardCharsets.UTF_8));
