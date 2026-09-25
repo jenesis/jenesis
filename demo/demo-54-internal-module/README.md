@@ -57,16 +57,16 @@ per line:
 
     greeting+binary/generated=./plugin
 
-The key is `<name>+<slot>`: the plugin's name (`greeting`), and the module of the
-stock build it adds to - here `binary/generated`, where generated sources are
+The key is `<name>+<hook point>`: the plugin's name (`greeting`), and the place in
+the stock build it joins - here `binary/generated`, where generated sources are
 compiled with the project's own. The value is where the
 plugin comes from: a value starting with `./` is a folder compiled from source,
 anything else a module name resolved from a repository. Either may end in
 `@<provider>` to select the provider annotated `@BuildModuleName("<provider>")`
-when the plugin module provides several. The slots are the modules the build log shows: `check`, `format`,
+when the plugin module provides several. The hook points of a module are the modules the build log shows: `check`, `format`,
 `compliance`, `binary`, `binary/generated`, `binary/compiled`, `binary/validate`,
-`artifact`, `observed`, `documentation` and `documentation/generate`; a key
-without `+<slot>` adds the plugin to the module build itself. A plugin reads what
+`artifact`, `observed`, `documentation`, `documentation/generate` and `package`; a key
+without `+<hook point>` adds the plugin to the module build itself. A plugin reads what
 the module it joins reads, and adds to it: it never replaces a stock step.
 
 Configuring the plugin
