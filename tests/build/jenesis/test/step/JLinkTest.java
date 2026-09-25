@@ -59,6 +59,9 @@ public class JLinkTest {
                                 Path.of("process/jlink.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         assertThat(next.resolve(JLink.RUNTIME + "release")).isRegularFile();
+        assertThat(Files.exists(supplement.resolve("jlink.args")))
+                .as("only a forked jlink reads its arguments from a file, as its tool refuses one")
+                .isEqualTo(process);
     }
 
     @ParameterizedTest
