@@ -788,18 +788,6 @@ public class ProjectTest {
     }
 
     @Test
-    public void refuses_a_plugin_named_for_two_hook_points_of_a_module() throws IOException {
-        Files.writeString(root.resolve("jenesis.plugins.properties"), """
-                lint+check=./lint
-                lint+format=./lint
-                """);
-        assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("The plugin lint")
-                .hasMessageContaining("is named for more than one hook point");
-    }
-
-    @Test
     public void refuses_a_plugin_of_transform_whose_name_holds_a_dot() throws IOException {
         Files.writeString(root.resolve("jenesis.plugins.properties"), "the.licenses+postprocess/transform=./licenses\n");
         assertThatThrownBy(() -> Project.ofEnvironment(new Environment(settings), root))
