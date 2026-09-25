@@ -271,7 +271,9 @@ public record Jpx(Path storage,
                                   system's usual JDK locations. Nothing is installed
                                   unless -Djenesis.toolchain.installer or the
                                   JENESIS_TOOLCHAIN_INSTALLER environment variable names
-                                  an installer, such as jenesis-jdk, for when none matches
+                                  an installer for when none matches, as jpx itself names
+                                  its jpx-jdk for the run where SDKMAN, mise or Scoop
+                                  installed it
               --docker[=<image>]  run the program in a Docker container; resolution and
                                   installation still happen on the host, the installation
                                   and the host's Java home are mounted read-only. Without

@@ -36,5 +36,13 @@ if !JAVA_MAJOR! LSS 25 (
     exit /b 1
 )
 
+if defined JENESIS_TOOLCHAIN_INSTALLER goto :launch
+set "SCOOP_APPS=%USERPROFILE%\scoop\apps\jpx\"
+if defined SCOOP set "SCOOP_APPS=%SCOOP%\apps\jpx\"
+set "BELOW_SCOOP=!JPX_HOME!\"
+set "BELOW_SCOOP=!BELOW_SCOOP:*%SCOOP_APPS%=!"
+if /i not "!BELOW_SCOOP!"=="!JPX_HOME!\" set "JENESIS_TOOLCHAIN_INSTALLER=!JPX_HOME!\bin\jpx-jdk.bat"
+
+:launch
 "!JAVA!" %JAVA_OPTS% -p "!JPX_HOME!\lib" -m build.jenesis/build.jenesis.Jpx %*
 exit /b %ERRORLEVEL%
