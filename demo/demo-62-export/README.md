@@ -118,3 +118,39 @@ again under the same version, or without one, ask `app` for a clean build to tak
 the new export:
 
     java -Djenesis.executor.rebuild=true $SETTINGS build/jenesis/Execute.java
+
+Releasing into a module repository
+----------------------------------
+
+`export` reaches this machine only. `release` puts each module of the same
+modular tree into a Jenesis module repository that other machines resolve from,
+as its `release/jenesis` step, once `jenesis.release.uri` names one. A `java`
+repository of a [Jenesis Repository](https://jenesis.build/repository/) serves
+the module layout at the same address a build names in `jenesis.module.uri`, and
+may ask for a key to accept a release:
+
+    cd ../library
+    java -Djenesis.project.version=1.0.0 \
+         -Djenesis.release.uri=https://repo.example.com/repository/releases/<repo>/ \
+         -Djenesis.release.token=<key> \
+         build/jenesis/Make.java release
+
+Each module is put once, as its jar under its version, below `module/`:
+
+    https://repo.example.com/repository/releases/<repo>/module/demo.greeter/1.0.0/demo.greeter.jar
+
+A project built with the `modular` layout then resolves the version it pins -
+`app` pins 1.0.0 since the section above - once `jenesis.module.uri` names the
+same address.
+
+A release without a version fails before anything is sent, as does a release to
+a plaintext `http:` address unless `-Djenesis.repository.insecure=true` allows
+it.
+
+The key is sent as the `Authorization` header. A release reads the
+`JENESIS_RELEASE_URI` and `JENESIS_RELEASE_TOKEN` environment variables where the
+settings are not given, never the variables that name the repositories a build
+resolves from, so a CI job holds its release key apart from the key it reads
+with. Like every credential, the token may come from the command line,
+`~/.jenesis/jenesis.properties` or the environment, never from a file of the
+project, and it is never sent to a repository that a file of the project named.
