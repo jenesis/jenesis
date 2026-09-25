@@ -156,7 +156,7 @@ jobs:
           project: github.com/jenesis/jenesis/jpx
           tag: v${{ steps.version.outputs.version }}
           artifacts: sdk/jpx-${{ steps.version.outputs.version }}.zip
-          bin: jpx
+          bin: jpx jpx-jdk
           require: bin:java@25
 
       - name: Upload JReleaser logs

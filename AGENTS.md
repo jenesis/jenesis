@@ -203,7 +203,8 @@ Jenesis itself installs nothing; the installer is a program the user names, such
 `jenesis-jdk`, which translates a version for the tool that installed Jenesis. The installer falls back to
 `JENESIS_TOOLCHAIN_INSTALLER`, which `jenesis-make` and `jenesis-exec` set, for the one run they start, to their
 own `jenesis-jdk` where SDKMAN, mise or Scoop installed them and the variable is unset, so `jenesis-jdk` calls
-that tool back. Nothing in the tool writes to a file of the user to arrange it.
+that tool back, and `jpx` does the same with `jpx-jdk`, a byte-identical copy that the jpx SDK tests hold to
+`jenesis-jdk`. Nothing in the tool writes to a file of the user to arrange it.
 
 **`jenesis.plugins.properties` adds to the stock build.** It sits beside `jenesis.properties` and names one plugin
 per line, `<name>+<hook point>=<module>`, or `<name>=<module>` for the module build itself: a value starting with `./`
