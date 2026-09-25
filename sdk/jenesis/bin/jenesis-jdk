@@ -117,12 +117,13 @@ VENDOR="${VENDOR:-temurin}"
 
 SDKMAN_HOME="${SDKMAN_DIR:-$HOME/.sdkman}"
 MISE_HOME="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}"
-if [ -z "$TOOL" ]; then
+for CANDIDATE in "sdkman $SDKMAN_HOME/candidates" "mise $MISE_HOME"; do
+    [ -z "$TOOL" ] || break
+    ROOT="$(cd "${CANDIDATE#* }" 2>/dev/null && pwd -P)" || continue
     case "$JENESIS_HOME/" in
-        "$SDKMAN_HOME/candidates/"*) TOOL=sdkman ;;
-        "$MISE_HOME/"*) TOOL=mise ;;
+        "$ROOT/"*) TOOL="${CANDIDATE%% *}" ;;
     esac
-fi
+done
 [ -n "$TOOL" ] || fail "neither SDKMAN nor mise installed the Jenesis at $JENESIS_HOME, and jenesis-jdk installs a JDK with the tool that installed Jenesis - name one with --tool=sdkman or --tool=mise, or install the JDK yourself"
 
 if [ "$TOOL" = sdkman ]; then
