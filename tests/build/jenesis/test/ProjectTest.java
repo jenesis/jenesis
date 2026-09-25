@@ -624,9 +624,21 @@ public class ProjectTest {
                     .layout(layout)
                     .build(Project.RELEASE);
             assertThat(elsewhere.resolve("module/demo.empty/1.0.0/demo.empty.jar")).isRegularFile();
-            assertThat(elsewhere.resolve("module/demo.empty/demo.empty.jar")).isRegularFile();
             assertThat(printed).anyMatch(line -> line.contains("[RELEASED]"));
         }
+    }
+
+    @Test
+    public void refuses_to_release_into_a_module_repository_without_a_version() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
+        settings.put("release.uri", elsewhere.toUri().toString());
+        Project project = Project.ofEnvironment(new Environment(settings), root)
+                .target(root.resolve("target"))
+                .layout(Project.Layout.MODULAR);
+        assertThatThrownBy(() -> project.build(Project.RELEASE))
+                .rootCause()
+                .hasMessageContaining("jenesis.project.version");
+        assertThat(elsewhere).isEmptyDirectory();
     }
 
     @Test

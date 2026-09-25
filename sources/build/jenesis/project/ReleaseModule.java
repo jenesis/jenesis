@@ -70,6 +70,10 @@ public class ReleaseModule implements BuildExecutorModule {
                         + " layout stages no modular tree: build with the modular or modular_to_maven layout, or"
                         + " unset jenesis.release.uri");
             }
+            if (version == null || version.isEmpty()) {
+                throw new IllegalStateException("Cannot release into a Jenesis module repository without a version:"
+                        + " set jenesis.project.version");
+            }
             buildExecutor.addStep(JENESIS, jenesisModuleRepositoryRelease, modular);
         }
     }

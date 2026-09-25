@@ -132,20 +132,18 @@ at an `https:` address, or a folder named by a `file:` URI, as here:
     cd ../library
     java -Djenesis.project.version=1.0.0 -Djenesis.release.uri=file:$RELEASED build/jenesis/Make.java release
 
-Every file is released under its version, and then again as the latest release
-of its module:
+Every file of the module is released under its version:
 
     $RELEASED/module/demo.greeter/1.0.0/demo.greeter.jar
-    $RELEASED/module/demo.greeter/demo.greeter.jar
 
-A release needs a version, and a released version is never replaced: releasing
-other content under 1.0.0 again fails, so the next release takes the next
-version.
+A release without a version fails, and a released version is never replaced:
+releasing other content under 1.0.0 again fails, so the next release takes the
+next version.
 
-A project built with the `modular` layout resolves the module from there once
-`jenesis.module.uri` names the repository. The local module repository is read
-first, so point it at an empty folder to see the release answer, and ask for a
-clean build as above:
+A project built with the `modular` layout resolves the version it pins from
+there once `jenesis.module.uri` names the repository - `app` pins 1.0.0 since
+the section above. The local module repository is read first, so point it at an
+empty folder to see the release answer, and ask for a clean build as above:
 
     cd ../app
     java -Djenesis.project.layout=modular -Djenesis.module.uri=file:$RELEASED \
