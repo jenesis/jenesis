@@ -2751,7 +2751,7 @@ public record Project(
                 jarsigner.storetype||Type of the store, as jarsigner names it: PKCS12, JKS, ...
                 jarsigner.tsa||Timestamp authority to stamp the signature with, so it outlives the certificate
                 jarsigner.arguments||Further jarsigner arguments, whitespace separated
-                release.uri||Jenesis module repository a release puts the staged modular tree into, each file under its version, which the release requires; an http(s) root such as a Jenesis Repository's, or a file: folder (env JENESIS_RELEASE_URI)
+                release.uri||Jenesis module repository a release puts each staged module's jar into, one put per module at module/<module>/<version>/<module>.jar, so every module needs a version; the https root of a Jenesis Repository, its /repository/ (env JENESIS_RELEASE_URI)
                 release.token||Authorization header value for that repository, sent as given (env JENESIS_RELEASE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and it is never sent to a repository a project's own files named
                 jreleaser.executable|jreleaser|The JReleaser executable a release runs
                 jreleaser.command|full-release|The JReleaser command a release runs

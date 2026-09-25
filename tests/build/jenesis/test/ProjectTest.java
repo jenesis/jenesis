@@ -1,6 +1,7 @@
 package build.jenesis.test;
 
 import module java.base;
+import module jdk.httpserver;
 import module org.junit.jupiter.api;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
@@ -615,30 +616,44 @@ public class ProjectTest {
     @Test
     public void releases_the_staged_modular_tree_into_the_module_repository_it_names() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
-        settings.put("release.uri", elsewhere.toUri().toString());
-        for (Project.Layout layout : List.of(Project.Layout.MODULAR, Project.Layout.MODULAR_TO_MAVEN)) {
-            List<String> printed = new ArrayList<>();
-            Project.ofEnvironment(new Environment(settings).out(printed::add), root)
-                    .target(root.resolve("target-" + layout.hashCode()))
-                    .version("1.0.0")
-                    .layout(layout)
-                    .build(Project.RELEASE);
-            assertThat(elsewhere.resolve("module/demo.empty/1.0.0/demo.empty.jar")).isRegularFile();
-            assertThat(printed).anyMatch(line -> line.contains("[RELEASED]"));
+        List<String> put = new CopyOnWriteArrayList<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            put.add(exchange.getRequestMethod() + " " + exchange.getRequestURI().getPath());
+            exchange.sendResponseHeaders(201, -1);
+            exchange.close();
+        });
+        server.start();
+        try {
+            settings.put("release.uri", "http://localhost:" + server.getAddress().getPort() + "/repository/");
+            settings.put("repository.insecure", "true");
+            for (Project.Layout layout : List.of(Project.Layout.MODULAR, Project.Layout.MODULAR_TO_MAVEN)) {
+                put.clear();
+                List<String> printed = new ArrayList<>();
+                Project.ofEnvironment(new Environment(settings).out(printed::add), root)
+                        .target(root.resolve("target-" + layout.hashCode()))
+                        .version("1.0.0")
+                        .layout(layout)
+                        .build(Project.RELEASE);
+                assertThat(put).containsExactly("PUT /repository/module/demo.empty/1.0.0/demo.empty.jar");
+                assertThat(printed).anyMatch(line -> line.contains("[RELEASED]"));
+            }
+        } finally {
+            server.stop(0);
         }
     }
 
     @Test
     public void refuses_to_release_into_a_module_repository_without_a_version() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module demo.empty { }\n");
-        settings.put("release.uri", elsewhere.toUri().toString());
+        settings.put("release.uri", "https://repository.invalid/repository/");
         Project project = Project.ofEnvironment(new Environment(settings), root)
                 .target(root.resolve("target"))
                 .layout(Project.Layout.MODULAR);
         assertThatThrownBy(() -> project.build(Project.RELEASE))
                 .rootCause()
                 .hasMessageContaining("jenesis.project.version");
-        assertThat(elsewhere).isEmptyDirectory();
     }
 
     @Test
@@ -651,7 +666,7 @@ public class ProjectTest {
                     <version>1</version>
                 </project>
                 """);
-        settings.put("release.uri", elsewhere.toUri().toString());
+        settings.put("release.uri", "https://repository.invalid/repository/");
         Project project = Project.ofEnvironment(new Environment(settings), root)
                 .target(root.resolve("target"))
                 .layout(Project.Layout.MAVEN);
