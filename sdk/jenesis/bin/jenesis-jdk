@@ -18,13 +18,15 @@ Usage: jenesis-jdk [--tool=sdkman|mise] <version>
 
 Installs a JDK for a Jenesis toolchain version, as 25, 25.0.3 or 25-temurin, with
 SDKMAN or mise, into the folder that tool keeps its JDKs in, which Jenesis searches
-by default. A build runs it when jenesis.toolchain.installer names it and no
-installed JDK matches jenesis.toolchain.version.
+by default. A build runs it when no installed JDK matches jenesis.toolchain.version
+and jenesis.toolchain.installer or the JENESIS_TOOLCHAIN_INSTALLER environment
+variable names it, as a Jenesis that SDKMAN installed does by itself.
 
   --tool=<tool>  install with sdkman or mise; by default the tool Jenesis was
                  installed with, otherwise SDKMAN when present, otherwise mise
-  --enable       let builds install a missing JDK with jenesis-jdk, by adding
-                 jenesis.toolchain.installer to ~/.jenesis/jenesis.properties
+  --enable       let builds install a missing JDK with jenesis-jdk where SDKMAN
+                 did not install Jenesis, by adding jenesis.toolchain.installer
+                 to ~/.jenesis/jenesis.properties
   --help         print this help
 
 A word of the version names the vendor: temurin, zulu, corretto, liberica,

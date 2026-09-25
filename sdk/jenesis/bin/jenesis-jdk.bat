@@ -156,8 +156,9 @@ echo        jenesis-jdk --enable
 echo.
 echo Installs a JDK for a Jenesis toolchain version, as 25, 25.0.3 or 25-temurin, with
 echo Scoop from its java bucket, into the folder Scoop keeps its apps in, which Jenesis
-echo searches by default. A build runs it when jenesis.toolchain.installer names it and
-echo no installed JDK matches jenesis.toolchain.version.
+echo searches by default. A build runs it when jenesis.toolchain.installer or the
+echo JENESIS_TOOLCHAIN_INSTALLER environment variable names it and no installed JDK
+echo matches jenesis.toolchain.version.
 echo.
 echo   --enable  let builds install a missing JDK with jenesis-jdk, by adding
 echo             jenesis.toolchain.installer to %%USERPROFILE%%\.jenesis\jenesis.properties

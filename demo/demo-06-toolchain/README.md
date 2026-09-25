@@ -76,13 +76,19 @@ Installing a missing JDK
 Jenesis installs nothing by itself, but it runs an installer you name when no JDK
 matches. The Jenesis command-line install ships one, `jenesis-jdk`, which turns a
 version into a request for the tool that installs JDKs on your machine: SDKMAN or
-mise, or Scoop on Windows. Enable it once, for every project:
+mise, or Scoop on Windows.
+
+Where SDKMAN installed Jenesis, `jenesis` names its `jenesis-jdk` as the installer
+through the `JENESIS_TOOLCHAIN_INSTALLER` environment variable, and `jenesis-jdk`
+installs the JDK with SDKMAN in turn. Anywhere else, enable it once, for every
+project:
 
     jenesis-jdk --enable
 
 which adds `jenesis.toolchain.installer=jenesis-jdk` to your
-`~/.jenesis/jenesis.properties`. A build asking for a JDK you do not have then
-installs it and runs on it:
+`~/.jenesis/jenesis.properties`. The setting wins over the environment variable, and
+an empty `-Djenesis.toolchain.installer=` switches the installer off. A build asking
+for a JDK you do not have then installs it and runs on it:
 
     java -Djenesis.toolchain.version=25-zulu build/jenesis/Execute.java
 
