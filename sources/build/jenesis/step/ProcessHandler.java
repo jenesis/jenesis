@@ -90,7 +90,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             ToolProvider toolProvider = ToolProvider.findFirst(name)
                     .orElseThrow(() -> new IllegalArgumentException("No tool: " + name));
             Lock exclusive = switch (name) {
-                case "jlink", "jpackage" -> IMAGE;
+                case "jlink", "jpackage" -> Runtime.version().feature() < 28 ? IMAGE : null;
                 default -> null;
             };
             return arguments -> new OfTool(toolProvider, exclusive, arguments);
