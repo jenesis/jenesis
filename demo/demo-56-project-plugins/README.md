@@ -7,8 +7,10 @@ Hook plugins into the build of the whole project rather than into one module's:
 - a `postprocess/transform` plugin adds files to every module built, and a
   `postprocess/inspect` plugin checks the result, before anything is staged;
 - a `package` plugin adds a package of its own beside the ones Jenesis builds;
+- a `stage/transform` plugin adds to what was staged, and a `stage/inspect`
+  plugin checks it, before anything is exported or released;
 - an `export` or a `release` plugin delivers what was staged;
-- a plugin under `plugin` runs only when it is asked for.
+- a plugin under `plugin` runs only when it is asked for, and needs no build.
 
 `preprocess` and `postprocess` run as part of `build`, so everything after it -
 `stage`, `export`, `release` and `java build/jenesis/Execute.java` - sees what the
@@ -68,7 +70,9 @@ Layout
     |-- audit/                                 the inspection
     |-- zip/                                   the packager
     |-- publish/                               the exporter
-    |-- checksums/                             a plugin run on demand
+    |-- checksums/                             the transform of the staged trees
+    |-- complete/                              the inspection of the staged trees
+    |-- lines/                                 a plugin run on demand
     `-- sources/
         |-- module-info.java                   module demo.app { requires org.json; }
         `-- sample/Sample.java
@@ -84,18 +88,22 @@ demo names its generator:
     audit+postprocess/inspect=./audit
     zip+package=./zip
     publish+export=./publish
-    checksums+plugin=./checksums
+    checksums+stage/transform=./checksums
+    complete+stage/inspect=./complete
+    lines+plugin=./lines
 
-Six slots run a plugin once for the whole project rather than once per module:
+Eight slots run a plugin once for the whole project rather than once per module:
 
 | Slot | Runs as | Runs | Is handed |
 | --- | --- | --- | --- |
 | `preprocess` | `build/preprocess/custom/<name>` | before any module is built | only what it binds |
 | `postprocess/transform` | `build/postprocess/transform/<name>` | after every module is built | every module's inventory |
 | `postprocess/inspect` | `build/postprocess/inspect/<name>` | after the transforms | the same, plus what they added |
+| `stage/transform` | `stage/transform/<name>` | after the stock staging | everything staged |
+| `stage/inspect` | `stage/inspect/<name>` | after the transforms of stage | the staged trees with what they added |
 | `export` | `export/custom/<name>` | with `export`, beside its stock steps | everything staged |
 | `release` | `release/custom/<name>` | with `release`, beside its stock steps | everything staged |
-| `plugin` | `plugin/<name>` | only when `plugin/<name>` is named | what `build` and `stage` produced |
+| `plugin` | `plugin/<name>` | only when `plugin/<name>` is named | only what it binds |
 
 No `plugin-<name>.properties` switches such a plugin on in a module: the line itself
 does. Transforms run in the order the file names them, each seeing what the ones
@@ -114,7 +122,8 @@ per value as `<plugin>.<key>`. This demo's holds
     notice.holder=Example Corp.
     notice.@legal=legal
     publish.directory=target/published
-    checksums.file=target/SHA256SUMS
+    lines.@sources=sources
+    lines.file=target/LINES
 
 and `holder=Example Corp.` reaches the `notice` plugin's `SequencedMap` constructor. A profile
 brings values of its own in `jenesis.plugins.arguments-<profile>.properties`, which
@@ -249,17 +258,36 @@ repositories. A step that writes outside the build, as an exporter does, runs ev
 time it is selected rather than only when what it reads has changed - `publish`
 says so by overriding `shouldRun`.
 
+Adding to what was staged
+-------------------------
+
+A transform of `stage` runs once the stock staging is done and is handed every
+staged tree. What it writes into a folder named after one - `maven/`, `modular/`,
+`packages/`, `project/` and the others under `target/stage/` - joins that tree, so
+`export`, `release` and their plugins take it with the rest; a file the tree holds
+already fails the build rather than being replaced. The `checksums` plugin writes a
+SHA-256 beside every file of the Maven and modular trees:
+
+    target/stage/maven/output/demo/app/demo.app/0-SNAPSHOT/demo.app-0-SNAPSHOT.jar.sha256
+
+An inspection of `stage` then checks the staged trees with what the transforms
+added, and nothing is exported or released past one that fails. The `complete`
+plugin refuses a staged jar without its checksum:
+
+    java -Djenesis.plugin.checksums=false build/jenesis/Make.java stage
+
+    demo.app-0-SNAPSHOT.jar is staged without a checksum - add checksums+stage/transform to jenesis.plugins.properties, or switch it back on
+
 Running a plugin on demand
 --------------------------
 
-A plugin under `plugin` is not part of any goal: no build waits for it, and it runs
-only when its own selector is named. It is handed what `build` and `stage` produced,
-so it suits a benchmark, a documentation site or a smoke test against a staged image.
-The `checksums` plugin writes a SHA-256 for every file staged:
+A plugin under `plugin` is not part of any goal: nothing waits for it, it waits for
+nothing, and it runs only when its own selector is named, handed only what it binds.
+The `lines` plugin counts the lines of the project's sources without building them:
 
-    java build/jenesis/Make.java plugin/checksums
+    java build/jenesis/Make.java plugin/lines
 
-    target/SHA256SUMS
+    target/LINES
 
 Its name cannot collide with anything of Jenesis, as `plugin/` holds nothing else.
 
@@ -272,7 +300,9 @@ in each plugin's closure:
 
     plugin-audit/module/build.jenesis=0.14.0 SHA-256/...
     plugin-checksums/module/build.jenesis=0.14.1 SHA-256/...
+    plugin-complete/module/build.jenesis=0.14.1 SHA-256/...
     plugin-licence/module/build.jenesis=0.14.1 SHA-256/...
+    plugin-lines/module/build.jenesis=0.14.1 SHA-256/...
     plugin-notice/module/build.jenesis=0.14.0 SHA-256/...
     plugin-publish/module/build.jenesis=0.14.1 SHA-256/...
 
