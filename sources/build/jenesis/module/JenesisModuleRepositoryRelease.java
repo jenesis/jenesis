@@ -83,6 +83,11 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
+        if ("http".equals(repository.getScheme()) && !connection.insecure()) {
+            throw new IllegalStateException("Refusing to release over insecure scheme 'http': "
+                    + repository
+                    + " (set -Djenesis.repository.insecure=true to allow a plaintext repository)");
+        }
         SequencedMap<String, Path> released = new TreeMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed() || !Files.isDirectory(argument.folder())) {
@@ -141,13 +146,6 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
     }
 
     private void upload(URI target, Path file) throws IOException {
-        if (!"https".equals(target.getScheme()) && !connection.insecure()) {
-            throw new IllegalStateException("Refusing to release over insecure scheme '"
-                    + target.getScheme()
-                    + "': "
-                    + target
-                    + " (set -Djenesis.repository.insecure=true to allow a plaintext repository)");
-        }
         for (int attempt = 0; ; attempt++) {
             int status;
             String reason;

@@ -178,6 +178,23 @@ public class JenesisModuleRepositoryReleaseTest {
     }
 
     @Test
+    public void releases_over_http_only_where_the_environment_allows_a_plaintext_repository() throws IOException {
+        stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
+        URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/repository/releases");
+
+        assertThatThrownBy(() -> run(JenesisModuleRepositoryRelease.ofEnvironment(
+                new Environment(Map.of("release.uri", uri.toString())), uri).printing(null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.repository.insecure");
+        assertThat(requests).isEmpty();
+
+        run(JenesisModuleRepositoryRelease.ofEnvironment(
+                new Environment(Map.of("release.uri", uri.toString(), "repository.insecure", "true")), uri).printing(null));
+
+        assertThat(received).containsEntry("/repository/releases/module/demo.greeter/1.0.0/demo.greeter.jar", "classes");
+    }
+
+    @Test
     public void refuses_a_repository_that_is_not_addressed_by_a_supported_scheme() {
         assertThatThrownBy(() -> new JenesisModuleRepositoryRelease(URI.create("ftp://example.com/releases")))
                 .isInstanceOf(IllegalArgumentException.class)
