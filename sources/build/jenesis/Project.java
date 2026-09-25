@@ -161,17 +161,14 @@ public record Project(
                               mavenDeps);
                 sub.addModule(ProjectPlugins.POSTPROCESS, project.plugins().postprocess(project.profiles()), "maven");
             }, METADATA);
-            executor.addModule(STAGE, (stage, inherited) -> {
-                stage.addStep("maven", MavenRepositoryStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
-                stage.addStep("packages", new ImageStaging("package").noFolder(true), inherited.sequencedKeySet());
-                stage.addStep("native", new ImageStaging("native").noFolder(true), inherited.sequencedKeySet());
-                stage.addStep("docker", new ImageStaging("docker"), inherited.sequencedKeySet());
-                stage.addStep("reports", new ReportStaging(), inherited.sequencedKeySet());
-                String projectFiles = BuildExecutorModule.PREVIOUS + BUILD + "/" + ProjectPlugins.POSTPROCESS + "/" + ProjectPlugins.PROJECT;
-                if (inherited.containsKey(projectFiles)) {
-                    stage.addStep(ProjectPlugins.PROJECT, new ProjectFiles(), projectFiles);
-                }
-            }, BUILD);
+            SequencedMap<String, BuildStep> trees = new LinkedHashMap<>();
+            trees.put("maven", MavenRepositoryStaging.ofEnvironment(project.environment()));
+            trees.put("packages", new ImageStaging("package").noFolder(true));
+            trees.put("native", new ImageStaging("native").noFolder(true));
+            trees.put("docker", new ImageStaging("docker"));
+            trees.put("reports", new ReportStaging());
+            trees.put(ProjectPlugins.PROJECT, new ProjectFiles());
+            executor.addModule(STAGE, project.plugins().stage(project.profiles(), trees), BUILD);
             executor.addModule(EXPORT, (export, inherited) -> {
                 export.addStep("maven", MavenRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/maven");
                 project.plugins().export(project.profiles()).accept(export, inherited);
@@ -189,7 +186,7 @@ public record Project(
                 ReleaseModule.ofEnvironment(project.environment(), project.root(), project.version()).accept(release, inherited);
                 project.plugins().release(project.profiles()).accept(release, inherited);
             }, STAGE);
-            executor.addModule(PLUGIN, project.plugins().goal(project.profiles()), BUILD, STAGE);
+            executor.addModule(PLUGIN, project.plugins().goal(project.profiles()));
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
@@ -246,19 +243,16 @@ public record Project(
                               modulesDeps);
                 sub.addModule(ProjectPlugins.POSTPROCESS, project.plugins().postprocess(project.profiles()), "modules");
             }, METADATA);
-            executor.addModule(STAGE, (stage, inherited) -> {
-                stage.addStep("modular", ModularStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
-                stage.addStep("packages", new ImageStaging("package").noFolder(true), inherited.sequencedKeySet());
-                stage.addStep("runtime", new ImageStaging("image"), inherited.sequencedKeySet());
-                stage.addStep("layers", new ImageStaging("layers"), inherited.sequencedKeySet());
-                stage.addStep("native", new ImageStaging("native").noFolder(true), inherited.sequencedKeySet());
-                stage.addStep("docker", new ImageStaging("docker"), inherited.sequencedKeySet());
-                stage.addStep("reports", new ReportStaging(), inherited.sequencedKeySet());
-                String projectFiles = BuildExecutorModule.PREVIOUS + BUILD + "/" + ProjectPlugins.POSTPROCESS + "/" + ProjectPlugins.PROJECT;
-                if (inherited.containsKey(projectFiles)) {
-                    stage.addStep(ProjectPlugins.PROJECT, new ProjectFiles(), projectFiles);
-                }
-            }, BUILD);
+            SequencedMap<String, BuildStep> trees = new LinkedHashMap<>();
+            trees.put("modular", ModularStaging.ofEnvironment(project.environment()));
+            trees.put("packages", new ImageStaging("package").noFolder(true));
+            trees.put("runtime", new ImageStaging("image"));
+            trees.put("layers", new ImageStaging("layers"));
+            trees.put("native", new ImageStaging("native").noFolder(true));
+            trees.put("docker", new ImageStaging("docker"));
+            trees.put("reports", new ReportStaging());
+            trees.put(ProjectPlugins.PROJECT, new ProjectFiles());
+            executor.addModule(STAGE, project.plugins().stage(project.profiles(), trees), BUILD);
             executor.addModule(EXPORT, (export, inherited) -> {
                 export.addStep("modular", JenesisModuleRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/modular");
                 project.plugins().export(project.profiles()).accept(export, inherited);
@@ -274,7 +268,7 @@ public record Project(
                 ReleaseModule.ofEnvironment(project.environment(), project.root(), project.version()).accept(release, inherited);
                 project.plugins().release(project.profiles()).accept(release, inherited);
             }, STAGE);
-            executor.addModule(PLUGIN, project.plugins().goal(project.profiles()), BUILD, STAGE);
+            executor.addModule(PLUGIN, project.plugins().goal(project.profiles()));
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
@@ -336,20 +330,17 @@ public record Project(
                               modulesDeps);
                 sub.addModule(ProjectPlugins.POSTPROCESS, project.plugins().postprocess(project.profiles()), "modules");
             }, METADATA);
-            executor.addModule(STAGE, (stage, inherited) -> {
-                stage.addStep("maven", MavenRepositoryStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
-                stage.addStep("modular", ModularStaging.ofEnvironment(project.environment()), inherited.sequencedKeySet());
-                stage.addStep("packages", new ImageStaging("package").noFolder(true), inherited.sequencedKeySet());
-                stage.addStep("runtime", new ImageStaging("image"), inherited.sequencedKeySet());
-                stage.addStep("layers", new ImageStaging("layers"), inherited.sequencedKeySet());
-                stage.addStep("native", new ImageStaging("native").noFolder(true), inherited.sequencedKeySet());
-                stage.addStep("docker", new ImageStaging("docker"), inherited.sequencedKeySet());
-                stage.addStep("reports", new ReportStaging(), inherited.sequencedKeySet());
-                String projectFiles = BuildExecutorModule.PREVIOUS + BUILD + "/" + ProjectPlugins.POSTPROCESS + "/" + ProjectPlugins.PROJECT;
-                if (inherited.containsKey(projectFiles)) {
-                    stage.addStep(ProjectPlugins.PROJECT, new ProjectFiles(), projectFiles);
-                }
-            }, BUILD);
+            SequencedMap<String, BuildStep> trees = new LinkedHashMap<>();
+            trees.put("maven", MavenRepositoryStaging.ofEnvironment(project.environment()));
+            trees.put("modular", ModularStaging.ofEnvironment(project.environment()));
+            trees.put("packages", new ImageStaging("package").noFolder(true));
+            trees.put("runtime", new ImageStaging("image"));
+            trees.put("layers", new ImageStaging("layers"));
+            trees.put("native", new ImageStaging("native").noFolder(true));
+            trees.put("docker", new ImageStaging("docker"));
+            trees.put("reports", new ReportStaging());
+            trees.put(ProjectPlugins.PROJECT, new ProjectFiles());
+            executor.addModule(STAGE, project.plugins().stage(project.profiles(), trees), BUILD);
             executor.addModule(EXPORT, (export, inherited) -> {
                 export.addStep("maven", MavenRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/maven");
                 export.addStep("modular", JenesisModuleRepositoryExport.ofEnvironment(project.environment()), BuildExecutorModule.PREVIOUS + STAGE + "/modular");
@@ -369,7 +360,7 @@ public record Project(
                 ReleaseModule.ofEnvironment(project.environment(), project.root(), project.version()).accept(release, inherited);
                 project.plugins().release(project.profiles()).accept(release, inherited);
             }, STAGE);
-            executor.addModule(PLUGIN, project.plugins().goal(project.profiles()), BUILD, STAGE);
+            executor.addModule(PLUGIN, project.plugins().goal(project.profiles()));
             return name -> {
                 int slash = name.indexOf('/');
                 String module = (slash == -1 ? name : name.substring(0, slash)).replace('+', '/');
@@ -637,16 +628,18 @@ public record Project(
                     project's code, as its tests do, so build an untrusted project with
                     -Djenesis.project.docker=true.
 
-                    Six slots run a plugin once for the whole project. preprocess runs as
+                    Eight slots run a plugin once for the whole project. preprocess runs as
                     build/preprocess/custom/<name> before any module is built, sees only the inputs it
                     binds and hands the build nothing, so it can only stop it. postprocess/transform
                     and postprocess/inspect run over every module built, as
                     build/postprocess/transform/<name> and build/postprocess/inspect/<name>, before
                     anything is staged. export and release run as export/custom/<name> and
                     release/custom/<name> beside the stock steps of their goal, and are handed
-                    everything staged. plugin runs as plugin/<name> only when that selector is
-                    named, handed what build and stage produced, for a benchmark, a site or a smoke
-                    test that no build should wait for. Switch an expensive one off with
+                    everything staged. stage/transform runs after the stock staging, and
+                    what it writes under a folder named after a staged tree joins that tree, so export
+                    and release ship it; stage/inspect checks the result before either runs. plugin
+                    runs as plugin/<name> only when that selector is named, depends on nothing and is
+                    handed only what it binds. Switch an expensive one off with
                     -Djenesis.plugin.<name>=false or in a profile, and every plugin with
                     -Djenesis.project.plugins=false. Such a plugin
                     reads its values as <name>.<key> from jenesis.plugins.arguments.properties, and
@@ -1569,6 +1562,8 @@ public record Project(
             for (String hook : List.of(ProjectPlugins.PREPROCESS,
                     ProjectPlugins.POSTPROCESS + "/" + ProjectPlugins.TRANSFORM,
                     ProjectPlugins.POSTPROCESS + "/" + ProjectPlugins.INSPECT,
+                    STAGE + "/" + ProjectPlugins.TRANSFORM,
+                    STAGE + "/" + ProjectPlugins.INSPECT,
                     EXPORT,
                     RELEASE,
                     PLUGIN)) {
@@ -1697,6 +1692,8 @@ public record Project(
                     hooks.get(ProjectPlugins.PREPROCESS),
                     hooks.get(ProjectPlugins.POSTPROCESS + "/" + ProjectPlugins.TRANSFORM),
                     hooks.get(ProjectPlugins.POSTPROCESS + "/" + ProjectPlugins.INSPECT),
+                    hooks.get(STAGE + "/" + ProjectPlugins.TRANSFORM),
+                    hooks.get(STAGE + "/" + ProjectPlugins.INSPECT),
                     hooks.get(EXPORT),
                     hooks.get(RELEASE),
                     hooks.get(PLUGIN),

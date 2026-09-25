@@ -209,16 +209,19 @@ reads as `../inputs/<input>`. The same input takes one key per target, which `Bi
 and merges into one folder, so a plugin module holds its inputs as a map from name to target to source; `@@<key>`
 is the value `@<key>`, and a path is refused unless it resolves, through any symbolic link, to the project itself -
 as a plugin's own `./<folder>` is.
-Six slots are not modules of a project module but of the project: `preprocess`, `postprocess/transform`,
-`postprocess/inspect`, `export`, `release` and `plugin`. Every layout registers `build/preprocess` inside `build` before its
+Eight slots are not modules of a project module but of the project: `preprocess`, `postprocess/transform`,
+`postprocess/inspect`, `stage/transform`, `stage/inspect`, `export`, `release` and `plugin`. Every layout registers `build/preprocess` inside `build` before its
 project module, which depends on it, and `build/postprocess` after it; `export` and `release` wire their plugins
 beside their own steps. Each keeps its plugins in a namespace apart from its own steps - `custom/`, or `transform/`
 and `inspect/` in `postprocess` - so that no plugin name is taken. A preprocessor is handed only what it binds and
 exports nothing, so it orders the build and can stop it but never feeds it; everything depending on `build` sees
-what the transforms added and nothing runs past a failed inspection; an exporter and a releaser are handed
-everything staged. The top-level `plugin` module holds nothing but the plugins of its slot, each as `plugin/<name>`
-beside the source that binds `jenesis.plugins.pin.properties` - a name no plugin can take - and depends on `build`
-and `stage` but on nothing that runs by default, so such a plugin runs only when its selector is named. An
+what the transforms added and nothing runs past a failed inspection. With a plugin of `stage`, the stock staging
+moves to `stage/staged/<tree>` and `stage/<tree>` merges it with what the transforms of stage wrote under `<tree>/`,
+refusing a file staged already, so every staged tree stays where `export`, `release` and a `jreleaser.yml` read it and
+a plugin's additions propagate like anything staged; the inspections of stage check the merged trees. An exporter and
+a releaser are handed everything staged. The top-level `plugin` module holds nothing but the plugins of its slot, each as `plugin/<name>`
+beside the source that binds `jenesis.plugins.pin.properties` - a name no plugin can take - and depends on nothing,
+so such a plugin runs only when its selector is named and is handed only what it binds. An
 expensive one is switched off by its setting, in a profile if need be, and
 `jenesis.project.plugins=false` leaves out every plugin the file names, while `pin` still resolves those of the
 project: such a plugin is switched on by its line alone and configured, never from the command

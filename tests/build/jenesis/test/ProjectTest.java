@@ -238,6 +238,13 @@ public class ProjectTest {
             assertThat(benched.build().keySet())
                     .as("a goal runs only when it is named")
                     .noneMatch(key -> key.startsWith(Project.PLUGIN + "/"));
+            SequencedMap<String, Path> summed = project.plugins(new ProjectPlugins().stageTransform("checksums", (_, context, _) -> {
+                Files.writeString(Files.createDirectories(context.next().resolve("project")).resolve("SHA256SUMS"), "sums");
+                return CompletableFuture.completedStage(new BuildStepResult(true));
+            })).build(Project.STAGE);
+            assertThat(summed.get(Project.STAGE + "/" + ProjectPlugins.PROJECT).resolve("SHA256SUMS"))
+                    .as("what a transform of stage adds joins the staged tree it names")
+                    .hasContent("sums");
             assertThat(benched.build(Project.PLUGIN + "/bench").keySet())
                     .anyMatch(key -> key.startsWith(Project.PLUGIN + "/bench"));
         }
@@ -718,6 +725,8 @@ public class ProjectTest {
                 publish+export=demo.publish
                 announce+release=./announce
                 bench+plugin=./bench
+                sums+stage/transform=./sums
+                signed+stage/inspect=./signed
                 """);
         Project project = Project.ofEnvironment(new Environment(settings), root);
         assertThat(project.assembler()).isInstanceOfSatisfying(InferredMultiProjectAssembler.class,
@@ -728,7 +737,10 @@ public class ProjectTest {
         assertThat(project.plugins().exporters()).containsOnlyKeys("publish");
         assertThat(project.plugins().releasers()).containsOnlyKeys("announce");
         assertThat(project.plugins().goals()).containsOnlyKeys("bench");
-        assertThat(project.plugins().resolutions()).containsOnlyKeys("headers", "licenses", "audit", "publish", "announce", "bench");
+        assertThat(project.plugins().stageTransforms()).containsOnlyKeys("sums");
+        assertThat(project.plugins().stageInspections()).containsOnlyKeys("signed");
+        assertThat(project.plugins().resolutions())
+                .containsOnlyKeys("headers", "licenses", "audit", "publish", "announce", "bench", "sums", "signed");
         assertThat(project.plugins().pins()).isEqualTo(root.resolve("jenesis.plugins.pin.properties"));
     }
 

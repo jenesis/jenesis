@@ -495,8 +495,11 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 throws IOException {
             Path packages = context.next().resolve(JPackage.PACKAGES);
             for (Map.Entry<String, BuildStepArgument> argument : arguments.entrySet()) {
+                if (argument.getValue().removed()) {
+                    continue;
+                }
                 Path folder = argument.getValue().folder().resolve(JPackage.PACKAGES);
-                if (argument.getValue().removed() || !Files.isDirectory(folder)) {
+                if (!Files.isDirectory(folder)) {
                     continue;
                 }
                 try (Stream<Path> files = Files.walk(folder)) {

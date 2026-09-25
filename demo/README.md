@@ -816,14 +816,17 @@ hooks plugins into the build of the whole project instead, one for each point:
     audit+postprocess/inspect=./audit
     zip+package=./zip
     publish+export=./publish
-    checksums+plugin=./checksums
+    checksums+stage/transform=./checksums
+    complete+stage/inspect=./complete
+    lines+plugin=./lines
 
 A preprocessor checks the project before any module is built, a transform adds
 files to the modules - here a notice listing what each module includes, staged
 beside its jar - and an inspection fails the build when the result is wrong. A
-packager adds a package of its own beside the stock ones, and an exporter, like a
-releaser, delivers what was staged, and a plugin under `plugin` runs only when it
-is named, as `plugin/checksums`. The plugins of the whole project read their
+packager adds a package of its own beside the stock ones. A transform of `stage`
+adds to the staged trees - here a checksum beside every file - which an inspection
+of `stage` checks before an exporter or a releaser delivers them, and a plugin
+under `plugin` runs only when it is named, as `plugin/lines`, without a build. The plugins of the whole project read their
 values from `jenesis.plugins.arguments.properties`, and `pin` records their own
 closures in `jenesis.plugins.pin.properties`.
 
