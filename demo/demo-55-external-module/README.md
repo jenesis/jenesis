@@ -42,7 +42,7 @@ Naming the plugin by module
 A value that does not start with `./` is a module name. The build resolves it as
 `module/demo.plugin` through the Jenesis module repository - whatever the
 project's layout - with the local export searched first, loads the module's
-`BuildExecutorModule` provider and runs it in the `binary/generated` slot, as the
+`BuildExecutorModule` provider and runs it at the `binary/generated` hook point, as the
 `internal-module` demo does with the one it compiles.
 
 The `@greeting` after the module name selects the provider to run. This demo's

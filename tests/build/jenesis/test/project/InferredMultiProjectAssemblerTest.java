@@ -525,7 +525,7 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
-    public void wires_a_plugin_into_a_nested_slot() throws IOException {
+    public void wires_a_plugin_into_a_nested_hook_point() throws IOException {
         Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("plugin-greeting.properties"), "");
         SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
@@ -574,7 +574,7 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
-    public void refuses_a_plugin_in_an_unknown_slot() {
+    public void refuses_a_plugin_at_an_unknown_hook_point() {
         SequencedMap<String, BiFunction<Path, SequencedMap<String, String>, BuildExecutorModule>> plugins = new LinkedHashMap<>();
         plugins.put("lint+binary/unknown", (_, _) -> (_, _) -> {});
         assertThatThrownBy(() -> new InferredMultiProjectAssembler().plugins(plugins))
