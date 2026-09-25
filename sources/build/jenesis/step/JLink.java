@@ -38,6 +38,14 @@ public class JLink extends ProcessBuildStep {
     }
 
     @Override
+    protected ProcessHandler handler(BuildStepContext context, List<String> commands) throws IOException {
+        ProcessHandler handler = super.handler(context, commands);
+        return handler.external()
+                ? super.handler(context, List.of("@" + argumentFile(context.supplement().resolve("jlink.args"), commands)))
+                : handler;
+    }
+
+    @Override
     protected CompletionStage<List<String>> process(Executor executor,
                                                     BuildStepContext context,
                                                     SequencedMap<String, BuildStepArgument> arguments,
