@@ -611,7 +611,9 @@ public record Project(
                     vendor and version in each JDK's release file. Make and Execute check the running
                     JVM first and otherwise relaunch on the newest match found under
                     jenesis.toolchain.searchpath, this system's usual JDK folders unless set, and only
-                    the command line or ~/.jenesis/jenesis.properties may set it. Nothing is installed.
+                    the command line or ~/.jenesis/jenesis.properties may set it. Nothing is installed
+                    unless jenesis.toolchain.installer, set in the same places, names a program such
+                    as the SDK's jenesis-jdk, which gets the version when no JDK matches.
 
                     To add to the stock build, name plugins in jenesis.plugins.properties beside
                     jenesis.properties, one line each: <name>+<hook point>=<module name>, or =./<folder>
@@ -2644,6 +2646,7 @@ public record Project(
                 daemon.options|-Xmx2g|JVM options for the daemon process itself, whitespace separated
                 toolchain.version||JDK the build runs on, as 25, 25.0.3 or 25-temurin: the numbers match as a prefix, every word must be one of the vendor and version words in the JDK's release file, and a pre-release matches only when its word is named; Make and Execute relaunch on a match when the running JVM is none
                 toolchain.searchpath|@|Comma-separated JDK folders searched for toolchain.version, absolute or under ~, * standing for any one folder name; @ splices this system's usual JDK locations and empty only checks the running JVM; settable only on the command line or in ~/.jenesis/jenesis.properties
+                toolchain.installer||Program run with the requested version as its last argument when no JDK under toolchain.searchpath matches, such as jenesis-jdk from the SDK; a name is looked up on the absolute folders of the PATH, a path must be absolute or start with ~; settable only on the command line or in ~/.jenesis/jenesis.properties
                 executor.concurrency|0|Run at most this many build steps at once; 0 is unbounded
                 executor.timeout|PT0S|ISO-8601 timeout per step; PT0S is no timeout
                 executor.digest|MD5|Algorithm behind the content and step hashes that drive the cache
