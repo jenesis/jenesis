@@ -124,20 +124,20 @@ Releasing into a module repository
 
 `export` reaches this machine only. `release` puts each module of the same
 modular tree into a Jenesis module repository that other machines resolve from,
-as its `release/jenesis` step, once `jenesis.release.uri` names one. A
-[Jenesis Repository](https://jenesis.build/repository/) serves the module layout
-under `/repository/`, the same address a build names in `jenesis.module.uri`, and
+as its `release/jenesis` step, once `jenesis.release.uri` names one. A `java`
+repository of a [Jenesis Repository](https://jenesis.build/repository/) serves
+the module layout at the same address a build names in `jenesis.module.uri`, and
 may ask for a key to accept a release:
 
     cd ../library
     java -Djenesis.project.version=1.0.0 \
-         -Djenesis.release.uri=https://repository.example/repository/ \
+         -Djenesis.release.uri=https://repo.example.com/repository/releases/<repo>/ \
          -Djenesis.release.token=<key> \
          build/jenesis/Make.java release
 
 Each module is put once, as its jar under its version, below `module/`:
 
-    https://repository.example/repository/module/demo.greeter/1.0.0/demo.greeter.jar
+    https://repo.example.com/repository/releases/<repo>/module/demo.greeter/1.0.0/demo.greeter.jar
 
 A project built with the `modular` layout then resolves the version it pins -
 `app` pins 1.0.0 since the section above - once `jenesis.module.uri` names the
