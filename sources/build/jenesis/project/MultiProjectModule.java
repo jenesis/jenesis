@@ -137,11 +137,14 @@ public record MultiProjectModule(BuildExecutorModule identifier,
                             if (tail.isEmpty()) {
                                 continue;
                             }
-                            String ownPrefix = PREVIOUS + entry.getKey() + "/";
+                            String ownPrefix = PREVIOUS + entry.getKey() + "/",
+                                    identifierPrefix = IDENTIFIER_PATH + entry.getKey() + "/";
                             SequencedMap<String, String> inputs = new LinkedHashMap<>();
                             for (String key : packageInherited.sequencedKeySet()) {
                                 if (key.startsWith(ownPrefix)) {
                                     inputs.put(key, key.substring(ownPrefix.length()));
+                                } else if (key.startsWith(identifierPrefix)) {
+                                    inputs.put(key, key.substring(identifierPrefix.length()));
                                 } else if (Files.isRegularFile(packageInherited.get(key).resolve(Inventory.INVENTORY))) {
                                     inputs.put(key, SELECTION + "/" + key.substring(PREVIOUS.length()));
                                 }
@@ -156,7 +159,9 @@ public record MultiProjectModule(BuildExecutorModule identifier,
                                 }
                             }, inputs);
                         }
-                    }, assemblies.sequencedKeySet().stream());
+                    }, Stream.concat(assemblies.sequencedKeySet().stream(), assemblies.sequencedKeySet().stream()
+                            .flatMap(module -> identifiers.get(module).stream())
+                            .map(identifier -> PREVIOUS + identifier)));
                 }
             }, Stream.concat(Stream.of(GROUP), identified.sequencedKeySet().stream()));
         }, Stream.concat(Stream.of(IDENTIFIER), inherited.sequencedKeySet().stream()));

@@ -79,6 +79,15 @@ deterministically from the document's own content, so a reproducible build
 reproduces the exact same SBOM, serial number included. No creation `timestamp`
 is written, because that cannot be made deterministic.
 
+The single executable jar of `demo-07-java-pom-executable` and
+`demo-08-java-modular-executable` carries a document of its own at the same
+`META-INF/sbom/<artifact>.cdx.json`, named by its own `MANIFEST.MF`. It lists what
+the module's document lists and adds the launcher the jar shades, as a dependency
+of the project, which it describes as an `application` rather than a `library`. A
+launcher the module already depends on at the same version is listed once; at another
+version, both are listed. The module's own document stays in its jar, inside the
+executable one.
+
 The license text in the jar
 ---------------------------
 
