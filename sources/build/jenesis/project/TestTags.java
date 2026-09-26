@@ -5,7 +5,6 @@ import module java.base;
 public record TestTags(SequencedSet<String> included, SequencedSet<String> excluded) {
 
     private static final Pattern NAME = Pattern.compile("[A-Za-z0-9_.\\-]+");
-
     public static final TestTags ALL = new TestTags(Collections.emptyNavigableSet(), Collections.emptyNavigableSet());
 
     public TestTags {
@@ -23,31 +22,20 @@ public record TestTags(SequencedSet<String> included, SequencedSet<String> exclu
             if (entry.isEmpty()) {
                 continue;
             }
-            if (entry.startsWith("!")) {
-                String name = entry.substring(1).trim();
+            boolean negated = entry.startsWith("!");
+            SequencedSet<String> names = new TreeSet<>();
+            for (String part : negated ? List.of(entry.substring(1)) : List.of(entry.split("&", -1))) {
+                String name = part.trim();
                 if (!NAME.matcher(name).matches()) {
-                    throw refused(entry, expression);
+                    throw new IllegalArgumentException("A test tag selection is a comma-separated list of tag names, each one"
+                            + " or several joined by & for the tests carrying all of them, or one preceded by ! to leave out the"
+                            + " tests carrying it, not " + entry + " in " + expression);
                 }
-                excluded.add(name);
-            } else {
-                SequencedSet<String> names = new TreeSet<>();
-                for (String part : entry.split("&", -1)) {
-                    String name = part.trim();
-                    if (!NAME.matcher(name).matches()) {
-                        throw refused(entry, expression);
-                    }
-                    names.add(name);
-                }
-                included.add(String.join("&", names));
+                names.add(name);
             }
+            (negated ? excluded : included).add(String.join("&", names));
         }
         return new TestTags(included, excluded);
-    }
-
-    private static IllegalArgumentException refused(String entry, String expression) {
-        return new IllegalArgumentException("A test tag selection is a comma-separated list of tag names, each one"
-                + " or several joined by & for the tests carrying all of them, or one preceded by ! to leave out the"
-                + " tests carrying it, not " + entry + " in " + expression);
     }
 
     public static Set<String> names(String term) {
