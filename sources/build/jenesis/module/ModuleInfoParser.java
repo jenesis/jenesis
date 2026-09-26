@@ -12,9 +12,6 @@ import static java.util.Objects.requireNonNull;
 public class ModuleInfoParser {
 
     private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.:+~@*/-]+");
-    private static final Pattern PARAGRAPH = Pattern.compile("\\n\\s*\\n");
-    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
-    private static final Pattern MARKUP = Pattern.compile("(`+|\\*\\*|__|\\*)(\\S(?:.*?\\S)?)\\1");
     private static final Set<String> BLOCKS = Set.of("p", "div", "pre", "ul", "ol", "dl", "table", "blockquote",
             "h1", "h2", "h3", "h4", "h5", "h6", "hr");
 
@@ -78,16 +75,28 @@ public class ModuleInfoParser {
             String main = null;
             DocCommentTree docComment = docTrees.getDocCommentTree(TreePath.getPath(unit, module));
             if (docComment != null) {
-                String summary = WHITESPACE.matcher(text(docComment.getFirstSentence())).replaceAll(" ").trim();
+                String summary = text(docComment.getFirstSentence()).lines()
+                        .map(String::strip)
+                        .filter(line -> !line.isEmpty())
+                        .collect(Collectors.joining(" "));
                 if (!summary.isEmpty()) {
                     name = summary.endsWith(".")
                             ? summary.substring(0, summary.length() - 1)
                             : summary;
                 }
-                List<String> paragraphs = PARAGRAPH.splitAsStream(text(docComment.getFullBody()))
-                        .map(paragraph -> WHITESPACE.matcher(paragraph).replaceAll(" ").trim())
-                        .filter(paragraph -> !paragraph.isEmpty())
-                        .toList();
+                List<String> paragraphs = new ArrayList<>();
+                StringBuilder paragraph = new StringBuilder();
+                for (String line : text(docComment.getFullBody()).lines().toList()) {
+                    if (!line.isBlank()) {
+                        paragraph.append(paragraph.isEmpty() ? "" : " ").append(line.strip());
+                    } else if (!paragraph.isEmpty()) {
+                        paragraphs.add(paragraph.toString());
+                        paragraph.setLength(0);
+                    }
+                }
+                if (!paragraph.isEmpty()) {
+                    paragraphs.add(paragraph.toString());
+                }
                 if (paragraphs.size() > 1) {
                     description = paragraphs.get(1);
                 }
@@ -96,16 +105,16 @@ public class ModuleInfoParser {
                         String content = unknown.getContent().stream()
                                 .map(Object::toString)
                                 .collect(Collectors.joining())
+                                .replaceAll("\\s+", " ")
                                 .trim();
                         switch (unknown.getTagName()) {
                             case "jenesis.pin" -> {
-                                String pin = content.replaceAll("\\s+", " ");
-                                int split = pin.indexOf(' ');
-                                if (split < 1 || split == pin.length() - 1) {
+                                int split = content.indexOf(' ');
+                                if (split < 1 || split == content.length() - 1) {
                                     continue;
                                 }
-                                String token = pin.substring(0, split);
-                                String version = pin.substring(split + 1).trim();
+                                String token = content.substring(0, split);
+                                String version = content.substring(split + 1).trim();
                                 String guard = null;
                                 if (version.endsWith(")")) {
                                     int bracket = version.lastIndexOf('(');
@@ -141,31 +150,30 @@ public class ModuleInfoParser {
                                 }
                             }
                             case "jenesis.bom" -> {
-                                String bom = content.replaceAll("\\s+", " ").trim();
                                 String guard = null;
-                                if (bom.endsWith(")")) {
-                                    int bracket = bom.lastIndexOf('(');
+                                if (content.endsWith(")")) {
+                                    int bracket = content.lastIndexOf('(');
                                     if (bracket < 0) {
                                         throw new IllegalArgumentException("Malformed @jenesis.bom guard '"
-                                                + bom
+                                                + content
                                                 + "': expected <value> (<token>,<token>...)");
                                     }
-                                    String guarded = bom.substring(0, bracket).trim();
+                                    String guarded = content.substring(0, bracket).trim();
                                     if (!guarded.isEmpty()) {
-                                        guard = Platform.of(bom.substring(bracket + 1, bom.length() - 1)).canonical();
-                                        bom = guarded;
+                                        guard = Platform.of(content.substring(bracket + 1, content.length() - 1)).canonical();
+                                        content = guarded;
                                     }
                                 }
-                                if (bom.isEmpty()) {
+                                if (content.isEmpty()) {
                                     continue;
                                 }
-                                String[] words = bom.split(" ");
+                                String[] words = content.split(" ");
                                 String token = words[0], key, value;
                                 String last = token.substring(token.lastIndexOf('/') + 1);
                                 if (last.startsWith("pin-") && last.endsWith(".properties")) {
                                     if (words.length > 1) {
                                         throw new IllegalArgumentException("Malformed @jenesis.bom declaration '"
-                                                + bom
+                                                + content
                                                 + "': a local BOM takes no version or checksum");
                                     }
                                     int first = token.indexOf('/');
@@ -183,7 +191,7 @@ public class ModuleInfoParser {
                                     int second = key.indexOf('/', first + 1);
                                     if (words.length > 3) {
                                         throw new IllegalArgumentException("Malformed @jenesis.bom declaration '"
-                                                + bom
+                                                + content
                                                 + "': expected <token> [<version> [<algorithm>/<hash>]]");
                                     }
                                     String version = words.length > 1 ? words[1] : "";
@@ -195,7 +203,7 @@ public class ModuleInfoParser {
                                     String checksum = words.length > 2 ? words[2] : "";
                                     if (!checksum.isEmpty() && !key.substring(first + 1, second).equals("module")) {
                                         throw new IllegalArgumentException("Malformed @jenesis.bom declaration '"
-                                                + bom
+                                                + content
                                                 + "': a Maven BOM cannot carry a checksum");
                                     }
                                     if (!checksum.isEmpty() && checksum.indexOf('/') < 1) {
@@ -212,15 +220,14 @@ public class ModuleInfoParser {
                                 }
                             }
                             case "jenesis.plugin" -> {
-                                String trimmed = content.trim();
-                                int space = trimmed.indexOf(' ');
+                                int space = content.indexOf(' ');
                                 String group, token;
-                                if (space > 0 && trimmed.substring(0, space).indexOf('/') < 0) {
-                                    group = trimmed.substring(0, space).trim();
-                                    token = trimmed.substring(space + 1).trim();
+                                if (space > 0 && content.substring(0, space).indexOf('/') < 0) {
+                                    group = content.substring(0, space).trim();
+                                    token = content.substring(space + 1).trim();
                                 } else {
                                     group = "plugin";
-                                    token = trimmed;
+                                    token = content;
                                 }
                                 if (token.isEmpty()) {
                                     continue;
@@ -228,11 +235,10 @@ public class ModuleInfoParser {
                                 plugins.put(token.indexOf('/') < 0 ? "module/" + token : token, group);
                             }
                             case "jenesis.layer" -> {
-                                String declaration = content.replaceAll("\\s+", " ").trim();
-                                if (declaration.isEmpty()) {
+                                if (content.isEmpty()) {
                                     continue;
                                 }
-                                String[] words = declaration.split(" ");
+                                String[] words = content.split(" ");
                                 if (words.length == 3 && words[1].equals("api")) {
                                     String previous = layerApis.putIfAbsent(words[0], words[2]);
                                     if (previous != null && !previous.equals(words[2])) {
@@ -253,17 +259,16 @@ public class ModuleInfoParser {
                                     natives.add("layer:" + words[0] + "/" + layered(words[1], words[2]));
                                 } else {
                                     throw new IllegalArgumentException("Malformed @jenesis.layer declaration '"
-                                            + declaration
+                                            + content
                                             + "': expected <layer> api <module>,"
                                             + " <layer> provider <token> or <layer> native <token>");
                                 }
                             }
                             case "jenesis.alias" -> {
-                                String declaration = content.replaceAll("\\s+", " ").trim();
-                                String[] words = declaration.split(" ");
+                                String[] words = content.split(" ");
                                 if (words.length != 2) {
                                     throw new IllegalArgumentException("Malformed @jenesis.alias declaration '"
-                                            + declaration
+                                            + content
                                             + "': expected <module-name>"
                                             + " <groupId>/<artifactId>[/<type>[/<classifier>]]");
                                 }
@@ -297,11 +302,10 @@ public class ModuleInfoParser {
                                 }
                             }
                             case "jenesis.exclude" -> {
-                                String declaration = content.replaceAll("\\s+", " ").trim();
-                                String[] words = declaration.split(" ");
+                                String[] words = content.split(" ");
                                 if (words.length < 2) {
                                     throw new IllegalArgumentException("Malformed @jenesis.exclude declaration '"
-                                            + declaration
+                                            + content
                                             + "': expected <module-name> <groupId>/<artifactId>...");
                                 }
                                 String excluded = words[0];
@@ -328,11 +332,10 @@ public class ModuleInfoParser {
                                 }
                             }
                             case "jenesis.override" -> {
-                                String declaration = content.replaceAll("\\s+", " ").trim();
-                                String[] words = declaration.split(" ");
+                                String[] words = content.split(" ");
                                 if (words.length < 2) {
                                     throw new IllegalArgumentException("Malformed @jenesis.override declaration '"
-                                            + declaration
+                                            + content
                                             + "': expected <module-name> <module-name>...");
                                 }
                                 for (String word : words) {
@@ -359,13 +362,12 @@ public class ModuleInfoParser {
                                 }
                             }
                             case "jenesis.attach" -> {
-                                String attach = content.replaceAll("\\s+", " ").trim();
-                                if (attach.isEmpty()) {
+                                if (content.isEmpty()) {
                                     continue;
                                 }
-                                int split = attach.indexOf(' ');
-                                String token = split < 0 ? attach : attach.substring(0, split);
-                                String arguments = split < 0 ? "" : attach.substring(split + 1).trim();
+                                int split = content.indexOf(' ');
+                                String token = split < 0 ? content : content.substring(0, split);
+                                String arguments = split < 0 ? "" : content.substring(split + 1).trim();
                                 if (token.startsWith("java.") || token.startsWith("jdk.")) {
                                     throw new IllegalArgumentException("Illegal @jenesis.attach token '"
                                             + token
@@ -384,15 +386,14 @@ public class ModuleInfoParser {
                                 }
                             }
                             case "jenesis.native" -> {
-                                String declaration = content.replaceAll("\\s+", " ").trim();
-                                if (declaration.isEmpty()) {
+                                if (content.isEmpty()) {
                                     throw new IllegalArgumentException("@jenesis.native of "
                                             + module.getName()
                                             + " names no module: name each module granted native access,"
                                             + " this one included, as @jenesis.native "
                                             + module.getName());
                                 }
-                                for (String token : declaration.split(" ")) {
+                                for (String token : content.split(" ")) {
                                     if (token.startsWith("java.") || token.startsWith("jdk.")) {
                                         throw new IllegalArgumentException("Illegal @jenesis.native token '"
                                                 + token
@@ -412,35 +413,33 @@ public class ModuleInfoParser {
                                 }
                             }
                             case "jenesis.test" -> {
-                                String test = content.replaceAll("\\s+", " ").trim();
-                                if (test.equals("abstract")) {
+                                if (content.equals("abstract")) {
                                     abstractTest = true;
                                     testOf = "";
-                                } else if (test.isEmpty() || SourceVersion.isName(test)) {
-                                    testOf = test;
+                                } else if (content.isEmpty() || SourceVersion.isName(content)) {
+                                    testOf = content;
                                 } else {
                                     throw new IllegalArgumentException("Malformed @jenesis.test value '"
-                                            + test
+                                            + content
                                             + "': expected no value, a module name, or 'abstract'");
                                 }
                             }
                             case "jenesis.signature" -> {
-                                String declaration = content.replaceAll("\\s+", " ").trim();
-                                int split = declaration.indexOf(' ');
+                                int split = content.indexOf(' ');
                                 if (split < 0) {
-                                    String last = declaration.substring(declaration.lastIndexOf('/') + 1);
+                                    String last = content.substring(content.lastIndexOf('/') + 1);
                                     if (!last.startsWith("signature-") || !last.endsWith(".properties")) {
                                         throw new IllegalArgumentException("Malformed @jenesis.signature declaration '"
-                                                + declaration
+                                                + content
                                                 + "': expected <algorithm>/<fingerprint> <token>... or"
                                                 + " [<group>/]signature-<name>.properties; a list that had to be"
                                                 + " downloaded would itself need verifying");
                                     }
-                                    int first = declaration.indexOf('/');
-                                    String qualifier = first < 0 ? group : declaration.substring(0, first);
-                                    if (qualifier.isEmpty() || first != declaration.lastIndexOf('/')) {
+                                    int first = content.indexOf('/');
+                                    String qualifier = first < 0 ? group : content.substring(0, first);
+                                    if (qualifier.isEmpty() || first != content.lastIndexOf('/')) {
                                         throw new IllegalArgumentException("Malformed @jenesis.signature token '"
-                                                + declaration
+                                                + content
                                                 + "': expected [<group>/]signature-<name>.properties");
                                     }
                                     signatures.putIfAbsent(qualifier + "/" + last, "");
@@ -448,10 +447,10 @@ public class ModuleInfoParser {
                                 }
                                 if (split < 1) {
                                     throw new IllegalArgumentException("Malformed @jenesis.signature declaration '"
-                                            + declaration
+                                            + content
                                             + "': expected <algorithm>/<fingerprint> <token>...");
                                 }
-                                String fingerprint = declaration.substring(0, split);
+                                String fingerprint = content.substring(0, split);
                                 int slash = fingerprint.indexOf('/');
                                 boolean identity = fingerprint.startsWith("Sigstore/");
                                 if (slash < 1 || slash == fingerprint.length() - 1
@@ -470,7 +469,7 @@ public class ModuleInfoParser {
                                 if (existing != null && !existing.isEmpty()) {
                                     tokens.addAll(List.of(existing.split(" ")));
                                 }
-                                for (String token : declaration.substring(split + 1).split(" ")) {
+                                for (String token : content.substring(split + 1).split(" ")) {
                                     if (!COORDINATE.matcher(token).matches()) {
                                         throw new IllegalArgumentException("Malformed @jenesis.signature token '"
                                                 + token
@@ -532,7 +531,7 @@ public class ModuleInfoParser {
         for (DocTree tree : trees) {
             text.append(switch (tree) {
                 case TextTree plain -> plain.getBody();
-                case RawTextTree markdown -> MARKUP.matcher(markdown.getContent()).replaceAll("$2");
+                case RawTextTree markdown -> markdown.getContent();
                 case LiteralTree literal -> literal.getBody().getBody();
                 case LinkTree link -> link.getLabel().isEmpty() ? link.getReference().getSignature() : text(link.getLabel());
                 case EntityTree entity -> switch (entity.getName().toString()) {
