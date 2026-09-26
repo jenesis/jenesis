@@ -30,15 +30,24 @@ public record TestNG() implements TestFramework {
                                   Path output,
                                   SequencedSet<String> classes,
                                   SequencedMap<String, SequencedSet<String>> methods,
-                                  SequencedSet<String> groups,
+                                  TestTags tags,
+                                  List<TestTags> ran,
                                   boolean parallel,
                                   boolean reporting) {
         List<String> commands = new ArrayList<>(List.of("-d", (reporting
                 ? output.resolve(BuildStep.REPORTS + "tests")
                 : supplement.resolve("test-output")).toString()));
-        if (!groups.isEmpty()) {
+        if (!tags.included().isEmpty()) {
             commands.add("-groups");
-            commands.add(String.join(",", groups));
+            commands.add(String.join(",", tags.included()));
+        }
+        SequencedSet<String> excluded = new LinkedHashSet<>(tags.excluded());
+        if (ran.stream().allMatch(earlier -> !earlier.included().isEmpty() && earlier.excluded().isEmpty())) {
+            ran.forEach(earlier -> excluded.addAll(earlier.included()));
+        }
+        if (!excluded.isEmpty()) {
+            commands.add("-excludegroups");
+            commands.add(String.join(",", excluded));
         }
         if (parallel) {
             commands.add("-parallel");

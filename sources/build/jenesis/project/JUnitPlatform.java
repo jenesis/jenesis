@@ -61,12 +61,30 @@ public record JUnitPlatform() implements TestFramework {
                                   Path output,
                                   SequencedSet<String> classes,
                                   SequencedMap<String, SequencedSet<String>> methods,
-                                  SequencedSet<String> groups,
+                                  TestTags tags,
+                                  List<TestTags> ran,
                                   boolean parallel,
                                   boolean reporting) {
         List<String> commands = new ArrayList<>(List.of("execute", "--disable-banner", "--disable-ansi-colors"));
-        for (String group : groups) {
-            commands.add("--include-tag=" + group);
+        List<String> conditions = new ArrayList<>();
+        if (!tags.included().isEmpty()) {
+            conditions.add("(" + String.join(" | ", tags.included()) + ")");
+        }
+        if (!tags.excluded().isEmpty()) {
+            conditions.add("!(" + String.join(" | ", tags.excluded()) + ")");
+        }
+        for (TestTags earlier : ran) {
+            List<String> outside = new ArrayList<>();
+            if (!earlier.included().isEmpty()) {
+                outside.add("!(" + String.join(" | ", earlier.included()) + ")");
+            }
+            if (!earlier.excluded().isEmpty()) {
+                outside.add("(" + String.join(" | ", earlier.excluded()) + ")");
+            }
+            conditions.add("(" + String.join(" | ", outside) + ")");
+        }
+        if (!conditions.isEmpty()) {
+            commands.add("--include-tag=" + String.join(" & ", conditions));
         }
         if (parallel) {
             commands.add("--config=junit.jupiter.execution.parallel.enabled=true");

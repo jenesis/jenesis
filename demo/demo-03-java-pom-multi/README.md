@@ -133,12 +133,19 @@ The test step's summary then reports `1 tests successful` instead of the default
 `2`. The `-D` flag must come **before** the source file - anything after it is
 read as a selector.
 
-Tests can also be selected by tag with `-Djenesis.test.tag`, which maps to
-the test framework's own grouping mechanism - JUnit Platform tags, JUnit 4
-categories, or TestNG groups. `GreeterTest#prefix_is_a_greeting` is annotated
-`@Tag("slow")`, so this again runs only that one test, this time by tag:
+Tests can also be selected by tag with `-Djenesis.test.tag`, a comma-separated
+list of tag names: a test runs where it carries one of them, and a name preceded
+by `!` leaves out the tests carrying it. Jenesis translates the list into the test
+framework's own grouping mechanism - JUnit Platform tags or TestNG groups; JUnit 4
+has none its console runner can select. `GreeterTest#prefix_is_a_greeting` is
+annotated `@Tag("slow")`, so this again runs only that one test, this time by tag:
 
     java -Djenesis.test.tag=slow build/jenesis/Make.java
+
+A run remembers what it covered until the tests or what they test change. Asked
+for `slow,io` next, the build runs only the tests tagged `io` that are not tagged
+`slow`, because the others already passed; asked for `slow` alone, it runs nothing.
+`-Djenesis.test.force=true` forgets what ran and runs the whole selection.
 
 Passing `-Djenesis.test.parallel` runs the matched tests in parallel, letting
 the test framework execute them concurrently where its configuration allows.
