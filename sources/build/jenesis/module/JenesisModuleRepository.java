@@ -8,12 +8,13 @@ import build.jenesis.RepositoryItem;
 import build.jenesis.SafeSegment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
+import build.jenesis.maven.MavenDependencyKey;
 import build.jenesis.maven.MavenModuleRepository;
 
 public class JenesisModuleRepository implements JenesisRepository {
 
     private static final SafeSegment SAFE_SEGMENT = new SafeSegment();
-    private static final String MODULE = "module", MAVEN = "maven";
+    private static final String MODULE = "module", MAVEN = "maven", MAPPED = "mapped";
 
     private final URI root;
     private final String token;
@@ -89,10 +90,10 @@ public class JenesisModuleRepository implements JenesisRepository {
                     location = location.substring(next + 1).strip();
                 }
             }
-            if (!type.equals(MODULE) && !type.equals(MAVEN)) {
+            if (!type.equals(MODULE) && !type.equals(MAVEN) && !type.equals(MAPPED)) {
                 throw new IllegalArgumentException("Unknown repository type in Jenesis module repository entry: "
                         + candidate
-                        + " (expected '" + MODULE + "' or '" + MAVEN + "')");
+                        + " (expected '" + MODULE + "', '" + MAVEN + "' or '" + MAPPED + "')");
             }
             if (segments != null && !type.equals(MAVEN)) {
                 throw new IllegalArgumentException("A group id segment count applies only to a '"
@@ -106,7 +107,9 @@ public class JenesisModuleRepository implements JenesisRepository {
             Repository.Credential granted = repository == null ? credential : credential.token(null);
             Repository.Credential grantedMaven = repository == null ? maven : maven.token(null);
             JenesisRepository current;
-            if (location.startsWith("@")) {
+            if (type.equals(MAPPED)) {
+                current = mapped(environment, location, candidate, grantedMaven, origin);
+            } else if (location.startsWith("@")) {
                 String name = location.substring(1);
                 String value;
                 Repository.Origin spliced;
@@ -173,6 +176,88 @@ public class JenesisModuleRepository implements JenesisRepository {
             repository = repository == null ? current : current.prepend(repository);
         }
         return repository;
+    }
+
+    private static JenesisRepository mapped(Environment environment,
+                                            String location,
+                                            String candidate,
+                                            Repository.Credential maven,
+                                            Repository.Origin origin) {
+        int scheme = location.indexOf(':');
+        int from = location.startsWith("@") ? 0 : scheme < 0
+                ? -1
+                : location.startsWith("://", scheme) ? location.indexOf('/', scheme + 3) : scheme + 1;
+        int split = from < 0 ? -1 : location.indexOf(':', from);
+        if (split < 0 || split == location.length() - 1) {
+            throw new IllegalArgumentException("Expected " + MAPPED + ":<Maven repository URI or @>:<list>[;<list>...] "
+                    + "in Jenesis module repository entry: " + candidate);
+        }
+        String repository = location.substring(0, split).strip();
+        if (repository.startsWith("@") && !repository.equals("@")) {
+            throw new IllegalArgumentException("A " + MAPPED + " entry names the Maven repository the build uses by @ alone, "
+                    + "or another one by its URI, not " + repository + ", in Jenesis module repository entry: " + candidate);
+        }
+        URI uri = repository.equals("@") ? null : URI.create(repository.endsWith("/") ? repository : repository + "/");
+        String token = uri == null ? null : maven.grant(origin);
+        Repository.Connection connection = Repository.Connection.ofEnvironment(environment);
+        SequencedMap<String, MavenDependencyKey> mapping = new LinkedHashMap<>();
+        Map<String, Map.Entry<URI, String>> declared = new HashMap<>();
+        for (String entry : location.substring(split + 1).split(";")) {
+            String list = entry.strip();
+            if (list.isEmpty()) {
+                continue;
+            }
+            int colon = list.indexOf(':');
+            URI source;
+            if (colon > 1) {
+                source = URI.create(list);
+            } else {
+                Path path = Path.of(list);
+                if (!path.isAbsolute()) {
+                    throw new IllegalArgumentException("A module list is named by a URI or an absolute path, not "
+                            + list + ", in Jenesis module repository entry: " + candidate);
+                }
+                source = path.toUri();
+            }
+            SequencedProperties properties = new SequencedProperties();
+            try (InputStream in = Repository.open(connection, source, uri != null
+                    && Objects.equals(uri.getScheme(), source.getScheme())
+                    && uri.getHost() != null
+                    && uri.getHost().equalsIgnoreCase(source.getHost())
+                    && uri.getPort() == source.getPort() ? token : null)) {
+                properties.load(in);
+            } catch (FileNotFoundException e) {
+                throw new IllegalStateException("The module list " + source + " of Jenesis module repository entry "
+                        + candidate + " does not exist", e);
+            } catch (IOException e) {
+                throw new IllegalStateException("Cannot read the module list " + source
+                        + " of Jenesis module repository entry " + candidate, e);
+            }
+            for (String module : properties.stringPropertyNames()) {
+                String value = properties.value(module);
+                if (value == null) {
+                    throw new IllegalArgumentException("The module list " + source + " maps " + module
+                            + " to nothing, where it expects <groupId>/<artifactId>[/<type>[/<classifier>]]");
+                }
+                MavenDependencyKey key;
+                try {
+                    key = MavenDependencyKey.parseKey(value);
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException("The module list " + source + " maps " + module + " to " + value
+                            + ", where it expects <groupId>/<artifactId>[/<type>[/<classifier>]]", e);
+                }
+                MavenDependencyKey previous = mapping.putIfAbsent(module, key);
+                if (previous != null && !previous.equals(key)) {
+                    Map.Entry<URI, String> first = declared.get(module);
+                    throw new IllegalArgumentException("The module lists " + first.getKey() + " and " + source
+                            + " map " + module + " to different coordinates, " + first.getValue() + " and " + value);
+                }
+                declared.putIfAbsent(module, Map.entry(source, value));
+            }
+        }
+        return MavenModuleRepository.ofEnvironment(environment, uri == null
+                ? MavenDefaultRepository.ofEnvironment(environment)
+                : MavenDefaultRepository.ofEnvironment(environment, uri, token)).mapping(mapping);
     }
 
     private static boolean isType(String value) {
