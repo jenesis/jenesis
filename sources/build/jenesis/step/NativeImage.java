@@ -66,6 +66,25 @@ public class NativeImage extends ProcessBuildStep {
                     Path home = program.getParent().getParent();
                     if (home != null && Files.isRegularFile(home.resolve(RELEASE))) {
                         Files.copy(home.resolve(RELEASE), context.next().resolve(RELEASE));
+                        SequencedProperties release = SequencedProperties.ofFiles(home.resolve(RELEASE));
+                        String version = release.value("GRAALVM_VERSION", release.value("JAVA_RUNTIME_VERSION", ""))
+                                .replace("\"", "");
+                        Path licenses = context.next().resolve(NATIVE).resolve(LICENSES)
+                                .resolve(version.isEmpty() ? "graalvm" : "graalvm-" + version);
+                        if (Files.exists(licenses)) {
+                            throw new IllegalStateException("The notices of a jar the image needs are named "
+                                    + licenses.getFileName() + ", where the licence of the GraalVM that compiles it"
+                                    + " belongs - rename that jar");
+                        }
+                        try (DirectoryStream<Path> files = Files.newDirectoryStream(home)) {
+                            for (Path file : files) {
+                                String name = file.getFileName().toString().toUpperCase(Locale.ROOT);
+                                if (Files.isRegularFile(file) && (name.contains("LICENSE") || name.contains("NOTICE"))) {
+                                    Files.createDirectories(licenses);
+                                    BuildStep.linkOrCopy(licenses.resolve(file.getFileName().toString()), file.toRealPath());
+                                }
+                            }
+                        }
                         break;
                     }
                     if (!Files.isSymbolicLink(program)) {

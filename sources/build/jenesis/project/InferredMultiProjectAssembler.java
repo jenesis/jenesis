@@ -481,7 +481,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     if (sbom == null) {
                         images.add("native-image");
                     } else {
-                        sub.addStep("native-sbom", sbom.type("application"), Stream.concat(described.stream(), Stream.of("native-image")));
+                        sub.addStep("native-sbom",
+                                sbom.type("application").graalvmLicense(environment.value("graalvm.license")),
+                                Stream.concat(described.stream(), Stream.of("native-image")));
                         sub.addStep("native", new Described(), "native-image", "native-sbom");
                         images.add("native");
                     }
