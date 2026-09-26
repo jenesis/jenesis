@@ -117,6 +117,7 @@ Quick index
 | 66 | [`native-image`](demo-66-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
 | 67 | [`jpx`](demo-67-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
 | 68 | [`java-pom-model-4-1-0`](demo-68-java-pom-model-4-1-0/README.md)  | The multi-module Maven project in POM model 4.1.0, as Maven 4 writes it      | `java build/jenesis/Make.java`    |
+| 69 | [`java-preview`](demo-69-java-preview/README.md)                  | Compile and run a module that uses the preview features of its Java release  | `java build/jenesis/Execute.java` |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1070,3 +1071,11 @@ groupId and version from the POM above, a dependency on a sibling names no versi
 and the source folders are `<build><sources>`. Jenesis reads it as it reads the 4.0.0
 model and publishes the 4.0.0 model, with every inferred version written out.
 
+## 51. Preview features - [`java-preview`](demo-69-java-preview/README.md)
+
+A module that uses a preview feature of Java 25 declares its release as
+`@jenesis.release 25-preview`, or a POM sets `maven.compiler.enablePreview` beside
+`maven.compiler.release`. It is compiled with the preview features enabled, and every
+run of it enables them: the tests, `Execute`, a bundle, a `jpackage` image, a program
+`jpx` runs, and a runtime image, whose own `java` enables them for good. A module
+compiled against it declares the same release, and only a JDK 25 builds either.
