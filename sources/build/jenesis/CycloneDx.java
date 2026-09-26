@@ -49,11 +49,17 @@ public class CycloneDx {
     public record Component(String type, String bomRef, String group, String name, String version, String purl, List<String> swhids,
                             String sha256, List<License> licenses, String description, List<Author> authors,
                             List<ExternalReference> externalReferences, List<Property> properties,
-                            Organization supplier, String copyright, Organization manufacturer, String publisher) {
+                            Organization supplier, String copyright, Organization manufacturer, String publisher,
+                            String scope) {
 
         public Component(String bomRef, String group, String name, String version, String purl, String sha256, List<License> licenses) {
             this("library", bomRef, group, name, version, purl, List.of(), sha256, licenses, null, List.of(), List.of(), List.of(),
-                    null, null, null, null);
+                    null, null, null, null, null);
+        }
+
+        public Component scope(String scope) {
+            return new Component(type, bomRef, group, name, version, purl, swhids, sha256, licenses, description, authors,
+                    externalReferences, properties, supplier, copyright, manufacturer, publisher, scope);
         }
 
         private SequencedMap<String, Organization> organizations() {
@@ -188,6 +194,9 @@ public class CycloneDx {
         }
         if (component.description() != null) {
             builder.append(",\n").append(pad).append("  \"description\": \"").append(escapeJson(component.description())).append("\"");
+        }
+        if (component.scope() != null) {
+            builder.append(",\n").append(pad).append("  \"scope\": \"").append(escapeJson(component.scope())).append("\"");
         }
         if (component.authors() != null && !component.authors().isEmpty()) {
             builder.append(",\n").append(pad).append("  \"authors\": [\n");
@@ -362,6 +371,9 @@ public class CycloneDx {
         }
         if (component.description() != null) {
             appendXmlText(document, node, "description", component.description());
+        }
+        if (component.scope() != null) {
+            appendXmlText(document, node, "scope", component.scope());
         }
         if (component.sha256() != null) {
             Element hashes = (Element) node.appendChild(document.createElementNS(NAMESPACE, "hashes"));
