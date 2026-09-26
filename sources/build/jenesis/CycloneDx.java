@@ -55,6 +55,17 @@ public class CycloneDx {
             this("library", bomRef, group, name, version, purl, List.of(), sha256, licenses, null, List.of(), List.of(), List.of(),
                     null, null, null, null);
         }
+
+        private SequencedMap<String, Organization> organizations() {
+            SequencedMap<String, Organization> organizations = new LinkedHashMap<>();
+            if (supplier != null) {
+                organizations.put("supplier", supplier);
+            }
+            if (manufacturer != null) {
+                organizations.put("manufacturer", manufacturer);
+            }
+            return organizations;
+        }
     }
 
     public record Organization(String name, String url) {
@@ -153,7 +164,7 @@ public class CycloneDx {
         if (component.bomRef() != null) {
             builder.append(pad).append("  \"bom-ref\": \"").append(escapeJson(component.bomRef())).append("\",\n");
         }
-        for (Map.Entry<String, Organization> entry : organizations(component).entrySet()) {
+        for (Map.Entry<String, Organization> entry : component.organizations().entrySet()) {
             Organization organization = entry.getValue();
             builder.append(pad).append("  \"").append(entry.getKey()).append("\": {");
             if (organization.name() != null) {
@@ -312,24 +323,13 @@ public class CycloneDx {
         return writer.toString().replace("\r\n", "\n");
     }
 
-    private static SequencedMap<String, Organization> organizations(Component component) {
-        SequencedMap<String, Organization> organizations = new LinkedHashMap<>();
-        if (component.supplier() != null) {
-            organizations.put("supplier", component.supplier());
-        }
-        if (component.manufacturer() != null) {
-            organizations.put("manufacturer", component.manufacturer());
-        }
-        return organizations;
-    }
-
     private void appendXmlComponent(Document document, Node parent, Component component) {
         Element node = (Element) parent.appendChild(document.createElementNS(NAMESPACE, "component"));
         node.setAttribute("type", component.type());
         if (component.bomRef() != null) {
             node.setAttribute("bom-ref", component.bomRef());
         }
-        for (Map.Entry<String, Organization> entry : organizations(component).entrySet()) {
+        for (Map.Entry<String, Organization> entry : component.organizations().entrySet()) {
             Element organization = (Element) node.appendChild(document.createElementNS(NAMESPACE, entry.getKey()));
             if (entry.getValue().name() != null) {
                 appendXmlText(document, organization, "name", entry.getValue().name());

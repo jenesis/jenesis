@@ -768,13 +768,12 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         jpackage.setProperty("--about-url", url);
                     }
                     List<String> emails = new ArrayList<>();
-                    SequencedMap<String, String[]> licenses = new LinkedHashMap<>();
+                    SequencedSet<String> licenses = new LinkedHashSet<>();
                     described.forEachProperty((key, value) -> {
                         if (key.startsWith("developer.") && key.endsWith(".email") && !value.isBlank()) {
                             emails.add(value.trim());
                         } else if (key.startsWith("license.") && (key.endsWith(".name") || key.endsWith(".url"))) {
-                            String[] license = licenses.computeIfAbsent(key.substring(0, key.lastIndexOf('.')), _ -> new String[2]);
-                            license[key.endsWith(".name") ? 0 : 1] = value.trim();
+                            licenses.add(key.substring(0, key.lastIndexOf('.')));
                         }
                     });
                     if ("deb".equals(packageType) && !emails.isEmpty()) {
@@ -785,9 +784,12 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                 .filter(argument -> !argument.removed())
                                 .map(BuildStepArgument::folder)
                                 .toList());
-                        List<String> identifiers = licenses.values().stream()
-                                .map(license -> new License(null, null, license[0], license[1]).identified(aliases).id())
-                                .toList();
+                        List<String> identifiers = new ArrayList<>();
+                        for (String license : licenses) {
+                            identifiers.add(new License(null, null,
+                                    described.value(license + ".name"),
+                                    described.value(license + ".url")).identified(aliases).id());
+                        }
                         if (!identifiers.contains(null)) {
                             jpackage.setProperty("--linux-rpm-license-type", String.join(" OR ", identifiers));
                         }

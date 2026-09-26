@@ -173,11 +173,13 @@ public class ModularizeModule implements BuildExecutorModule {
                                     + " and "
                                     + jar.getFileName());
                         }
-                        String[] parts = split(key);
-                        String version = parts == null ? null : versions.get(parts[2] + "/" + parts[3]);
+                        int first = key.indexOf('/'),
+                                second = first < 0 ? -1 : key.indexOf('/', first + 1),
+                                third = second < 0 ? -1 : key.indexOf('/', second + 1);
+                        String version = third < 0 ? null : versions.get(key.substring(second + 1));
                         String name = version == null
                                 ? module + ".jar"
-                                : PathPlacement.fileName(parts[3], module, named);
+                                : PathPlacement.fileName(key.substring(third + 1), module, named);
                         relative = (named ? JDeps.MODULES : JDeps.ANALYZED) + name;
                         Path target = (named ? modules : analyzed).resolve(name);
                         if (!Files.exists(target)) {
@@ -213,17 +215,6 @@ public class ModularizeModule implements BuildExecutorModule {
                 });
             }
             return versions;
-        }
-
-        private static String[] split(String key) {
-            int first = key.indexOf('/');
-            int second = first < 0 ? -1 : key.indexOf('/', first + 1);
-            int third = second < 0 ? -1 : key.indexOf('/', second + 1);
-            return third < 0 ? null : new String[] {
-                    key.substring(0, first),
-                    key.substring(first + 1, second),
-                    key.substring(second + 1, third),
-                    key.substring(third + 1)};
         }
     }
 

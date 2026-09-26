@@ -6,6 +6,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Json;
+import build.jenesis.License;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDependencyKey;
 
@@ -58,7 +59,7 @@ public class LicenseCheck implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        SequencedMap<String, List<String[]>> licensesByCoordinate = new TreeMap<>();
+        SequencedMap<String, List<License>> licensesByCoordinate = new TreeMap<>();
         SequencedMap<String, Path> jarByCoordinate = new LinkedHashMap<>();
         SequencedSet<String> strict = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
@@ -74,7 +75,25 @@ public class LicenseCheck implements BuildStep {
             SequencedProperties licenses = Files.exists(sidecar)
                     ? SequencedProperties.ofFiles(sidecar)
                     : new SequencedProperties();
-            Map<String, List<String[]>> licensesByKey = bucketLicenses(licenses);
+            Map<String, SequencedMap<Integer, String>> licensesByKey = new HashMap<>();
+            for (String key : licenses.stringPropertyNames()) {
+                int fieldHash = key.lastIndexOf('#');
+                if (fieldHash < 0) {
+                    continue;
+                }
+                int indexHash = key.lastIndexOf('#', fieldHash - 1);
+                if (indexHash < 0) {
+                    continue;
+                }
+                int position;
+                try {
+                    position = Integer.parseInt(key.substring(indexHash + 1, fieldHash));
+                } catch (NumberFormatException _) {
+                    continue;
+                }
+                licensesByKey.computeIfAbsent(key.substring(0, indexHash), _ -> new TreeMap<>())
+                        .putIfAbsent(position, key.substring(0, fieldHash + 1));
+            }
             for (String key : dependencies.stringPropertyNames()) {
                 int first = key.indexOf('/'), second = key.indexOf('/', first + 1), third = key.indexOf('/', second + 1);
                 if (third < 0 || !key.substring(0, first).equals("main")) {
@@ -85,8 +104,11 @@ public class LicenseCheck implements BuildStep {
                         || licensesByCoordinate.containsKey(coordinate)) {
                     continue;
                 }
-                licensesByCoordinate.put(coordinate,
-                        licensesByKey.getOrDefault(key.substring(second + 1), List.of()));
+                licensesByCoordinate.put(coordinate, licensesByKey.getOrDefault(key.substring(second + 1), Collections.emptySortedMap())
+                        .values()
+                        .stream()
+                        .map(prefix -> new License(null, null, licenses.getProperty(prefix + "name"), licenses.getProperty(prefix + "url")))
+                        .toList());
                 if (key.substring(second + 1, third).equals("maven")) {
                     strict.add(coordinate);
                 }
@@ -98,9 +120,9 @@ public class LicenseCheck implements BuildStep {
         }
         List<String> violations = new ArrayList<>();
         StringBuilder builder = new StringBuilder();
-        for (Map.Entry<String, List<String[]>> entry : licensesByCoordinate.entrySet()) {
+        for (Map.Entry<String, List<License>> entry : licensesByCoordinate.entrySet()) {
             String coordinate = entry.getKey();
-            List<String[]> licenses = resolve(coordinate, entry.getValue(), jarByCoordinate.get(coordinate), overrides);
+            List<License> licenses = resolve(coordinate, entry.getValue(), jarByCoordinate.get(coordinate), overrides);
             String verdict;
             if (licenses.isEmpty()) {
                 if (!strict.contains(coordinate)) {
@@ -130,10 +152,10 @@ public class LicenseCheck implements BuildStep {
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
-    private static List<String[]> resolve(String coordinate, List<String[]> declared, Path jar, Map<String, String> overrides) {
+    private static List<License> resolve(String coordinate, List<License> declared, Path jar, Map<String, String> overrides) {
         String override = override(coordinate, overrides);
         if (override != null) {
-            return Collections.singletonList(new String[]{override, null});
+            return List.of(new License(override, null, null, null));
         }
         if (!declared.isEmpty()) {
             return declared;
@@ -154,9 +176,9 @@ public class LicenseCheck implements BuildStep {
         }
     }
 
-    private boolean acceptable(List<String[]> licenses) {
-        for (String[] license : licenses) {
-            Set<String> tokens = tokens(license[0], license[1]);
+    private boolean acceptable(List<License> licenses) {
+        for (License license : licenses) {
+            Set<String> tokens = tokens(license.id() == null ? license.name() : license.id(), license.url());
             boolean rejected = denied != null && matches(tokens, denied);
             boolean permitted = allowed == null || matches(tokens, allowed);
             if (!rejected && permitted) {
@@ -186,88 +208,88 @@ public class LicenseCheck implements BuildStep {
         if (url != null && !url.isBlank()) {
             tokens.add(url.toLowerCase(Locale.ROOT));
         }
-        String[] spdx = identify(name, url);
+        License spdx = identify(name, url);
         if (spdx != null) {
-            tokens.add(spdx[0].toLowerCase(Locale.ROOT));
-            tokens.add(spdx[1]);
+            tokens.add(spdx.id().toLowerCase(Locale.ROOT));
+            tokens.add(spdx.category());
         }
         return tokens;
     }
 
-    private static String[] identify(String name, String url) {
+    private static License identify(String name, String url) {
         String text = ((name == null ? "" : name) + " " + (url == null ? "" : url)).toLowerCase(Locale.ROOT);
         if (text.isBlank()) {
             return null;
         }
         if (text.contains("affero")) {
-            return new String[]{"AGPL-3.0", "network-copyleft"};
+            return new License("AGPL-3.0", "network-copyleft", null, null);
         }
         if (text.contains("lesser general public") || text.contains("lgpl")) {
-            return new String[]{"LGPL", "weak-copyleft"};
+            return new License("LGPL", "weak-copyleft", null, null);
         }
         if (text.contains("general public license") || text.contains("/gpl")) {
-            return new String[]{"GPL", "strong-copyleft"};
+            return new License("GPL", "strong-copyleft", null, null);
         }
         if (text.contains("apache")) {
-            return new String[]{"Apache-2.0", "permissive"};
+            return new License("Apache-2.0", "permissive", null, null);
         }
         if (text.contains("eclipse distribution")) {
-            return new String[]{"BSD-3-Clause", "permissive"};
+            return new License("BSD-3-Clause", "permissive", null, null);
         }
         if (text.contains("eclipse public") || text.contains("/epl")) {
-            return new String[]{"EPL-2.0", "weak-copyleft"};
+            return new License("EPL-2.0", "weak-copyleft", null, null);
         }
         if (text.contains("mozilla public") || text.contains("mpl")) {
-            return new String[]{"MPL-2.0", "weak-copyleft"};
+            return new License("MPL-2.0", "weak-copyleft", null, null);
         }
         if (text.contains("common development and distribution") || text.contains("cddl")) {
-            return new String[]{"CDDL-1.1", "weak-copyleft"};
+            return new License("CDDL-1.1", "weak-copyleft", null, null);
         }
         if (text.contains("bsd")) {
-            return new String[]{"BSD", "permissive"};
+            return new License("BSD", "permissive", null, null);
         }
         if (text.contains("mit license") || text.contains("licenses/mit") || text.contains("(mit)")) {
-            return new String[]{"MIT", "permissive"};
+            return new License("MIT", "permissive", null, null);
         }
         if (text.contains("boost software")) {
-            return new String[]{"BSL-1.0", "permissive"};
+            return new License("BSL-1.0", "permissive", null, null);
         }
         if (text.contains("unlicense")) {
-            return new String[]{"Unlicense", "permissive"};
+            return new License("Unlicense", "permissive", null, null);
         }
         if (text.contains("cc0") || text.contains("public domain")) {
-            return new String[]{"CC0-1.0", "permissive"};
+            return new License("CC0-1.0", "permissive", null, null);
         }
         if (text.contains("isc")) {
-            return new String[]{"ISC", "permissive"};
+            return new License("ISC", "permissive", null, null);
         }
         return null;
     }
 
-    private static List<String[]> jarLicenses(Path jar) {
+    private static List<License> jarLicenses(Path jar) {
         if (jar == null || !Files.isRegularFile(jar)) {
             return List.of();
         }
         try (JarFile file = new JarFile(jar.toFile())) {
             Manifest manifest = file.getManifest();
             if (manifest != null) {
-                List<String[]> embedded = sbomLicenses(file, manifest);
+                List<License> embedded = sbomLicenses(file, manifest);
                 if (!embedded.isEmpty()) {
                     return embedded;
                 }
                 String bundle = bundleLicense(manifest);
                 if (bundle != null) {
-                    return Collections.singletonList(new String[]{bundle, null});
+                    return List.of(new License(bundle, null, null, null));
                 }
             }
             String text = licenseFile(file);
-            return text == null ? List.of() : Collections.singletonList(new String[]{text, null});
+            return text == null ? List.of() : List.of(new License(text, null, null, null));
         } catch (IOException _) {
             return List.of();
         }
     }
 
-    private static List<String[]> sbomLicenses(JarFile file, Manifest manifest) {
+    private static List<License> sbomLicenses(JarFile file, Manifest manifest) {
         String location = manifest.getMainAttributes().getValue("Sbom-Location");
         if (location == null || location.isBlank()) {
             return List.of();
@@ -288,7 +310,7 @@ public class LicenseCheck implements BuildStep {
                 || !(component.get("licenses") instanceof List<?> licenses)) {
             return List.of();
         }
-        List<String[]> result = new ArrayList<>();
+        List<License> result = new ArrayList<>();
         for (Object element : licenses) {
             if (!(element instanceof Map<?, ?> wrapper)) {
                 continue;
@@ -298,14 +320,14 @@ public class LicenseCheck implements BuildStep {
                 String name = string(license.get("name"));
                 String url = string(license.get("url"));
                 if (id != null) {
-                    result.add(new String[]{id, url});
+                    result.add(new License(id, null, null, url));
                 } else if (name != null || url != null) {
-                    result.add(new String[]{name, url});
+                    result.add(new License(null, null, name, url));
                 }
             } else {
                 String expression = string(wrapper.get("expression"));
                 if (expression != null) {
-                    result.add(new String[]{expression, null});
+                    result.add(new License(expression, null, null, null));
                 }
             }
         }
@@ -327,12 +349,12 @@ public class LicenseCheck implements BuildStep {
             if (entry == null) {
                 continue;
             }
-            String[] spdx;
+            License spdx;
             try (InputStream in = file.getInputStream(entry)) {
                 spdx = identify(new String(in.readNBytes(1 << 20), StandardCharsets.UTF_8), null);
             }
             if (spdx != null) {
-                return spdx[0];
+                return spdx.id();
             }
         }
         return null;
@@ -342,46 +364,16 @@ public class LicenseCheck implements BuildStep {
         return value instanceof String text && !text.isBlank() ? text : null;
     }
 
-    private static String describe(List<String[]> licenses) {
+    private static String describe(List<License> licenses) {
         List<String> rendered = new ArrayList<>();
-        for (String[] license : licenses) {
-            if (license[0] != null && !license[0].isBlank()) {
-                rendered.add(license[0]);
-            } else if (license[1] != null && !license[1].isBlank()) {
-                rendered.add(license[1]);
+        for (License license : licenses) {
+            String label = license.id() == null ? license.name() : license.id();
+            if (label != null && !label.isBlank()) {
+                rendered.add(label);
+            } else if (license.url() != null && !license.url().isBlank()) {
+                rendered.add(license.url());
             }
         }
         return String.join("; ", rendered);
-    }
-
-    private static Map<String, List<String[]>> bucketLicenses(SequencedProperties licenses) {
-        Map<String, SequencedMap<Integer, String[]>> byKey = new HashMap<>();
-        for (String key : licenses.stringPropertyNames()) {
-            int fieldHash = key.lastIndexOf('#');
-            if (fieldHash < 0) {
-                continue;
-            }
-            int indexHash = key.lastIndexOf('#', fieldHash - 1);
-            if (indexHash < 0) {
-                continue;
-            }
-            int index;
-            try {
-                index = Integer.parseInt(key.substring(indexHash + 1, fieldHash));
-            } catch (NumberFormatException _) {
-                continue;
-            }
-            String[] entry = byKey.computeIfAbsent(key.substring(0, indexHash), _ -> new TreeMap<>())
-                    .computeIfAbsent(index, _ -> new String[2]);
-            String field = key.substring(fieldHash + 1);
-            if (field.equals("name")) {
-                entry[0] = licenses.getProperty(key);
-            } else if (field.equals("url")) {
-                entry[1] = licenses.getProperty(key);
-            }
-        }
-        Map<String, List<String[]>> result = new HashMap<>();
-        byKey.forEach((licenseKey, byIndex) -> result.put(licenseKey, new ArrayList<>(byIndex.values())));
-        return result;
     }
 }

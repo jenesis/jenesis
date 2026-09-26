@@ -1353,7 +1353,7 @@ public class Dependencies implements BuildExecutorModule {
 
     public static SequencedMap<String, Resolver.Resolution> graph(Iterable<Path> graphFiles,
                                                                   Iterable<Path> licenseFiles) throws IOException {
-        SequencedMap<String, SequencedMap<Integer, String[]>> licenseEntries = new LinkedHashMap<>();
+        SequencedMap<String, SequencedMap<Integer, Map<String, String>>> licenseEntries = new LinkedHashMap<>();
         for (Path file : licenseFiles) {
             if (!Files.isRegularFile(file)) {
                 continue;
@@ -1371,22 +1371,16 @@ public class Dependencies implements BuildExecutorModule {
                 } catch (NumberFormatException _) {
                     continue;
                 }
-                String[] entry = licenseEntries
-                        .computeIfAbsent(key.substring(0, prior), _ -> new TreeMap<>())
-                        .computeIfAbsent(index, _ -> new String[4]);
-                switch (key.substring(last + 1)) {
-                    case "id" -> entry[0] = properties.getProperty(key);
-                    case "category" -> entry[1] = properties.getProperty(key);
-                    case "name" -> entry[2] = properties.getProperty(key);
-                    case "url" -> entry[3] = properties.getProperty(key);
-                    default -> {
-                    }
-                }
+                licenseEntries.computeIfAbsent(key.substring(0, prior), _ -> new TreeMap<>())
+                        .computeIfAbsent(index, _ -> new HashMap<>())
+                        .put(key.substring(last + 1), properties.getProperty(key));
             }
         }
         SequencedMap<String, List<License>> licenses = new LinkedHashMap<>();
         licenseEntries.forEach((coordinate, byIndex) -> licenses.put(coordinate,
-                byIndex.values().stream().map(entry -> new License(entry[0], entry[1], entry[2], entry[3])).toList()));
+                byIndex.values().stream()
+                        .map(entry -> new License(entry.get("id"), entry.get("category"), entry.get("name"), entry.get("url")))
+                        .toList()));
         SequencedMap<String, SequencedSet<Resolver.Edge>> edges = new LinkedHashMap<>();
         SequencedMap<String, SequencedMap<String, Resolver.Vertex>> vertices = new LinkedHashMap<>();
         for (Path file : graphFiles) {
