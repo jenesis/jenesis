@@ -183,8 +183,7 @@ public class Sbom implements BuildStep {
             }
             SequencedSet<String> declared = new LinkedHashSet<>();
             for (String key : metadata.stringPropertyNames()) {
-                if (key.startsWith("license.") && (key.endsWith(".name") || key.endsWith(".url"))
-                        && key.lastIndexOf('.') > "license.".length()) {
+                if (key.startsWith("license.") && key.lastIndexOf('.') > "license.".length()) {
                     declared.add(key.substring(0, key.lastIndexOf('.')));
                 }
             }
@@ -327,7 +326,7 @@ public class Sbom implements BuildStep {
     }
 
     private static List<License> readLicenses(SequencedProperties licenses, String licenseKey) {
-        SequencedMap<Integer, String[]> byIndex = new TreeMap<>();
+        SequencedMap<Integer, String> byIndex = new TreeMap<>();
         String prefix = licenseKey + "#";
         for (String key : licenses.stringPropertyNames()) {
             if (!key.startsWith(prefix)) {
@@ -344,17 +343,12 @@ public class Sbom implements BuildStep {
             } catch (NumberFormatException _) {
                 continue;
             }
-            String[] entry = byIndex.computeIfAbsent(index, _ -> new String[4]);
-            switch (rest.substring(hash + 1)) {
-                case "id" -> entry[0] = licenses.getProperty(key);
-                case "category" -> entry[1] = licenses.getProperty(key);
-                case "name" -> entry[2] = licenses.getProperty(key);
-                case "url" -> entry[3] = licenses.getProperty(key);
-                default -> {
-                }
-            }
+            byIndex.putIfAbsent(index, prefix + rest.substring(0, hash + 1));
         }
-        return byIndex.values().stream().map(entry -> new License(entry[0], entry[1], entry[2], entry[3])).toList();
+        return byIndex.values().stream().map(entry -> new License(licenses.getProperty(entry + "id"),
+                licenses.getProperty(entry + "category"),
+                licenses.getProperty(entry + "name"),
+                licenses.getProperty(entry + "url"))).toList();
     }
 
     private static CycloneDx.Organization organization(SequencedProperties metadata, String prefix) {
@@ -363,26 +357,15 @@ public class Sbom implements BuildStep {
     }
 
     private static List<CycloneDx.Author> developers(SequencedProperties metadata) {
-        SequencedMap<String, String[]> byId = new LinkedHashMap<>();
+        SequencedSet<String> developers = new LinkedHashSet<>();
         for (String key : metadata.stringPropertyNames()) {
-            if (!key.startsWith("developer.")) {
-                continue;
-            }
-            String suffix = key.substring("developer.".length());
-            int dot = suffix.lastIndexOf('.');
-            if (dot <= 0) {
-                continue;
-            }
-            String[] entry = byId.computeIfAbsent(suffix.substring(0, dot), _ -> new String[2]);
-            if (suffix.substring(dot + 1).equals("name")) {
-                entry[0] = metadata.getProperty(key);
-            } else if (suffix.substring(dot + 1).equals("email")) {
-                entry[1] = metadata.getProperty(key);
+            if (key.startsWith("developer.") && key.lastIndexOf('.') > "developer.".length()) {
+                developers.add(key.substring(0, key.lastIndexOf('.') + 1));
             }
         }
-        return byId.values().stream()
-                .filter(entry -> entry[0] != null || entry[1] != null)
-                .map(entry -> new CycloneDx.Author(entry[0], entry[1]))
+        return developers.stream()
+                .map(developer -> new CycloneDx.Author(metadata.getProperty(developer + "name"), metadata.getProperty(developer + "email")))
+                .filter(author -> author.name() != null || author.email() != null)
                 .toList();
     }
 

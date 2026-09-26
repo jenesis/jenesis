@@ -9,6 +9,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.License;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.LicenseCheck;
 
@@ -40,24 +41,20 @@ public class LicenseCheckTest {
     }
 
     private void resolve(String coordinate, String... licenseNames) throws IOException {
-        String[][] licenses = new String[licenseNames.length][];
-        for (int index = 0; index < licenseNames.length; index++) {
-            licenses[index] = new String[]{licenseNames[index], null};
-        }
-        resolveLicensed(coordinate, licenses);
+        resolveLicensed(coordinate, Stream.of(licenseNames).map(name -> new License(null, null, name, null)).toList());
     }
 
-    private void resolveLicensed(String coordinate, String[]... licenses) throws IOException {
+    private void resolveLicensed(String coordinate, List<License> licenses) throws IOException {
         SequencedProperties dependencies = new SequencedProperties();
         dependencies.setProperty("main/compile/maven/" + coordinate, "resolved/lib.jar");
         dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
         SequencedProperties properties = new SequencedProperties();
-        for (int index = 0; index < licenses.length; index++) {
-            if (licenses[index][0] != null) {
-                properties.setProperty("maven/" + coordinate + "#" + index + "#name", licenses[index][0]);
+        for (int index = 0; index < licenses.size(); index++) {
+            if (licenses.get(index).name() != null) {
+                properties.setProperty("maven/" + coordinate + "#" + index + "#name", licenses.get(index).name());
             }
-            if (licenses[index].length > 1 && licenses[index][1] != null) {
-                properties.setProperty("maven/" + coordinate + "#" + index + "#url", licenses[index][1]);
+            if (licenses.get(index).url() != null) {
+                properties.setProperty("maven/" + coordinate + "#" + index + "#url", licenses.get(index).url());
             }
         }
         properties.store(argument.resolve("licenses.properties"));
@@ -89,7 +86,7 @@ public class LicenseCheckTest {
 
     @Test
     public void matches_on_the_license_url_when_the_name_is_unhelpful() throws Exception {
-        resolveLicensed("org.example/lib/1.2.3", new String[]{"LICENSE", "https://www.apache.org/licenses/LICENSE-2.0"});
+        resolveLicensed("org.example/lib/1.2.3", List.of(new License(null, null, "LICENSE", "https://www.apache.org/licenses/LICENSE-2.0")));
         assertThat(run(new LicenseCheck().allowed(new LinkedHashSet<>(List.of("Apache-2.0")))).next()).isTrue();
     }
 
@@ -101,9 +98,7 @@ public class LicenseCheckTest {
 
     @Test
     public void accepts_any_allowed_license_under_or_semantics() throws Exception {
-        resolveLicensed("org.example/lib/1.2.3",
-                new String[]{"GNU General Public License v3.0", null},
-                new String[]{"The MIT License", null});
+        resolve("org.example/lib/1.2.3", "GNU General Public License v3.0", "The MIT License");
         assertThat(run(new LicenseCheck().allowed(new LinkedHashSet<>(List.of("MIT")))).next()).isTrue();
     }
 
