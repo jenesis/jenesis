@@ -46,13 +46,13 @@ public class CycloneDx {
         return new CycloneDx(identifiers);
     }
 
-    public record Component(String type, String bomRef, String group, String name, String version, String purl, String sha256,
-                            List<License> licenses, String description, List<Author> authors,
+    public record Component(String type, String bomRef, String group, String name, String version, String purl, List<String> swhids,
+                            String sha256, List<License> licenses, String description, List<Author> authors,
                             List<ExternalReference> externalReferences, List<Property> properties,
                             Organization supplier, String copyright, Organization manufacturer, String publisher) {
 
         public Component(String bomRef, String group, String name, String version, String purl, String sha256, List<License> licenses) {
-            this("library", bomRef, group, name, version, purl, sha256, licenses, null, List.of(), List.of(), List.of(),
+            this("library", bomRef, group, name, version, purl, List.of(), sha256, licenses, null, List.of(), List.of(), List.of(),
                     null, null, null, null);
         }
     }
@@ -224,6 +224,13 @@ public class CycloneDx {
         if (component.purl() != null) {
             builder.append(",\n").append(pad).append("  \"purl\": \"").append(escapeJson(component.purl())).append("\"");
         }
+        if (component.swhids() != null && !component.swhids().isEmpty()) {
+            builder.append(",\n").append(pad).append("  \"swhid\": [")
+                    .append(component.swhids().stream()
+                            .map(swhid -> "\"" + escapeJson(swhid) + "\"")
+                            .collect(Collectors.joining(", ")))
+                    .append("]");
+        }
         if (component.externalReferences() != null && !component.externalReferences().isEmpty()) {
             builder.append(",\n").append(pad).append("  \"externalReferences\": [\n");
             for (int index = 0; index < component.externalReferences().size(); index++) {
@@ -382,6 +389,11 @@ public class CycloneDx {
         }
         if (component.purl() != null) {
             appendXmlText(document, node, "purl", component.purl());
+        }
+        if (component.swhids() != null) {
+            for (String swhid : component.swhids()) {
+                appendXmlText(document, node, "swhid", swhid);
+            }
         }
         if (component.externalReferences() != null && !component.externalReferences().isEmpty()) {
             Element references = (Element) node.appendChild(document.createElementNS(NAMESPACE, "externalReferences"));
