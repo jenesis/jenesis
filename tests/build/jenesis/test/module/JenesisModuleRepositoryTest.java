@@ -22,11 +22,13 @@ public class JenesisModuleRepositoryTest {
     @BeforeEach
     public void setUp() throws IOException {
         settings.put("module.local", Files.createDirectories(root.resolve("home")).toString());
+        settings.put("maven.local", Files.createDirectories(root.resolve("m2")).toString());
     }
 
     @AfterEach
     public void tearDown() {
         settings.remove("module.local");
+        settings.remove("maven.local");
     }
 
     @Test
@@ -822,7 +824,7 @@ public class JenesisModuleRepositoryTest {
             assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("nexus:https://repo.example.com/")
-                    .hasMessageContaining("expected 'module' or 'maven'");
+                    .hasMessageContaining("expected 'module', 'maven' or 'mapped'");
         } finally {
             settings.remove("module.uri");
         }
@@ -946,6 +948,88 @@ public class JenesisModuleRepositoryTest {
         });
         server.start();
         return server;
+    }
+
+    @Test
+    public void factory_mapped_type_resolves_a_listed_module_at_its_mapped_coordinate() throws IOException {
+        writeMavenArtifact("com.corp", "billing-core", "mapped-classes");
+        Files.writeString(Files.createDirectories(root.resolve("public/module/other.mod/1.0.0")).resolve("other.mod.jar"),
+                "public-classes");
+        Path list = Files.writeString(root.resolve("modules.properties"), "com.corp.billing=com.corp/billing-core\n");
+        settings.put("module.uri", "mapped:" + root.resolve("company").toUri() + ":" + list.toUri()
+                + "," + root.resolve("public").toUri());
+        try {
+            Repository merged = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE);
+            assertThat(content(merged.fetch(Runnable::run, "com.corp.billing/1.0.0").orElseThrow()))
+                    .isEqualTo("mapped-classes");
+            assertThat(content(merged.fetch(Runnable::run, "other.mod/1.0.0").orElseThrow()))
+                    .as("a module the list does not name falls through to the next entry")
+                    .isEqualTo("public-classes");
+        } finally {
+            settings.remove("module.uri");
+        }
+    }
+
+    @Test
+    public void factory_mapped_type_reads_the_maven_repository_of_the_build_for_an_at_sign() throws IOException {
+        writeMavenArtifact("com.corp", "billing-core", "build-repository-classes");
+        Path list = Files.writeString(root.resolve("modules.properties"), "com.corp.billing=com.corp/billing-core\n");
+        settings.put("maven.uri", root.resolve("company").toUri().toString());
+        settings.put("module.uri", "mapped:@:" + list);
+        try {
+            assertThat(content(JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE)
+                    .fetch(Runnable::run, "com.corp.billing/1.0.0").orElseThrow()))
+                    .as("@ is the Maven repository jenesis.maven.uri configures, and a list may be an absolute path")
+                    .isEqualTo("build-repository-classes");
+        } finally {
+            settings.remove("module.uri");
+            settings.remove("maven.uri");
+        }
+    }
+
+    @Test
+    public void factory_mapped_type_merges_its_lists_and_refuses_one_that_contradicts_another() throws IOException {
+        writeMavenArtifact("com.corp", "billing-core", "billing");
+        writeMavenArtifact("com.corp", "ledger-core", "ledger");
+        Path first = Files.writeString(root.resolve("first.properties"), "com.corp.billing=com.corp/billing-core\n");
+        Path second = Files.writeString(root.resolve("second.properties"),
+                "com.corp.ledger=com.corp/ledger-core\ncom.corp.billing=com.corp/billing-core\n");
+        settings.put("module.uri", "mapped:" + root.resolve("company").toUri() + ":" + first.toUri() + ";" + second.toUri());
+        try {
+            Repository merged = JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE);
+            assertThat(content(merged.fetch(Runnable::run, "com.corp.billing/1.0.0").orElseThrow())).isEqualTo("billing");
+            assertThat(content(merged.fetch(Runnable::run, "com.corp.ledger/1.0.0").orElseThrow())).isEqualTo("ledger");
+            Files.writeString(second, "com.corp.billing=com.corp/billing-other\n");
+            assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining(first.toUri().toString())
+                    .hasMessageContaining(second.toUri().toString())
+                    .hasMessageContaining("com.corp/billing-other");
+        } finally {
+            settings.remove("module.uri");
+        }
+    }
+
+    @Test
+    public void factory_mapped_type_refuses_a_relative_list_and_a_named_reference() {
+        settings.put("module.uri", "mapped:https://repo.example.com/maven2/:modules.properties");
+        try {
+            assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("absolute path");
+            settings.put("module.uri", "mapped:@corp:https://lists.example.com/modules.properties");
+            assertThatThrownBy(() -> JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("@ alone");
+        } finally {
+            settings.remove("module.uri");
+        }
+    }
+
+    private static String content(RepositoryItem item) throws IOException {
+        try (InputStream stream = item.toInputStream()) {
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     private void writeMavenArtifact(String groupId, String artifactId, String content) throws IOException {

@@ -109,6 +109,15 @@ public class Demo {
         System.out.println("Resolving through the configured chain, with no repository in code:");
         report(chain, module, "the company repository, by the Maven convention");
         report(chain, "demo.other", "the regular module repository");
+
+        Path list = Files.writeString(Path.of("target", "modules.properties"), "company.greeter=" + group + "/" + module + "\n");
+        Environment listed = new Environment(Map.of("module.uri",
+                "mapped:" + published.toUri() + ":" + list.toAbsolutePath().toUri() + "," + Path.of("target", "modules").toUri()));
+        JenesisRepository mapped = JenesisModuleRepository.ofEnvironment(listed, JenesisRepository.Scope.MODULE);
+        System.out.println();
+        System.out.println("Resolving through a company module list:");
+        report(mapped, "company.greeter", "the company repository, at the coordinate the list names");
+        report(mapped, "demo.other", "the regular module repository");
     }
 
     private static void report(JenesisRepository chain, String module, String source) throws IOException {
