@@ -68,7 +68,7 @@ public record JUnitPlatform() implements TestFramework {
         List<String> commands = new ArrayList<>(List.of("execute", "--disable-banner", "--disable-ansi-colors"));
         List<String> conditions = new ArrayList<>();
         if (!tags.included().isEmpty()) {
-            conditions.add("(" + String.join(" | ", tags.included()) + ")");
+            conditions.add(disjunction(tags.included()));
         }
         if (!tags.excluded().isEmpty()) {
             conditions.add("!(" + String.join(" | ", tags.excluded()) + ")");
@@ -76,7 +76,7 @@ public record JUnitPlatform() implements TestFramework {
         for (TestTags earlier : ran) {
             List<String> outside = new ArrayList<>();
             if (!earlier.included().isEmpty()) {
-                outside.add("!(" + String.join(" | ", earlier.included()) + ")");
+                outside.add("!" + disjunction(earlier.included()));
             }
             if (!earlier.excluded().isEmpty()) {
                 outside.add("(" + String.join(" | ", earlier.excluded()) + ")");
@@ -125,5 +125,11 @@ public record JUnitPlatform() implements TestFramework {
                 .flatMap(module -> module.rawVersion().stream())
                 .findFirst()
                 .orElse(null);
+    }
+
+    private static String disjunction(SequencedSet<String> terms) {
+        return terms.stream()
+                .map(term -> term.contains("&") ? "(" + String.join(" & ", TestTags.names(term).stream().sorted().toList()) + ")" : term)
+                .collect(Collectors.joining(" | ", "(", ")"));
     }
 }

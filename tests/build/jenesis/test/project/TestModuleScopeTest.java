@@ -28,8 +28,15 @@ public class TestModuleScopeTest {
     }
 
     @Test
+    public void reads_tags_a_test_carries_all_of() {
+        TestTags tags = TestTags.parse("foo & bar,baz,!qux");
+        assertThat(tags.included()).containsExactly("bar&foo", "baz");
+        assertThat(tags).hasToString("bar&foo,baz,!qux");
+    }
+
+    @Test
     public void refuses_the_syntax_of_a_test_framework() {
-        for (String expression : List.of("foo&bar", "!(npm|pypi)", "foo|bar", "any()", "!")) {
+        for (String expression : List.of("!(npm|pypi)", "foo|bar", "any()", "!", "!foo&bar", "foo&", "foo&&bar")) {
             assertThatThrownBy(() -> TestTags.parse(expression))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("comma-separated list of tag names");
@@ -58,6 +65,15 @@ public class TestModuleScopeTest {
     }
 
     @Test
+    public void a_run_of_any_of_the_tags_covers_a_request_for_all_of_them() {
+        assertThat(covered("foo&bar", "foo")).isTrue();
+        assertThat(covered("foo&bar", "bar,baz")).isTrue();
+        assertThat(covered("foo&bar&baz", "bar&foo")).isTrue();
+        assertThat(covered("foo", "foo&bar")).as("the tests tagged foo but not bar never ran").isFalse();
+        assertThat(covered("foo&bar", "foo&baz")).isFalse();
+    }
+
+    @Test
     public void a_run_that_left_tests_out_covers_only_a_request_that_leaves_them_out_too() {
         assertThat(covered("foo,!qux", "foo,!qux")).isTrue();
         assertThat(covered("foo,!qux,!quux", "foo,!qux")).isTrue();
@@ -75,6 +91,25 @@ public class TestModuleScopeTest {
         assertThat(new JUnitPlatform().arguments(root, root, Collections.emptyNavigableSet(), Collections.emptyNavigableMap(),
                 TestTags.ALL, List.of(TestTags.parse("foo,!slow")), false, false))
                 .contains("--include-tag=(!(foo) | (slow))");
+    }
+
+    @Test
+    public void junit_requires_every_tag_of_a_conjunction(@TempDir Path root) {
+        assertThat(new JUnitPlatform().arguments(root, root, Collections.emptyNavigableSet(), Collections.emptyNavigableMap(),
+                TestTags.parse("foo&bar,baz"), List.of(TestTags.parse("bar&qux")), false, false))
+                .contains("--include-tag=((bar & foo) | baz) & (!((bar & qux)))");
+    }
+
+    @Test
+    public void testng_refuses_a_conjunction_its_groups_cannot_express(@TempDir Path root) {
+        assertThatThrownBy(() -> new TestNG().arguments(root, root, Collections.emptyNavigableSet(), Collections.emptyNavigableMap(),
+                TestTags.parse("foo&bar"), List.of(), false, false))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("bar&foo");
+        assertThat(new TestNG().arguments(root, root, Collections.emptyNavigableSet(), Collections.emptyNavigableMap(),
+                TestTags.parse("baz"), List.of(TestTags.parse("foo&bar")), false, false))
+                .as("an earlier conjunction cannot be left out by groups, so the request runs whole")
+                .doesNotContain("-excludegroups");
     }
 
     @Test

@@ -2716,7 +2716,7 @@ public record Project(
                 cache.insecure|false|Permit the cache key over plaintext http off loopback, and over https accept a certificate that does not verify; likewise yours alone to allow
                 test.skip|false|Skip executing tests, still resolving what running them needs
                 test.filter||Comma-separated <classRegex>[#<method>] entries restricting which tests run
-                test.tag||Comma-separated tag names, each run where a test carries one of them, and !<name> to leave out the tests carrying it, translated for the test framework; a run remembers what it covered until the tests' inputs change, so a later selection runs only the tests no earlier one ran
+                test.tag||Comma-separated tag names, each run where a test carries one of them, several joined by & for the tests carrying all of them, and !<name> to leave out the tests carrying it, translated for the test framework; a run remembers what it covered until the tests' inputs change, so a later selection runs only the tests no earlier one ran
                 test.force|false|Execute tests even where a previous run already covered them
                 test.incremental||Run only the tests a change can reach; the value names the digest
                 test.parallel|false|Let the engine execute the matched tests concurrently

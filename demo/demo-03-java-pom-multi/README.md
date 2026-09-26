@@ -134,8 +134,9 @@ The test step's summary then reports `1 tests successful` instead of the default
 read as a selector.
 
 Tests can also be selected by tag with `-Djenesis.test.tag`, a comma-separated
-list of tag names: a test runs where it carries one of them, and a name preceded
-by `!` leaves out the tests carrying it. Jenesis translates the list into the test
+list of tag names: a test runs where it carries one of them, names joined by `&`
+select the tests carrying all of them, and a name preceded by `!` leaves out the
+tests carrying it. Jenesis translates the list into the test
 framework's own grouping mechanism - JUnit Platform tags or TestNG groups; JUnit 4
 has none its console runner can select. `GreeterTest#prefix_is_a_greeting` is
 annotated `@Tag("slow")`, so this again runs only that one test, this time by tag:
