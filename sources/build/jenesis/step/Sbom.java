@@ -108,7 +108,7 @@ public class Sbom implements BuildStep {
                 if (platforms.add(ref)) {
                     components.put(ref, new CycloneDx.Component("platform", ref, implementor, "GraalVM", graalvm, null, null,
                             graalvmLicense == null ? List.of() : List.of(new License(graalvmLicense, null, null, null)),
-                            null, List.of(), List.of(), List.of(), null, null));
+                            null, List.of(), List.of(), List.of(), null, null, null, null));
                 }
             }
             Path index = argument.folder().resolve(DEPENDENCIES);
@@ -177,12 +177,13 @@ public class Sbom implements BuildStep {
                     properties.add(new CycloneDx.Property("jenesis:source:swhid", identifier));
                 }
             }
-            String organization = metadata.value("organization.name"), organizationUrl = metadata.value("organization.url");
             project = new CycloneDx.Component(type, projectRef, groupId, artifactId, version, purl, null,
                     ownLicenses(metadata, Dependencies.aliases(folders)), metadata.getProperty("description"), developers(metadata),
                     references(metadata, revision == null ? tag : revision), properties,
-                    organization == null && organizationUrl == null ? null : new CycloneDx.Organization(organization, organizationUrl),
-                    metadata.value("copyright"));
+                    organization(metadata, "organization"),
+                    metadata.value("copyright"),
+                    organization(metadata, "manufacturer"),
+                    metadata.value("publisher"));
         }
         List<CycloneDx.Dependency> dependencies = relationships(projectRef, components.keySet(), platforms, graphFiles);
         String document = new CycloneDx().emit(format, project, new ArrayList<>(components.values()), dependencies);
@@ -336,6 +337,11 @@ public class Sbom implements BuildStep {
             }
         }
         return byIndex.values().stream().map(entry -> new License(entry[0], entry[1], entry[2], entry[3])).toList();
+    }
+
+    private static CycloneDx.Organization organization(SequencedProperties metadata, String prefix) {
+        String name = metadata.value(prefix + ".name"), url = metadata.value(prefix + ".url");
+        return name == null && url == null ? null : new CycloneDx.Organization(name, url);
     }
 
     private static List<License> ownLicenses(SequencedProperties metadata, Map<String, String> aliases) {
