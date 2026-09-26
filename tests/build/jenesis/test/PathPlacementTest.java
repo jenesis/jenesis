@@ -29,6 +29,13 @@ public class PathPlacementTest {
     }
 
     @Test
+    public void an_unversioned_module_is_named_after_the_module_alone() {
+        assertThat(PathPlacement.fileName("demo.greeter", "demo.greeter", true))
+                .as("a coordinate without a version names no version, rather than repeating the module")
+                .isEqualTo("demo.greeter.jar");
+    }
+
+    @Test
     public void a_version_the_runtime_cannot_derive_is_dropped_from_a_derived_name() {
         assertThat(PathPlacement.fileName("org.example/lib/1-SNAPSHOT", "org.example.lib", false))
                 .as("the runtime would truncate the name at the dash and fail to derive a module")

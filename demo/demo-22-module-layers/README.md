@@ -103,7 +103,7 @@ Any build that resolves that jar reads the header, resolves those coordinates in
 and materialises them into a folder, exactly as it would for `Jenesis-Aliases` or
 `Jenesis-Overrides`. The result is visible in the bundle:
 
-    jars/classes.jar                              every jar, stored once
+    jars/demo.layers.app-0-SNAPSHOT.jar           every jar, stored once
     jars/demo.layers.library-0-SNAPSHOT.jar
     jars/demo.layers.spi-0-SNAPSHOT.jar
     jars/com.fasterxml.jackson.core-2.18.2.jar    the application's
@@ -116,7 +116,7 @@ and materialises them into a folder, exactly as it would for `Jenesis-Aliases` o
       "-Djlayer.modulepath.inner=jars/demo.layers.nested-...:jars/...2.13.5.jar"
       "-Djlayer.modulepath.render=jars/demo.layers.impl-...:jars/...2.15.4.jar"
       "--module-path"
-      "jars/build.jenesis.launcher-...:jars/classes.jar:jars/...2.18.2.jar:jars/demo.layers.library-...:jars/demo.layers.spi-..."
+      "jars/build.jenesis.launcher-...:jars/...2.18.2.jar:jars/demo.layers.app-0-SNAPSHOT.jar:jars/demo.layers.library-...:jars/demo.layers.spi-..."
       "--module"
       "demo.layers.app/demo.layers.app.Main"
 

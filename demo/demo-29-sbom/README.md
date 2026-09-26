@@ -57,7 +57,7 @@ tool involved. It is placed three ways, each for a different consumer:
 Where it lands
 --------------
 
-    target/build/.../assemble/binary/artifacts/jar/output/artifacts/classes.jar   (embeds META-INF/sbom/)
+    target/build/.../assemble/binary/artifacts/jar/output/artifacts/build.jenesis.demo%2Fsbom-demo%2F1.0.0.jar   (embeds META-INF/sbom/)
     target/stage/reports/sbom/<module>/sbom-demo-1.0.0.cdx.json                    (the report)
     target/stage/maven/output/.../sbom-demo/1.0.0/sbom-demo-1.0.0-cyclonedx.json   (the attachment)
 
