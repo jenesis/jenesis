@@ -64,6 +64,7 @@ public class JMod extends ProcessBuildStep {
                     }
                 }
             }
+            collect(argument.folder().resolve(BuildStep.RESOURCES), classPath);
             collect(argument.folder().resolve(CONFIG), config);
             collect(argument.folder().resolve(LIBRARIES), libs);
             collect(argument.folder().resolve(COMMANDS), cmds);
