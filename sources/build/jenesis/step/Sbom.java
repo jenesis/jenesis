@@ -76,6 +76,7 @@ public class Sbom implements BuildStep {
         HashDigestFunction hash = new HashDigestFunction("SHA-256");
         SequencedMap<String, CycloneDx.Component> components = new LinkedHashMap<>();
         List<Path> graphFiles = new ArrayList<>();
+        Set<Path> described = new HashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -93,21 +94,23 @@ public class Sbom implements BuildStep {
             SequencedProperties licenses = Files.exists(sidecar)
                     ? SequencedProperties.ofFiles(sidecar)
                     : new SequencedProperties();
-            for (String key : dependencies.stringPropertyNames()) {
-                int first = key.indexOf('/'), second = key.indexOf('/', first + 1), third = key.indexOf('/', second + 1);
-                if (first < 0 || second < 0 || third < 0) {
-                    continue;
+            for (boolean maven : new boolean[] {true, false}) {
+                for (String key : dependencies.stringPropertyNames()) {
+                    int first = key.indexOf('/'), second = key.indexOf('/', first + 1), third = key.indexOf('/', second + 1);
+                    if (first < 0 || second < 0 || third < 0 || maven != key.substring(second + 1, third).equals("maven")) {
+                        continue;
+                    }
+                    String coordinate = key.substring(third + 1), licenseKey = key.substring(second + 1);
+                    String value = dependencies.getProperty(key);
+                    int space = value.indexOf(' ');
+                    Path jar = argument.folder().resolve(space < 0 ? value : value.substring(0, space)).normalize();
+                    if (components.containsKey(coordinate) || Files.isRegularFile(jar) && !described.add(jar)) {
+                        continue;
+                    }
+                    components.put(coordinate, component(coordinate,
+                            Files.exists(jar) ? HexFormat.of().formatHex(hash.hash(jar)) : null,
+                            readLicenses(licenses, licenseKey)));
                 }
-                String coordinate = key.substring(third + 1), licenseKey = key.substring(second + 1);
-                if (components.containsKey(coordinate)) {
-                    continue;
-                }
-                String value = dependencies.getProperty(key);
-                int space = value.indexOf(' ');
-                Path jar = argument.folder().resolve(space < 0 ? value : value.substring(0, space)).normalize();
-                components.put(coordinate, component(coordinate,
-                        Files.exists(jar) ? HexFormat.of().formatHex(hash.hash(jar)) : null,
-                        readLicenses(licenses, licenseKey)));
             }
         }
         CycloneDx.Component project = null;
@@ -122,6 +125,7 @@ public class Sbom implements BuildStep {
                 tag = null;
             }
             List<CycloneDx.Property> properties = new ArrayList<>();
+            List<String> swhids = new ArrayList<>();
             if (tag != null) {
                 properties.add(new CycloneDx.Property("jenesis:scm:tag", tag));
             }
@@ -134,7 +138,7 @@ public class Sbom implements BuildStep {
                     throw new IllegalArgumentException("The tree of a release must be the 40-character id of a Git"
                             + " tree, as `git rev-parse HEAD^{tree}` prints it: " + tree);
                 }
-                properties.add(new CycloneDx.Property("jenesis:scm:swhid", "swh:1:dir:" + tree));
+                swhids.add("swh:1:dir:" + tree);
             }
             if (swhid) {
                 List<Path> roots = new ArrayList<>();
@@ -147,10 +151,10 @@ public class Sbom implements BuildStep {
                 }
                 String identifier = swhid(roots);
                 if (identifier != null) {
-                    properties.add(new CycloneDx.Property("jenesis:source:swhid", identifier));
+                    swhids.add(identifier);
                 }
             }
-            project = new CycloneDx.Component(projectRef, groupId, artifactId, version, purl, null,
+            project = new CycloneDx.Component(projectRef, groupId, artifactId, version, purl, swhids, null,
                     ownLicenses(metadata), metadata.getProperty("description"), developers(metadata),
                     references(metadata, revision == null ? tag : revision), properties);
         }

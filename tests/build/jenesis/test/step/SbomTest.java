@@ -150,7 +150,7 @@ public class SbomTest {
     @Test
     public void records_the_tree_of_a_release_as_a_swhid() throws Exception {
         assertThat(sbom(Map.of("scm.tree", "b293ceb1896f112828a70184317caf4f87f7d327")))
-                .contains("{ \"name\": \"jenesis:scm:swhid\", \"value\": \"swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327\" }");
+                .contains("\"swhid\": [\"swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327\"]");
     }
 
     @Test
@@ -171,14 +171,14 @@ public class SbomTest {
         Files.writeString(argument.resolve(BuildStep.RESOURCES + "demo.txt"), "a text file beside the demo folder\n");
         assertThat(sbom(new Sbom().swhid(true), Map.of()))
                 .as("git write-tree over the same four files names the tree b293ceb1, listing demo.txt before demo/")
-                .contains("{ \"name\": \"jenesis:source:swhid\", \"value\": \"swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327\" }");
+                .contains("\"swhid\": [\"swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327\"]");
     }
 
     @Test
     public void computes_no_swhid_unless_configured() throws Exception {
         Files.writeString(Files.createDirectories(argument.resolve(BuildStep.SOURCES)).resolve("module-info.java"),
                 "module demo {}\n");
-        assertThat(sbom(Map.of())).doesNotContain("jenesis:source:swhid");
+        assertThat(sbom(Map.of())).doesNotContain("swhid");
     }
 
     @Test
@@ -199,6 +199,23 @@ public class SbomTest {
                 Map.of(Path.of(BuildStep.SOURCES + "demo/Greeting.java"), Checksum.of(ChecksumStatus.ALTERED)))));
         assertThat(Sbom.configured(configuration).shouldRun(arguments)).isTrue();
         assertThat(Sbom.configured(null).shouldRun(arguments)).isFalse();
+    }
+
+    @Test
+    public void describes_a_jar_resolved_as_a_module_and_as_a_maven_artifact_by_its_maven_coordinate() throws Exception {
+        Path resolved = Files.createDirectories(argument.resolve("resolved"));
+        Files.writeString(resolved.resolve("org.slf4j-2.0.16.jar"), "slf4j");
+        Files.writeString(resolved.resolve("only-1.0.jar"), "only");
+        SequencedProperties dependencies = new SequencedProperties();
+        dependencies.setProperty("main/runtime/module/org.slf4j/2.0.16", "resolved/org.slf4j-2.0.16.jar");
+        dependencies.setProperty("main/runtime/maven/org.slf4j/slf4j-api/2.0.16", "resolved/org.slf4j-2.0.16.jar");
+        dependencies.setProperty("main/runtime/module/only/1.0", "resolved/only-1.0.jar");
+        dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+
+        assertThat(sbom(Map.of()))
+                .as("one component per jar, named by its maven coordinate where it has one")
+                .contains("\"bom-ref\": \"org.slf4j/slf4j-api/2.0.16\"", "\"bom-ref\": \"only/1.0\"")
+                .doesNotContain("\"bom-ref\": \"org.slf4j/2.0.16\"");
     }
 
     private String sbom(Map<String, String> scm) throws Exception {
