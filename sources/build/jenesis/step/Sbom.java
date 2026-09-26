@@ -125,6 +125,7 @@ public class Sbom implements BuildStep {
                 tag = null;
             }
             List<CycloneDx.Property> properties = new ArrayList<>();
+            List<String> swhids = new ArrayList<>();
             if (tag != null) {
                 properties.add(new CycloneDx.Property("jenesis:scm:tag", tag));
             }
@@ -137,7 +138,7 @@ public class Sbom implements BuildStep {
                     throw new IllegalArgumentException("The tree of a release must be the 40-character id of a Git"
                             + " tree, as `git rev-parse HEAD^{tree}` prints it: " + tree);
                 }
-                properties.add(new CycloneDx.Property("jenesis:scm:swhid", "swh:1:dir:" + tree));
+                swhids.add("swh:1:dir:" + tree);
             }
             if (swhid) {
                 List<Path> roots = new ArrayList<>();
@@ -150,10 +151,10 @@ public class Sbom implements BuildStep {
                 }
                 String identifier = swhid(roots);
                 if (identifier != null) {
-                    properties.add(new CycloneDx.Property("jenesis:source:swhid", identifier));
+                    swhids.add(identifier);
                 }
             }
-            project = new CycloneDx.Component(projectRef, groupId, artifactId, version, purl, null,
+            project = new CycloneDx.Component(projectRef, groupId, artifactId, version, purl, swhids, null,
                     ownLicenses(metadata), metadata.getProperty("description"), developers(metadata),
                     references(metadata, revision == null ? tag : revision), properties);
         }

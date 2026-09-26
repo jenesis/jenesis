@@ -150,7 +150,7 @@ public class SbomTest {
     @Test
     public void records_the_tree_of_a_release_as_a_swhid() throws Exception {
         assertThat(sbom(Map.of("scm.tree", "b293ceb1896f112828a70184317caf4f87f7d327")))
-                .contains("{ \"name\": \"jenesis:scm:swhid\", \"value\": \"swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327\" }");
+                .contains("\"swhid\": [\"swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327\"]");
     }
 
     @Test
@@ -171,14 +171,14 @@ public class SbomTest {
         Files.writeString(argument.resolve(BuildStep.RESOURCES + "demo.txt"), "a text file beside the demo folder\n");
         assertThat(sbom(new Sbom().swhid(true), Map.of()))
                 .as("git write-tree over the same four files names the tree b293ceb1, listing demo.txt before demo/")
-                .contains("{ \"name\": \"jenesis:source:swhid\", \"value\": \"swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327\" }");
+                .contains("\"swhid\": [\"swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327\"]");
     }
 
     @Test
     public void computes_no_swhid_unless_configured() throws Exception {
         Files.writeString(Files.createDirectories(argument.resolve(BuildStep.SOURCES)).resolve("module-info.java"),
                 "module demo {}\n");
-        assertThat(sbom(Map.of())).doesNotContain("jenesis:source:swhid");
+        assertThat(sbom(Map.of())).doesNotContain("swhid");
     }
 
     @Test
