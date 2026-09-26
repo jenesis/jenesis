@@ -201,6 +201,23 @@ public class SbomTest {
         assertThat(Sbom.configured(null).shouldRun(arguments)).isFalse();
     }
 
+    @Test
+    public void describes_a_jar_resolved_as_a_module_and_as_a_maven_artifact_by_its_maven_coordinate() throws Exception {
+        Path resolved = Files.createDirectories(argument.resolve("resolved"));
+        Files.writeString(resolved.resolve("org.slf4j-2.0.16.jar"), "slf4j");
+        Files.writeString(resolved.resolve("only-1.0.jar"), "only");
+        SequencedProperties dependencies = new SequencedProperties();
+        dependencies.setProperty("main/runtime/module/org.slf4j/2.0.16", "resolved/org.slf4j-2.0.16.jar");
+        dependencies.setProperty("main/runtime/maven/org.slf4j/slf4j-api/2.0.16", "resolved/org.slf4j-2.0.16.jar");
+        dependencies.setProperty("main/runtime/module/only/1.0", "resolved/only-1.0.jar");
+        dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+
+        assertThat(sbom(Map.of()))
+                .as("one component per jar, named by its maven coordinate where it has one")
+                .contains("\"bom-ref\": \"org.slf4j/slf4j-api/2.0.16\"", "\"bom-ref\": \"only/1.0\"")
+                .doesNotContain("\"bom-ref\": \"org.slf4j/2.0.16\"");
+    }
+
     private String sbom(Map<String, String> scm) throws Exception {
         return sbom(new Sbom(), scm);
     }
