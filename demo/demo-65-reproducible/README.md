@@ -65,9 +65,9 @@ A release can record the time of its commit instead, with
 When the digest does not match
 ------------------------------
 
-A deliberate change changes the digest: to the sources, to the module's
-documentation comment after its first sentence (which becomes the SBOM's
-description), or to what Jenesis writes into a jar. Record the new digest in `build/Demo.java`. A
+A deliberate change changes the digest: to the sources, to the second paragraph
+of the module's documentation comment (which becomes the SBOM's description), or
+to what Jenesis writes into a jar. Record the new digest in `build/Demo.java`. A
 mismatch on only one runner means something about that runner reached the jar;
 `unzip -Z -v` of the jar from two machines, side by side, shows which entry
 differs.
