@@ -13,7 +13,6 @@ import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Dependencies;
-import build.jenesis.step.Jar;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -189,9 +188,13 @@ public class JApiCmpModule implements BuildExecutorModule {
                 for (Path jar : Dependencies.select(argument.folder(), group, "compile")) {
                     classPath.add(jar.toString());
                 }
-                Path candidate = argument.folder().resolve(BuildStep.ARTIFACTS).resolve(Jar.Sort.CLASSES.getFile());
-                if (Files.isRegularFile(candidate)) {
-                    artifact = candidate;
+                Path artifacts = argument.folder().resolve(BuildStep.ARTIFACTS);
+                if (Files.isDirectory(artifacts)) {
+                    try (DirectoryStream<Path> files = Files.newDirectoryStream(artifacts, "*.jar")) {
+                        for (Path file : files) {
+                            artifact = file;
+                        }
+                    }
                 }
             }
             if (artifact == null) {

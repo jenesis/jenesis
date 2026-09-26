@@ -109,7 +109,7 @@ Every jar is stored once under `jars/`, and the argument file is the launch itse
 `--class-path` and a main class, because this is a non-modular project:
 
     "--class-path"
-    "jars/classes.jar:jars/org.apache.commons.lang3-3.14.0.jar"
+    "jars/build.jenesis.demo%2Fjava-pom-executable%2F1.0.0.jar:jars/org.apache.commons.lang3-3.14.0.jar"
     "sample.Sample"
 
 Unzipped onto a JRE base, it needs no JDK, no jpackage and no descriptor reader:

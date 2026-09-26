@@ -158,7 +158,7 @@ does:
 
     "-javaagent:jars/io.opentelemetry.javaagent-2.30.0.jar"
     "--module-path"
-    "jars/classes.jar:jars/io.opentelemetry.javaagent-2.30.0.jar"
+    "jars/demo.agents.jar:jars/io.opentelemetry.javaagent-2.30.0.jar"
     "--module"
     "demo.agents/demo.agents.Application"
 

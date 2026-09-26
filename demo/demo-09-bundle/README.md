@@ -43,7 +43,7 @@ It carries exactly the runtime closure the `Execute` launcher would run, and the
 descriptor is not a description of the launch but the launch itself:
 
     "--module-path"
-    "jars/classes.jar:jars/org.slf4j-2.0.16.jar"
+    "jars/demo.bundle.jar:jars/org.slf4j-2.0.16.jar"
     "--module"
     "demo.bundle/sample.Sample"
 
