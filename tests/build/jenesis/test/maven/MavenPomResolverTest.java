@@ -3763,6 +3763,142 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_of_model_4_1_0_infers_its_parent_subprojects_sources_and_sibling_versions() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.1.0" root="true">
+                    <modelVersion>4.1.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>${revision}</version>
+                    <packaging>pom</packaging>
+                    <properties>
+                        <revision>1.2</revision>
+                    </properties>
+                    <subprojects>
+                        <subproject>api</subproject>
+                        <subproject>app</subproject>
+                    </subprojects>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("api")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.1.0">
+                    <modelVersion>4.1.0</modelVersion>
+                    <parent/>
+                    <artifactId>api</artifactId>
+                </project>
+                """);
+        Files.writeString(Files.createDirectory(project.resolve("app")).resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.1.0">
+                    <modelVersion>4.1.0</modelVersion>
+                    <parent>
+                        <relativePath>..</relativePath>
+                    </parent>
+                    <artifactId>app</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>project</groupId>
+                            <artifactId>api</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.example</groupId>
+                            <artifactId>processor</artifactId>
+                            <version>3</version>
+                            <type>processor</type>
+                        </dependency>
+                    </dependencies>
+                    <build>
+                        <sources>
+                            <source>
+                                <directory>code</directory>
+                            </source>
+                            <source>
+                                <scope>test</scope>
+                            </source>
+                            <source>
+                                <lang>resources</lang>
+                                <directory>assets</directory>
+                            </source>
+                            <source>
+                                <directory>disabled</directory>
+                                <enabled>false</enabled>
+                            </source>
+                        </sources>
+                    </build>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.keySet()).containsExactly(Path.of(""), Path.of("api"), Path.of("app"));
+        MavenLocalPom app = poms.get(Path.of("app"));
+        assertThat(app.groupId()).as("the parent is the POM at its relativePath, and its groupId is inherited").isEqualTo("project");
+        assertThat(app.version()).isEqualTo("1.2");
+        assertThat(app.dependencies().get(new MavenDependencyKey("project", "api", "jar", null)).version())
+                .as("a dependency on a subproject takes the subproject's version")
+                .isEqualTo("1.2");
+        assertThat(app.dependencies()).doesNotContainKey(new MavenDependencyKey("org.example", "processor", "processor", null));
+        assertThat(app.plugins())
+                .as("a processor dependency is placed on the processor path")
+                .containsEntry("maven/org.example/processor/3", "plugin");
+        assertThat(app.sourceDirectory()).isEqualTo("code");
+        assertThat(app.testSourceDirectory()).isEqualTo("src/test/java");
+        assertThat(app.resourceDirectories()).containsExactly("assets");
+        assertThat(poms.get(Path.of("api")).version()).isEqualTo("1.2");
+    }
+
+    @Test
+    public void local_pom_of_model_4_1_0_discovers_its_subprojects_without_a_list() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.1.0">
+                    <modelVersion>4.1.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>1</version>
+                    <packaging>pom</packaging>
+                </project>
+                """);
+        for (String name : List.of("second", "first")) {
+            Files.writeString(Files.createDirectory(project.resolve(name)).resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.1.0">
+                        <modelVersion>4.1.0</modelVersion>
+                        <parent/>
+                        <artifactId>%s</artifactId>
+                    </project>
+                    """.formatted(name));
+        }
+        Files.createDirectory(project.resolve("notes"));
+        assertThat(mavenPomResolver.local(Runnable::run, mavenRepository, project).keySet())
+                .containsExactly(Path.of(""), Path.of("first"), Path.of("second"));
+    }
+
+    @Test
+    public void local_pom_of_model_4_1_0_refuses_what_jenesis_does_not_read() throws IOException {
+        for (Map.Entry<String, String> refused : Map.of(
+                "<build><sources><source><module>a</module></source></sources></build>", "<module>",
+                "<build><sources><source><directory>a</directory></source><source><directory>b</directory></source></sources></build>",
+                "one source directory per scope",
+                "<dependencies><dependency><groupId>g</groupId><artifactId>a</artifactId><version>1</version><type>modular-jar</type></dependency></dependencies>",
+                "modular-jar").entrySet()) {
+            Files.writeString(project.resolve("pom.xml"), """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.1.0">
+                        <modelVersion>4.1.0</modelVersion>
+                        <groupId>project</groupId>
+                        <artifactId>artifact</artifactId>
+                        <version>1</version>
+                        %s
+                    </project>
+                    """.formatted(refused.getKey()));
+            assertThatThrownBy(() -> mavenPomResolver.local(Runnable::run, mavenRepository, project))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining(refused.getValue());
+        }
+    }
+
+    @Test
     public void local_pom_resolves_a_version_from_an_imported_bom() throws IOException {
         addToRepository("test", "bom", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>
