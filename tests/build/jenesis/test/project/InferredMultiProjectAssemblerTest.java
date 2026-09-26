@@ -12,6 +12,8 @@ import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.RepositoryItem;
+import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.InferredComplianceModule;
@@ -218,6 +220,32 @@ public class InferredMultiProjectAssemblerTest {
         assertThat(fixture.execute("package/inventory"))
                 .as("a native-image-only package phase still feeds the binary through an inventory step")
                 .containsKey("package/inventory");
+    }
+
+    @Test
+    public void launcher_enabled_lists_the_resolved_launcher_in_the_package_inventory() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"), "launcher=true\n");
+        Path served = Files.createDirectory(root.resolve("served"));
+        AssemblyDescriptor assembled = new InferredMultiProjectAssembler().apply(fixture.descriptor(),
+                Map.of("maven", (_, coordinate, _) -> Optional.of(RepositoryItem.ofFile(Files.writeString(
+                        served.resolve(coordinate.replace('/', '-') + ".jar"), coordinate)))),
+                Map.of("maven", Resolver.identity()));
+        BuildExecutor executor = BuildExecutor.of(fixture.build(),
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+        executor.addSource("manifests", fixture.manifests());
+        executor.addSource("sources", fixture.sources());
+        executor.addSource("artifacts", fixture.artifacts());
+        executor.addModule("sub", assembled.build(), "manifests", "sources", "artifacts");
+        assembled.tail().forEach((name, phase) -> executor.addModule(name, phase, "sub"));
+        SequencedMap<String, Path> outputs = executor.execute(Runnable::run, "package/inventory").toCompletableFuture().join();
+        SequencedProperties inventory = SequencedProperties.ofFiles(outputs.get("package/inventory").resolve(Inventory.INVENTORY));
+        assertThat(inventory.stringPropertyNames())
+                .as("a launcher-only package phase still lists what it resolved, so pin reaches the launcher group")
+                .anyMatch(key -> key.endsWith(".group") && inventory.getProperty(key).equals("launcher"));
     }
 
     @Test
