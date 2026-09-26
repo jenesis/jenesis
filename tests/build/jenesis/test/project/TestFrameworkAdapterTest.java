@@ -15,6 +15,7 @@ import build.jenesis.project.JUnitPlatform;
 import build.jenesis.project.TestFramework;
 import build.jenesis.project.TestModule;
 import build.jenesis.project.TestNG;
+import build.jenesis.project.TestTags;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -75,7 +76,8 @@ public class TestFrameworkAdapterTest {
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                Collections.emptyNavigableSet(),
+                TestTags.ALL,
+                List.of(),
                 false,
                 false))
                 .isEmpty();
@@ -109,7 +111,8 @@ public class TestFrameworkAdapterTest {
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                Collections.emptyNavigableSet(),
+                TestTags.ALL,
+                List.of(),
                 false,
                 false))
                 .containsExactly("-d", root.resolve("test-output").toString());
@@ -123,12 +126,13 @@ public class TestFrameworkAdapterTest {
                 root,
                 new LinkedHashSet<>(List.of("sample.AlphaTest", "sample.BetaTest")),
                 methods,
-                new LinkedHashSet<>(List.of("slow", "flaky")),
+                TestTags.parse("slow,flaky"),
+                List.of(),
                 true,
                 false))
                 .containsExactly(
                         "-d", root.resolve("test-output").toString(),
-                        "-groups", "slow,flaky",
+                        "-groups", "flaky,slow",
                         "-parallel", "methods",
                         "-testclass", "sample.AlphaTest,sample.BetaTest",
                         "-methods", "sample.AlphaTest.first");
