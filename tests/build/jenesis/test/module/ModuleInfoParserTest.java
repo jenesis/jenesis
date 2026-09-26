@@ -883,7 +883,7 @@ public class ModuleInfoParserTest {
     }
 
     @Test
-    public void describes_a_markdown_module_by_its_second_paragraph_as_plain_text() throws IOException {
+    public void describes_a_markdown_module_by_its_second_paragraph_as_written() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /// Foo `Library`.
                 ///
@@ -894,8 +894,10 @@ public class ModuleInfoParserTest {
                 }
                 """);
         ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
-        assertThat(info.name()).isEqualTo("Foo Library");
-        assertThat(info.description()).isEqualTo("A small library that does foo things.");
+        assertThat(info.name()).isEqualTo("Foo `Library`");
+        assertThat(info.description())
+                .as("a link becomes its label, but the rest of the Markdown is kept as written")
+                .isEqualTo("A **small** library that does foo things.");
     }
 
     @Test

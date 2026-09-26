@@ -85,8 +85,9 @@ duplicated:
   from the full name - so `module build.jenesis.demo.publishing` becomes
   `build.jenesis : build.jenesis.demo.publishing`. The module declaration's
   Javadoc supplies `<name>` (its first sentence) and `<description>` (its second
-  paragraph), each as plain text: HTML, `{@code}` and `{@link}` markup and Markdown
-  emphasis are reduced to the words they mark.
+  paragraph), each as plain text: HTML, `{@code}` and `{@link}` markup are reduced to
+  the words they mark. A Markdown comment (`///`) keeps its inline markup as written,
+  apart from a link, which becomes its label.
 - **`project.properties`** (bound via `Project.metadata(...)`) carries only what a
   module declaration cannot express: `url`, every `license.<id>.name|url`, every
   `developer.<id>.name|email`, and the `scm.connection|developerConnection|url`
