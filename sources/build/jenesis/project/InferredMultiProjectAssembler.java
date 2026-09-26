@@ -404,7 +404,12 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             if (packaging.jmod()) {
                 sub.addStep("jmod",
                         JMod.ofEnvironment(environment, factory),
-                        Stream.of(Stream.of("binary", "legal"), descriptor.content().stream()).flatMap(Function.identity()));
+                        Stream.of(Stream.of("binary", "legal"),
+                                        descriptor.content().stream(),
+                                        descriptor.resources().stream(),
+                                        sbom == null ? Stream.<String>empty() : Stream.of("sbom"),
+                                        resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"))
+                                .flatMap(Function.identity()));
             }
             if (!hooks.get("").isEmpty()) {
                 sub.addModule("custom", (nested, nestedInherited) -> hooks.get("").forEach((name, module) ->
@@ -433,7 +438,11 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
                 SequencedSet<String> linked = new LinkedHashSet<>(inputs);
                 if (!packaging.jmod() && (packaging.jlink() || packaging.jpackage() != null)) {
-                    sub.addStep("jmod", JMod.ofEnvironment(environment, factory), inputs);
+                    SequencedSet<String> packed = descriptor.resources().stream()
+                            .map(InferredMultiProjectAssembler::local)
+                            .collect(Collectors.toCollection(LinkedHashSet::new));
+                    sub.addStep("jmod", JMod.ofEnvironment(environment, factory), Stream.concat(inputs.stream(),
+                            inherited.sequencedKeySet().stream().filter(key -> packed.contains(local(key)))));
                     linked.add("jmod");
                 }
                 if (packaging.jlink()) {
