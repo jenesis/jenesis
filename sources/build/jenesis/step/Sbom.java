@@ -181,8 +181,22 @@ public class Sbom implements BuildStep {
                     swhids.add(identifier);
                 }
             }
+            SequencedSet<String> declared = new LinkedHashSet<>();
+            for (String key : metadata.stringPropertyNames()) {
+                if (key.startsWith("license.") && (key.endsWith(".name") || key.endsWith(".url"))
+                        && key.lastIndexOf('.') > "license.".length()) {
+                    declared.add(key.substring(0, key.lastIndexOf('.')));
+                }
+            }
+            Map<String, String> aliases = Dependencies.aliases(folders);
+            List<License> licenses = new ArrayList<>();
+            for (String license : declared) {
+                licenses.add(new License(null, null,
+                        metadata.getProperty(license + ".name"),
+                        metadata.getProperty(license + ".url")).identified(aliases));
+            }
             project = new CycloneDx.Component(type, projectRef, groupId, artifactId, version, purl, swhids, null,
-                    ownLicenses(metadata, Dependencies.aliases(folders)), metadata.getProperty("description"), developers(metadata),
+                    licenses, metadata.getProperty("description"), developers(metadata),
                     references(metadata, revision == null ? tag : revision), properties,
                     organization(metadata, "organization"),
                     metadata.value("copyright"),
@@ -346,27 +360,6 @@ public class Sbom implements BuildStep {
     private static CycloneDx.Organization organization(SequencedProperties metadata, String prefix) {
         String name = metadata.value(prefix + ".name"), url = metadata.value(prefix + ".url");
         return name == null && url == null ? null : new CycloneDx.Organization(name, url);
-    }
-
-    private static List<License> ownLicenses(SequencedProperties metadata, Map<String, String> aliases) {
-        SequencedMap<String, String[]> byId = new LinkedHashMap<>();
-        for (String key : metadata.stringPropertyNames()) {
-            if (!key.startsWith("license.")) {
-                continue;
-            }
-            String suffix = key.substring("license.".length());
-            int dot = suffix.lastIndexOf('.');
-            if (dot <= 0) {
-                continue;
-            }
-            String[] entry = byId.computeIfAbsent(suffix.substring(0, dot), _ -> new String[2]);
-            if (suffix.substring(dot + 1).equals("name")) {
-                entry[0] = metadata.getProperty(key);
-            } else if (suffix.substring(dot + 1).equals("url")) {
-                entry[1] = metadata.getProperty(key);
-            }
-        }
-        return byId.values().stream().map(entry -> new License(null, null, entry[0], entry[1]).identified(aliases)).toList();
     }
 
     private static List<CycloneDx.Author> developers(SequencedProperties metadata) {
