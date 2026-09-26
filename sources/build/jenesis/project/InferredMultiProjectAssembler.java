@@ -475,6 +475,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     images.addFirst("packaged");
                     images.add("custom");
                 }
+                if (packaging.launcher()) {
+                    images.add("launcher");
+                }
                 if (!images.isEmpty()) {
                     String named = descriptor.name().endsWith("-")
                             ? descriptor.name().substring(0, descriptor.name().length() - 1)
