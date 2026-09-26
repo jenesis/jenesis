@@ -20,27 +20,33 @@ public class Sbom implements BuildStep {
     private final CycloneDx.Format format;
     private final boolean swhid;
     private final String type;
+    private final String graalvmLicense;
 
     public Sbom() {
-        this(CycloneDx.Format.JSON, false, "library");
+        this(CycloneDx.Format.JSON, false, "library", null);
     }
 
-    private Sbom(CycloneDx.Format format, boolean swhid, String type) {
+    private Sbom(CycloneDx.Format format, boolean swhid, String type, String graalvmLicense) {
         this.format = format;
         this.swhid = swhid;
         this.type = type;
+        this.graalvmLicense = graalvmLicense;
     }
 
     public Sbom format(CycloneDx.Format format) {
-        return new Sbom(format, swhid, type);
+        return new Sbom(format, swhid, type, graalvmLicense);
     }
 
     public Sbom swhid(boolean swhid) {
-        return new Sbom(format, swhid, type);
+        return new Sbom(format, swhid, type, graalvmLicense);
     }
 
     public Sbom type(String type) {
-        return new Sbom(format, swhid, type);
+        return new Sbom(format, swhid, type, graalvmLicense);
+    }
+
+    public Sbom graalvmLicense(String graalvmLicense) {
+        return new Sbom(format, swhid, type, graalvmLicense);
     }
 
     public static Sbom configured(Path properties) throws IOException {
@@ -95,14 +101,13 @@ public class Sbom implements BuildStep {
             Path release = argument.folder().resolve(RELEASE);
             if (Files.isRegularFile(release)) {
                 SequencedProperties runtime = SequencedProperties.ofFiles(release);
-                String implementor = unquote(runtime.value("IMPLEMENTOR")), graalvm = unquote(runtime.value("GRAALVM_VERSION"));
-                String name = graalvm == null ? "Java runtime" : "GraalVM",
-                        runtimeVersion = graalvm == null ? unquote(runtime.value("JAVA_RUNTIME_VERSION")) : graalvm;
-                String ref = (implementor == null ? "" : implementor + "/") + name
-                        + (runtimeVersion == null ? "" : "/" + runtimeVersion);
+                String implementor = unquote(runtime.value("IMPLEMENTOR")),
+                        graalvm = unquote(runtime.value("GRAALVM_VERSION", runtime.value("JAVA_RUNTIME_VERSION")));
+                String ref = (implementor == null ? "" : implementor + "/") + "GraalVM" + (graalvm == null ? "" : "/" + graalvm);
                 if (platforms.add(ref)) {
-                    components.put(ref, new CycloneDx.Component("platform", ref, implementor, name, runtimeVersion, null, null,
-                            List.of(), null, List.of(), List.of(), List.of()));
+                    components.put(ref, new CycloneDx.Component("platform", ref, implementor, "GraalVM", graalvm, null, null,
+                            graalvmLicense == null ? List.of() : List.of(new License(graalvmLicense, null, null, null)),
+                            null, List.of(), List.of(), List.of()));
                 }
             }
             Path index = argument.folder().resolve(DEPENDENCIES);

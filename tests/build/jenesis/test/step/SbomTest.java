@@ -215,6 +215,20 @@ public class SbomTest {
                 .contains("{ \"ref\": \"build.jenesis/demo/1.0.0\", \"dependsOn\": [\"Oracle Corporation/GraalVM/25.0.3\"] }");
     }
 
+    @Test
+    public void records_the_licence_configured_for_the_graalvm() throws Exception {
+        Files.writeString(argument.resolve(BuildStep.RELEASE), "IMPLEMENTOR=\"GraalVM Community\"\nGRAALVM_VERSION=\"25.0.2\"\n");
+
+        assertThat(sbom(new Sbom().graalvmLicense("GPL-2.0-with-classpath-exception"), Map.of()))
+                .contains("\"name\": \"GraalVM\",\n"
+                        + "      \"version\": \"25.0.2\",\n"
+                        + "      \"licenses\": [\n"
+                        + "        { \"license\": { \"id\": \"GPL-2.0-with-classpath-exception\" } }");
+        assertThat(sbom(new Sbom(), Map.of()))
+                .as("the release file names no licence, so none is recorded unless one is configured")
+                .doesNotContain("licenses");
+    }
+
     private String sbom(Map<String, String> scm) throws Exception {
         return sbom(new Sbom(), scm);
     }
