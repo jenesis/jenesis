@@ -16,6 +16,7 @@ public class MavenModuleRepository implements JenesisRepository {
     private final MavenRepository repository;
     private final String group;
     private final int segments;
+    private final Map<String, MavenDependencyKey> mapping;
     private final DocumentBuilderFactory documentBuilderFactory;
     private final Map<MavenDependencyName, Optional<Metadata>> metadata = new ConcurrentHashMap<>();
 
@@ -24,7 +25,7 @@ public class MavenModuleRepository implements JenesisRepository {
     }
 
     public MavenModuleRepository(MavenRepository repository) {
-        this(repository, null, segments(), MavenDefaultVersionNegotiator.toDocumentBuilderFactory());
+        this(repository, null, segments(), null, MavenDefaultVersionNegotiator.toDocumentBuilderFactory());
     }
 
     public static MavenModuleRepository ofEnvironment(Environment environment, MavenRepository repository) {
@@ -34,26 +35,33 @@ public class MavenModuleRepository implements JenesisRepository {
     private MavenModuleRepository(MavenRepository repository,
                                   String group,
                                   int segments,
+                                  Map<String, MavenDependencyKey> mapping,
                                   DocumentBuilderFactory documentBuilderFactory) {
         this.repository = repository;
         this.group = group;
         this.segments = segments;
+        this.mapping = mapping;
         this.documentBuilderFactory = documentBuilderFactory;
     }
 
     public MavenModuleRepository repository(MavenRepository repository) {
-        return new MavenModuleRepository(repository, group, segments, documentBuilderFactory);
+        return new MavenModuleRepository(repository, group, segments, mapping, documentBuilderFactory);
     }
 
     public MavenModuleRepository group(String group) {
         if (group != null) {
             SAFE_SEGMENT.accept("group id", group);
         }
-        return new MavenModuleRepository(repository, group, segments, documentBuilderFactory);
+        return new MavenModuleRepository(repository, group, segments, mapping, documentBuilderFactory);
     }
 
     public MavenModuleRepository segments(int segments) {
-        return new MavenModuleRepository(repository, group, checkedSegments(segments), documentBuilderFactory);
+        return new MavenModuleRepository(repository, group, checkedSegments(segments), mapping, documentBuilderFactory);
+    }
+
+    public MavenModuleRepository mapping(Map<String, MavenDependencyKey> mapping) {
+        return new MavenModuleRepository(repository, group, segments, mapping == null ? null : Map.copyOf(mapping),
+                documentBuilderFactory);
     }
 
     public static int segments() {
@@ -97,22 +105,38 @@ public class MavenModuleRepository implements JenesisRepository {
         if (version != null) {
             SAFE_SEGMENT.accept("version", version);
         }
-        String groupId = group == null ? groupId(module, segments) : group;
-        String suffix = type == null ? "jar" : type;
+        String groupId, artifactId, suffix = type == null ? "jar" : type;
+        if (mapping == null) {
+            groupId = group == null ? groupId(module, segments) : group;
+            artifactId = module;
+        } else {
+            MavenDependencyKey mapped = mapping.get(module);
+            if (mapped == null) {
+                return Optional.empty();
+            }
+            groupId = mapped.groupId();
+            artifactId = mapped.artifactId();
+            if (classifier == null) {
+                classifier = mapped.classifier();
+            }
+            if (suffix.equals("jar") || suffix.startsWith("jar.")) {
+                suffix = mapped.type() + suffix.substring("jar".length());
+            }
+        }
         int dot = suffix.indexOf('.');
         String resolved;
         if (version == null || version.equals("RELEASE") || version.equals("LATEST")) {
-            Metadata published = metadata(executor, groupId, module).orElse(null);
+            Metadata published = metadata(executor, groupId, artifactId).orElse(null);
             if (published == null) {
                 return Optional.empty();
             }
-            resolved = published.resolve(version, groupId, module);
+            resolved = published.resolve(version, groupId, artifactId);
         } else {
             resolved = version;
         }
         return repository.fetch(executor,
                 groupId,
-                module,
+                artifactId,
                 resolved,
                 dot < 0 ? suffix : suffix.substring(0, dot),
                 classifier,

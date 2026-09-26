@@ -31,6 +31,10 @@ builds the consumer at the project root against it, and runs the produced module
       [resolved] demo.convention.greeter-1.0.0.jar from the company repository, by the Maven convention
       [resolved] demo.other-1.0.0.jar from the regular module repository
 
+    Resolving through a company module list:
+      [resolved] company.greeter-1.0.0.jar from the company repository, at the coordinate the list names
+      [resolved] demo.other-1.0.0.jar from the regular module repository
+
 Layout
 ------
 
@@ -154,6 +158,40 @@ there too, with `-Djenesis.maven.token`, or keeps both in
 `~/.jenesis/jenesis.properties`. A type also carries into a
 spliced reference, so `maven:@CORP_MODULES` reads every remote that variable
 names as a Maven repository, and an unknown type is rejected by name.
+
+A module list
+-------------
+
+A module that was published under a coordinate the convention does not derive - a
+library older than its module name, or one a vendor publishes - is found through a
+list instead. A `.properties` file maps each module name to its Maven coordinate,
+`<groupId>/<artifactId>`, optionally followed by `/<type>` and `/<classifier>`:
+
+    # modules.properties
+    company.greeter=demo.convention/demo.convention.greeter
+    com.example.billing=com.example/billing-core
+
+A `mapped:` entry names the Maven repository to read and, after a colon, the lists,
+separated by `;`, each a URI or an absolute path:
+
+    -Djenesis.module.uri=mapped:https://nexus.example.com/releases/:https://lists.example.com/modules.properties,https://repo.jenesis.build/
+
+The entry answers for the modules its lists name and for no other, so every other
+module falls through to the next entry; the last section of the demo run above is
+this chain, with a list the demo writes. `@` in place of the URI reads the Maven
+repository the build already uses for its Maven dependencies, as `jenesis.maven.uri`
+or `MAVEN_REPOSITORY_URI` configures it:
+
+    -Djenesis.module.uri=mapped:@:/etc/company/modules.properties,https://repo.jenesis.build/
+
+A company keeps its list in one place and every build names it. The lists are read
+once, when the build starts; a module that two lists map to different coordinates
+fails the build, naming both. A version is not part of the list: it comes from the
+`requires` that is resolved, pinned or floating, as with the convention. A type or
+classifier the list names applies where the request names none of its own, so the
+sources of a listed module are still found by their classifier. A list on the host of
+the Maven repository is fetched with the Maven credential, by the same rules as the
+repository itself, and a list anywhere else without one.
 
 Why the demo wires two repositories
 -----------------------------------
