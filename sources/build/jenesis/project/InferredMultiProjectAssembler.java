@@ -269,6 +269,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             }
         }
         SequencedMap<String, BuildExecutorModule> none = Collections.emptyNavigableMap();
+        Sbom sbom = environment.flag("sbom.cyclonedx", true)
+                ? Sbom.configured(BuildStep.locate(descriptor.configuration(), "sbom.properties"))
+                : null;
         AssemblyDescriptor assembly = new AssemblyDescriptor((sub, outerInherited) -> {
             SequencedSet<String> closure = new LinkedHashSet<>(descriptor.artifacts());
             if (modules != null) {
@@ -292,9 +295,6 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                  .custom(hooks.getOrDefault("format", none))),
                     Stream.of(descriptor.sources().stream(), descriptor.spdx().stream(), descriptor.manifests().stream())
                             .flatMap(Function.identity()));
-            Sbom sbom = environment.flag("sbom.cyclonedx", true)
-                    ? Sbom.configured(BuildStep.locate(descriptor.configuration(), "sbom.properties"))
-                    : null;
             if (sbom != null) {
                 sub.addStep("sbom", sbom,
                         Stream.of(descriptor.manifests().stream(),
@@ -416,6 +416,14 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             assembly = assembly.then("package", (sub, inherited) -> {
                 SequencedSet<String> images = new LinkedHashSet<>();
                 SequencedSet<String> inputs = new LinkedHashSet<>(inherited.sequencedKeySet());
+                SequencedSet<String> identified = Stream.of(descriptor.manifests(),
+                                descriptor.coordinates(),
+                                descriptor.sources(),
+                                descriptor.resources())
+                        .flatMap(SequencedSet::stream)
+                        .map(InferredMultiProjectAssembler::local)
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+                inputs.removeIf(key -> identified.contains(local(key)));
                 if (modules != null) {
                     SequencedSet<String> replaced = descriptor.artifacts().stream()
                             .map(InferredMultiProjectAssembler::local)
@@ -441,11 +449,25 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     sub.addStep("bundle", Bundle.ofEnvironment(environment), inputs);
                 }
                 if (packaging.launcher()) {
-                    sub.addModule("launcher",
-                            LauncherModule.ofEnvironment(environment, repositories, resolvers)
-                                    .pinning(descriptor.pinning())
-                                    .pathPlacement(descriptor.pathPlacement()),
-                            inputs.stream());
+                    LauncherModule launcher = LauncherModule.ofEnvironment(environment, repositories, resolvers)
+                            .pinning(descriptor.pinning())
+                            .pathPlacement(descriptor.pathPlacement());
+                    SequencedSet<String> launched = new LinkedHashSet<>(inputs);
+                    if (sbom != null) {
+                        SequencedSet<String> locals = Stream.of(descriptor.manifests(),
+                                        descriptor.artifacts(),
+                                        descriptor.sources(),
+                                        descriptor.resources())
+                                .flatMap(SequencedSet::stream)
+                                .map(InferredMultiProjectAssembler::local)
+                                .collect(Collectors.toCollection(LinkedHashSet::new));
+                        SequencedSet<String> described = inherited.sequencedKeySet().stream()
+                                .filter(key -> locals.contains(local(key)))
+                                .collect(Collectors.toCollection(LinkedHashSet::new));
+                        launcher = launcher.sbom(sbom.type("application")).sbomInputs(described);
+                        launched.addAll(described);
+                    }
+                    sub.addModule("launcher", launcher, launched);
                 }
                 if (packaging.docker() != null) {
                     sub.addStep("docker", new Docker(packaging.docker()), inputs);

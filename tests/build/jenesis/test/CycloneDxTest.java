@@ -113,7 +113,7 @@ public class CycloneDxTest {
 
     @Test
     public void emits_subject_description_authors_and_external_references() {
-        CycloneDx.Component subject = new CycloneDx.Component(
+        CycloneDx.Component subject = new CycloneDx.Component("library",
                 "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", null,
                 List.of(),
                 "A demo project",
@@ -140,7 +140,7 @@ public class CycloneDxTest {
 
     @Test
     public void emits_the_properties_of_a_component() {
-        CycloneDx.Component subject = new CycloneDx.Component(
+        CycloneDx.Component subject = new CycloneDx.Component("library",
                 "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", null,
                 List.of(),
                 null,
@@ -175,5 +175,23 @@ public class CycloneDxTest {
 
     private static String uuidOf(String serialLess) {
         return "urn:uuid:" + UUID.nameUUIDFromBytes(serialLess.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void emits_the_type_of_a_component() {
+        CycloneDx.Component subject = new CycloneDx.Component("application",
+                "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", null,
+                List.of(),
+                null,
+                List.of(),
+                List.of(),
+                List.of());
+
+        assertThat(emitter.emit(CycloneDx.Format.JSON, subject, COMPONENTS, List.of()))
+                .contains("\"type\": \"application\",\n      \"bom-ref\": \"build.jenesis/demo/1.0.0\"")
+                .contains("\"type\": \"library\",\n      \"bom-ref\": \"org.foo/bar/1.2.3\"");
+        assertThat(emitter.emit(CycloneDx.Format.XML, subject, COMPONENTS, List.of()))
+                .contains("<component bom-ref=\"build.jenesis/demo/1.0.0\" type=\"application\">")
+                .contains("<component bom-ref=\"org.foo/bar/1.2.3\" type=\"library\">");
     }
 }

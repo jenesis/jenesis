@@ -56,8 +56,9 @@ public class Launcher implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        String mainClass = null, mainModule = null, name = null;
-        Path shaded = null;
+        String mainClass = null, mainModule = null, name = null, location = null;
+        Path shaded = null, sbom = null;
+        Manifest fragment = null;
         SequencedMap<String, Path> jars = new TreeMap<>();
         SequencedSet<Path> granted = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
@@ -75,6 +76,16 @@ public class Launcher implements BuildStep {
                 }
                 if (name == null) {
                     name = application.getProperty("name");
+                }
+            }
+            Path manifest = argument.folder().resolve(Versions.MANIFEST);
+            if (sbom == null && Files.isRegularFile(manifest)) {
+                try (InputStream in = Files.newInputStream(manifest)) {
+                    fragment = new Manifest(in);
+                }
+                location = fragment.getMainAttributes().getValue("Sbom-Location");
+                if (location != null && Files.isRegularFile(argument.folder().resolve(RESOURCES).resolve(location))) {
+                    sbom = argument.folder().resolve(RESOURCES).resolve(location);
                 }
             }
             for (Path file : Dependencies.select(argument.folder(), tool, "runtime")) {
@@ -181,6 +192,9 @@ public class Launcher implements BuildStep {
             }
         }
         Manifest manifest = new Manifest();
+        if (sbom != null) {
+            manifest.getMainAttributes().putAll(fragment.getMainAttributes());
+        }
         manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
         manifest.getMainAttributes().put(Attributes.Name.MAIN_CLASS, MAIN_CLASS);
         if (jars.values().stream().anyMatch(jar -> granted.contains(jar.toAbsolutePath().normalize()))) {
@@ -194,6 +208,9 @@ public class Launcher implements BuildStep {
                     || entry.equals("META-INF/LICENSE")
                     || entry.equals("META-INF/NOTICE"));
             writeEntry(out, "application.properties", descriptor);
+            if (sbom != null) {
+                writeEntry(out, location, sbom);
+            }
             for (Map.Entry<String, Path> entry : stored.entrySet()) {
                 explode(out, entry.getValue(), "jars/" + entry.getKey() + "/", _ -> true);
             }

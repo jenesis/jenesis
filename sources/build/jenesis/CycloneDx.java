@@ -46,12 +46,12 @@ public class CycloneDx {
         return new CycloneDx(identifiers);
     }
 
-    public record Component(String bomRef, String group, String name, String version, String purl, String sha256,
+    public record Component(String type, String bomRef, String group, String name, String version, String purl, String sha256,
                             List<License> licenses, String description, List<Author> authors,
                             List<ExternalReference> externalReferences, List<Property> properties) {
 
         public Component(String bomRef, String group, String name, String version, String purl, String sha256, List<License> licenses) {
-            this(bomRef, group, name, version, purl, sha256, licenses, null, List.of(), List.of(), List.of());
+            this("library", bomRef, group, name, version, purl, sha256, licenses, null, List.of(), List.of(), List.of());
         }
     }
 
@@ -144,7 +144,7 @@ public class CycloneDx {
     private void appendJsonComponent(StringBuilder builder, Component component, int indent) {
         String pad = " ".repeat(indent);
         builder.append("{\n");
-        builder.append(pad).append("  \"type\": \"library\",\n");
+        builder.append(pad).append("  \"type\": \"").append(escapeJson(component.type())).append("\",\n");
         if (component.bomRef() != null) {
             builder.append(pad).append("  \"bom-ref\": \"").append(escapeJson(component.bomRef())).append("\",\n");
         }
@@ -284,7 +284,7 @@ public class CycloneDx {
 
     private void appendXmlComponent(Document document, Node parent, Component component) {
         Element node = (Element) parent.appendChild(document.createElementNS(NAMESPACE, "component"));
-        node.setAttribute("type", "library");
+        node.setAttribute("type", component.type());
         if (component.bomRef() != null) {
             node.setAttribute("bom-ref", component.bomRef());
         }
