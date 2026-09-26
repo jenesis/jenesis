@@ -4991,6 +4991,70 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void captures_the_license_of_a_dependency_whose_own_dependencies_are_all_excluded() throws IOException {
+        addToRepository("flatgroup", "flatlib", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>flatgroup</groupId>
+                    <artifactId>flatlib</artifactId>
+                    <version>1</version>
+                    <licenses>
+                        <license>
+                            <name>Apache-2.0</name>
+                            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+                        </license>
+                    </licenses>
+                    <dependencies>
+                        <dependency>
+                            <groupId>hiddengroup</groupId>
+                            <artifactId>hiddenlib</artifactId>
+                            <version>1</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addToRepository("rootgroup", "rootlib", "1", """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>rootgroup</groupId>
+                    <artifactId>rootlib</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>flatgroup</groupId>
+                            <artifactId>flatlib</artifactId>
+                            <version>1</version>
+                            <exclusions>
+                                <exclusion>
+                                    <groupId>*</groupId>
+                                    <artifactId>*</artifactId>
+                                </exclusion>
+                            </exclusions>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """);
+        addJarToRepository("rootgroup", "rootlib", "1");
+        addJarToRepository("flatgroup", "flatlib", "1");
+
+        Resolver.Resolution resolution = mavenPomResolver.dependencies(
+                Runnable::run,
+                "maven",
+                Map.<String, Repository>of("maven", mavenRepository),
+                new LinkedHashMap<>(Map.of("rootgroup/rootlib/1", Collections.emptyNavigableSet())),
+                new LinkedHashMap<>(),
+                DependencyScope.COMPILE);
+
+        assertThat(resolution.vertices().get("maven/flatgroup/flatlib").licenses())
+                .as("a POM that lists its closure flat excludes every dependency's own dependencies, as Jenesis writes"
+                        + " one, and the license of each is still read from its POM")
+                .containsExactly(new License(null, null, "Apache-2.0", "https://www.apache.org/licenses/LICENSE-2.0.txt"));
+        assertThat(resolution.vertices()).doesNotContainKey("maven/hiddengroup/hiddenlib");
+    }
+
+    @Test
     public void bom_flattens_dependency_management() throws IOException {
         addToRepository("group", "bom", "1", """
                 <?xml version="1.0" encoding="UTF-8"?>

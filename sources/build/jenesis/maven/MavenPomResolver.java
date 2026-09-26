@@ -455,15 +455,13 @@ public class MavenPomResolver implements MavenResolver {
                         exclusions = new HashSet<>(exclusions);
                         exclusions.addAll(value.exclusions());
                     }
-                    if (!exclusions.contains(MavenDependencyName.EXCLUDE_ALL)) {
-                        queue.add(new PendingPom(dispatch(executor,
-                                repository,
-                                entry.getKey().groupId(),
-                                entry.getKey().artifactId(),
-                                version,
-                                resolved,
-                                unresolved), scope, exclusions, entry.getKey(), value.version()));
-                    }
+                    queue.add(new PendingPom(dispatch(executor,
+                            repository,
+                            entry.getKey().groupId(),
+                            entry.getKey().artifactId(),
+                            version,
+                            resolved,
+                            unresolved), scope, exclusions, entry.getKey(), value.version()));
                 }
             }
             PendingPom pending = queue.poll();
