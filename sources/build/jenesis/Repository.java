@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import java.security.cert.X509Certificate;
 
 @FunctionalInterface
 public interface Repository {
@@ -133,7 +134,7 @@ public interface Repository {
                                 + current
                                 + " (set -Djenesis.repository.insecure=true to allow plaintext repositories)");
                     }
-                    URLConnection connection = current.toURL().openConnection();
+                    URLConnection connection = connect(current, settings.insecure());
                     connection.setConnectTimeout(settings.connectTimeout());
                     connection.setReadTimeout(settings.readTimeout());
                     if (!(connection instanceof HttpURLConnection http)) {
@@ -188,11 +189,60 @@ public interface Repository {
                             + " after "
                             + (attempt + 1)
                             + " attempt(s): "
-                            + e, e);
+                            + e
+                            + (e instanceof SSLHandshakeException && !settings.insecure()
+                                    ? " (set -Djenesis.repository.insecure=true to accept a certificate that does not"
+                                            + " verify, as a self-signed one does)"
+                                    : ""), e);
                 }
                 pause(settings.backoff().toMillis() << attempt, uri);
             }
         }
+    }
+
+    static URLConnection connect(URI uri, boolean insecure) throws IOException {
+        URLConnection connection = uri.toURL().openConnection();
+        if (insecure && connection instanceof HttpsURLConnection https) {
+            SSLContext context;
+            try {
+                context = SSLContext.getInstance("TLS");
+                context.init(null, new TrustManager[] {new X509ExtendedTrustManager() {
+                    @Override
+                    public void checkClientTrusted(X509Certificate[] chain, String authType) {
+                    }
+
+                    @Override
+                    public void checkServerTrusted(X509Certificate[] chain, String authType) {
+                    }
+
+                    @Override
+                    public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket) {
+                    }
+
+                    @Override
+                    public void checkServerTrusted(X509Certificate[] chain, String authType, Socket socket) {
+                    }
+
+                    @Override
+                    public void checkClientTrusted(X509Certificate[] chain, String authType, SSLEngine engine) {
+                    }
+
+                    @Override
+                    public void checkServerTrusted(X509Certificate[] chain, String authType, SSLEngine engine) {
+                    }
+
+                    @Override
+                    public X509Certificate[] getAcceptedIssuers() {
+                        return new X509Certificate[0];
+                    }
+                }}, null);
+            } catch (GeneralSecurityException e) {
+                throw new IllegalStateException("Cannot switch off the certificate check for " + uri, e);
+            }
+            https.setSSLSocketFactory(context.getSocketFactory());
+            https.setHostnameVerifier((_, _) -> true);
+        }
+        return connection;
     }
 
     private static void pause(long delay, URI uri) throws InterruptedIOException {

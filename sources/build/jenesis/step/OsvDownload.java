@@ -319,7 +319,7 @@ public class OsvDownload implements BuildStep {
     private static String request(URI uri, String body, boolean insecure) throws IOException {
         requireSecure(uri, insecure);
         for (int attempt = 0; ; attempt++) {
-            HttpURLConnection http = (HttpURLConnection) uri.toURL().openConnection();
+            HttpURLConnection http = (HttpURLConnection) Repository.connect(uri, insecure);
             http.setRequestProperty("User-Agent", "Jenesis");
             http.setConnectTimeout(10_000);
             http.setReadTimeout(30_000);

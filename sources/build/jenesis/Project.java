@@ -2690,7 +2690,7 @@ public record Project(
                 pin.retain|groups|groups|all|none: which pins no closure resolved a refresh keeps - those of groups it did not resolve, all, or none
                 platform.<token>||true adds a platform token and false removes one, selecting guarded pins
                 plugin.<name>|true|false leaves out the plugin <name> that jenesis.plugins.properties names
-                repository.insecure|false|Allow plaintext http:// repository fetches; only the command line or ~/.jenesis/jenesis.properties may allow it, never a file a project provides
+                repository.insecure|false|Allow plaintext http:// repositories, and over https accept a certificate that does not verify, as a self-signed one; only the command line or ~/.jenesis/jenesis.properties may allow it, never a file a project provides
                 repository.retries|2|Retries after a failed fetch; 0 disables
                 repository.backoff|125|Initial retry backoff in milliseconds, doubling per attempt
                 repository.connect.timeout|10000|Connect timeout for a repository fetch, in milliseconds
@@ -2713,7 +2713,7 @@ public record Project(
                 cache.key||Access key sent to a cache server (env JENESIS_CACHE_KEY); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and a cache server a project's own files named is not sent it
                 cache.connect|PT1S|Connect timeout for a cache server
                 cache.read|PT10S|Read timeout for a cache server
-                cache.insecure|false|Permit the cache key over plaintext http off loopback; likewise yours alone to allow
+                cache.insecure|false|Permit the cache key over plaintext http off loopback, and over https accept a certificate that does not verify; likewise yours alone to allow
                 test.skip|false|Skip executing tests, still resolving what running them needs
                 test.filter||Comma-separated <classRegex>[#<method>] entries restricting which tests run
                 test.tag||Comma-separated tag expressions; only tests carrying one of them run
@@ -2763,7 +2763,7 @@ public record Project(
                 jarsigner.storetype||Type of the store, as jarsigner names it: PKCS12, JKS, ...; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 jarsigner.tsa||Timestamp authority to stamp the signature with, so it outlives the certificate; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 jarsigner.arguments||Further jarsigner arguments, whitespace separated; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
-                release.uri||Jenesis module repository a release puts each staged module's jar into, one put per module at module/<module>/<version>/<module>.jar, so every module needs a version; the https address of a Jenesis Repository's java repository, as jenesis.module.uri names it (env JENESIS_RELEASE_URI)
+                release.uri||Jenesis module repository a release puts each staged module's jar into, one put per module at module/<module>/<version>/<module>.jar, so every module needs a version; the https address of a Jenesis Repository's jenesis repository, as jenesis.module.uri names it; a java repository takes Maven publishes only and refuses the put (env JENESIS_RELEASE_URI)
                 release.token||Authorization header value for that repository, sent as given (env JENESIS_RELEASE_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one, and it is never sent to a repository a project's own files named
                 jreleaser.executable|jreleaser|The JReleaser executable a release runs; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 jreleaser.command|full-release|The JReleaser command a release runs
