@@ -971,6 +971,20 @@ public class JenesisModuleRepositoryTest {
     }
 
     @Test
+    public void factory_mapped_type_reads_a_file_uri_with_a_drive_letter_as_one_maven_repository() throws IOException {
+        Path list = Files.writeString(root.resolve("modules.properties"), "com.corp.billing=com.corp/billing-core\n");
+        settings.put("module.uri", "mapped:file:///C:/nowhere/:" + list.toUri());
+        try {
+            assertThat(JenesisModuleRepository.ofEnvironment(new Environment(settings), JenesisRepository.Scope.MODULE)
+                    .fetch(Runnable::run, "com.corp.billing/1.0.0"))
+                    .as("the colon of a drive letter, as a Windows file URI carries it, does not end the Maven repository")
+                    .isEmpty();
+        } finally {
+            settings.remove("module.uri");
+        }
+    }
+
+    @Test
     public void factory_mapped_type_reads_the_maven_repository_of_the_build_for_an_at_sign() throws IOException {
         writeMavenArtifact("com.corp", "billing-core", "build-repository-classes");
         Path list = Files.writeString(root.resolve("modules.properties"), "com.corp.billing=com.corp/billing-core\n");
