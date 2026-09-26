@@ -15,7 +15,7 @@ import build.jenesis.Make;
  *
  * which builds the jar and prints:
  *
- *     demo.reproducible.jar has the recorded SHA-256 ...
+ *     demo.reproducible-0-SNAPSHOT.jar has the recorded SHA-256 ...
  */
 public class Demo {
 
@@ -28,9 +28,9 @@ public class Demo {
 
         Path jar;
         try (Stream<Path> walk = Files.walk(Path.of("target"))) {
-            jar = walk.filter(path -> path.getFileName().toString().equals("demo.reproducible.jar"))
+            jar = walk.filter(path -> path.getFileName().toString().equals("demo.reproducible-0-SNAPSHOT.jar"))
                     .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("No demo.reproducible.jar was produced"));
+                    .orElseThrow(() -> new IllegalStateException("No demo.reproducible-0-SNAPSHOT.jar was produced"));
         }
 
         String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(jar)));

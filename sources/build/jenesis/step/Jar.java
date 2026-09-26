@@ -163,7 +163,9 @@ public class Jar extends ProcessBuildStep {
                     metadata = SequencedProperties.ofFiles(metadataFile);
                 }
             }
-            String version = metadata == null ? null : metadata.value("version");
+            String version = metadata == null
+                    ? null
+                    : metadata.value("version", metadata.value("project") == null ? null : "0-SNAPSHOT");
             if (module != null && module.flag("modular") && module.value("module") != null) {
                 return BuildExecutorModule.encode(module.value("module"))
                         + (version == null ? "" : "-" + BuildExecutorModule.encode(version)) + suffix + ".jar";

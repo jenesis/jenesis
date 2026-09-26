@@ -19,7 +19,7 @@ From this directory:
 
 which builds the module and prints
 
-    demo.reproducible.jar has the recorded SHA-256 e90d68a2bc7492b27c031c2235123e3a20a732cc8e5564f9a2d143d36f8a534a
+    demo.reproducible-0-SNAPSHOT.jar has the recorded SHA-256 e90d68a2bc7492b27c031c2235123e3a20a732cc8e5564f9a2d143d36f8a534a
 
 Layout
 ------
