@@ -101,7 +101,7 @@ Every launch the build makes receives the grant. This demo's `bundle` carries it
 in its launch:
 
     "--module-path"
-    "jars/demo.natives.app.jar:jars/demo.natives.text-0-SNAPSHOT.jar:jars/demo.natives.words-0-SNAPSHOT.jar"
+    "jars/demo.natives.app-0-SNAPSHOT.jar:jars/demo.natives.text-0-SNAPSHOT.jar:jars/demo.natives.words-0-SNAPSHOT.jar"
     "--enable-native-access=demo.natives.text"
     "--module"
     "demo.natives.app/demo.natives.app.Application"

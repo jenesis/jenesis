@@ -849,13 +849,13 @@ public class ModularProjectTest {
                 .resolve(BuildStep.IDENTITY));
         assertThat(foo.stringPropertyNames()).containsExactly("module/foo");
         assertThat(foo.getProperty("module/foo"))
-                .isEqualTo("../../produce/java/artifacts/jar/output/artifacts/foo.jar");
+                .isEqualTo("../../produce/java/artifacts/jar/output/artifacts/foo-0-SNAPSHOT.jar");
         SequencedProperties bar = SequencedProperties.ofFiles(results
                 .get("modules/module-bar/assign")
                 .resolve(BuildStep.IDENTITY));
         assertThat(bar.stringPropertyNames()).containsExactly("module/bar");
         assertThat(bar.getProperty("module/bar"))
-                .isEqualTo("../../produce/java/artifacts/jar/output/artifacts/bar.jar");
+                .isEqualTo("../../produce/java/artifacts/jar/output/artifacts/bar-0-SNAPSHOT.jar");
         assertThat(results.keySet())
                 .contains("modules/module-foo/inventory", "modules/module-bar/inventory")
                 .doesNotContain("modules/module-foo/coordinates", "modules/module-bar/coordinates");
@@ -864,17 +864,17 @@ public class ModularProjectTest {
                 .resolve("inventory.properties"));
         assertThat(fooInventory.getProperty("module-foo.module")).isEqualTo("foo");
         assertThat(fooInventory.getProperty("module-foo.runtime.0"))
-                .endsWith("/foo.jar");
+                .endsWith("/foo-0-SNAPSHOT.jar");
         assertThat(fooInventory.getProperty("module-foo.artifacts.0"))
-                .endsWith("/foo.jar");
+                .endsWith("/foo-0-SNAPSHOT.jar");
         SequencedProperties barInventory = SequencedProperties.ofFiles(results
                 .get("modules/module-bar/inventory")
                 .resolve("inventory.properties"));
         assertThat(barInventory.getProperty("module-bar.module")).isEqualTo("bar");
         assertThat(barInventory.getProperty("module-bar.runtime.0"))
-                .endsWith("/bar.jar");
+                .endsWith("/bar-0-SNAPSHOT.jar");
         assertThat(barInventory.getProperty("module-bar.artifacts.0"))
-                .endsWith("/bar.jar");
+                .endsWith("/bar-0-SNAPSHOT.jar");
     }
 
     @Test

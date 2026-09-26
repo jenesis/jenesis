@@ -40,7 +40,7 @@ directory:
 The `javac` step compiles `module-info.java`, `Sample.java`, and the baseline
 `Platform.java` at release 21, then runs a second pass over
 `META-INF/versions/25/sample/Platform.java` at release 25. The produced
-`demo.multirelease.jar` carries both copies of `sample.Platform` and a `Multi-Release: true`
+`demo.multirelease-0-SNAPSHOT.jar` carries both copies of `sample.Platform` and a `Multi-Release: true`
 manifest.
 
 Layout

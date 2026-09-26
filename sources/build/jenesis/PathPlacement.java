@@ -62,7 +62,7 @@ public enum PathPlacement {
 
     public static String fileName(String coordinate, String module, boolean declared) {
         String version = coordinate.substring(coordinate.lastIndexOf('/') + 1);
-        if (!declared && !derivable(version)) {
+        if (coordinate.indexOf('/') < 0 || !declared && !derivable(version)) {
             return BuildExecutorModule.encode(module) + ".jar";
         }
         return BuildExecutorModule.encode(module) + "-" + BuildExecutorModule.encode(version) + ".jar";
