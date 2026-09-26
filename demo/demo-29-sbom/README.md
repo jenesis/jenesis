@@ -88,6 +88,21 @@ launcher the module already depends on at the same version is listed once; at an
 version, both are listed. The module's own document stays in its jar, inside the
 executable one.
 
+The coordinate in the jar
+-------------------------
+
+The jar also carries the POM it is published with, and its coordinate, where Maven
+puts them in every jar it builds:
+
+    META-INF/maven/build.jenesis.demo/sbom-demo/pom.xml
+    META-INF/maven/build.jenesis.demo/sbom-demo/pom.properties   groupId, artifactId, version
+
+Tools that find a jar inside an image or an archive - a scanner such as Syft, or
+GraalVM's own SBOM of a native image - identify it by these files, so a jar built by
+Jenesis is recognised as `pkg:maven/build.jenesis.demo/sbom-demo@1.0.0` wherever it
+ends up. A module built under the pure modular layout has no Maven coordinate and
+carries neither.
+
 The license text in the jar
 ---------------------------
 
