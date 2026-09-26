@@ -81,7 +81,7 @@ public class PomTest {
         metadata.setProperty("version", "1.0.0");
         metadata.store(argument.resolve(BuildStep.METADATA));
 
-        new Pom().apply(Runnable::run,
+        new Pom().embedded(true).apply(Runnable::run,
                         new BuildStepContext(previous, next, supplement),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                                 argument,
@@ -96,6 +96,25 @@ public class PomTest {
         assertThat(embedded.resolve("pom.properties"))
                 .as("the coordinate as Maven writes it, without a timestamp")
                 .hasContent("artifactId=jenesis\ngroupId=build.jenesis\nversion=1.0.0");
+    }
+
+    @Test
+    public void writes_nothing_for_a_jar_unless_embedded() throws IOException {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+
+        new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+
+        assertThat(next.resolve(Pom.POM)).exists();
+        assertThat(next.resolve(BuildStep.RESOURCES)).doesNotExist();
     }
 
     @Test
