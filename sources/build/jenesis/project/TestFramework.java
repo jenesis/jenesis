@@ -27,7 +27,8 @@ public interface TestFramework extends Serializable {
                            Path output,
                            SequencedSet<String> classes,
                            SequencedMap<String, SequencedSet<String>> methods,
-                           SequencedSet<String> groups,
+                           TestTags tags,
+                           List<TestTags> ran,
                            boolean parallel,
                            boolean reporting);
 

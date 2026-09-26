@@ -61,12 +61,30 @@ public record JUnitPlatform() implements TestFramework {
                                   Path output,
                                   SequencedSet<String> classes,
                                   SequencedMap<String, SequencedSet<String>> methods,
-                                  SequencedSet<String> groups,
+                                  TestTags tags,
+                                  List<TestTags> ran,
                                   boolean parallel,
                                   boolean reporting) {
         List<String> commands = new ArrayList<>(List.of("execute", "--disable-banner", "--disable-ansi-colors"));
-        for (String group : groups) {
-            commands.add("--include-tag=" + group);
+        List<String> conditions = new ArrayList<>();
+        if (!tags.included().isEmpty()) {
+            conditions.add(disjunction(tags.included()));
+        }
+        if (!tags.excluded().isEmpty()) {
+            conditions.add("!(" + String.join(" | ", tags.excluded()) + ")");
+        }
+        for (TestTags earlier : ran) {
+            List<String> outside = new ArrayList<>();
+            if (!earlier.included().isEmpty()) {
+                outside.add("!" + disjunction(earlier.included()));
+            }
+            if (!earlier.excluded().isEmpty()) {
+                outside.add("(" + String.join(" | ", earlier.excluded()) + ")");
+            }
+            conditions.add("(" + String.join(" | ", outside) + ")");
+        }
+        if (!conditions.isEmpty()) {
+            commands.add("--include-tag=" + String.join(" & ", conditions));
         }
         if (parallel) {
             commands.add("--config=junit.jupiter.execution.parallel.enabled=true");
@@ -107,5 +125,11 @@ public record JUnitPlatform() implements TestFramework {
                 .flatMap(module -> module.rawVersion().stream())
                 .findFirst()
                 .orElse(null);
+    }
+
+    private static String disjunction(SequencedSet<String> terms) {
+        return terms.stream()
+                .map(term -> term.contains("&") ? "(" + String.join(" & ", TestTags.names(term).stream().sorted().toList()) + ")" : term)
+                .collect(Collectors.joining(" | ", "(", ")"));
     }
 }
