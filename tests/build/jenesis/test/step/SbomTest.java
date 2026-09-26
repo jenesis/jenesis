@@ -229,6 +229,18 @@ public class SbomTest {
                 .doesNotContain("licenses");
     }
 
+    @Test
+    public void describes_the_supplier_and_the_copyright_the_project_declares() throws Exception {
+        assertThat(sbom(Map.of("organization.name", "Example Ltd",
+                        "organization.url", "https://example.com",
+                        "copyright", "Copyright 2020 Example Ltd")))
+                .contains("\"supplier\": { \"name\": \"Example Ltd\", \"url\": [\"https://example.com\"] }")
+                .contains("\"copyright\": \"Copyright 2020 Example Ltd\"");
+        assertThat(sbom(Map.of()))
+                .as("neither is invented when the project declares none")
+                .doesNotContain("supplier", "copyright");
+    }
+
     private String sbom(Map<String, String> scm) throws Exception {
         return sbom(new Sbom(), scm);
     }

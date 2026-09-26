@@ -747,9 +747,16 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     jpackage.setProperty("--app-version", version);
                 }
                 if (described != null) {
-                    String description = described.value("description"), url = described.value("url");
+                    String description = described.value("description"), url = described.value("url"),
+                            vendor = described.value("organization.name"), copyright = described.value("copyright");
                     if (description != null) {
                         jpackage.setProperty("--description", description.replaceAll("\\s+", " "));
+                    }
+                    if (vendor != null) {
+                        jpackage.setProperty("--vendor", vendor);
+                    }
+                    if (copyright != null) {
+                        jpackage.setProperty("--copyright", copyright);
                     }
                     if (url != null && packageType != null && !packageType.equals("app-image")) {
                         jpackage.setProperty("--about-url", url);

@@ -719,6 +719,7 @@ public record Project(
 
                       metadata.properties   project, artifact, version, name, description, url,
                                             license.<id>.{name,url}, developer.<id>.{name,email},
+                                            organization.{name,url}, copyright,
                                             scm.{connection,developerConnection,url,tag,revision,tree}. Project-level
                                             overrides live in the file that
                                             -Djenesis.project.metadata=<path> names, conventionally

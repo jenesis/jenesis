@@ -1094,6 +1094,10 @@ public class MavenProjectTest {
                     <name>Project Name</name>
                     <description>Project description.</description>
                     <url>https://example.com/project</url>
+                    <organization>
+                        <name>Example Ltd</name>
+                        <url>https://example.com</url>
+                    </organization>
                     <licenses>
                         <license>
                             <name>Apache-2.0</name>
@@ -1146,6 +1150,8 @@ public class MavenProjectTest {
                 Map.entry("name", "Project Name"),
                 Map.entry("description", "Project description."),
                 Map.entry("url", "https://example.com/project"),
+                Map.entry("organization.name", "Example Ltd"),
+                Map.entry("organization.url", "https://example.com"),
                 Map.entry("license.apache-2_0.name", "Apache-2.0"),
                 Map.entry("license.apache-2_0.url", "https://www.apache.org/licenses/LICENSE-2.0.txt"),
                 Map.entry("developer.alice.name", "Alice Example"),

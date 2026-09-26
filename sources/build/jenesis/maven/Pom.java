@@ -231,7 +231,10 @@ public class Pom implements BuildStep {
                 metadata.getProperty("url"),
                 licenses,
                 developers,
-                scm);
+                scm,
+                metadata.value("organization.name") == null && metadata.value("organization.url") == null
+                        ? null
+                        : new MavenPomEmitter.Metadata.Organization(metadata.value("organization.name"), metadata.value("organization.url")));
     }
 
 }

@@ -48,11 +48,15 @@ public class CycloneDx {
 
     public record Component(String type, String bomRef, String group, String name, String version, String purl, String sha256,
                             List<License> licenses, String description, List<Author> authors,
-                            List<ExternalReference> externalReferences, List<Property> properties) {
+                            List<ExternalReference> externalReferences, List<Property> properties,
+                            Organization supplier, String copyright) {
 
         public Component(String bomRef, String group, String name, String version, String purl, String sha256, List<License> licenses) {
-            this("library", bomRef, group, name, version, purl, sha256, licenses, null, List.of(), List.of(), List.of());
+            this("library", bomRef, group, name, version, purl, sha256, licenses, null, List.of(), List.of(), List.of(), null, null);
         }
+    }
+
+    public record Organization(String name, String url) {
     }
 
     public record Author(String name, String email) {
@@ -148,6 +152,17 @@ public class CycloneDx {
         if (component.bomRef() != null) {
             builder.append(pad).append("  \"bom-ref\": \"").append(escapeJson(component.bomRef())).append("\",\n");
         }
+        if (component.supplier() != null) {
+            builder.append(pad).append("  \"supplier\": {");
+            if (component.supplier().name() != null) {
+                builder.append(" \"name\": \"").append(escapeJson(component.supplier().name())).append("\"");
+            }
+            if (component.supplier().url() != null) {
+                builder.append(component.supplier().name() != null ? "," : "")
+                        .append(" \"url\": [\"").append(escapeJson(component.supplier().url())).append("\"]");
+            }
+            builder.append(" },\n");
+        }
         if (component.group() != null) {
             builder.append(pad).append("  \"group\": \"").append(escapeJson(component.group())).append("\",\n");
         }
@@ -197,6 +212,9 @@ public class CycloneDx {
                 builder.append(" } }").append(index + 1 < component.licenses().size() ? ",\n" : "\n");
             }
             builder.append(pad).append("  ]");
+        }
+        if (component.copyright() != null) {
+            builder.append(",\n").append(pad).append("  \"copyright\": \"").append(escapeJson(component.copyright())).append("\"");
         }
         if (component.purl() != null) {
             builder.append(",\n").append(pad).append("  \"purl\": \"").append(escapeJson(component.purl())).append("\"");
@@ -288,6 +306,15 @@ public class CycloneDx {
         if (component.bomRef() != null) {
             node.setAttribute("bom-ref", component.bomRef());
         }
+        if (component.supplier() != null) {
+            Element supplier = (Element) node.appendChild(document.createElementNS(NAMESPACE, "supplier"));
+            if (component.supplier().name() != null) {
+                appendXmlText(document, supplier, "name", component.supplier().name());
+            }
+            if (component.supplier().url() != null) {
+                appendXmlText(document, supplier, "url", component.supplier().url());
+            }
+        }
         if (component.authors() != null && !component.authors().isEmpty()) {
             Element authors = (Element) node.appendChild(document.createElementNS(NAMESPACE, "authors"));
             for (Author author : component.authors()) {
@@ -330,6 +357,9 @@ public class CycloneDx {
                     }
                 }
             }
+        }
+        if (component.copyright() != null) {
+            appendXmlText(document, node, "copyright", component.copyright());
         }
         if (component.purl() != null) {
             appendXmlText(document, node, "purl", component.purl());
