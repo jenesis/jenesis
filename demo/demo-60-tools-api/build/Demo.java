@@ -82,7 +82,9 @@ public class Demo {
 
     private static String stamped(Path folder) throws IOException {
         try (Stream<Path> walk = Files.walk(folder)) {
-            Path jar = walk.filter(path -> path.getFileName().toString().equals("classes.jar")).findFirst()
+            Path jar = walk.filter(path -> path.getFileName().toString().endsWith(".jar")
+                            && path.getParent().getFileName().toString().equals("artifacts"))
+                    .findFirst()
                     .orElseThrow(() -> new IllegalStateException("The build produced no jar below " + folder));
             return ModuleFinder.of(jar).findAll().stream()
                     .map(reference -> reference.descriptor().toNameAndVersion())
