@@ -6,6 +6,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
+import build.jenesis.SequencedProperties;
 
 public class Javadoc extends ProcessBuildStep {
 
@@ -92,9 +93,17 @@ public class Javadoc extends ProcessBuildStep {
         if (!timestamped) {
             commands.add("-notimestamp");
         }
+        String preview = null;
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
+            }
+            Path javac = argument.folder().resolve(ProcessBuildStep.PROCESS + "javac.properties");
+            if (preview == null && Files.isRegularFile(javac)) {
+                SequencedProperties release = SequencedProperties.ofFiles(javac);
+                if (release.containsKey("--enable-preview")) {
+                    preview = release.value("--release");
+                }
             }
             Path sources = argument.folder().resolve(BuildStep.SOURCES),
                     classes = argument.folder().resolve(BuildStep.CLASSES);
@@ -125,6 +134,9 @@ public class Javadoc extends ProcessBuildStep {
                     }
                 });
             }
+        }
+        if (preview != null) {
+            commands.addAll(List.of("--enable-preview", "--release", preview));
         }
         files.sort(null);
         path.sort(null);

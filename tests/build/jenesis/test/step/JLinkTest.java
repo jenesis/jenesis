@@ -9,6 +9,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.JLink;
@@ -62,6 +63,32 @@ public class JLinkTest {
         assertThat(Files.exists(supplement.resolve("jlink.args")))
                 .as("only a forked jlink reads its arguments from a file, as its tool refuses one")
                 .isEqualTo(process);
+    }
+
+    @Test
+    public void links_the_preview_features_a_jar_uses_into_the_runtime() throws IOException {
+        Path sources = Files.createDirectory(root.resolve("sources"));
+        Files.writeString(sources.resolve("module-info.java"), "module sample { }\n");
+        Path classes = Files.createDirectory(root.resolve("classes"));
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
+                "-d", classes.toString(), sources.resolve("module-info.java").toString())).isZero();
+        Path manifest = Files.writeString(root.resolve("manifest.mf"), PathPlacement.PREVIEW + ": 25\n");
+        Path artifacts = Files.createDirectory(bundle.resolve(BuildStep.ARTIFACTS));
+        assertThat(ToolProvider.findFirst("jar").orElseThrow().run(System.out, System.err,
+                "--create", "--file", artifacts.resolve("sample.jar").toString(),
+                "--manifest", manifest.toString(), "-C", classes.toString(), ".")).isZero();
+        SequencedProperties configuration = new SequencedProperties();
+        configuration.setProperty("--add-modules", "sample");
+        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jlink.properties"));
+        BuildStepResult result = new JLink(ProcessHandler.Factory.FORK).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
+                        bundle,
+                        Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("process/jlink.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(supplement.resolve("jlink.args")).content().contains("--add-options=--enable-preview");
     }
 
     @ParameterizedTest

@@ -770,7 +770,8 @@ public record Project(
                     on one it cannot resolve. alias, exclude and override are MODULAR_TO_MAVEN
                     only.
 
-                      @jenesis.release <V>   Java release target (default: the running JDK's)
+                      @jenesis.release <V>   Java release target (default: the running JDK's); <V>-preview also
+                                             enables its preview features, to compile and to run
                       @jenesis.main <class>  main class
                       @jenesis.test [<module>|abstract]
                           Test variant of <module>. `abstract` supplies infrastructure only: declares
@@ -1098,7 +1099,7 @@ public record Project(
 
                     ## 13. Copy a demo: they are the recipe book
 
-                    67 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    69 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -1108,14 +1109,16 @@ public record Project(
                     https://github.com/jenesis/jenesis/tree/main/demo.
 
                       Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
-                                         04 java-modular-multi, 20 module-layout (forcing MODULAR)
+                                         04 java-modular-multi, 20 module-layout (forcing MODULAR),
+                                         68 java-pom-model-4-1-0 (Maven 4's POM model)
                       Starting a build   05 startup (what launching costs, the daemon, the AOT cache),
                                          06 toolchain (the JDK the build runs on)
                       Runnable output    07, 08 java-*-executable (jpackage), 09 bundle (jars for a
                                          stock JRE), 10 java-multi-release, 66 native-image (GraalVM)
                       Compiler control   11 javac-arguments (process-javac.properties),
                                          12 annotations (an annotation processor via @jenesis.plugin),
-                                         13 error-prone (a javac plugin)
+                                         13 error-prone (a javac plugin),
+                                         69 java-preview (@jenesis.release <V>-preview)
                       Generated sources  14 data-formats (xjc, protoc, avro),
                                          15 service-contracts (wsimport, OpenAPI),
                                          16 antlr (a grammar)

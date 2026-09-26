@@ -90,7 +90,7 @@ public class Bundle implements BuildStep {
         SequencedMap<String, Path> classpath = new LinkedHashMap<>(), modulepath = new LinkedHashMap<>();
         ModuleGraph graph = new ModuleGraph();
         for (Map.Entry<String, Path> entry : jars.entrySet()) {
-            boolean placed = mainModule != null && graph.place(PathPlacement.INFERRED, entry.getValue());
+            boolean placed = graph.place(mainModule == null ? PathPlacement.CLASS_PATH : PathPlacement.INFERRED, entry.getValue());
             (placed ? modulepath : classpath).put(entry.getKey(), entry.getValue());
             if (granted.contains(entry.getValue().toAbsolutePath().normalize())) {
                 graph.enableNativeAccess(entry.getValue(), placed);

@@ -83,6 +83,10 @@ public class JLink extends ProcessBuildStep {
                 jars.add(file);
             }
         }
+        boolean preview = false;
+        for (Path jar : jars) {
+            preview |= PathPlacement.preview(jar) != null;
+        }
         SequencedSet<String> modules = new LinkedHashSet<>();
         List<String> path = new ArrayList<>();
         for (Path jmod : jmods) {
@@ -105,8 +109,12 @@ public class JLink extends ProcessBuildStep {
                         "Path entry contains separator '" + File.pathSeparator + "': " + entry);
             }
         }
-        return CompletableFuture.completedStage(new ArrayList<>(List.of(
+        List<String> commands = new ArrayList<>(List.of(
                 "--module-path", String.join(File.pathSeparator, path),
-                "--output", context.next().resolve(RUNTIME).toString())));
+                "--output", context.next().resolve(RUNTIME).toString()));
+        if (preview) {
+            commands.add("--add-options=--enable-preview");
+        }
+        return CompletableFuture.completedStage(commands);
     }
 }

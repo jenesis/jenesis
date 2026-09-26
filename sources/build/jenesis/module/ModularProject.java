@@ -427,11 +427,16 @@ public class ModularProject implements BuildExecutorModule {
                 }
                 overrides.store(context.next().resolve(BuildStep.OVERRIDES));
             }
-            if (!targets.isEmpty() || !info.overrides().isEmpty() || !info.layers().isEmpty() || !named.isEmpty()) {
+            boolean preview = info.release() != null && info.release().endsWith("-preview");
+            if (!targets.isEmpty() || !info.overrides().isEmpty() || !info.layers().isEmpty() || !named.isEmpty() || preview) {
                 Manifest manifest = new Manifest();
                 manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
                 if (!named.isEmpty()) {
                     manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, String.join(",", named));
+                }
+                if (preview) {
+                    manifest.getMainAttributes().putValue(PathPlacement.PREVIEW,
+                            info.release().substring(0, info.release().length() - "-preview".length()));
                 }
                 if (!targets.isEmpty()) {
                     List<String> declarations = new ArrayList<>();
