@@ -114,7 +114,7 @@ public class CycloneDxTest {
     @Test
     public void emits_subject_description_authors_and_external_references() {
         CycloneDx.Component subject = new CycloneDx.Component(
-                "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", null,
+                "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", List.of(), null,
                 List.of(),
                 "A demo project",
                 List.of(new CycloneDx.Author("Rafael Winterhalter", "rafael.wth@gmail.com")),
@@ -141,7 +141,7 @@ public class CycloneDxTest {
     @Test
     public void emits_the_properties_of_a_component() {
         CycloneDx.Component subject = new CycloneDx.Component(
-                "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", null,
+                "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", List.of(), null,
                 List.of(),
                 null,
                 List.of(),
@@ -175,5 +175,25 @@ public class CycloneDxTest {
 
     private static String uuidOf(String serialLess) {
         return "urn:uuid:" + UUID.nameUUIDFromBytes(serialLess.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void emits_the_swhids_of_a_component() {
+        CycloneDx.Component subject = new CycloneDx.Component(
+                "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0",
+                List.of("swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327", "swh:1:dir:0123456789abcdef0123456789abcdef01234567"),
+                null,
+                List.of(),
+                null,
+                List.of(),
+                List.of(),
+                List.of());
+
+        assertThat(emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of()))
+                .contains("\"swhid\": [\"swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327\", \"swh:1:dir:0123456789abcdef0123456789abcdef01234567\"]");
+        assertThat(emitter.emit(CycloneDx.Format.XML, subject, List.of(), List.of()))
+                .contains("<purl>pkg:maven/build.jenesis/demo@1.0.0</purl>\n"
+                        + "            <swhid>swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327</swhid>\n"
+                        + "            <swhid>swh:1:dir:0123456789abcdef0123456789abcdef01234567</swhid>");
     }
 }
