@@ -5,12 +5,18 @@ import module jdk.compiler;
 import build.jenesis.Platform;
 import javax.lang.model.SourceVersion;
 import javax.tools.ToolProvider;
+import com.sun.source.doctree.LiteralTree;
 
 import static java.util.Objects.requireNonNull;
 
 public class ModuleInfoParser {
 
     private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.:+~@*/-]+");
+    private static final Pattern PARAGRAPH = Pattern.compile("\\n\\s*\\n");
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    private static final Pattern MARKUP = Pattern.compile("(`+|\\*\\*|__|\\*)(\\S(?:.*?\\S)?)\\1");
+    private static final Set<String> BLOCKS = Set.of("p", "div", "pre", "ul", "ol", "dl", "table", "blockquote",
+            "h1", "h2", "h3", "h4", "h5", "h6", "hr");
 
     private final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
     private final String group;
@@ -72,21 +78,18 @@ public class ModuleInfoParser {
             String main = null;
             DocCommentTree docComment = docTrees.getDocCommentTree(TreePath.getPath(unit, module));
             if (docComment != null) {
-                String summary = docComment.getFirstSentence().stream()
-                        .map(Object::toString)
-                        .collect(Collectors.joining())
-                        .trim();
+                String summary = WHITESPACE.matcher(text(docComment.getFirstSentence())).replaceAll(" ").trim();
                 if (!summary.isEmpty()) {
                     name = summary.endsWith(".")
                             ? summary.substring(0, summary.length() - 1)
                             : summary;
                 }
-                String body = docComment.getBody().stream()
-                        .map(Object::toString)
-                        .collect(Collectors.joining())
-                        .trim();
-                if (!body.isEmpty()) {
-                    description = body;
+                List<String> paragraphs = PARAGRAPH.splitAsStream(text(docComment.getFullBody()))
+                        .map(paragraph -> WHITESPACE.matcher(paragraph).replaceAll(" ").trim())
+                        .filter(paragraph -> !paragraph.isEmpty())
+                        .toList();
+                if (paragraphs.size() > 1) {
+                    description = paragraphs.get(1);
                 }
                 for (DocTree tag : docComment.getBlockTags()) {
                     if (tag instanceof UnknownBlockTagTree unknown) {
@@ -522,6 +525,33 @@ public class ModuleInfoParser {
                     bomVariants);
         }
         throw new IllegalArgumentException("Expected module-info.java to contain module information");
+    }
+
+    private static String text(List<? extends DocTree> trees) {
+        StringBuilder text = new StringBuilder();
+        for (DocTree tree : trees) {
+            text.append(switch (tree) {
+                case TextTree plain -> plain.getBody();
+                case RawTextTree markdown -> MARKUP.matcher(markdown.getContent()).replaceAll("$2");
+                case LiteralTree literal -> literal.getBody().getBody();
+                case LinkTree link -> link.getLabel().isEmpty() ? link.getReference().getSignature() : text(link.getLabel());
+                case EntityTree entity -> switch (entity.getName().toString()) {
+                    case "amp" -> "&";
+                    case "lt" -> "<";
+                    case "gt" -> ">";
+                    case "quot" -> "\"";
+                    case "apos" -> "'";
+                    case "nbsp" -> " ";
+                    case String numeric when numeric.startsWith("#x") || numeric.startsWith("#X") ->
+                            Character.toString(Integer.parseInt(numeric.substring(2), 16));
+                    case String numeric when numeric.startsWith("#") -> Character.toString(Integer.parseInt(numeric.substring(1)));
+                    case String named -> "&" + named + ";";
+                };
+                case StartElementTree element -> BLOCKS.contains(element.getName().toString().toLowerCase(Locale.ROOT)) ? "\n\n" : "";
+                default -> "";
+            });
+        }
+        return text.toString();
     }
 
     private static String layered(String kind, String token) {
