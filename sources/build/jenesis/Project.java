@@ -1062,7 +1062,7 @@ public record Project(
                     than the JVM, so two runs in one program never clash; everything after them is
                     what the command line would take. A setting that replaces the process a build
                     runs in - toolchain.version, project.docker, execute.docker - is refused by name
-                    there, and demo-60-tools-api shows the whole contract.
+                    there, and demo-62-tools-api shows the whole contract.
 
                     Every command line here, the commands and the tools alike, reads @<file> as the
                     arguments that file holds - settings and selectors, # to the end of a line being
@@ -1109,47 +1109,47 @@ public record Project(
                     https://github.com/jenesis/jenesis/tree/main/demo.
 
                       Project shapes     01 java-pom, 02 java-modular, 03 java-pom-multi,
-                                         04 java-modular-multi, 20 module-layout (forcing MODULAR),
-                                         68 java-pom-model-4-1-0 (Maven 4's POM model)
-                      Starting a build   05 startup (what launching costs, the daemon, the AOT cache),
-                                         06 toolchain (the JDK the build runs on)
-                      Runnable output    07, 08 java-*-executable (jpackage), 09 bundle (jars for a
-                                         stock JRE), 10 java-multi-release, 66 native-image (GraalVM)
-                      Compiler control   11 javac-arguments (process-javac.properties),
-                                         12 annotations (an annotation processor via @jenesis.plugin),
-                                         13 error-prone (a javac plugin),
-                                         69 java-preview (@jenesis.release <V>-preview)
-                      Generated sources  14 data-formats (xjc, protoc, avro),
-                                         15 service-contracts (wsimport, OpenAPI),
-                                         16 antlr (a grammar)
-                      Dependencies       17 maven-exclusions, 18 bom, 19 module-alias,
-                                         21 module-override, 22, 23 module-layers (a private
-                                         dependency), 24, 25 platform-guard (classified and
+                                         04 java-modular-multi, 05 java-pom-model-4-1-0 (Maven 4's POM model),
+                                         22 module-layout (forcing MODULAR)
+                      Starting a build   06 startup (what launching costs, the daemon, the AOT cache),
+                                         07 toolchain (the JDK the build runs on)
+                      Runnable output    08, 09 java-*-executable (jpackage), 10 bundle (jars for a
+                                         stock JRE), 11 java-multi-release, 68 native-image (GraalVM)
+                      Compiler control   12 javac-arguments (process-javac.properties),
+                                         13 annotations (an annotation processor via @jenesis.plugin),
+                                         14 error-prone (a javac plugin),
+                                         15 java-preview (@jenesis.release <V>-preview)
+                      Generated sources  16 data-formats (xjc, protoc, avro),
+                                         17 service-contracts (wsimport, OpenAPI),
+                                         18 antlr (a grammar)
+                      Dependencies       19 maven-exclusions, 20 bom, 21 module-alias,
+                                         23 module-override, 24, 25 module-layers (a private
+                                         dependency), 26, 27 platform-guard (classified and
                                          per-platform variants)
-                      Trusting them      26 pinning (versions and checksums), 27 openpgp (a declared
-                                         key), 28 sigstore (a declared identity, no key at all),
-                                         29 sbom, 30 compliance (licenses), 31 vulnerabilities (OSV)
-                      Quality gates      32 java-quality, 38 api-compatibility (japicmp),
-                                         40 kotlin-quality, 43 scala-quality, 45 groovy-quality
-                      Tests              33 test-framework (what the tests are written against),
-                                         34 code-coverage (JaCoCo), 35 test-selection (incremental),
-                                         36 pitest (mutation), 37 jmh (benchmark harness)
-                      Other languages    39 kotlin, 41 kotlin-plugin, 42 scala, 44 groovy
-                      Operating it       46 profiles, 47 build-cache, 48 docker-isolation,
-                                         49 agents (@jenesis.attach),
-                                         50 native-access (@jenesis.native),
-                                         51 native-access-layer (passed on to a layer)
-                      Shipping it        61 code-signing (jarsigner), 62 export (into the local repositories),
-                                         63 publishing (Maven Central),
-                                         64 module-convention (resolving what you published),
-                                         65 reproducible (a jar checked against a recorded digest),
-                                         67 jpx (run a released program without building)
-                      Extending it       52 custom-assembler, 53 custom-jmod, 54 internal-module,
-                                         55 external-module,
-                                         56 project-plugins (hooks from a first check to release),
-                                         57 custom-maven, 58 custom-modular,
-                                         59 custom-build (no Project at all),
-                                         60 tools-api (a build inside another program's JVM)
+                      Trusting them      28 pinning (versions and checksums), 29 openpgp (a declared
+                                         key), 30 sigstore (a declared identity, no key at all),
+                                         31 sbom, 32 compliance (licenses), 33 vulnerabilities (OSV)
+                      Quality gates      34 java-quality, 40 api-compatibility (japicmp),
+                                         42 kotlin-quality, 45 scala-quality, 47 groovy-quality
+                      Tests              35 test-framework (what the tests are written against),
+                                         36 code-coverage (JaCoCo), 37 test-selection (incremental),
+                                         38 pitest (mutation), 39 jmh (benchmark harness)
+                      Other languages    41 kotlin, 43 kotlin-plugin, 44 scala, 46 groovy
+                      Operating it       48 profiles, 49 build-cache, 50 docker-isolation,
+                                         51 agents (@jenesis.attach),
+                                         52 native-access (@jenesis.native),
+                                         53 native-access-layer (passed on to a layer)
+                      Shipping it        63 code-signing (jarsigner), 64 export (into the local repositories),
+                                         65 publishing (Maven Central),
+                                         66 module-convention (resolving what you published),
+                                         67 reproducible (a jar checked against a recorded digest),
+                                         69 jpx (run a released program without building)
+                      Extending it       54 custom-assembler, 55 custom-jmod, 56 internal-module,
+                                         57 external-module,
+                                         58 project-plugins (hooks from a first check to release),
+                                         59 custom-maven, 60 custom-modular,
+                                         61 custom-build (no Project at all),
+                                         62 tools-api (a build inside another program's JVM)
 
                     ## 14. When stuck, read the source
 
