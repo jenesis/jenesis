@@ -53,6 +53,33 @@ public class NativeImage extends ProcessBuildStep {
     }
 
     @Override
+    protected ProcessHandler handler(BuildStepContext context, List<String> commands) throws IOException {
+        ProcessHandler handler = super.handler(context, commands);
+        for (String command : handler.commands()) {
+            if (command.startsWith("-")) {
+                break;
+            }
+            Path program = Path.of(command).toAbsolutePath();
+            if (Files.isRegularFile(program) && program.getFileName().toString().startsWith("native-image")) {
+                Set<Path> visited = new HashSet<>();
+                while (visited.add(program)) {
+                    Path home = program.getParent().getParent();
+                    if (home != null && Files.isRegularFile(home.resolve(RELEASE))) {
+                        Files.copy(home.resolve(RELEASE), context.next().resolve(RELEASE));
+                        break;
+                    }
+                    if (!Files.isSymbolicLink(program)) {
+                        break;
+                    }
+                    program = program.getParent().resolve(Files.readSymbolicLink(program)).normalize();
+                }
+                break;
+            }
+        }
+        return handler;
+    }
+
+    @Override
     protected CompletionStage<List<String>> process(Executor executor,
                                                     BuildStepContext context,
                                                     SequencedMap<String, BuildStepArgument> arguments,

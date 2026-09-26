@@ -102,6 +102,17 @@ own jar at its root, and those of every jar it needs at run time in a folder nam
 after that jar. `-Djenesis.legal.notices` names the entries taken, as it does for
 the `legal/` folder of a linked runtime.
 
+The binary drops the bill of materials its jar carries as well, so one travels beside it
+too, `demo.graal.image.cdx.json`. It lists what the module's own document from
+`../demo-29-sbom` lists, describes the binary as an `application`, and adds the GraalVM
+that compiled it as a `platform` the application depends on, since the binary contains
+its runtime:
+
+    { "type": "platform", "bom-ref": "Oracle Corporation/GraalVM/25.0.3", "group": "Oracle Corporation", "name": "GraalVM", "version": "25.0.3" }
+
+The vendor and the version come from the `release` file of the GraalVM that ran
+`native-image`, so building with GraalVM Community names `GraalVM Community` instead.
+
 Layout
 ------
 

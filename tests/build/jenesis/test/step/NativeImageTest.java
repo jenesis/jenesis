@@ -147,6 +147,32 @@ public class NativeImageTest {
     }
 
     @Test
+    @DisabledOnOs(OS.WINDOWS)
+    public void records_the_release_of_the_graalvm_it_runs_through_a_linked_launcher() throws IOException {
+        SequencedProperties launcher = new SequencedProperties();
+        launcher.setProperty("mainClass", "sample.Sample");
+        store(launcher);
+        Path home = Files.createDirectory(root.resolve("graalvm"));
+        Files.writeString(home.resolve(BuildStep.RELEASE), "IMPLEMENTOR=\"GraalVM Community\"\nGRAALVM_VERSION=\"25.0.2\"\n");
+        Path program = Files.copy(shim, Files.createDirectories(home.resolve("lib/svm/bin")).resolve("native-image"));
+        Path linked = Files.createSymbolicLink(Files.createDirectory(home.resolve("bin")).resolve("native-image"),
+                Path.of("../lib/svm/bin/native-image"));
+
+        new NativeImage(PathPlacement.CLASS_PATH, ProcessHandler.OfProcess.of(List.of(linked.toString()))).apply(
+                        Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
+                                bundle,
+                                Map.of(Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+
+        assertThat(program).isExecutable();
+        assertThat(next.resolve(BuildStep.RELEASE))
+                .as("the release file sits in the home the link leads out of, not beside the linked program")
+                .hasSameTextualContentAs(home.resolve(BuildStep.RELEASE));
+    }
+
+    @Test
     public void skips_when_no_launcher_is_configured() throws IOException {
         SequencedProperties launcher = new SequencedProperties();
         launcher.setProperty("name", "sample-app");

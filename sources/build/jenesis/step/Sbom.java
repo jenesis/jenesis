@@ -62,7 +62,8 @@ public class Sbom implements BuildStep {
                 Path.of(METADATA),
                 Path.of(Dependencies.GRAPH),
                 Path.of(Dependencies.LICENSES),
-                Path.of(Dependencies.RESOLVED))
+                Path.of(Dependencies.RESOLVED),
+                Path.of(RELEASE))
                 || swhid && argument.hasChanged(Path.of(SOURCES), Path.of(RESOURCES)));
     }
 
@@ -82,6 +83,7 @@ public class Sbom implements BuildStep {
         HashDigestFunction hash = new HashDigestFunction("SHA-256");
         SequencedMap<String, CycloneDx.Component> components = new LinkedHashMap<>();
         List<Path> graphFiles = new ArrayList<>();
+        SequencedSet<String> platforms = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -89,6 +91,19 @@ public class Sbom implements BuildStep {
             Path graphFile = argument.folder().resolve(Dependencies.GRAPH);
             if (Files.isRegularFile(graphFile)) {
                 graphFiles.add(graphFile);
+            }
+            Path release = argument.folder().resolve(RELEASE);
+            if (Files.isRegularFile(release)) {
+                SequencedProperties runtime = SequencedProperties.ofFiles(release);
+                String implementor = unquote(runtime.value("IMPLEMENTOR")), graalvm = unquote(runtime.value("GRAALVM_VERSION"));
+                String name = graalvm == null ? "Java runtime" : "GraalVM",
+                        runtimeVersion = graalvm == null ? unquote(runtime.value("JAVA_RUNTIME_VERSION")) : graalvm;
+                String ref = (implementor == null ? "" : implementor + "/") + name
+                        + (runtimeVersion == null ? "" : "/" + runtimeVersion);
+                if (platforms.add(ref)) {
+                    components.put(ref, new CycloneDx.Component("platform", ref, implementor, name, runtimeVersion, null, null,
+                            List.of(), null, List.of(), List.of(), List.of()));
+                }
             }
             Path index = argument.folder().resolve(DEPENDENCIES);
             if (!Files.exists(index)) {
@@ -160,7 +175,7 @@ public class Sbom implements BuildStep {
                     ownLicenses(metadata), metadata.getProperty("description"), developers(metadata),
                     references(metadata, revision == null ? tag : revision), properties);
         }
-        List<CycloneDx.Dependency> dependencies = relationships(projectRef, components.keySet(), graphFiles);
+        List<CycloneDx.Dependency> dependencies = relationships(projectRef, components.keySet(), platforms, graphFiles);
         String document = new CycloneDx().emit(format, project, new ArrayList<>(components.values()), dependencies);
 
         Path embedded = Files.createDirectories(context.next()
@@ -214,13 +229,14 @@ public class Sbom implements BuildStep {
 
     private static List<CycloneDx.Dependency> relationships(String projectRef,
                                                                    Set<String> componentRefs,
+                                                                   SequencedSet<String> platforms,
                                                                    List<Path> graphFiles) throws IOException {
-        if (graphFiles.isEmpty()) {
+        if (graphFiles.isEmpty() && (platforms.isEmpty() || projectRef == null)) {
             return List.of();
         }
         SequencedMap<String, SequencedSet<String>> dependsOn = new LinkedHashMap<>();
         if (projectRef != null) {
-            dependsOn.put(projectRef, new LinkedHashSet<>());
+            dependsOn.put(projectRef, new LinkedHashSet<>(platforms));
         }
         for (String ref : componentRefs) {
             dependsOn.put(ref, new LinkedHashSet<>());
@@ -258,6 +274,13 @@ public class Sbom implements BuildStep {
         List<CycloneDx.Dependency> result = new ArrayList<>();
         dependsOn.forEach((ref, on) -> result.add(new CycloneDx.Dependency(ref, new ArrayList<>(on))));
         return result;
+    }
+
+    private static String unquote(String value) {
+        String unquoted = value != null && value.length() > 1 && value.startsWith("\"") && value.endsWith("\"")
+                ? value.substring(1, value.length() - 1).trim()
+                : value;
+        return unquoted == null || unquoted.isEmpty() ? null : unquoted;
     }
 
     private static String ref(String vertexKey, SequencedMap<String, Resolver.Vertex> vertices) {
