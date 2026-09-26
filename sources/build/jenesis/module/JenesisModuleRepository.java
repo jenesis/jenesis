@@ -112,6 +112,10 @@ public class JenesisModuleRepository implements JenesisRepository {
                 int from = location.startsWith("@") ? 0 : scheme < 0
                         ? -1
                         : location.startsWith("://", scheme) ? location.indexOf('/', scheme + 3) : scheme + 1;
+                if (location.startsWith("file:") && from >= 0 && location.length() > from + 2
+                        && Character.isLetter(location.charAt(from + 1)) && location.charAt(from + 2) == ':') {
+                    from += 3;
+                }
                 int split = from < 0 ? -1 : location.indexOf(':', from);
                 if (split < 0 || split == location.length() - 1) {
                     throw new IllegalArgumentException("Expected " + MAPPED + ":<Maven repository URI or @>:<list>[;<list>...] "
