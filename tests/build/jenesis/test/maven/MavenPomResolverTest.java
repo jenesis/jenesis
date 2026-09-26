@@ -3975,6 +3975,43 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_enables_the_preview_features_of_its_release() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.release>25</maven.compiler.release>
+                        <maven.compiler.enablePreview>true</maven.compiler.enablePreview>
+                    </properties>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("")).release()).isEqualTo("25-preview");
+    }
+
+    @Test
+    public void local_pom_without_a_release_enables_the_preview_features_of_the_jdk() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <maven.compiler.enablePreview>true</maven.compiler.enablePreview>
+                    </properties>
+                </project>
+                """);
+        SequencedMap<Path, MavenLocalPom> poms = mavenPomResolver.local(Runnable::run, mavenRepository, project);
+        assertThat(poms.get(Path.of("")).release()).isEqualTo(Runtime.version().feature() + "-preview");
+    }
+
+    @Test
     public void local_pom_direct_dependency_checksum_is_ignored() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

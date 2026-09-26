@@ -8,11 +8,11 @@ public class ModuleGraph {
     private static final String SELF_CONTAINED = "selfContainedModuleGraph";
     private static final String ADD_MODULES = "--add-modules", ROOTS = "ALL-MODULE-PATH,ALL-DEFAULT",
             ENABLE_NATIVE_ACCESS = "--enable-native-access", ALL_UNNAMED = "ALL-UNNAMED",
-            LAYER_NATIVE_ACCESS = "-Djlayer.enableNativeAccess.";
+            LAYER_NATIVE_ACCESS = "-Djlayer.enableNativeAccess.", ENABLE_PREVIEW = "--enable-preview";
 
     private final SequencedSet<String> nativeAccess = new LinkedHashSet<>();
     private final SequencedMap<String, SequencedSet<String>> layerAccess = new TreeMap<>();
-    private boolean modular, automatic, unnamed;
+    private boolean modular, automatic, unnamed, preview;
 
     public void place(PathPlacement placement, Path file, List<String> modulePath, List<String> classPath)
             throws IOException {
@@ -24,18 +24,24 @@ public class ModuleGraph {
             module(file);
             return true;
         }
+        preview |= PathPlacement.preview(file) != null;
         unnamed();
         return false;
     }
 
-    public void module(Path file) {
+    public void module(Path file) throws IOException {
         ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(file);
         modular = true;
         automatic |= descriptor == null ? !Files.isDirectory(file) : descriptor.isAutomatic();
+        preview |= PathPlacement.preview(file) != null;
     }
 
     public void unnamed() {
         unnamed = true;
+    }
+
+    public void enablePreview() {
+        preview = true;
     }
 
     public void enableNativeAccess(String module) {
@@ -68,8 +74,11 @@ public class ModuleGraph {
         return descriptor.name();
     }
 
-    private List<String> nativeAccessOptions() {
+    private List<String> enablingOptions() {
         List<String> options = new ArrayList<>();
+        if (preview) {
+            options.add(ENABLE_PREVIEW);
+        }
         if (!nativeAccess.isEmpty()) {
             options.add(ENABLE_NATIVE_ACCESS + "=" + String.join(",", nativeAccess));
         }
@@ -87,7 +96,7 @@ public class ModuleGraph {
             arguments.add(ADD_MODULES);
             arguments.add(ROOTS);
         }
-        arguments.addAll(nativeAccessOptions());
+        arguments.addAll(enablingOptions());
         return arguments;
     }
 
@@ -96,7 +105,7 @@ public class ModuleGraph {
         if (!selfContained()) {
             options.add(ADD_MODULES + "=" + ROOTS);
         }
-        options.addAll(nativeAccessOptions());
+        options.addAll(enablingOptions());
         return options;
     }
 

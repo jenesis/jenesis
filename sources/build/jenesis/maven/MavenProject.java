@@ -360,11 +360,18 @@ public class MavenProject implements BuildExecutorModule {
                                     }
                                     natives.store(context.next().resolve(BuildStep.NATIVES));
                                 }
-                                String named = properties.getProperty("named");
-                                if (named != null) {
+                                String named = properties.getProperty("named"), release = properties.getProperty("release");
+                                boolean preview = release != null && release.endsWith("-preview");
+                                if (named != null || preview) {
                                     Manifest manifest = new Manifest();
                                     manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
-                                    manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, named);
+                                    if (named != null) {
+                                        manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, named);
+                                    }
+                                    if (preview) {
+                                        manifest.getMainAttributes().putValue(PathPlacement.PREVIEW,
+                                                release.substring(0, release.length() - "-preview".length()));
+                                    }
                                     try (OutputStream out = Files.newOutputStream(context.next().resolve(Versions.MANIFEST))) {
                                         manifest.write(out);
                                     }

@@ -54,6 +54,32 @@ public class JavadocTest {
         assertThat(next.resolve(Javadoc.JAVADOC + "sample/Sample.html")).content().contains("This is a javadoc.");
     }
 
+    @Test
+    public void documents_sources_that_use_the_preview_features_they_were_compiled_with() throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve(Javac.SOURCES + "sample")).resolve("Sample.java"), """
+                package sample;
+                /** Documented. */
+                public class Sample {
+                    /** Describes a value. */
+                    public static String describe(long value) {
+                        return switch (value) {
+                            case int small -> "int";
+                            case long large -> "long";
+                        };
+                    }
+                }
+                """);
+        Javac.writeRelease(sources, Runtime.version().feature() + "-preview", Runtime.version().feature());
+        BuildStepResult result = Javadoc.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sample/Sample.java"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Javadoc.JAVADOC + "sample/Sample.html")).content().contains("Describes a value.");
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void records_when_a_page_was_generated_only_when_the_archive_timestamp_is_empty(boolean empty)
