@@ -113,13 +113,13 @@ public class CycloneDxTest {
 
     @Test
     public void emits_subject_description_authors_and_external_references() {
-        CycloneDx.Component subject = new CycloneDx.Component(
+        CycloneDx.Component subject = new CycloneDx.Component("library",
                 "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", null,
                 List.of(),
                 "A demo project",
                 List.of(new CycloneDx.Author("Rafael Winterhalter", "rafael.wth@gmail.com")),
                 List.of(new CycloneDx.ExternalReference("website", "https://example.com/demo")),
-                List.of());
+                List.of(), null, null, null, null);
 
         String json = emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of());
         assertThat(json)
@@ -140,13 +140,13 @@ public class CycloneDxTest {
 
     @Test
     public void emits_the_properties_of_a_component() {
-        CycloneDx.Component subject = new CycloneDx.Component(
+        CycloneDx.Component subject = new CycloneDx.Component("library",
                 "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", null,
                 List.of(),
                 null,
                 List.of(),
                 List.of(),
-                List.of(new CycloneDx.Property("jenesis:scm:tag", "v1.0.0")));
+                List.of(new CycloneDx.Property("jenesis:scm:tag", "v1.0.0")), null, null, null, null);
 
         assertThat(emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of()))
                 .contains("\"properties\": [")
@@ -175,5 +175,51 @@ public class CycloneDxTest {
 
     private static String uuidOf(String serialLess) {
         return "urn:uuid:" + UUID.nameUUIDFromBytes(serialLess.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void emits_the_type_of_a_component() {
+        CycloneDx.Component subject = new CycloneDx.Component("application",
+                "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", null,
+                List.of(),
+                null,
+                List.of(),
+                List.of(),
+                List.of(), null, null, null, null);
+
+        assertThat(emitter.emit(CycloneDx.Format.JSON, subject, COMPONENTS, List.of()))
+                .contains("\"type\": \"application\",\n      \"bom-ref\": \"build.jenesis/demo/1.0.0\"")
+                .contains("\"type\": \"library\",\n      \"bom-ref\": \"org.foo/bar/1.2.3\"");
+        assertThat(emitter.emit(CycloneDx.Format.XML, subject, COMPONENTS, List.of()))
+                .contains("<component bom-ref=\"build.jenesis/demo/1.0.0\" type=\"application\">")
+                .contains("<component bom-ref=\"org.foo/bar/1.2.3\" type=\"library\">");
+    }
+
+    @Test
+    public void emits_the_supplier_the_manufacturer_the_publisher_and_the_copyright_of_a_component() {
+        CycloneDx.Component subject = new CycloneDx.Component("library",
+                "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", null,
+                List.of(),
+                null,
+                List.of(),
+                List.of(),
+                List.of(),
+                new CycloneDx.Organization("Example Ltd", "https://example.com"),
+                "Copyright 2020 Example Ltd",
+                new CycloneDx.Organization("Example Factory", "https://factory.example.com"),
+                "Example Publishing");
+
+        assertThat(emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of()))
+                .contains("\"supplier\": { \"name\": \"Example Ltd\", \"url\": [\"https://example.com\"] }")
+                .contains("\"copyright\": \"Copyright 2020 Example Ltd\"")
+                .contains("\"manufacturer\": { \"name\": \"Example Factory\", \"url\": [\"https://factory.example.com\"] }")
+                .contains("\"publisher\": \"Example Publishing\"");
+        assertThat(emitter.emit(CycloneDx.Format.XML, subject, List.of(), List.of()))
+                .contains("<manufacturer>")
+                .contains("<publisher>Example Publishing</publisher>")
+                .contains("<supplier>")
+                .contains("<name>Example Ltd</name>")
+                .contains("<url>https://example.com</url>")
+                .contains("<copyright>Copyright 2020 Example Ltd</copyright>");
     }
 }

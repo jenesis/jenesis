@@ -535,6 +535,10 @@ public class MavenProject implements BuildExecutorModule {
                         copyChildText(developer, "email", result, "developer." + id + ".email");
                     }
                 }
+                case "organization" -> {
+                    copyChildText(node, "name", result, "organization.name");
+                    copyChildText(node, "url", result, "organization.url");
+                }
                 case "scm" -> {
                     copyChildText(node, "connection", result, "scm.connection");
                     copyChildText(node, "developerConnection", result, "scm.developerConnection");

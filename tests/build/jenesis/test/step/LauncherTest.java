@@ -79,6 +79,45 @@ public class LauncherTest {
     }
 
     @Test
+    public void embeds_the_first_bill_of_materials_it_is_handed() throws IOException {
+        writeLauncherJar(Files.createDirectory(input.resolve("resolved")).resolve("launcher.jar"));
+        writeJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"), "sample/Sample.class");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("launcher/runtime/maven/build.jenesis/build.jenesis.launcher", "resolved/launcher.jar");
+        index.store(input.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties application = new SequencedProperties();
+        application.setProperty("mainClass", "sample.Sample");
+        application.setProperty("name", "app");
+        application.store(input.resolve("launcher.properties"));
+        Path sbom = Files.createDirectory(root.resolve("sbom"));
+        for (Map.Entry<Path, String> document : Map.of(sbom, "application", input, "library").entrySet()) {
+            Files.writeString(document.getKey().resolve("manifest.mf"),
+                    "Manifest-Version: 1.0\nSbom-Format: CycloneDX\nSbom-Location: META-INF/sbom/app.cdx.json\n");
+            Files.writeString(Files.createDirectories(document.getKey().resolve("resources/META-INF/sbom")).resolve("app.cdx.json"),
+                    document.getValue());
+        }
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("sbom", new BuildStepArgument(sbom, Map.of(Path.of("manifest.mf"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("input", new BuildStepArgument(input, Map.of(Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED))));
+
+        Launcher.ofEnvironment(Environment.NONE, "launcher", PathPlacement.INFERRED).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                arguments).toCompletableFuture().join();
+
+        Path jar = next.resolve(Launcher.LAUNCHER).resolve("app.jar");
+        try (JarFile file = new JarFile(jar.toFile())) {
+            assertThat(file.getManifest().getMainAttributes().getValue("Sbom-Location")).isEqualTo("META-INF/sbom/app.cdx.json");
+            assertThat(file.getManifest().getMainAttributes().getValue(Attributes.Name.MAIN_CLASS)).isEqualTo("build.jenesis.launcher.Launcher");
+            try (InputStream in = file.getInputStream(file.getEntry("META-INF/sbom/app.cdx.json"))) {
+                assertThat(new String(in.readAllBytes(), StandardCharsets.UTF_8))
+                        .as("the document handed first describes the jar, as the first launcher.properties names it")
+                        .isEqualTo("application");
+            }
+        }
+    }
+
+    @Test
     public void routes_a_modular_main_onto_the_module_path() throws IOException {
         writeLauncherJar(Files.createDirectory(input.resolve("resolved")).resolve("launcher.jar"));
         compileModularJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("sample.jar"));

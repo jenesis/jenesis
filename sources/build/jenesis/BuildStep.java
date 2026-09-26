@@ -25,7 +25,8 @@ public interface BuildStep extends Serializable {
             ATTACHMENTS = "attachments.properties",
             NATIVES = "natives.properties",
             LAYERS = "layers.properties",
-            DEPENDENCIES = "dependencies.properties";
+            DEPENDENCIES = "dependencies.properties",
+            RELEASE = "release";
 
     default BuildExecutorModule asModule(String name) {
         return new BuildExecutorModule() {

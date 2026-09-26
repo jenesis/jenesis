@@ -12,6 +12,9 @@ import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Repository;
+import build.jenesis.RepositoryItem;
+import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.AssemblyDescriptor;
 import build.jenesis.project.InferredComplianceModule;
@@ -22,6 +25,7 @@ import build.jenesis.project.ProjectModule;
 import build.jenesis.project.ProjectModuleDescriptor;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.JPackage;
+import build.jenesis.step.NativeImage;
 import build.jenesis.step.ProcessBuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -85,6 +89,71 @@ public class InferredMultiProjectAssemblerTest {
         assertThat(jpackageArguments.getProperty("--app-version"))
                 .as("nothing is invented for a version jpackage cannot parse; it is reported by jpackage itself")
                 .isEqualTo("RELEASE");
+    }
+
+    @Test
+    public void describes_a_debian_package_with_the_metadata_it_supports() throws IOException {
+        SequencedProperties arguments = describedPackage("deb");
+        assertThat(arguments.getProperty("--description"))
+                .as("a description spanning lines is passed as one argument")
+                .isEqualTo("A demo project");
+        assertThat(arguments.getProperty("--about-url")).isEqualTo("https://example.com/demo");
+        assertThat(arguments.getProperty("--linux-deb-maintainer")).isEqualTo("dev@example.com");
+        assertThat(arguments.getProperty("--linux-rpm-license-type")).isNull();
+    }
+
+    @Test
+    public void describes_an_rpm_package_with_the_licences_the_project_offers() throws IOException {
+        SequencedProperties arguments = describedPackage("rpm");
+        assertThat(arguments.getProperty("--linux-rpm-license-type"))
+                .as("a project that lists several licences may be used under any of them")
+                .isEqualTo("Apache-2.0 OR MIT");
+        assertThat(arguments.getProperty("--linux-deb-maintainer")).isNull();
+    }
+
+    @Test
+    public void names_no_rpm_licence_type_unless_every_licence_is_identified() throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false, "rpm");
+        Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), """
+                artifact=demo
+                license.apache.name=The Apache Software License, Version 2.0
+                license.own.name=A licence of our own
+                """);
+        Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
+        assertThat(readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"))
+                .getProperty("--linux-rpm-license-type"))
+                .as("RPM expects SPDX identifiers, so a licence without one leaves the field to jpackage")
+                .isNull();
+    }
+
+    @Test
+    public void describes_an_application_image_only_with_what_jpackage_accepts_for_one() throws IOException {
+        SequencedProperties arguments = describedPackage("app-image");
+        assertThat(arguments.getProperty("--description")).isEqualTo("A demo project");
+        assertThat(arguments.getProperty("--vendor")).isEqualTo("Example Ltd");
+        assertThat(arguments.getProperty("--copyright"))
+                .as("the copyright is passed as declared, so jpackage adds no year of its own")
+                .isEqualTo("Copyright 2020 Example Ltd");
+        assertThat(arguments.stringPropertyNames())
+                .as("jpackage refuses the options of an installable package for an application image")
+                .doesNotContain("--about-url", "--linux-deb-maintainer", "--linux-rpm-license-type");
+    }
+
+    private SequencedProperties describedPackage(String type) throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false, type);
+        Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), """
+                artifact=demo
+                description=A demo\\n    project
+                url=https://example.com/demo
+                developer.dev.name=Dev
+                developer.dev.email=dev@example.com
+                license.apache.name=The Apache Software License, Version 2.0
+                license.mit.name=MIT
+                organization.name=Example Ltd
+                copyright=Copyright 2020 Example Ltd
+                """);
+        Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
+        return readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"));
     }
 
     @Test
@@ -221,6 +290,47 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void stages_no_bill_of_materials_for_a_module_that_builds_no_native_image() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false, null, false, false, true);
+        Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "project=sample\nartifact=app\nversion=1\n");
+        assertThat(fixture.execute("package/native").get("package/native").resolve(NativeImage.NATIVE))
+                .as("a module without a main class has no binary for its bill of materials to sit beside")
+                .doesNotExist();
+    }
+
+    @Test
+    public void launcher_enabled_lists_the_resolved_launcher_in_the_package_inventory() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"), "launcher=true\n");
+        SequencedMap<String, Path> outputs = fixture.execute(new InferredMultiProjectAssembler(),
+                served(Files.createDirectory(root.resolve("served"))),
+                Map.of("maven", Resolver.identity()),
+                "package/inventory");
+        SequencedProperties inventory = SequencedProperties.ofFiles(outputs.get("package/inventory").resolve(Inventory.INVENTORY));
+        assertThat(inventory.stringPropertyNames())
+                .as("a launcher-only package phase still lists what it resolved, so pin reaches the launcher group")
+                .anyMatch(key -> key.endsWith(".group") && inventory.getProperty(key).equals("launcher"));
+    }
+
+    @Test
+    public void launcher_describes_the_application_with_the_dependencies_of_the_module_and_the_launcher() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"), "launcher=true\n");
+        Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "project=sample\nartifact=app\nversion=1\n");
+        Files.writeString(fixture.artifacts().resolve(BuildStep.DEPENDENCIES), "main/runtime/maven/org.foo/bar/1=bar.jar\n");
+        SequencedMap<String, Path> outputs = fixture.execute(new InferredMultiProjectAssembler(),
+                served(Files.createDirectory(root.resolve("served"))),
+                Map.of("maven", Resolver.identity()),
+                "package/launcher/sbom");
+        assertThat(outputs.get("package/launcher/sbom").resolve(BuildStep.REPORTS + "sbom").resolve("app-1.cdx.json"))
+                .content()
+                .as("the executable jar is described as an application of what the module's own SBOM lists and the launcher")
+                .contains("\"type\": \"application\",\n      \"bom-ref\": \"sample/app/1\"")
+                .contains("\"bom-ref\": \"org.foo/bar/1\"")
+                .contains("\"bom-ref\": \"build.jenesis/build.jenesis.launcher/RELEASE\"");
+    }
+
+    @Test
     public void source_flag_enabled_adds_sources_jar_step() throws IOException {
         Fixture fixture = setUp("path=\n", false, true, false);
         Files.createDirectory(fixture.sources.resolve(BuildStep.SOURCES));
@@ -299,6 +409,11 @@ public class InferredMultiProjectAssemblerTest {
                 .as("editing only a process override must re-run prepare, not serve the stale one")
                 .contains("-verbose")
                 .doesNotContain("-g");
+    }
+
+    private static Map<String, Repository> served(Path folder) {
+        return Map.of("maven", (_, coordinate, _) -> Optional.of(RepositoryItem.ofFile(Files.writeString(
+                folder.resolve(coordinate.replace('/', '-') + ".jar"), coordinate))));
     }
 
     private Fixture setUp(String moduleProperties,
@@ -419,7 +534,14 @@ public class InferredMultiProjectAssemblerTest {
         }
 
         SequencedMap<String, Path> execute(InferredMultiProjectAssembler assembler, String... selectors) throws IOException {
-            AssemblyDescriptor assembled = assembler.apply(descriptor, Map.of(), Map.of());
+            return execute(assembler, Map.of(), Map.of(), selectors);
+        }
+
+        SequencedMap<String, Path> execute(InferredMultiProjectAssembler assembler,
+                                           Map<String, Repository> repositories,
+                                           Map<String, Resolver> resolvers,
+                                           String... selectors) throws IOException {
+            AssemblyDescriptor assembled = assembler.apply(descriptor, repositories, resolvers);
             BuildExecutor executor = BuildExecutor.of(build,
                     Duration.ZERO,
                     new HashDigestFunction("MD5"),
@@ -431,7 +553,7 @@ public class InferredMultiProjectAssemblerTest {
             executor.addModule("sub", assembled.build(),
                     "manifests", "sources", "artifacts");
             for (Map.Entry<String, BuildExecutorModule> phase : assembled.tail().entrySet()) {
-                executor.addModule(phase.getKey(), phase.getValue(), "sub");
+                executor.addModule(phase.getKey(), phase.getValue(), "sub", "manifests", "sources", "artifacts");
             }
             return executor.execute(Runnable::run, selectors).toCompletableFuture().join();
         }

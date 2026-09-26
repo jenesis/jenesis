@@ -14,23 +14,28 @@ import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Sbom;
 
 public class LauncherModule implements BuildExecutorModule {
 
     public static final String BUNDLE = "bundle";
-    private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";
+    private static final String REQUIRED = "required", DEPENDENCIES = "dependencies", SBOM = "sbom";
 
     private final Dependencies dependencies;
     private final Pinning pinning;
     private final String group;
     private final PathPlacement pathPlacement;
+    private final Sbom sbom;
+    private final SequencedSet<String> sbomInputs;
 
     public LauncherModule(Map<String, Repository> repositories,
                           Map<String, Resolver> resolvers) {
         this(new Dependencies(repositories, resolvers),
              null,
              "launcher",
-             PathPlacement.INFERRED);
+             PathPlacement.INFERRED,
+             null,
+             null);
     }
 
     public static LauncherModule ofEnvironment(Environment environment,
@@ -39,29 +44,43 @@ public class LauncherModule implements BuildExecutorModule {
         return new LauncherModule(Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "launcher",
-                PathPlacement.INFERRED);
+                PathPlacement.INFERRED,
+                null,
+                null);
     }
 
     private LauncherModule(Dependencies dependencies,
                            Pinning pinning,
                            String group,
-                           PathPlacement pathPlacement) {
+                           PathPlacement pathPlacement,
+                           Sbom sbom,
+                           SequencedSet<String> sbomInputs) {
         this.dependencies = dependencies;
         this.pinning = pinning;
         this.group = group;
         this.pathPlacement = pathPlacement;
+        this.sbom = sbom;
+        this.sbomInputs = sbomInputs;
     }
 
     public LauncherModule pinning(Pinning pinning) {
-        return new LauncherModule(dependencies, pinning, group, pathPlacement);
+        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs);
     }
 
     public LauncherModule group(String group) {
-        return new LauncherModule(dependencies, pinning, group, pathPlacement);
+        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs);
     }
 
     public LauncherModule pathPlacement(PathPlacement pathPlacement) {
-        return new LauncherModule(dependencies, pinning, group, pathPlacement);
+        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs);
+    }
+
+    public LauncherModule sbom(Sbom sbom) {
+        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs);
+    }
+
+    public LauncherModule sbomInputs(SequencedSet<String> sbomInputs) {
+        return new LauncherModule(dependencies, pinning, group, pathPlacement, sbom, sbomInputs);
     }
 
     @Override
@@ -74,6 +93,17 @@ public class LauncherModule implements BuildExecutorModule {
                 dependencies.pinning(pinning).group(group),
                 resolveInputs);
         SequencedSet<String> bundleInputs = new LinkedHashSet<>();
+        if (sbom != null) {
+            SequencedSet<String> described = new LinkedHashSet<>();
+            if (sbomInputs == null) {
+                described.addAll(inherited.sequencedKeySet());
+            } else {
+                sbomInputs.forEach(input -> described.add(PREVIOUS + input));
+            }
+            described.add(DEPENDENCIES);
+            buildExecutor.addStep(SBOM, sbom, described);
+            bundleInputs.add(SBOM);
+        }
         bundleInputs.add(DEPENDENCIES);
         bundleInputs.addAll(inherited.sequencedKeySet());
         buildExecutor.addStep(BUNDLE, new build.jenesis.step.Launcher(group, pathPlacement), bundleInputs);

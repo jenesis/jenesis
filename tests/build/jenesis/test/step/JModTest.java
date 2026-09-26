@@ -77,6 +77,36 @@ public class JModTest {
     }
 
     @Test
+    public void packages_the_resources_the_jar_carries_beside_the_classes() throws IOException {
+        Path sources = Files.createDirectory(root.resolve("sources"));
+        Files.writeString(sources.resolve("module-info.java"), "module sample { }\n");
+        Path classes = Files.createDirectory(bundle.resolve(BuildStep.CLASSES));
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
+                "-d", classes.toString(),
+                sources.resolve("module-info.java").toString())).isZero();
+        Path sbom = Files.createDirectory(root.resolve("sbom"));
+        Files.writeString(Files.createDirectories(sbom.resolve(BuildStep.RESOURCES + "META-INF/sbom")).resolve("sample.cdx.json"), "{}");
+        Path resources = Files.createDirectory(root.resolve("resources"));
+        Files.writeString(Files.createDirectory(resources.resolve(BuildStep.RESOURCES)).resolve("greeting.txt"), "hello");
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("classes", new BuildStepArgument(bundle, Map.of(Path.of("classes/module-info.class"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("sbom", new BuildStepArgument(sbom, Map.of(Path.of("resources/META-INF/sbom/sample.cdx.json"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("resources", new BuildStepArgument(resources, Map.of(Path.of("resources/greeting.txt"), Checksum.of(ChecksumStatus.ADDED))));
+
+        BuildStepResult result = JMod.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                arguments).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        try (ZipFile jmod = new ZipFile(next.resolve(JMod.JMODS + "sample.jmod").toFile())) {
+            assertThat(jmod.stream().map(ZipEntry::getName))
+                    .as("a runtime linked from the jmod serves the resources and the bill of materials the jar does")
+                    .contains("classes/greeting.txt", "classes/META-INF/sbom/sample.cdx.json");
+        }
+    }
+
+    @Test
     public void passes_no_date_when_the_archive_timestamp_is_empty() throws IOException {
         Path sources = Files.createDirectory(root.resolve("sources"));
         Files.writeString(sources.resolve("module-info.java"), "module sample { }\n");
