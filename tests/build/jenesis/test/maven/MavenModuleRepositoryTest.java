@@ -5,6 +5,7 @@ import module org.junit.jupiter.api;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.maven.MavenDefaultRepository;
+import build.jenesis.maven.MavenDependencyKey;
 import build.jenesis.maven.MavenModuleRepository;
 import build.jenesis.module.JenesisRepository;
 
@@ -175,6 +176,28 @@ public class MavenModuleRepositoryTest {
         assertThatThrownBy(() -> repository().fetch(Runnable::run, "../escaped/1.0.0"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("module name");
+    }
+
+    @Test
+    public void resolves_a_mapped_module_at_its_coordinate_and_nothing_else() throws IOException {
+        writeArtifact("com.corp", "billing-core", "1.0.0", "jar", "mapped");
+        MavenModuleRepository repository = repository().mapping(Map.of("com.corp.billing", MavenDependencyKey.parseKey("com.corp/billing-core")));
+
+        assertThat(content(repository.fetch(Runnable::run, "com.corp.billing/1.0.0"))).isEqualTo("mapped");
+        assertThat(repository.fetch(Runnable::run, "demo.convention.greeter/1.0.0"))
+                .as("a mapped repository answers for the modules its mapping names only")
+                .isEmpty();
+    }
+
+    @Test
+    public void takes_the_type_and_classifier_of_a_mapping_unless_the_request_names_its_own() throws IOException {
+        writeArtifact("com.corp", "billing", "1.0.0", "linux", "jar", "native");
+        writeArtifact("com.corp", "billing", "1.0.0", "sources", "jar", "sources");
+        MavenModuleRepository repository = repository().mapping(Map.of("com.corp.billing.native",
+                MavenDependencyKey.parseKey("com.corp/billing/jar/linux")));
+
+        assertThat(content(repository.fetch(Runnable::run, "com.corp.billing.native/1.0.0"))).isEqualTo("native");
+        assertThat(content(repository.fetch(Runnable::run, "com.corp.billing.native-sources/1.0.0"))).isEqualTo("sources");
     }
 
     private MavenModuleRepository repository() {
