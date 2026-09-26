@@ -65,7 +65,8 @@ public class MavenPomEmitterTest {
                                 "scm:git:https://example.com/project.git",
                                 "scm:git:git@example.com:project.git",
                                 "https://example.com/project",
-                                null))).accept(writer);
+                                null),
+                        new MavenPomEmitter.Metadata.Organization("Example Ltd", "https://example.com"))).accept(writer);
         assertThat(writer.toString()).isEqualTo("""
                 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
                 <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0">
@@ -76,6 +77,10 @@ public class MavenPomEmitterTest {
                     <name>Project Name</name>
                     <description>Project description.</description>
                     <url>https://example.com/project</url>
+                    <organization>
+                        <name>Example Ltd</name>
+                        <url>https://example.com</url>
+                    </organization>
                     <licenses>
                         <license>
                             <name>Apache-2.0</name>
@@ -157,7 +162,8 @@ public class MavenPomEmitterTest {
                                 "scm:git:https://example.com/project.git",
                                 null,
                                 null,
-                                null))).accept(writer);
+                                null),
+                        null)).accept(writer);
         assertThat(writer.toString()).isEqualTo("""
                 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
                 <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0">
@@ -190,7 +196,8 @@ public class MavenPomEmitterTest {
                                 null,
                                 null,
                                 "https://example.com/project",
-                                "v1.0.0"))).accept(writer);
+                                "v1.0.0"),
+                        null)).accept(writer);
         assertThat(writer.toString()).contains("""
                     <scm>
                         <tag>v1.0.0</tag>

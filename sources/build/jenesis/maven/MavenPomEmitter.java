@@ -50,6 +50,15 @@ public class MavenPomEmitter {
             if (metadata.url() != null) {
                 appendText(document, project, "url", metadata.url());
             }
+            if (metadata.organization() != null) {
+                Node node = appendChild(document, project, "organization");
+                if (metadata.organization().name() != null) {
+                    appendText(document, node, "name", metadata.organization().name());
+                }
+                if (metadata.organization().url() != null) {
+                    appendText(document, node, "url", metadata.organization().url());
+                }
+            }
             if (!metadata.licenses().isEmpty()) {
                 Node wrapper = appendChild(document, project, "licenses");
                 for (Metadata.License license : metadata.licenses()) {
@@ -176,7 +185,8 @@ public class MavenPomEmitter {
             String url,
             List<License> licenses,
             List<Developer> developers,
-            Scm scm
+            Scm scm,
+            Organization organization
     ) implements Serializable {
 
         public Metadata {
@@ -191,6 +201,9 @@ public class MavenPomEmitter {
         }
 
         public record Scm(String connection, String developerConnection, String url, String tag) implements Serializable {
+        }
+
+        public record Organization(String name, String url) implements Serializable {
         }
     }
 }

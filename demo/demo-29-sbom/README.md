@@ -79,6 +79,30 @@ deterministically from the document's own content, so a reproducible build
 reproduces the exact same SBOM, serial number included. No creation `timestamp`
 is written, because that cannot be made deterministic.
 
+The single executable jar of `demo-07-java-pom-executable` and
+`demo-08-java-modular-executable` carries a document of its own at the same
+`META-INF/sbom/<artifact>.cdx.json`, named by its own `MANIFEST.MF`. It lists what
+the module's document lists and adds the launcher the jar shades, as a dependency
+of the project, which it describes as an `application` rather than a `library`. A
+launcher the module already depends on at the same version is listed once; at another
+version, both are listed. The module's own document stays in its jar, inside the
+executable one.
+
+The coordinate in the jar
+-------------------------
+
+The jar also carries the POM it is published with, and its coordinate, where Maven
+puts them in every jar it builds:
+
+    META-INF/maven/build.jenesis.demo/sbom-demo/pom.xml
+    META-INF/maven/build.jenesis.demo/sbom-demo/pom.properties   groupId, artifactId, version
+
+Tools that find a jar inside an image or an archive - a scanner such as Syft, or
+GraalVM's own SBOM of a native image - identify it by these files, so a jar built by
+Jenesis is recognised as `pkg:maven/build.jenesis.demo/sbom-demo@1.0.0` wherever it
+ends up. A module built under the pure modular layout has no Maven coordinate and
+carries neither.
+
 The license text in the jar
 ---------------------------
 

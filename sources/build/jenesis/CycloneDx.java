@@ -46,13 +46,18 @@ public class CycloneDx {
         return new CycloneDx(identifiers);
     }
 
-    public record Component(String bomRef, String group, String name, String version, String purl, String sha256,
+    public record Component(String type, String bomRef, String group, String name, String version, String purl, String sha256,
                             List<License> licenses, String description, List<Author> authors,
-                            List<ExternalReference> externalReferences, List<Property> properties) {
+                            List<ExternalReference> externalReferences, List<Property> properties,
+                            Organization supplier, String copyright, Organization manufacturer, String publisher) {
 
         public Component(String bomRef, String group, String name, String version, String purl, String sha256, List<License> licenses) {
-            this(bomRef, group, name, version, purl, sha256, licenses, null, List.of(), List.of(), List.of());
+            this("library", bomRef, group, name, version, purl, sha256, licenses, null, List.of(), List.of(), List.of(),
+                    null, null, null, null);
         }
+    }
+
+    public record Organization(String name, String url) {
     }
 
     public record Author(String name, String email) {
@@ -144,9 +149,24 @@ public class CycloneDx {
     private void appendJsonComponent(StringBuilder builder, Component component, int indent) {
         String pad = " ".repeat(indent);
         builder.append("{\n");
-        builder.append(pad).append("  \"type\": \"library\",\n");
+        builder.append(pad).append("  \"type\": \"").append(escapeJson(component.type())).append("\",\n");
         if (component.bomRef() != null) {
             builder.append(pad).append("  \"bom-ref\": \"").append(escapeJson(component.bomRef())).append("\",\n");
+        }
+        for (Map.Entry<String, Organization> entry : organizations(component).entrySet()) {
+            Organization organization = entry.getValue();
+            builder.append(pad).append("  \"").append(entry.getKey()).append("\": {");
+            if (organization.name() != null) {
+                builder.append(" \"name\": \"").append(escapeJson(organization.name())).append("\"");
+            }
+            if (organization.url() != null) {
+                builder.append(organization.name() != null ? "," : "")
+                        .append(" \"url\": [\"").append(escapeJson(organization.url())).append("\"]");
+            }
+            builder.append(" },\n");
+        }
+        if (component.publisher() != null) {
+            builder.append(pad).append("  \"publisher\": \"").append(escapeJson(component.publisher())).append("\",\n");
         }
         if (component.group() != null) {
             builder.append(pad).append("  \"group\": \"").append(escapeJson(component.group())).append("\",\n");
@@ -197,6 +217,9 @@ public class CycloneDx {
                 builder.append(" } }").append(index + 1 < component.licenses().size() ? ",\n" : "\n");
             }
             builder.append(pad).append("  ]");
+        }
+        if (component.copyright() != null) {
+            builder.append(",\n").append(pad).append("  \"copyright\": \"").append(escapeJson(component.copyright())).append("\"");
         }
         if (component.purl() != null) {
             builder.append(",\n").append(pad).append("  \"purl\": \"").append(escapeJson(component.purl())).append("\"");
@@ -282,11 +305,31 @@ public class CycloneDx {
         return writer.toString().replace("\r\n", "\n");
     }
 
+    private static SequencedMap<String, Organization> organizations(Component component) {
+        SequencedMap<String, Organization> organizations = new LinkedHashMap<>();
+        if (component.supplier() != null) {
+            organizations.put("supplier", component.supplier());
+        }
+        if (component.manufacturer() != null) {
+            organizations.put("manufacturer", component.manufacturer());
+        }
+        return organizations;
+    }
+
     private void appendXmlComponent(Document document, Node parent, Component component) {
         Element node = (Element) parent.appendChild(document.createElementNS(NAMESPACE, "component"));
-        node.setAttribute("type", "library");
+        node.setAttribute("type", component.type());
         if (component.bomRef() != null) {
             node.setAttribute("bom-ref", component.bomRef());
+        }
+        for (Map.Entry<String, Organization> entry : organizations(component).entrySet()) {
+            Element organization = (Element) node.appendChild(document.createElementNS(NAMESPACE, entry.getKey()));
+            if (entry.getValue().name() != null) {
+                appendXmlText(document, organization, "name", entry.getValue().name());
+            }
+            if (entry.getValue().url() != null) {
+                appendXmlText(document, organization, "url", entry.getValue().url());
+            }
         }
         if (component.authors() != null && !component.authors().isEmpty()) {
             Element authors = (Element) node.appendChild(document.createElementNS(NAMESPACE, "authors"));
@@ -299,6 +342,9 @@ public class CycloneDx {
                     appendXmlText(document, entry, "email", author.email());
                 }
             }
+        }
+        if (component.publisher() != null) {
+            appendXmlText(document, node, "publisher", component.publisher());
         }
         if (component.group() != null) {
             appendXmlText(document, node, "group", component.group());
@@ -330,6 +376,9 @@ public class CycloneDx {
                     }
                 }
             }
+        }
+        if (component.copyright() != null) {
+            appendXmlText(document, node, "copyright", component.copyright());
         }
         if (component.purl() != null) {
             appendXmlText(document, node, "purl", component.purl());

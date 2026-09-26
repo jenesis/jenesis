@@ -7,12 +7,14 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.License;
 import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Bundle;
+import build.jenesis.step.Dependencies;
 import build.jenesis.step.Docker;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.JLink;
@@ -25,6 +27,7 @@ import build.jenesis.step.NativeImage;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.Sbom;
+import build.jenesis.step.Versions;
 
 public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityModule, BuildExecutorModule> check,
                                             Function<InferredSourceFormattingModule, BuildExecutorModule> format,
@@ -269,6 +272,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             }
         }
         SequencedMap<String, BuildExecutorModule> none = Collections.emptyNavigableMap();
+        Sbom sbom = environment.flag("sbom.cyclonedx", true)
+                ? Sbom.configured(BuildStep.locate(descriptor.configuration(), "sbom.properties"))
+                : null;
         AssemblyDescriptor assembly = new AssemblyDescriptor((sub, outerInherited) -> {
             SequencedSet<String> closure = new LinkedHashSet<>(descriptor.artifacts());
             if (modules != null) {
@@ -278,7 +284,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 closure = new LinkedHashSet<>(Set.of("modules"));
             }
             sub.addStep("prepare",
-                    new Prepare(descriptor.pathPlacement(), overrides),
+                    new Prepare(descriptor.pathPlacement(), packaging.jpackage(), overrides),
                     outerInherited.sequencedKeySet().stream());
             sub.addModule("check",
                     check.apply(InferredSourceCodeQualityModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
@@ -292,15 +298,13 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                  .custom(hooks.getOrDefault("format", none))),
                     Stream.of(descriptor.sources().stream(), descriptor.spdx().stream(), descriptor.manifests().stream())
                             .flatMap(Function.identity()));
-            Sbom sbom = environment.flag("sbom.cyclonedx", true)
-                    ? Sbom.configured(BuildStep.locate(descriptor.configuration(), "sbom.properties"))
-                    : null;
             if (sbom != null) {
                 sub.addStep("sbom", sbom,
                         Stream.of(descriptor.manifests().stream(),
                                         descriptor.artifacts().stream(),
                                         descriptor.sources().stream(),
-                                        descriptor.resources().stream())
+                                        descriptor.resources().stream(),
+                                        descriptor.spdx().stream())
                                 .flatMap(Function.identity()));
             }
             sub.addModule("compliance", compliance.apply(InferredComplianceModule.ofEnvironment(environment, descriptor.configuration())
@@ -341,6 +345,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             Stream.of("prepare"),
                             inputs(descriptor, closure),
                             descriptor.resources().stream(),
+                            descriptor.synthetics().stream(),
                             sbom == null ? Stream.<String>empty() : Stream.of("sbom"),
                             resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"))
                             .flatMap(Function.identity()));
@@ -403,7 +408,13 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             if (packaging.jmod()) {
                 sub.addStep("jmod",
                         JMod.ofEnvironment(environment, factory),
-                        Stream.of(Stream.of("binary", "legal"), descriptor.content().stream()).flatMap(Function.identity()));
+                        Stream.of(Stream.of("binary", "legal"),
+                                        descriptor.content().stream(),
+                                        descriptor.resources().stream(),
+                                        descriptor.synthetics().stream(),
+                                        sbom == null ? Stream.<String>empty() : Stream.of("sbom"),
+                                        resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"))
+                                .flatMap(Function.identity()));
             }
             if (!hooks.get("").isEmpty()) {
                 sub.addModule("custom", (nested, nestedInherited) -> hooks.get("").forEach((name, module) ->
@@ -416,6 +427,14 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             assembly = assembly.then("package", (sub, inherited) -> {
                 SequencedSet<String> images = new LinkedHashSet<>();
                 SequencedSet<String> inputs = new LinkedHashSet<>(inherited.sequencedKeySet());
+                SequencedSet<String> identified = Stream.of(descriptor.manifests(),
+                                descriptor.coordinates(),
+                                descriptor.sources(),
+                                descriptor.resources())
+                        .flatMap(SequencedSet::stream)
+                        .map(InferredMultiProjectAssembler::local)
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+                inputs.removeIf(key -> identified.contains(local(key)));
                 if (modules != null) {
                     SequencedSet<String> replaced = descriptor.artifacts().stream()
                             .map(InferredMultiProjectAssembler::local)
@@ -424,7 +443,11 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
                 SequencedSet<String> linked = new LinkedHashSet<>(inputs);
                 if (!packaging.jmod() && (packaging.jlink() || packaging.jpackage() != null)) {
-                    sub.addStep("jmod", JMod.ofEnvironment(environment, factory), inputs);
+                    SequencedSet<String> packed = descriptor.resources().stream()
+                            .map(InferredMultiProjectAssembler::local)
+                            .collect(Collectors.toCollection(LinkedHashSet::new));
+                    sub.addStep("jmod", JMod.ofEnvironment(environment, factory), Stream.concat(inputs.stream(),
+                            inherited.sequencedKeySet().stream().filter(key -> packed.contains(local(key)))));
                     linked.add("jmod");
                 }
                 if (packaging.jlink()) {
@@ -440,12 +463,27 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 if (packaging.bundle()) {
                     sub.addStep("bundle", Bundle.ofEnvironment(environment), inputs);
                 }
+                SequencedSet<String> locals = Stream.of(descriptor.manifests(),
+                                descriptor.artifacts(),
+                                descriptor.sources(),
+                                descriptor.resources(),
+                                descriptor.spdx())
+                        .flatMap(SequencedSet::stream)
+                        .map(InferredMultiProjectAssembler::local)
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+                SequencedSet<String> described = inherited.sequencedKeySet().stream()
+                        .filter(key -> locals.contains(local(key)))
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
                 if (packaging.launcher()) {
-                    sub.addModule("launcher",
-                            LauncherModule.ofEnvironment(environment, repositories, resolvers)
-                                    .pinning(descriptor.pinning())
-                                    .pathPlacement(descriptor.pathPlacement()),
-                            inputs.stream());
+                    LauncherModule launcher = LauncherModule.ofEnvironment(environment, repositories, resolvers)
+                            .pinning(descriptor.pinning())
+                            .pathPlacement(descriptor.pathPlacement());
+                    SequencedSet<String> launched = new LinkedHashSet<>(inputs);
+                    if (sbom != null) {
+                        launcher = launcher.sbom(sbom.type("application")).sbomInputs(described);
+                        launched.addAll(described);
+                    }
+                    sub.addModule("launcher", launcher, launched);
                 }
                 if (packaging.docker() != null) {
                     sub.addStep("docker", new Docker(packaging.docker()), inputs);
@@ -455,7 +493,15 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     sub.addStep("reachability", new NativeImageMetadata(), inputs);
                     sub.addStep("native-image", NativeImage.ofEnvironment(environment, descriptor.pathPlacement()),
                                 Stream.concat(inputs.stream(), Stream.of("reachability")));
-                    images.add("native-image");
+                    if (sbom == null) {
+                        images.add("native-image");
+                    } else {
+                        sub.addStep("native-sbom",
+                                sbom.type("application").graalvmLicense(environment.value("graalvm.license")),
+                                Stream.concat(described.stream(), Stream.of("native-image")));
+                        sub.addStep("native", new Described(), "native-image", "native-sbom");
+                        images.add("native");
+                    }
                 }
                 if (!packagers.isEmpty()) {
                     SequencedSet<String> handed = new LinkedHashSet<>(linked);
@@ -474,6 +520,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     images.remove("jpackage");
                     images.addFirst("packaged");
                     images.add("custom");
+                }
+                if (packaging.launcher()) {
+                    images.add("launcher");
                 }
                 if (!images.isEmpty()) {
                     String named = descriptor.name().endsWith("-")
@@ -511,6 +560,57 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         }
                         Files.createDirectories(target.getParent());
                         BuildStep.linkOrCopy(target, file);
+                    }
+                }
+            }
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    private record Described() implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            Path image = context.next().resolve(NativeImage.NATIVE);
+            for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
+                Path folder = argument.folder().resolve(NativeImage.NATIVE);
+                if (Files.isDirectory(folder)) {
+                    try (Stream<Path> files = Files.walk(folder)) {
+                        for (Path file : files.filter(Files::isRegularFile).toList()) {
+                            Path target = image.resolve(folder.relativize(file).toString());
+                            Files.createDirectories(target.getParent());
+                            BuildStep.linkOrCopy(target, file);
+                        }
+                    }
+                }
+            }
+            if (!Files.isDirectory(image)) {
+                return CompletableFuture.completedStage(new BuildStepResult(true));
+            }
+            for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
+                Path fragment = argument.folder().resolve(Versions.MANIFEST);
+                if (Files.isRegularFile(fragment)) {
+                    String location;
+                    try (InputStream in = Files.newInputStream(fragment)) {
+                        location = new Manifest(in).getMainAttributes().getValue("Sbom-Location");
+                    }
+                    Path document = location == null ? null : argument.folder().resolve(RESOURCES).resolve(location);
+                    if (document != null && Files.isRegularFile(document)) {
+                        Path target = image.resolve(document.getFileName().toString());
+                        if (Files.exists(target)) {
+                            throw new IllegalStateException("The native image already holds " + target.getFileName()
+                                    + ", where its bill of materials belongs - give the image another name");
+                        }
+                        BuildStep.linkOrCopy(target, document);
                     }
                 }
             }
@@ -580,6 +680,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
     }
 
     private record Prepare(PathPlacement pathPlacement,
+                           String packageType,
                            SequencedMap<String, SequencedMap<String, String>> overrides) implements BuildStep {
 
         @Override
@@ -591,6 +692,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             String version = null;
             String artifact = null;
             String moduleName = null;
+            SequencedProperties described = null;
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
@@ -614,6 +716,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 Path metadataFile = argument.folder().resolve(BuildStep.METADATA);
                 if (Files.isRegularFile(metadataFile)) {
                     SequencedProperties metadata = SequencedProperties.ofFiles(metadataFile);
+                    if (described == null) {
+                        described = metadata;
+                    }
                     if (version == null) {
                         String value = metadata.getProperty("version");
                         if (value != null && !value.isEmpty()) {
@@ -646,6 +751,47 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
                 if (version != null) {
                     jpackage.setProperty("--app-version", version);
+                }
+                if (described != null) {
+                    String description = described.value("description"), url = described.value("url"),
+                            vendor = described.value("organization.name"), copyright = described.value("copyright");
+                    if (description != null) {
+                        jpackage.setProperty("--description", description.replaceAll("\\s+", " "));
+                    }
+                    if (vendor != null) {
+                        jpackage.setProperty("--vendor", vendor);
+                    }
+                    if (copyright != null) {
+                        jpackage.setProperty("--copyright", copyright);
+                    }
+                    if (url != null && packageType != null && !packageType.equals("app-image")) {
+                        jpackage.setProperty("--about-url", url);
+                    }
+                    List<String> emails = new ArrayList<>();
+                    SequencedMap<String, String[]> licenses = new LinkedHashMap<>();
+                    described.forEachProperty((key, value) -> {
+                        if (key.startsWith("developer.") && key.endsWith(".email") && !value.isBlank()) {
+                            emails.add(value.trim());
+                        } else if (key.startsWith("license.") && (key.endsWith(".name") || key.endsWith(".url"))) {
+                            String[] license = licenses.computeIfAbsent(key.substring(0, key.lastIndexOf('.')), _ -> new String[2]);
+                            license[key.endsWith(".name") ? 0 : 1] = value.trim();
+                        }
+                    });
+                    if ("deb".equals(packageType) && !emails.isEmpty()) {
+                        jpackage.setProperty("--linux-deb-maintainer", emails.getFirst());
+                    }
+                    if ("rpm".equals(packageType) && !licenses.isEmpty()) {
+                        Map<String, String> aliases = Dependencies.aliases(arguments.values().stream()
+                                .filter(argument -> !argument.removed())
+                                .map(BuildStepArgument::folder)
+                                .toList());
+                        List<String> identifiers = licenses.values().stream()
+                                .map(license -> new License(null, null, license[0], license[1]).identified(aliases).id())
+                                .toList();
+                        if (!identifiers.contains(null)) {
+                            jpackage.setProperty("--linux-rpm-license-type", String.join(" OR ", identifiers));
+                        }
+                    }
                 }
                 jpackage.store(processFolder.resolve("jpackage.properties"));
                 SequencedProperties launcher = new SequencedProperties();

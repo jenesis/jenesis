@@ -9,6 +9,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Dependencies;
 import build.jenesis.step.Sbom;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -199,6 +200,60 @@ public class SbomTest {
                 Map.of(Path.of(BuildStep.SOURCES + "demo/Greeting.java"), Checksum.of(ChecksumStatus.ALTERED)))));
         assertThat(Sbom.configured(configuration).shouldRun(arguments)).isTrue();
         assertThat(Sbom.configured(null).shouldRun(arguments)).isFalse();
+    }
+
+    @Test
+    public void describes_the_runtime_a_release_file_names_as_a_platform_of_the_project() throws Exception {
+        Files.writeString(argument.resolve(BuildStep.RELEASE), "IMPLEMENTOR=\"Oracle Corporation\"\n"
+                + "JAVA_RUNTIME_VERSION=\"25.0.3+9-LTS-jvmci-b01\"\nGRAALVM_VERSION=\"25.0.3\"\n");
+
+        assertThat(sbom(Map.of()))
+                .contains("\"type\": \"platform\",\n"
+                        + "      \"bom-ref\": \"Oracle Corporation/GraalVM/25.0.3\",\n"
+                        + "      \"group\": \"Oracle Corporation\",\n"
+                        + "      \"name\": \"GraalVM\",\n"
+                        + "      \"version\": \"25.0.3\"")
+                .contains("{ \"ref\": \"build.jenesis/demo/1.0.0\", \"dependsOn\": [\"Oracle Corporation/GraalVM/25.0.3\"] }");
+    }
+
+    @Test
+    public void records_the_licence_configured_for_the_graalvm() throws Exception {
+        Files.writeString(argument.resolve(BuildStep.RELEASE), "IMPLEMENTOR=\"GraalVM Community\"\nGRAALVM_VERSION=\"25.0.2\"\n");
+
+        assertThat(sbom(new Sbom().graalvmLicense("GPL-2.0-with-classpath-exception"), Map.of()))
+                .contains("\"name\": \"GraalVM\",\n"
+                        + "      \"version\": \"25.0.2\",\n"
+                        + "      \"licenses\": [\n"
+                        + "        { \"license\": { \"id\": \"GPL-2.0-with-classpath-exception\" } }");
+        assertThat(sbom(new Sbom(), Map.of()))
+                .as("the release file names no licence, so none is recorded unless one is configured")
+                .doesNotContain("licenses");
+    }
+
+    @Test
+    public void describes_the_supplier_manufacturer_publisher_and_copyright_the_project_declares() throws Exception {
+        assertThat(sbom(Map.of("organization.name", "Example Ltd",
+                        "organization.url", "https://example.com",
+                        "copyright", "Copyright 2020 Example Ltd",
+                        "manufacturer.name", "Example Factory",
+                        "publisher", "Example Publishing")))
+                .contains("\"supplier\": { \"name\": \"Example Ltd\", \"url\": [\"https://example.com\"] }")
+                .contains("\"copyright\": \"Copyright 2020 Example Ltd\"")
+                .contains("\"manufacturer\": { \"name\": \"Example Factory\" }")
+                .contains("\"publisher\": \"Example Publishing\"");
+        assertThat(sbom(Map.of()))
+                .as("none is invented when the project declares none")
+                .doesNotContain("supplier", "copyright", "manufacturer", "publisher");
+    }
+
+    @Test
+    public void identifies_the_licence_of_the_project_as_it_does_a_dependency_licence() throws Exception {
+        Files.writeString(argument.resolve(Dependencies.SPDX), "alias/our\\ own\\ licence=LicenseRef-Own\n");
+        assertThat(sbom(Map.of("license.apache.name", "The Apache Software License, Version 2.0",
+                        "license.own.name", "Our Own Licence")))
+                .contains("{ \"license\": { \"id\": \"Apache-2.0\" } }")
+                .as("an alias of spdx.properties applies to the project's licence as well")
+                .contains("{ \"license\": { \"name\": \"LicenseRef-Own\" } }");
     }
 
     private String sbom(Map<String, String> scm) throws Exception {

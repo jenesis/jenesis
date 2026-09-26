@@ -19,22 +19,34 @@ public class Sbom implements BuildStep {
 
     private final CycloneDx.Format format;
     private final boolean swhid;
+    private final String type;
+    private final String graalvmLicense;
 
     public Sbom() {
-        this(CycloneDx.Format.JSON, false);
+        this(CycloneDx.Format.JSON, false, "library", null);
     }
 
-    private Sbom(CycloneDx.Format format, boolean swhid) {
+    private Sbom(CycloneDx.Format format, boolean swhid, String type, String graalvmLicense) {
         this.format = format;
         this.swhid = swhid;
+        this.type = type;
+        this.graalvmLicense = graalvmLicense;
     }
 
     public Sbom format(CycloneDx.Format format) {
-        return new Sbom(format, swhid);
+        return new Sbom(format, swhid, type, graalvmLicense);
     }
 
     public Sbom swhid(boolean swhid) {
-        return new Sbom(format, swhid);
+        return new Sbom(format, swhid, type, graalvmLicense);
+    }
+
+    public Sbom type(String type) {
+        return new Sbom(format, swhid, type, graalvmLicense);
+    }
+
+    public Sbom graalvmLicense(String graalvmLicense) {
+        return new Sbom(format, swhid, type, graalvmLicense);
     }
 
     public static Sbom configured(Path properties) throws IOException {
@@ -56,7 +68,9 @@ public class Sbom implements BuildStep {
                 Path.of(METADATA),
                 Path.of(Dependencies.GRAPH),
                 Path.of(Dependencies.LICENSES),
-                Path.of(Dependencies.RESOLVED))
+                Path.of(Dependencies.RESOLVED),
+                Path.of(Dependencies.SPDX),
+                Path.of(RELEASE))
                 || swhid && argument.hasChanged(Path.of(SOURCES), Path.of(RESOURCES)));
     }
 
@@ -76,6 +90,7 @@ public class Sbom implements BuildStep {
         HashDigestFunction hash = new HashDigestFunction("SHA-256");
         SequencedMap<String, CycloneDx.Component> components = new LinkedHashMap<>();
         List<Path> graphFiles = new ArrayList<>();
+        SequencedSet<String> platforms = new LinkedHashSet<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
@@ -83,6 +98,18 @@ public class Sbom implements BuildStep {
             Path graphFile = argument.folder().resolve(Dependencies.GRAPH);
             if (Files.isRegularFile(graphFile)) {
                 graphFiles.add(graphFile);
+            }
+            Path release = argument.folder().resolve(RELEASE);
+            if (Files.isRegularFile(release)) {
+                SequencedProperties runtime = SequencedProperties.ofFiles(release);
+                String implementor = unquote(runtime.value("IMPLEMENTOR")),
+                        graalvm = unquote(runtime.value("GRAALVM_VERSION", runtime.value("JAVA_RUNTIME_VERSION")));
+                String ref = (implementor == null ? "" : implementor + "/") + "GraalVM" + (graalvm == null ? "" : "/" + graalvm);
+                if (platforms.add(ref)) {
+                    components.put(ref, new CycloneDx.Component("platform", ref, implementor, "GraalVM", graalvm, null, null,
+                            graalvmLicense == null ? List.of() : List.of(new License(graalvmLicense, null, null, null)),
+                            null, List.of(), List.of(), List.of(), null, null, null, null));
+                }
             }
             Path index = argument.folder().resolve(DEPENDENCIES);
             if (!Files.exists(index)) {
@@ -150,11 +177,15 @@ public class Sbom implements BuildStep {
                     properties.add(new CycloneDx.Property("jenesis:source:swhid", identifier));
                 }
             }
-            project = new CycloneDx.Component(projectRef, groupId, artifactId, version, purl, null,
-                    ownLicenses(metadata), metadata.getProperty("description"), developers(metadata),
-                    references(metadata, revision == null ? tag : revision), properties);
+            project = new CycloneDx.Component(type, projectRef, groupId, artifactId, version, purl, null,
+                    ownLicenses(metadata, Dependencies.aliases(folders)), metadata.getProperty("description"), developers(metadata),
+                    references(metadata, revision == null ? tag : revision), properties,
+                    organization(metadata, "organization"),
+                    metadata.value("copyright"),
+                    organization(metadata, "manufacturer"),
+                    metadata.value("publisher"));
         }
-        List<CycloneDx.Dependency> dependencies = relationships(projectRef, components.keySet(), graphFiles);
+        List<CycloneDx.Dependency> dependencies = relationships(projectRef, components.keySet(), platforms, graphFiles);
         String document = new CycloneDx().emit(format, project, new ArrayList<>(components.values()), dependencies);
 
         Path embedded = Files.createDirectories(context.next()
@@ -208,13 +239,14 @@ public class Sbom implements BuildStep {
 
     private static List<CycloneDx.Dependency> relationships(String projectRef,
                                                                    Set<String> componentRefs,
+                                                                   SequencedSet<String> platforms,
                                                                    List<Path> graphFiles) throws IOException {
-        if (graphFiles.isEmpty()) {
+        if (graphFiles.isEmpty() && (platforms.isEmpty() || projectRef == null)) {
             return List.of();
         }
         SequencedMap<String, SequencedSet<String>> dependsOn = new LinkedHashMap<>();
         if (projectRef != null) {
-            dependsOn.put(projectRef, new LinkedHashSet<>());
+            dependsOn.put(projectRef, new LinkedHashSet<>(platforms));
         }
         for (String ref : componentRefs) {
             dependsOn.put(ref, new LinkedHashSet<>());
@@ -252,6 +284,13 @@ public class Sbom implements BuildStep {
         List<CycloneDx.Dependency> result = new ArrayList<>();
         dependsOn.forEach((ref, on) -> result.add(new CycloneDx.Dependency(ref, new ArrayList<>(on))));
         return result;
+    }
+
+    private static String unquote(String value) {
+        String unquoted = value != null && value.length() > 1 && value.startsWith("\"") && value.endsWith("\"")
+                ? value.substring(1, value.length() - 1).trim()
+                : value;
+        return unquoted == null || unquoted.isEmpty() ? null : unquoted;
     }
 
     private static String ref(String vertexKey, SequencedMap<String, Resolver.Vertex> vertices) {
@@ -300,7 +339,12 @@ public class Sbom implements BuildStep {
         return byIndex.values().stream().map(entry -> new License(entry[0], entry[1], entry[2], entry[3])).toList();
     }
 
-    private static List<License> ownLicenses(SequencedProperties metadata) {
+    private static CycloneDx.Organization organization(SequencedProperties metadata, String prefix) {
+        String name = metadata.value(prefix + ".name"), url = metadata.value(prefix + ".url");
+        return name == null && url == null ? null : new CycloneDx.Organization(name, url);
+    }
+
+    private static List<License> ownLicenses(SequencedProperties metadata, Map<String, String> aliases) {
         SequencedMap<String, String[]> byId = new LinkedHashMap<>();
         for (String key : metadata.stringPropertyNames()) {
             if (!key.startsWith("license.")) {
@@ -318,7 +362,7 @@ public class Sbom implements BuildStep {
                 entry[1] = metadata.getProperty(key);
             }
         }
-        return byId.values().stream().map(entry -> new License(null, null, entry[0], entry[1])).toList();
+        return byId.values().stream().map(entry -> new License(null, null, entry[0], entry[1]).identified(aliases)).toList();
     }
 
     private static List<CycloneDx.Author> developers(SequencedProperties metadata) {
