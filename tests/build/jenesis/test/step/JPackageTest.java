@@ -19,6 +19,7 @@ import sample.Sample;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 public class JPackageTest {
 
@@ -85,6 +86,63 @@ public class JPackageTest {
         assertThat(properties.get("bundle").get("--app-version"))
                 .as("jpackage parses --app-version as a dotted version on every platform")
                 .isEqualTo(expected);
+    }
+
+    @Test
+    public void leaves_the_licence_out_of_an_application_image() throws IOException {
+        mainJar();
+        Files.writeString(Files.createDirectory(bundle.resolve("legal")).resolve("LICENSE"), "licence");
+        new JPackage(ProcessHandler.Factory.TOOL).type("app-image").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
+                        bundle,
+                        Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("process/jpackage.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(supplement.resolve("command"))
+                .as("jpackage refuses a licence file for an application image")
+                .content()
+                .doesNotContain("--license-file");
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX)
+    public void passes_the_licence_of_the_module_to_an_installable_package() throws IOException {
+        assumeTrue(Stream.of(System.getenv().getOrDefault("PATH", "").split(File.pathSeparator))
+                .anyMatch(folder -> Files.isExecutable(Path.of(folder, "dpkg-deb"))), "dpkg-deb builds a Debian package");
+        mainJar();
+        Path licence = Files.createDirectory(bundle.resolve("legal")).resolve("LICENSE");
+        Files.writeString(licence, "licence");
+        new JPackage(ProcessHandler.Factory.TOOL).type("deb").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
+                        bundle,
+                        Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("process/jpackage.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(supplement.resolve("command")).content().contains("--license-file " + licence);
+        try (Stream<Path> files = Files.list(next.resolve(JPackage.PACKAGES))) {
+            assertThat(files.map(file -> file.getFileName().toString())).anyMatch(name -> name.endsWith(".deb"));
+        }
+    }
+
+    private void mainJar() throws IOException {
+        Path artifacts = Files.createDirectory(bundle.resolve(BuildStep.ARTIFACTS));
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        manifest.getMainAttributes().put(Attributes.Name.MAIN_CLASS, "sample.Sample");
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(artifacts.resolve("app.jar")), manifest)) {
+            jar.putNextEntry(new JarEntry("sample/Sample.class"));
+            try (InputStream in = Sample.class.getResourceAsStream("Sample.class")) {
+                requireNonNull(in).transferTo(jar);
+            }
+            jar.closeEntry();
+        }
+        SequencedProperties configuration = new SequencedProperties();
+        configuration.setProperty("--name", "sample");
+        configuration.setProperty("--main-jar", "app.jar");
+        configuration.setProperty("--main-class", "sample.Sample");
+        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jpackage.properties"));
     }
 
     private static class ExposedJPackage extends JPackage {

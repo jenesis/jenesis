@@ -52,6 +52,25 @@ public class JPackage extends ProcessBuildStep {
     protected SequencedMap<String, SequencedMap<String, String>> properties(
             SequencedMap<String, BuildStepArgument> arguments) throws IOException {
         SequencedMap<String, SequencedMap<String, String>> properties = super.properties(arguments);
+        if (type != null && !type.equals("app-image")
+                && properties.values().stream().noneMatch(folder -> folder.containsKey("--license-file"))) {
+            Path license = null;
+            for (BuildStepArgument argument : arguments.values()) {
+                Path legal = argument.removed() ? null : argument.folder().resolve(Legal.LEGAL);
+                if (license == null && legal != null && Files.isDirectory(legal)) {
+                    try (Stream<Path> files = Files.list(legal)) {
+                        license = files.filter(Files::isRegularFile)
+                                .filter(file -> file.getFileName().toString().toUpperCase(Locale.ROOT).startsWith("LICENSE"))
+                                .sorted()
+                                .findFirst()
+                                .orElse(null);
+                    }
+                }
+            }
+            if (license != null) {
+                properties.computeIfAbsent(Legal.LEGAL, _ -> new LinkedHashMap<>()).put("--license-file", license.toString());
+            }
+        }
         for (SequencedMap<String, String> folder : properties.values()) {
             folder.computeIfPresent("--app-version", (_, version) -> {
                 String dotted = version.split("[^0-9.]", 2)[0];

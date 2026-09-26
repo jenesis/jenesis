@@ -92,6 +92,50 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void describes_a_debian_package_with_the_metadata_it_supports() throws IOException {
+        SequencedProperties arguments = describedPackage("deb");
+        assertThat(arguments.getProperty("--description"))
+                .as("a description spanning lines is passed as one argument")
+                .isEqualTo("A demo project");
+        assertThat(arguments.getProperty("--about-url")).isEqualTo("https://example.com/demo");
+        assertThat(arguments.getProperty("--linux-deb-maintainer")).isEqualTo("dev@example.com");
+        assertThat(arguments.getProperty("--linux-rpm-license-type")).isNull();
+    }
+
+    @Test
+    public void describes_an_rpm_package_with_the_licences_the_project_offers() throws IOException {
+        SequencedProperties arguments = describedPackage("rpm");
+        assertThat(arguments.getProperty("--linux-rpm-license-type"))
+                .as("a project that lists several licences may be used under any of them")
+                .isEqualTo("Apache-2.0 OR MIT");
+        assertThat(arguments.getProperty("--linux-deb-maintainer")).isNull();
+    }
+
+    @Test
+    public void describes_an_application_image_only_with_what_jpackage_accepts_for_one() throws IOException {
+        SequencedProperties arguments = describedPackage("app-image");
+        assertThat(arguments.getProperty("--description")).isEqualTo("A demo project");
+        assertThat(arguments.stringPropertyNames())
+                .as("jpackage refuses the options of an installable package for an application image")
+                .doesNotContain("--about-url", "--linux-deb-maintainer", "--linux-rpm-license-type");
+    }
+
+    private SequencedProperties describedPackage(String type) throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false, type);
+        Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), """
+                artifact=demo
+                description=A demo\\n    project
+                url=https://example.com/demo
+                developer.dev.name=Dev
+                developer.dev.email=dev@example.com
+                license.apache.name=Apache-2.0
+                license.mit.name=MIT
+                """);
+        Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
+        return readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"));
+    }
+
+    @Test
     public void absent_main_in_module_properties_yields_no_jpackage_arguments() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false);
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
