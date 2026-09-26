@@ -1442,8 +1442,10 @@ public record Project(
         public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
                                         Map<String, Repository> repositories,
                                         Map<String, Resolver> resolvers) throws IOException {
-            return base.apply(descriptor.toInherited(), repositories, resolvers).mapBuild(delegate -> (sub, inherited) -> {
-                sub.addModule("assemble", delegate, inherited.sequencedKeySet().stream());
+            ProjectModuleDescriptor nested = descriptor.toInherited();
+            SequencedSet<String> embedded = new LinkedHashSet<>(nested.embedded());
+            embedded.add(BuildExecutorModule.PREVIOUS + "describe/pom");
+            return base.apply(nested.embedded(embedded), repositories, resolvers).mapBuild(delegate -> (sub, inherited) -> {
                 sub.addModule("describe", (describe, describeInherited) -> {
                             describe.addStep("pom", new Pom().resolved(resolved), describeInherited.sequencedKeySet().stream());
                             if (manifests != null) {
@@ -1451,6 +1453,7 @@ public record Project(
                             }
                         },
                         inherited.sequencedKeySet().stream());
+                sub.addModule("assemble", delegate, Stream.concat(inherited.sequencedKeySet().stream(), Stream.of("describe/pom")));
             });
         }
     }

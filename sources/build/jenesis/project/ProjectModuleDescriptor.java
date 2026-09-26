@@ -17,6 +17,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
     private final SequencedSet<String> artifacts;
     private final SequencedSet<String> spdx;
     private final SequencedSet<String> content;
+    private final SequencedSet<String> embedded;
     private final boolean test;
     private final boolean source;
     private final boolean documentation;
@@ -34,6 +35,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 immutable(base.coordinates()),
                 immutable(base.artifacts()),
                 immutable(base.spdx()),
+                Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
                 true,
                 false,
@@ -53,6 +55,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                                     SequencedSet<String> artifacts,
                                     SequencedSet<String> spdx,
                                     SequencedSet<String> content,
+                                    SequencedSet<String> embedded,
                                     boolean test,
                                     boolean source,
                                     boolean documentation,
@@ -69,6 +72,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
         this.artifacts = artifacts;
         this.spdx = spdx;
         this.content = content;
+        this.embedded = embedded;
         this.test = test;
         this.source = source;
         this.documentation = documentation;
@@ -92,6 +96,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 artifacts,
                 spdx,
                 content,
+                embedded,
                 test,
                 source,
                 documentation,
@@ -115,6 +120,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 prefix(artifacts),
                 prefix(spdx),
                 prefix(content),
+                prefix(embedded),
                 test,
                 source,
                 documentation,
@@ -139,6 +145,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 artifacts,
                 spdx,
                 content,
+                embedded,
                 test,
                 source,
                 documentation,
@@ -163,6 +170,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 artifacts,
                 spdx,
                 content,
+                embedded,
                 test,
                 source,
                 documentation,
@@ -191,6 +199,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 artifacts,
                 spdx,
                 content,
+                embedded,
                 test,
                 source,
                 documentation,
@@ -219,6 +228,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 artifacts,
                 spdx,
                 content,
+                embedded,
                 test,
                 source,
                 documentation,
@@ -247,6 +257,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 artifacts,
                 spdx,
                 content,
+                embedded,
                 test,
                 source,
                 documentation,
@@ -275,6 +286,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 artifacts,
                 spdx,
                 content,
+                embedded,
                 test,
                 source,
                 documentation,
@@ -308,6 +320,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 immutable(artifacts),
                 spdx,
                 content,
+                embedded,
                 test,
                 source,
                 documentation,
@@ -335,6 +348,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 artifacts,
                 spdx,
                 immutable(content),
+                embedded,
                 test,
                 source,
                 documentation,
@@ -345,6 +359,34 @@ public class ProjectModuleDescriptor implements ProjectModule {
 
     public ProjectModuleDescriptor content(String... content) {
         return content(new LinkedHashSet<>(List.of(content)));
+    }
+
+    public SequencedSet<String> embedded() {
+        return embedded;
+    }
+
+    public ProjectModuleDescriptor embedded(SequencedSet<String> embedded) {
+        return new ProjectModuleDescriptor(name,
+                configuration,
+                dependencies,
+                sources,
+                resources,
+                manifests,
+                coordinates,
+                artifacts,
+                spdx,
+                content,
+                immutable(embedded),
+                test,
+                source,
+                documentation,
+                pinning,
+                pathPlacement,
+                location);
+    }
+
+    public ProjectModuleDescriptor embedded(String... embedded) {
+        return embedded(new LinkedHashSet<>(List.of(embedded)));
     }
 
     public boolean test() {
@@ -362,6 +404,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 artifacts,
                 spdx,
                 content,
+                embedded,
                 test,
                 source,
                 documentation,
@@ -385,6 +428,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 artifacts,
                 spdx,
                 content,
+                embedded,
                 test,
                 source,
                 documentation,
@@ -408,6 +452,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 artifacts,
                 spdx,
                 content,
+                embedded,
                 test,
                 source,
                 documentation,
@@ -431,6 +476,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 artifacts,
                 spdx,
                 content,
+                embedded,
                 test,
                 source,
                 documentation,
@@ -458,6 +504,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 artifacts,
                 spdx,
                 content,
+                embedded,
                 test,
                 source,
                 documentation,
@@ -477,6 +524,7 @@ public class ProjectModuleDescriptor implements ProjectModule {
                 artifacts,
                 spdx,
                 content,
+                embedded,
                 test,
                 source,
                 documentation,

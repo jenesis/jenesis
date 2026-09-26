@@ -157,6 +157,16 @@ public class Pom implements BuildStep {
                     deps,
                     parseMetadata(metadata)).accept(writer);
         }
+        Path embedded = Files.createDirectories(context.next()
+                .resolve(RESOURCES + "META-INF/maven")
+                .resolve(groupId)
+                .resolve(artifactId));
+        Files.copy(context.next().resolve(POM), embedded.resolve(POM));
+        SequencedProperties coordinate = new SequencedProperties();
+        coordinate.setProperty("artifactId", artifactId);
+        coordinate.setProperty("groupId", groupId);
+        coordinate.setProperty("version", version);
+        coordinate.store(embedded.resolve("pom.properties"));
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
