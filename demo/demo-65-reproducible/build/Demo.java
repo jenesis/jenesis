@@ -15,7 +15,7 @@ import build.jenesis.Make;
  *
  * which builds the jar and prints:
  *
- *     classes.jar has the recorded SHA-256 ...
+ *     demo.reproducible-0-SNAPSHOT.jar has the recorded SHA-256 ...
  */
 public class Demo {
 
@@ -28,17 +28,17 @@ public class Demo {
 
         Path jar;
         try (Stream<Path> walk = Files.walk(Path.of("target"))) {
-            jar = walk.filter(path -> path.getFileName().toString().equals("classes.jar"))
+            jar = walk.filter(path -> path.getFileName().toString().equals("demo.reproducible-0-SNAPSHOT.jar"))
                     .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("No classes.jar was produced"));
+                    .orElseThrow(() -> new IllegalStateException("No demo.reproducible-0-SNAPSHOT.jar was produced"));
         }
 
         String digest = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(jar)));
         if (!digest.equals(EXPECTED)) {
-            throw new IllegalStateException("classes.jar has SHA-256 " + digest + " where " + EXPECTED
+            throw new IllegalStateException(jar.getFileName() + " has SHA-256 " + digest + " where " + EXPECTED
                     + " was recorded: something about this build reached the jar, and `unzip -Z -v "
                     + jar + "` next to the same listing from another machine shows what");
         }
-        System.out.println("classes.jar has the recorded SHA-256 " + digest);
+        System.out.println(jar.getFileName() + " has the recorded SHA-256 " + digest);
     }
 }

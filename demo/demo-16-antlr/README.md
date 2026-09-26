@@ -68,7 +68,7 @@ ANTLR writes `.java` files next to the `.tokens` and `.interp` files it uses
 while it runs. Only the sources survive the step, so the auxiliary files never
 reach the jar:
 
-    jar tf target/build/**/artifacts/classes.jar
+    jar tf target/build/**/artifacts/demo.antlr-0-SNAPSHOT.jar
 
     demo/antlr/calc/CalcLexer.class
     demo/antlr/calc/CalcParser.class

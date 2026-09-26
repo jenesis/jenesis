@@ -3,9 +3,11 @@ package build.jenesis.step;
 import module java.base;
 import java.util.jar.Attributes;
 import build.jenesis.Environment;
+import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
+import build.jenesis.SequencedProperties;
 
 public class Jar extends ProcessBuildStep {
 
@@ -58,13 +60,13 @@ public class Jar extends ProcessBuildStep {
                 "--create",
                 "--file",
                 Files.createDirectory(context.next().resolve(sort.folder))
-                        .resolve(sort.file)
+                        .resolve(sort.file(arguments))
                         .toString()));
         if (timestamp != null) {
             commands.add("--date=" + timestamp);
         }
         List<Path> manifestFiles = new ArrayList<>();
-        for (BuildStepArgument argument : arguments.values()) {
+        for (BuildStepArgument argument : sort == Sort.CLASSES ? arguments.values() : List.<BuildStepArgument>of()) {
             if (argument.removed()) {
                 continue;
             }
@@ -130,22 +132,51 @@ public class Jar extends ProcessBuildStep {
 
     public enum Sort {
 
-        CLASSES("classes.jar", BuildStep.ARTIFACTS, BuildStep.CLASSES, BuildStep.RESOURCES),
-        SOURCES("sources.jar", BuildStep.SOURCES, BuildStep.SOURCES, BuildStep.RESOURCES),
-        JAVADOC("javadoc.jar", BuildStep.DOCUMENTATION, Javadoc.JAVADOC);
+        CLASSES("classes", "", BuildStep.ARTIFACTS, BuildStep.CLASSES, BuildStep.RESOURCES),
+        SOURCES("sources", "-sources", BuildStep.SOURCES, BuildStep.SOURCES, BuildStep.RESOURCES),
+        JAVADOC("javadoc", "-javadoc", BuildStep.DOCUMENTATION, Javadoc.JAVADOC);
 
-        final String file;
+        final String kind;
+        final String suffix;
         final String folder;
         final List<String> folders;
 
-        Sort(String file, String folder, String... folders) {
-            this.file = file;
+        Sort(String kind, String suffix, String folder, String... folders) {
+            this.kind = kind;
+            this.suffix = suffix;
             this.folder = folder;
             this.folders = List.of(folders);
         }
 
-        public String getFile() {
-            return file;
+        public String file(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            SequencedProperties module = null, metadata = null;
+            for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
+                Path moduleFile = argument.folder().resolve(BuildStep.MODULE),
+                        metadataFile = argument.folder().resolve(BuildStep.METADATA);
+                if (module == null && Files.isRegularFile(moduleFile)) {
+                    module = SequencedProperties.ofFiles(moduleFile);
+                }
+                if (metadata == null && Files.isRegularFile(metadataFile)) {
+                    metadata = SequencedProperties.ofFiles(metadataFile);
+                }
+            }
+            String version = metadata == null
+                    ? null
+                    : metadata.value("version", metadata.value("project") == null ? null : "0-SNAPSHOT");
+            if (module != null && module.flag("modular") && module.value("module") != null) {
+                return BuildExecutorModule.encode(module.value("module"))
+                        + (version == null ? "" : "-" + BuildExecutorModule.encode(version)) + suffix + ".jar";
+            }
+            String artifact = metadata == null ? null : metadata.value("artifact");
+            if (artifact == null) {
+                return kind + ".jar";
+            }
+            String group = metadata.value("project");
+            return BuildExecutorModule.encode((group == null ? "" : group + "/") + artifact + (version == null ? "" : "/" + version))
+                    + (module != null && module.value("test") != null ? "-tests" : "") + suffix + ".jar";
         }
     }
 }

@@ -19,7 +19,7 @@ From this directory:
 
 which builds the module and prints
 
-    classes.jar has the recorded SHA-256 b318a6b0bd83a7fef8eef4164c96d449fd3ae5d14275170d0d5c249ee5cf35ac
+    demo.reproducible-0-SNAPSHOT.jar has the recorded SHA-256 b318a6b0bd83a7fef8eef4164c96d449fd3ae5d14275170d0d5c249ee5cf35ac
 
 Layout
 ------

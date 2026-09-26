@@ -65,7 +65,7 @@ public class InferredMultiProjectAssemblerTest {
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
         SequencedProperties jpackageArguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"));
         assertThat(jpackageArguments.getProperty("--name")).isEqualTo("demo");
-        assertThat(jpackageArguments.getProperty("--main-jar")).isEqualTo("classes.jar");
+        assertThat(jpackageArguments.getProperty("--main-jar")).isEqualTo("demo.jar");
         assertThat(jpackageArguments.getProperty("--main-class")).isEqualTo("com.example.Entry");
     }
 

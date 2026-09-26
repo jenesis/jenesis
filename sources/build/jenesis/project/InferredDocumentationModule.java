@@ -123,11 +123,11 @@ public class InferredDocumentationModule implements BuildExecutorModule {
         if (archiver != null) {
             buildExecutor.addStep(ARCHIVE,
                     archiver,
-                    GENERATE
+                    Stream.concat(Stream.of(GENERATE
                             + "/"
                             + InferredDocumentationChainModule.DOCUMENT
                             + "/"
-                            + InferredDocumentationChainModule.AGGREGATE);
+                            + InferredDocumentationChainModule.AGGREGATE), inherited.sequencedKeySet().stream()));
         }
     }
 }

@@ -55,6 +55,27 @@ public class JarTest {
     }
 
     @ParameterizedTest
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+            "CLASSES | modular=true;module=demo.app | version=1.0         | demo.app-1.0.jar",
+            "SOURCES | modular=true;module=demo.app | version=1.0         | demo.app-1.0-sources.jar",
+            "JAVADOC | modular=true;module=demo.app | -                   | demo.app-javadoc.jar",
+            "CLASSES | modular=true;module=demo.app | project=demo        | demo.app-0-SNAPSHOT.jar",
+            "CLASSES | modular=false                | project=g;artifact=a;version=1 | g%2Fa%2F1.jar",
+            "SOURCES | modular=false;test=a         | project=g;artifact=a;version=1 | g%2Fa%2F1-tests-sources.jar",
+            "CLASSES | -                            | -                   | classes.jar"})
+    public void names_a_jar_as_a_dependency_on_it_is_named(Jar.Sort sort, String module, String metadata, String name)
+            throws IOException {
+        if (module != null) {
+            Files.writeString(classes.resolve(BuildStep.MODULE), module.replace(';', '\n'));
+        }
+        if (metadata != null) {
+            Files.writeString(classes.resolve(BuildStep.METADATA), metadata.replace(';', '\n'));
+        }
+        assertThat(sort.file(new LinkedHashMap<>(Map.of("manifests", new BuildStepArgument(classes, Map.of())))))
+                .isEqualTo(name);
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void can_execute_sources_jar(boolean process) throws IOException {
         Path folder = Files.createDirectory(classes.resolve(Javac.SOURCES));

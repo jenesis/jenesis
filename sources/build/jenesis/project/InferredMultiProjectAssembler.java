@@ -385,7 +385,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 sub.addModule("sources", (module, inherited) ->
                         module.addStep("archive",
                                 Jar.ofEnvironment(environment, factory, Jar.Sort.SOURCES),
-                                inherited.sequencedKeySet()), descriptor.sources());
+                                inherited.sequencedKeySet()),
+                        Stream.concat(descriptor.sources().stream(), descriptor.manifests().stream()));
             }
             if (descriptor.documentation()) {
                 InferredDocumentationModule documentationModule = InferredDocumentationModule.ofEnvironment(environment,
@@ -746,7 +747,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 if (pathPlacement.modular() && moduleName != null) {
                     jpackage.setProperty("--module", moduleName + "/" + main);
                 } else {
-                    jpackage.setProperty("--main-jar", Jar.Sort.CLASSES.getFile());
+                    jpackage.setProperty("--main-jar", Jar.Sort.CLASSES.file(arguments));
                     jpackage.setProperty("--main-class", main);
                 }
                 if (version != null) {

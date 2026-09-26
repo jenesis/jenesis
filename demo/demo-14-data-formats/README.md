@@ -34,7 +34,7 @@ is an input to the build and nothing more - none of these three jars carries the
 `.xsd`, the `.proto` or the `.avsc` it was built from, nor an empty directory where
 they sat:
 
-    jar tf .../classes.jar
+    jar tf .../build.jenesis.demo%2Fdata-formats-xml%2F1.0.0.jar
     demo/order/Item.class
     demo/order/ObjectFactory.class
     demo/order/Order.class
