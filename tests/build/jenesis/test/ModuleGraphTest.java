@@ -49,13 +49,22 @@ public class ModuleGraphTest {
 
     @Test
     public void a_jar_compiled_with_preview_features_enables_them_for_the_run() throws IOException {
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        manifest.getMainAttributes().putValue(PathPlacement.PREVIEW, "25");
+        Path previewing = folder.resolve("previewing.jar");
+        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(previewing), manifest)) {
+            output.putNextEntry(new JarEntry("previewing/Type.class"));
+            output.write(new byte[]{1, 2, 3});
+            output.closeEntry();
+        }
         List<String> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
         ModuleGraph graph = new ModuleGraph();
         graph.place(PathPlacement.INFERRED, plain(), modulePath, classPath);
 
         assertThat(graph.arguments()).isEmpty();
 
-        graph.place(PathPlacement.INFERRED, previewing(), modulePath, classPath);
+        graph.place(PathPlacement.INFERRED, previewing, modulePath, classPath);
 
         assertThat(graph.arguments()).containsExactly("--enable-preview");
         assertThat(graph.options()).containsExactly("--enable-preview");
@@ -246,19 +255,6 @@ public class ModuleGraphTest {
         Path file = folder.resolve(name + ".jar");
         try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(file), manifest)) {
             output.putNextEntry(new JarEntry("auto/Type.class"));
-            output.write(new byte[]{1, 2, 3});
-            output.closeEntry();
-        }
-        return file;
-    }
-
-    private Path previewing() throws IOException {
-        Manifest manifest = new Manifest();
-        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
-        manifest.getMainAttributes().putValue(PathPlacement.PREVIEW, "25");
-        Path file = folder.resolve("previewing.jar");
-        try (JarOutputStream output = new JarOutputStream(Files.newOutputStream(file), manifest)) {
-            output.putNextEntry(new JarEntry("previewing/Type.class"));
             output.write(new byte[]{1, 2, 3});
             output.closeEntry();
         }
