@@ -100,7 +100,27 @@ A binary compiles the jars it was built from away, and their licence files with
 them, so a `licenses/` folder travels beside it: the legal notices of the module's
 own jar at its root, and those of every jar it needs at run time in a folder named
 after that jar. `-Djenesis.legal.notices` names the entries taken, as it does for
-the `legal/` folder of a linked runtime.
+the `legal/` folder of a linked runtime. The binary also contains the GraalVM that
+compiled it, so the licence and notice files of that GraalVM's installation travel in
+`licenses/graalvm-<version>/`.
+
+The binary drops the bill of materials its jar carries as well, so one travels beside it
+too, `demo.graal.image.cdx.json`. It lists what the module's own document from
+`../demo-29-sbom` lists, describes the binary as an `application`, and adds the GraalVM
+that compiled it as a `platform` the application depends on, since the binary contains
+its runtime:
+
+    { "type": "platform", "bom-ref": "Oracle Corporation/GraalVM/25.0.3", "group": "Oracle Corporation", "name": "GraalVM", "version": "25.0.3" }
+
+The vendor and the version come from the `release` file of the GraalVM that ran
+`native-image`, so building with GraalVM Community names `GraalVM Community` instead.
+That file names no licence, so the component carries none, unless one is configured
+for the GraalVM you build with:
+
+    java -Djenesis.graalvm.license=GPL-2.0-with-classpath-exception build/jenesis/Make.java stage
+
+A known SPDX identifier is recorded as one; any other value is recorded as a licence
+name, as `GraalVM Free Terms and Conditions` would be for Oracle GraalVM.
 
 Layout
 ------

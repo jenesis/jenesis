@@ -25,6 +25,7 @@ import build.jenesis.step.NativeImage;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.Sbom;
+import build.jenesis.step.Versions;
 
 public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityModule, BuildExecutorModule> check,
                                             Function<InferredSourceFormattingModule, BuildExecutorModule> format,
@@ -448,22 +449,22 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 if (packaging.bundle()) {
                     sub.addStep("bundle", Bundle.ofEnvironment(environment), inputs);
                 }
+                SequencedSet<String> locals = Stream.of(descriptor.manifests(),
+                                descriptor.artifacts(),
+                                descriptor.sources(),
+                                descriptor.resources())
+                        .flatMap(SequencedSet::stream)
+                        .map(InferredMultiProjectAssembler::local)
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+                SequencedSet<String> described = inherited.sequencedKeySet().stream()
+                        .filter(key -> locals.contains(local(key)))
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
                 if (packaging.launcher()) {
                     LauncherModule launcher = LauncherModule.ofEnvironment(environment, repositories, resolvers)
                             .pinning(descriptor.pinning())
                             .pathPlacement(descriptor.pathPlacement());
                     SequencedSet<String> launched = new LinkedHashSet<>(inputs);
                     if (sbom != null) {
-                        SequencedSet<String> locals = Stream.of(descriptor.manifests(),
-                                        descriptor.artifacts(),
-                                        descriptor.sources(),
-                                        descriptor.resources())
-                                .flatMap(SequencedSet::stream)
-                                .map(InferredMultiProjectAssembler::local)
-                                .collect(Collectors.toCollection(LinkedHashSet::new));
-                        SequencedSet<String> described = inherited.sequencedKeySet().stream()
-                                .filter(key -> locals.contains(local(key)))
-                                .collect(Collectors.toCollection(LinkedHashSet::new));
                         launcher = launcher.sbom(sbom.type("application")).sbomInputs(described);
                         launched.addAll(described);
                     }
@@ -477,7 +478,15 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     sub.addStep("reachability", new NativeImageMetadata(), inputs);
                     sub.addStep("native-image", NativeImage.ofEnvironment(environment, descriptor.pathPlacement()),
                                 Stream.concat(inputs.stream(), Stream.of("reachability")));
-                    images.add("native-image");
+                    if (sbom == null) {
+                        images.add("native-image");
+                    } else {
+                        sub.addStep("native-sbom",
+                                sbom.type("application").graalvmLicense(environment.value("graalvm.license")),
+                                Stream.concat(described.stream(), Stream.of("native-image")));
+                        sub.addStep("native", new Described(), "native-image", "native-sbom");
+                        images.add("native");
+                    }
                 }
                 if (!packagers.isEmpty()) {
                     SequencedSet<String> handed = new LinkedHashSet<>(linked);
@@ -536,6 +545,57 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         }
                         Files.createDirectories(target.getParent());
                         BuildStep.linkOrCopy(target, file);
+                    }
+                }
+            }
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    private record Described() implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            Path image = context.next().resolve(NativeImage.NATIVE);
+            for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
+                Path folder = argument.folder().resolve(NativeImage.NATIVE);
+                if (Files.isDirectory(folder)) {
+                    try (Stream<Path> files = Files.walk(folder)) {
+                        for (Path file : files.filter(Files::isRegularFile).toList()) {
+                            Path target = image.resolve(folder.relativize(file).toString());
+                            Files.createDirectories(target.getParent());
+                            BuildStep.linkOrCopy(target, file);
+                        }
+                    }
+                }
+            }
+            if (!Files.isDirectory(image)) {
+                return CompletableFuture.completedStage(new BuildStepResult(true));
+            }
+            for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
+                Path fragment = argument.folder().resolve(Versions.MANIFEST);
+                if (Files.isRegularFile(fragment)) {
+                    String location;
+                    try (InputStream in = Files.newInputStream(fragment)) {
+                        location = new Manifest(in).getMainAttributes().getValue("Sbom-Location");
+                    }
+                    Path document = location == null ? null : argument.folder().resolve(RESOURCES).resolve(location);
+                    if (document != null && Files.isRegularFile(document)) {
+                        Path target = image.resolve(document.getFileName().toString());
+                        if (Files.exists(target)) {
+                            throw new IllegalStateException("The native image already holds " + target.getFileName()
+                                    + ", where its bill of materials belongs - give the image another name");
+                        }
+                        BuildStep.linkOrCopy(target, document);
                     }
                 }
             }

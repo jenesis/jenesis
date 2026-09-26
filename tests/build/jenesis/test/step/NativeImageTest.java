@@ -14,6 +14,7 @@ import build.jenesis.step.NativeImage;
 import build.jenesis.step.ProcessHandler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class NativeImageTest {
 
@@ -144,6 +145,67 @@ public class NativeImageTest {
         BuildStepResult result = run(PathPlacement.MODULE_PATH);
         assertThat(result.next()).isTrue();
         assertThat(command()).contains("-H:ConfigurationFileDirectories=" + config);
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    public void records_the_release_and_the_licence_of_the_graalvm_it_runs_through_a_linked_launcher() throws IOException {
+        SequencedProperties launcher = new SequencedProperties();
+        launcher.setProperty("mainClass", "sample.Sample");
+        store(launcher);
+        Path home = Files.createDirectory(root.resolve("graalvm"));
+        Files.writeString(home.resolve(BuildStep.RELEASE), "IMPLEMENTOR=\"GraalVM Community\"\nGRAALVM_VERSION=\"25.0.2\"\n");
+        Files.writeString(home.resolve("LICENSE.txt"), "GPLv2 with the Classpath Exception");
+        Files.writeString(home.resolve("THIRD_PARTY_LICENSE.txt"), "third parties");
+        Files.writeString(Files.createDirectories(home.resolve("lib/svm")).resolve("LICENSE_NATIVEIMAGE.txt"), "native image");
+        Files.createSymbolicLink(home.resolve("LICENSE_NATIVEIMAGE.txt"), Path.of("lib/svm/LICENSE_NATIVEIMAGE.txt"));
+        Files.writeString(home.resolve("GRAALVM-README.md"), "read me");
+        Path program = Files.copy(shim, Files.createDirectories(home.resolve("lib/svm/bin")).resolve("native-image"));
+        Path linked = Files.createSymbolicLink(Files.createDirectory(home.resolve("bin")).resolve("native-image"),
+                Path.of("../lib/svm/bin/native-image"));
+
+        new NativeImage(PathPlacement.CLASS_PATH, ProcessHandler.OfProcess.of(List.of(linked.toString()))).apply(
+                        Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
+                                bundle,
+                                Map.of(Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+
+        assertThat(program).isExecutable();
+        assertThat(next.resolve(BuildStep.RELEASE))
+                .as("the release file sits in the home the link leads out of, not beside the linked program")
+                .hasSameTextualContentAs(home.resolve(BuildStep.RELEASE));
+        try (Stream<Path> files = Files.list(next.resolve(NativeImage.NATIVE).resolve(NativeImage.LICENSES).resolve("graalvm-25.0.2"))) {
+            assertThat(files.map(file -> file.getFileName().toString()))
+                    .as("the binary contains the GraalVM, so its licence and notice files travel beside it")
+                    .containsExactlyInAnyOrder("LICENSE.txt", "THIRD_PARTY_LICENSE.txt", "LICENSE_NATIVEIMAGE.txt");
+        }
+        assertThat(next.resolve(NativeImage.NATIVE).resolve(NativeImage.LICENSES).resolve("graalvm-25.0.2/LICENSE_NATIVEIMAGE.txt"))
+                .as("a licence the GraalVM links to from its home is taken as the file it names")
+                .hasContent("native image");
+    }
+
+    @Test
+    @DisabledOnOs(OS.WINDOWS)
+    public void refuses_the_notices_of_a_jar_that_take_the_place_of_the_graalvm_licence() throws IOException {
+        SequencedProperties launcher = new SequencedProperties();
+        launcher.setProperty("mainClass", "sample.Sample");
+        store(launcher);
+        Files.writeString(Files.createDirectories(bundle.resolve("legal/graalvm-25.0.2")).resolve("LICENSE"), "a jar");
+        Path home = Files.createDirectory(root.resolve("graalvm"));
+        Files.writeString(home.resolve(BuildStep.RELEASE), "GRAALVM_VERSION=\"25.0.2\"\n");
+        Path program = Files.copy(shim, Files.createDirectory(home.resolve("bin")).resolve("native-image"));
+
+        assertThatThrownBy(() -> new NativeImage(PathPlacement.CLASS_PATH, ProcessHandler.OfProcess.of(List.of(program.toString()))).apply(
+                        Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
+                                bundle,
+                                Map.of(Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join())
+                .rootCause()
+                .hasMessageContaining("graalvm-25.0.2");
     }
 
     @Test

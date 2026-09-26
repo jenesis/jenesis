@@ -201,6 +201,34 @@ public class SbomTest {
         assertThat(Sbom.configured(null).shouldRun(arguments)).isFalse();
     }
 
+    @Test
+    public void describes_the_runtime_a_release_file_names_as_a_platform_of_the_project() throws Exception {
+        Files.writeString(argument.resolve(BuildStep.RELEASE), "IMPLEMENTOR=\"Oracle Corporation\"\n"
+                + "JAVA_RUNTIME_VERSION=\"25.0.3+9-LTS-jvmci-b01\"\nGRAALVM_VERSION=\"25.0.3\"\n");
+
+        assertThat(sbom(Map.of()))
+                .contains("\"type\": \"platform\",\n"
+                        + "      \"bom-ref\": \"Oracle Corporation/GraalVM/25.0.3\",\n"
+                        + "      \"group\": \"Oracle Corporation\",\n"
+                        + "      \"name\": \"GraalVM\",\n"
+                        + "      \"version\": \"25.0.3\"")
+                .contains("{ \"ref\": \"build.jenesis/demo/1.0.0\", \"dependsOn\": [\"Oracle Corporation/GraalVM/25.0.3\"] }");
+    }
+
+    @Test
+    public void records_the_licence_configured_for_the_graalvm() throws Exception {
+        Files.writeString(argument.resolve(BuildStep.RELEASE), "IMPLEMENTOR=\"GraalVM Community\"\nGRAALVM_VERSION=\"25.0.2\"\n");
+
+        assertThat(sbom(new Sbom().graalvmLicense("GPL-2.0-with-classpath-exception"), Map.of()))
+                .contains("\"name\": \"GraalVM\",\n"
+                        + "      \"version\": \"25.0.2\",\n"
+                        + "      \"licenses\": [\n"
+                        + "        { \"license\": { \"id\": \"GPL-2.0-with-classpath-exception\" } }");
+        assertThat(sbom(new Sbom(), Map.of()))
+                .as("the release file names no licence, so none is recorded unless one is configured")
+                .doesNotContain("licenses");
+    }
+
     private String sbom(Map<String, String> scm) throws Exception {
         return sbom(new Sbom(), scm);
     }

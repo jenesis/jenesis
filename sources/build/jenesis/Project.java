@@ -2732,6 +2732,7 @@ public record Project(
                 execute.docker.mountWritable||Extra writable container mounts
                 execute.docker.env||Host environment variables to forward
                 sbom.cyclonedx|true|Emit a CycloneDX SBOM; sbom.properties selects its format
+                graalvm.license||Licence the SBOM beside a native image records for the GraalVM that compiled it, as an SPDX identifier or a name; empty records none
                 compliance|true|Run the license and vulnerability checks their configuration files activate
                 source.checkstyle|true|Checkstyle, activated by a checkstyle.xml
                 source.pmd|true|PMD, activated by a pmd.xml
