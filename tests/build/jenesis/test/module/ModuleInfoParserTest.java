@@ -864,6 +864,59 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void describes_a_module_by_its_second_paragraph_as_plain_text() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * Foo {@code Library}.
+                 *
+                 * A <b>small</b> library that does {@link java.util.List foo} things &amp; more.
+                 * <!-- not for readers -->It spans two lines.
+                 *
+                 * <p>A third paragraph, which is left out.
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.name()).isEqualTo("Foo Library");
+        assertThat(info.description()).isEqualTo("A small library that does foo things & more. It spans two lines.");
+    }
+
+    @Test
+    public void describes_a_markdown_module_by_its_second_paragraph_as_written() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /// Foo `Library`.
+                ///
+                /// A **small** library that does [foo][java.util.List] things.
+                ///
+                /// A third paragraph, which is left out.
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.name()).isEqualTo("Foo `Library`");
+        assertThat(info.description())
+                .as("a link becomes its label, but the rest of the Markdown is kept as written")
+                .isEqualTo("A **small** library that does foo things.");
+    }
+
+    @Test
+    public void a_first_paragraph_of_several_sentences_names_the_module_and_describes_nothing() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * The consumer. It requires the library and nothing else.
+                 */
+                module foo {
+                }
+                """);
+        ModuleInfo info = new ModuleInfoParser().identify(folder.resolve("module-info.java"));
+        assertThat(info.name()).isEqualTo("The consumer");
+        assertThat(info.description())
+                .as("the rest of the first paragraph belongs to the name's paragraph, not to a description")
+                .isNull();
+    }
+
+    @Test
     public void single_sentence_javadoc_extracts_only_name() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**
