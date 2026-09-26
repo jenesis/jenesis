@@ -63,14 +63,17 @@ jobs:
         shell: bash
         working-directory: demo/demo-66-native-image
         run: |
-          image=$(find target -path "*stage/native/output/*" -type f | head -1)
+          output=target/stage/native/output
+          image=$(find "$output" -maxdepth 1 -type f \( -name demo.graal.image -o -name demo.graal.image.exe \) | head -1)
           if [ -z "$image" ]; then
-            echo "No native image was produced under target/stage/native/output"
+            echo "No native image was produced under $output"
             exit 1
           fi
           echo "Produced native image: $image"
           "$image" | grep -q "from a native binary built by Jenesis"
           "$image" Ada | grep -q "Hello, Ada,"
+          grep -q '"name": "GraalVM"' "$output/demo.graal.image.cdx.json"
+          find "$output/licenses" -path "*graalvm-*" -type f | grep -q .
 
       - name: Upload target on failure
         if: failure()
