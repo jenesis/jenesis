@@ -282,7 +282,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 closure = new LinkedHashSet<>(Set.of("modules"));
             }
             sub.addStep("prepare",
-                    new Prepare(descriptor.pathPlacement(), overrides),
+                    new Prepare(descriptor.pathPlacement(), packaging.jpackage(), overrides),
                     outerInherited.sequencedKeySet().stream());
             sub.addModule("check",
                     check.apply(InferredSourceCodeQualityModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
@@ -674,6 +674,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
     }
 
     private record Prepare(PathPlacement pathPlacement,
+                           String packageType,
                            SequencedMap<String, SequencedMap<String, String>> overrides) implements BuildStep {
 
         @Override
@@ -685,6 +686,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             String version = null;
             String artifact = null;
             String moduleName = null;
+            SequencedProperties described = null;
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
                     continue;
@@ -708,6 +710,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 Path metadataFile = argument.folder().resolve(BuildStep.METADATA);
                 if (Files.isRegularFile(metadataFile)) {
                     SequencedProperties metadata = SequencedProperties.ofFiles(metadataFile);
+                    if (described == null) {
+                        described = metadata;
+                    }
                     if (version == null) {
                         String value = metadata.getProperty("version");
                         if (value != null && !value.isEmpty()) {
@@ -740,6 +745,29 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
                 if (version != null) {
                     jpackage.setProperty("--app-version", version);
+                }
+                if (described != null) {
+                    String description = described.value("description"), url = described.value("url");
+                    if (description != null) {
+                        jpackage.setProperty("--description", description.replaceAll("\\s+", " "));
+                    }
+                    if (url != null && packageType != null && !packageType.equals("app-image")) {
+                        jpackage.setProperty("--about-url", url);
+                    }
+                    List<String> emails = new ArrayList<>(), licenses = new ArrayList<>();
+                    described.forEachProperty((key, value) -> {
+                        if (key.startsWith("developer.") && key.endsWith(".email") && !value.isBlank()) {
+                            emails.add(value.trim());
+                        } else if (key.startsWith("license.") && key.endsWith(".name") && !value.isBlank()) {
+                            licenses.add(value.trim());
+                        }
+                    });
+                    if ("deb".equals(packageType) && !emails.isEmpty()) {
+                        jpackage.setProperty("--linux-deb-maintainer", emails.getFirst());
+                    }
+                    if ("rpm".equals(packageType) && !licenses.isEmpty()) {
+                        jpackage.setProperty("--linux-rpm-license-type", String.join(" OR ", licenses));
+                    }
                 }
                 jpackage.store(processFolder.resolve("jpackage.properties"));
                 SequencedProperties launcher = new SequencedProperties();
