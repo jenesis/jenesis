@@ -12,6 +12,7 @@ import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
@@ -226,26 +227,32 @@ public class InferredMultiProjectAssemblerTest {
     public void launcher_enabled_lists_the_resolved_launcher_in_the_package_inventory() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false);
         Files.writeString(fixture.configuration().resolve("packaging.properties"), "launcher=true\n");
-        Path served = Files.createDirectory(root.resolve("served"));
-        AssemblyDescriptor assembled = new InferredMultiProjectAssembler().apply(fixture.descriptor(),
-                Map.of("maven", (_, coordinate, _) -> Optional.of(RepositoryItem.ofFile(Files.writeString(
-                        served.resolve(coordinate.replace('/', '-') + ".jar"), coordinate)))),
-                Map.of("maven", Resolver.identity()));
-        BuildExecutor executor = BuildExecutor.of(fixture.build(),
-                Duration.ZERO,
-                new HashDigestFunction("MD5"),
-                BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
-        executor.addSource("manifests", fixture.manifests());
-        executor.addSource("sources", fixture.sources());
-        executor.addSource("artifacts", fixture.artifacts());
-        executor.addModule("sub", assembled.build(), "manifests", "sources", "artifacts");
-        assembled.tail().forEach((name, phase) -> executor.addModule(name, phase, "sub"));
-        SequencedMap<String, Path> outputs = executor.execute(Runnable::run, "package/inventory").toCompletableFuture().join();
+        SequencedMap<String, Path> outputs = fixture.execute(new InferredMultiProjectAssembler(),
+                served(Files.createDirectory(root.resolve("served"))),
+                Map.of("maven", Resolver.identity()),
+                "package/inventory");
         SequencedProperties inventory = SequencedProperties.ofFiles(outputs.get("package/inventory").resolve(Inventory.INVENTORY));
         assertThat(inventory.stringPropertyNames())
                 .as("a launcher-only package phase still lists what it resolved, so pin reaches the launcher group")
                 .anyMatch(key -> key.endsWith(".group") && inventory.getProperty(key).equals("launcher"));
+    }
+
+    @Test
+    public void launcher_describes_the_application_with_the_dependencies_of_the_module_and_the_launcher() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"), "launcher=true\n");
+        Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "project=sample\nartifact=app\nversion=1\n");
+        Files.writeString(fixture.artifacts().resolve(BuildStep.DEPENDENCIES), "main/runtime/maven/org.foo/bar/1=bar.jar\n");
+        SequencedMap<String, Path> outputs = fixture.execute(new InferredMultiProjectAssembler(),
+                served(Files.createDirectory(root.resolve("served"))),
+                Map.of("maven", Resolver.identity()),
+                "package/launcher/sbom");
+        assertThat(outputs.get("package/launcher/sbom").resolve(BuildStep.REPORTS + "sbom").resolve("app-1.cdx.json"))
+                .content()
+                .as("the executable jar is described as an application of what the module's own SBOM lists and the launcher")
+                .contains("\"type\": \"application\",\n      \"bom-ref\": \"sample/app/1\"")
+                .contains("\"bom-ref\": \"org.foo/bar/1\"")
+                .contains("\"bom-ref\": \"build.jenesis/build.jenesis.launcher/RELEASE\"");
     }
 
     @Test
@@ -327,6 +334,11 @@ public class InferredMultiProjectAssemblerTest {
                 .as("editing only a process override must re-run prepare, not serve the stale one")
                 .contains("-verbose")
                 .doesNotContain("-g");
+    }
+
+    private static Map<String, Repository> served(Path folder) {
+        return Map.of("maven", (_, coordinate, _) -> Optional.of(RepositoryItem.ofFile(Files.writeString(
+                folder.resolve(coordinate.replace('/', '-') + ".jar"), coordinate))));
     }
 
     private Fixture setUp(String moduleProperties,
@@ -447,7 +459,14 @@ public class InferredMultiProjectAssemblerTest {
         }
 
         SequencedMap<String, Path> execute(InferredMultiProjectAssembler assembler, String... selectors) throws IOException {
-            AssemblyDescriptor assembled = assembler.apply(descriptor, Map.of(), Map.of());
+            return execute(assembler, Map.of(), Map.of(), selectors);
+        }
+
+        SequencedMap<String, Path> execute(InferredMultiProjectAssembler assembler,
+                                           Map<String, Repository> repositories,
+                                           Map<String, Resolver> resolvers,
+                                           String... selectors) throws IOException {
+            AssemblyDescriptor assembled = assembler.apply(descriptor, repositories, resolvers);
             BuildExecutor executor = BuildExecutor.of(build,
                     Duration.ZERO,
                     new HashDigestFunction("MD5"),
@@ -459,7 +478,7 @@ public class InferredMultiProjectAssemblerTest {
             executor.addModule("sub", assembled.build(),
                     "manifests", "sources", "artifacts");
             for (Map.Entry<String, BuildExecutorModule> phase : assembled.tail().entrySet()) {
-                executor.addModule(phase.getKey(), phase.getValue(), "sub");
+                executor.addModule(phase.getKey(), phase.getValue(), "sub", "manifests", "sources", "artifacts");
             }
             return executor.execute(Runnable::run, selectors).toCompletableFuture().join();
         }

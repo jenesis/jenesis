@@ -19,22 +19,28 @@ public class Sbom implements BuildStep {
 
     private final CycloneDx.Format format;
     private final boolean swhid;
+    private final String type;
 
     public Sbom() {
-        this(CycloneDx.Format.JSON, false);
+        this(CycloneDx.Format.JSON, false, "library");
     }
 
-    private Sbom(CycloneDx.Format format, boolean swhid) {
+    private Sbom(CycloneDx.Format format, boolean swhid, String type) {
         this.format = format;
         this.swhid = swhid;
+        this.type = type;
     }
 
     public Sbom format(CycloneDx.Format format) {
-        return new Sbom(format, swhid);
+        return new Sbom(format, swhid, type);
     }
 
     public Sbom swhid(boolean swhid) {
-        return new Sbom(format, swhid);
+        return new Sbom(format, swhid, type);
+    }
+
+    public Sbom type(String type) {
+        return new Sbom(format, swhid, type);
     }
 
     public static Sbom configured(Path properties) throws IOException {
@@ -150,7 +156,7 @@ public class Sbom implements BuildStep {
                     properties.add(new CycloneDx.Property("jenesis:source:swhid", identifier));
                 }
             }
-            project = new CycloneDx.Component(projectRef, groupId, artifactId, version, purl, null,
+            project = new CycloneDx.Component(type, projectRef, groupId, artifactId, version, purl, null,
                     ownLicenses(metadata), metadata.getProperty("description"), developers(metadata),
                     references(metadata, revision == null ? tag : revision), properties);
         }
