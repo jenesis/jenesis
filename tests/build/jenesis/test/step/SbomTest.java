@@ -223,6 +223,7 @@ public class SbomTest {
         assertThat(sbom(new Sbom().graalvmLicense("GPL-2.0-with-classpath-exception"), Map.of()))
                 .contains("\"name\": \"GraalVM\",\n"
                         + "      \"version\": \"25.0.2\",\n"
+                        + "      \"scope\": \"required\",\n"
                         + "      \"licenses\": [\n"
                         + "        { \"license\": { \"id\": \"GPL-2.0-with-classpath-exception\" } }");
         assertThat(sbom(new Sbom(), Map.of()))
@@ -271,6 +272,31 @@ public class SbomTest {
                 .as("one component per jar, named by its maven coordinate where it has one")
                 .contains("\"bom-ref\": \"org.slf4j/slf4j-api/2.0.16\"", "\"bom-ref\": \"only/1.0\"")
                 .doesNotContain("\"bom-ref\": \"org.slf4j/2.0.16\"");
+    }
+
+    @Test
+    public void scopes_a_dependency_by_whether_the_application_runs_with_it() throws Exception {
+        Path resolved = Files.createDirectories(argument.resolve("resolved"));
+        Files.writeString(resolved.resolve("run-1.0.jar"), "run");
+        Files.writeString(resolved.resolve("compile-1.0.jar"), "compile");
+        SequencedProperties dependencies = new SequencedProperties();
+        dependencies.setProperty("main/compile/maven/org.run/run/1.0", "resolved/run-1.0.jar");
+        dependencies.setProperty("main/runtime/maven/org.run/run/1.0", "resolved/run-1.0.jar");
+        dependencies.setProperty("main/compile/maven/org.compile/compile/1.0", "resolved/compile-1.0.jar");
+        dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+
+        assertThat(sbom(Map.of()))
+                .contains("\"bom-ref\": \"org.run/run/1.0\",\n"
+                        + "      \"group\": \"org.run\",\n"
+                        + "      \"name\": \"run\",\n"
+                        + "      \"version\": \"1.0\",\n"
+                        + "      \"scope\": \"required\"")
+                .as("a dependency on the compile path alone is not reached when the application runs")
+                .contains("\"bom-ref\": \"org.compile/compile/1.0\",\n"
+                        + "      \"group\": \"org.compile\",\n"
+                        + "      \"name\": \"compile\",\n"
+                        + "      \"version\": \"1.0\",\n"
+                        + "      \"scope\": \"excluded\"");
     }
 
     private String sbom(Map<String, String> scm) throws Exception {
