@@ -802,6 +802,7 @@ public class ModularProjectTest {
                 Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, false)),
                 null,
                 true,
+                true,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableSet(),
