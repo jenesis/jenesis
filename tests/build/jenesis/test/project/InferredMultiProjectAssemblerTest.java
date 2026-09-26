@@ -25,6 +25,7 @@ import build.jenesis.project.ProjectModule;
 import build.jenesis.project.ProjectModuleDescriptor;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.JPackage;
+import build.jenesis.step.NativeImage;
 import build.jenesis.step.ProcessBuildStep;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -221,6 +222,15 @@ public class InferredMultiProjectAssemblerTest {
         assertThat(fixture.execute("package/inventory"))
                 .as("a native-image-only package phase still feeds the binary through an inventory step")
                 .containsKey("package/inventory");
+    }
+
+    @Test
+    public void stages_no_bill_of_materials_for_a_module_that_builds_no_native_image() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false, null, false, false, true);
+        Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "project=sample\nartifact=app\nversion=1\n");
+        assertThat(fixture.execute("package/native").get("package/native").resolve(NativeImage.NATIVE))
+                .as("a module without a main class has no binary for its bill of materials to sit beside")
+                .doesNotExist();
     }
 
     @Test
