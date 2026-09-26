@@ -22,6 +22,8 @@ which builds the project, unpacks the produced `bundle.zip`, launches the app ou
     the library's private tree: commons-beanutils converted "42" to Integer 42, logging through
         commons-logging/commons-logging/1.2.jar, loaded by java.net.URLClassLoader@...
 
+`java build/jenesis/Execute.java` prints the same, reading the layer from the jars the build resolved.
+
 The four modules
 ----------------
 

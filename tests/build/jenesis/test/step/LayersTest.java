@@ -44,6 +44,32 @@ public class LayersTest {
     }
 
     @Test
+    public void a_layer_needs_the_platform_modules_its_modules_require() throws IOException {
+        module(resolved, "demo.impl", builder -> builder
+                .requires(ModuleDesc.of("java.sql"), 0, null)
+                .requires(ModuleDesc.of("demo.api"), 0, null));
+        Layers.Membership membership = new Layers.Membership(
+                new LinkedHashSet<>(List.of("demo.impl.jar")),
+                new LinkedHashSet<>());
+
+        assertThat(membership.platform(Map.of("demo.impl.jar", resolved.resolve("demo.impl.jar"))))
+                .as("a module that is no platform module, as demo.api, is not linked into a runtime")
+                .containsExactly("java.base", "java.sql");
+    }
+
+    @Test
+    public void a_layer_class_path_needs_every_platform_module_with_an_api() {
+        Layers.Membership membership = new Layers.Membership(
+                new LinkedHashSet<>(),
+                new LinkedHashSet<>(List.of("legacy.jar")));
+
+        assertThat(membership.platform(Map.of()))
+                .as("code without a module reads whatever the platform exports, as an unnamed module does")
+                .contains("java.base", "java.sql", "java.desktop")
+                .doesNotContain("jdk.internal.opt");
+    }
+
+    @Test
     public void isolates_a_layers_closure_and_shares_the_api_module() throws IOException {
         module(artifacts, "demo.api", builder -> builder.exports(PackageDesc.of("demo.api"), 0));
         module(resolved, "demo.api", builder -> builder.exports(PackageDesc.of("demo.api"), 0));

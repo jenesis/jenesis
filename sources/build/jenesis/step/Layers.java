@@ -155,6 +155,31 @@ public class Layers implements BuildStep {
             return all;
         }
 
+        public SequencedSet<String> platform(Map<String, Path> jars) {
+            SequencedMap<String, ModuleDescriptor> system = new TreeMap<>();
+            ModuleFinder.ofSystem().findAll().forEach(reference -> system.put(reference.descriptor().name(), reference.descriptor()));
+            SequencedSet<String> platform = new TreeSet<>();
+            boolean unnamed = !classpath.isEmpty();
+            for (String name : modulepath) {
+                ModuleDescriptor descriptor = jars.containsKey(name) ? PathPlacement.moduleDescriptor(jars.get(name)) : null;
+                if (descriptor == null || descriptor.isAutomatic()) {
+                    unnamed = true;
+                } else {
+                    descriptor.requires().stream()
+                            .map(ModuleDescriptor.Requires::name)
+                            .filter(system::containsKey)
+                            .forEach(platform::add);
+                }
+            }
+            if (unnamed) {
+                system.values().stream()
+                        .filter(descriptor -> descriptor.exports().stream().anyMatch(exports -> !exports.isQualified()))
+                        .map(ModuleDescriptor::name)
+                        .forEach(platform::add);
+            }
+            return platform;
+        }
+
         public SequencedMap<Path, Boolean> nativeAccess(Map<String, Path> jars, Set<Path> granted) {
             SequencedMap<Path, Boolean> members = new LinkedHashMap<>();
             for (String name : all()) {

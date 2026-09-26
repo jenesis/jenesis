@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.step.Inventory;
+import build.jenesis.step.Layers;
 
 public record Execution(Project project, String mainClass, String module, Container container) {
 
@@ -168,6 +169,44 @@ public record Execution(Project project, String mainClass, String module, Contai
         }
         List<Path> granted = Inventory.paths(merged, candidate.folder, selected.getKey() + ".nativeAccess");
         ModuleGraph graph = new ModuleGraph();
+        String layered = merged.getProperty(selected.getKey() + ".layers");
+        SequencedMap<String, Layers.Membership> layers = layered == null
+                ? Collections.emptyNavigableMap()
+                : Layers.membership(candidate.folder.resolve(layered).getParent());
+        if (!layers.isEmpty()) {
+            SequencedMap<String, Path> resolved = new LinkedHashMap<>();
+            for (int index = 0; ; index++) {
+                String dependency = merged.getProperty(selected.getKey() + ".dependency." + index);
+                if (dependency == null) {
+                    break;
+                }
+                int space = dependency.indexOf(' '), end = dependency.indexOf(' ', space + 1);
+                Path jar = candidate.folder.resolve(dependency.substring(space + 1, end < 0 ? dependency.length() : end))
+                        .toAbsolutePath()
+                        .normalize();
+                resolved.putIfAbsent(jar.getFileName().toString(), jar);
+            }
+            Set<Path> absolute = granted.stream().map(file -> file.toAbsolutePath().normalize()).collect(Collectors.toSet());
+            for (Map.Entry<String, Layers.Membership> layer : layers.entrySet()) {
+                for (String name : layer.getValue().all()) {
+                    if (!resolved.containsKey(name)) {
+                        throw new IllegalStateException("Layer " + layer.getKey() + " names " + name
+                                + ", which was not resolved for this application");
+                    }
+                }
+                javaArgs.add("-Djlayer.modulepath." + layer.getKey() + "=" + layer.getValue().modulepath().stream()
+                        .map(name -> resolved.get(name).toString())
+                        .collect(Collectors.joining(File.pathSeparator)));
+                if (!layer.getValue().classpath().isEmpty()) {
+                    javaArgs.add("-Djlayer.classpath." + layer.getKey() + "=" + layer.getValue().classpath().stream()
+                            .map(name -> resolved.get(name).toString())
+                            .collect(Collectors.joining(File.pathSeparator)));
+                    graph.unnamed();
+                }
+                layer.getValue().nativeAccess(resolved, absolute)
+                        .forEach((jar, module) -> graph.enableNativeAccess(layer.getKey(), jar, module));
+            }
+        }
         if (candidate.module != null) {
             List<String> modulePath = new ArrayList<>(), classPath = new ArrayList<>();
             for (String jar : jars) {

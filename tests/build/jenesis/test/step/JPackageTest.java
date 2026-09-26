@@ -14,6 +14,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.JLink;
 import build.jenesis.step.JPackage;
+import build.jenesis.step.Layers;
 import sample.Sample;
 
 import static java.util.Objects.requireNonNull;
@@ -248,6 +249,56 @@ public class JPackageTest {
                     .orElseThrow(() -> new AssertionError("Bundled runtime config not found in " + image));
         }
         assertThat(bundled).content().contains("greeting=bundled");
+    }
+
+    @Test
+    public void ships_a_layer_beside_the_application_and_names_it_to_the_launcher() throws IOException {
+        Path sources = Files.createDirectory(root.resolve("sources"));
+        Files.writeString(sources.resolve("module-info.java"), "module sample { }\n");
+        Files.writeString(Files.createDirectory(sources.resolve("sample")).resolve("Sample.java"),
+                "package sample; public class Sample { public static void main(String[] args) { } }\n");
+        Path classes = Files.createDirectory(root.resolve("classes"));
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
+                "-d", classes.toString(),
+                sources.resolve("module-info.java").toString(),
+                sources.resolve("sample/Sample.java").toString())).isZero();
+        Path modules = Files.createDirectory(root.resolve("modules"));
+        assertThat(ToolProvider.findFirst("jar").orElseThrow().run(System.out, System.err,
+                "--create", "--file", modules.resolve("sample.jar").toString(),
+                "-C", classes.toString(), ".")).isZero();
+        assertThat(ToolProvider.findFirst("jlink").orElseThrow().run(System.out, System.err,
+                "--module-path", modules.toString(),
+                "--add-modules", "sample",
+                "--output", bundle.resolve(JLink.RUNTIME).toString())).isZero();
+        Files.writeString(Files.createDirectory(bundle.resolve("resolved")).resolve("layered.jar"), "layered");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("layer:render/runtime/module/layered", "resolved/layered.jar");
+        index.store(bundle.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties membership = new SequencedProperties();
+        membership.setProperty("modulepath.render", "layered.jar");
+        membership.store(bundle.resolve(Layers.MEMBERSHIP));
+        SequencedProperties configuration = new SequencedProperties();
+        configuration.setProperty("--name", "Sample");
+        configuration.setProperty("--module", "sample/sample.Sample");
+        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jpackage.properties"));
+        BuildStepResult result = new JPackage(ProcessHandler.Factory.TOOL).type("app-image").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("runtime", new BuildStepArgument(
+                        bundle,
+                        Map.of(Path.of("process/jpackage.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        Path launcher, shipped;
+        try (Stream<Path> walk = Files.walk(imageDirectory())) {
+            List<Path> files = walk.toList();
+            launcher = files.stream().filter(path -> path.getFileName().toString().equals("Sample.cfg")).findFirst().orElseThrow();
+            shipped = files.stream().filter(path -> path.endsWith(Path.of("layers", "layered.jar"))).findFirst().orElseThrow();
+        }
+        assertThat(shipped.getParent().getParent())
+                .as("the layers travel beside the application folder, where no class path reaches them")
+                .isEqualTo(launcher.getParent().getParent());
+        assertThat(launcher).content().contains("-Djlayer.modulepath.render="
+                + String.join(File.separator, "$APPDIR", "..", "layers", "layered.jar"));
     }
 
     @Test

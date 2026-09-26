@@ -94,15 +94,53 @@ public class JPackage extends ProcessBuildStep {
             return CompletableFuture.completedStage(null);
         }
         Path runtime = null;
+        ModuleGraph graph = new ModuleGraph();
+        SequencedSet<Path> granted = new LinkedHashSet<>();
+        SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
+        SequencedMap<String, Path> pool = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
             }
             Path candidate = argument.folder().resolve(JLink.RUNTIME);
-            if (Files.isDirectory(candidate)) {
+            if (runtime == null && Files.isDirectory(candidate)) {
                 runtime = candidate;
-                break;
             }
+            granted.addAll(Inventory.nativeAccess(argument.folder()));
+            layers.putAll(Layers.membership(argument.folder()));
+            for (Path jar : Dependencies.all(argument.folder())) {
+                pool.putIfAbsent(jar.getFileName().toString(), jar);
+            }
+        }
+        List<String> layered = new ArrayList<>();
+        if (!layers.isEmpty()) {
+            Path content = Files.createDirectories(context.supplement().resolve("content").resolve("layers"));
+            for (Map.Entry<String, Layers.Membership> layer : layers.entrySet()) {
+                for (String name : layer.getValue().all()) {
+                    Path jar = pool.get(name);
+                    if (jar == null) {
+                        throw new IllegalStateException("Layer " + layer.getKey() + " names " + name
+                                + ", which was not resolved for this application");
+                    }
+                    if (!Files.exists(content.resolve(name))) {
+                        BuildStep.linkOrCopy(content.resolve(name), jar);
+                    }
+                }
+                layered.add("--java-options");
+                layered.add("-Djlayer.modulepath." + layer.getKey() + "=" + layer.getValue().modulepath().stream()
+                        .map(name -> String.join(File.separator, "$APPDIR", "..", "layers", name))
+                        .collect(Collectors.joining(File.pathSeparator)));
+                if (!layer.getValue().classpath().isEmpty()) {
+                    layered.add("--java-options");
+                    layered.add("-Djlayer.classpath." + layer.getKey() + "=" + layer.getValue().classpath().stream()
+                            .map(name -> String.join(File.separator, "$APPDIR", "..", "layers", name))
+                            .collect(Collectors.joining(File.pathSeparator)));
+                }
+                layer.getValue().nativeAccess(pool, granted)
+                        .forEach((jar, module) -> graph.enableNativeAccess(layer.getKey(), jar, module));
+            }
+            layered.add("--app-content");
+            layered.add(content.toString());
         }
         if (runtime != null) {
             List<String> commands = new ArrayList<>();
@@ -112,19 +150,17 @@ public class JPackage extends ProcessBuildStep {
             }
             commands.add("--runtime-image");
             commands.add(runtime.toString());
+            commands.addAll(layered);
+            for (String option : graph.options()) {
+                commands.add("--java-options");
+                commands.add(option);
+            }
             commands.add("--dest");
             commands.add(Files.createDirectory(context.next().resolve(PACKAGES)).toString());
             return CompletableFuture.completedStage(commands);
         }
         Path input = Files.createDirectory(context.supplement().resolve("input"));
         SequencedMap<String, Path> staged = new LinkedHashMap<>();
-        ModuleGraph graph = new ModuleGraph();
-        SequencedSet<Path> granted = new LinkedHashSet<>();
-        for (BuildStepArgument argument : arguments.values()) {
-            if (!argument.removed()) {
-                granted.addAll(Inventory.nativeAccess(argument.folder()));
-            }
-        }
         SequencedMap<String, Path> jmods = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             Path folder = argument.removed() ? null : argument.folder().resolve(JMod.JMODS);
@@ -183,10 +219,17 @@ public class JPackage extends ProcessBuildStep {
                     List.of("--module-path", staged.values().stream()
                             .map(file -> input.resolve(file.getFileName().toString()).toString())
                             .collect(Collectors.joining(File.pathSeparator)))));
+            SequencedSet<String> platform = new TreeSet<>();
+            layers.values().forEach(membership -> platform.addAll(membership.platform(pool)));
+            if (!platform.isEmpty()) {
+                commands.add("--add-modules");
+                commands.add(String.join(",", platform));
+            }
         } else {
             commands.add("--input");
             commands.add(input.toString());
         }
+        commands.addAll(layered);
         for (String option : graph.options()) {
             commands.add("--java-options");
             commands.add(option);
