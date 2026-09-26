@@ -231,15 +231,19 @@ public class SbomTest {
     }
 
     @Test
-    public void describes_the_supplier_and_the_copyright_the_project_declares() throws Exception {
+    public void describes_the_supplier_manufacturer_publisher_and_copyright_the_project_declares() throws Exception {
         assertThat(sbom(Map.of("organization.name", "Example Ltd",
                         "organization.url", "https://example.com",
-                        "copyright", "Copyright 2020 Example Ltd")))
+                        "copyright", "Copyright 2020 Example Ltd",
+                        "manufacturer.name", "Example Factory",
+                        "publisher", "Example Publishing")))
                 .contains("\"supplier\": { \"name\": \"Example Ltd\", \"url\": [\"https://example.com\"] }")
-                .contains("\"copyright\": \"Copyright 2020 Example Ltd\"");
+                .contains("\"copyright\": \"Copyright 2020 Example Ltd\"")
+                .contains("\"manufacturer\": { \"name\": \"Example Factory\" }")
+                .contains("\"publisher\": \"Example Publishing\"");
         assertThat(sbom(Map.of()))
-                .as("neither is invented when the project declares none")
-                .doesNotContain("supplier", "copyright");
+                .as("none is invented when the project declares none")
+                .doesNotContain("supplier", "copyright", "manufacturer", "publisher");
     }
 
     @Test
