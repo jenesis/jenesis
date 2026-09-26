@@ -1446,11 +1446,11 @@ public record Project(
                                         Map<String, Repository> repositories,
                                         Map<String, Resolver> resolvers) throws IOException {
             ProjectModuleDescriptor nested = descriptor.toInherited();
-            SequencedSet<String> resources = new LinkedHashSet<>(nested.resources());
+            SequencedSet<String> synthetics = new LinkedHashSet<>(nested.synthetics());
             if (embed) {
-                resources.add(BuildExecutorModule.PREVIOUS + "describe/pom");
+                synthetics.add(BuildExecutorModule.PREVIOUS + "describe/pom");
             }
-            return base.apply(nested.resources(resources), repositories, resolvers).mapBuild(delegate -> (sub, inherited) -> {
+            return base.apply(nested.synthetics(synthetics), repositories, resolvers).mapBuild(delegate -> (sub, inherited) -> {
                 sub.addModule("describe", (describe, describeInherited) -> {
                             describe.addStep("pom",
                                     new Pom().resolved(resolved).embedded(embed),
