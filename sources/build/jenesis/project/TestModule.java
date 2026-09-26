@@ -663,20 +663,22 @@ public class TestModule implements BuildExecutorModule {
         }
     }
 
-    public record Scope(String filter, String tag) {
+    public record Scope(String filter, List<TestTags> covered) {
 
-        private static final String FILTER = "filter", TAG = "tag";
-        private static final Pattern TAG_NAME = Pattern.compile("[A-Za-z0-9_.\\-]+");
-        private static final Set<String> RESERVED = Set.of("any", "none");
+        private static final String FILTER = "filter", COVERED = "covered.";
 
         public Scope {
             filter = filter == null || filter.isBlank() ? null : filter;
-            tag = tag == null || tag.isBlank() ? null : tag;
+            covered = List.copyOf(covered);
         }
 
         public static Scope ofFile(Path file) throws IOException {
             SequencedProperties recorded = SequencedProperties.ofFiles(file);
-            return new Scope(recorded.getProperty(FILTER), recorded.getProperty(TAG));
+            List<TestTags> covered = new ArrayList<>();
+            for (int index = 0; recorded.getProperty(COVERED + index) != null; index++) {
+                covered.add(TestTags.parse(recorded.getProperty(COVERED + index)));
+            }
+            return new Scope(recorded.getProperty(FILTER), covered);
         }
 
         public void store(Path file) throws IOException {
@@ -684,55 +686,14 @@ public class TestModule implements BuildExecutorModule {
             if (filter != null) {
                 recorded.setProperty(FILTER, filter);
             }
-            if (tag != null) {
-                recorded.setProperty(TAG, tag);
+            for (int index = 0; index < covered.size(); index++) {
+                recorded.setProperty(COVERED + index, covered.get(index).toString());
             }
             recorded.store(file);
         }
 
-        public boolean covers(Scope requested) {
-            return entries(filter).equals(entries(requested.filter())) && coversTag(requested.tag());
-        }
-
-        private boolean coversTag(String requested) {
-            List<String> executed = entries(tag), selected = entries(requested);
-            if (executed.isEmpty()) {
-                return true;
-            } else if (selected.isEmpty()) {
-                return false;
-            } else if (Set.copyOf(executed).equals(Set.copyOf(selected))) {
-                return true;
-            } else if (executed.size() == 1 && selected.size() == 1) {
-                Set<String> excluded = excluded(executed.getFirst()), narrowed = excluded(selected.getFirst());
-                return excluded != null && narrowed != null && narrowed.containsAll(excluded);
-            } else {
-                return false;
-            }
-        }
-
-        private static Set<String> excluded(String expression) {
-            if (!expression.startsWith("!")) {
-                return null;
-            }
-            String body = expression.substring(1).trim();
-            if (!body.startsWith("(")) {
-                return name(body) ? Set.of(body) : null;
-            } else if (!body.endsWith(")")) {
-                return null;
-            }
-            Set<String> excluded = new TreeSet<>();
-            for (String candidate : body.substring(1, body.length() - 1).split("\\|", -1)) {
-                String name = candidate.trim();
-                if (!name(name)) {
-                    return null;
-                }
-                excluded.add(name);
-            }
-            return excluded;
-        }
-
-        private static boolean name(String candidate) {
-            return TAG_NAME.matcher(candidate).matches() && !RESERVED.contains(candidate);
+        public boolean filters(String requested) {
+            return entries(filter).equals(entries(requested));
         }
 
         private static List<String> entries(String expression) {
@@ -812,15 +773,28 @@ public class TestModule implements BuildExecutorModule {
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            Scope scope = new Scope(filter, tag);
-            if (!force && !super.shouldRun(arguments) && context.previous() != null) {
-                Path recorded = context.previous().resolve("testscope.properties");
-                if (Files.exists(recorded) && Scope.ofFile(recorded).covers(scope)) {
-                    return CompletableFuture.completedStage(new BuildStepResult(false));
-                }
+            TestTags requested = TestTags.parse(tag);
+            List<TestTags> ran = ran(context, arguments);
+            if (requested.coveredBy(ran)) {
+                return CompletableFuture.completedStage(new BuildStepResult(false));
             }
-            scope.store(context.next().resolve("testscope.properties"));
+            List<TestTags> covered = new ArrayList<>(ran);
+            covered.add(requested);
+            new Scope(filter, covered).store(context.next().resolve("testscope.properties"));
             return super.apply(executor, context, arguments);
+        }
+
+        private List<TestTags> ran(BuildStepContext context, SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            if (force || super.shouldRun(arguments) || context.previous() == null) {
+                return List.of();
+            }
+            Path recorded = context.previous().resolve("testscope.properties");
+            if (!Files.exists(recorded)) {
+                return List.of();
+            }
+            Scope scope = Scope.ofFile(recorded);
+            return scope.filters(filter) ? scope.covered() : List.of();
         }
 
         @Override
@@ -836,7 +810,8 @@ public class TestModule implements BuildExecutorModule {
                             .iterator())
                     .orElseThrow(() -> new IllegalArgumentException("No test framework found"));
             List<TestSpec> specs = TestSpec.parse(filter);
-            SequencedSet<String> groups = groups(tag);
+            TestTags tags = TestTags.parse(tag);
+            List<TestTags> ran = ran(context, arguments);
             List<String> commands = new ArrayList<>();
             for (ObservabilityEngine observer : observers) {
                 commands.addAll(observer.commands(agentJars(arguments, observer, group), context.next()));
@@ -955,7 +930,7 @@ public class TestModule implements BuildExecutorModule {
                     });
                 }
             }
-            if (matchedClasses.isEmpty() && matchedMethods.isEmpty() && groups.isEmpty()) {
+            if (matchedClasses.isEmpty() && matchedMethods.isEmpty() && tags.all()) {
                 throw new IllegalStateException("No tests matched the requested selection"
                         + (filter != null ? ", filter: " + filter : "")
                         + (tag != null ? ", tag: " + tag : "")
@@ -963,7 +938,7 @@ public class TestModule implements BuildExecutorModule {
                         + " or set jenesis.test.skip to skip testing.");
             }
             SequencedSet<String> selection = matchedClasses;
-            if (incrementalDigest != null && filter == null && tag == null && !matchedClasses.isEmpty()) {
+            if (incrementalDigest != null && filter == null && tags.all() && ran.isEmpty() && !matchedClasses.isEmpty()) {
                 SequencedSet<String> narrowed = selected(arguments, context, matchedClasses);
                 if (narrowed != null && !narrowed.isEmpty()) {
                     selection = narrowed;
@@ -974,7 +949,8 @@ public class TestModule implements BuildExecutorModule {
                     context.next(),
                     selection,
                     matchedMethods,
-                    groups,
+                    tags,
+                    ran,
                     parallel,
                     reporting));
             return CompletableFuture.completedFuture(commands);
@@ -1157,19 +1133,6 @@ public class TestModule implements BuildExecutorModule {
             return resolved;
         }
 
-        private static SequencedSet<String> groups(String tag) {
-            if (tag == null || tag.isBlank()) {
-                return Collections.emptyNavigableSet();
-            }
-            SequencedSet<String> groups = new LinkedHashSet<>();
-            for (String entry : tag.split(",")) {
-                String trimmed = entry.trim();
-                if (!trimmed.isEmpty()) {
-                    groups.add(trimmed);
-                }
-            }
-            return groups;
-        }
     }
 
     private record TestSpec(Pattern classPattern, String method) {

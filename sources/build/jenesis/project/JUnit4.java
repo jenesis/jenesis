@@ -29,13 +29,14 @@ public record JUnit4() implements TestFramework {
                                   Path output,
                                   SequencedSet<String> classes,
                                   SequencedMap<String, SequencedSet<String>> methods,
-                                  SequencedSet<String> groups,
+                                  TestTags tags,
+                                  List<TestTags> ran,
                                   boolean parallel,
                                   boolean reporting) {
         if (!methods.isEmpty()) {
             throw new IllegalArgumentException("JUnit4 does not support running individual methods");
         }
-        if (!groups.isEmpty()) {
+        if (!tags.all()) {
             throw new IllegalArgumentException("JUnit 4 cannot select @Category groups through its console runner");
         }
         return List.copyOf(classes);

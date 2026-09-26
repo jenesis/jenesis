@@ -9,6 +9,7 @@ import build.jenesis.project.JUnit4;
 import build.jenesis.project.JUnitPlatform;
 import build.jenesis.project.TestFramework;
 import build.jenesis.project.TestNG;
+import build.jenesis.project.TestTags;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -206,7 +207,8 @@ public class TestFrameworkTest {
                 root,
                 new LinkedHashSet<>(List.of("sample.AlphaTest", "sample.BetaTest")),
                 Collections.emptyNavigableMap(),
-                Collections.emptyNavigableSet(),
+                TestTags.ALL,
+                List.of(),
                 false,
                 false))
                 .containsExactly("sample.AlphaTest", "sample.BetaTest");
@@ -220,7 +222,8 @@ public class TestFrameworkTest {
                 root,
                 Collections.emptyNavigableSet(),
                 methods,
-                Collections.emptyNavigableSet(),
+                TestTags.ALL,
+                List.of(),
                 false,
                 false))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -234,7 +237,8 @@ public class TestFrameworkTest {
                 root,
                 new LinkedHashSet<>(List.of("sample.BetaTest")),
                 methods,
-                Collections.emptyNavigableSet(),
+                TestTags.ALL,
+                List.of(),
                 false,
                 false))
                 .containsExactly("execute", "--disable-banner", "--disable-ansi-colors",
@@ -251,7 +255,8 @@ public class TestFrameworkTest {
                 root,
                 new LinkedHashSet<>(List.of("sample.AlphaTest", "sample.BetaTest")),
                 methods,
-                Collections.emptyNavigableSet(),
+                TestTags.ALL,
+                List.of(),
                 false,
                 false))
                 .containsSubsequence("-testclass", "sample.AlphaTest,sample.BetaTest",
@@ -259,26 +264,27 @@ public class TestFrameworkTest {
     }
 
     @Test
-    public void junit_platform_commands_add_one_tag_per_group_and_parallel_config() {
+    public void junit_platform_commands_translate_the_tags_into_one_expression_and_add_parallel_config() {
         assertThat(new JUnitPlatform().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                new LinkedHashSet<>(List.of("slow", "flaky")),
+                TestTags.parse("slow,flaky"),
+                List.of(),
                 true,
                 false))
-                .contains("--include-tag=slow",
-                        "--include-tag=flaky",
+                .contains("--include-tag=(flaky | slow)",
                         "--config=junit.jupiter.execution.parallel.enabled=true",
                         "--config=junit.jupiter.execution.parallel.mode.default=concurrent");
         assertThat(new JUnitPlatform().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                Collections.emptyNavigableSet(),
+                TestTags.ALL,
+                List.of(),
                 false,
                 false))
-                .doesNotContain("--include-tag=slow",
+                .doesNotContain("--include-tag=(flaky | slow)",
                         "--config=junit.jupiter.execution.parallel.enabled=true");
     }
 
@@ -288,7 +294,8 @@ public class TestFrameworkTest {
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                Collections.emptyNavigableSet(),
+                TestTags.ALL,
+                List.of(),
                 false,
                 true))
                 .contains("--reports-dir=" + root.resolve(BuildStep.REPORTS + "tests"),
@@ -298,7 +305,8 @@ public class TestFrameworkTest {
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                Collections.emptyNavigableSet(),
+                TestTags.ALL,
+                List.of(),
                 false,
                 false))
                 .noneMatch(command -> command.startsWith("--reports-dir")
@@ -311,7 +319,8 @@ public class TestFrameworkTest {
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                Collections.emptyNavigableSet(),
+                TestTags.ALL,
+                List.of(),
                 false,
                 true))
                 .containsExactly("-d", root.resolve(BuildStep.REPORTS + "tests").toString());
@@ -323,10 +332,11 @@ public class TestFrameworkTest {
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                new LinkedHashSet<>(List.of("slow", "flaky")),
+                TestTags.parse("slow,flaky"),
+                List.of(),
                 true,
                 false))
-                .containsSubsequence("-groups", "slow,flaky")
+                .containsSubsequence("-groups", "flaky,slow")
                 .containsSubsequence("-parallel", "methods");
     }
 
@@ -336,7 +346,8 @@ public class TestFrameworkTest {
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                new LinkedHashSet<>(List.of("slow")),
+                TestTags.parse("slow"),
+                List.of(),
                 false,
                 false))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -348,7 +359,8 @@ public class TestFrameworkTest {
                 root,
                 new LinkedHashSet<>(List.of("sample.AlphaTest")),
                 Collections.emptyNavigableMap(),
-                Collections.emptyNavigableSet(),
+                TestTags.ALL,
+                List.of(),
                 true,
                 false))
                 .containsExactly("sample.AlphaTest");
