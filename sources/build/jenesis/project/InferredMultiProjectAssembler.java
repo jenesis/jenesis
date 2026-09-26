@@ -345,7 +345,6 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             Stream.of("prepare"),
                             inputs(descriptor, closure),
                             descriptor.resources().stream(),
-                            descriptor.embedded().stream(),
                             sbom == null ? Stream.<String>empty() : Stream.of("sbom"),
                             resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"))
                             .flatMap(Function.identity()));
@@ -411,7 +410,6 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         Stream.of(Stream.of("binary", "legal"),
                                         descriptor.content().stream(),
                                         descriptor.resources().stream(),
-                                        descriptor.embedded().stream(),
                                         sbom == null ? Stream.<String>empty() : Stream.of("sbom"),
                                         resources.isEmpty() ? Stream.<String>empty() : Stream.of("include"))
                                 .flatMap(Function.identity()));

@@ -124,7 +124,8 @@ public record Project(
             executor.addModule(HELP, new HelpModule("maven", assembler.getClass().getName(), project.environment().out()));
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
-            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler, null, null, false);
+            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler, null, null, false,
+                    project.environment().flag("maven.embed", true));
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
                 repositories.putIfAbsent("maven",
@@ -284,7 +285,8 @@ public record Project(
             MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler,
                     BuildExecutorModule.PREVIOUS.repeat(2) + MultiProjectModule.MANIFESTS,
                     "module",
-                    true);
+                    true,
+                    project.environment().flag("maven.embed", true));
             MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(pomAware, project.hashFunction());
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
@@ -1436,24 +1438,30 @@ public record Project(
     private record PomAwareAssembler(MultiProjectAssembler<? super ProjectModuleDescriptor> base,
                                      String manifests,
                                      String prefix,
-                                     boolean resolved) implements MultiProjectAssembler<ProjectModuleDescriptor> {
+                                     boolean resolved,
+                                     boolean embed) implements MultiProjectAssembler<ProjectModuleDescriptor> {
 
         @Override
         public AssemblyDescriptor apply(ProjectModuleDescriptor descriptor,
                                         Map<String, Repository> repositories,
                                         Map<String, Resolver> resolvers) throws IOException {
             ProjectModuleDescriptor nested = descriptor.toInherited();
-            SequencedSet<String> embedded = new LinkedHashSet<>(nested.embedded());
-            embedded.add(BuildExecutorModule.PREVIOUS + "describe/pom");
-            return base.apply(nested.embedded(embedded), repositories, resolvers).mapBuild(delegate -> (sub, inherited) -> {
+            SequencedSet<String> resources = new LinkedHashSet<>(nested.resources());
+            if (embed) {
+                resources.add(BuildExecutorModule.PREVIOUS + "describe/pom");
+            }
+            return base.apply(nested.resources(resources), repositories, resolvers).mapBuild(delegate -> (sub, inherited) -> {
                 sub.addModule("describe", (describe, describeInherited) -> {
-                            describe.addStep("pom", new Pom().resolved(resolved), describeInherited.sequencedKeySet().stream());
+                            describe.addStep("pom",
+                                    new Pom().resolved(resolved).embedded(embed),
+                                    describeInherited.sequencedKeySet().stream());
                             if (manifests != null) {
                                 describe.addStep("identity", new MavenIdentity(prefix, manifests), "pom", manifests);
                             }
                         },
                         inherited.sequencedKeySet().stream());
-                sub.addModule("assemble", delegate, Stream.concat(inherited.sequencedKeySet().stream(), Stream.of("describe/pom")));
+                sub.addModule("assemble", delegate, Stream.concat(inherited.sequencedKeySet().stream(),
+                        embed ? Stream.of("describe/pom") : Stream.empty()));
             });
         }
     }
@@ -2703,6 +2711,7 @@ public record Project(
                 maven.uri||Maven remotes, comma-separated and queried left to right; a |<groupId> suffix, repeatable, asks a remote only for that group and the groups below it, and @<name> splices the chain that jenesis.<name> or the environment variable <name> holds (env MAVEN_REPOSITORY_URI)
                 maven.local||Local Maven cache folder (env MAVEN_REPOSITORY_LOCAL); only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 maven.token||Authorization header value for the Maven remotes, sent as given, so it names its scheme, as Bearer <token> or Basic <credentials> (env MAVEN_REPOSITORY_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one; a token the environment provides is sent only to the remotes the environment names, a remote a project's own files named is never sent one, and neither is the built-in public repository
+                maven.embed|true|Carry the POM and a pom.properties in the jar under META-INF/maven/<groupId>/<artifactId>/, as Maven does, where the layout publishes to Maven
                 maven.segments|2|Leading dot-separated segments of a module name that form its Maven groupId, when a module is published or resolved by the coordinate convention; a shorter name becomes the groupId in full
                 module.uri||Jenesis module remotes, likewise, where a |<module> suffix asks a remote only for that module and the modules whose name it prefixes, and a maven:[<segments>:]<uri> entry reads a remote as a Maven repository by the publishing convention, taking that many leading segments of a module name as its groupId where it names a count and jenesis.maven.segments where it does not (env JENESIS_REPOSITORY_URI)
                 module.local||Local module cache folder (env JENESIS_REPOSITORY_LOCAL); only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides

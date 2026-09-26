@@ -15,33 +15,39 @@ public class Pom implements BuildStep {
     private final Map<String, String> shared;
     private final boolean resolved;
     private final String group;
+    private final boolean embedded;
     private final transient MavenPomEmitter emitter = new MavenPomEmitter();
 
     public Pom() {
-        this(Set.of("maven"), Map.of(), false, "main");
+        this(Set.of("maven"), Map.of(), false, "main", false);
     }
 
-    private Pom(Set<String> prefixes, Map<String, String> shared, boolean resolved, String group) {
+    private Pom(Set<String> prefixes, Map<String, String> shared, boolean resolved, String group, boolean embedded) {
         this.prefixes = Set.copyOf(prefixes);
         this.shared = Map.copyOf(shared);
         this.resolved = resolved;
         this.group = group;
+        this.embedded = embedded;
     }
 
     public Pom prefixes(Set<String> prefixes) {
-        return new Pom(prefixes, shared, resolved, group);
+        return new Pom(prefixes, shared, resolved, group, embedded);
     }
 
     public Pom shared(Map<String, String> shared) {
-        return new Pom(prefixes, shared, resolved, group);
+        return new Pom(prefixes, shared, resolved, group, embedded);
     }
 
     public Pom resolved(boolean resolved) {
-        return new Pom(prefixes, shared, resolved, group);
+        return new Pom(prefixes, shared, resolved, group, embedded);
     }
 
     public Pom group(String group) {
-        return new Pom(prefixes, shared, resolved, group);
+        return new Pom(prefixes, shared, resolved, group, embedded);
+    }
+
+    public Pom embedded(boolean embedded) {
+        return new Pom(prefixes, shared, resolved, group, embedded);
     }
 
     @Override
@@ -157,16 +163,18 @@ public class Pom implements BuildStep {
                     deps,
                     parseMetadata(metadata)).accept(writer);
         }
-        Path embedded = Files.createDirectories(context.next()
-                .resolve(RESOURCES + "META-INF/maven")
-                .resolve(groupId)
-                .resolve(artifactId));
-        Files.copy(context.next().resolve(POM), embedded.resolve(POM));
-        SequencedProperties coordinate = new SequencedProperties();
-        coordinate.setProperty("artifactId", artifactId);
-        coordinate.setProperty("groupId", groupId);
-        coordinate.setProperty("version", version);
-        coordinate.store(embedded.resolve("pom.properties"));
+        if (embedded) {
+            Path folder = Files.createDirectories(context.next()
+                    .resolve(RESOURCES + "META-INF/maven")
+                    .resolve(groupId)
+                    .resolve(artifactId));
+            Files.copy(context.next().resolve(POM), folder.resolve(POM));
+            SequencedProperties coordinate = new SequencedProperties();
+            coordinate.setProperty("artifactId", artifactId);
+            coordinate.setProperty("groupId", groupId);
+            coordinate.setProperty("version", version);
+            coordinate.store(folder.resolve("pom.properties"));
+        }
         return CompletableFuture.completedStage(new BuildStepResult(true));
     }
 
