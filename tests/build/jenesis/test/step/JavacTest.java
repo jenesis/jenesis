@@ -61,6 +61,29 @@ public class JavacTest {
         assertThat(properties).containsEntry("--release", "21");
     }
 
+    @Test
+    public void a_preview_release_compiles_with_the_preview_features_of_the_jdk() throws IOException {
+        Path folder = Files.createDirectory(root.resolve("write-release-preview"));
+        Javac.writeRelease(folder, "25-preview", 25);
+        assertThat(SequencedProperties.ofFiles(folder.resolve("process/javac.properties")))
+                .containsEntry("--release", "25")
+                .containsEntry("--enable-preview", "");
+    }
+
+    @Test
+    public void a_preview_release_of_another_jdk_names_the_toolchain_that_compiles_it() {
+        assertThatThrownBy(() -> Javac.writeRelease(root, "25-preview", 26))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("-Djenesis.toolchain.version=25");
+    }
+
+    @Test
+    public void a_preview_release_names_a_feature() {
+        assertThatThrownBy(() -> Javac.writeRelease(root, "next-preview", 25))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("<feature>-preview");
+    }
+
     @ParameterizedTest
     @NullAndEmptySource
     public void writeRelease_without_a_release_writes_the_feature_of_the_jdk(String release) throws IOException {

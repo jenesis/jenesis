@@ -161,6 +161,10 @@ public abstract class Java extends ProcessBuildStep {
                     graph.enableNativeAccess(pathPlacement.modular() ? module.value("module") : null);
                 }
             }
+            Path javacFile = argument.folder().resolve(PROCESS + "javac.properties");
+            if (Files.isRegularFile(javacFile) && SequencedProperties.ofFiles(javacFile).containsKey("--enable-preview")) {
+                graph.enablePreview();
+            }
             Path nativesFile = argument.folder().resolve(NATIVES);
             if (Files.isRegularFile(nativesFile)) {
                 natives.addAll(SequencedProperties.ofFiles(nativesFile).stringPropertyNames());

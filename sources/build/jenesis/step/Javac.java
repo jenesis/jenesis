@@ -52,9 +52,24 @@ public class Javac extends ProcessBuildStep {
     public static void writeRelease(Path folder, String release, int feature) throws IOException {
         Path target = Files.createDirectories(folder.resolve(ProcessBuildStep.PROCESS));
         SequencedProperties properties = new SequencedProperties();
-        properties.setProperty("--release", release == null || release.isEmpty()
-                ? Integer.toString(feature)
-                : release);
+        if (release != null && release.endsWith("-preview")) {
+            String number = release.substring(0, release.length() - "-preview".length());
+            if (!number.matches("[0-9]+")) {
+                throw new IllegalArgumentException("A release with preview features is written <feature>-preview, not "
+                        + release);
+            }
+            if (Integer.parseInt(number) != feature) {
+                throw new IllegalStateException("The release " + release + " enables the preview features of Java "
+                        + number + ", which only a JDK " + number + " compiles, but the build runs on Java " + feature
+                        + " - select one with -Djenesis.toolchain.version=" + number);
+            }
+            properties.setProperty("--release", number);
+            properties.setProperty("--enable-preview", "");
+        } else {
+            properties.setProperty("--release", release == null || release.isEmpty()
+                    ? Integer.toString(feature)
+                    : release);
+        }
         properties.store(target.resolve("javac.properties"));
     }
 
@@ -227,6 +242,17 @@ public class Javac extends ProcessBuildStep {
             patchModule = new ModuleInfoParser().identify(Path.of(moduleInfo)).coordinate();
         } else {
             path.addAll(siblingClasses);
+        }
+        if (properties.values().stream().noneMatch(folder -> folder.containsKey("--enable-preview"))) {
+            for (String entry : path) {
+                String preview = PathPlacement.preview(Path.of(entry));
+                if (preview != null) {
+                    throw new IllegalStateException("Compiling against " + Path.of(entry).getFileName()
+                            + ", which uses the preview features of Java " + preview + ", enables them as well:"
+                            + " declare the release as " + preview + "-preview, as @jenesis.release " + preview
+                            + "-preview or with maven.compiler.enablePreview");
+                }
+            }
         }
         if (!path.isEmpty() || patchModule != null || !processorPath.isEmpty()) {
             for (String entry : path) {

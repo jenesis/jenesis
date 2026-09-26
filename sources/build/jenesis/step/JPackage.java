@@ -162,6 +162,8 @@ public class JPackage extends ProcessBuildStep {
                 }
                 if (modular) {
                     graph.module(file);
+                } else {
+                    graph.place(PathPlacement.CLASS_PATH, file);
                 }
                 if (granted.contains(file.toAbsolutePath().normalize())) {
                     graph.enableNativeAccess(file, modular);

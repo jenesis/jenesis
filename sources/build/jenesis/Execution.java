@@ -186,6 +186,9 @@ public record Execution(Project project, String mainClass, String module, Contai
             javaArgs.add("-m");
             javaArgs.add(candidate.module + "/" + candidate.mainClass);
         } else {
+            for (String jar : jars) {
+                graph.place(PathPlacement.CLASS_PATH, Path.of(jar));
+            }
             for (Path file : granted) {
                 graph.enableNativeAccess(file, false);
             }
