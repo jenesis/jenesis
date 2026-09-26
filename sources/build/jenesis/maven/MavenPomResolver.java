@@ -14,7 +14,8 @@ import build.jenesis.SequencedProperties;
 
 public class MavenPomResolver implements MavenResolver {
 
-    private static final String NAMESPACE_4_0_0 = "http://maven.apache.org/POM/4.0.0";
+    private static final String NAMESPACE_4_0_0 = "http://maven.apache.org/POM/4.0.0",
+            NAMESPACE_4_1_0 = "http://maven.apache.org/POM/4.1.0";
     private static final Set<String> IMPLICITS = Set.of("groupId", "artifactId", "version", "packaging");
     private static final Pattern PROPERTY = Pattern.compile("(\\$\\{([^}]+)})");
     private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.:+~@*/-]+");
@@ -533,9 +534,20 @@ public class MavenPomResolver implements MavenResolver {
                 throw new IllegalArgumentException("Circular POM module reference to " + current);
             }
         } while ((current = queue.poll()) != null);
+        Map<MavenDependencyName, String> subprojects = new HashMap<>();
+        for (Path module : modules) {
+            UnresolvedPom pom = paths.get(module);
+            String groupId = property(pom.groupId(), pom.properties()),
+                    artifactId = property(pom.artifactId(), pom.properties()),
+                    version = property(pom.version(), pom.properties());
+            if (groupId != null && artifactId != null && version != null) {
+                subprojects.put(new MavenDependencyName(groupId, artifactId), version);
+            }
+        }
         SequencedMap<Path, MavenLocalPom> results = new LinkedHashMap<>();
         for (Path module : modules) {
             UnresolvedPom pom = paths.get(module);
+            SequencedMap<String, String> plugins = new LinkedHashMap<>(pom.plugins());
             SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies = new LinkedHashMap<>();
             SequencedMap<MavenDependencyKey, MavenDependencyValue> managedDependencies = new LinkedHashMap<>();
             for (Map.Entry<DependencyKey, DependencyValue> entry : pom.managedDependencies().entrySet()) {
@@ -557,8 +569,28 @@ public class MavenPomResolver implements MavenResolver {
             }
             pom.dependencies().forEach((key, value) -> {
                 MavenDependencyKey resolvedKey = key.resolve(pom.properties());
-                dependencies.put(resolvedKey, defaultScope(merge(value.resolve(pom.properties()),
-                        managedDependencies.get(resolvedKey))));
+                MavenDependencyValue resolved = defaultScope(merge(value.resolve(pom.properties()),
+                        managedDependencies.get(resolvedKey)));
+                String subproject = subprojects.get(new MavenDependencyName(resolvedKey.groupId(), resolvedKey.artifactId()));
+                if (resolved.version() == null && subproject != null) {
+                    resolved = new MavenDependencyValue(subproject,
+                            resolved.scope(),
+                            resolved.systemPath(),
+                            resolved.exclusions(),
+                            resolved.optional(),
+                            resolved.checksum());
+                }
+                switch (resolvedKey.type()) {
+                    case "processor", "classpath-processor", "modular-processor" -> plugins.put("maven/"
+                            + resolvedKey.groupId() + "/"
+                            + resolvedKey.artifactId()
+                            + (resolved.version() == null ? "" : "/" + resolved.version()), "plugin");
+                    case "classpath-jar", "modular-jar" -> throw new IllegalArgumentException("The dependency on "
+                            + resolvedKey.groupId() + ":" + resolvedKey.artifactId() + " in " + module.resolve("pom.xml")
+                            + " is of type " + resolvedKey.type() + ", but Jenesis places a jar by whether it"
+                            + " describes a module - declare it as a jar");
+                    default -> dependencies.put(resolvedKey, resolved);
+                }
             });
             results.put(root.relativize(module), new MavenLocalPom(property(pom.groupId(), pom.properties()),
                     property(pom.artifactId(), pom.properties()),
@@ -578,7 +610,7 @@ public class MavenPomResolver implements MavenResolver {
                     pom.qualifiedDependencies(),
                     pom.attachments(),
                     pom.natives(),
-                    pom.plugins(),
+                    plugins,
                     pom.signatures(),
                     property(pom.properties().get("mainClass"), pom.properties())));
         }
@@ -605,17 +637,57 @@ public class MavenPomResolver implements MavenResolver {
         }
         String namespace = document.getDocumentElement().getNamespaceURI();
         return switch (namespace == null ? NAMESPACE_4_0_0 : namespace) {
-            case NAMESPACE_4_0_0 -> {
-                ParentCoordinate parent = toChildren400(document.getDocumentElement(), "parent")
-                        .findFirst()
-                        .map(node -> new ParentCoordinate(
-                                toTextChild400(node, "groupId").orElseThrow(missing("parent.groupId")),
-                                toTextChild400(node, "artifactId").orElseThrow(missing("parent.artifactId")),
-                                toTextChild400(node, "version").orElseThrow(missing("parent.version")),
-                                path != null ? toTextChild400(node, "relativePath").map(value -> value.endsWith("/pom.xml")
-                                        ? value.substring(0, value.length() - 7)
-                                        : value).orElse("../") : null))
-                        .orElse(null);
+            case NAMESPACE_4_0_0, NAMESPACE_4_1_0 -> {
+                boolean inferring = NAMESPACE_4_1_0.equals(namespace);
+                ParentCoordinate parent = null;
+                Node declared = toElements(document.getDocumentElement(), "parent").findFirst().orElse(null);
+                if (declared != null) {
+                    String relative = toElementText(declared, "relativePath").map(value -> value.endsWith("/pom.xml")
+                            ? value.substring(0, value.length() - 7)
+                            : value).orElse("../");
+                    String parentGroupId = toElementText(declared, "groupId").orElse(null),
+                            parentArtifactId = toElementText(declared, "artifactId").orElse(null),
+                            parentVersion = toElementText(declared, "version").orElse(null);
+                    if (!inferring || parentGroupId != null && parentArtifactId != null && parentVersion != null) {
+                        if (parentGroupId == null) {
+                            throw missing("parent.groupId").get();
+                        } else if (parentArtifactId == null) {
+                            throw missing("parent.artifactId").get();
+                        } else if (parentVersion == null) {
+                            throw missing("parent.version").get();
+                        }
+                    } else {
+                        Path pom = path == null || relative.isEmpty() ? null : path.resolve(relative).resolve("pom.xml");
+                        if (pom == null || !Files.exists(pom)) {
+                            throw new IllegalStateException("A parent that leaves out its groupId, artifactId or version"
+                                    + " is the POM at its relativePath, but there is none"
+                                    + (pom == null ? "" : " at " + pom)
+                                    + " - name the parent's coordinate or point relativePath at its folder");
+                        }
+                        UnresolvedPom local = paths.get(path);
+                        if (local == null) {
+                            if (!children.add(new DependencyCoordinate("", pom.toAbsolutePath().normalize().toString(), ""))) {
+                                throw new IllegalStateException("Circular parent inferred through relativePath at " + pom);
+                            }
+                            local = assemble(executor,
+                                    repository,
+                                    Files.newInputStream(pom),
+                                    false,
+                                    trusted,
+                                    pom.getParent(),
+                                    paths,
+                                    children,
+                                    unresolved);
+                            paths.put(path, local);
+                        }
+                        parentGroupId = parentGroupId == null ? property(local.groupId(), local.properties()) : parentGroupId;
+                        parentArtifactId = parentArtifactId == null
+                                ? property(local.artifactId(), local.properties())
+                                : parentArtifactId;
+                        parentVersion = parentVersion == null ? property(local.version(), local.properties()) : parentVersion;
+                    }
+                    parent = new ParentCoordinate(parentGroupId, parentArtifactId, parentVersion, path != null ? relative : null);
+                }
                 Map<String, String> properties = new HashMap<>();
                 Map<DependencyKey, DependencyValue> managedDependencies = new LinkedHashMap<>();
                 Map<DependencyKey, DependencyValue> inheritedManagedDependencies = new LinkedHashMap<>();
@@ -683,68 +755,122 @@ public class MavenPomResolver implements MavenResolver {
                     dependencies.putAll(resolution.dependencies());
                     parentLicenses = resolution.licenses();
                 }
-                IMPLICITS.forEach(property -> toChildren400(document.getDocumentElement(), property)
+                IMPLICITS.forEach(property -> toElements(document.getDocumentElement(), property)
                         .findFirst()
                         .ifPresent(node -> {
                             String value = node.getTextContent().trim();
                             properties.put(property, value);
                             properties.put("project." + property, value);
                         }));
-                toChildren400(document.getDocumentElement(), "properties")
+                toElements(document.getDocumentElement(), "properties")
                         .limit(1)
                         .flatMap(MavenPomResolver::toChildren)
                         .filter(node -> node.getNodeType() == Node.ELEMENT_NODE)
                         .forEach(node -> properties.put(node.getLocalName(), node.getTextContent().trim()));
-                toChildren400(document.getDocumentElement(), "dependencyManagement")
+                toElements(document.getDocumentElement(), "dependencyManagement")
                         .limit(1)
-                        .flatMap(node -> toChildren400(node, "dependencies"))
+                        .flatMap(node -> toElements(node, "dependencies"))
                         .limit(1)
-                        .flatMap(node -> toChildren400(node, "dependency"))
-                        .map(node -> toDependency400(node, trusted))
+                        .flatMap(node -> toElements(node, "dependency"))
+                        .map(node -> toDependency(node, trusted))
                         .forEach(entry -> managedDependencies.put(entry.getKey(), entry.getValue()));
                 inheritedManagedDependencies.forEach(managedDependencies::putIfAbsent);
-                toChildren400(document.getDocumentElement(), "dependencies")
+                toElements(document.getDocumentElement(), "dependencies")
                         .limit(1)
-                        .flatMap(node -> toChildren400(node, "dependency"))
-                        .map(node -> toDependency400(node, false))
+                        .flatMap(node -> toElements(node, "dependency"))
+                        .map(node -> toDependency(node, false))
                         .forEach(entry -> dependencies.putLast(entry.getKey(), entry.getValue()));
                 Node build = extended
-                        ? toChildren400(document.getDocumentElement(), "build").findFirst().orElse(null)
+                        ? toElements(document.getDocumentElement(), "build").findFirst().orElse(null)
                         : null;
-                Node modules = extended
-                        ? toChildren400(document.getDocumentElement(), "modules").findFirst().orElse(null)
-                        : null;
-                List<License> ownLicenses = toChildren400(document.getDocumentElement(), "licenses")
+                List<String> subprojects = null;
+                if (extended) {
+                    Node listed = toElements(document.getDocumentElement(), "subprojects").findFirst()
+                            .or(() -> toElements(document.getDocumentElement(), "modules").findFirst())
+                            .orElse(null);
+                    String packaging = toElementText(document.getDocumentElement(), "packaging").orElse(null);
+                    if (listed != null) {
+                        subprojects = Stream.concat(toElements(listed, "subproject"), toElements(listed, "module"))
+                                .map(node -> node.getTextContent().trim())
+                                .toList();
+                    } else if (inferring && path != null && ("pom".equals(packaging) || "bom".equals(packaging))) {
+                        try (Stream<Path> folders = Files.list(path)) {
+                            subprojects = folders.filter(folder -> Files.isRegularFile(folder.resolve("pom.xml")))
+                                    .map(folder -> folder.getFileName().toString())
+                                    .sorted()
+                                    .toList();
+                        }
+                    }
+                }
+                String sourceDirectory = build == null ? null : toElementText(build, "sourceDirectory").orElse(null),
+                        testSourceDirectory = build == null ? null : toElementText(build, "testSourceDirectory").orElse(null);
+                List<String> resourceDirectories = build == null ? null : toElements(build, "resources").findFirst()
+                        .map(node -> toElements(node, "resource")
+                                .map(child -> toElementText(child, "directory").orElse(null))
+                                .filter(Objects::nonNull)
+                                .toList())
+                        .orElse(null),
+                        testResourceDirectories = build == null ? null : toElements(build, "testResources").findFirst()
+                                .map(node -> toElements(node, "testResource")
+                                        .map(child -> toElementText(child, "directory").orElse(null))
+                                        .filter(Objects::nonNull)
+                                        .toList())
+                                .orElse(null);
+                Node sources = build == null || !inferring ? null : toElements(build, "sources").findFirst().orElse(null);
+                if (sources != null) {
+                    SequencedMap<String, List<String>> declaredSources = new LinkedHashMap<>();
+                    for (Node source : toElements(sources, "source").toList()) {
+                        if (toElementText(source, "enabled").map("false"::equals).orElse(false)) {
+                            continue;
+                        }
+                        for (String unsupported : List.of("module", "targetVersion")) {
+                            if (toElementText(source, unsupported).isPresent()) {
+                                throw new IllegalArgumentException("A <source> with a <" + unsupported + "> is not read"
+                                        + " by Jenesis, in " + (path == null ? "a POM" : path.resolve("pom.xml"))
+                                        + " - build each Java module, and each release, from a POM of its own");
+                            }
+                        }
+                        String scope = toElementText(source, "scope").orElse("main"),
+                                lang = toElementText(source, "lang").orElse("java");
+                        declaredSources.computeIfAbsent(scope + "/" + lang, _ -> new ArrayList<>())
+                                .add(toElementText(source, "directory").orElse("src/" + scope + "/" + lang));
+                    }
+                    for (String scope : List.of("main", "test")) {
+                        List<String> java = declaredSources.get(scope + "/java");
+                        if (java != null && java.size() > 1) {
+                            throw new IllegalArgumentException("Jenesis compiles one source directory per scope, but "
+                                    + (path == null ? "a POM" : path.resolve("pom.xml")) + " declares " + java
+                                    + " for " + scope + " - keep one of them");
+                        }
+                    }
+                    sourceDirectory = declaredSources.containsKey("main/java")
+                            ? declaredSources.get("main/java").getFirst()
+                            : sourceDirectory;
+                    testSourceDirectory = declaredSources.containsKey("test/java")
+                            ? declaredSources.get("test/java").getFirst()
+                            : testSourceDirectory;
+                    resourceDirectories = declaredSources.getOrDefault("main/resources", resourceDirectories);
+                    testResourceDirectories = declaredSources.getOrDefault("test/resources", testResourceDirectories);
+                }
+                List<License> ownLicenses = toElements(document.getDocumentElement(), "licenses")
                         .limit(1)
-                        .flatMap(node -> toChildren400(node, "license"))
+                        .flatMap(node -> toElements(node, "license"))
                         .map(node -> new License(
                                 null,
                                 null,
-                                toTextChild400(node, "name").orElse(null),
-                                toTextChild400(node, "url").orElse(null)))
+                                toElementText(node, "name").orElse(null),
+                                toElementText(node, "url").orElse(null)))
                         .toList();
                 yield new UnresolvedPom(
-                        toTextChild400(document.getDocumentElement(), "groupId").orElse(groupId),
-                        toTextChild400(document.getDocumentElement(), "artifactId").orElse(artifactId),
-                        toTextChild400(document.getDocumentElement(), "version").orElse(version),
-                        extended ? toTextChild400(document.getDocumentElement(), "packaging").orElse(null) : null,
-                        build == null ? null : toTextChild400(build, "sourceDirectory").orElse(null),
-                        build == null ? null : toChildren400(build, "resources").findFirst()
-                                .map(node -> toChildren400(node, "resource")
-                                        .map(child -> toTextChild400(child, "directory").orElse(null))
-                                        .filter(Objects::nonNull)
-                                        .toList())
-                                .orElse(null),
-                        build == null ? null : toTextChild400(build, "testSourceDirectory").orElse(null),
-                        build == null ? null : toChildren400(build, "testResources").findFirst()
-                                .map(node -> toChildren400(node, "testResource")
-                                        .map(child -> toTextChild400(child, "directory").orElse(null))
-                                        .filter(Objects::nonNull)
-                                        .toList())
-                                .orElse(null),
-                        modules == null ? null : toChildren400(modules, "module")
-                                .map(Node::getTextContent)
-                                .toList(),
+                        toElementText(document.getDocumentElement(), "groupId").orElse(groupId),
+                        toElementText(document.getDocumentElement(), "artifactId").orElse(artifactId),
+                        toElementText(document.getDocumentElement(), "version").orElse(version),
+                        extended ? toElementText(document.getDocumentElement(), "packaging").orElse(null) : null,
+                        sourceDirectory,
+                        resourceDirectories,
+                        testSourceDirectory,
+                        testResourceDirectories,
+                        subprojects,
                         properties,
                         managedDependencies,
                         dependencies,
@@ -961,19 +1087,20 @@ public class MavenPomResolver implements MavenResolver {
                 index -> index + 1).mapToObj(children::item);
     }
 
-    private static Stream<Node> toChildren400(Node node, String localName) {
+    private static Stream<Node> toElements(Node node, String localName) {
         return toChildren(node).filter(child -> Objects.equals(child.getLocalName(), localName)
                 && (child.getNamespaceURI() == null
-                        || NAMESPACE_4_0_0.equals(child.getNamespaceURI())));
+                        || NAMESPACE_4_0_0.equals(child.getNamespaceURI())
+                        || NAMESPACE_4_1_0.equals(child.getNamespaceURI())));
     }
 
-    private static Optional<String> toTextChild400(Node node, String localName) {
-        return toChildren400(node, localName).map(child -> child.getTextContent().trim()).findFirst();
+    private static Optional<String> toElementText(Node node, String localName) {
+        return toElements(node, localName).map(child -> child.getTextContent().trim()).findFirst();
     }
 
-    private static Map.Entry<DependencyKey, DependencyValue> toDependency400(Node node, boolean trusted) {
-        String type = toTextChild400(node, "type").orElse("jar");
-        String classifier = toTextChild400(node, "classifier").orElse(null);
+    private static Map.Entry<DependencyKey, DependencyValue> toDependency(Node node, boolean trusted) {
+        String type = toElementText(node, "type").orElse("jar");
+        String classifier = toElementText(node, "classifier").orElse(null);
         String aliased = switch (type) {
             case "test-jar" -> "tests";
             case "ejb-client" -> "client";
@@ -989,23 +1116,23 @@ public class MavenPomResolver implements MavenResolver {
         }
         return Map.entry(
                 new DependencyKey(
-                        toTextChild400(node, "groupId").orElseThrow(missing("groupId")),
-                        toTextChild400(node, "artifactId").orElseThrow(missing("artifactId")),
+                        toElementText(node, "groupId").orElseThrow(missing("groupId")),
+                        toElementText(node, "artifactId").orElseThrow(missing("artifactId")),
                         type,
                         classifier),
                 new DependencyValue(
-                        toTextChild400(node, "version").orElse(null),
-                        toTextChild400(node, "scope").orElse(null),
-                        toTextChild400(node, "systemPath").orElse(null),
-                        toChildren400(node, "exclusions")
+                        toElementText(node, "version").orElse(null),
+                        toElementText(node, "scope").orElse(null),
+                        toElementText(node, "systemPath").orElse(null),
+                        toElements(node, "exclusions")
                                 .findFirst()
-                                .map(exclusions -> toChildren400(exclusions, "exclusion")
+                                .map(exclusions -> toElements(exclusions, "exclusion")
                                         .map(child -> new MavenDependencyName(
-                                                toTextChild400(child, "groupId").orElseThrow(missing("exclusion.groupId")),
-                                                toTextChild400(child, "artifactId").orElseThrow(missing("exclusion.artifactId"))))
+                                                toElementText(child, "groupId").orElseThrow(missing("exclusion.groupId")),
+                                                toElementText(child, "artifactId").orElseThrow(missing("exclusion.artifactId"))))
                                         .toList())
                                 .orElse(null),
-                        toTextChild400(node, "optional").orElse(null),
+                        toElementText(node, "optional").orElse(null),
                         trusted ? toCommentChecksum(node).orElse(null) : null));
     }
 
@@ -1020,9 +1147,9 @@ public class MavenPomResolver implements MavenResolver {
                 .toList();
         if (matches.size() > 1) {
             throw new IllegalStateException("Multiple " + CHECKSUM_PREFIX + "* comments on dependency "
-                    + toTextChild400(node, "groupId").orElse("?")
-                    + ":" + toTextChild400(node, "artifactId").orElse("?")
-                    + ":" + toTextChild400(node, "version").orElse("?")
+                    + toElementText(node, "groupId").orElse("?")
+                    + ":" + toElementText(node, "artifactId").orElse("?")
+                    + ":" + toElementText(node, "version").orElse("?")
                     + ": " + matches);
         }
         return matches.stream().findFirst();
