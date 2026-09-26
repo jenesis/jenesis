@@ -9,6 +9,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Dependencies;
 import build.jenesis.step.Sbom;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -239,6 +240,16 @@ public class SbomTest {
         assertThat(sbom(Map.of()))
                 .as("neither is invented when the project declares none")
                 .doesNotContain("supplier", "copyright");
+    }
+
+    @Test
+    public void identifies_the_licence_of_the_project_as_it_does_a_dependency_licence() throws Exception {
+        Files.writeString(argument.resolve(Dependencies.SPDX), "alias/our\\ own\\ licence=LicenseRef-Own\n");
+        assertThat(sbom(Map.of("license.apache.name", "The Apache Software License, Version 2.0",
+                        "license.own.name", "Our Own Licence")))
+                .contains("{ \"license\": { \"id\": \"Apache-2.0\" } }")
+                .as("an alias of spdx.properties applies to the project's licence as well")
+                .contains("{ \"license\": { \"name\": \"LicenseRef-Own\" } }");
     }
 
     private String sbom(Map<String, String> scm) throws Exception {

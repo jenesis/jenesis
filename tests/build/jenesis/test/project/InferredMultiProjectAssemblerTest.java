@@ -112,6 +112,21 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void names_no_rpm_licence_type_unless_every_licence_is_identified() throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false, "rpm");
+        Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), """
+                artifact=demo
+                license.apache.name=The Apache Software License, Version 2.0
+                license.own.name=A licence of our own
+                """);
+        Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
+        assertThat(readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"))
+                .getProperty("--linux-rpm-license-type"))
+                .as("RPM expects SPDX identifiers, so a licence without one leaves the field to jpackage")
+                .isNull();
+    }
+
+    @Test
     public void describes_an_application_image_only_with_what_jpackage_accepts_for_one() throws IOException {
         SequencedProperties arguments = describedPackage("app-image");
         assertThat(arguments.getProperty("--description")).isEqualTo("A demo project");
@@ -132,7 +147,7 @@ public class InferredMultiProjectAssemblerTest {
                 url=https://example.com/demo
                 developer.dev.name=Dev
                 developer.dev.email=dev@example.com
-                license.apache.name=Apache-2.0
+                license.apache.name=The Apache Software License, Version 2.0
                 license.mit.name=MIT
                 organization.name=Example Ltd
                 copyright=Copyright 2020 Example Ltd

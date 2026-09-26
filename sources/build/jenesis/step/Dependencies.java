@@ -167,7 +167,10 @@ public class Dependencies implements BuildExecutorModule {
                                                       SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
             boolean pinned = pinning != Pinning.IGNORE;
-            Map<String, String> aliases = new LinkedHashMap<>(DEFAULT_ALIASES);
+            Map<String, String> aliases = aliases(arguments.values().stream()
+                    .filter(argument -> !argument.removed())
+                    .map(BuildStepArgument::folder)
+                    .toList());
             Map<String, String> categories = new LinkedHashMap<>(DEFAULT_CATEGORIES);
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
@@ -178,21 +181,14 @@ public class Dependencies implements BuildExecutorModule {
                     SequencedProperties properties = SequencedProperties.ofFiles(file);
                     for (String key : properties.stringPropertyNames()) {
                         String value = properties.getProperty(key).trim();
-                        if (key.startsWith("alias/")) {
-                            String name = key.substring("alias/".length()).toLowerCase(Locale.ROOT).trim();
-                            if (value.isEmpty()) {
-                                aliases.remove(name);
-                            } else {
-                                aliases.put(name, value);
-                            }
-                        } else if (key.startsWith("category/")) {
+                        if (key.startsWith("category/")) {
                             String identifier = key.substring("category/".length()).trim();
                             if (value.isEmpty()) {
                                 categories.remove(identifier);
                             } else {
                                 categories.put(identifier, value);
                             }
-                        } else {
+                        } else if (!key.startsWith("alias/")) {
                             throw new IllegalArgumentException("Expected key to be prefixed: " + key);
                         }
                     }
@@ -669,16 +665,7 @@ public class Dependencies implements BuildExecutorModule {
                                         : entry.getKey() + "/" + node.resolvedVersion();
                                 for (int i = 0; i < node.licenses().size(); i++) {
                                     License license = node.licenses().get(i);
-                                    String id = license.id();
-                                    if (id == null && license.name() != null) {
-                                        id = aliases.get(license.name().toLowerCase(Locale.ROOT).trim());
-                                    }
-                                    if (id == null && license.url() != null) {
-                                        id = aliases.get(license.url().toLowerCase(Locale.ROOT).trim()
-                                                .replaceFirst("^https?://(www\\.)?", "")
-                                                .replaceFirst("\\.(txt|html?|php|md)$", "")
-                                                .replaceFirst("/+$", ""));
-                                    }
+                                    String id = license.identified(aliases).id();
                                     String category = license.category();
                                     if (category == null && id != null) {
                                         category = categories.get(id);
@@ -1128,6 +1115,28 @@ public class Dependencies implements BuildExecutorModule {
         }
         Path dependencies = folder.resolve(BuildStep.DEPENDENCIES);
         return Files.exists(dependencies) ? dependencies : null;
+    }
+
+    public static Map<String, String> aliases(List<Path> folders) throws IOException {
+        Map<String, String> aliases = new LinkedHashMap<>(DEFAULT_ALIASES);
+        for (Path folder : folders) {
+            Path file = folder.resolve(SPDX);
+            if (Files.isRegularFile(file)) {
+                SequencedProperties properties = SequencedProperties.ofFiles(file);
+                for (String key : properties.stringPropertyNames()) {
+                    if (key.startsWith("alias/")) {
+                        String name = key.substring("alias/".length()).toLowerCase(Locale.ROOT).trim();
+                        String value = properties.getProperty(key).trim();
+                        if (value.isEmpty()) {
+                            aliases.remove(name);
+                        } else {
+                            aliases.put(name, value);
+                        }
+                    }
+                }
+            }
+        }
+        return aliases;
     }
 
     public static List<Path> select(Path folder, String group, String scope) throws IOException {
