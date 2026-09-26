@@ -69,6 +69,7 @@ public class Sbom implements BuildStep {
                 Path.of(Dependencies.GRAPH),
                 Path.of(Dependencies.LICENSES),
                 Path.of(Dependencies.RESOLVED),
+                Path.of(Dependencies.SPDX),
                 Path.of(RELEASE))
                 || swhid && argument.hasChanged(Path.of(SOURCES), Path.of(RESOURCES)));
     }
@@ -178,7 +179,7 @@ public class Sbom implements BuildStep {
             }
             String organization = metadata.value("organization.name"), organizationUrl = metadata.value("organization.url");
             project = new CycloneDx.Component(type, projectRef, groupId, artifactId, version, purl, null,
-                    ownLicenses(metadata), metadata.getProperty("description"), developers(metadata),
+                    ownLicenses(metadata, Dependencies.aliases(folders)), metadata.getProperty("description"), developers(metadata),
                     references(metadata, revision == null ? tag : revision), properties,
                     organization == null && organizationUrl == null ? null : new CycloneDx.Organization(organization, organizationUrl),
                     metadata.value("copyright"));
@@ -337,7 +338,7 @@ public class Sbom implements BuildStep {
         return byIndex.values().stream().map(entry -> new License(entry[0], entry[1], entry[2], entry[3])).toList();
     }
 
-    private static List<License> ownLicenses(SequencedProperties metadata) {
+    private static List<License> ownLicenses(SequencedProperties metadata, Map<String, String> aliases) {
         SequencedMap<String, String[]> byId = new LinkedHashMap<>();
         for (String key : metadata.stringPropertyNames()) {
             if (!key.startsWith("license.")) {
@@ -355,7 +356,7 @@ public class Sbom implements BuildStep {
                 entry[1] = metadata.getProperty(key);
             }
         }
-        return byId.values().stream().map(entry -> new License(null, null, entry[0], entry[1])).toList();
+        return byId.values().stream().map(entry -> new License(null, null, entry[0], entry[1]).identified(aliases)).toList();
     }
 
     private static List<CycloneDx.Author> developers(SequencedProperties metadata) {

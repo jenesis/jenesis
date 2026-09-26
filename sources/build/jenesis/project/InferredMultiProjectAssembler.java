@@ -7,12 +7,14 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.License;
 import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Bundle;
+import build.jenesis.step.Dependencies;
 import build.jenesis.step.Docker;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.JLink;
@@ -301,7 +303,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         Stream.of(descriptor.manifests().stream(),
                                         descriptor.artifacts().stream(),
                                         descriptor.sources().stream(),
-                                        descriptor.resources().stream())
+                                        descriptor.resources().stream(),
+                                        descriptor.spdx().stream())
                                 .flatMap(Function.identity()));
             }
             sub.addModule("compliance", compliance.apply(InferredComplianceModule.ofEnvironment(environment, descriptor.configuration())
@@ -461,7 +464,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 SequencedSet<String> locals = Stream.of(descriptor.manifests(),
                                 descriptor.artifacts(),
                                 descriptor.sources(),
-                                descriptor.resources())
+                                descriptor.resources(),
+                                descriptor.spdx())
                         .flatMap(SequencedSet::stream)
                         .map(InferredMultiProjectAssembler::local)
                         .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -761,19 +765,30 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     if (url != null && packageType != null && !packageType.equals("app-image")) {
                         jpackage.setProperty("--about-url", url);
                     }
-                    List<String> emails = new ArrayList<>(), licenses = new ArrayList<>();
+                    List<String> emails = new ArrayList<>();
+                    SequencedMap<String, String[]> licenses = new LinkedHashMap<>();
                     described.forEachProperty((key, value) -> {
                         if (key.startsWith("developer.") && key.endsWith(".email") && !value.isBlank()) {
                             emails.add(value.trim());
-                        } else if (key.startsWith("license.") && key.endsWith(".name") && !value.isBlank()) {
-                            licenses.add(value.trim());
+                        } else if (key.startsWith("license.") && (key.endsWith(".name") || key.endsWith(".url"))) {
+                            String[] license = licenses.computeIfAbsent(key.substring(0, key.lastIndexOf('.')), _ -> new String[2]);
+                            license[key.endsWith(".name") ? 0 : 1] = value.trim();
                         }
                     });
                     if ("deb".equals(packageType) && !emails.isEmpty()) {
                         jpackage.setProperty("--linux-deb-maintainer", emails.getFirst());
                     }
                     if ("rpm".equals(packageType) && !licenses.isEmpty()) {
-                        jpackage.setProperty("--linux-rpm-license-type", String.join(" OR ", licenses));
+                        Map<String, String> aliases = Dependencies.aliases(arguments.values().stream()
+                                .filter(argument -> !argument.removed())
+                                .map(BuildStepArgument::folder)
+                                .toList());
+                        List<String> identifiers = licenses.values().stream()
+                                .map(license -> new License(null, null, license[0], license[1]).identified(aliases).id())
+                                .toList();
+                        if (!identifiers.contains(null)) {
+                            jpackage.setProperty("--linux-rpm-license-type", String.join(" OR ", identifiers));
+                        }
                     }
                 }
                 jpackage.store(processFolder.resolve("jpackage.properties"));
