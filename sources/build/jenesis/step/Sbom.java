@@ -107,7 +107,7 @@ public class Sbom implements BuildStep {
                 if (platforms.add(ref)) {
                     components.put(ref, new CycloneDx.Component("platform", ref, implementor, "GraalVM", graalvm, null, null,
                             graalvmLicense == null ? List.of() : List.of(new License(graalvmLicense, null, null, null)),
-                            null, List.of(), List.of(), List.of()));
+                            null, List.of(), List.of(), List.of(), null, null));
                 }
             }
             Path index = argument.folder().resolve(DEPENDENCIES);
@@ -176,9 +176,12 @@ public class Sbom implements BuildStep {
                     properties.add(new CycloneDx.Property("jenesis:source:swhid", identifier));
                 }
             }
+            String organization = metadata.value("organization.name"), organizationUrl = metadata.value("organization.url");
             project = new CycloneDx.Component(type, projectRef, groupId, artifactId, version, purl, null,
                     ownLicenses(metadata), metadata.getProperty("description"), developers(metadata),
-                    references(metadata, revision == null ? tag : revision), properties);
+                    references(metadata, revision == null ? tag : revision), properties,
+                    organization == null && organizationUrl == null ? null : new CycloneDx.Organization(organization, organizationUrl),
+                    metadata.value("copyright"));
         }
         List<CycloneDx.Dependency> dependencies = relationships(projectRef, components.keySet(), platforms, graphFiles);
         String document = new CycloneDx().emit(format, project, new ArrayList<>(components.values()), dependencies);

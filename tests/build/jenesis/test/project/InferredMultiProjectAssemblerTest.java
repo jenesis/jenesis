@@ -115,6 +115,10 @@ public class InferredMultiProjectAssemblerTest {
     public void describes_an_application_image_only_with_what_jpackage_accepts_for_one() throws IOException {
         SequencedProperties arguments = describedPackage("app-image");
         assertThat(arguments.getProperty("--description")).isEqualTo("A demo project");
+        assertThat(arguments.getProperty("--vendor")).isEqualTo("Example Ltd");
+        assertThat(arguments.getProperty("--copyright"))
+                .as("the copyright is passed as declared, so jpackage adds no year of its own")
+                .isEqualTo("Copyright 2020 Example Ltd");
         assertThat(arguments.stringPropertyNames())
                 .as("jpackage refuses the options of an installable package for an application image")
                 .doesNotContain("--about-url", "--linux-deb-maintainer", "--linux-rpm-license-type");
@@ -130,6 +134,8 @@ public class InferredMultiProjectAssemblerTest {
                 developer.dev.email=dev@example.com
                 license.apache.name=Apache-2.0
                 license.mit.name=MIT
+                organization.name=Example Ltd
+                copyright=Copyright 2020 Example Ltd
                 """);
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
         return readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"));

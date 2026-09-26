@@ -119,7 +119,7 @@ public class CycloneDxTest {
                 "A demo project",
                 List.of(new CycloneDx.Author("Rafael Winterhalter", "rafael.wth@gmail.com")),
                 List.of(new CycloneDx.ExternalReference("website", "https://example.com/demo")),
-                List.of());
+                List.of(), null, null);
 
         String json = emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of());
         assertThat(json)
@@ -146,7 +146,7 @@ public class CycloneDxTest {
                 null,
                 List.of(),
                 List.of(),
-                List.of(new CycloneDx.Property("jenesis:scm:tag", "v1.0.0")));
+                List.of(new CycloneDx.Property("jenesis:scm:tag", "v1.0.0")), null, null);
 
         assertThat(emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of()))
                 .contains("\"properties\": [")
@@ -185,7 +185,7 @@ public class CycloneDxTest {
                 null,
                 List.of(),
                 List.of(),
-                List.of());
+                List.of(), null, null);
 
         assertThat(emitter.emit(CycloneDx.Format.JSON, subject, COMPONENTS, List.of()))
                 .contains("\"type\": \"application\",\n      \"bom-ref\": \"build.jenesis/demo/1.0.0\"")
@@ -193,5 +193,27 @@ public class CycloneDxTest {
         assertThat(emitter.emit(CycloneDx.Format.XML, subject, COMPONENTS, List.of()))
                 .contains("<component bom-ref=\"build.jenesis/demo/1.0.0\" type=\"application\">")
                 .contains("<component bom-ref=\"org.foo/bar/1.2.3\" type=\"library\">");
+    }
+
+    @Test
+    public void emits_the_supplier_and_the_copyright_of_a_component() {
+        CycloneDx.Component subject = new CycloneDx.Component("library",
+                "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", null,
+                List.of(),
+                null,
+                List.of(),
+                List.of(),
+                List.of(),
+                new CycloneDx.Organization("Example Ltd", "https://example.com"),
+                "Copyright 2020 Example Ltd");
+
+        assertThat(emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of()))
+                .contains("\"supplier\": { \"name\": \"Example Ltd\", \"url\": [\"https://example.com\"] }")
+                .contains("\"copyright\": \"Copyright 2020 Example Ltd\"");
+        assertThat(emitter.emit(CycloneDx.Format.XML, subject, List.of(), List.of()))
+                .contains("<supplier>")
+                .contains("<name>Example Ltd</name>")
+                .contains("<url>https://example.com</url>")
+                .contains("<copyright>Copyright 2020 Example Ltd</copyright>");
     }
 }
