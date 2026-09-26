@@ -13,6 +13,7 @@ import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.JLink;
+import build.jenesis.step.Layers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -89,6 +90,47 @@ public class JLinkTest {
                                 Path.of("process/jlink.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
         assertThat(result.next()).isTrue();
         assertThat(supplement.resolve("jlink.args")).content().contains("--add-options=--enable-preview");
+    }
+
+    @Test
+    public void links_the_platform_modules_a_layer_requires_but_not_the_layer() throws IOException {
+        Path sources = Files.createDirectory(root.resolve("sources"));
+        Files.writeString(sources.resolve("module-info.java"), "module sample { }\n");
+        Path classes = Files.createDirectory(root.resolve("classes"));
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
+                "-d", classes.toString(), sources.resolve("module-info.java").toString())).isZero();
+        Path artifacts = Files.createDirectory(bundle.resolve(BuildStep.ARTIFACTS));
+        assertThat(ToolProvider.findFirst("jar").orElseThrow().run(System.out, System.err,
+                "--create", "--file", artifacts.resolve("sample.jar").toString(), "-C", classes.toString(), ".")).isZero();
+        Path layered = Files.createDirectory(root.resolve("layered"));
+        Files.writeString(layered.resolve("module-info.java"), "module layered { requires java.logging; }\n");
+        Path layeredClasses = Files.createDirectory(root.resolve("layered-classes"));
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
+                "-d", layeredClasses.toString(), layered.resolve("module-info.java").toString())).isZero();
+        Path resolved = Files.createDirectory(bundle.resolve("resolved"));
+        assertThat(ToolProvider.findFirst("jar").orElseThrow().run(System.out, System.err,
+                "--create", "--file", resolved.resolve("layered.jar").toString(), "-C", layeredClasses.toString(), ".")).isZero();
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("layer:render/runtime/module/layered", "resolved/layered.jar");
+        index.store(bundle.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties membership = new SequencedProperties();
+        membership.setProperty("modulepath.render", "layered.jar");
+        membership.store(bundle.resolve(Layers.MEMBERSHIP));
+        SequencedProperties configuration = new SequencedProperties();
+        configuration.setProperty("--add-modules", "sample");
+        configuration.store(Files.createDirectory(bundle.resolve("process")).resolve("jlink.properties"));
+        BuildStepResult result = new JLink(ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
+                        bundle,
+                        Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("process/jlink.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(SequencedProperties.ofFiles(next.resolve(JLink.RUNTIME + "release")).value("MODULES"))
+                .as("the layer is loaded from its jars at run time, but what it requires of the platform is linked")
+                .contains("java.logging")
+                .doesNotContain("layered");
     }
 
     @ParameterizedTest

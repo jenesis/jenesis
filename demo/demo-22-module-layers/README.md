@@ -26,6 +26,26 @@ Three loaders, three versions, one package name. Here the layer's jars are files
 bundle, so the JDK's own layer loader reads them; inside an executable jar, where there is no file to
 name, the launcher reads them from the jar it is already holding open instead.
 
+The same run needs no bundle at all:
+
+    java build/jenesis/Execute.java
+
+builds the project and starts the app with its layers, reading them from the jars the build resolved.
+
+A packaged application
+----------------------
+
+The `image` profile links a runtime and packages the app with `jpackage`, as
+`../demo-08-java-modular-executable` does, from `app/META-INF/build.jenesis/image/packaging.properties`:
+
+    java -Djenesis.make.profiles=image build/jenesis/Make.java stage
+    target/stage/packages/output/demo.layers.app/bin/demo.layers.app
+
+prints the same three lines. The runtime links the platform modules the layers require, but not the
+layers themselves: two versions of one module cannot share a runtime image. `jpackage` ships the layers'
+jars in a `layers/` folder beside the application's own, where no class path reaches them, and points the
+launcher at them.
+
 The four modules
 ----------------
 
