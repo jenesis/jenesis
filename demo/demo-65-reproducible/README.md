@@ -19,7 +19,7 @@ From this directory:
 
 which builds the module and prints
 
-    classes.jar has the recorded SHA-256 e90d68a2bc7492b27c031c2235123e3a20a732cc8e5564f9a2d143d36f8a534a
+    classes.jar has the recorded SHA-256 b318a6b0bd83a7fef8eef4164c96d449fd3ae5d14275170d0d5c249ee5cf35ac
 
 Layout
 ------
