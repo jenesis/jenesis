@@ -74,6 +74,50 @@ public class PomTest {
     }
 
     @Test
+    public void writes_the_pom_and_its_coordinate_where_a_jar_carries_them() throws IOException {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+
+        new Pom().embedded(true).apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+
+        Path embedded = next.resolve(BuildStep.RESOURCES + "META-INF/maven/build.jenesis/jenesis");
+        assertThat(embedded.resolve(Pom.POM))
+                .as("the jar carries the POM that is published beside it")
+                .hasSameTextualContentAs(next.resolve(Pom.POM));
+        assertThat(embedded.resolve("pom.properties"))
+                .as("the coordinate as Maven writes it, without a timestamp")
+                .hasContent("artifactId=jenesis\ngroupId=build.jenesis\nversion=1.0.0");
+    }
+
+    @Test
+    public void writes_nothing_for_a_jar_unless_embedded() throws IOException {
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+
+        new Pom().apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                                argument,
+                                Map.of(Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+
+        assertThat(next.resolve(Pom.POM)).exists();
+        assertThat(next.resolve(BuildStep.RESOURCES)).doesNotExist();
+    }
+
+    @Test
     public void can_emit_pom_from_files() throws IOException {
         SequencedProperties coordinates = new SequencedProperties();
         coordinates.setProperty("maven/build.jenesis/jenesis/jar/1.0.0", "");

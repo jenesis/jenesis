@@ -77,7 +77,7 @@ jobs:
           - { name: pinning, dir: demo-26-pinning, entry: build/Demo.java }
           - { name: openpgp, dir: demo-27-openpgp, entry: build/Demo.java }
           - { name: sigstore, dir: demo-28-sigstore, entry: build/Demo.java }
-          - { name: sbom, dir: demo-29-sbom, entry: build/jenesis/Make.java, verify: 'find target -name "*.cdx.json" | grep -q . && unzip -l "$(find target -path "*artifacts/jar/output/artifacts/classes.jar" | head -1)" | grep -q "META-INF/LICENSE"' }
+          - { name: sbom, dir: demo-29-sbom, entry: build/jenesis/Make.java, verify: 'find target -name "*.cdx.json" | grep -q . && unzip -l "$(find target -path "*artifacts/jar/output/artifacts/classes.jar" | head -1)" | grep -q "META-INF/LICENSE" && unzip -l "$(find target -path "*artifacts/jar/output/artifacts/classes.jar" | head -1)" | grep -q "META-INF/maven/build.jenesis.demo/sbom-demo/pom.properties"' }
           - { name: compliance, dir: demo-30-compliance, entry: build/Demo.java }
           - { name: vulnerabilities, dir: demo-31-vulnerabilities, entry: build/Demo.java }
           - { name: java-quality, dir: demo-32-java-quality, entry: build/jenesis/Make.java, verify: 'find target -type d -name checkstyle | grep -q . && find target -type d -name pmd | grep -q . && find target -type d -name spotbugs | grep -q .' }
