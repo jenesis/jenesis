@@ -28,6 +28,7 @@ jobs:
           - { name: java-modular, dir: demo-02-java-modular, entry: build/jenesis/Make.java, verify: 'find target -name classes.jar | grep -q .' }
           - { name: java-modular-as-modular, dir: demo-02-java-modular, entry: build/jenesis/Make.java, flags: -Djenesis.project.layout=modular, verify: 'find target -name classes.jar | grep -q .' }
           - { name: java-pom-multi, dir: demo-03-java-pom-multi, entry: build/jenesis/Make.java, verify: 'test "$(find target -name classes.jar | wc -l)" -ge 2' }
+          - { name: java-pom-model-4-1-0, dir: demo-68-java-pom-model-4-1-0, entry: build/jenesis/Make.java, verify: 'test "$(find target -name classes.jar | wc -l)" -ge 2 && grep -q "<version>1.0.0</version>" "$(find target -path "*module-app*describe/pom/output/pom.xml" | head -1)"' }
           - { name: java-pom-multi-module, dir: demo-03-java-pom-multi, entry: build/jenesis/Make.java +greeter, verify: 'find target -path "*module-greeter*" -name classes.jar | grep -q .' }
           - { name: java-pom-multi-test-filter, dir: demo-03-java-pom-multi, entry: build/jenesis/Make.java, flags: "-Djenesis.test.filter=.*GreeterTest#prefix_is_a_greeting", verify: 'grep -rqs prefix_is_a_greeting target' }
           - { name: java-pom-multi-test-reporting, dir: demo-03-java-pom-multi, entry: build/jenesis/Make.java, flags: -Djenesis.test.reporting=true, verify: 'find target -path "*reports/tests*" -name "TEST-*.xml" | grep -q . && find target -path "*reports/tests*" -name "junit-platform-events-*.xml" | grep -q .' }
