@@ -109,7 +109,7 @@ public class Sbom implements BuildStep {
                 if (platforms.add(ref)) {
                     components.put(ref, new CycloneDx.Component("platform", ref, implementor, "GraalVM", graalvm, null, List.of(), null,
                             graalvmLicense == null ? List.of() : List.of(new License(graalvmLicense, null, null, null)),
-                            null, List.of(), List.of(), List.of(), null, null, null, null));
+                            null, List.of(), List.of(), List.of(), null, null, null, null, "required"));
                 }
             }
             Path index = argument.folder().resolve(DEPENDENCIES);
@@ -121,6 +121,15 @@ public class Sbom implements BuildStep {
             SequencedProperties licenses = Files.exists(sidecar)
                     ? SequencedProperties.ofFiles(sidecar)
                     : new SequencedProperties();
+            Set<Path> runtime = new HashSet<>();
+            for (String key : dependencies.stringPropertyNames()) {
+                int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
+                if (second > 0 && key.substring(first + 1, second).equals("runtime")) {
+                    String value = dependencies.getProperty(key);
+                    int space = value.indexOf(' ');
+                    runtime.add(argument.folder().resolve(space < 0 ? value : value.substring(0, space)).normalize());
+                }
+            }
             for (boolean maven : new boolean[] {true, false}) {
                 for (String key : dependencies.stringPropertyNames()) {
                     int first = key.indexOf('/'), second = key.indexOf('/', first + 1), third = key.indexOf('/', second + 1);
@@ -136,7 +145,7 @@ public class Sbom implements BuildStep {
                     }
                     components.put(coordinate, component(coordinate,
                             Files.exists(jar) ? HexFormat.of().formatHex(hash.hash(jar)) : null,
-                            readLicenses(licenses, licenseKey)));
+                            readLicenses(licenses, licenseKey)).scope(runtime.contains(jar) ? "required" : "excluded"));
                 }
             }
         }
@@ -200,7 +209,8 @@ public class Sbom implements BuildStep {
                     organization(metadata, "organization"),
                     metadata.value("copyright"),
                     organization(metadata, "manufacturer"),
-                    metadata.value("publisher"));
+                    metadata.value("publisher"),
+                    null);
         }
         List<CycloneDx.Dependency> dependencies = relationships(projectRef, components.keySet(), platforms, graphFiles);
         String document = new CycloneDx().emit(format, project, new ArrayList<>(components.values()), dependencies);

@@ -63,8 +63,10 @@ Where it lands
 
 The document is CycloneDX 1.6. Because the project depends on `commons-lang3`,
 the SBOM lists it as a component carrying its `pkg:maven/...` package URL, its
-`SHA-256` hash, and its `Apache-2.0` license, with a `dependsOn` relationship
-back to the project.
+`SHA-256` hash, its `Apache-2.0` license, and the scope `required`, since the
+application runs with it, with a `dependsOn` relationship back to the project. A
+dependency on the compile path alone is scoped `excluded`, as CycloneDX names
+what no run reaches.
 
 The `metadata.component` (the project itself) is described from the POM: its
 `description`, its `Apache-2.0` license, its developers (rendered as CycloneDX

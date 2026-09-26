@@ -119,7 +119,7 @@ public class CycloneDxTest {
                 "A demo project",
                 List.of(new CycloneDx.Author("Rafael Winterhalter", "rafael.wth@gmail.com")),
                 List.of(new CycloneDx.ExternalReference("website", "https://example.com/demo")),
-                List.of(), null, null, null, null);
+                List.of(), null, null, null, null, null);
 
         String json = emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of());
         assertThat(json)
@@ -146,7 +146,7 @@ public class CycloneDxTest {
                 null,
                 List.of(),
                 List.of(),
-                List.of(new CycloneDx.Property("jenesis:scm:tag", "v1.0.0")), null, null, null, null);
+                List.of(new CycloneDx.Property("jenesis:scm:tag", "v1.0.0")), null, null, null, null, null);
 
         assertThat(emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of()))
                 .contains("\"properties\": [")
@@ -185,7 +185,7 @@ public class CycloneDxTest {
                 null,
                 List.of(),
                 List.of(),
-                List.of(), null, null, null, null);
+                List.of(), null, null, null, null, null);
 
         assertThat(emitter.emit(CycloneDx.Format.JSON, subject, COMPONENTS, List.of()))
                 .contains("\"type\": \"application\",\n      \"bom-ref\": \"build.jenesis/demo/1.0.0\"")
@@ -207,7 +207,8 @@ public class CycloneDxTest {
                 new CycloneDx.Organization("Example Ltd", "https://example.com"),
                 "Copyright 2020 Example Ltd",
                 new CycloneDx.Organization("Example Factory", "https://factory.example.com"),
-                "Example Publishing");
+                "Example Publishing",
+                null);
 
         assertThat(emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of()))
                 .contains("\"supplier\": { \"name\": \"Example Ltd\", \"url\": [\"https://example.com\"] }")
@@ -233,7 +234,7 @@ public class CycloneDxTest {
                 null,
                 List.of(),
                 List.of(),
-                List.of(), null, null, null, null);
+                List.of(), null, null, null, null, null);
 
         assertThat(emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of()))
                 .contains("\"swhid\": [\"swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327\", \"swh:1:dir:0123456789abcdef0123456789abcdef01234567\"]");
@@ -241,5 +242,21 @@ public class CycloneDxTest {
                 .contains("<purl>pkg:maven/build.jenesis/demo@1.0.0</purl>\n"
                         + "            <swhid>swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327</swhid>\n"
                         + "            <swhid>swh:1:dir:0123456789abcdef0123456789abcdef01234567</swhid>");
+    }
+
+    @Test
+    public void emits_the_scope_of_a_component() {
+        List<CycloneDx.Component> components = List.of(
+                new CycloneDx.Component("org.foo/bar/1.2.3", "org.foo", "bar", "1.2.3", "pkg:maven/org.foo/bar@1.2.3", "abc123",
+                        List.of()).scope("required"),
+                new CycloneDx.Component("org.baz/qux/4.5", "org.baz", "qux", "4.5", "pkg:maven/org.baz/qux@4.5", "def456",
+                        List.of()).scope("excluded"));
+
+        assertThat(emitter.emit(CycloneDx.Format.JSON, PROJECT, components, List.of()))
+                .contains("\"version\": \"1.2.3\",\n      \"scope\": \"required\"")
+                .contains("\"version\": \"4.5\",\n      \"scope\": \"excluded\"");
+        assertThat(emitter.emit(CycloneDx.Format.XML, PROJECT, components, List.of()))
+                .contains("<version>1.2.3</version>\n            <scope>required</scope>\n            <hashes>")
+                .contains("<scope>excluded</scope>");
     }
 }
