@@ -55,9 +55,15 @@ public class JLink extends ProcessBuildStep {
             return CompletableFuture.completedStage(null);
         }
         List<Path> jmods = new ArrayList<>(), jars = new ArrayList<>();
+        SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
+        SequencedMap<String, Path> pool = new LinkedHashMap<>();
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
                 continue;
+            }
+            layers.putAll(Layers.membership(argument.folder()));
+            for (Path jar : Dependencies.all(argument.folder())) {
+                pool.putIfAbsent(jar.getFileName().toString(), jar);
             }
             Path modules = argument.folder().resolve(JMod.JMODS);
             if (Files.exists(modules)) {
@@ -114,6 +120,12 @@ public class JLink extends ProcessBuildStep {
                 "--output", context.next().resolve(RUNTIME).toString()));
         if (preview) {
             commands.add("--add-options=--enable-preview");
+        }
+        SequencedSet<String> platform = new TreeSet<>();
+        layers.values().forEach(membership -> platform.addAll(membership.platform(pool)));
+        if (!platform.isEmpty()) {
+            commands.add("--add-modules");
+            commands.add(String.join(",", platform));
         }
         return CompletableFuture.completedStage(commands);
     }
