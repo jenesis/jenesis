@@ -14,6 +14,12 @@ abstract class JenesisTool implements ToolProvider {
             err.println(e.getMessage());
             return 1;
         }
+        String option = jvmOption(remaining);
+        if (option != null) {
+            err.println(name() + " run as a tool takes no option for a JVM, as the JDK's tools take none: "
+                    + option + " - run the " + name() + " command to pass one");
+            return 2;
+        }
         try {
             return run(new Environment(Make.keys(settings), out, err), remaining);
         } catch (InterruptedException e) {
@@ -31,6 +37,10 @@ abstract class JenesisTool implements ToolProvider {
 
     protected abstract int run(Environment environment, List<String> arguments)
             throws IOException, InterruptedException;
+
+    protected String jvmOption(List<String> arguments) {
+        return !arguments.isEmpty() && arguments.getFirst().startsWith("-J") ? arguments.getFirst() : null;
+    }
 
     protected Environment layered(Environment environment, Path root) throws IOException {
         return environment.keys(Make.settings(root, environment.keys()).keys());

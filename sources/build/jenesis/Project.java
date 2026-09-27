@@ -1066,7 +1066,8 @@ public record Project(
                     than the JVM, so two runs in one program never clash; everything after them is
                     what the command line would take. A setting that replaces the process a build
                     runs in - toolchain.version, project.docker, execute.docker - is refused by name
-                    there, and demo-62-tools-api shows the whole contract.
+                    there, and so is a -J option, as the JDK's own tools refuse one; demo-62-tools-api
+                    shows the whole contract.
 
                     Every command line here, the commands and the tools alike, reads @<file> as the
                     arguments that file holds - settings and selectors, # to the end of a line being

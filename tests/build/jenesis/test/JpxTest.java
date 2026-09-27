@@ -616,6 +616,27 @@ public class JpxTest {
     }
 
     @Test
+    public void command_hands_its_jvm_options_to_the_java_that_runs_the_program() throws IOException {
+        Path folder = Files.createDirectories(work.resolve("crafted@1.0"));
+        SequencedProperties properties = new SequencedProperties();
+        properties.setProperty("mainClass", "toolmain.Main");
+        properties.store(folder.resolve(Jpx.PROPERTIES));
+
+        List<String> command = new Jpx.Installation(folder, new HashDigestFunction("SHA-256"))
+                .options(List.of("-Xmx64m"))
+                .command(List.of("run"));
+
+        assertThat(command.subList(1, command.size())).containsExactly("-Xmx64m", "toolmain.Main", "run");
+    }
+
+    @Test
+    public void refuses_a_j_that_names_no_option() throws IOException, InterruptedException {
+        List<String> errors = new ArrayList<>();
+        assertThat(Jpx.run(Environment.NONE.err(errors::add), "-J", "org.example:tool-main")).isEqualTo(64);
+        assertThat(errors).first().isEqualTo("Unknown option: -J");
+    }
+
+    @Test
     public void docker_command_mounts_the_jdk_the_installation_names() throws IOException, InterruptedException {
         addMavenTool();
         Path home = work.resolve("jdk");
