@@ -712,8 +712,8 @@ public class TestModuleTest {
 
     @Test
     public void an_unchanged_tag_selection_reuses_the_cached_test_result() throws IOException {
-        assertThat(executeTests(null, "!npm")).contains(EXECUTED);
-        assertThat(executeTests(null, "!npm"))
+        assertThat(executeTests(null, "-npm")).contains(EXECUTED);
+        assertThat(executeTests(null, "-npm"))
                 .as("a no-op rebuild under an unchanged tag selection reuses the cached test result")
                 .doesNotContain(EXECUTED);
     }
@@ -721,15 +721,15 @@ public class TestModuleTest {
     @Test
     public void an_untagged_test_result_covers_a_later_tagged_request() throws IOException {
         assertThat(executeTests(null, null)).contains(EXECUTED);
-        assertThat(executeTests(null, "!npm"))
+        assertThat(executeTests(null, "-npm"))
                 .as("an untagged run executed every test, so it covers any tagged request")
                 .doesNotContain(EXECUTED);
     }
 
     @Test
     public void a_tagged_test_result_does_not_cover_a_request_that_excludes_less() throws IOException {
-        assertThat(executeTests(null, "!npm,!pypi")).contains(EXECUTED);
-        assertThat(executeTests(null, "!npm"))
+        assertThat(executeTests(null, "-npm+-pypi")).contains(EXECUTED);
+        assertThat(executeTests(null, "-npm"))
                 .as("the cached run never executed the pypi-tagged tests the narrower exclusion selects")
                 .contains(EXECUTED);
         assertThat(executeTests(null, null))
@@ -739,7 +739,7 @@ public class TestModuleTest {
 
     @Test
     public void a_changed_source_reruns_the_tests_under_an_unchanged_tag_expression() throws IOException {
-        assertThat(executeTests(null, "!npm")).contains(EXECUTED);
+        assertThat(executeTests(null, "-npm")).contains(EXECUTED);
         compileSource(classes.resolve(Javac.CLASSES + "sample"), "TestSample", """
                 package sample;
                 @org.junit.jupiter.api.Tag("fast")
@@ -748,7 +748,7 @@ public class TestModuleTest {
                     public void test() { System.out.println("Goodbye world!"); }
                 }
                 """, bootModuleJars());
-        assertThat(executeTests(null, "!npm"))
+        assertThat(executeTests(null, "-npm"))
                 .as("coverage never overrides a changed input")
                 .contains(EXECUTED);
         assertThat(root.resolve("test").resolve(TestModule.EXECUTED).resolve("supplement").resolve("output"))
@@ -764,7 +764,7 @@ public class TestModuleTest {
         assertThat(executeTests(null, "fast,slow,io")).contains(EXECUTED);
         assertThat(root.resolve("test").resolve(TestModule.EXECUTED).resolve("supplement").resolve("java.args"))
                 .as("only the tests tagged io, and neither fast nor slow, run")
-                .content().contains("--include-tag=(fast | io | slow) & (!(fast | slow))");
+                .content().contains("--include-tag=(fast | io | slow) & !(fast | slow)");
         assertThat(SequencedProperties.ofFiles(root.resolve("test")
                 .resolve(TestModule.EXECUTED)
                 .resolve("output")
@@ -786,19 +786,19 @@ public class TestModuleTest {
 
     @Test
     public void a_tag_expression_is_recorded_with_the_test_output() throws IOException {
-        executeTests(".*TestSample", "!npm");
+        executeTests(".*TestSample", "-npm");
         assertThat(SequencedProperties.ofFiles(root.resolve("test")
                 .resolve(TestModule.EXECUTED)
                 .resolve("output")
                 .resolve("testscope.properties")))
                 .containsEntry("filter", ".*TestSample")
-                .containsEntry("covered.0", "!npm");
+                .containsEntry("covered.0", "-npm");
     }
 
     @Test
     public void a_reused_test_result_keeps_the_scope_that_produced_it() throws IOException {
         assertThat(executeTests(null, null)).contains(EXECUTED);
-        assertThat(executeTests(null, "!npm")).doesNotContain(EXECUTED);
+        assertThat(executeTests(null, "-npm")).doesNotContain(EXECUTED);
         assertThat(SequencedProperties.ofFiles(root.resolve("test")
                 .resolve(TestModule.EXECUTED)
                 .resolve("output")
@@ -991,8 +991,6 @@ public class TestModuleTest {
                                      Path output,
                                      SequencedSet<String> classes,
                                      SequencedMap<String, SequencedSet<String>> methods,
-                                     TestTags tags,
-                                     List<TestTags> ran,
                                      boolean parallel,
                                      boolean reporting) {
             return List.of();

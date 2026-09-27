@@ -207,8 +207,6 @@ public class TestFrameworkTest {
                 root,
                 new LinkedHashSet<>(List.of("sample.AlphaTest", "sample.BetaTest")),
                 Collections.emptyNavigableMap(),
-                TestTags.ALL,
-                List.of(),
                 false,
                 false))
                 .containsExactly("sample.AlphaTest", "sample.BetaTest");
@@ -222,8 +220,6 @@ public class TestFrameworkTest {
                 root,
                 Collections.emptyNavigableSet(),
                 methods,
-                TestTags.ALL,
-                List.of(),
                 false,
                 false))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -237,8 +233,6 @@ public class TestFrameworkTest {
                 root,
                 new LinkedHashSet<>(List.of("sample.BetaTest")),
                 methods,
-                TestTags.ALL,
-                List.of(),
                 false,
                 false))
                 .containsExactly("execute", "--disable-banner", "--disable-ansi-colors",
@@ -255,8 +249,6 @@ public class TestFrameworkTest {
                 root,
                 new LinkedHashSet<>(List.of("sample.AlphaTest", "sample.BetaTest")),
                 methods,
-                TestTags.ALL,
-                List.of(),
                 false,
                 false))
                 .containsSubsequence("-testclass", "sample.AlphaTest,sample.BetaTest",
@@ -265,27 +257,24 @@ public class TestFrameworkTest {
 
     @Test
     public void junit_platform_commands_translate_the_tags_into_one_expression_and_add_parallel_config() {
+        assertThat(new JUnitPlatform().tags(TestTags.parse("slow,flaky"), List.of()))
+                .containsExactly("--include-tag=(flaky | slow)");
+        assertThat(new JUnitPlatform().tags(TestTags.ALL, List.of())).isEmpty();
         assertThat(new JUnitPlatform().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                TestTags.parse("slow,flaky"),
-                List.of(),
                 true,
                 false))
-                .contains("--include-tag=(flaky | slow)",
-                        "--config=junit.jupiter.execution.parallel.enabled=true",
+                .contains("--config=junit.jupiter.execution.parallel.enabled=true",
                         "--config=junit.jupiter.execution.parallel.mode.default=concurrent");
         assertThat(new JUnitPlatform().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                TestTags.ALL,
-                List.of(),
                 false,
                 false))
-                .doesNotContain("--include-tag=(flaky | slow)",
-                        "--config=junit.jupiter.execution.parallel.enabled=true");
+                .doesNotContain("--config=junit.jupiter.execution.parallel.enabled=true");
     }
 
     @Test
@@ -294,8 +283,6 @@ public class TestFrameworkTest {
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                TestTags.ALL,
-                List.of(),
                 false,
                 true))
                 .contains("--reports-dir=" + root.resolve(BuildStep.REPORTS + "tests"),
@@ -305,8 +292,6 @@ public class TestFrameworkTest {
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                TestTags.ALL,
-                List.of(),
                 false,
                 false))
                 .noneMatch(command -> command.startsWith("--reports-dir")
@@ -319,8 +304,6 @@ public class TestFrameworkTest {
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                TestTags.ALL,
-                List.of(),
                 false,
                 true))
                 .containsExactly("-d", root.resolve(BuildStep.REPORTS + "tests").toString());
@@ -328,29 +311,23 @@ public class TestFrameworkTest {
 
     @Test
     public void testng_joins_groups_with_commas_and_adds_parallel() {
+        assertThat(new TestNG().tags(TestTags.parse("slow,flaky"), List.of()))
+                .containsExactly("-groups", "flaky,slow");
         assertThat(new TestNG().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                TestTags.parse("slow,flaky"),
-                List.of(),
                 true,
                 false))
-                .containsSubsequence("-groups", "flaky,slow")
                 .containsSubsequence("-parallel", "methods");
     }
 
     @Test
     public void junit4_rejects_groups() {
-        assertThatThrownBy(() -> new JUnit4().arguments(root,
-                root,
-                Collections.emptyNavigableSet(),
-                Collections.emptyNavigableMap(),
-                TestTags.parse("slow"),
-                List.of(),
-                false,
-                false))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new JUnit4().tags(TestTags.parse("slow"), List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot select tests by tag");
+        assertThat(new JUnit4().tags(TestTags.ALL, List.of())).isEmpty();
     }
 
     @Test
@@ -359,8 +336,6 @@ public class TestFrameworkTest {
                 root,
                 new LinkedHashSet<>(List.of("sample.AlphaTest")),
                 Collections.emptyNavigableMap(),
-                TestTags.ALL,
-                List.of(),
                 true,
                 false))
                 .containsExactly("sample.AlphaTest");

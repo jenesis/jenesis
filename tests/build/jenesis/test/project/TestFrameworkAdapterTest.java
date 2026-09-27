@@ -15,7 +15,6 @@ import build.jenesis.project.JUnitPlatform;
 import build.jenesis.project.TestFramework;
 import build.jenesis.project.TestModule;
 import build.jenesis.project.TestNG;
-import build.jenesis.project.TestTags;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -76,8 +75,6 @@ public class TestFrameworkAdapterTest {
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                TestTags.ALL,
-                List.of(),
                 false,
                 false))
                 .isEmpty();
@@ -111,28 +108,23 @@ public class TestFrameworkAdapterTest {
                 root,
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
-                TestTags.ALL,
-                List.of(),
                 false,
                 false))
                 .containsExactly("-d", root.resolve("test-output").toString());
     }
 
     @Test
-    public void testng_orders_groups_parallel_classes_and_methods_after_output_header() {
+    public void testng_orders_parallel_classes_and_methods_after_output_header() {
         SequencedMap<String, SequencedSet<String>> methods = new LinkedHashMap<>();
         methods.put("sample.AlphaTest", new LinkedHashSet<>(List.of("first")));
         assertThat(new TestNG().arguments(root,
                 root,
                 new LinkedHashSet<>(List.of("sample.AlphaTest", "sample.BetaTest")),
                 methods,
-                TestTags.parse("slow,flaky"),
-                List.of(),
                 true,
                 false))
                 .containsExactly(
                         "-d", root.resolve("test-output").toString(),
-                        "-groups", "flaky,slow",
                         "-parallel", "methods",
                         "-testclass", "sample.AlphaTest,sample.BetaTest",
                         "-methods", "sample.AlphaTest.first");
