@@ -95,45 +95,45 @@ public class TestModuleScopeTest {
 
     @Test
     public void junit_runs_what_was_requested_and_did_not_run_before(@TempDir Path root) {
-        assertThat(new JUnitPlatform().tags(TestTags.parse("foo,bar+-qux"), List.of(TestTags.parse("foo"))))
+        assertThat(new JUnitPlatform().tags(List.of(), TestTags.parse("foo,bar+-qux"), List.of(TestTags.parse("foo"))))
                 .as("foo, or bar but not qux, and outside what ran as foo")
                 .contains("--include-tag=((bar & !qux) | foo) & !(foo)");
-        assertThat(new JUnitPlatform().tags(TestTags.ALL, List.of(TestTags.parse("foo+-slow"))))
+        assertThat(new JUnitPlatform().tags(List.of(), TestTags.ALL, List.of(TestTags.parse("foo+-slow"))))
                 .contains("--include-tag=!((foo & !slow))");
     }
 
     @Test
     public void junit_expresses_every_selection_of_the_grammar(@TempDir Path root) {
-        assertThat(new JUnitPlatform().tags(TestTags.parse("-container+-network,release+-soak"), List.of()))
+        assertThat(new JUnitPlatform().tags(List.of(), TestTags.parse("-container+-network,release+-soak"), List.of()))
                 .contains("--include-tag=((!container & !network) | (release & !soak))");
-        assertThat(new JUnitPlatform().tags(TestTags.parse("-container,-soak"), List.of()))
+        assertThat(new JUnitPlatform().tags(List.of(), TestTags.parse("-container,-soak"), List.of()))
                 .as("not both")
                 .contains("--include-tag=(!container | !soak)");
-        assertThat(new JUnitPlatform().tags(TestTags.parse("release,-container"), List.of()))
+        assertThat(new JUnitPlatform().tags(List.of(), TestTags.parse("release,-container"), List.of()))
                 .contains("--include-tag=(!container | release)");
     }
 
     @Test
     public void testng_refuses_what_its_groups_cannot_express(@TempDir Path root) {
         for (String expression : List.of("foo+bar", "foo+-qux,bar", "release,-container")) {
-            assertThatThrownBy(() -> new TestNG().tags(TestTags.parse(expression), List.of()))
+            assertThatThrownBy(() -> new TestNG().tags(List.of(), TestTags.parse(expression), List.of()))
                     .as(expression)
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("TestNG");
         }
-        assertThat(new TestNG().tags(TestTags.parse("baz"), List.of(TestTags.parse("foo+bar"))))
+        assertThat(new TestNG().tags(List.of(), TestTags.parse("baz"), List.of(TestTags.parse("foo+bar"))))
                 .as("an earlier conjunction cannot be left out by groups, so the request runs whole")
                 .doesNotContain("-excludegroups");
     }
 
     @Test
     public void testng_runs_groups_that_leave_out_the_same_groups(@TempDir Path root) {
-        assertThat(new TestNG().tags(TestTags.parse("foo+-qux,bar+-qux"), List.of(TestTags.parse("foo"))))
+        assertThat(new TestNG().tags(List.of(), TestTags.parse("foo+-qux,bar+-qux"), List.of(TestTags.parse("foo"))))
                 .containsSubsequence("-groups", "bar,foo", "-excludegroups", "foo,qux");
-        assertThat(new TestNG().tags(TestTags.parse("-qux"), List.of()))
+        assertThat(new TestNG().tags(List.of(), TestTags.parse("-qux"), List.of()))
                 .containsSubsequence("-excludegroups", "qux")
                 .doesNotContain("-groups");
-        assertThat(new TestNG().tags(TestTags.parse("foo,bar"), List.of(TestTags.parse("foo+-slow"))))
+        assertThat(new TestNG().tags(List.of(), TestTags.parse("foo,bar"), List.of(TestTags.parse("foo+-slow"))))
                 .as("an earlier exclusion cannot be undone by groups, so the request runs whole")
                 .containsSubsequence("-groups", "bar,foo")
                 .doesNotContain("-excludegroups");

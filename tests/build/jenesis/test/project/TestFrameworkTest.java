@@ -257,9 +257,9 @@ public class TestFrameworkTest {
 
     @Test
     public void junit_platform_commands_translate_the_tags_into_one_expression_and_add_parallel_config() {
-        assertThat(new JUnitPlatform().tags(TestTags.parse("slow,flaky"), List.of()))
+        assertThat(new JUnitPlatform().tags(List.of(), TestTags.parse("slow,flaky"), List.of()))
                 .containsExactly("--include-tag=(flaky | slow)");
-        assertThat(new JUnitPlatform().tags(TestTags.ALL, List.of())).isEmpty();
+        assertThat(new JUnitPlatform().tags(List.of(), TestTags.ALL, List.of())).isEmpty();
         assertThat(new JUnitPlatform().arguments(root,
                 root,
                 Collections.emptyNavigableSet(),
@@ -311,7 +311,7 @@ public class TestFrameworkTest {
 
     @Test
     public void testng_joins_groups_with_commas_and_adds_parallel() {
-        assertThat(new TestNG().tags(TestTags.parse("slow,flaky"), List.of()))
+        assertThat(new TestNG().tags(List.of(), TestTags.parse("slow,flaky"), List.of()))
                 .containsExactly("-groups", "flaky,slow");
         assertThat(new TestNG().arguments(root,
                 root,
@@ -324,39 +324,51 @@ public class TestFrameworkTest {
 
     @Test
     public void junit4_translates_one_alternative_into_one_filter_per_category() {
-        assertThat(new JUnit4().tags(TestTags.parse("a.Slow+a.Io+-a.Flaky+-a.Remote"), List.of()))
+        assertThat(new JUnit4().tags(List.of(), TestTags.parse("a.Slow+a.Io+-a.Flaky+-a.Remote"), List.of()))
                 .containsExactly("--filter=org.junit.experimental.categories.IncludeCategories=a.Io",
                         "--filter=org.junit.experimental.categories.IncludeCategories=a.Slow",
                         "--filter=org.junit.experimental.categories.ExcludeCategories=a.Flaky,a.Remote");
-        assertThat(new JUnit4().tags(TestTags.ALL, List.of())).isEmpty();
+        assertThat(new JUnit4().tags(List.of(), TestTags.ALL, List.of())).isEmpty();
     }
 
     @Test
     public void junit4_translates_alternatives_of_one_category_into_one_filter() {
-        assertThat(new JUnit4().tags(TestTags.parse("a.Slow+-a.Flaky,a.Io+-a.Flaky"), List.of()))
+        assertThat(new JUnit4().tags(List.of(), TestTags.parse("a.Slow+-a.Flaky,a.Io+-a.Flaky"), List.of()))
                 .containsExactly("--filter=org.junit.experimental.categories.IncludeCategories=a.Io,a.Slow",
                         "--filter=org.junit.experimental.categories.ExcludeCategories=a.Flaky");
-        assertThat(new JUnit4().tags(TestTags.parse("a.Slow+-a.Flaky,-a.Flaky"), List.of()))
+        assertThat(new JUnit4().tags(List.of(), TestTags.parse("a.Slow+-a.Flaky,-a.Flaky"), List.of()))
                 .containsExactly("--filter=org.junit.experimental.categories.ExcludeCategories=a.Flaky");
     }
 
     @Test
     public void junit4_leaves_out_the_categories_that_ran_before() {
-        assertThat(new JUnit4().tags(TestTags.parse("a.Slow,a.Io"), List.of(TestTags.parse("a.Slow"))))
+        assertThat(new JUnit4().tags(List.of(), TestTags.parse("a.Slow,a.Io"), List.of(TestTags.parse("a.Slow"))))
                 .containsExactly("--filter=org.junit.experimental.categories.IncludeCategories=a.Io,a.Slow",
                         "--filter=org.junit.experimental.categories.ExcludeCategories=a.Slow");
-        assertThat(new JUnit4().tags(TestTags.parse("a.Slow,a.Io"), List.of(TestTags.parse("a.Slow+a.Io"))))
+        assertThat(new JUnit4().tags(List.of(), TestTags.parse("a.Slow,a.Io"), List.of(TestTags.parse("a.Slow+a.Io"))))
                 .containsExactly("--filter=org.junit.experimental.categories.IncludeCategories=a.Io,a.Slow");
     }
 
     @Test
     public void junit4_rejects_alternatives_it_cannot_express() {
-        assertThatThrownBy(() -> new JUnit4().tags(TestTags.parse("a.Slow,a.Io+a.Remote"), List.of()))
+        assertThatThrownBy(() -> new JUnit4().tags(List.of(), TestTags.parse("a.Slow,a.Io+a.Remote"), List.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cannot run");
-        assertThatThrownBy(() -> new JUnit4().tags(TestTags.parse("a.Slow+-a.Flaky,a.Io"), List.of()))
+        assertThatThrownBy(() -> new JUnit4().tags(List.of(), TestTags.parse("a.Slow+-a.Flaky,a.Io"), List.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("cannot run");
+    }
+
+    @Test
+    public void places_the_selection_where_each_runner_reads_it() {
+        assertThat(new JUnitPlatform().tags(List.of("execute", "--select-class=a.SlowTest"), TestTags.parse("slow"), List.of()))
+                .as("the console launcher reads its options after the execute command")
+                .containsExactly("execute", "--select-class=a.SlowTest", "--include-tag=(slow)");
+        assertThat(new TestNG().tags(List.of("-testclass", "a.SlowTest"), TestTags.parse("slow"), List.of()))
+                .containsExactly("-testclass", "a.SlowTest", "-groups", "slow");
+        assertThat(new JUnit4().tags(List.of("a.SlowTest"), TestTags.parse("a.Slow"), List.of()))
+                .as("JUnitCore reads its options only ahead of the class names")
+                .containsExactly("--filter=org.junit.experimental.categories.IncludeCategories=a.Slow", "a.SlowTest");
     }
 
     @Test

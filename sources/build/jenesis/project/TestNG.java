@@ -57,8 +57,8 @@ public record TestNG() implements TestFramework {
     }
 
     @Override
-    public List<String> tags(TestTags requested, List<TestTags> ran) {
-        List<String> arguments = new ArrayList<>();
+    public List<String> tags(List<String> arguments, TestTags requested, List<TestTags> ran) {
+        List<String> selection = new ArrayList<>(arguments);
         SequencedSet<String> groups = new TreeSet<>();
         Set<String> excluded = null;
         boolean everything = false;
@@ -81,8 +81,8 @@ public record TestNG() implements TestFramework {
             everything |= tagged.isEmpty();
         }
         if (!everything && !groups.isEmpty()) {
-            arguments.add("-groups");
-            arguments.add(String.join(",", groups));
+            selection.add("-groups");
+            selection.add(String.join(",", groups));
         }
         SequencedSet<String> excludedGroups = new TreeSet<>(excluded == null ? Set.of() : excluded);
         if (ran.stream().allMatch(earlier -> !earlier.all() && earlier.alternatives().stream()
@@ -90,9 +90,9 @@ public record TestNG() implements TestFramework {
             ran.forEach(earlier -> excludedGroups.addAll(earlier.alternatives()));
         }
         if (!excludedGroups.isEmpty()) {
-            arguments.add("-excludegroups");
-            arguments.add(String.join(",", excludedGroups));
+            selection.add("-excludegroups");
+            selection.add(String.join(",", excludedGroups));
         }
-        return arguments;
+        return selection;
     }
 }

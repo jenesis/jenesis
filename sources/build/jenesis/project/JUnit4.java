@@ -38,8 +38,8 @@ public record JUnit4() implements TestFramework {
     }
 
     @Override
-    public List<String> tags(TestTags requested, List<TestTags> ran) {
-        List<String> arguments = new ArrayList<>();
+    public List<String> tags(List<String> arguments, TestTags requested, List<TestTags> ran) {
+        List<String> selection = new ArrayList<>();
         SequencedSet<String> included = new TreeSet<>();
         Set<String> excluded = null;
         boolean everything = false;
@@ -53,7 +53,7 @@ public record JUnit4() implements TestFramework {
                 }
             }
             if (requested.alternatives().size() == 1) {
-                tagged.forEach(category -> arguments.add("--filter=org.junit.experimental.categories.IncludeCategories="
+                tagged.forEach(category -> selection.add("--filter=org.junit.experimental.categories.IncludeCategories="
                         + category));
             } else if (tagged.size() > 1 || excluded != null && !excluded.equals(untagged)) {
                 throw new IllegalArgumentException("JUnit4 runs the tests of all of several categories, or of any of"
@@ -67,7 +67,7 @@ public record JUnit4() implements TestFramework {
             excluded = untagged;
         }
         if (!everything && !included.isEmpty()) {
-            arguments.add("--filter=org.junit.experimental.categories.IncludeCategories=" + String.join(",", included));
+            selection.add("--filter=org.junit.experimental.categories.IncludeCategories=" + String.join(",", included));
         }
         SequencedSet<String> excludedCategories = new TreeSet<>(excluded == null ? Set.of() : excluded);
         if (ran.stream().allMatch(earlier -> !earlier.all() && earlier.alternatives().stream()
@@ -75,9 +75,10 @@ public record JUnit4() implements TestFramework {
             ran.forEach(earlier -> excludedCategories.addAll(earlier.alternatives()));
         }
         if (!excludedCategories.isEmpty()) {
-            arguments.add("--filter=org.junit.experimental.categories.ExcludeCategories="
+            selection.add("--filter=org.junit.experimental.categories.ExcludeCategories="
                     + String.join(",", excludedCategories));
         }
-        return arguments;
+        selection.addAll(arguments);
+        return selection;
     }
 }
