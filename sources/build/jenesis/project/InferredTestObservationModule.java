@@ -28,6 +28,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
     private final Function<TestModule, BuildExecutorModule> test;
     private final Function<JaCoCoModule, BuildExecutorModule> jacoco;
     private final Function<NativeImageAgentModule, BuildExecutorModule> nativeImage;
+    private final UnaryOperator<Jfr> jfr;
     private final Function<PiTestModule, BuildExecutorModule> pitest;
     private final SequencedMap<String, BuildExecutorModule> custom;
 
@@ -41,6 +42,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 new TestModule(repositories, resolvers),
                 new JaCoCoModule(repositories, resolvers),
                 new PiTestModule(repositories, resolvers),
+                value -> value,
                 value -> value,
                 value -> value,
                 value -> value,
@@ -63,6 +65,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 value -> value,
                 value -> value,
                 value -> value,
+                value -> value,
                 Collections.emptyNavigableMap());
         Boolean jacoco = environment.flagOrNull("observe.jacoco");
         if (jacoco != null) {
@@ -71,6 +74,10 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         Boolean nativeImage = environment.flagOrNull("observe.native");
         if (nativeImage != null) {
             module = module.nativeImage(nativeImage ? value -> value : null);
+        }
+        Boolean jfr = environment.flagOrNull("observe.jfr");
+        if (jfr != null) {
+            module = module.jfr(jfr ? value -> value : null);
         }
         Boolean pitest = environment.flagOrNull("mutate.pitest");
         if (pitest != null) {
@@ -103,6 +110,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                                           Function<TestModule, BuildExecutorModule> test,
                                           Function<JaCoCoModule, BuildExecutorModule> jacoco,
                                           Function<NativeImageAgentModule, BuildExecutorModule> nativeImage,
+                                          UnaryOperator<Jfr> jfr,
                                           Function<PiTestModule, BuildExecutorModule> pitest,
                                           SequencedMap<String, BuildExecutorModule> custom) {
         this.configuration = configuration;
@@ -115,6 +123,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
         this.test = test;
         this.jacoco = jacoco;
         this.nativeImage = nativeImage;
+        this.jfr = jfr;
         this.pitest = pitest;
         this.custom = custom;
     }
@@ -130,6 +139,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 test,
                 jacoco,
                 nativeImage,
+                jfr,
                 pitest,
                 custom);
     }
@@ -145,6 +155,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 test,
                 jacoco,
                 nativeImage,
+                jfr,
                 pitest,
                 custom);
     }
@@ -160,6 +171,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 test,
                 jacoco,
                 nativeImage,
+                jfr,
                 pitest,
                 custom);
     }
@@ -175,6 +187,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 test,
                 jacoco,
                 nativeImage,
+                jfr,
                 pitest,
                 custom);
     }
@@ -190,6 +203,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 test,
                 jacoco,
                 nativeImage,
+                jfr,
                 pitest,
                 custom);
     }
@@ -205,6 +219,23 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 test,
                 jacoco,
                 nativeImage,
+                jfr,
+                pitest,
+                custom);
+    }
+
+    public InferredTestObservationModule jfr(UnaryOperator<Jfr> jfr) {
+        return new InferredTestObservationModule(configuration,
+                pinning,
+                pathPlacement,
+                moduleName,
+                testModule,
+                jacocoModule,
+                pitestModule,
+                test,
+                jacoco,
+                nativeImage,
+                jfr,
                 pitest,
                 custom);
     }
@@ -220,6 +251,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 test,
                 jacoco,
                 nativeImage,
+                jfr,
                 pitest,
                 custom);
     }
@@ -235,6 +267,7 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 test,
                 jacoco,
                 nativeImage,
+                jfr,
                 pitest,
                 custom);
     }
@@ -271,6 +304,13 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 NativeImageAgent engine = new NativeImageAgent();
                 engines.add(engine);
                 reports.put(engine.name(), report);
+            }
+        }
+        Path recording = BuildStep.locate(configuration, "jfr.properties");
+        if (jfr != null && recording != null) {
+            Jfr engine = jfr.apply(Jfr.ofFile(recording));
+            if (engine != null) {
+                engines.add(engine);
             }
         }
         if (test != null) {

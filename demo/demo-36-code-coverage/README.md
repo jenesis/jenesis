@@ -27,7 +27,8 @@ Layout
     demo/demo-36-code-coverage
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
     |-- pom.xml                    pins JUnit; sources in sources/, tests in test/
-    |-- jacoco.properties          marker file; presence enables JaCoCo
+    |-- build.jenesis/jacoco.properties         marker file; presence enables JaCoCo
+    |-- build.jenesis/profiling/jfr.properties  settings=profile, under a profile
     |-- sources
     |   `-- coverage
     |       `-- Calculator.java    add(...) and subtract(...)
@@ -73,3 +74,21 @@ Pinning
 JUnit is pinned in the POM the usual way. JaCoCo's agent and CLI resolve a
 floating `RELEASE` in the `jacoco` group; run `java build/jenesis/Make.java
 pin` to record them with checksums when you want a reproducible tool chain.
+
+Recording the tests with Java Flight Recorder
+---------------------------------------------
+
+A `jfr.properties` in a configuration folder records the test JVM with Java Flight
+Recorder. Each line is an option of the recording, as `-XX:StartFlightRecording`
+takes it; the build names the file itself and writes it into the test step's
+reports. The demo ships the file under a profile, so a plain build does not record:
+
+    java -Djenesis.make.profiles=profiling build/jenesis/Make.java stage
+
+    target/stage/reports/output/jfr/module/tests.jfr
+
+`settings=profile` samples more often than the JDK's default settings. Open the
+recording in JDK Mission Control, or summarise it with `jfr summary`. Changing the
+file runs the tests again, and `-Djenesis.observe.jfr=false` switches the recording
+off.
+
