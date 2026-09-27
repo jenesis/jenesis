@@ -61,31 +61,9 @@ public record JUnitPlatform() implements TestFramework {
                                   Path output,
                                   SequencedSet<String> classes,
                                   SequencedMap<String, SequencedSet<String>> methods,
-                                  TestTags tags,
-                                  List<TestTags> ran,
                                   boolean parallel,
                                   boolean reporting) {
         List<String> commands = new ArrayList<>(List.of("execute", "--disable-banner", "--disable-ansi-colors"));
-        List<String> conditions = new ArrayList<>();
-        if (!tags.included().isEmpty()) {
-            conditions.add(disjunction(tags.included()));
-        }
-        if (!tags.excluded().isEmpty()) {
-            conditions.add("!(" + String.join(" | ", tags.excluded()) + ")");
-        }
-        for (TestTags earlier : ran) {
-            List<String> outside = new ArrayList<>();
-            if (!earlier.included().isEmpty()) {
-                outside.add("!" + disjunction(earlier.included()));
-            }
-            if (!earlier.excluded().isEmpty()) {
-                outside.add("(" + String.join(" | ", earlier.excluded()) + ")");
-            }
-            conditions.add("(" + String.join(" | ", outside) + ")");
-        }
-        if (!conditions.isEmpty()) {
-            commands.add("--include-tag=" + String.join(" & ", conditions));
-        }
         if (parallel) {
             commands.add("--config=junit.jupiter.execution.parallel.enabled=true");
             commands.add("--config=junit.jupiter.execution.parallel.mode.default=concurrent");
@@ -105,6 +83,20 @@ public record JUnitPlatform() implements TestFramework {
             }
         }
         return commands;
+    }
+
+    @Override
+    public List<String> tags(TestTags requested, List<TestTags> ran) {
+        List<String> conditions = new ArrayList<>();
+        if (!requested.all()) {
+            conditions.add(disjunction(requested));
+        }
+        for (TestTags earlier : ran) {
+            if (!earlier.all()) {
+                conditions.add("!" + disjunction(earlier));
+            }
+        }
+        return conditions.isEmpty() ? List.of() : List.of("--include-tag=" + String.join(" & ", conditions));
     }
 
     private static void artifact(SequencedMap<String, String> coordinates,
@@ -127,9 +119,17 @@ public record JUnitPlatform() implements TestFramework {
                 .orElse(null);
     }
 
-    private static String disjunction(SequencedSet<String> terms) {
-        return terms.stream()
-                .map(term -> term.contains("&") ? "(" + String.join(" & ", TestTags.names(term).stream().sorted().toList()) + ")" : term)
+    private static String condition(String literal) {
+        return literal.startsWith("-") ? "!" + literal.substring(1) : literal;
+    }
+
+    private static String disjunction(TestTags tags) {
+        return tags.alternatives().stream()
+                .map(alternative -> TestTags.literals(alternative).size() == 1
+                        ? condition(alternative)
+                        : TestTags.literals(alternative).stream()
+                                .map(JUnitPlatform::condition)
+                                .collect(Collectors.joining(" & ", "(", ")")))
                 .collect(Collectors.joining(" | ", "(", ")"));
     }
 }

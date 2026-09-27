@@ -675,8 +675,12 @@ public class TestModule implements BuildExecutorModule {
         public static Scope ofFile(Path file) throws IOException {
             SequencedProperties recorded = SequencedProperties.ofFiles(file);
             List<TestTags> covered = new ArrayList<>();
-            for (int index = 0; recorded.getProperty(COVERED + index) != null; index++) {
-                covered.add(TestTags.parse(recorded.getProperty(COVERED + index)));
+            try {
+                for (int index = 0; recorded.getProperty(COVERED + index) != null; index++) {
+                    covered.add(TestTags.parse(recorded.getProperty(COVERED + index)));
+                }
+            } catch (IllegalArgumentException _) {
+                covered.clear();
             }
             return new Scope(recorded.getProperty(FILTER), covered);
         }
@@ -949,10 +953,9 @@ public class TestModule implements BuildExecutorModule {
                     context.next(),
                     selection,
                     matchedMethods,
-                    tags,
-                    ran,
                     parallel,
                     reporting));
+            commands.addAll(resolved.tags(tags, ran));
             return CompletableFuture.completedFuture(commands);
         }
 
