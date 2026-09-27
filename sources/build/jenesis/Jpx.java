@@ -80,14 +80,18 @@ public record Jpx(Path storage,
         }
     }
 
-    public record Installation(Path folder, HashDigestFunction hashFunction, Path home) {
+    public record Installation(Path folder, HashDigestFunction hashFunction, Path home, List<String> options) {
 
         public Installation(Path folder, HashDigestFunction hashFunction) {
-            this(folder, hashFunction, Path.of(System.getProperty("java.home")));
+            this(folder, hashFunction, Path.of(System.getProperty("java.home")), List.of());
         }
 
         public Installation home(Path home) {
-            return new Installation(folder, hashFunction, home);
+            return new Installation(folder, hashFunction, home, options);
+        }
+
+        public Installation options(List<String> options) {
+            return new Installation(folder, hashFunction, home, List.copyOf(options));
         }
 
         public SequencedProperties properties() throws IOException {
@@ -188,7 +192,7 @@ public record Jpx(Path storage,
                         + " declares neither a module main class nor a Main-Class manifest attribute"
                         + " - name one as <name>[@<version>]/<main-class>");
             }
-            List<String> command = new ArrayList<>();
+            List<String> command = new ArrayList<>(options);
             String modulepath = properties.getProperty("modulepath"), classpath = properties.getProperty("classpath");
             SequencedMap<String, String> options = new LinkedHashMap<>();
             options.put("-p", modulepath == null ? null : join(modulepath));
@@ -238,7 +242,7 @@ public record Jpx(Path storage,
 
     public static final String HELP = """
             Usage: jpx [--modular] [--java=<version>] [--docker[=<image>]] [--hash=<checksum>] [--pin]
-                       <target> [argument...]
+                       [-J<option>...] <target> [argument...]
 
             Runs the main entry point of a published module, resolving and installing
             it on first use.
@@ -288,6 +292,8 @@ public record Jpx(Path storage,
                                   - against --hash where one is given, and against the
                                   installation's own digest otherwise - so a printed
                                   command is one that runs
+              -J<option>          pass the option to the JVM that runs the program, as
+                                  -J-Xmx512m or -J-Xlog:gc
               --help              print this help""";
 
     public static void main(String... arguments) throws IOException, InterruptedException {
@@ -301,7 +307,8 @@ public record Jpx(Path storage,
         boolean dockerized = false, pin = false;
         String image = null, checksum = null, java = null;
         int target = 0;
-        while (target < arguments.length && arguments[target].startsWith("--")) {
+        List<String> jvm = new ArrayList<>();
+        while (target < arguments.length && (arguments[target].startsWith("--") || arguments[target].startsWith("-J"))) {
             switch (arguments[target]) {
                 case "--modular" -> placement = PathPlacement.MODULE_PATH;
                 case "--docker" -> dockerized = true;
@@ -320,6 +327,8 @@ public record Jpx(Path storage,
                         java = value.isBlank() ? null : value;
                     } else if (arguments[target].startsWith("--hash=")) {
                         checksum = requireValidChecksum(arguments[target].substring("--hash=".length()));
+                    } else if (arguments[target].length() > 2 && arguments[target].startsWith("-J")) {
+                        jvm.add(arguments[target].substring(2));
                     } else {
                         environment.err().accept("Unknown option: " + arguments[target]);
                         environment.err().accept(HELP);
@@ -343,6 +352,7 @@ public record Jpx(Path storage,
         if (toolchain != null) {
             installation = installation.home(toolchain.home());
         }
+        installation = installation.options(jvm);
         if (checksum == null && pin) {
             checksum = installation.properties().getProperty("checksum");
         }
@@ -357,6 +367,7 @@ public record Jpx(Path storage,
         if (java != null) {
             options.add("--java=" + java);
         }
+        jvm.forEach(option -> options.add("-J" + option));
         DockerizedJava docker = null;
         if (dockerized) {
             Path workingDirectory = Path.of("").toAbsolutePath();
