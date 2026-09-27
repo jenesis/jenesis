@@ -2737,7 +2737,7 @@ public record Project(
                 test.filter||Comma-separated <classRegex>[#<method>] entries restricting which tests run
                 test.tag||Comma-separated alternatives, a test running when it matches any of them: a tag, several joined by + for the tests carrying all of them, and -<tag> for the tests not carrying it, as -container or release+-soak,-container, with nothing to quote on a command line and translated for the test framework; a run remembers what it covered until the tests' inputs change, so a later selection runs only the tests no earlier one ran
                 test.force|false|Execute tests even where a previous run already covered them
-                test.incremental||Run only the tests a change can reach; the value names the digest
+                test.incremental||Run only the tests a change can reach: true, or the setting named with no value, detects changes with MD5, the name of another message digest with that one, and false runs every test
                 test.parallel|false|Let the engine execute the matched tests concurrently
                 test.reporting|false|Write test reports into the module's reports/tests folder
                 stage.tests|false|Stage test-variant artifacts alongside the main ones

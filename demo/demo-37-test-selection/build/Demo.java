@@ -7,6 +7,7 @@ public class Demo {
     static void main(String[] args) throws Exception {
         Path source = Path.of("sources", "calc", "Adder.java");
         Path ran = Path.of("target", "ran");
+        Path unreached = Path.of("sources", "calc", "Multiplier.java");
         String original = Files.readString(source);
         try {
             build();
@@ -22,8 +23,25 @@ public class Demo {
             require(ran, "AdderTest", true);
             require(ran, "SubtractorTest", false);
             System.out.println("Editing Adder re-ran only AdderTest; SubtractorTest stayed cached.");
+
+            delete(ran);
+            Files.writeString(unreached, """
+                    package calc;
+
+                    public class Multiplier {
+
+                        public int multiply(int left, int right) {
+                            return left * right;
+                        }
+                    }
+                    """);
+            build();
+            require(ran, "AdderTest", false);
+            require(ran, "SubtractorTest", false);
+            System.out.println("Adding Multiplier, which no test reaches, ran no test.");
         } finally {
             Files.writeString(source, original);
+            Files.deleteIfExists(unreached);
         }
     }
 
