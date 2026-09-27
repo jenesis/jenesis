@@ -958,14 +958,13 @@ public class TestModule implements BuildExecutorModule {
                     selection = narrowed;
                 }
             }
-            commands.addAll(resolved.tags(tags, ran));
-            commands.addAll(resolved.arguments(
+            commands.addAll(resolved.tags(resolved.arguments(
                     context.supplement(),
                     context.next(),
                     selection,
                     matchedMethods,
                     parallel,
-                    reporting));
+                    reporting), tags, ran));
             return CompletableFuture.completedFuture(commands);
         }
 

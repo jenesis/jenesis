@@ -86,7 +86,7 @@ public record JUnitPlatform() implements TestFramework {
     }
 
     @Override
-    public List<String> tags(TestTags requested, List<TestTags> ran) {
+    public List<String> tags(List<String> arguments, TestTags requested, List<TestTags> ran) {
         List<String> conditions = new ArrayList<>();
         if (!requested.all()) {
             conditions.add(disjunction(requested));
@@ -96,7 +96,11 @@ public record JUnitPlatform() implements TestFramework {
                 conditions.add("!" + disjunction(earlier));
             }
         }
-        return conditions.isEmpty() ? List.of() : List.of("--include-tag=" + String.join(" & ", conditions));
+        List<String> selection = new ArrayList<>(arguments);
+        if (!conditions.isEmpty()) {
+            selection.add("--include-tag=" + String.join(" & ", conditions));
+        }
+        return selection;
     }
 
     private static void artifact(SequencedMap<String, String> coordinates,
