@@ -153,13 +153,18 @@ M_F()  { echo "$1 package -o -q -ntp"; }
 # as the Maven baseline and the comparison stays like-for-like (as it was before the default).
 LAYOUT="-Djenesis.project.layout=maven"
 DAEMON="-Djenesis.make.daemon=true"
+AOT="-Djenesis.make.aot=true"
 SRC_NT="java $LAYOUT -Djenesis.test.skip=true $ENGINE/Make.java build"
 NOCOMPILE_NT="java $LAYOUT -Djenesis.make.compile=false -Djenesis.test.skip=true $ENGINE/Make.java build"
 JAVAC_NT="java $LAYOUT -Djenesis.test.skip=true -cp $TOOL build.jenesis.Make build"
 DAEMON_NT="java $LAYOUT $DAEMON -Djenesis.test.skip=true -cp $TOOL build.jenesis.Make build"
+AOT_NT="java $LAYOUT $AOT -Djenesis.test.skip=true -cp $TOOL build.jenesis.Make build"
 SRC_DAEMON_NT="java $LAYOUT $DAEMON -Djenesis.test.skip=true $ENGINE/Make.java build"
 NATIVE_NT="$NATIVE_BIN $LAYOUT -Djenesis.test.skip=true build"
 SRC_F="java $LAYOUT $ENGINE/Make.java build"
+JAVAC_F="java $LAYOUT -cp $TOOL build.jenesis.Make build"
+DAEMON_F="java $LAYOUT $DAEMON -cp $TOOL build.jenesis.Make build"
+AOT_F="java $LAYOUT $AOT -cp $TOOL build.jenesis.Make build"
 
 table_launch() {
   note "Table: build-tool launch overhead (run 'help', no project work)"
@@ -176,13 +181,15 @@ table_launch() {
 }
 
 table_make() {
-  note "Table: how the engine is launched and kept - jenesis.make.compile, .classes, .daemon"
+  note "Table: how the engine is launched and kept - jenesis.make.compile, .classes, .daemon, .aot"
   build_tool
   echo "-- warm no-op build (nothing changed; the engine is the only variable) --"
   bench_warm "source (compile=false)"   "$RUNS_WARM" "rm -rf target; $NOCOMPILE_NT" "$NOCOMPILE_NT"
   bench_warm "source (engine cached)"   "$RUNS_WARM" "rm -rf target; $SRC_NT"       "$SRC_NT"
   bench_warm "precompiled"              "$RUNS_WARM" "rm -rf target; $JAVAC_NT"     "$JAVAC_NT"
   bench_warm "precompiled + daemon"     "$RUNS_WARM" "rm -rf target; $DAEMON_NT"    "$DAEMON_NT"
+  bench_warm "precompiled + aot"        "$RUNS_WARM" "rm -f $ROOT/.jenesis/engine*.aot; rm -rf target; $AOT_NT" "$AOT_NT"
+  bench "precompiled + aot (training)"  "$RUNS_WARM" "rm -f $ROOT/.jenesis/engine*.aot; $JAVAC_NT" "$AOT_NT"
   SOURCE_DAEMON=1
   bench_warm "source + daemon"          "$RUNS_WARM" "rm -rf target; $SRC_DAEMON_NT" "$SRC_DAEMON_NT"
   echo "-- first build after an engine source changed (the stamp misses, the engine recompiles) --"
@@ -197,17 +204,20 @@ table_compile() {
   note "Table: compile + package, tests compiled but not run"
   build_tool; build_native
   local m; m="$(M_NT "$MVN")"
+  rm -f "$ROOT"/.jenesis/engine*.aot; bash -c "$AOT_NT" >/dev/null 2>&1
   echo "-- cold (empty target/) --"
   bench "maven3"      "$RUNS_COLD" "rm -rf target" "$m"
   bench "jenesis-source"  "$RUNS_COLD" "rm -rf target" "$SRC_NT"
   bench "jenesis-precompiled" "$RUNS_COLD" "rm -rf target" "$JAVAC_NT"
   bench "jenesis-daemon" "$RUNS_COLD" "rm -rf target" "$DAEMON_NT"
+  bench "jenesis-aot"    "$RUNS_COLD" "rm -rf target" "$AOT_NT"
   [ -x "$NATIVE_BIN" ] && bench "jenesis-native" "$RUNS_COLD" "rm -rf target" "$NATIVE_NT"
   echo "-- warm no-op (nothing changed) --"
   bench_warm "maven3"      "$RUNS_WARM" "rm -rf target; $m" "$m"
   bench_warm "jenesis-source"  "$RUNS_WARM" "rm -rf target; $SRC_NT" "$SRC_NT"
   bench_warm "jenesis-precompiled" "$RUNS_WARM" "rm -rf target; $JAVAC_NT" "$JAVAC_NT"
   bench_warm "jenesis-daemon" "$RUNS_WARM" "rm -rf target; $DAEMON_NT" "$DAEMON_NT"
+  bench_warm "jenesis-aot"    "$RUNS_WARM" "rm -rf target; $AOT_NT" "$AOT_NT"
   [ -x "$NATIVE_BIN" ] && bench_warm "jenesis-native" "$RUNS_WARM" "rm -rf target; $NATIVE_NT" "$NATIVE_NT"
   echo "-- one-line edit to a test source (no tool's own code changes) --"
   if git diff --quiet -- "$EDIT_TEST" 2>/dev/null; then
@@ -215,6 +225,7 @@ table_compile() {
     bench_warm "jenesis-source"  "$RUNS_WARM" "git checkout -- $EDIT_TEST; rm -rf target; $SRC_NT" "edit $EDIT_TEST; $SRC_NT"
     bench_warm "jenesis-precompiled" "$RUNS_WARM" "git checkout -- $EDIT_TEST; rm -rf target; $JAVAC_NT" "edit $EDIT_TEST; $JAVAC_NT"
     bench_warm "jenesis-daemon" "$RUNS_WARM" "git checkout -- $EDIT_TEST; rm -rf target; $DAEMON_NT" "edit $EDIT_TEST; $DAEMON_NT"
+    bench_warm "jenesis-aot"    "$RUNS_WARM" "git checkout -- $EDIT_TEST; rm -rf target; $AOT_NT" "edit $EDIT_TEST; $AOT_NT"
     [ -x "$NATIVE_BIN" ] && bench_warm "jenesis-native" "$RUNS_WARM" "git checkout -- $EDIT_TEST; rm -rf target; $NATIVE_NT" "edit $EDIT_TEST; $NATIVE_NT"
     git checkout -- "$EDIT_TEST" 2>/dev/null
   else
@@ -226,6 +237,7 @@ table_compile() {
     bench_warm "jenesis-source"  "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $SRC_NT" "edit $EDIT; $SRC_NT"
     bench_warm "jenesis-precompiled" "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $JAVAC_NT" "edit $EDIT; $JAVAC_NT"
     bench_warm "jenesis-daemon" "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $DAEMON_NT" "edit $EDIT; $DAEMON_NT"
+    bench_warm "jenesis-aot"    "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $AOT_NT" "edit $EDIT; $AOT_NT"
     [ -x "$NATIVE_BIN" ] && bench_warm "jenesis-native" "$RUNS_WARM" "git checkout -- $EDIT; rm -rf target; $NATIVE_NT" "edit $EDIT; $NATIVE_NT"
     git checkout -- "$EDIT" 2>/dev/null
   else
@@ -236,6 +248,7 @@ table_compile() {
   bench "jenesis-source"  "$RUNS_WARM" "rm -rf target>/dev/null 2>&1; $SRC_NT>/dev/null 2>&1; touch $EDIT" "$SRC_NT"
   bench "jenesis-precompiled" "$RUNS_WARM" "rm -rf target>/dev/null 2>&1; $JAVAC_NT>/dev/null 2>&1; touch $EDIT" "$JAVAC_NT"
   bench "jenesis-daemon" "$RUNS_WARM" "rm -rf target>/dev/null 2>&1; $DAEMON_NT>/dev/null 2>&1; touch $EDIT" "$DAEMON_NT"
+  bench "jenesis-aot"    "$RUNS_WARM" "rm -rf target>/dev/null 2>&1; $AOT_NT>/dev/null 2>&1; touch $EDIT" "$AOT_NT"
   [ -x "$NATIVE_BIN" ] && bench "jenesis-native" "$RUNS_WARM" "rm -rf target>/dev/null 2>&1; $NATIVE_NT>/dev/null 2>&1; touch $EDIT" "$NATIVE_NT"
   stop_daemons
 }
@@ -274,6 +287,11 @@ table_full() {
   bench      "maven3 cold"           1 "rm -rf target" "$m"
   bench_warm "maven3 warm no-op"     1 "rm -rf target; $m"     "$m"
   bench_warm "jenesis warm no-op"    2 "rm -rf target; $SRC_F" "$SRC_F"
+  build_tool
+  bench_warm "jenesis-precompiled warm no-op" 2 "$JAVAC_F" "$JAVAC_F"
+  bench_warm "jenesis-daemon warm no-op"      2 "$DAEMON_F" "$DAEMON_F"
+  bench_warm "jenesis-aot warm no-op"         2 "rm -f $ROOT/.jenesis/engine*.aot; $AOT_F" "$AOT_F"
+  stop_daemons
 }
 
 table_maven() {
