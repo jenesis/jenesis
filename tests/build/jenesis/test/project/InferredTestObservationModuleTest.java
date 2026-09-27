@@ -59,6 +59,26 @@ public class InferredTestObservationModuleTest {
     }
 
     @Test
+    public void reads_the_recording_options_of_a_jfr_properties_file() throws IOException {
+        Files.writeString(project.resolve("jfr.properties"), "filename=elsewhere.jfr");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", observation().test(_ -> (_, _) -> {}), "project");
+        assertThatThrownBy(executor::execute)
+                .as("the file is read, and the build places the recording itself")
+                .hasStackTraceContaining("remove the filename line");
+    }
+
+    @Test
+    public void the_observe_override_switches_off_the_recording() throws IOException {
+        Files.writeString(project.resolve("jfr.properties"), "filename=elsewhere.jfr");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("observed", observation().test(_ -> (_, _) -> {}).jfr(null), "project");
+        executor.execute();
+    }
+
+    @Test
     public void the_test_configurator_decorates_the_inferred_test_module() throws IOException {
         Files.writeString(project.resolve("jacoco.properties"), "");
         List<TestModule> decorated = new ArrayList<>();
