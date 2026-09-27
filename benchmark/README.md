@@ -27,7 +27,7 @@ Running
 | Subcommand  | What it isolates                                                                          |
 |-------------|-------------------------------------------------------------------------------------------|
 | `launch`    | Launch overhead alone: `help` with no project work, once per launch strategy               |
-| `make`      | The engine itself: `jenesis.make.compile`, `jenesis.make.classes`, `jenesis.make.daemon`   |
+| `make`      | The engine itself: `jenesis.make.compile`, `jenesis.make.classes`, `jenesis.make.daemon`, `jenesis.make.aot` |
 | `compile`   | Maven vs Jenesis, compile and package, tests compiled but not run                          |
 | `full`      | Maven vs Jenesis with the whole test suite executed                                        |
 | `maven`     | Maven 3 vs Maven 4 on the same `pom.xml`                                                   |
@@ -104,6 +104,12 @@ and JIT-compiled. Its fingerprint covers the engine and the non-`jenesis.*` JVM 
 set gets a daemon of its own; the script stops the ones it starts. Source mode cannot benefit much from it:
 the JDK source launcher compiles `Make.java` and what it pulls in on every single invocation, before any
 daemon is reached, and that floor is the `source` row of the `launch` table.
+
+`jenesis.make.aot` (default `false`) runs the build in a JVM that loads the precompiled engine from an
+ahead-of-time cache under `.jenesis`, trained by the first build that finds none. The `make` table measures a
+build that reuses the cache and, separately, the build that trains it. It has no effect on `help`, which is
+answered before the engine starts, nor in source mode. The `aot` table measures the same JVM feature by hand,
+with a jar and a recording run of its own.
 
 Notes on the figures
 ---------------------
