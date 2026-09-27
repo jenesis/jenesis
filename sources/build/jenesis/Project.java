@@ -1042,11 +1042,13 @@ public record Project(
 
                     ## 11. Run a built main class with Execute
 
-                      java build/jenesis/Execute.java [args...]
-                      jenesis-exec [args...]
+                      java build/jenesis/Execute.java [-J<option>...] [args...]
+                      jenesis-exec [-J<option>...] [args...]
 
                     Execute builds, finds the module declaring a main class and launches it on the
-                    resolved runtime paths. Where more than one declares a main, name it with
+                    resolved runtime paths. Each leading -J<option> goes to the program's JVM, after
+                    what process-java.properties gives it, and the first other argument starts the
+                    program's own. Where more than one declares a main, name it with
                     -Djenesis.execute.module=<source folder> (nested: server/ui or server+ui) and
                     -Djenesis.execute.mainClass=<fqcn>. Wrap the program alone in Docker with
                     -Djenesis.execute.docker=true, plus .docker.image, .docker.mount (read-only),
@@ -1064,7 +1066,8 @@ public record Project(
                     than the JVM, so two runs in one program never clash; everything after them is
                     what the command line would take. A setting that replaces the process a build
                     runs in - toolchain.version, project.docker, execute.docker - is refused by name
-                    there, and demo-62-tools-api shows the whole contract.
+                    there, and so is a -J option, as the JDK's own tools refuse one; demo-62-tools-api
+                    shows the whole contract.
 
                     Every command line here, the commands and the tools alike, reads @<file> as the
                     arguments that file holds - settings and selectors, # to the end of a line being
