@@ -21,13 +21,15 @@ Layout
     demo/demo-35-test-framework
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- build.jenesis/explicit/test.properties   framework=junit-platform, under a profile
+    |-- build.jenesis/legacy/test.properties     framework=junit4, under a profile
     |-- greeter/
     |   |-- module-info.java     module demo.greeter; ships pinned
     |   `-- sample/greeter/Greeter.java
     `-- greeter-test/
         |-- module-info.java     @jenesis.test demo.greeter; one requires, no engine
         |-- greetertest/GreeterTest.java         package-private, @org.junit.jupiter.api.Test
-        `-- greetertest/LegacyGreeterTest.java   public, @org.junit.Test
+        |-- greetertest/LegacyGreeterTest.java   public, @org.junit.Test, @Category(Legacy.class)
+        `-- greetertest/Legacy.java              the category, an empty interface
 
 There is no `pom.xml`, so the MODULAR_TO_MAVEN layout is detected and every
 `requires` resolves through the module repository.
@@ -109,3 +111,20 @@ as above. The demo ships the file under a profile, so both paths stay runnable:
 
 Being a file in the project rather than a command-line flag, the declaration is
 what every checkout and every CI run reads.
+
+Selecting by category
+---------------------
+
+`-Djenesis.test.tag` selects tests the same way whichever framework runs them.
+Under JUnit 4 a tag is a category, named by its class in full. The `legacy`
+profile declares `framework=junit4`, and `LegacyGreeterTest` is annotated
+`@Category(Legacy.class)`, so this runs that class alone on JUnit 4:
+
+    java -Djenesis.make.profiles=legacy -Djenesis.test.tag=greetertest.Legacy -Djenesis.print.tests=true build/jenesis/Make.java
+
+    JUnit version 4.13.2
+    .
+    OK (1 test)
+
+The Jupiter `GreeterTest` carries no category, so it is left out. A category
+class that does not exist, or a selection that matches no test, fails the run.

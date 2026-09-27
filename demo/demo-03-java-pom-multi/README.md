@@ -139,8 +139,8 @@ is a tag, or tags joined by `+` for the tests carrying all of them, and a tag
 preceded by `-` stands for the tests not carrying it: `-slow` runs every test but
 the slow ones, and `io+-slow,smoke` the `io` tests that are not slow beside the
 `smoke` tests. None of it needs quoting on a command line. Jenesis translates the
-list into the test framework's own grouping mechanism - JUnit Platform tags or TestNG groups; JUnit 4
-has none its console runner can select. `GreeterTest#prefix_is_a_greeting` is
+list into the test framework's own grouping mechanism: JUnit Platform tags, TestNG groups, or JUnit 4
+categories, named by their class, as `com.example.Slow`. `GreeterTest#prefix_is_a_greeting` is
 annotated `@Tag("slow")`, so this again runs only that one test, this time by tag:
 
     java -Djenesis.test.tag=slow build/jenesis/Make.java
