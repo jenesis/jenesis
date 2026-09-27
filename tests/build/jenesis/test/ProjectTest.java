@@ -109,6 +109,22 @@ public class ProjectTest {
                 .doesNotContainKeys("scm.tag", "scm.revision", "scm.tree");
     }
 
+    @Test
+    public void reads_project_properties_at_the_root_when_no_metadata_is_named() throws IOException {
+        Files.writeString(root.resolve("project.properties"), "copyright=Copyright 2026 Example");
+        assertThat(metadataValues(Project.ofEnvironment(new Environment(settings), Path.of("."))))
+                .containsEntry("copyright", "Copyright 2026 Example");
+    }
+
+    @Test
+    public void reads_no_project_properties_when_the_metadata_names_none() throws IOException {
+        Files.writeString(root.resolve("project.properties"), "copyright=Copyright 2026 Example");
+        Map<String, String> named = new HashMap<>(settings);
+        named.put("project.metadata", "");
+        assertThat(metadataValues(Project.ofEnvironment(new Environment(named), Path.of("."))))
+                .doesNotContainKey("copyright");
+    }
+
     private SequencedProperties metadataValues(Project project) throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
         Path target = root.resolve("target");
