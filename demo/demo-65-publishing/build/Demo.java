@@ -59,7 +59,6 @@ public class Demo {
                 .sources(true)
                 .documentation(true)
                 .version("1.0.0")
-                .metadata(Path.of("project.properties"))
                 .build("stage")
                 .get("stage/maven");
     }

@@ -14,7 +14,7 @@ Run it
     java build/Demo.java
 
 `build/Demo.java` configures publication explicitly on the `Project` builder -
-`new Project(Path.of(".")).target(...).sources(true).documentation(true).version("1.0.0").metadata(Path.of("project.properties"))` -
+`new Project(Path.of(".")).target(...).sources(true).documentation(true).version("1.0.0")` -
 and runs the `stage` target. That materializes the release tree in Maven
 repository layout, and `build` hands back the staging step's folder under the
 `stage/maven` key:
@@ -88,10 +88,11 @@ duplicated:
   paragraph), each as plain text: HTML, `{@code}` and `{@link}` markup are reduced to
   the words they mark. A Markdown comment (`///`) keeps its inline markup as written,
   apart from a link, which becomes its label.
-- **`project.properties`** (bound via `Project.metadata(...)`) carries only what a
+- **`project.properties`**, read because it sits at the project root, carries only what a
   module declaration cannot express: `url`, every `license.<id>.name|url`, every
   `developer.<id>.name|email`, and the `scm.connection|developerConnection|url`
-  block.
+  block. A file elsewhere, or several, is named with `Project.metadata(...)` or
+  `-Djenesis.project.metadata`, and an empty value there reads none.
 
 The version is stamped by `Project.version("1.0.0")`. Without one, the module is
 published unversioned and its POM, which cannot omit a version, carries
