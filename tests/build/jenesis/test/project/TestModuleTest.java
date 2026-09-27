@@ -103,6 +103,77 @@ public class TestModuleTest {
     }
 
     @Test
+    public void selects_the_tests_a_change_reaches_when_incremental_is_true() throws IOException {
+        settings.put("test.incremental", "true");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
+                "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content().contains("Hello world!");
+        assertThat(reportedErrors(supplement)).isEmpty();
+    }
+
+    @Test
+    public void runs_no_test_when_a_change_reaches_none_of_them() throws IOException {
+        settings.put("test.incremental", "true");
+        Path sampleClasses = classes.resolve(Javac.CLASSES + "sample");
+        compileSource(sampleClasses, "Unreached", """
+                package sample;
+                public class Unreached {
+                    public String value() { return "first"; }
+                }
+                """, bootModuleJars());
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        for (String value : List.of("first", "second")) {
+            compileSource(sampleClasses, "Unreached", """
+                    package sample;
+                    public class Unreached {
+                        public String value() { return "%s"; }
+                    }
+                    """.formatted(value), bootModuleJars());
+            BuildExecutor executor = newExecutor();
+            executor.addSource("dependencies", dependencies);
+            executor.addSource("classes", classes);
+            executor.addModule(
+                    "test",
+                    TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                                    URI.create("https://repo1.maven.org/maven2/"),
+                                    null,
+                                    Map.of(),
+                                    null)),
+                            Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                            .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
+                    "dependencies", "classes");
+            executor.execute();
+            if (value.equals("first")) {
+                assertThat(supplement.resolve("output")).content().contains("Hello world!");
+            }
+        }
+        assertThat(supplement.resolve("output"))
+                .as("a change to a class no test reaches runs no test")
+                .doesNotExist();
+    }
+
+    @Test
+    public void refuses_an_incremental_setting_that_names_no_digest() {
+        assertThatThrownBy(() -> TestModule.ofEnvironment(new Environment(Map.of("test.incremental", "yes")), Map.of(), Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.test.incremental is true, false or the name of a message digest");
+    }
+
+    @Test
     public void can_execute_junit_non_modular() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", dependencies);

@@ -249,6 +249,9 @@ public abstract class Java extends ProcessBuildStep {
             }
         });
         return commands(executor, context, arguments).thenComposeAsync(commands -> {
+            if (commands == null) {
+                return CompletableFuture.completedStage(null);
+            }
             List<String> invocation = Stream.concat(options.stream(), commands.stream()).toList();
             if (invocation.isEmpty()) {
                 return CompletableFuture.completedStage(List.of());
