@@ -174,6 +174,54 @@ public class TestModuleTest {
     }
 
     @Test
+    public void runs_the_tests_of_a_tag_on_the_junit_platform() throws IOException {
+        settings.put("test.tag", "fast");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
+                "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content().contains("Hello world!");
+        assertThat(reportedErrors(supplement)).isEmpty();
+    }
+
+    @Test
+    public void leaves_out_the_tests_a_tag_excludes_on_the_junit_platform() throws IOException {
+        settings.put("test.tag", "-fast");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
+                "dependencies", "classes");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output"))
+                .as("the launcher applies the tag, so the test tagged fast does not run")
+                .content().doesNotContain("Hello world!");
+        assertThat(reportedErrors(supplement)).isEmpty();
+    }
+
+    @Test
     public void can_execute_junit_non_modular() throws IOException {
         BuildExecutor executor = newExecutor();
         executor.addSource("dependencies", dependencies);

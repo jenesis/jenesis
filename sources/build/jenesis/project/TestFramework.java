@@ -30,12 +30,12 @@ public interface TestFramework extends Serializable {
                            boolean parallel,
                            boolean reporting);
 
-    default List<String> tags(TestTags requested, List<TestTags> ran) {
+    default List<String> tags(List<String> arguments, TestTags requested, List<TestTags> ran) {
         if (!requested.all()) {
             throw new IllegalArgumentException(getClass().getSimpleName() + " cannot select tests by tag, so it cannot run "
                     + requested);
         }
-        return List.of();
+        return arguments;
     }
 
     static TestFramework named(String name) {
