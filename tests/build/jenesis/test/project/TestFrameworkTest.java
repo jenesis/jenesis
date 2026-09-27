@@ -323,11 +323,40 @@ public class TestFrameworkTest {
     }
 
     @Test
-    public void junit4_rejects_groups() {
-        assertThatThrownBy(() -> new JUnit4().tags(TestTags.parse("slow"), List.of()))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("cannot select tests by tag");
+    public void junit4_translates_one_alternative_into_one_filter_per_category() {
+        assertThat(new JUnit4().tags(TestTags.parse("a.Slow+a.Io+-a.Flaky+-a.Remote"), List.of()))
+                .containsExactly("--filter=org.junit.experimental.categories.IncludeCategories=a.Io",
+                        "--filter=org.junit.experimental.categories.IncludeCategories=a.Slow",
+                        "--filter=org.junit.experimental.categories.ExcludeCategories=a.Flaky,a.Remote");
         assertThat(new JUnit4().tags(TestTags.ALL, List.of())).isEmpty();
+    }
+
+    @Test
+    public void junit4_translates_alternatives_of_one_category_into_one_filter() {
+        assertThat(new JUnit4().tags(TestTags.parse("a.Slow+-a.Flaky,a.Io+-a.Flaky"), List.of()))
+                .containsExactly("--filter=org.junit.experimental.categories.IncludeCategories=a.Io,a.Slow",
+                        "--filter=org.junit.experimental.categories.ExcludeCategories=a.Flaky");
+        assertThat(new JUnit4().tags(TestTags.parse("a.Slow+-a.Flaky,-a.Flaky"), List.of()))
+                .containsExactly("--filter=org.junit.experimental.categories.ExcludeCategories=a.Flaky");
+    }
+
+    @Test
+    public void junit4_leaves_out_the_categories_that_ran_before() {
+        assertThat(new JUnit4().tags(TestTags.parse("a.Slow,a.Io"), List.of(TestTags.parse("a.Slow"))))
+                .containsExactly("--filter=org.junit.experimental.categories.IncludeCategories=a.Io,a.Slow",
+                        "--filter=org.junit.experimental.categories.ExcludeCategories=a.Slow");
+        assertThat(new JUnit4().tags(TestTags.parse("a.Slow,a.Io"), List.of(TestTags.parse("a.Slow+a.Io"))))
+                .containsExactly("--filter=org.junit.experimental.categories.IncludeCategories=a.Io,a.Slow");
+    }
+
+    @Test
+    public void junit4_rejects_alternatives_it_cannot_express() {
+        assertThatThrownBy(() -> new JUnit4().tags(TestTags.parse("a.Slow,a.Io+a.Remote"), List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot run");
+        assertThatThrownBy(() -> new JUnit4().tags(TestTags.parse("a.Slow+-a.Flaky,a.Io"), List.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cannot run");
     }
 
     @Test

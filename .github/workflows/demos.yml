@@ -89,6 +89,7 @@ jobs:
           - { name: ide-quality-groups, dir: demo-34-java-quality, entry: build/jenesis/Make.java ide/idea, verify: '! grep -q PROJECT_DIR sources/demo.quality.iml && ! grep -q jar:// sources/demo.quality.iml' }
           - { name: test-framework, dir: demo-35-test-framework, entry: build/jenesis/Make.java, verify: 'find target -name "org.junit.jupiter.engine-*.jar" | grep -q . && find target -name "org.junit.vintage.engine-*.jar" | grep -q . && grep -rqs ConsoleLauncher target' }
           - { name: test-framework-declared, dir: demo-35-test-framework, entry: build/jenesis/Make.java, flags: -Djenesis.make.profiles=explicit, verify: 'find target -type d -path "*test/executed*" | grep -q . && grep -rqs ConsoleLauncher target' }
+          - { name: test-framework-category, dir: demo-35-test-framework, entry: build/jenesis/Make.java, flags: '-Djenesis.make.profiles=legacy -Djenesis.test.tag=greetertest.Legacy', verify: 'grep -rqs "IncludeCategories=greetertest.Legacy" target && grep -rqs JUnitCore target' }
           - { name: code-coverage, dir: demo-36-code-coverage, entry: build/jenesis/Make.java, verify: 'find target -path "*reports/jacoco/coverage/Calculator.html" | grep -q .' }
           - { name: test-selection, dir: demo-37-test-selection, entry: build/Demo.java }
           - { name: pitest, dir: demo-38-pitest, entry: build/jenesis/Make.java, verify: 'find target -path "*reports/pitest/mutations.xml" -exec grep -l "calc.Calculator" {} + | grep -q .' }

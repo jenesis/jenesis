@@ -948,6 +948,7 @@ public class TestModule implements BuildExecutorModule {
                     selection = narrowed;
                 }
             }
+            commands.addAll(resolved.tags(tags, ran));
             commands.addAll(resolved.arguments(
                     context.supplement(),
                     context.next(),
@@ -955,7 +956,6 @@ public class TestModule implements BuildExecutorModule {
                     matchedMethods,
                     parallel,
                     reporting));
-            commands.addAll(resolved.tags(tags, ran));
             return CompletableFuture.completedFuture(commands);
         }
 
