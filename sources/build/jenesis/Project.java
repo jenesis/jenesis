@@ -423,10 +423,12 @@ public record Project(
     private BuildExecutorModule metadataModule() {
         Path base = root.toAbsolutePath().normalize();
         SequencedMap<String, Path> files = new LinkedHashMap<>();
-        for (Path file : metadata) {
+        for (Path file : metadata != null ? metadata
+                : Files.isRegularFile(root.resolve("project.properties")) ? List.of(Path.of("project.properties"))
+                : List.<Path>of()) {
             Path absolute = (file.isAbsolute() ? file : root.resolve(file)).toAbsolutePath().normalize();
             Path relative = base.relativize(absolute);
-            files.put(METADATA + "-" + BuildExecutorModule.encode(relative.toString()), relative);
+            files.put(METADATA + "-" + BuildExecutorModule.encode(relative.toString()), absolute);
         }
         return new MetadataModule(files, version, tag, revision, tree);
     }
@@ -727,8 +729,8 @@ public record Project(
                                             publisher,
                                             scm.{connection,developerConnection,url,tag,revision,tree}. Project-level
                                             overrides live in the file that
-                                            -Djenesis.project.metadata=<path> names, conventionally
-                                            project.properties.
+                                            -Djenesis.project.metadata=<path> names, or
+                                            project.properties at the root when it names none.
                       module.properties     graph state: path, module, test, main
                       identity.properties   <repository>/<coordinate> -> path or empty
                       requires.properties   <group>/<scope>/<repository>/<coordinate> -> empty, or
@@ -1524,7 +1526,7 @@ public record Project(
         this(resolved,
                 Path.of("target"),
                 Path.of(".jenesis", "artifacts"),
-                Collections.emptyNavigableSet(),
+                null,
                 configuration,
                 configuration,
                 configuration,
@@ -2646,7 +2648,7 @@ public record Project(
                 openpgp.expiry|signing|An expired signing key: ignored accepts it, signing accepts what it signed before expiring, current rejects it
                 sigstore.uri||URI of the Sigstore trust root; default: the published root of the public instance, carried as source; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 sigstore.issuers|github.com=token.actions.githubusercontent.com|Comma-separated <host>=<issuer> pairs, both named without a scheme, for identity hosts whose OpenID Connect issuer is not the host itself; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
-                project.metadata||Comma-separated extra metadata files
+                project.metadata||Comma-separated metadata files; unset reads project.properties at the project root when it exists, empty reads none
                 project.configuration|build.jenesis|Comma-separated folders searched for tool configuration files; @ splices the default, and @<name> splices what jenesis.<name> or the environment variable <name> holds
                 project.boms||Comma-separated locations of local pin-<name>.properties; default: the configuration folders
                 project.signatures||Comma-separated locations of local signature-<name>.properties; default: the configuration folders
@@ -2833,7 +2835,7 @@ public record Project(
             SequencedSet<Path> locations = new LinkedHashSet<>();
             locations.addAll(this.configuration());
             locations.addAll(this.boms());
-            for (Path path : this.metadata()) {
+            for (Path path : this.metadata() == null ? List.<Path>of() : this.metadata()) {
                 Path parent = (path.isAbsolute() ? path : root.resolve(path)).normalize().getParent();
                 if (parent != null) {
                     locations.add(parent);
