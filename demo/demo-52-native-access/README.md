@@ -38,6 +38,18 @@ warning was printed. `build.jenesis/process-java.properties` passes
 and the application alike, so a missing grant fails the run instead of printing a
 warning.
 
+For one run, a leading `-J` hands an option to the application's JVM alone,
+written as `java` takes it and with no file to change:
+
+    java build/jenesis/Execute.java -J-Xlog:gc
+
+    [0.005s][info][gc] Using G1
+    native access: demo.natives.text=true, demo.natives.app=false
+
+It follows what `process-java.properties` gives that JVM, so it wins where both
+set the same option, and the first argument not starting with `-J` begins the
+application's own arguments.
+
 Layout
 ------
 
