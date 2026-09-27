@@ -6,8 +6,8 @@ inputs changed. This demo shows the finer-grained companion: within a module
 that did change, run only the test classes that can actually be affected by the
 change, and leave the rest cached. It is enabled by passing
 `-Djenesis.test.incremental`, whose value names the message-digest algorithm
-used for change detection; passing it bare picks `MD5`, and leaving the
-property unset disables selection. It is meant mainly for **watching** a project during development,
+used for change detection; passing it bare or as `true` picks `MD5`, and
+`false` or leaving the property unset disables selection. It is meant mainly for **watching** a project during development,
 where the build re-runs on every save and a fast, narrowed test pass keeps the
 feedback loop tight:
 
@@ -31,7 +31,7 @@ whole suite.
 What the demo does
 ------------------
 
-`build/Demo.java` runs the build twice. Each test records that it ran by
+`build/Demo.java` runs the build three times. Each test records that it ran by
 touching a marker file under `target/ran/`.
 
 1. A first build (`-Djenesis.test.incremental`) has no previous snapshot, so it
@@ -39,7 +39,10 @@ touching a marker file under `target/ran/`.
 2. The driver edits `Adder` and rebuilds. Only `Adder`'s bytecode changed, and
    only `AdderTest` reaches `Adder`, so the second build re-runs `AdderTest`
    alone; `SubtractorTest` stays cached and writes no marker.
+3. The driver adds `Multiplier`, a class no test reaches, and rebuilds. The
+   module changed, so its test step runs, but it selects no test: neither
+   marker appears.
 
-The driver asserts exactly that and restores `Adder` afterwards. Run it with:
+The driver asserts exactly that, then restores `Adder` and removes `Multiplier`. Run it with:
 
     java build/Demo.java
