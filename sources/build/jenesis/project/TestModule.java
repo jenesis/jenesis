@@ -93,7 +93,15 @@ public class TestModule implements BuildExecutorModule {
     }
 
     private static String incrementalDigest(String property) {
-        return property == null ? null : property.isEmpty() ? "MD5" : property;
+        if (property == null || property.strip().equals("false")) {
+            return null;
+        } else if (property.isBlank() || property.strip().equals("true")) {
+            return "MD5";
+        } else if (!Security.getAlgorithms("MessageDigest").contains(property.strip().toUpperCase(Locale.ROOT))) {
+            throw new IllegalArgumentException("jenesis.test.incremental is true, false or the name of a message digest,"
+                    + " one of " + new TreeSet<>(Security.getAlgorithms("MessageDigest")) + ": " + property);
+        }
+        return property.strip();
     }
 
     private static Predicate<String> defaultIsTest() {
@@ -944,7 +952,9 @@ public class TestModule implements BuildExecutorModule {
             SequencedSet<String> selection = matchedClasses;
             if (incrementalDigest != null && filter == null && tags.all() && ran.isEmpty() && !matchedClasses.isEmpty()) {
                 SequencedSet<String> narrowed = selected(arguments, context, matchedClasses);
-                if (narrowed != null && !narrowed.isEmpty()) {
+                if (narrowed != null && narrowed.isEmpty()) {
+                    return CompletableFuture.completedFuture(null);
+                } else if (narrowed != null) {
                     selection = narrowed;
                 }
             }
