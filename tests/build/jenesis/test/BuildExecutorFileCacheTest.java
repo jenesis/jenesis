@@ -51,6 +51,14 @@ public class BuildExecutorFileCacheTest {
     }
 
     @Test
+    public void marks_its_root_so_that_no_project_scan_reads_the_cached_sources() throws IOException {
+        BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
+        Files.writeString(output.resolve("module-info.java"), "module sample {}");
+        cache.store(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, output, "", Map.of());
+        assertThat(cacheRoot.resolve(BuildExecutor.SKIP_MARKER)).isRegularFile();
+    }
+
+    @Test
     public void fetch_returns_empty_on_miss() throws IOException {
         BuildExecutorFileCache cache = new BuildExecutorFileCache(cacheRoot);
         Optional<BuildStepResult> result = cache.fetch(Runnable::run, "step", new byte[]{1}, inputs("source", "file", new byte[]{9}), true, target);

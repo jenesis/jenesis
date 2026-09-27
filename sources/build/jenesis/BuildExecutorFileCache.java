@@ -126,6 +126,10 @@ public record BuildExecutorFileCache(Path root,
         Path temporary = null;
         try {
             Files.createDirectories(folder);
+            try {
+                Files.createFile(root.resolve(BuildExecutor.SKIP_MARKER));
+            } catch (FileAlreadyExistsException _) {
+            }
             temporary = compressed
                     ? Files.createTempFile(folder, "tmp", null)
                     : Files.createTempDirectory(folder, "tmp");
