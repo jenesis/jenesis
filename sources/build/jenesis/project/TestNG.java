@@ -30,31 +30,11 @@ public record TestNG() implements TestFramework {
                                   Path output,
                                   SequencedSet<String> classes,
                                   SequencedMap<String, SequencedSet<String>> methods,
-                                  TestTags tags,
-                                  List<TestTags> ran,
                                   boolean parallel,
                                   boolean reporting) {
         List<String> commands = new ArrayList<>(List.of("-d", (reporting
                 ? output.resolve(BuildStep.REPORTS + "tests")
                 : supplement.resolve("test-output")).toString()));
-        if (tags.included().stream().anyMatch(term -> term.contains("&"))) {
-            throw new IllegalArgumentException("TestNG selects the tests of any of several groups, not of all of them,"
-                    + " so it cannot run " + tags + " - name each group on its own");
-        }
-        if (!tags.included().isEmpty()) {
-            commands.add("-groups");
-            commands.add(String.join(",", tags.included()));
-        }
-        SequencedSet<String> excluded = new LinkedHashSet<>(tags.excluded());
-        if (ran.stream().allMatch(earlier -> !earlier.included().isEmpty()
-                && earlier.excluded().isEmpty()
-                && earlier.included().stream().noneMatch(term -> term.contains("&")))) {
-            ran.forEach(earlier -> excluded.addAll(earlier.included()));
-        }
-        if (!excluded.isEmpty()) {
-            commands.add("-excludegroups");
-            commands.add(String.join(",", excluded));
-        }
         if (parallel) {
             commands.add("-parallel");
             commands.add("methods");
@@ -74,5 +54,45 @@ public record TestNG() implements TestFramework {
             commands.add(String.join(",", joined));
         }
         return commands;
+    }
+
+    @Override
+    public List<String> tags(TestTags requested, List<TestTags> ran) {
+        List<String> arguments = new ArrayList<>();
+        SequencedSet<String> groups = new TreeSet<>();
+        Set<String> excluded = null;
+        boolean everything = false;
+        for (String alternative : requested.alternatives()) {
+            SequencedSet<String> tagged = new TreeSet<>(), untagged = new TreeSet<>();
+            for (String literal : TestTags.literals(alternative)) {
+                if (literal.startsWith("-")) {
+                    untagged.add(literal.substring(1));
+                } else {
+                    tagged.add(literal);
+                }
+            }
+            if (tagged.size() > 1 || excluded != null && !excluded.equals(untagged)) {
+                throw new IllegalArgumentException("TestNG runs the tests of any of several groups and leaves the same"
+                        + " groups out of all of them, so it cannot run " + requested + " - write each alternative as at most"
+                        + " one group, with the same groups preceded by - in every alternative");
+            }
+            excluded = untagged;
+            groups.addAll(tagged);
+            everything |= tagged.isEmpty();
+        }
+        if (!everything && !groups.isEmpty()) {
+            arguments.add("-groups");
+            arguments.add(String.join(",", groups));
+        }
+        SequencedSet<String> excludedGroups = new TreeSet<>(excluded == null ? Set.of() : excluded);
+        if (ran.stream().allMatch(earlier -> !earlier.all() && earlier.alternatives().stream()
+                .allMatch(alternative -> !alternative.contains("+") && !alternative.startsWith("-")))) {
+            ran.forEach(earlier -> excludedGroups.addAll(earlier.alternatives()));
+        }
+        if (!excludedGroups.isEmpty()) {
+            arguments.add("-excludegroups");
+            arguments.add(String.join(",", excludedGroups));
+        }
+        return arguments;
     }
 }

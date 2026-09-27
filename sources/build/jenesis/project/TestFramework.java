@@ -27,10 +27,16 @@ public interface TestFramework extends Serializable {
                            Path output,
                            SequencedSet<String> classes,
                            SequencedMap<String, SequencedSet<String>> methods,
-                           TestTags tags,
-                           List<TestTags> ran,
                            boolean parallel,
                            boolean reporting);
+
+    default List<String> tags(TestTags requested, List<TestTags> ran) {
+        if (!requested.all()) {
+            throw new IllegalArgumentException(getClass().getSimpleName() + " cannot select tests by tag, so it cannot run "
+                    + requested);
+        }
+        return List.of();
+    }
 
     static TestFramework named(String name) {
         return switch (name.toLowerCase(Locale.ROOT)) {

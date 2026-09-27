@@ -18,29 +18,34 @@ public class TestModuleScopeTest {
     }
 
     @Test
-    public void reads_tag_names_to_include_and_to_leave_out() {
-        TestTags tags = TestTags.parse(" foo , bar ,! qux,,");
-        assertThat(tags.included()).containsExactly("bar", "foo");
-        assertThat(tags.excluded()).containsExactly("qux");
-        assertThat(tags).hasToString("bar,foo,!qux");
+    public void reads_alternatives_of_tags_and_negated_tags() {
+        TestTags tags = TestTags.parse("foo,-qux+bar,-baz,,");
+        assertThat(tags.alternatives()).containsExactly("-baz", "bar+-qux", "foo");
+        assertThat(tags).hasToString("-baz,bar+-qux,foo");
+        assertThat(TestTags.literals("bar+-qux")).containsExactly("bar", "-qux");
+        assertThat(TestTags.parse("slow-tests+-slow-io").alternatives())
+                .as("a hyphen inside a tag is part of its name")
+                .containsExactly("slow-tests+-slow-io");
         assertThat(TestTags.parse(null)).isEqualTo(TestTags.ALL);
         assertThat(TestTags.parse(" ")).isEqualTo(TestTags.ALL);
     }
 
     @Test
-    public void reads_tags_a_test_carries_all_of() {
-        TestTags tags = TestTags.parse("foo & bar,baz,!qux");
-        assertThat(tags.included()).containsExactly("bar&foo", "baz");
-        assertThat(tags).hasToString("bar&foo,baz,!qux");
+    public void refuses_anything_a_command_line_would_have_to_quote() {
+        for (String expression : List.of("!(npm|pypi)", "foo|bar", "foo&bar", "!foo", "foo, bar", "foo+", "+foo",
+                "foo++bar", "--foo", "-", "any()")) {
+            assertThatThrownBy(() -> TestTags.parse(expression))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("comma-separated list of alternatives");
+        }
     }
 
     @Test
-    public void refuses_the_syntax_of_a_test_framework() {
-        for (String expression : List.of("!(npm|pypi)", "foo|bar", "any()", "!", "!foo&bar", "foo&", "foo&&bar")) {
-            assertThatThrownBy(() -> TestTags.parse(expression))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("comma-separated list of tag names");
-        }
+    public void refuses_an_alternative_that_selects_no_test() {
+        assertThatThrownBy(() -> TestTags.parse("bar,foo+-foo"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("foo+-foo")
+                .hasMessageContaining("selects none");
     }
 
     @Test
@@ -52,87 +57,104 @@ public class TestModuleScopeTest {
     @Test
     public void a_run_of_every_test_covers_every_request() {
         assertThat(covered(null, "")).isTrue();
-        assertThat(covered("foo,!qux", "")).isTrue();
-        assertThat(covered("!qux", "")).isTrue();
+        assertThat(covered("foo+-qux", "")).isTrue();
+        assertThat(covered("-qux", "")).isTrue();
     }
 
     @Test
-    public void a_run_of_more_tags_covers_a_run_of_fewer() {
+    public void a_run_of_more_alternatives_covers_a_run_of_fewer() {
         assertThat(covered("foo", "foo,bar")).isTrue();
         assertThat(covered("foo,bar", "foo")).as("bar never ran").isFalse();
-        assertThat(covered("foo,bar", "foo", "bar")).as("each tag ran in a run of its own").isTrue();
+        assertThat(covered("foo,bar", "foo", "bar")).as("each alternative ran in a run of its own").isTrue();
         assertThat(covered(null, "foo", "bar")).as("tests carrying neither tag never ran").isFalse();
     }
 
     @Test
-    public void a_run_of_any_of_the_tags_covers_a_request_for_all_of_them() {
-        assertThat(covered("foo&bar", "foo")).isTrue();
-        assertThat(covered("foo&bar", "bar,baz")).isTrue();
-        assertThat(covered("foo&bar&baz", "bar&foo")).isTrue();
-        assertThat(covered("foo", "foo&bar")).as("the tests tagged foo but not bar never ran").isFalse();
-        assertThat(covered("foo&bar", "foo&baz")).isFalse();
+    public void a_run_of_fewer_conditions_covers_an_alternative_with_more() {
+        assertThat(covered("foo+bar", "foo")).isTrue();
+        assertThat(covered("foo+bar", "bar,baz")).isTrue();
+        assertThat(covered("foo+bar+baz", "bar+foo")).isTrue();
+        assertThat(covered("foo", "foo+bar")).as("the tests tagged foo but not bar never ran").isFalse();
+        assertThat(covered("foo+bar", "foo+baz")).isFalse();
     }
 
     @Test
-    public void a_run_that_left_tests_out_covers_only_a_request_that_leaves_them_out_too() {
-        assertThat(covered("foo,!qux", "foo,!qux")).isTrue();
-        assertThat(covered("foo,!qux,!quux", "foo,!qux")).isTrue();
-        assertThat(covered("foo", "foo,!qux")).as("the tests tagged foo and qux never ran").isFalse();
-        assertThat(covered(null, "!qux")).isFalse();
-        assertThat(covered("!qux", "!qux")).isTrue();
+    public void a_run_that_left_tests_out_covers_only_an_alternative_that_leaves_them_out_too() {
+        assertThat(covered("foo+-qux", "foo+-qux")).isTrue();
+        assertThat(covered("foo+-qux+-quux", "foo+-qux")).isTrue();
+        assertThat(covered("foo", "foo+-qux")).as("the tests tagged foo and qux never ran").isFalse();
+        assertThat(covered(null, "-qux")).isFalse();
+        assertThat(covered("-qux+-quux", "-qux")).isTrue();
+        assertThat(covered("-container", "-container,-soak"))
+                .as("not both of container and soak includes every test that is not container")
+                .isTrue();
+        assertThat(covered("-container,-soak", "-container+-soak"))
+                .as("neither of them never ran the tests carrying exactly one")
+                .isFalse();
     }
 
     @Test
     public void junit_runs_what_was_requested_and_did_not_run_before(@TempDir Path root) {
-        assertThat(new JUnitPlatform().arguments(root, root, Collections.emptyNavigableSet(), Collections.emptyNavigableMap(),
-                TestTags.parse("foo,bar,!qux"), List.of(TestTags.parse("foo")), false, false))
-                .as("tagged foo or bar, not qux, and outside what ran as foo")
-                .contains("--include-tag=(bar | foo) & !(qux) & (!(foo))");
-        assertThat(new JUnitPlatform().arguments(root, root, Collections.emptyNavigableSet(), Collections.emptyNavigableMap(),
-                TestTags.ALL, List.of(TestTags.parse("foo,!slow")), false, false))
-                .contains("--include-tag=(!(foo) | (slow))");
+        assertThat(new JUnitPlatform().tags(TestTags.parse("foo,bar+-qux"), List.of(TestTags.parse("foo"))))
+                .as("foo, or bar but not qux, and outside what ran as foo")
+                .contains("--include-tag=((bar & !qux) | foo) & !(foo)");
+        assertThat(new JUnitPlatform().tags(TestTags.ALL, List.of(TestTags.parse("foo+-slow"))))
+                .contains("--include-tag=!((foo & !slow))");
     }
 
     @Test
-    public void junit_requires_every_tag_of_a_conjunction(@TempDir Path root) {
-        assertThat(new JUnitPlatform().arguments(root, root, Collections.emptyNavigableSet(), Collections.emptyNavigableMap(),
-                TestTags.parse("foo&bar,baz"), List.of(TestTags.parse("bar&qux")), false, false))
-                .contains("--include-tag=((bar & foo) | baz) & (!((bar & qux)))");
+    public void junit_expresses_every_selection_of_the_grammar(@TempDir Path root) {
+        assertThat(new JUnitPlatform().tags(TestTags.parse("-container+-network,release+-soak"), List.of()))
+                .contains("--include-tag=((!container & !network) | (release & !soak))");
+        assertThat(new JUnitPlatform().tags(TestTags.parse("-container,-soak"), List.of()))
+                .as("not both")
+                .contains("--include-tag=(!container | !soak)");
+        assertThat(new JUnitPlatform().tags(TestTags.parse("release,-container"), List.of()))
+                .contains("--include-tag=(!container | release)");
     }
 
     @Test
-    public void testng_refuses_a_conjunction_its_groups_cannot_express(@TempDir Path root) {
-        assertThatThrownBy(() -> new TestNG().arguments(root, root, Collections.emptyNavigableSet(), Collections.emptyNavigableMap(),
-                TestTags.parse("foo&bar"), List.of(), false, false))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("bar&foo");
-        assertThat(new TestNG().arguments(root, root, Collections.emptyNavigableSet(), Collections.emptyNavigableMap(),
-                TestTags.parse("baz"), List.of(TestTags.parse("foo&bar")), false, false))
+    public void testng_refuses_what_its_groups_cannot_express(@TempDir Path root) {
+        for (String expression : List.of("foo+bar", "foo+-qux,bar", "release,-container")) {
+            assertThatThrownBy(() -> new TestNG().tags(TestTags.parse(expression), List.of()))
+                    .as(expression)
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("TestNG");
+        }
+        assertThat(new TestNG().tags(TestTags.parse("baz"), List.of(TestTags.parse("foo+bar"))))
                 .as("an earlier conjunction cannot be left out by groups, so the request runs whole")
                 .doesNotContain("-excludegroups");
     }
 
     @Test
-    public void testng_leaves_out_what_ran_before_where_its_groups_can_say_so(@TempDir Path root) {
-        assertThat(new TestNG().arguments(root, root, Collections.emptyNavigableSet(), Collections.emptyNavigableMap(),
-                TestTags.parse("foo,bar,!qux"), List.of(TestTags.parse("foo")), false, false))
-                .containsSubsequence("-groups", "bar,foo", "-excludegroups", "qux,foo");
-        assertThat(new TestNG().arguments(root, root, Collections.emptyNavigableSet(), Collections.emptyNavigableMap(),
-                TestTags.parse("foo,bar"), List.of(TestTags.parse("foo,!slow")), false, false))
+    public void testng_runs_groups_that_leave_out_the_same_groups(@TempDir Path root) {
+        assertThat(new TestNG().tags(TestTags.parse("foo+-qux,bar+-qux"), List.of(TestTags.parse("foo"))))
+                .containsSubsequence("-groups", "bar,foo", "-excludegroups", "foo,qux");
+        assertThat(new TestNG().tags(TestTags.parse("-qux"), List.of()))
+                .containsSubsequence("-excludegroups", "qux")
+                .doesNotContain("-groups");
+        assertThat(new TestNG().tags(TestTags.parse("foo,bar"), List.of(TestTags.parse("foo+-slow"))))
                 .as("an earlier exclusion cannot be undone by groups, so the request runs whole")
                 .containsSubsequence("-groups", "bar,foo")
                 .doesNotContain("-excludegroups");
     }
 
     @Test
+    public void a_memory_in_an_earlier_notation_is_forgotten(@TempDir Path folder) throws IOException {
+        Path file = folder.resolve("testscope.properties");
+        Files.writeString(file, "covered.0=foo,\\!qux\n");
+        assertThat(TestModule.Scope.ofFile(file).covered()).isEmpty();
+    }
+
+    @Test
     public void a_scope_round_trips_through_a_file(@TempDir Path folder) throws IOException {
         Path file = folder.resolve("testscope.properties");
-        TestModule.Scope scope = new TestModule.Scope(".*FooTest", List.of(TestTags.parse("foo"), TestTags.parse("bar,!qux")));
+        TestModule.Scope scope = new TestModule.Scope(".*FooTest", List.of(TestTags.parse("foo"), TestTags.parse("bar+-qux")));
         scope.store(file);
         assertThat(SequencedProperties.ofFiles(file)).containsExactly(
                 Map.entry("filter", ".*FooTest"),
                 Map.entry("covered.0", "foo"),
-                Map.entry("covered.1", "bar,!qux"));
+                Map.entry("covered.1", "bar+-qux"));
         assertThat(TestModule.Scope.ofFile(file)).isEqualTo(scope);
     }
 
