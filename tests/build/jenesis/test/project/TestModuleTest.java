@@ -20,6 +20,7 @@ import build.jenesis.project.TestTags;
 import build.jenesis.project.JUnit4;
 import build.jenesis.project.JUnitPlatform;
 import build.jenesis.project.JaCoCo;
+import build.jenesis.project.Jfr;
 import build.jenesis.step.Javac;
 import build.jenesis.project.TestFramework;
 import build.jenesis.project.TestNG;
@@ -219,6 +220,29 @@ public class TestModuleTest {
                 .as("the launcher applies the tag, so the test tagged fast does not run")
                 .content().doesNotContain("Hello world!");
         assertThat(reportedErrors(supplement)).isEmpty();
+    }
+
+    @Test
+    public void records_the_test_jvm_into_the_reports_of_the_test_step() throws IOException {
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false)
+                        .observe(new Jfr()),
+                "dependencies", "classes");
+        executor.execute();
+
+        assertThat(root.resolve("test").resolve("executed").resolve("output")
+                .resolve(BuildStep.REPORTS + "jfr").resolve("tests.jfr"))
+                .isNotEmptyFile();
     }
 
     @Test
