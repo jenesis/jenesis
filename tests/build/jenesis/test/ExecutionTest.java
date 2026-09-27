@@ -300,6 +300,58 @@ public class ExecutionTest {
                 .isEqualTo(0);
     }
 
+    @Test
+    public void execute_hands_leading_j_options_to_the_program_s_jvm_after_the_configured_ones()
+            throws IOException, InterruptedException {
+        int code = Execution.ofEnvironment(Environment.NONE, optionProject("-Dsample.option\\=no\n"))
+                .execute("-J-Dsample.option=yes", "plain", "-Jkept");
+        assertThat(code)
+                .as("a -J option follows process-java.properties, and the first other argument starts the program's own")
+                .isEqualTo(0);
+    }
+
+    @Test
+    public void execute_refuses_a_j_that_names_no_option() throws IOException {
+        Execution execution = Execution.ofEnvironment(Environment.NONE, optionProject(""));
+        assertThatThrownBy(() -> execution.execute("-J"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("-J names no option for the program's JVM");
+    }
+
+    private Project optionProject(String processOptions) throws IOException {
+        Path source = Files.createDirectories(root.resolve("src/main/java/sample"));
+        Files.writeString(source.resolve("Sample.java"), """
+                package sample;
+
+                public class Sample {
+
+                    public static void main(String[] args) {
+                        boolean arguments = java.util.List.of(args).equals(java.util.List.of("plain", "-Jkept"));
+                        System.exit("yes".equals(System.getProperty("sample.option")) && arguments ? 0 : 3);
+                    }
+                }
+                """);
+        Files.writeString(root.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1</version>
+                    <properties>
+                        <mainClass>sample.Sample</mainClass>
+                    </properties>
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(root.resolve("build.jenesis")).resolve("process-java.properties"),
+                processOptions);
+        return Project.ofEnvironment(Environment.NONE, root)
+                .target(Files.createDirectory(root.resolve("target")))
+                .artifacts(Files.createDirectory(root.resolve("artifacts")))
+                .layout(Project.Layout.MAVEN)
+                .tests(false);
+    }
+
     private void writeNativeModules(boolean granted) throws IOException {
         Path library = Files.createDirectories(root.resolve("library/demo/library"));
         Files.writeString(library.resolve("../../module-info.java"), """

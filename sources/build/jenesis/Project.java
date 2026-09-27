@@ -1042,11 +1042,13 @@ public record Project(
 
                     ## 11. Run a built main class with Execute
 
-                      java build/jenesis/Execute.java [args...]
-                      jenesis-exec [args...]
+                      java build/jenesis/Execute.java [-J<option>...] [args...]
+                      jenesis-exec [-J<option>...] [args...]
 
                     Execute builds, finds the module declaring a main class and launches it on the
-                    resolved runtime paths. Where more than one declares a main, name it with
+                    resolved runtime paths. Each leading -J<option> goes to the program's JVM, after
+                    what process-java.properties gives it, and the first other argument starts the
+                    program's own. Where more than one declares a main, name it with
                     -Djenesis.execute.module=<source folder> (nested: server/ui or server+ui) and
                     -Djenesis.execute.mainClass=<fqcn>. Wrap the program alone in Docker with
                     -Djenesis.execute.docker=true, plus .docker.image, .docker.mount (read-only),

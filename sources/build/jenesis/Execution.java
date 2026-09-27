@@ -63,6 +63,14 @@ public record Execution(Project project, String mainClass, String module, Contai
     private int doExecute(SequencedMap<String, Path> outputs,
                           Path argumentFile,
                           String... arguments) throws IOException, InterruptedException {
+        int jvmOptions = 0;
+        while (jvmOptions < arguments.length && arguments[jvmOptions].startsWith("-J")) {
+            if (arguments[jvmOptions].length() == 2) {
+                throw new IllegalArgumentException("-J names no option for the program's JVM - write the option right"
+                        + " after it, as -J<option>");
+            }
+            jvmOptions++;
+        }
         SequencedProperties merged = new SequencedProperties();
         SequencedMap<String, Path> sourceByPrefix = new LinkedHashMap<>();
         for (Map.Entry<String, Path> entry : outputs.entrySet()) {
@@ -144,6 +152,9 @@ public record Execution(Project project, String mainClass, String module, Contai
                     }
                 }
             });
+        }
+        for (int index = 0; index < jvmOptions; index++) {
+            javaArgs.add(arguments[index].substring(2));
         }
         for (int index = 0; ; index++) {
             String agent = merged.getProperty(selected.getKey() + ".agent." + index);
@@ -236,7 +247,7 @@ public record Execution(Project project, String mainClass, String module, Contai
             javaArgs.addAll(graph.arguments());
             javaArgs.add(candidate.mainClass);
         }
-        javaArgs.addAll(List.of(arguments));
+        javaArgs.addAll(List.of(arguments).subList(jvmOptions, arguments.length));
         if (container != null) {
             Path root = project.root().toAbsolutePath().normalize();
             DockerizedJava docker = container.image() == null
