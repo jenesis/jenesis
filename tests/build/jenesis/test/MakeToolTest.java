@@ -101,6 +101,19 @@ public class MakeToolTest {
     }
 
     @Test
+    public void refuses_an_option_for_a_jvm_as_the_jdk_s_tools_do() {
+        StringWriter out = new StringWriter(), err = new StringWriter();
+        int execute = ToolProvider.findFirst("jenesis-exec").orElseThrow().run(new PrintWriter(out), new PrintWriter(err),
+                "-J-Xmx64m", "argument");
+        int jpx = ToolProvider.findFirst("jpx").orElseThrow().run(new PrintWriter(out), new PrintWriter(err),
+                "--modular", "-J-Xmx64m", "org.example:tool");
+        assertThat(List.of(execute, jpx)).containsOnly(2);
+        assertThat(err.toString())
+                .as("a tool runs in its caller's JVM, and a JDK tool refuses -J there as well")
+                .contains("jenesis-exec run as a tool takes no option for a JVM", "jpx run as a tool takes no option for a JVM");
+    }
+
+    @Test
     public void refuses_a_toolchain_it_cannot_relaunch_onto() {
         StringWriter out = new StringWriter(), err = new StringWriter();
         int code = ToolProvider.findFirst("jenesis-make").orElseThrow().run(new PrintWriter(out), new PrintWriter(err),

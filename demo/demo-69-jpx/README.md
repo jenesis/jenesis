@@ -189,3 +189,15 @@ over module descriptors, walking `requires` clauses like the `modular` layout, a
 runs the whole closure on the module path; `--docker[=<image>]` runs the launched
 process in a container while resolution and installation stay on the host, so the
 containerized run needs no network and no credentials.
+
+A leading `-J` hands an option to the JVM that runs the program, as the JDK's own
+launchers read it:
+
+    java build/jenesis/Jpx.java -J-Xlog:gc org.junit.platform.console@6.1.3 --version
+
+    [0.003s][info][gc] Using G1
+    JUnit Platform Console Launcher 6.1.3
+
+`--pin` keeps the option in both lines it prints. Run as a tool, through
+`ToolProvider.findFirst("jpx")`, `jpx` refuses `-J`, as the JDK's own tools do.
+
