@@ -2776,6 +2776,7 @@ public record Project(
                 generate.antlr|true|ANTLR generation, activated by an antlr.properties
                 observe.jacoco|true|JaCoCo coverage, activated by a jacoco.properties
                 observe.native|true|native-image reachability agent, activated by a graal.properties
+                observe.jfr|true|Java Flight Recorder in the test JVM, activated by a jfr.properties whose lines are the options of the recording
                 mutate.pitest|true|PIT mutation testing, activated by a pitest.properties
                 artifact.japicmp|true|japicmp API comparison, activated by a japicmp.properties
                 jarsigner.keystore||Key store jarsigner signs the produced jar with, in place of the unsigned one; a release machine supplies it, and a build that names any jarsigner setting without it fails rather than shipping unsigned; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
