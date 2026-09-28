@@ -298,24 +298,15 @@ Your own application offers the same hook the same way. One of its modules decla
 interface and `uses` it, and an extension's module-info says
 `provides <interface> with <class>`. A module that provides no such service is only resolved
 when you name it, and a system property is set on the command line. Both are options for `java`,
-which an image adds as an argument file of its own. `java` reads the `JDK_JAVA_OPTIONS` variable
-before the `ENTRYPOINT`'s command line and expands argument files named there. An image extends
-the variable rather than replacing it, so it keeps what every image below it added:
+and `java` reads more of them from the `JDK_JAVA_OPTIONS` variable, ahead of the `ENTRYPOINT`'s
+command line. An image extends the variable rather than replacing it, so it keeps what every
+image below it added:
 
-    COPY extension.args /app/arguments/
-    ENV JDK_JAVA_OPTIONS="${JDK_JAVA_OPTIONS} @/app/arguments/extension.args"
+    ENV JDK_JAVA_OPTIONS="${JDK_JAVA_OPTIONS} --add-modules com.example.extension -Dcom.example.enabled=true"
 
-with `extension.args` holding, one per line, what the image adds:
-
-    --add-modules com.example.extension
-    -Dcom.example.extension.enabled=true
-
-`java` prints a `NOTE` line naming the variable whenever it is set.
-
-A `docker.options` line in `packaging.properties` adds options to this image's own
-`application.args`, ahead of the paths:
-
-    docker.options=-Xmx256m -XX:+ExitOnOutOfMemoryError
+The variable may also name an argument file, as `@/app/extension.args`, which the image copies in.
+`docker run -e JDK_JAVA_OPTIONS=...` sets it for a single container. `java` prints a `NOTE` line
+naming the variable whenever it is set.
 
 A project without `mainModule` gets the same folder on its class path, as `/app/extensions/*`,
 where an extension is found through its `META-INF/services` entries

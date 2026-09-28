@@ -12,34 +12,28 @@ import build.jenesis.SequencedProperties;
 public class Docker implements BuildStep {
 
     public static final String DOCKER = "docker/";
-    private static final String EXTENSIONS = "/app/extensions", ARGUMENTS = "/app/arguments";
+    private static final String EXTENSIONS = "/app/extensions";
 
     private final String from;
     private final String group;
-    private final List<String> options;
     private final String diff;
 
     public Docker(String from) {
-        this(from, "main", List.of(), null);
+        this(from, "main", null);
     }
 
-    private Docker(String from, String group, List<String> options, String diff) {
+    private Docker(String from, String group, String diff) {
         this.from = from;
         this.group = group;
-        this.options = options;
         this.diff = diff;
     }
 
     public Docker group(String group) {
-        return new Docker(from, group, options, diff);
-    }
-
-    public Docker options(List<String> options) {
-        return new Docker(from, group, List.copyOf(options), diff);
+        return new Docker(from, group, diff);
     }
 
     public Docker diff(String diff) {
-        return new Docker(from, group, options, diff);
+        return new Docker(from, group, diff);
     }
 
     @Override
@@ -108,41 +102,24 @@ public class Docker implements BuildStep {
             for (Path jar : jars.values()) {
                 if (granted.contains(jar.toAbsolutePath().normalize())) {
                     throw new IllegalStateException("An image that extends " + from + " cannot grant native access to "
-                            + jar.getFileName() + " - name --enable-native-access in docker.options instead");
+                            + jar.getFileName() + " - name --enable-native-access in JDK_JAVA_OPTIONS instead");
                 }
             }
             agents.keySet().retainAll(jars.sequencedKeySet());
-            List<String> command = new ArrayList<>();
-            agents.forEach((jar, parameters) -> command.add("-javaagent:" + EXTENSIONS + "/" + jar
-                    + (parameters.isEmpty() ? "" : "=" + parameters)));
-            command.addAll(options);
-            if (jars.isEmpty() && command.isEmpty()) {
+            if (!agents.isEmpty()) {
+                throw new IllegalStateException("An image that extends " + from + " cannot attach the agents "
+                        + agents.sequencedKeySet() + " - name -javaagent:" + EXTENSIONS + "/<jar> in JDK_JAVA_OPTIONS instead");
+            }
+            if (jars.isEmpty()) {
                 throw new IllegalStateException("The image adds nothing to " + from
-                        + ": every module it holds is declared by docker.diff already, and docker.options is empty");
+                        + ": every module it holds is declared by docker.diff already");
             }
-            Path folder = Files.createDirectory(context.next().resolve(DOCKER));
-            StringBuilder dockerfile = new StringBuilder("FROM ").append(from).append('\n');
-            if (!jars.isEmpty()) {
-                Path store = Files.createDirectory(folder.resolve("extensions"));
-                for (Map.Entry<String, Path> entry : jars.entrySet()) {
-                    BuildStep.linkOrCopy(store.resolve(entry.getKey()), entry.getValue());
-                }
-                dockerfile.append("COPY extensions/ ").append(EXTENSIONS).append("/\n");
+            Path folder = Files.createDirectory(context.next().resolve(DOCKER)),
+                    store = Files.createDirectory(folder.resolve("extensions"));
+            for (Map.Entry<String, Path> entry : jars.entrySet()) {
+                BuildStep.linkOrCopy(store.resolve(entry.getKey()), entry.getValue());
             }
-            if (!command.isEmpty()) {
-                String name;
-                try {
-                    name = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                            .digest(String.join("\n", command).getBytes(StandardCharsets.UTF_8)), 0, 8) + ".args";
-                } catch (NoSuchAlgorithmException e) {
-                    throw new IllegalStateException("The JDK offers no SHA-256 digest", e);
-                }
-                ProcessBuildStep.argumentFile(Files.createDirectory(folder.resolve("arguments")).resolve(name), command);
-                dockerfile.append("COPY arguments/ ").append(ARGUMENTS).append("/\n")
-                        .append("ENV JDK_JAVA_OPTIONS=\"${JDK_JAVA_OPTIONS} @").append(ARGUMENTS).append('/')
-                        .append(name).append("\"\n");
-            }
-            Files.writeString(folder.resolve("Dockerfile"), dockerfile.toString());
+            Files.writeString(folder.resolve("Dockerfile"), "FROM " + from + "\nCOPY extensions/ " + EXTENSIONS + "/\n");
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         if (jars.isEmpty()) {
@@ -190,15 +167,14 @@ public class Docker implements BuildStep {
             BuildStep.linkOrCopy(store.resolve(entry.getKey()), entry.getValue());
         }
         List<String> command = new ArrayList<>();
-        agents.forEach((jar, parameters) -> command.add("-javaagent:/app/jars/" + jar
-                + (parameters.isEmpty() ? "" : "=" + parameters)));
+        agents.forEach((jar, options) -> command.add("-javaagent:/app/jars/" + jar
+                + (options.isEmpty() ? "" : "=" + options)));
         layers.forEach((layer, membership) -> {
             command.add("-Djlayer.modulepath." + layer + "=" + path(membership.modulepath()));
             if (!membership.classpath().isEmpty()) {
                 command.add("-Djlayer.classpath." + layer + "=" + path(membership.classpath()));
             }
         });
-        command.addAll(options);
         if (!classpath.isEmpty()) {
             command.add("--class-path");
             command.add(modulepath.isEmpty()
