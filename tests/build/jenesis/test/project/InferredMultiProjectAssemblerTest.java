@@ -282,25 +282,6 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
-    public void docker_diff_requires_what_the_base_image_holds_in_a_group_of_its_own() throws IOException {
-        Fixture fixture = setUp("path=\n", false, false, false);
-        Files.writeString(fixture.configuration().resolve("packaging.properties"),
-                "docker=example/base:1.0\ndocker.diff=org.slf4j, com.example:app:1.0\n");
-        Path required = fixture.execute("package/docker/required").get("package/docker/required");
-        assertThat(SequencedProperties.ofFiles(required.resolve(BuildStep.REQUIRES)).stringPropertyNames())
-                .containsExactlyInAnyOrder("docker/runtime/module/org.slf4j", "docker/runtime/maven/com.example/app/1.0");
-    }
-
-    @Test
-    public void refuses_docker_diff_without_the_image_it_extends() throws IOException {
-        Fixture fixture = setUp("path=\n", false, false, false);
-        Files.writeString(fixture.configuration().resolve("packaging.properties"), "docker.diff=org.slf4j\n");
-        assertThatThrownBy(() -> fixture.execute("package/docker"))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("without docker=<image>");
-    }
-
-    @Test
     public void native_image_enabled_wires_package_inventory_so_the_binary_is_stageable() throws IOException {
         Fixture fixture = setUp("path=\n", false, false, false, null, false, false, true);
         assertThat(fixture.execute("package/inventory"))

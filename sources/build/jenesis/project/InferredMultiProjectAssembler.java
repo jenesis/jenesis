@@ -15,6 +15,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Bundle;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.Docker;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.JLink;
 import build.jenesis.step.JMod;
@@ -486,9 +487,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     sub.addModule("launcher", launcher, launched);
                 }
                 if (packaging.docker() != null) {
-                    sub.addModule("docker", DockerModule.ofEnvironment(environment, repositories, resolvers, packaging.docker())
-                            .pinning(descriptor.pinning())
-                            .diff(packaging.dockerDiff()), inputs);
+                    sub.addStep("docker", new Docker(packaging.docker()), inputs);
                     images.add("docker");
                 }
                 if (packaging.nativeImage()) {
@@ -626,27 +625,20 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             boolean launcher,
                             boolean nativeImage,
                             String jpackage,
-                            String docker,
-                            List<String> dockerDiff) {
+                            String docker) {
 
         private static Packaging configured(Path properties) throws IOException {
             if (properties == null) {
-                return new Packaging(false, false, false, false, false, null, null, List.of());
+                return new Packaging(false, false, false, false, false, null, null);
             }
             SequencedProperties configuration = SequencedProperties.ofFiles(properties);
-            Packaging packaging = new Packaging(configuration.flag("jmod"),
+            return new Packaging(configuration.flag("jmod"),
                     configuration.flag("jlink"),
                     configuration.flag("bundle"),
                     configuration.flag("launcher"),
                     configuration.flag("native"),
                     configuration.value("jpackage"),
-                    configuration.value("docker"),
-                    Objects.requireNonNullElse(configuration.entries("docker.diff"), List.of()));
-            if (packaging.docker() == null && !packaging.dockerDiff().isEmpty()) {
-                throw new IllegalArgumentException(properties + " sets docker.diff without docker=<image>,"
-                        + " which names the image to extend");
-            }
-            return packaging;
+                    configuration.value("docker"));
         }
     }
 

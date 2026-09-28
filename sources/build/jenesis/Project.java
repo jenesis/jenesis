@@ -952,9 +952,7 @@ public record Project(
                     sources, which the compiler never copies into the artifact, unless folders=<paths>
                     names other folders; each reads only the file kinds it compiles.
 
-                      packaging.properties      jmod/jlink/bundle/launcher/native booleans, jpackage=<type>,
-                                                docker=<image>, and docker.diff=<modules> to extend that
-                                                image instead
+                      packaging.properties      jmod/jlink/bundle/launcher/native booleans, jpackage=<type>
                       test.properties           framework=junit-platform|junit4|testng, naming what
                                                 this module's tests are written against; absent, it is
                                                 inferred from the resolved dependencies
@@ -1150,8 +1148,7 @@ public record Project(
                                          65 publishing (Maven Central),
                                          66 module-convention (resolving what you published),
                                          67 reproducible (a jar checked against a recorded digest),
-                                         69 jpx (run a released program without building),
-                                         70 docker-extension (an image built on another)
+                                         69 jpx (run a released program without building)
                       Extending it       54 custom-assembler, 55 custom-jmod, 56 internal-module,
                                          57 external-module,
                                          58 project-plugins (hooks from a first check to release),
