@@ -12,7 +12,6 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.step.Docker;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class DockerTest {
 
@@ -142,69 +141,6 @@ public class DockerTest {
 
         assertThat(result.next()).isTrue();
         assertThat(next.resolve(Docker.DOCKER)).doesNotExist();
-    }
-
-    @Test
-    public void extends_an_image_with_the_modules_its_diff_does_not_declare() throws IOException {
-        writeModularJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("sample.jar"));
-        Path resolved = Files.createDirectory(input.resolve("resolved"));
-        writePlainJar(resolved.resolve("lib-2.0.jar"));
-        writePlainJar(resolved.resolve("extra-1.0.jar"));
-        SequencedProperties index = new SequencedProperties();
-        index.setProperty("main/runtime/maven/lib", "resolved/lib-2.0.jar");
-        index.setProperty("main/runtime/maven/extra", "resolved/extra-1.0.jar");
-        index.store(input.resolve(BuildStep.DEPENDENCIES));
-        Path base = Files.createDirectory(root.resolve("base"));
-        writePlainJar(Files.createDirectory(base.resolve("resolved")).resolve("lib-1.0.jar"));
-        SequencedProperties declared = new SequencedProperties();
-        declared.setProperty("docker/runtime/maven/lib", "resolved/lib-1.0.jar");
-        declared.store(base.resolve(BuildStep.DEPENDENCIES));
-
-        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
-        arguments.put("input", new BuildStepArgument(
-                input,
-                Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
-                        Path.of("resolved/lib-2.0.jar"), Checksum.of(ChecksumStatus.ADDED),
-                        Path.of("resolved/extra-1.0.jar"), Checksum.of(ChecksumStatus.ADDED))));
-        arguments.put("base", new BuildStepArgument(
-                base,
-                Map.of(Path.of("resolved/lib-1.0.jar"), Checksum.of(ChecksumStatus.ADDED))));
-
-        BuildStepResult result = new Docker("example/base:1.0").diff("docker").apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                arguments).toCompletableFuture().join();
-
-        assertThat(result.next()).isTrue();
-        Path folder = next.resolve(Docker.DOCKER);
-        assertThat(folder.resolve("extensions/modulepath/sample.jar")).isRegularFile();
-        assertThat(folder.resolve("extensions/classpath/extra-1.0.jar")).isRegularFile();
-        assertThat(folder.resolve("extensions/classpath/lib-2.0.jar"))
-                .as("the module lib is declared by the base image already, in whatever version")
-                .doesNotExist();
-        assertThat(folder.resolve("application.args")).doesNotExist();
-        assertThat(dockerfile(folder)).containsExactly(
-                "FROM example/base:1.0",
-                "COPY extensions/ /app/extensions/");
-    }
-
-    @Test
-    public void refuses_an_extending_image_that_adds_nothing() throws IOException {
-        Path resolved = Files.createDirectory(input.resolve("resolved"));
-        writePlainJar(resolved.resolve("lib-1.0.jar"));
-        SequencedProperties index = new SequencedProperties();
-        index.setProperty("main/runtime/maven/lib", "resolved/lib-1.0.jar");
-        index.setProperty("docker/runtime/maven/lib", "resolved/lib-1.0.jar");
-        index.store(input.resolve(BuildStep.DEPENDENCIES));
-
-        assertThatThrownBy(() -> new Docker("example/base:1.0").diff("docker").apply(
-                Runnable::run,
-                new BuildStepContext(previous, next, supplement),
-                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
-                        input,
-                        Map.of(Path.of("resolved/lib-1.0.jar"), Checksum.of(ChecksumStatus.ADDED)))))))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("adds nothing to example/base:1.0");
     }
 
     private static List<String> dockerfile(Path folder) throws IOException {

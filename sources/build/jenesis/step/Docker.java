@@ -12,28 +12,22 @@ import build.jenesis.SequencedProperties;
 public class Docker implements BuildStep {
 
     public static final String DOCKER = "docker/";
-    private static final String EXTENSIONS = "/app/extensions", MODULE_PATH = "modulepath", CLASS_PATH = "classpath";
+    private static final String MODULE_PATH = "/app/extensions/modulepath", CLASS_PATH = "/app/extensions/classpath/*";
 
     private final String from;
     private final String group;
-    private final String diff;
 
     public Docker(String from) {
-        this(from, "main", null);
+        this(from, "main");
     }
 
-    private Docker(String from, String group, String diff) {
+    private Docker(String from, String group) {
         this.from = from;
         this.group = group;
-        this.diff = diff;
     }
 
     public Docker group(String group) {
-        return new Docker(from, group, diff);
-    }
-
-    public Docker diff(String diff) {
-        return new Docker(from, group, diff);
+        return new Docker(from, group);
     }
 
     @Override
@@ -58,7 +52,7 @@ public class Docker implements BuildStep {
                 mainModule = launcher.getProperty("mainModule");
             }
         }
-        if (mainClass == null && diff == null) {
+        if (mainClass == null) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         SequencedMap<String, Path> jars = new TreeMap<>();
@@ -83,47 +77,6 @@ public class Docker implements BuildStep {
             granted.addAll(Inventory.nativeAccess(argument.folder()));
             layers.putAll(Layers.membership(argument.folder()));
             agents.putAll(Inventory.agents(argument.folder()));
-        }
-        if (diff != null) {
-            Set<String> declared = new HashSet<>();
-            for (BuildStepArgument argument : arguments.values()) {
-                if (argument.removed()) {
-                    continue;
-                }
-                for (Path jar : Dependencies.select(argument.folder(), diff, "runtime")) {
-                    declared.add(identity(jar));
-                }
-            }
-            jars.values().removeIf(jar -> declared.contains(identity(jar)));
-            if (!layers.isEmpty()) {
-                throw new IllegalStateException("An image that extends " + from + " cannot hold the layers "
-                        + layers.sequencedKeySet() + ", which only the image that launches the application defines");
-            }
-            for (Path jar : jars.values()) {
-                if (granted.contains(jar.toAbsolutePath().normalize())) {
-                    throw new IllegalStateException("An image that extends " + from + " cannot grant native access to "
-                            + jar.getFileName() + " - name --enable-native-access in JDK_JAVA_OPTIONS instead");
-                }
-            }
-            agents.keySet().retainAll(jars.sequencedKeySet());
-            if (!agents.isEmpty()) {
-                throw new IllegalStateException("An image that extends " + from + " cannot attach the agents "
-                        + agents.sequencedKeySet() + " - name -javaagent:<jar> in JDK_JAVA_OPTIONS instead");
-            }
-            if (jars.isEmpty()) {
-                throw new IllegalStateException("The image adds nothing to " + from
-                        + ": every module it holds is declared by docker.diff already");
-            }
-            Path folder = Files.createDirectory(context.next().resolve(DOCKER)),
-                    store = Files.createDirectory(folder.resolve("extensions"));
-            for (Map.Entry<String, Path> entry : jars.entrySet()) {
-                Path target = Files.createDirectories(store.resolve(PathPlacement.INFERRED.test(entry.getValue())
-                        ? MODULE_PATH
-                        : CLASS_PATH));
-                BuildStep.linkOrCopy(target.resolve(entry.getKey()), entry.getValue());
-            }
-            Files.writeString(folder.resolve("Dockerfile"), "FROM " + from + "\nCOPY extensions/ " + EXTENSIONS + "/\n");
-            return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         if (jars.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
@@ -179,16 +132,14 @@ public class Docker implements BuildStep {
             }
         });
         command.add("--class-path");
-        command.add(classpath.isEmpty()
-                ? EXTENSIONS + "/" + CLASS_PATH + "/*"
-                : path(classpath.sequencedKeySet()) + ":" + EXTENSIONS + "/" + CLASS_PATH + "/*");
+        command.add(classpath.isEmpty() ? CLASS_PATH : path(classpath.sequencedKeySet()) + ":" + CLASS_PATH);
         command.add("--module-path");
         if (modulepath.isEmpty()) {
-            command.add(EXTENSIONS + "/" + MODULE_PATH);
+            command.add(MODULE_PATH);
             command.addAll(graph.arguments());
             command.add(mainClass);
         } else {
-            command.add(path(modulepath.sequencedKeySet()) + ":" + EXTENSIONS + "/" + MODULE_PATH);
+            command.add(path(modulepath.sequencedKeySet()) + ":" + MODULE_PATH);
             command.addAll(graph.arguments());
             command.add("--module");
             command.add(mainModule + "/" + mainClass);
@@ -201,21 +152,6 @@ public class Docker implements BuildStep {
                 .append("]\n")
                 .toString());
         return CompletableFuture.completedStage(new BuildStepResult(true));
-    }
-
-    private static String identity(Path jar) {
-        ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
-        if (descriptor != null) {
-            return descriptor.name();
-        }
-        try {
-            return ModuleFinder.of(jar).findAll().stream()
-                    .map(reference -> reference.descriptor().name())
-                    .findFirst()
-                    .orElse(jar.getFileName().toString());
-        } catch (FindException _) {
-            return jar.getFileName().toString();
-        }
     }
 
     private static String path(SequencedSet<String> names) {
