@@ -24,13 +24,12 @@ public class DockerModule implements BuildExecutorModule {
     private final Pinning pinning;
     private final String group;
     private final String from;
-    private final List<String> options;
     private final List<String> diff;
 
     public DockerModule(Map<String, Repository> repositories,
                         Map<String, Resolver> resolvers,
                         String from) {
-        this(new Dependencies(repositories, resolvers), null, "docker", from, List.of(), List.of());
+        this(new Dependencies(repositories, resolvers), null, "docker", from, List.of());
     }
 
     public static DockerModule ofEnvironment(Environment environment,
@@ -41,7 +40,6 @@ public class DockerModule implements BuildExecutorModule {
                 null,
                 "docker",
                 from,
-                List.of(),
                 List.of());
     }
 
@@ -49,41 +47,35 @@ public class DockerModule implements BuildExecutorModule {
                          Pinning pinning,
                          String group,
                          String from,
-                         List<String> options,
                          List<String> diff) {
         this.dependencies = dependencies;
         this.pinning = pinning;
         this.group = group;
         this.from = from;
-        this.options = options;
         this.diff = diff;
     }
 
     public DockerModule pinning(Pinning pinning) {
-        return new DockerModule(dependencies, pinning, group, from, options, diff);
+        return new DockerModule(dependencies, pinning, group, from, diff);
     }
 
     public DockerModule group(String group) {
-        return new DockerModule(dependencies, pinning, group, from, options, diff);
+        return new DockerModule(dependencies, pinning, group, from, diff);
     }
 
     public DockerModule from(String from) {
-        return new DockerModule(dependencies, pinning, group, from, options, diff);
-    }
-
-    public DockerModule options(List<String> options) {
-        return new DockerModule(dependencies, pinning, group, from, List.copyOf(options), diff);
+        return new DockerModule(dependencies, pinning, group, from, diff);
     }
 
     public DockerModule diff(List<String> diff) {
-        return new DockerModule(dependencies, pinning, group, from, options, diff.stream()
+        return new DockerModule(dependencies, pinning, group, from, diff.stream()
                 .map(DockerModule::coordinate)
                 .toList());
     }
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        Docker docker = new Docker(from).options(options);
+        Docker docker = new Docker(from);
         if (diff.isEmpty()) {
             buildExecutor.addStep(IMAGE, docker, inherited.sequencedKeySet());
             return;

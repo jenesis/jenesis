@@ -1047,12 +1047,11 @@ its module path. `docker-extension` builds an image `FROM` it that fills the fol
 
     docker=sample
     docker.diff=org.slf4j
-    docker.options=-Dorg.slf4j.simpleLogger.showThreadName=false
 
 `docker.diff` names what the base image holds. The build resolves it and leaves every module it
 names out of the image, so the extension ships a logging backend but not the `slf4j-api` the base
-image has already. `docker.options` reaches `java` through an argument file that the image appends
-to `JDK_JAVA_OPTIONS`, so images stack without replacing the entry point or each other's options.
+image has already. Options for `java` are the user's to add, through the `JDK_JAVA_OPTIONS` variable
+that every image extends rather than replaces, so images stack without touching the entry point.
 
 Cross-cutting concepts
 ----------------------

@@ -488,7 +488,6 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 if (packaging.docker() != null) {
                     sub.addModule("docker", DockerModule.ofEnvironment(environment, repositories, resolvers, packaging.docker())
                             .pinning(descriptor.pinning())
-                            .options(packaging.dockerOptions())
                             .diff(packaging.dockerDiff()), inputs);
                     images.add("docker");
                 }
@@ -628,12 +627,11 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             boolean nativeImage,
                             String jpackage,
                             String docker,
-                            List<String> dockerOptions,
                             List<String> dockerDiff) {
 
         private static Packaging configured(Path properties) throws IOException {
             if (properties == null) {
-                return new Packaging(false, false, false, false, false, null, null, List.of(), List.of());
+                return new Packaging(false, false, false, false, false, null, null, List.of());
             }
             SequencedProperties configuration = SequencedProperties.ofFiles(properties);
             Packaging packaging = new Packaging(configuration.flag("jmod"),
@@ -643,11 +641,10 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     configuration.flag("native"),
                     configuration.value("jpackage"),
                     configuration.value("docker"),
-                    configuration.words("docker.options"),
                     Objects.requireNonNullElse(configuration.entries("docker.diff"), List.of()));
-            if (packaging.docker() == null && !(packaging.dockerOptions().isEmpty() && packaging.dockerDiff().isEmpty())) {
-                throw new IllegalArgumentException(properties + " sets docker.options or docker.diff without"
-                        + " docker=<image>, which names the image to build from");
+            if (packaging.docker() == null && !packaging.dockerDiff().isEmpty()) {
+                throw new IllegalArgumentException(properties + " sets docker.diff without docker=<image>,"
+                        + " which names the image to extend");
             }
             return packaging;
         }
