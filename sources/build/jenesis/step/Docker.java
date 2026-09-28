@@ -5,6 +5,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.License;
 import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
@@ -19,23 +20,35 @@ public class Docker implements BuildStep {
     private final String from;
     private final String group;
     private final SequencedMap<String, String> labels;
+    private final OffsetDateTime created;
 
     public Docker(String from) {
-        this(from, "main", new LinkedHashMap<>());
+        this(from, "main", new LinkedHashMap<>(), null);
     }
 
-    private Docker(String from, String group, SequencedMap<String, String> labels) {
+    public static Docker ofEnvironment(Environment environment, String from) {
+        return new Docker(from).created(environment.value("archive.timestamp") == null
+                ? null
+                : BuildStep.timestamp(environment));
+    }
+
+    private Docker(String from, String group, SequencedMap<String, String> labels, OffsetDateTime created) {
         this.from = from;
         this.group = group;
         this.labels = labels;
+        this.created = created;
     }
 
     public Docker group(String group) {
-        return new Docker(from, group, labels);
+        return new Docker(from, group, labels, created);
     }
 
     public Docker labels(SequencedMap<String, String> labels) {
-        return new Docker(from, group, new LinkedHashMap<>(labels));
+        return new Docker(from, group, new LinkedHashMap<>(labels), created);
+    }
+
+    public Docker created(OffsetDateTime created) {
+        return new Docker(from, group, labels, created);
     }
 
     @Override
@@ -164,7 +177,7 @@ public class Docker implements BuildStep {
         annotations.put(ANNOTATION + "title", metadata.value("name", metadata.value("artifact")));
         annotations.put(ANNOTATION + "description", metadata.value("description"));
         annotations.put(ANNOTATION + "version", metadata.value("version"));
-        annotations.put(ANNOTATION + "created", null);
+        annotations.put(ANNOTATION + "created", created == null ? null : DateTimeFormatter.ISO_INSTANT.format(created));
         annotations.put(ANNOTATION + "authors", null);
         annotations.put(ANNOTATION + "url", metadata.value("url"));
         annotations.put(ANNOTATION + "documentation", null);

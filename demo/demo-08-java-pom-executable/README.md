@@ -164,6 +164,13 @@ is written as an SPDX identifier, and only when every licence has one. Every sta
 written, empty where the project declares nothing, so that none is inherited from the base
 image: `eclipse-temurin` sets `version` and `created` for itself.
 
+`created` is left empty unless you name the time, since a clock reading would make every build
+differ. The time the archives record is the one it takes, when you set it explicitly - to the
+time of the commit that is built, for example:
+
+    java -Djenesis.make.profiles=docker -Djenesis.archive.timestamp=$(git log -1 --format=%cI) \
+        build/jenesis/Make.java stage
+
 A `docker.label.<name>=<value>` line in `packaging.properties` adds a label of your own, or
 replaces a standard one. This demo's `docker` profile adds the documentation:
 

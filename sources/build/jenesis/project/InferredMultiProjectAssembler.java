@@ -490,7 +490,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     SequencedSet<String> manifests = descriptor.manifests().stream()
                             .map(InferredMultiProjectAssembler::local)
                             .collect(Collectors.toCollection(LinkedHashSet::new));
-                    sub.addStep("docker", new Docker(packaging.docker()).labels(packaging.dockerLabels()), Stream.concat(
+                    sub.addStep("docker", Docker.ofEnvironment(environment, packaging.docker()).labels(packaging.dockerLabels()), Stream.concat(
                             inputs.stream(),
                             inherited.sequencedKeySet().stream().filter(key -> manifests.contains(local(key)))));
                     images.add("docker");
