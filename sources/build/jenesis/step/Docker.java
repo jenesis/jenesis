@@ -12,22 +12,34 @@ import build.jenesis.SequencedProperties;
 public class Docker implements BuildStep {
 
     public static final String DOCKER = "docker/";
-    private static final String EXTENSIONS = "/app/extensions";
+    private static final String EXTENSIONS = "/app/extensions", ARGUMENTS = "/app/arguments";
 
     private final String from;
     private final String group;
+    private final List<String> options;
+    private final String diff;
 
     public Docker(String from) {
-        this(from, "main");
+        this(from, "main", List.of(), null);
     }
 
-    private Docker(String from, String group) {
+    private Docker(String from, String group, List<String> options, String diff) {
         this.from = from;
         this.group = group;
+        this.options = options;
+        this.diff = diff;
     }
 
     public Docker group(String group) {
-        return new Docker(from, group);
+        return new Docker(from, group, options, diff);
+    }
+
+    public Docker options(List<String> options) {
+        return new Docker(from, group, List.copyOf(options), diff);
+    }
+
+    public Docker diff(String diff) {
+        return new Docker(from, group, options, diff);
     }
 
     @Override
@@ -52,7 +64,7 @@ public class Docker implements BuildStep {
                 mainModule = launcher.getProperty("mainModule");
             }
         }
-        if (mainClass == null) {
+        if (mainClass == null && diff == null) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         SequencedMap<String, Path> jars = new TreeMap<>();
@@ -77,6 +89,61 @@ public class Docker implements BuildStep {
             granted.addAll(Inventory.nativeAccess(argument.folder()));
             layers.putAll(Layers.membership(argument.folder()));
             agents.putAll(Inventory.agents(argument.folder()));
+        }
+        if (diff != null) {
+            Set<String> declared = new HashSet<>();
+            for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
+                for (Path jar : Dependencies.select(argument.folder(), diff, "runtime")) {
+                    declared.add(identity(jar));
+                }
+            }
+            jars.values().removeIf(jar -> declared.contains(identity(jar)));
+            if (!layers.isEmpty()) {
+                throw new IllegalStateException("An image that extends " + from + " cannot hold the layers "
+                        + layers.sequencedKeySet() + ", which only the image that launches the application defines");
+            }
+            for (Path jar : jars.values()) {
+                if (granted.contains(jar.toAbsolutePath().normalize())) {
+                    throw new IllegalStateException("An image that extends " + from + " cannot grant native access to "
+                            + jar.getFileName() + " - name --enable-native-access in docker.options instead");
+                }
+            }
+            agents.keySet().retainAll(jars.sequencedKeySet());
+            List<String> command = new ArrayList<>();
+            agents.forEach((jar, parameters) -> command.add("-javaagent:" + EXTENSIONS + "/" + jar
+                    + (parameters.isEmpty() ? "" : "=" + parameters)));
+            command.addAll(options);
+            if (jars.isEmpty() && command.isEmpty()) {
+                throw new IllegalStateException("The image adds nothing to " + from
+                        + ": every module it holds is declared by docker.diff already, and docker.options is empty");
+            }
+            Path folder = Files.createDirectory(context.next().resolve(DOCKER));
+            StringBuilder dockerfile = new StringBuilder("FROM ").append(from).append('\n');
+            if (!jars.isEmpty()) {
+                Path store = Files.createDirectory(folder.resolve("extensions"));
+                for (Map.Entry<String, Path> entry : jars.entrySet()) {
+                    BuildStep.linkOrCopy(store.resolve(entry.getKey()), entry.getValue());
+                }
+                dockerfile.append("COPY extensions/ ").append(EXTENSIONS).append("/\n");
+            }
+            if (!command.isEmpty()) {
+                String name;
+                try {
+                    name = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                            .digest(String.join("\n", command).getBytes(StandardCharsets.UTF_8)), 0, 8) + ".args";
+                } catch (NoSuchAlgorithmException e) {
+                    throw new IllegalStateException("The JDK offers no SHA-256 digest", e);
+                }
+                ProcessBuildStep.argumentFile(Files.createDirectory(folder.resolve("arguments")).resolve(name), command);
+                dockerfile.append("COPY arguments/ ").append(ARGUMENTS).append("/\n")
+                        .append("ENV JDK_JAVA_OPTIONS=\"${JDK_JAVA_OPTIONS} @").append(ARGUMENTS).append('/')
+                        .append(name).append("\"\n");
+            }
+            Files.writeString(folder.resolve("Dockerfile"), dockerfile.toString());
+            return CompletableFuture.completedStage(new BuildStepResult(true));
         }
         if (jars.isEmpty()) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
@@ -123,14 +190,15 @@ public class Docker implements BuildStep {
             BuildStep.linkOrCopy(store.resolve(entry.getKey()), entry.getValue());
         }
         List<String> command = new ArrayList<>();
-        agents.forEach((jar, options) -> command.add("-javaagent:/app/jars/" + jar
-                + (options.isEmpty() ? "" : "=" + options)));
+        agents.forEach((jar, parameters) -> command.add("-javaagent:/app/jars/" + jar
+                + (parameters.isEmpty() ? "" : "=" + parameters)));
         layers.forEach((layer, membership) -> {
             command.add("-Djlayer.modulepath." + layer + "=" + path(membership.modulepath()));
             if (!membership.classpath().isEmpty()) {
                 command.add("-Djlayer.classpath." + layer + "=" + path(membership.classpath()));
             }
         });
+        command.addAll(options);
         if (!classpath.isEmpty()) {
             command.add("--class-path");
             command.add(modulepath.isEmpty()
@@ -155,6 +223,21 @@ public class Docker implements BuildStep {
                 .append("]\n")
                 .toString());
         return CompletableFuture.completedStage(new BuildStepResult(true));
+    }
+
+    private static String identity(Path jar) {
+        ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(jar);
+        if (descriptor != null) {
+            return descriptor.name();
+        }
+        try {
+            return ModuleFinder.of(jar).findAll().stream()
+                    .map(reference -> reference.descriptor().name())
+                    .findFirst()
+                    .orElse(jar.getFileName().toString());
+        } catch (FindException _) {
+            return jar.getFileName().toString();
+        }
     }
 
     private static String path(SequencedSet<String> names) {
