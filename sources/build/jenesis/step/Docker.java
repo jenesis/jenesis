@@ -23,16 +23,17 @@ public class Docker implements BuildStep {
     private final OffsetDateTime created;
 
     public Docker(String from) {
-        this(from, "main", new LinkedHashMap<>(), null);
+        this(from, "main", Collections.emptyNavigableMap(), null);
     }
 
     public static Docker ofEnvironment(Environment environment, String from) {
-        return new Docker(from).created(environment.value("archive.timestamp") == null
-                ? null
-                : BuildStep.timestamp(environment));
+        return new Docker(from,
+                "main",
+                Collections.emptyNavigableMap(),
+                environment.value("archive.timestamp") == null ? null : BuildStep.timestamp(environment));
     }
 
-    private Docker(String from, String group, SequencedMap<String, String> labels, OffsetDateTime created) {
+    public Docker(String from, String group, SequencedMap<String, String> labels, OffsetDateTime created) {
         this.from = from;
         this.group = group;
         this.labels = labels;
