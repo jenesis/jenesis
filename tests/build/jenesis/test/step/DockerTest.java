@@ -12,6 +12,7 @@ import build.jenesis.SequencedProperties;
 import build.jenesis.step.Docker;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class DockerTest {
 
@@ -137,6 +138,119 @@ public class DockerTest {
 
         assertThat(result.next()).isTrue();
         assertThat(next.resolve(Docker.DOCKER)).doesNotExist();
+    }
+
+    @Test
+    public void places_configured_options_ahead_of_the_paths() throws IOException {
+        writeModularJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("sample.jar"));
+        SequencedProperties launcher = new SequencedProperties();
+        launcher.setProperty("mainClass", "sample.Sample");
+        launcher.setProperty("mainModule", "sample");
+        launcher.store(input.resolve("launcher.properties"));
+
+        BuildStepResult result = new Docker("example:latest").options(List.of("-Dgreeting=hello", "-Xmx64m")).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        assertThat(arguments(next.resolve(Docker.DOCKER))).containsExactly(
+                "-Dgreeting=hello", "-Xmx64m",
+                "--module-path", "/app/jars/sample.jar:/app/extensions",
+                "--module", "sample/sample.Sample");
+    }
+
+    @Test
+    public void extends_an_image_with_the_modules_its_diff_does_not_declare() throws IOException {
+        writeModularJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("sample.jar"));
+        Path resolved = Files.createDirectory(input.resolve("resolved"));
+        writePlainJar(resolved.resolve("lib-2.0.jar"));
+        writePlainJar(resolved.resolve("extra-1.0.jar"));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/runtime/maven/lib", "resolved/lib-2.0.jar");
+        index.setProperty("main/runtime/maven/extra", "resolved/extra-1.0.jar");
+        index.store(input.resolve(BuildStep.DEPENDENCIES));
+        Path base = Files.createDirectory(root.resolve("base"));
+        writePlainJar(Files.createDirectory(base.resolve("resolved")).resolve("lib-1.0.jar"));
+        SequencedProperties declared = new SequencedProperties();
+        declared.setProperty("docker/runtime/maven/lib", "resolved/lib-1.0.jar");
+        declared.store(base.resolve(BuildStep.DEPENDENCIES));
+
+        SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+        arguments.put("input", new BuildStepArgument(
+                input,
+                Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
+                        Path.of("resolved/lib-2.0.jar"), Checksum.of(ChecksumStatus.ADDED),
+                        Path.of("resolved/extra-1.0.jar"), Checksum.of(ChecksumStatus.ADDED))));
+        arguments.put("base", new BuildStepArgument(
+                base,
+                Map.of(Path.of("resolved/lib-1.0.jar"), Checksum.of(ChecksumStatus.ADDED))));
+
+        BuildStepResult result = new Docker("example/base:1.0").diff("docker").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                arguments).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        Path folder = next.resolve(Docker.DOCKER);
+        assertThat(folder.resolve("extensions"))
+                .as("the module lib is declared by the base image already, in whatever version")
+                .isDirectoryContaining(path -> path.getFileName().toString().equals("sample.jar"))
+                .isDirectoryContaining(path -> path.getFileName().toString().equals("extra-1.0.jar"))
+                .isDirectoryNotContaining(path -> path.getFileName().toString().startsWith("lib-"));
+        assertThat(folder.resolve("application.args")).doesNotExist();
+        assertThat(dockerfile(folder)).containsExactly(
+                "FROM example/base:1.0",
+                "COPY extensions/ /app/extensions/");
+    }
+
+    @Test
+    public void hands_the_options_of_an_extending_image_to_java_through_its_own_argument_file() throws IOException {
+        writePlainJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("extension.jar"));
+
+        BuildStepResult result = new Docker("example/base:1.0").diff("docker").options(List.of("-Dgreeting=hello")).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("artifacts/extension.jar"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        Path folder = next.resolve(Docker.DOCKER);
+        List<String> dockerfile = dockerfile(folder);
+        assertThat(dockerfile).hasSize(4);
+        assertThat(dockerfile.subList(0, 3)).containsExactly(
+                "FROM example/base:1.0",
+                "COPY extensions/ /app/extensions/",
+                "COPY arguments/ /app/arguments/");
+        assertThat(dockerfile.getLast())
+                .as("appending to JDK_JAVA_OPTIONS keeps what every image below this one added")
+                .matches("ENV JDK_JAVA_OPTIONS=\"\\$\\{JDK_JAVA_OPTIONS} @/app/arguments/[0-9a-f]{16}\\.args\"");
+        String name = dockerfile.getLast().substring(dockerfile.getLast().lastIndexOf('/') + 1,
+                dockerfile.getLast().length() - 1);
+        assertThat(Files.readAllLines(folder.resolve("arguments").resolve(name))).containsExactly("\"-Dgreeting=hello\"");
+    }
+
+    @Test
+    public void refuses_an_extending_image_that_adds_nothing() throws IOException {
+        Path resolved = Files.createDirectory(input.resolve("resolved"));
+        writePlainJar(resolved.resolve("lib-1.0.jar"));
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/runtime/maven/lib", "resolved/lib-1.0.jar");
+        index.setProperty("docker/runtime/maven/lib", "resolved/lib-1.0.jar");
+        index.store(input.resolve(BuildStep.DEPENDENCIES));
+
+        assertThatThrownBy(() -> new Docker("example/base:1.0").diff("docker").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("resolved/lib-1.0.jar"), Checksum.of(ChecksumStatus.ADDED)))))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("adds nothing to example/base:1.0");
     }
 
     private static List<String> dockerfile(Path folder) throws IOException {

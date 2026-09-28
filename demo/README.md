@@ -118,6 +118,7 @@ Quick index
 | 67 | [`reproducible`](demo-67-reproducible/README.md)                  | Build the same bytes on every machine, checked against a recorded digest     | `java build/Demo.java`            |
 | 68 | [`native-image`](demo-68-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
 | 69 | [`jpx`](demo-69-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
+| 70 | [`docker-extension`](demo-70-docker-extension/README.md)          | Build an image on another image, adding only what it lacks                   | `java build/jenesis/Make.java stage`|
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1038,6 +1039,20 @@ be pointed at a mirror with `JENESIS_REPOSITORY_URI` and `MAVEN_REPOSITORY_URI`.
 
 The demo runs those same commands from `java build/Demo.java`, with the
 installation directed at its own `target/` so your home directory is left alone.
+
+## 52. An image built on another - [`docker-extension`](demo-70-docker-extension/README.md)
+
+The generated image of `java-modular-executable` keeps a folder, `/app/extensions/`, at the end of
+its module path. `docker-extension` builds an image `FROM` it that fills the folder:
+
+    docker=sample
+    docker.diff=org.slf4j
+    docker.options=-Dorg.slf4j.simpleLogger.showThreadName=false
+
+`docker.diff` names what the base image holds. The build resolves it and leaves every module it
+names out of the image, so the extension ships a logging backend but not the `slf4j-api` the base
+image has already. `docker.options` reaches `java` through an argument file that the image appends
+to `JDK_JAVA_OPTIONS`, so images stack without replacing the entry point or each other's options.
 
 Cross-cutting concepts
 ----------------------
