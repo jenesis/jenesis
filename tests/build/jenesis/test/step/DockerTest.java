@@ -51,7 +51,7 @@ public class DockerTest {
         Path folder = next.resolve(Docker.DOCKER);
         assertThat(folder.resolve("jars/app.jar")).isRegularFile();
         assertThat(folder.resolve("jars/lib.jar")).isRegularFile();
-        assertThat(dockerfile(folder)).containsExactly(
+        assertThat(dockerfile(folder)).containsSubsequence(
                 "FROM example:latest",
                 "WORKDIR /app",
                 "COPY jars/ /app/jars/",
@@ -84,7 +84,7 @@ public class DockerTest {
         assertThat(result.next()).isTrue();
         Path folder = next.resolve(Docker.DOCKER);
         assertThat(folder.resolve("jars/sample.jar")).isRegularFile();
-        assertThat(dockerfile(folder)).containsExactly(
+        assertThat(dockerfile(folder)).containsSubsequence(
                 "FROM example:latest",
                 "WORKDIR /app",
                 "COPY jars/ /app/jars/",
@@ -96,6 +96,69 @@ public class DockerTest {
                         "--class-path", "/app/extensions/classpath/*",
                         "--module-path", "/app/jars/sample.jar:/app/extensions/modulepath",
                         "--module", "sample/sample.Sample");
+    }
+
+    @Test
+    public void labels_the_image_with_the_metadata_of_the_module_and_the_configured_labels() throws IOException {
+        writeModularJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("sample.jar"));
+        SequencedProperties launcher = new SequencedProperties();
+        launcher.setProperty("mainClass", "sample.Sample");
+        launcher.setProperty("mainModule", "sample");
+        launcher.store(input.resolve("launcher.properties"));
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "com.example");
+        metadata.setProperty("artifact", "sample");
+        metadata.setProperty("name", "Sample");
+        metadata.setProperty("version", "1.0");
+        metadata.setProperty("description", "A sample\n   application");
+        metadata.setProperty("url", "https://example.com");
+        metadata.setProperty("scm.url", "https://example.com/sample.git");
+        metadata.setProperty("scm.revision", "0123abc");
+        metadata.setProperty("organization.name", "Example Corp.");
+        metadata.setProperty("developer.0.name", "Ada Lovelace");
+        metadata.setProperty("developer.0.email", "ada@example.com");
+        metadata.setProperty("developer.1.name", "Charles Babbage");
+        metadata.setProperty("license.0.name", "Apache License, Version 2.0");
+        metadata.store(input.resolve(BuildStep.METADATA));
+        SequencedMap<String, String> labels = new LinkedHashMap<>();
+        labels.put("com.example.team", "core \"$HOME\" \\");
+        labels.put("org.opencontainers.image.url", "");
+        labels.put("org.opencontainers.image.version", "1.0-custom");
+
+        BuildStepResult result = new Docker("example:latest").labels(labels).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        assertThat(dockerfile(next.resolve(Docker.DOCKER)))
+                .as("every standard label is written, so that none is inherited from the base image,"
+                        + " and a configured label replaces the one of the same name")
+                .containsExactly(
+                        "FROM example:latest",
+                        "LABEL \"org.opencontainers.image.base.name\"=\"example:latest\" \\",
+                        "      \"org.opencontainers.image.base.digest\"=\"\" \\",
+                        "      \"org.opencontainers.image.title\"=\"Sample\" \\",
+                        "      \"org.opencontainers.image.description\"=\"A sample application\" \\",
+                        "      \"org.opencontainers.image.version\"=\"1.0-custom\" \\",
+                        "      \"org.opencontainers.image.created\"=\"\" \\",
+                        "      \"org.opencontainers.image.authors\"=\"Ada Lovelace <ada@example.com>, Charles Babbage\" \\",
+                        "      \"org.opencontainers.image.url\"=\"\" \\",
+                        "      \"org.opencontainers.image.documentation\"=\"\" \\",
+                        "      \"org.opencontainers.image.source\"=\"https://example.com/sample.git\" \\",
+                        "      \"org.opencontainers.image.revision\"=\"0123abc\" \\",
+                        "      \"org.opencontainers.image.vendor\"=\"Example Corp.\" \\",
+                        "      \"org.opencontainers.image.licenses\"=\"Apache-2.0\" \\",
+                        "      \"org.opencontainers.image.ref.name\"=\"\" \\",
+                        "      \"com.example.team\"=\"core \\\"\\$HOME\\\" \\\\\"",
+                        "WORKDIR /app",
+                        "COPY jars/ /app/jars/",
+                        "COPY application.args /app/",
+                        "ENTRYPOINT [\"java\", \"@/app/application.args\"]");
     }
 
     @Test

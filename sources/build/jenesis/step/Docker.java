@@ -5,6 +5,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.License;
 import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
@@ -12,22 +13,29 @@ import build.jenesis.SequencedProperties;
 public class Docker implements BuildStep {
 
     public static final String DOCKER = "docker/";
-    private static final String MODULE_PATH = "/app/extensions/modulepath", CLASS_PATH = "/app/extensions/classpath/*";
+    private static final String MODULE_PATH = "/app/extensions/modulepath", CLASS_PATH = "/app/extensions/classpath/*",
+            ANNOTATION = "org.opencontainers.image.";
 
     private final String from;
     private final String group;
+    private final SequencedMap<String, String> labels;
 
     public Docker(String from) {
-        this(from, "main");
+        this(from, "main", new LinkedHashMap<>());
     }
 
-    private Docker(String from, String group) {
+    private Docker(String from, String group, SequencedMap<String, String> labels) {
         this.from = from;
         this.group = group;
+        this.labels = labels;
     }
 
     public Docker group(String group) {
-        return new Docker(from, group);
+        return new Docker(from, group, labels);
+    }
+
+    public Docker labels(SequencedMap<String, String> labels) {
+        return new Docker(from, group, new LinkedHashMap<>(labels));
     }
 
     @Override
@@ -145,7 +153,60 @@ public class Docker implements BuildStep {
             command.add(mainModule + "/" + mainClass);
         }
         ProcessBuildStep.argumentFile(folder.resolve("application.args"), command);
-        Files.writeString(folder.resolve("Dockerfile"), new StringBuilder("FROM ").append(from)
+        List<Path> folders = arguments.values().stream()
+                .filter(argument -> !argument.removed())
+                .map(BuildStepArgument::folder)
+                .toList();
+        SequencedProperties metadata = SequencedProperties.ofFolders(folders, METADATA);
+        SequencedMap<String, String> annotations = new LinkedHashMap<>();
+        annotations.put(ANNOTATION + "base.name", from);
+        annotations.put(ANNOTATION + "base.digest", null);
+        annotations.put(ANNOTATION + "title", metadata.value("name", metadata.value("artifact")));
+        annotations.put(ANNOTATION + "description", metadata.value("description"));
+        annotations.put(ANNOTATION + "version", metadata.value("version"));
+        annotations.put(ANNOTATION + "created", null);
+        annotations.put(ANNOTATION + "authors", null);
+        annotations.put(ANNOTATION + "url", metadata.value("url"));
+        annotations.put(ANNOTATION + "documentation", null);
+        annotations.put(ANNOTATION + "source", metadata.value("scm.url"));
+        annotations.put(ANNOTATION + "revision", metadata.value("scm.revision"));
+        annotations.put(ANNOTATION + "vendor", metadata.value("organization.name"));
+        annotations.put(ANNOTATION + "licenses", null);
+        annotations.put(ANNOTATION + "ref.name", null);
+        SequencedSet<String> developers = new LinkedHashSet<>(), licenses = new LinkedHashSet<>();
+        for (String key : metadata.stringPropertyNames()) {
+            if (key.startsWith("developer.") && key.lastIndexOf('.') > "developer.".length()) {
+                developers.add(key.substring(0, key.lastIndexOf('.') + 1));
+            } else if (key.startsWith("license.") && key.lastIndexOf('.') > "license.".length()) {
+                licenses.add(key.substring(0, key.lastIndexOf('.') + 1));
+            }
+        }
+        List<String> authors = new ArrayList<>();
+        for (String developer : developers) {
+            String name = metadata.value(developer + "name"), email = metadata.value(developer + "email");
+            if (name != null || email != null) {
+                authors.add(name == null ? "<" + email + ">" : email == null ? name : name + " <" + email + ">");
+            }
+        }
+        annotations.put(ANNOTATION + "authors", authors.isEmpty() ? null : String.join(", ", authors));
+        Map<String, String> aliases = Dependencies.aliases(folders);
+        List<String> identifiers = licenses.stream()
+                .map(license -> new License(null, null, metadata.value(license + "name"), metadata.value(license + "url"))
+                        .identified(aliases)
+                        .id())
+                .toList();
+        annotations.put(ANNOTATION + "licenses", identifiers.isEmpty() || identifiers.contains(null)
+                ? null
+                : String.join(" OR ", identifiers));
+        annotations.putAll(labels);
+        annotations.replaceAll((_, value) -> value == null ? "" : value);
+        StringBuilder dockerfile = new StringBuilder("FROM ").append(from);
+        String separator = "\nLABEL ";
+        for (Map.Entry<String, String> annotation : annotations.entrySet()) {
+            dockerfile.append(separator).append(label(annotation.getKey())).append('=').append(label(annotation.getValue()));
+            separator = " \\\n      ";
+        }
+        Files.writeString(folder.resolve("Dockerfile"), dockerfile
                 .append("\nWORKDIR /app\nCOPY jars/ /app/jars/\nCOPY application.args /app/\n")
                 .append("ENTRYPOINT [")
                 .append(quoted(List.of("java", "@/app/application.args")))
@@ -156,6 +217,17 @@ public class Docker implements BuildStep {
 
     private static String path(SequencedSet<String> names) {
         return names.stream().map(name -> "/app/jars/" + name).collect(Collectors.joining(":"));
+    }
+
+    private static String label(String value) {
+        StringBuilder builder = new StringBuilder("\"");
+        for (char character : value.strip().replaceAll("\\s+", " ").toCharArray()) {
+            switch (character) {
+                case '"', '\\', '$' -> builder.append('\\').append(character);
+                default -> builder.append(character);
+            }
+        }
+        return builder.append('"').toString();
     }
 
     private static String quoted(List<String> values) {

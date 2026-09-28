@@ -246,6 +246,7 @@ command travels in the argument file, so the `ENTRYPOINT` is the same three word
 large the closure grows:
 
     FROM eclipse-temurin:25-jre
+    LABEL ...                      the metadata, as in ../demo-08-java-pom-executable
     WORKDIR /app
     COPY jars/ /app/jars/
     COPY application.args /app/

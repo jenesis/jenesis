@@ -147,10 +147,28 @@ application: on the class path they come after its own jars, so they can add cla
 application's own jar.
 
     FROM eclipse-temurin:25-jre
+    LABEL "org.opencontainers.image.base.name"="eclipse-temurin:25-jre" \
+          "org.opencontainers.image.title"="java-pom-executable" \
+          "org.opencontainers.image.version"="1.0.0" \
+          "org.opencontainers.image.documentation"="https://jenesis.build" \
+          ...
     WORKDIR /app
     COPY jars/ /app/jars/
     COPY application.args /app/
     ENTRYPOINT ["java", "@/app/application.args"]
+
+The `LABEL` describes the image with the standard `org.opencontainers.image.*` keys, taken from
+what the project declares: its name, description, version and URL, its source repository and
+revision, its organization, developers and licences - what its SBOM names as well. A licence
+is written as an SPDX identifier, and only when every licence has one. Every standard key is
+written, empty where the project declares nothing, so that none is inherited from the base
+image: `eclipse-temurin` sets `version` and `created` for itself.
+
+A `docker.label.<name>=<value>` line in `packaging.properties` adds a label of your own, or
+replaces a standard one. This demo's `docker` profile adds the documentation:
+
+    docker=eclipse-temurin:25-jre
+    docker.label.org.opencontainers.image.documentation=https://jenesis.build
 
 The build never runs a container tool, so nothing here needs Docker installed. The
 staged folder is a complete build context, and creating the image is one command:
