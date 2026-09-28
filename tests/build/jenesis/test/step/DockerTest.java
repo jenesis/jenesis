@@ -8,6 +8,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Docker;
 
@@ -159,6 +160,30 @@ public class DockerTest {
                         "COPY jars/ /app/jars/",
                         "COPY application.args /app/",
                         "ENTRYPOINT [\"java\", \"@/app/application.args\"]");
+    }
+
+    @Test
+    public void labels_the_creation_time_only_when_the_archive_timestamp_is_set_explicitly() throws IOException {
+        writeModularJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("sample.jar"));
+        SequencedProperties launcher = new SequencedProperties();
+        launcher.setProperty("mainClass", "sample.Sample");
+        launcher.setProperty("mainModule", "sample");
+        launcher.store(input.resolve("launcher.properties"));
+
+        BuildStepResult result = Docker.ofEnvironment(
+                new Environment(Map.of("archive.timestamp", "2026-01-01T00:00:00+01:00")),
+                "example:latest").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        assertThat(dockerfile(next.resolve(Docker.DOCKER)))
+                .as("the creation time is written as an instant in UTC, as the OCI annotation expects")
+                .contains("      \"org.opencontainers.image.created\"=\"2025-12-31T23:00:00Z\" \\");
     }
 
     @Test
