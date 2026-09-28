@@ -173,19 +173,14 @@ public class Docker implements BuildStep {
         SequencedProperties metadata = SequencedProperties.ofFolders(folders, METADATA);
         SequencedMap<String, String> annotations = new LinkedHashMap<>();
         annotations.put(ANNOTATION + "base.name", from);
-        annotations.put(ANNOTATION + "base.digest", null);
         annotations.put(ANNOTATION + "title", metadata.value("name", metadata.value("artifact")));
         annotations.put(ANNOTATION + "description", metadata.value("description"));
         annotations.put(ANNOTATION + "version", metadata.value("version"));
         annotations.put(ANNOTATION + "created", created == null ? null : DateTimeFormatter.ISO_INSTANT.format(created));
-        annotations.put(ANNOTATION + "authors", null);
         annotations.put(ANNOTATION + "url", metadata.value("url"));
-        annotations.put(ANNOTATION + "documentation", null);
         annotations.put(ANNOTATION + "source", metadata.value("scm.url"));
         annotations.put(ANNOTATION + "revision", metadata.value("scm.revision"));
         annotations.put(ANNOTATION + "vendor", metadata.value("organization.name"));
-        annotations.put(ANNOTATION + "licenses", null);
-        annotations.put(ANNOTATION + "ref.name", null);
         SequencedSet<String> developers = new LinkedHashSet<>(), licenses = new LinkedHashSet<>();
         for (String key : metadata.stringPropertyNames()) {
             if (key.startsWith("developer.") && key.lastIndexOf('.') > "developer.".length()) {
@@ -212,7 +207,7 @@ public class Docker implements BuildStep {
                 ? null
                 : String.join(" OR ", identifiers));
         annotations.putAll(labels);
-        annotations.replaceAll((_, value) -> value == null ? "" : value);
+        annotations.values().removeIf(value -> value == null || value.isBlank());
         StringBuilder dockerfile = new StringBuilder("FROM ").append(from);
         String separator = "\nLABEL ";
         for (Map.Entry<String, String> annotation : annotations.entrySet()) {
