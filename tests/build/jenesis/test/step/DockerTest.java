@@ -59,7 +59,7 @@ public class DockerTest {
                 "ENTRYPOINT [\"java\", \"@/app/application.args\"]");
         assertThat(arguments(folder))
                 .as("the entry point names an argument file, so no path can outgrow the command line")
-                .containsExactly("--class-path", "/app/jars/app.jar:/app/jars/lib.jar", "sample.Sample");
+                .containsExactly("--class-path", "/app/jars/app.jar:/app/jars/lib.jar:/app/extensions/*", "sample.Sample");
     }
 
     @Test
@@ -87,9 +87,11 @@ public class DockerTest {
                 "COPY jars/ /app/jars/",
                 "COPY application.args /app/",
                 "ENTRYPOINT [\"java\", \"@/app/application.args\"]");
-        assertThat(arguments(folder)).containsExactly(
-                "--module-path", "/app/jars/sample.jar",
-                "--module", "sample/sample.Sample");
+        assertThat(arguments(folder))
+                .as("an image built from this one adds a module by copying its jar into /app/extensions")
+                .containsExactly(
+                        "--module-path", "/app/jars/sample.jar:/app/extensions",
+                        "--module", "sample/sample.Sample");
     }
 
     @Test
@@ -117,7 +119,7 @@ public class DockerTest {
         assertThat(folder.resolve("jars/lib.jar")).isRegularFile();
         assertThat(arguments(folder)).containsExactly(
                 "--class-path", "/app/jars/lib.jar",
-                "--module-path", "/app/jars/sample.jar",
+                "--module-path", "/app/jars/sample.jar:/app/extensions",
                 "--add-modules", "ALL-MODULE-PATH,ALL-DEFAULT",
                 "--module", "sample/sample.Sample");
     }

@@ -256,6 +256,56 @@ producing this. The staged folder is a complete build context:
 
     docker build -t sample target/stage/docker/output/module-sources
 
+An image to build on
+--------------------
+
+The module path in `application.args` ends with one folder that the build leaves empty:
+
+    "--module-path"
+    "/app/jars/demo.modular.executable-0-SNAPSHOT.jar:/app/jars/org.slf4j-2.0.16.jar:/app/extensions"
+
+`/app/extensions/` is where an image built `FROM` this one adds modules. Every jar of the
+application stays named, and is found before anything in that folder, so a jar added there can
+extend the application but never replace one of its modules. Adding a module needs no change to
+the argument file and no `ENTRYPOINT` of its own. The module system activates it: when a module
+uses a service, `java` resolves every module on the module path that provides it, and
+`ServiceLoader` finds them.
+
+This demo uses that already. `org.slf4j` looks up its logging backend as a service, and none is
+shipped, so `sample` runs with slf4j's no-op logger:
+
+    docker run --rm sample Ada
+
+    SLF4J(W): No SLF4J providers were found.
+    ...
+    Hello, Ada, from a packaged Java module built by Jenesis!
+
+An image built from it adds a provider, and nothing else:
+
+    FROM sample
+    COPY slf4j-simple-2.0.16.jar /app/extensions/
+
+Download the jar from Maven Central into an empty folder, then write that Dockerfile beside it:
+
+    curl -O https://repo1.maven.org/maven2/org/slf4j/slf4j-simple/2.0.16/slf4j-simple-2.0.16.jar
+    docker build -t sample-logging .
+    docker run --rm sample-logging Ada
+
+    [main] INFO sample.Sample - greeting Ada
+    Hello, Ada, from a packaged Java module built by Jenesis!
+
+Your own application offers the same hook the same way. One of its modules declares an
+interface and `uses` it, and an extension's module-info says
+`provides <interface> with <class>`. A module that provides no such service is only resolved
+when you name it. Name it through the `JDK_JAVA_OPTIONS` variable, which `java` reads before the
+argument file, and which an image can extend without removing what its base set:
+
+    ENV JDK_JAVA_OPTIONS="${JDK_JAVA_OPTIONS} --add-modules com.example.extension"
+
+A project without `mainModule` gets the same folder on its class path, as `/app/extensions/*`,
+where an extension is found through its `META-INF/services` entries
+(see `../demo-08-java-pom-executable`).
+
 A single executable jar with the launcher
 -----------------------------------------
 
