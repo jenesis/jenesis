@@ -487,7 +487,12 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     sub.addModule("launcher", launcher, launched);
                 }
                 if (packaging.docker() != null) {
-                    sub.addStep("docker", new Docker(packaging.docker()), inputs);
+                    SequencedSet<String> manifests = descriptor.manifests().stream()
+                            .map(InferredMultiProjectAssembler::local)
+                            .collect(Collectors.toCollection(LinkedHashSet::new));
+                    sub.addStep("docker", Docker.ofEnvironment(environment, packaging.docker()).labels(packaging.dockerLabels()), Stream.concat(
+                            inputs.stream(),
+                            inherited.sequencedKeySet().stream().filter(key -> manifests.contains(local(key)))));
                     images.add("docker");
                 }
                 if (packaging.nativeImage()) {
@@ -625,20 +630,39 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             boolean launcher,
                             boolean nativeImage,
                             String jpackage,
-                            String docker) {
+                            String docker,
+                            SequencedMap<String, String> dockerLabels) {
+
+        private static final String DOCKER_LABEL = "docker.label.";
 
         private static Packaging configured(Path properties) throws IOException {
             if (properties == null) {
-                return new Packaging(false, false, false, false, false, null, null);
+                return new Packaging(false, false, false, false, false, null, null, Collections.emptyNavigableMap());
             }
             SequencedProperties configuration = SequencedProperties.ofFiles(properties);
+            SequencedMap<String, String> labels = new LinkedHashMap<>();
+            configuration.forEachProperty((key, value) -> {
+                if (key.startsWith(DOCKER_LABEL)) {
+                    labels.put(key.substring(DOCKER_LABEL.length()), value.strip());
+                }
+            });
+            if (labels.containsKey("")) {
+                throw new IllegalArgumentException(properties + " sets " + DOCKER_LABEL + " without naming the label,"
+                        + " as " + DOCKER_LABEL + "<name>=<value>");
+            }
+            String docker = configuration.value("docker");
+            if (docker == null && !labels.isEmpty()) {
+                throw new IllegalArgumentException(properties + " sets " + DOCKER_LABEL + "* without docker=<image>,"
+                        + " which names the image the labels belong to");
+            }
             return new Packaging(configuration.flag("jmod"),
                     configuration.flag("jlink"),
                     configuration.flag("bundle"),
                     configuration.flag("launcher"),
                     configuration.flag("native"),
                     configuration.value("jpackage"),
-                    configuration.value("docker"));
+                    docker,
+                    labels);
         }
     }
 

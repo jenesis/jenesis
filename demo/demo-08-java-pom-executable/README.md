@@ -137,15 +137,48 @@ build cannot infer, and this demo commits `docker=eclipse-temurin:25-jre` as a
     `-- jars/                      the app jar and commons-lang3
 
 The generated file is the one written by hand above, with the entry point taken from the
-module's main class. Every jar on the path is named rather than globbed, and the command
+module's main class. Every jar of the application is named rather than globbed, and the command
 travels in the argument file, so the `ENTRYPOINT` stays this size however many jars the
-application resolves:
+application resolves. The class path ends with one glob, `/app/extensions/classpath/*`, and the
+module path is `/app/extensions/modulepath`. The build creates neither folder, and `java` skips a
+folder that does not exist. An image built `FROM` this one copies jars into them to extend the
+application: on the class path they come after its own jars, so they can add classes and
+`META-INF/services` entries, but a class the application already has is always loaded from the
+application's own jar.
 
     FROM eclipse-temurin:25-jre
+    LABEL "org.opencontainers.image.base.name"="eclipse-temurin:25-jre" \
+          "org.opencontainers.image.title"="java-pom-executable" \
+          "org.opencontainers.image.version"="1.0.0" \
+          "org.opencontainers.image.documentation"="https://jenesis.build" \
+          ...
     WORKDIR /app
     COPY jars/ /app/jars/
     COPY application.args /app/
     ENTRYPOINT ["java", "@/app/application.args"]
+
+The `LABEL` describes the image with the standard `org.opencontainers.image.*` keys, taken from
+what the project declares: its name, description, version and URL, its source repository and
+revision, its organization, developers and licences - what its SBOM names as well. A licence
+is written as an SPDX identifier, and only when every licence has one. Every standard key is
+written, empty where the project declares nothing, so that none is inherited from the base
+image: `eclipse-temurin` sets `version` and `created` for itself.
+
+`created` is left empty unless you name the time, since a clock reading would make every build
+differ. The time the archives record is the one it takes, when you set it explicitly - to the
+time of the commit that is built, for example:
+
+    java -Djenesis.make.profiles=docker -Djenesis.archive.timestamp=$(git log -1 --format=%cI) \
+        build/jenesis/Make.java stage
+
+A `docker.label.<name>=<value>` line in `packaging.properties` adds a label of your own, or
+replaces a standard one. An empty value suppresses a standard label: it is written empty, so the
+base image's value is not inherited either. `docker.label.org.opencontainers.image.created=`
+keeps an image without a creation time even where `jenesis.archive.timestamp` is set. This demo's
+`docker` profile adds the documentation:
+
+    docker=eclipse-temurin:25-jre
+    docker.label.org.opencontainers.image.documentation=https://jenesis.build
 
 The build never runs a container tool, so nothing here needs Docker installed. The
 staged folder is a complete build context, and creating the image is one command:

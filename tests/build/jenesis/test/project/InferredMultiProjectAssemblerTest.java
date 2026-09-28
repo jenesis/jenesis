@@ -23,6 +23,7 @@ import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.project.InferredTestObservationModule;
 import build.jenesis.project.ProjectModule;
 import build.jenesis.project.ProjectModuleDescriptor;
+import build.jenesis.step.Docker;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.JPackage;
 import build.jenesis.step.NativeImage;
@@ -279,6 +280,35 @@ public class InferredMultiProjectAssemblerTest {
         assertThatThrownBy(() -> fixture.execute("sub/native-image"))
                 .rootCause()
                 .hasMessageStartingWith("Unknown selector: native-image - ");
+    }
+
+    @Test
+    public void labels_the_docker_image_with_the_metadata_of_the_module_and_the_configured_labels() throws IOException {
+        Fixture fixture = setUp("main=sample.Sample\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"),
+                "docker=example:latest\ndocker.label.com.example.team=core\n");
+        Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "project=sample\nartifact=app\nversion=1\n");
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(
+                Files.createDirectory(fixture.artifacts().resolve(BuildStep.ARTIFACTS)).resolve("app.jar")))) {
+            jar.putNextEntry(new JarEntry("sample/Sample.class"));
+            jar.closeEntry();
+        }
+        Path docker = fixture.execute("package/docker").get("package/docker");
+        assertThat(docker.resolve(Docker.DOCKER).resolve("Dockerfile"))
+                .content()
+                .as("the metadata of the module reaches the image through its manifests")
+                .contains("\"org.opencontainers.image.title\"=\"app\"")
+                .contains("\"org.opencontainers.image.version\"=\"1\"")
+                .contains("\"com.example.team\"=\"core\"");
+    }
+
+    @Test
+    public void refuses_a_docker_label_without_the_image_it_belongs_to() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"), "docker.label.com.example.team=core\n");
+        assertThatThrownBy(() -> fixture.execute("package/docker"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("without docker=<image>");
     }
 
     @Test

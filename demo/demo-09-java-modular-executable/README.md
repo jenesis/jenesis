@@ -246,6 +246,7 @@ command travels in the argument file, so the `ENTRYPOINT` is the same three word
 large the closure grows:
 
     FROM eclipse-temurin:25-jre
+    LABEL ...                      the metadata, as in ../demo-08-java-pom-executable
     WORKDIR /app
     COPY jars/ /app/jars/
     COPY application.args /app/
@@ -255,6 +256,67 @@ The build never runs a container tool, so no Docker installation is involved in
 producing this. The staged folder is a complete build context:
 
     docker build -t sample target/stage/docker/output/module-sources
+
+An image to build on
+--------------------
+
+The module path and the class path in `application.args` each end with a folder under
+`/app/extensions/`:
+
+    "--class-path"
+    "/app/extensions/classpath/*"
+    "--module-path"
+    "/app/jars/demo.modular.executable-0-SNAPSHOT.jar:/app/jars/org.slf4j-2.0.16.jar:/app/extensions/modulepath"
+
+The build creates neither folder, and `java` skips a folder that does not exist, so the image runs
+as if they were not named. An image built `FROM` this one creates them by copying jars in:
+`modulepath/` for a jar that is a module, `classpath/` for one that is not. Every jar of the
+application stays named, and is found before anything in those folders, so a jar added there can
+extend the application but never replace one of its modules. Adding a jar needs no change to the
+argument file and no `ENTRYPOINT` of its own. The module system activates a module: when a module
+uses a service, `java` resolves every module on the module path that provides it, and
+`ServiceLoader` finds them - on the class path, through its `META-INF/services` entries.
+
+This demo uses that already. `org.slf4j` looks up its logging backend as a service, and none is
+shipped, so `sample` runs with slf4j's no-op logger:
+
+    docker run --rm sample Ada
+
+    SLF4J(W): No SLF4J providers were found.
+    ...
+    Hello, Ada, from a packaged Java module built by Jenesis!
+
+An image built from it adds a provider, and nothing else:
+
+    FROM sample
+    COPY slf4j-simple-2.0.16.jar /app/extensions/modulepath/
+
+Download the jar from Maven Central into an empty folder, then write that Dockerfile beside it:
+
+    curl -O https://repo1.maven.org/maven2/org/slf4j/slf4j-simple/2.0.16/slf4j-simple-2.0.16.jar
+    docker build -t sample-logging .
+    docker run --rm sample-logging Ada
+
+    [main] INFO sample.Sample - greeting Ada
+    Hello, Ada, from a packaged Java module built by Jenesis!
+
+Your own application offers the same hook the same way. One of its modules declares an
+interface and `uses` it, and an extension's module-info says
+`provides <interface> with <class>`. A module that provides no such service is only resolved
+when you name it, and a system property is set on the command line. Both are options for `java`,
+and `java` reads more of them from the `JDK_JAVA_OPTIONS` variable, ahead of the `ENTRYPOINT`'s
+command line. An image extends the variable rather than replacing it, so it keeps what every
+image below it added:
+
+    ENV JDK_JAVA_OPTIONS="${JDK_JAVA_OPTIONS} --add-modules com.example.extension -Dcom.example.enabled=true"
+
+The variable may also name an argument file, as `@/app/extension.args`, which the image copies in.
+`docker run -e JDK_JAVA_OPTIONS=...` sets it for a single container. `java` prints a `NOTE` line
+naming the variable whenever it is set.
+
+A project without `mainModule` names the same two folders (see `../demo-08-java-pom-executable`).
+Its application runs on the class path, so a module in `modulepath/` is resolved only when
+`--add-modules` names it.
 
 A single executable jar with the launcher
 -----------------------------------------
