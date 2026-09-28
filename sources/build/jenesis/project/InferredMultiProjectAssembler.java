@@ -637,7 +637,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
 
         private static Packaging configured(Path properties) throws IOException {
             if (properties == null) {
-                return new Packaging(false, false, false, false, false, null, null, new LinkedHashMap<>());
+                return new Packaging(false, false, false, false, false, null, null, Collections.emptyNavigableMap());
             }
             SequencedProperties configuration = SequencedProperties.ofFiles(properties);
             SequencedMap<String, String> labels = new LinkedHashMap<>();
