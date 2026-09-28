@@ -91,37 +91,47 @@ the build tool works.
 Build performance
 -----------------
 
-Measured on `35e51bbc` - v0.12.0 plus the 23 commits after it - by the on-demand
+Measured on `ec15f6ea` - v0.15.2 plus the 67 commits after it - by the on-demand
 [benchmark workflow](.github/workflows/benchmark.yml) on a GitHub `ubuntu-latest` runner, with GraalVM JDK
-25.0.4 and Maven 3.9.9 ([run 34607103168](https://github.com/jenesis/jenesis/actions/runs/34607103168)). Both
-tools compile the same 166 main and 158 test sources with the tests compiled but not executed, from warm
+25.0.4 and Maven 3.9.9 ([run 36336605019](https://github.com/jenesis/jenesis/actions/runs/36336605019)). Both
+tools compile the same 188 main and 183 test sources with the tests compiled but not executed, from warm
 dependency caches; wall clock comes from `/usr/bin/time` rather than from either tool's own report, as the
 median of five cold runs and of three for the rest.
 
 | Scenario | Maven 3 | Jenesis | + daemon | native image |
 |----------|---------|---------|----------|--------------|
-| cold, empty `target/` | 16.35 s | 14.99 s | 8.39 s | 9.95 s |
-| warm no-op | 2.03 s | 0.66 s | 0.41 s | 0.12 s |
-| one-line edit to a test source | 14.20 s | 12.82 s | 6.47 s | 8.27 s |
-| one-line edit to a main source | 16.49 s | 15.15 s | 7.76 s | 10.00 s |
-| spurious `touch`, content identical | 16.43 s | 0.65 s | 0.46 s | 0.12 s |
+| cold, empty `target/` | 14.50 s | 13.51 s | 7.98 s | 8.92 s |
+| warm no-op | 1.59 s | 0.67 s | 0.41 s | 0.12 s |
+| one-line edit to a test source | 12.02 s | 11.40 s | 7.09 s | 6.87 s |
+| one-line edit to a main source | 14.25 s | 13.62 s | 7.73 s | 8.94 s |
+| spurious `touch`, content identical | 14.37 s | 0.65 s | 0.37 s | 0.13 s |
 
 The Jenesis column is the `javac`-precompiled engine. Running it from source costs the launcher's own compile
-on top - 0.99 s of launch overhead against 0.18 s, and a full engine rebuild whenever the edited file is an
+on top - 0.94 s of launch overhead against 0.15 s, and a full engine rebuild whenever the edited file is an
 engine source, as every main source is in this repository.
 
 The table says two different things. An ordinary edit costs about what Maven costs, because in a single-module
 project a changed main class invalidates nearly every step below it; the daemon and the native launcher are
 where the difference comes from. What the content-addressed cache buys is the last two rows - a rebuild that
-changes nothing costs 0.66 s against 2.03 s, and a file whose timestamp moved while its bytes did not costs
-0.65 s against a full 16.43 s Maven rebuild.
+changes nothing costs 0.67 s against 1.59 s, and a file whose timestamp moved while its bytes did not costs
+0.65 s against a full 14.37 s Maven rebuild.
 
-From an empty machine, Maven downloads 9.5 MB of distribution before it can start and then pulls 31.5 MB of
-plugins into an empty repository for a 30.89 s first build. The engine is vendored source: it downloads
-nothing, compiles itself in 5.31 s, fetches 48 KB and builds in 16.38 s.
+With the whole test suite executed, the two tools are level on a cold build - 394.61 s against 402.38 s -
+because the tests dominate. A warm no-op is where they part: Maven runs the suite again in 387.62 s, Jenesis
+finds nothing changed in 0.68 s, and in 0.43 s with the daemon.
 
-This is one project on one runner class. [`benchmark/README.md`](benchmark/README.md) has the full tables,
-every platform, and what the figures do and do not support.
+From an empty machine, Maven transfers up to 18.9 MB for its distribution before it can start and then up to
+65.8 MB into an empty repository for a 21.54 s first build. The engine is vendored source: it downloads
+nothing, compiles itself in 5.01 s, fetches 111 KB and builds in 14.49 s.
+
+The same run measured `macos-latest` and `windows-latest`, where every Jenesis column is ahead of Maven in
+every row as well; both tools are about twice as slow on Windows. Two settings do not pay off on this
+project: `jenesis.make.aot` is no faster than the precompiled engine alone (0.77 s against 0.66 s for a
+no-op, after a 1.90 s training build), and stripping checksums with `jenesis.dependency.pin=versions` saves
+nothing measurable (13.35 s against 13.49 s cold).
+
+This is one project on one runner class. The run's summary holds the tables for all three runners, and
+[`benchmark/README.md`](benchmark/README.md) describes the method and what the figures do and do not support.
 
 Demos
 -----
