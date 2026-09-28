@@ -150,7 +150,8 @@ application's own jar.
     LABEL "org.opencontainers.image.base.name"="eclipse-temurin:25-jre" \
           "org.opencontainers.image.title"="java-pom-executable" \
           "org.opencontainers.image.version"="1.0.0" \
-          "org.opencontainers.image.documentation"="https://jenesis.build"
+          "org.opencontainers.image.documentation"="https://jenesis.build" \
+          ...
     WORKDIR /app
     COPY jars/ /app/jars/
     COPY application.args /app/
@@ -159,11 +160,11 @@ application's own jar.
 The `LABEL` describes the image with the standard `org.opencontainers.image.*` keys, taken from
 what the project declares: its name, description, version and URL, its source repository and
 revision, its organization, developers and licences - what its SBOM names as well. A licence
-is written as an SPDX identifier, and only when every licence has one. A label the project does
-not declare is not written, and is then inherited from the base image: `eclipse-temurin` labels
-its own `version` and `created`, which a project with a version of its own replaces.
+is written as an SPDX identifier, and only when every licence has one. Every standard key is
+written, empty where the project declares nothing, so that none is inherited from the base
+image: `eclipse-temurin` sets `version` and `created` for itself.
 
-`created` is left out unless you name the time, since a clock reading would make every build
+`created` is left empty unless you name the time, since a clock reading would make every build
 differ. The time the archives record is the one it takes, when you set it explicitly - to the
 time of the commit that is built, for example:
 
@@ -171,9 +172,10 @@ time of the commit that is built, for example:
         build/jenesis/Make.java stage
 
 A `docker.label.<name>=<value>` line in `packaging.properties` adds a label of your own, or
-replaces a standard one. An empty value drops a label:
-`docker.label.org.opencontainers.image.created=` leaves out the creation time even where
-`jenesis.archive.timestamp` is set. This demo's `docker` profile adds the documentation:
+replaces a standard one. An empty value suppresses a standard label: it is written empty, so the
+base image's value is not inherited either. `docker.label.org.opencontainers.image.created=`
+keeps an image without a creation time even where `jenesis.archive.timestamp` is set. This demo's
+`docker` profile adds the documentation:
 
     docker=eclipse-temurin:25-jre
     docker.label.org.opencontainers.image.documentation=https://jenesis.build
