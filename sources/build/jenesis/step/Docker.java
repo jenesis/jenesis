@@ -12,7 +12,7 @@ import build.jenesis.SequencedProperties;
 public class Docker implements BuildStep {
 
     public static final String DOCKER = "docker/";
-    private static final String EXTENSIONS = "/app/extensions";
+    private static final String EXTENSIONS = "/app/extensions", MODULE_PATH = "modulepath", CLASS_PATH = "classpath";
 
     private final String from;
     private final String group;
@@ -108,7 +108,7 @@ public class Docker implements BuildStep {
             agents.keySet().retainAll(jars.sequencedKeySet());
             if (!agents.isEmpty()) {
                 throw new IllegalStateException("An image that extends " + from + " cannot attach the agents "
-                        + agents.sequencedKeySet() + " - name -javaagent:" + EXTENSIONS + "/<jar> in JDK_JAVA_OPTIONS instead");
+                        + agents.sequencedKeySet() + " - name -javaagent:<jar> in JDK_JAVA_OPTIONS instead");
             }
             if (jars.isEmpty()) {
                 throw new IllegalStateException("The image adds nothing to " + from
@@ -117,7 +117,10 @@ public class Docker implements BuildStep {
             Path folder = Files.createDirectory(context.next().resolve(DOCKER)),
                     store = Files.createDirectory(folder.resolve("extensions"));
             for (Map.Entry<String, Path> entry : jars.entrySet()) {
-                BuildStep.linkOrCopy(store.resolve(entry.getKey()), entry.getValue());
+                Path target = Files.createDirectories(store.resolve(PathPlacement.INFERRED.test(entry.getValue())
+                        ? MODULE_PATH
+                        : CLASS_PATH));
+                BuildStep.linkOrCopy(target.resolve(entry.getKey()), entry.getValue());
             }
             Files.writeString(folder.resolve("Dockerfile"), "FROM " + from + "\nCOPY extensions/ " + EXTENSIONS + "/\n");
             return CompletableFuture.completedStage(new BuildStepResult(true));
@@ -175,18 +178,17 @@ public class Docker implements BuildStep {
                 command.add("-Djlayer.classpath." + layer + "=" + path(membership.classpath()));
             }
         });
-        if (!classpath.isEmpty()) {
-            command.add("--class-path");
-            command.add(modulepath.isEmpty()
-                    ? path(classpath.sequencedKeySet()) + ":" + EXTENSIONS + "/*"
-                    : path(classpath.sequencedKeySet()));
-        }
+        command.add("--class-path");
+        command.add(classpath.isEmpty()
+                ? EXTENSIONS + "/" + CLASS_PATH + "/*"
+                : path(classpath.sequencedKeySet()) + ":" + EXTENSIONS + "/" + CLASS_PATH + "/*");
+        command.add("--module-path");
         if (modulepath.isEmpty()) {
+            command.add(EXTENSIONS + "/" + MODULE_PATH);
             command.addAll(graph.arguments());
             command.add(mainClass);
         } else {
-            command.add("--module-path");
-            command.add(path(modulepath.sequencedKeySet()) + ":" + EXTENSIONS);
+            command.add(path(modulepath.sequencedKeySet()) + ":" + EXTENSIONS + "/" + MODULE_PATH);
             command.addAll(graph.arguments());
             command.add("--module");
             command.add(mainModule + "/" + mainClass);

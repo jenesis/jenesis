@@ -60,7 +60,10 @@ public class DockerTest {
                 "ENTRYPOINT [\"java\", \"@/app/application.args\"]");
         assertThat(arguments(folder))
                 .as("the entry point names an argument file, so no path can outgrow the command line")
-                .containsExactly("--class-path", "/app/jars/app.jar:/app/jars/lib.jar:/app/extensions/*", "sample.Sample");
+                .containsExactly(
+                        "--class-path", "/app/jars/app.jar:/app/jars/lib.jar:/app/extensions/classpath/*",
+                        "--module-path", "/app/extensions/modulepath",
+                        "sample.Sample");
     }
 
     @Test
@@ -89,9 +92,10 @@ public class DockerTest {
                 "COPY application.args /app/",
                 "ENTRYPOINT [\"java\", \"@/app/application.args\"]");
         assertThat(arguments(folder))
-                .as("an image built from this one adds a module by copying its jar into /app/extensions")
+                .as("an image built from this one adds a jar by copying it into a folder under /app/extensions")
                 .containsExactly(
-                        "--module-path", "/app/jars/sample.jar:/app/extensions",
+                        "--class-path", "/app/extensions/classpath/*",
+                        "--module-path", "/app/jars/sample.jar:/app/extensions/modulepath",
                         "--module", "sample/sample.Sample");
     }
 
@@ -119,8 +123,8 @@ public class DockerTest {
         assertThat(folder.resolve("jars/sample.jar")).isRegularFile();
         assertThat(folder.resolve("jars/lib.jar")).isRegularFile();
         assertThat(arguments(folder)).containsExactly(
-                "--class-path", "/app/jars/lib.jar",
-                "--module-path", "/app/jars/sample.jar:/app/extensions",
+                "--class-path", "/app/jars/lib.jar:/app/extensions/classpath/*",
+                "--module-path", "/app/jars/sample.jar:/app/extensions/modulepath",
                 "--add-modules", "ALL-MODULE-PATH,ALL-DEFAULT",
                 "--module", "sample/sample.Sample");
     }
@@ -173,11 +177,11 @@ public class DockerTest {
 
         assertThat(result.next()).isTrue();
         Path folder = next.resolve(Docker.DOCKER);
-        assertThat(folder.resolve("extensions"))
+        assertThat(folder.resolve("extensions/modulepath/sample.jar")).isRegularFile();
+        assertThat(folder.resolve("extensions/classpath/extra-1.0.jar")).isRegularFile();
+        assertThat(folder.resolve("extensions/classpath/lib-2.0.jar"))
                 .as("the module lib is declared by the base image already, in whatever version")
-                .isDirectoryContaining(path -> path.getFileName().toString().equals("sample.jar"))
-                .isDirectoryContaining(path -> path.getFileName().toString().equals("extra-1.0.jar"))
-                .isDirectoryNotContaining(path -> path.getFileName().toString().startsWith("lib-"));
+                .doesNotExist();
         assertThat(folder.resolve("application.args")).doesNotExist();
         assertThat(dockerfile(folder)).containsExactly(
                 "FROM example/base:1.0",
