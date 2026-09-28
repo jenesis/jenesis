@@ -85,6 +85,10 @@ public class DockerTest {
         assertThat(result.next()).isTrue();
         Path folder = next.resolve(Docker.DOCKER);
         assertThat(folder.resolve("jars/sample.jar")).isRegularFile();
+        assertThat(dockerfile(folder))
+                .as("a module without metadata writes its labels empty, so that the base image's are not inherited")
+                .contains("      \"org.opencontainers.image.version\"=\"\" \\",
+                        "      \"org.opencontainers.image.created\"=\"\" \\");
         assertThat(dockerfile(folder)).containsSubsequence(
                 "FROM example:latest",
                 "WORKDIR /app",
@@ -137,18 +141,24 @@ public class DockerTest {
 
         assertThat(result.next()).isTrue();
         assertThat(dockerfile(next.resolve(Docker.DOCKER)))
-                .as("a configured label replaces the one of the same name, and an empty one drops it")
+                .as("every standard label is written, so that none is inherited from the base image,"
+                        + " and a configured label replaces the one of the same name")
                 .containsExactly(
                         "FROM example:latest",
                         "LABEL \"org.opencontainers.image.base.name\"=\"example:latest\" \\",
+                        "      \"org.opencontainers.image.base.digest\"=\"\" \\",
                         "      \"org.opencontainers.image.title\"=\"Sample\" \\",
                         "      \"org.opencontainers.image.description\"=\"A sample application\" \\",
                         "      \"org.opencontainers.image.version\"=\"1.0-custom\" \\",
+                        "      \"org.opencontainers.image.created\"=\"\" \\",
+                        "      \"org.opencontainers.image.authors\"=\"Ada Lovelace <ada@example.com>, Charles Babbage\" \\",
+                        "      \"org.opencontainers.image.url\"=\"\" \\",
+                        "      \"org.opencontainers.image.documentation\"=\"\" \\",
                         "      \"org.opencontainers.image.source\"=\"https://example.com/sample.git\" \\",
                         "      \"org.opencontainers.image.revision\"=\"0123abc\" \\",
                         "      \"org.opencontainers.image.vendor\"=\"Example Corp.\" \\",
-                        "      \"org.opencontainers.image.authors\"=\"Ada Lovelace <ada@example.com>, Charles Babbage\" \\",
                         "      \"org.opencontainers.image.licenses\"=\"Apache-2.0\" \\",
+                        "      \"org.opencontainers.image.ref.name\"=\"\" \\",
                         "      \"com.example.team\"=\"core \\\"\\$HOME\\\" \\\\\"",
                         "WORKDIR /app",
                         "COPY jars/ /app/jars/",
@@ -177,11 +187,11 @@ public class DockerTest {
         assertThat(result.next()).isTrue();
         assertThat(dockerfile(next.resolve(Docker.DOCKER)))
                 .as("the creation time is written as an instant in UTC, as the OCI annotation expects")
-                .anyMatch(line -> line.contains("\"org.opencontainers.image.created\"=\"2025-12-31T23:00:00Z\""));
+                .contains("      \"org.opencontainers.image.created\"=\"2025-12-31T23:00:00Z\" \\");
     }
 
     @Test
-    public void drops_the_creation_time_by_an_empty_label() throws IOException {
+    public void suppresses_the_creation_time_by_an_empty_label() throws IOException {
         writeModularJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("sample.jar"));
         SequencedProperties launcher = new SequencedProperties();
         launcher.setProperty("mainClass", "sample.Sample");
@@ -202,7 +212,8 @@ public class DockerTest {
 
         assertThat(result.next()).isTrue();
         assertThat(dockerfile(next.resolve(Docker.DOCKER)))
-                .noneMatch(line -> line.contains("org.opencontainers.image.created"));
+                .as("an empty label stays written, so the base image's creation time is not inherited either")
+                .contains("      \"org.opencontainers.image.created\"=\"\" \\");
     }
 
     @Test
