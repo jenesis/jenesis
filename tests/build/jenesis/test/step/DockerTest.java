@@ -187,6 +187,32 @@ public class DockerTest {
     }
 
     @Test
+    public void suppresses_the_creation_time_by_an_empty_label() throws IOException {
+        writeModularJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("sample.jar"));
+        SequencedProperties launcher = new SequencedProperties();
+        launcher.setProperty("mainClass", "sample.Sample");
+        launcher.setProperty("mainModule", "sample");
+        launcher.store(input.resolve("launcher.properties"));
+        SequencedMap<String, String> labels = new LinkedHashMap<>();
+        labels.put("org.opencontainers.image.created", "");
+
+        BuildStepResult result = Docker.ofEnvironment(
+                new Environment(Map.of("archive.timestamp", "2026-01-01T00:00:00Z")),
+                "example:latest").labels(labels).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("artifacts/sample.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("launcher.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        assertThat(dockerfile(next.resolve(Docker.DOCKER)))
+                .as("an empty label stays written, so the base image's creation time is not inherited either")
+                .contains("      \"org.opencontainers.image.created\"=\"\" \\");
+    }
+
+    @Test
     public void relaxes_the_graph_when_a_class_path_jar_is_present() throws IOException {
         Path artifacts = Files.createDirectory(input.resolve(BuildStep.ARTIFACTS));
         writeModularJar(artifacts.resolve("sample.jar"));

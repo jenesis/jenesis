@@ -172,7 +172,10 @@ time of the commit that is built, for example:
         build/jenesis/Make.java stage
 
 A `docker.label.<name>=<value>` line in `packaging.properties` adds a label of your own, or
-replaces a standard one. This demo's `docker` profile adds the documentation:
+replaces a standard one. An empty value suppresses a standard label: it is written empty, so the
+base image's value is not inherited either. `docker.label.org.opencontainers.image.created=`
+keeps an image without a creation time even where `jenesis.archive.timestamp` is set. This demo's
+`docker` profile adds the documentation:
 
     docker=eclipse-temurin:25-jre
     docker.label.org.opencontainers.image.documentation=https://jenesis.build
