@@ -12,6 +12,7 @@ import build.jenesis.SequencedProperties;
 public class Docker implements BuildStep {
 
     public static final String DOCKER = "docker/";
+    private static final String EXTENSIONS = "/app/extensions";
 
     private final String from;
     private final String group;
@@ -132,14 +133,16 @@ public class Docker implements BuildStep {
         });
         if (!classpath.isEmpty()) {
             command.add("--class-path");
-            command.add(path(classpath.sequencedKeySet()));
+            command.add(modulepath.isEmpty()
+                    ? path(classpath.sequencedKeySet()) + ":" + EXTENSIONS + "/*"
+                    : path(classpath.sequencedKeySet()));
         }
         if (modulepath.isEmpty()) {
             command.addAll(graph.arguments());
             command.add(mainClass);
         } else {
             command.add("--module-path");
-            command.add(path(modulepath.sequencedKeySet()));
+            command.add(path(modulepath.sequencedKeySet()) + ":" + EXTENSIONS);
             command.addAll(graph.arguments());
             command.add("--module");
             command.add(mainModule + "/" + mainClass);

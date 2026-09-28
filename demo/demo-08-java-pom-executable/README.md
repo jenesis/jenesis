@@ -137,9 +137,12 @@ build cannot infer, and this demo commits `docker=eclipse-temurin:25-jre` as a
     `-- jars/                      the app jar and commons-lang3
 
 The generated file is the one written by hand above, with the entry point taken from the
-module's main class. Every jar on the path is named rather than globbed, and the command
+module's main class. Every jar of the application is named rather than globbed, and the command
 travels in the argument file, so the `ENTRYPOINT` stays this size however many jars the
-application resolves:
+application resolves. The class path ends with one glob, `/app/extensions/*`, a folder the build
+leaves empty. An image built `FROM` this one copies jars into it to extend the application:
+they come after its own jars, so they can add classes and `META-INF/services` entries, but a class
+the application already has is always loaded from the application's own jar.
 
     FROM eclipse-temurin:25-jre
     WORKDIR /app
