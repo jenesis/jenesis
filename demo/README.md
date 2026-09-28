@@ -1042,8 +1042,9 @@ installation directed at its own `target/` so your home directory is left alone.
 
 ## 52. An image built on another - [`docker-extension`](demo-70-docker-extension/README.md)
 
-The generated image of `java-modular-executable` keeps a folder, `/app/extensions/`, at the end of
-its module path. `docker-extension` builds an image `FROM` it that fills the folder:
+The generated image of `java-modular-executable` ends its module path with
+`/app/extensions/modulepath` and its class path with `/app/extensions/classpath/*`, folders that
+only an image built on it creates. `docker-extension` builds such an image `FROM` it:
 
     docker=sample
     docker.diff=org.slf4j

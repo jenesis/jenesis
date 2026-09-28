@@ -46,9 +46,12 @@ Run it
 
     target/stage/docker/output/module-sources/
     |-- Dockerfile
-    `-- extensions/                    this module and org.slf4j.simple, without org.slf4j
+    `-- extensions/
+        `-- modulepath/                this module and org.slf4j.simple, without org.slf4j
 
-The `Dockerfile` adds the jars to the folder `sample` keeps for extensions, and nothing else:
+A jar that is a module goes into `modulepath/`, any other jar into `classpath/`. The `Dockerfile`
+adds them to the folders under `/app/extensions/` that `sample` names on its paths, and nothing
+else:
 
     FROM sample
     COPY extensions/ /app/extensions/

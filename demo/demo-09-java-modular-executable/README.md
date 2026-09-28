@@ -259,17 +259,22 @@ producing this. The staged folder is a complete build context:
 An image to build on
 --------------------
 
-The module path in `application.args` ends with one folder that the build leaves empty:
+The module path and the class path in `application.args` each end with a folder under
+`/app/extensions/`:
 
+    "--class-path"
+    "/app/extensions/classpath/*"
     "--module-path"
-    "/app/jars/demo.modular.executable-0-SNAPSHOT.jar:/app/jars/org.slf4j-2.0.16.jar:/app/extensions"
+    "/app/jars/demo.modular.executable-0-SNAPSHOT.jar:/app/jars/org.slf4j-2.0.16.jar:/app/extensions/modulepath"
 
-`/app/extensions/` is where an image built `FROM` this one adds modules. Every jar of the
-application stays named, and is found before anything in that folder, so a jar added there can
-extend the application but never replace one of its modules. Adding a module needs no change to
-the argument file and no `ENTRYPOINT` of its own. The module system activates it: when a module
+The build creates neither folder, and `java` skips a folder that does not exist, so the image runs
+as if they were not named. An image built `FROM` this one creates them by copying jars in:
+`modulepath/` for a jar that is a module, `classpath/` for one that is not. Every jar of the
+application stays named, and is found before anything in those folders, so a jar added there can
+extend the application but never replace one of its modules. Adding a jar needs no change to the
+argument file and no `ENTRYPOINT` of its own. The module system activates a module: when a module
 uses a service, `java` resolves every module on the module path that provides it, and
-`ServiceLoader` finds them.
+`ServiceLoader` finds them - on the class path, through its `META-INF/services` entries.
 
 This demo uses that already. `org.slf4j` looks up its logging backend as a service, and none is
 shipped, so `sample` runs with slf4j's no-op logger:
@@ -283,7 +288,7 @@ shipped, so `sample` runs with slf4j's no-op logger:
 An image built from it adds a provider, and nothing else:
 
     FROM sample
-    COPY slf4j-simple-2.0.16.jar /app/extensions/
+    COPY slf4j-simple-2.0.16.jar /app/extensions/modulepath/
 
 Download the jar from Maven Central into an empty folder, then write that Dockerfile beside it:
 
@@ -308,9 +313,9 @@ The variable may also name an argument file, as `@/app/extension.args`, which th
 `docker run -e JDK_JAVA_OPTIONS=...` sets it for a single container. `java` prints a `NOTE` line
 naming the variable whenever it is set.
 
-A project without `mainModule` gets the same folder on its class path, as `/app/extensions/*`,
-where an extension is found through its `META-INF/services` entries
-(see `../demo-08-java-pom-executable`).
+A project without `mainModule` names the same two folders (see `../demo-08-java-pom-executable`).
+Its application runs on the class path, so a module in `modulepath/` is resolved only when
+`--add-modules` names it.
 
 A single executable jar with the launcher
 -----------------------------------------
