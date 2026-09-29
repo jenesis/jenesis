@@ -5,7 +5,7 @@
  * @jenesis.release 25
  * @jenesis.main demo.strings.app.Application
  * @jenesis.native demo.strings.library
- * @jenesis.pin build.jenesis/build.jenesis.launcher 0.5.2 SHA-256/f88e6840cdfd142876b6bbc36743597755e66430780ba97348a4a47a32e30794
+ * @jenesis.pin build.jenesis/build.jenesis.launcher 0.5.3 SHA-256/47d0bc19f02c904ee6c573f8aafe69234006dc1357525281f8f36f4d1a96f9bf
  */
 module demo.strings.app {
     requires demo.strings.library;

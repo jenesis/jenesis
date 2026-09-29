@@ -5,10 +5,10 @@
  *
  * @jenesis.release 25
  * @jenesis.test demo.layers.library
- * @jenesis.pin build.jenesis/build.jenesis.launcher 0.5.2 SHA-256/f88e6840cdfd142876b6bbc36743597755e66430780ba97348a4a47a32e30794
+ * @jenesis.pin build.jenesis/build.jenesis.launcher 0.5.3 SHA-256/47d0bc19f02c904ee6c573f8aafe69234006dc1357525281f8f36f4d1a96f9bf
  * @jenesis.pin com.fasterxml.jackson.core/jackson-core 2.15.4 SHA-256/8dc9210dd285db366f45f518dd1e6a9ccfeb0f1a8e184a899fe96d29edf1fd94
  * @jenesis.pin layer:inner/maven/com.fasterxml.jackson.core/jackson-core 2.13.5 SHA-256/48f36a025311d0464ad8dda4512a20c79e279a9550f63f3179d731d94482474b
- * @jenesis.pin layer:render/maven/build.jenesis/build.jenesis.launcher 0.5.2 SHA-256/f88e6840cdfd142876b6bbc36743597755e66430780ba97348a4a47a32e30794
+ * @jenesis.pin layer:render/maven/build.jenesis/build.jenesis.launcher 0.5.3 SHA-256/47d0bc19f02c904ee6c573f8aafe69234006dc1357525281f8f36f4d1a96f9bf
  * @jenesis.pin layer:render/maven/com.fasterxml.jackson.core/jackson-core 2.15.4 SHA-256/8dc9210dd285db366f45f518dd1e6a9ccfeb0f1a8e184a899fe96d29edf1fd94
  * @jenesis.pin org.apiguardian/apiguardian-api 1.1.2 SHA-256/b509448ac506d607319f182537f0b35d71007582ec741832a1f111e5b5b70b38
  * @jenesis.pin org.jspecify/jspecify 1.0.0 SHA-256/1fad6e6be7557781e4d33729d49ae1cdc8fdda6fe477bb0cc68ce351eafdfbab
