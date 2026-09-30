@@ -91,7 +91,7 @@ the build tool works.
 Build performance
 -----------------
 
-Measured on `ec15f6ea` - v0.15.2 plus the 67 commits after it - by the on-demand
+Measured on the main branch, 67 commits after v0.15.2, by the on-demand
 [benchmark workflow](.github/workflows/benchmark.yml) on a GitHub `ubuntu-latest` runner, with GraalVM JDK
 25.0.4 and Maven 3.9.9 ([run 36336605019](https://github.com/jenesis/jenesis/actions/runs/36336605019)). Both
 tools compile the same 188 main and 183 test sources with the tests compiled but not executed, from warm
