@@ -50,6 +50,14 @@ nothing) and resolves it straight back out, reporting each artifact:
 That is the whole bundle a release would carry, validated without publishing
 anything.
 
+Central requires the `-javadoc.jar`, but not that it documents anything, and rendered
+documentation can make up most of a release's size. To publish the jar without it, set
+
+    java -Djenesis.documentation.empty=true build/Demo.java
+
+The `-javadoc.jar` is then still staged and resolved beside the others, but it holds
+nothing but a file named `INTENTIONALLY_EMPTY`, and no documentation tool runs at all.
+
 The two jobs of publishing
 --------------------------
 

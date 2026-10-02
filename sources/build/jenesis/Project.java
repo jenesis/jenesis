@@ -2642,6 +2642,7 @@ public record Project(
                 project.layout|auto|auto|maven|modular|modular_to_maven; auto reads the project
                 project.sources|false|Assemble a sources jar for every module
                 project.documentation|false|Assemble a javadoc jar for every module
+                documentation.empty|false|Archive that javadoc jar holding nothing but an INTENTIONALLY_EMPTY file instead of rendering the documentation, for a repository such as Maven Central that requires the jar but not its content
                 project.version||Version stamped onto every produced artifact; empty leaves modules unversioned and POMs at 0-SNAPSHOT
                 project.tag||SCM tag recorded in the generated POM and SBOM; empty for none
                 project.revision||Source revision, such as a commit id, recorded in the SBOM; empty for none

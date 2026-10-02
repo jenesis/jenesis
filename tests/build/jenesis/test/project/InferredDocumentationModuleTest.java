@@ -7,12 +7,14 @@ import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.DokkaDocumentationModule;
 import build.jenesis.project.GroovyDocumentationModule;
 import build.jenesis.project.InferredDocumentationChainModule;
+import build.jenesis.project.InferredDocumentationModule;
 import build.jenesis.project.ScalaDocumentationModule;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -63,6 +65,32 @@ public class InferredDocumentationModuleTest {
         assertThat(scan.getProperty("dokka")).isEqualTo("false");
         assertThat(scan.getProperty("scaladoc")).isEqualTo("false");
         assertThat(scan.getProperty("groovydoc")).isEqualTo("false");
+    }
+
+    @Test
+    public void archives_an_intentionally_empty_javadoc_jar_without_rendering_the_documentation() throws IOException {
+        Path sample = Files.createDirectories(project.resolve(BuildStep.SOURCES + "sample"));
+        Files.writeString(sample.resolve("Greeter.java"), "package sample; class Greeter {}");
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule("documentation",
+                InferredDocumentationModule.ofEnvironment(new Environment(Map.of("documentation.empty", "true")),
+                        Map.of(),
+                        Map.of("maven", Resolver.identity())),
+                "project");
+        SequencedMap<String, Path> steps = executor.execute();
+
+        assertThat(steps.keySet())
+                .as("no documentation tool runs for an empty javadoc jar")
+                .noneMatch(step -> step.startsWith("documentation/generate"));
+        try (JarFile jar = new JarFile(steps.get("documentation/archive")
+                .resolve(BuildStep.DOCUMENTATION)
+                .resolve("javadoc.jar")
+                .toFile())) {
+            assertThat(jar.stream().map(JarEntry::getName))
+                    .containsExactlyInAnyOrder("META-INF/", "META-INF/MANIFEST.MF", "INTENTIONALLY_EMPTY");
+        }
     }
 
     @Test

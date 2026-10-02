@@ -4,21 +4,26 @@ import module java.base;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
+import build.jenesis.BuildStepArgument;
+import build.jenesis.BuildStepContext;
+import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.step.Jar;
+import build.jenesis.step.Javadoc;
 import build.jenesis.step.ProcessHandler;
 
 public class InferredDocumentationModule implements BuildExecutorModule {
 
-    public static final String GENERATE = "generate", ARCHIVE = "archive";
+    public static final String GENERATE = "generate", EMPTY = "empty", ARCHIVE = "archive";
 
     private final Pinning pinning;
     private final InferredDocumentationChainModule generateModule;
     private final Function<InferredDocumentationChainModule, BuildExecutorModule> generate;
     private final BuildStep archiver;
+    private final boolean empty;
     private final SequencedMap<String, BuildExecutorModule> custom;
 
     public InferredDocumentationModule(Map<String, Repository> repositories,
@@ -27,6 +32,7 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                 new InferredDocumentationChainModule(repositories, resolvers),
                 value -> value,
                 new Jar(ProcessHandler.Factory.of(), Jar.Sort.JAVADOC),
+                false,
                 Collections.emptyNavigableMap());
     }
 
@@ -37,6 +43,7 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                 InferredDocumentationChainModule.ofEnvironment(environment, repositories, resolvers),
                 value -> value,
                 Jar.ofEnvironment(environment, ProcessHandler.Factory.of(), Jar.Sort.JAVADOC),
+                environment.flag("documentation.empty", false),
                 Collections.emptyNavigableMap());
     }
 
@@ -44,11 +51,13 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                                         InferredDocumentationChainModule generateModule,
                                         Function<InferredDocumentationChainModule, BuildExecutorModule> generate,
                                         BuildStep archiver,
+                                        boolean empty,
                                         SequencedMap<String, BuildExecutorModule> custom) {
         this.pinning = pinning;
         this.generateModule = generateModule;
         this.generate = generate;
         this.archiver = archiver;
+        this.empty = empty;
         this.custom = custom;
     }
 
@@ -57,6 +66,7 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                 generateModule,
                 generate,
                 archiver,
+                empty,
                 custom);
     }
 
@@ -65,6 +75,7 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                 generateModule,
                 generate,
                 archiver,
+                empty,
                 custom);
     }
 
@@ -73,6 +84,16 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                 generateModule,
                 generate,
                 archiver,
+                empty,
+                custom);
+    }
+
+    public InferredDocumentationModule empty(boolean empty) {
+        return new InferredDocumentationModule(pinning,
+                generateModule,
+                generate,
+                archiver,
+                empty,
                 custom);
     }
 
@@ -81,6 +102,7 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                 generateModule,
                 generate,
                 archiver,
+                empty,
                 custom);
     }
 
@@ -89,6 +111,7 @@ public class InferredDocumentationModule implements BuildExecutorModule {
                 generateModule,
                 generate,
                 archiver,
+                empty,
                 custom);
     }
 
@@ -115,19 +138,39 @@ public class InferredDocumentationModule implements BuildExecutorModule {
         if (generate == null) {
             return;
         }
-        BuildExecutorModule chain = generate.apply(generateModule.pinning(pinning));
-        if (chain == null) {
-            return;
+        String documented;
+        if (empty) {
+            buildExecutor.addStep(EMPTY, new Empty());
+            documented = EMPTY;
+        } else {
+            BuildExecutorModule chain = generate.apply(generateModule.pinning(pinning));
+            if (chain == null) {
+                return;
+            }
+            buildExecutor.addModule(GENERATE, chain, inherited.sequencedKeySet());
+            documented = GENERATE
+                    + "/"
+                    + InferredDocumentationChainModule.DOCUMENT
+                    + "/"
+                    + InferredDocumentationChainModule.AGGREGATE;
         }
-        buildExecutor.addModule(GENERATE, chain, inherited.sequencedKeySet());
         if (archiver != null) {
             buildExecutor.addStep(ARCHIVE,
                     archiver,
-                    Stream.concat(Stream.of(GENERATE
-                            + "/"
-                            + InferredDocumentationChainModule.DOCUMENT
-                            + "/"
-                            + InferredDocumentationChainModule.AGGREGATE), inherited.sequencedKeySet().stream()));
+                    Stream.concat(Stream.of(documented), inherited.sequencedKeySet().stream()));
+        }
+    }
+
+    private static class Empty implements BuildStep {
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            Files.writeString(Files.createDirectories(context.next().resolve(Javadoc.JAVADOC))
+                    .resolve("INTENTIONALLY_EMPTY"), "This module publishes no API documentation.\n");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
         }
     }
 }
