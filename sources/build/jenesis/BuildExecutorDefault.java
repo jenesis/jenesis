@@ -67,8 +67,8 @@ class BuildExecutorDefault implements BuildExecutor {
 
     private Bound bindSource(Path path) {
         return (identity, executor, _, selectors) -> {
-            if (!selectors.isEmpty()) {
-                selectors.stream().filter(selector -> !selector.lenient()).findFirst().ifPresent(selector -> {
+            if (!selectors.stream().allMatch(Selector::probe)) {
+                selectors.stream().filter(selector -> !selector.lenient() && !selector.probe()).findFirst().ifPresent(selector -> {
                     throw new IllegalArgumentException("Unknown selector: " + selector.path()
                             + " - " + identity + " is a source, which holds no steps to select");
                 });
@@ -111,8 +111,8 @@ class BuildExecutorDefault implements BuildExecutor {
     private Bound bindStep(BuildStep step) {
         return (identity, executor, summaries, selectors) -> {
             try {
-                if (!selectors.isEmpty()) {
-                    selectors.stream().filter(selector -> !selector.lenient()).findFirst().ifPresent(selector -> {
+                if (!selectors.stream().allMatch(Selector::probe)) {
+                    selectors.stream().filter(selector -> !selector.lenient() && !selector.probe()).findFirst().ifPresent(selector -> {
                         throw new IllegalArgumentException("Unknown selector: " + selector.path()
                                 + " - " + identity + " is a step, which holds no steps to select");
                     });
@@ -432,12 +432,18 @@ class BuildExecutorDefault implements BuildExecutor {
     public CompletionStage<SequencedMap<String, Path>> execute(Executor executor, String... selectors) {
         BiConsumer<Boolean, Throwable> completion = callback.step(null, registrations.sequencedKeySet());
         Set<Selector> initial = Arrays.stream(selectors)
-                .map(s -> new Selector(s, false))
+                .map(s -> new Selector(s, false, false, new Match()))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Path canonical = target.toAbsolutePath().normalize();
         FileChannel lock = lock(canonical);
         try {
             return doExecute(executor, initial).thenApplyAsync(summaries -> {
+                for (Selector selector : initial) {
+                    if (!selector.match().matched) {
+                        throw new IllegalArgumentException("Unknown selector: " + selector.path()
+                                + " - it matches no step" + selector.match().nearest());
+                    }
+                }
                 SequencedMap<String, Path> translated = new LinkedHashMap<>();
                 for (Map.Entry<String, StepSummary> entry : summaries.entrySet()) {
                     translated.put(entry.getKey(), entry.getValue().folder());
@@ -501,45 +507,59 @@ class BuildExecutorDefault implements BuildExecutor {
         SequencedSet<String> scheduled = new LinkedHashSet<>();
         Set<String> pinned = new HashSet<>(), direct = new HashSet<>();
         Map<String, Set<Selector>> forwarded = new LinkedHashMap<>();
-        if (selectors.isEmpty()) {
+        if (selectors.stream().allMatch(Selector::probe)) {
             scheduled.addAll(registrations.keySet());
-        } else {
-            Queue<Selector> queue = new ArrayDeque<>(selectors);
-            while (!queue.isEmpty()) {
-                Selector selector = queue.poll(), tail = selector.tail();
-                String first = selector.first();
-                if (first.equals(":") || first.equals("::")) {
+        }
+        Queue<Selector> queue = new ArrayDeque<>(selectors);
+        while (!queue.isEmpty()) {
+            Selector selector = queue.poll(), tail = selector.tail();
+            String first = selector.first();
+            if (first.equals(":") || first.equals("::")) {
+                if (!selector.probe()) {
                     scheduled.addAll(registrations.keySet());
-                    if (tail == null) {
+                }
+                if (tail == null) {
+                    if (!selector.probe()) {
                         direct.addAll(registrations.keySet());
                         pinned.addAll(registrations.keySet());
-                    } else {
-                        boolean anyDepth = first.equals("::");
-                        if (anyDepth) {
-                            queue.add(tail.asLenient());
-                        }
-                        Selector descend = (anyDepth ? selector : tail).asLenient();
-                        registrations.keySet().forEach(identity ->
-                                forwarded.computeIfAbsent(identity, _ -> new LinkedHashSet<>())
-                                        .add(descend));
                     }
-                } else if (!registrations.containsKey(first)) {
-                    if (!selector.lenient()) {
-                        throw new IllegalArgumentException("Unknown selector: " + selector.path()
-                                + " - " + (registrations.isEmpty()
-                                ? "nothing is registered here"
-                                : "expected one of " + registrations.sequencedKeySet()));
+                    if (!registrations.isEmpty()) {
+                        selector.match().matched = true;
                     }
                 } else {
+                    boolean anyDepth = first.equals("::");
+                    if (anyDepth) {
+                        queue.add(tail.asLenient());
+                    }
+                    Selector descend = (anyDepth ? selector : tail).asLenient();
+                    registrations.keySet().forEach(identity ->
+                            forwarded.computeIfAbsent(identity, _ -> new LinkedHashSet<>())
+                                    .add(descend));
+                }
+            } else if (!registrations.containsKey(first)) {
+                selector.match().compared(first, registrations.keySet());
+                if (!selector.lenient() && !selector.probe()) {
+                    throw new IllegalArgumentException("Unknown selector: " + selector.path()
+                            + " - " + (registrations.isEmpty()
+                            ? "nothing is registered here"
+                            : "expected one of " + registrations.sequencedKeySet() + selector.match().nearest()));
+                }
+            } else {
+                if (!selector.probe()) {
                     scheduled.add(first);
                     pinned.add(first);
-                    if (tail == null) {
+                }
+                if (tail == null) {
+                    if (!selector.probe()) {
                         direct.add(first);
-                    } else {
-                        forwarded.computeIfAbsent(first, _ -> new LinkedHashSet<>()).add(tail);
                     }
+                    selector.match().matched = true;
+                } else {
+                    forwarded.computeIfAbsent(first, _ -> new LinkedHashSet<>()).add(tail);
                 }
             }
+        }
+        if (!selectors.stream().allMatch(Selector::probe)) {
             ArrayDeque<String> prelimQueue = new ArrayDeque<>(pinned);
             for (String identity : scheduled) {
                 if (registrations.get(identity).bound().module() && pinned.add(identity)) {
@@ -556,7 +576,12 @@ class BuildExecutorDefault implements BuildExecutor {
                 }
             }
             for (String identity : direct) {
-                forwarded.remove(identity);
+                Set<Selector> subsumed = forwarded.remove(identity);
+                if (subsumed != null) {
+                    forwarded.put(identity, subsumed.stream()
+                            .map(Selector::asProbe)
+                            .collect(Collectors.toCollection(LinkedHashSet::new)));
+                }
             }
         }
         CompletionStage<Map<String, Map<String, StepSummary>>> initial = CompletableFuture.completedStage(Map.of());
@@ -702,7 +727,7 @@ class BuildExecutorDefault implements BuildExecutor {
         }
     }
 
-    private record Selector(String path, boolean lenient) {
+    private record Selector(String path, boolean lenient, boolean probe, Match match) {
 
         String first() {
             int slash = path.indexOf('/');
@@ -711,11 +736,54 @@ class BuildExecutorDefault implements BuildExecutor {
 
         Selector tail() {
             int slash = path.indexOf('/');
-            return slash == -1 ? null : new Selector(path.substring(slash + 1), lenient);
+            return slash == -1 ? null : new Selector(path.substring(slash + 1), lenient, probe, match);
         }
 
         Selector asLenient() {
-            return lenient ? this : new Selector(path, true);
+            return lenient ? this : new Selector(path, true, probe, match);
+        }
+
+        Selector asProbe() {
+            return probe ? this : new Selector(path, lenient, true, match);
+        }
+    }
+
+    private static final class Match {
+
+        private final Map<String, Set<String>> compared = new ConcurrentHashMap<>();
+        private volatile boolean matched;
+
+        private void compared(String segment, Set<String> names) {
+            compared.computeIfAbsent(segment, _ -> ConcurrentHashMap.newKeySet()).addAll(names);
+        }
+
+        private String nearest() {
+            SequencedSet<String> nearest = new TreeSet<>();
+            compared.forEach((segment, names) -> {
+                int closest = names.stream().mapToInt(name -> distance(segment, name)).min().orElse(Integer.MAX_VALUE);
+                if (closest <= Math.max(2, segment.length() / 3)) {
+                    names.stream().filter(name -> distance(segment, name) == closest).forEach(nearest::add);
+                }
+            });
+            return nearest.isEmpty() ? "" : " - did you mean " + String.join(" or ", nearest) + "?";
+        }
+
+        private static int distance(String left, String right) {
+            int[] previous = new int[right.length() + 1], current = new int[right.length() + 1];
+            for (int column = 0; column <= right.length(); column++) {
+                previous[column] = column;
+            }
+            for (int row = 1; row <= left.length(); row++) {
+                current[0] = row;
+                for (int column = 1; column <= right.length(); column++) {
+                    current[column] = Math.min(Math.min(current[column - 1], previous[column]) + 1,
+                            previous[column - 1] + (left.charAt(row - 1) == right.charAt(column - 1) ? 0 : 1));
+                }
+                int[] swapped = previous;
+                previous = current;
+                current = swapped;
+            }
+            return previous[right.length()];
         }
     }
 

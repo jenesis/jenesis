@@ -318,7 +318,8 @@ name that is taken already.
 
 **Fail loudly, name the fix.** Bad input is an `IllegalArgumentException` whose message says what was given
 and what would be valid; a missing prerequisite is an `IllegalStateException` that names it. Nothing
-silently falls back, and a lenient wildcard selector is the one deliberate exception, documented as such.
+silently falls back: a wildcard selector skips the branches it does not match, but one that matches no step at all
+is refused like an unknown selector.
 
 ## Tests
 
