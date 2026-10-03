@@ -755,6 +755,13 @@ public final class Make {
                         + " provides (pass -D" + key + " instead)");
             }
         }
+        if (properties.getProperty("jenesis.environment.pass") != null) {
+            throw new IllegalStateException("jenesis.environment.pass cannot be set in " + file
+                    + ": it hands this machine's environment variables, which may hold credentials, to every JVM the"
+                    + " build forks, so only the command line or your own ~/.jenesis/jenesis.properties may set it;"
+                    + " a project declares the variables its own runs read with @jenesis.environment"
+                    + " (pass -Djenesis.environment.pass instead)");
+        }
         for (String key : SHARED) {
             if (properties.getProperty(key) != null) {
                 throw new IllegalStateException(key + " cannot be set in " + file

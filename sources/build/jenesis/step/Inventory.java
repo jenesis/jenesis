@@ -107,6 +107,7 @@ public class Inventory implements BuildStep {
                 Path.of(IDENTITY),
                 Path.of(ATTACHMENTS),
                 Path.of(NATIVES),
+                Path.of(ENVIRONMENT),
                 Path.of(POM),
                 Path.of(ARTIFACTS),
                 Path.of(Bom.BOM),
@@ -161,7 +162,7 @@ public class Inventory implements BuildStep {
         SequencedMap<String, Path> bomFiles = new LinkedHashMap<>();
         SequencedMap<String, String> bomValues = new LinkedHashMap<>();
         SequencedMap<String, String> attachments = new LinkedHashMap<>();
-        SequencedSet<String> natives = new LinkedHashSet<>();
+        SequencedSet<String> natives = new LinkedHashSet<>(), environment = new LinkedHashSet<>();
         boolean self = false;
         SequencedMap<String, String> licenses = new LinkedHashMap<>();
         SequencedSet<String> identity = new LinkedHashSet<>();
@@ -281,6 +282,10 @@ public class Inventory implements BuildStep {
             if (Files.isRegularFile(nativesFile)) {
                 natives.addAll(SequencedProperties.ofFiles(nativesFile).stringPropertyNames());
             }
+            Path environmentFile = folder.resolve(ENVIRONMENT);
+            if (Files.isRegularFile(environmentFile)) {
+                environment.addAll(SequencedProperties.ofFiles(environmentFile).stringPropertyNames());
+            }
             collectClosure(folder, closureJars, closureScopes, closureChecksums);
             Path bomsFile = folder.resolve(BOMS);
             if (Files.isRegularFile(folder.resolve(DEPENDENCIES)) && Files.isRegularFile(bomsFile)) {
@@ -348,6 +353,9 @@ public class Inventory implements BuildStep {
             }
             inventory.setProperty(prefix + "agent." + agentIndex + ".coordinate", key);
             agentIndex++;
+        }
+        if (!environment.isEmpty()) {
+            inventory.setProperty(prefix + "environment", String.join(",", environment));
         }
         SequencedSet<Path> reachable = new LinkedHashSet<>(runtime);
         for (Map.Entry<String, Path> entry : closureJars.entrySet()) {

@@ -4192,6 +4192,24 @@ public class MavenPomResolverTest {
     }
 
     @Test
+    public void local_pom_reads_environment_comments_with_the_test_runs_confined() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>project</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.environment AWS_REGION-->
+                    <!--jenesis.environment test JENREPO_TEST_* AWS_REGION-->
+                </project>
+                """);
+        assertThat(mavenPomResolver.local(Runnable::run, mavenRepository, project).get(Path.of("")).environment())
+                .as("a variable declared for every run stays one when the tests name it again")
+                .containsExactly(Map.entry("AWS_REGION", "main"), Map.entry("JENREPO_TEST_*", "test"));
+    }
+
+    @Test
     public void native_block_that_names_nothing_is_refused() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

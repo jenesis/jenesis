@@ -86,6 +86,7 @@ public class Javadoc extends ProcessBuildStep {
                 "-tag", "jenesis.override:a:Overridden modules:",
                 "-tag", "jenesis.attach:a:Attached agents:",
                 "-tag", "jenesis.native:a:Native access:",
+                "-tag", "jenesis.environment:a:Environment variables:",
                 "-tag", "jenesis.bom:a:Imported bills of materials:",
                 "-tag", "jenesis.plugin:a:Compiler plugins:",
                 "-tag", "jenesis.layer:a:Isolated layers:",

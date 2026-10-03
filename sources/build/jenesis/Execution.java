@@ -5,18 +5,20 @@ import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Layers;
+import build.jenesis.step.ProcessHandler;
 
-public record Execution(Project project, String mainClass, String module, Container container) {
+public record Execution(Project project, String mainClass, String module, Container container, List<String> passed) {
 
     public Execution(Project project) {
-        this(project, null, null, null);
+        this(project, null, null, null, List.of());
     }
 
     public static Execution ofEnvironment(Environment environment, Project project) {
         return new Execution(project,
                 environment.getProperty("execute.mainClass"),
                 environment.getProperty("execute.module"),
-                Container.ofEnvironment(environment));
+                Container.ofEnvironment(environment),
+                environment.entries("environment.pass") == null ? List.of() : environment.entries("environment.pass"));
     }
 
     public record Container(String image, String mount, String mountWritable, String env, boolean announcing) {
@@ -33,15 +35,19 @@ public record Execution(Project project, String mainClass, String module, Contai
     }
 
     public Execution mainClass(String mainClass) {
-        return new Execution(project, mainClass, module, container);
+        return new Execution(project, mainClass, module, container, passed);
     }
 
     public Execution module(String module) {
-        return new Execution(project, mainClass, module, container);
+        return new Execution(project, mainClass, module, container, passed);
     }
 
     public Execution container(Container container) {
-        return new Execution(project, mainClass, module, container);
+        return new Execution(project, mainClass, module, container, passed);
+    }
+
+    public Execution passed(List<String> passed) {
+        return new Execution(project, mainClass, module, container, passed);
     }
 
     public int execute(String... arguments) throws IOException, InterruptedException {
@@ -248,6 +254,11 @@ public record Execution(Project project, String mainClass, String module, Contai
             javaArgs.add(candidate.mainClass);
         }
         javaArgs.addAll(List.of(arguments).subList(jvmOptions, arguments.length));
+        List<String> environment = new ArrayList<>(passed);
+        String declared = merged.getProperty(selected.getKey() + ".environment");
+        if (declared != null) {
+            environment.addAll(List.of(declared.split(",")));
+        }
         if (container != null) {
             Path root = project.root().toAbsolutePath().normalize();
             DockerizedJava docker = container.image() == null
@@ -262,6 +273,9 @@ public record Execution(Project project, String mainClass, String module, Contai
             docker = docker.mounts(container.mount(), root, true)
                     .mounts(container.mountWritable(), root, false)
                     .envs(container.env());
+            for (Map.Entry<String, String> variable : ProcessHandler.OfProcess.matching(environment).entrySet()) {
+                docker = docker.env(variable.getKey(), variable.getValue());
+            }
             if (container.announcing()) {
                 project.environment().out().accept("Launching Java execution within Docker image: " + docker.image());
             }
@@ -282,7 +296,10 @@ public record Execution(Project project, String mainClass, String module, Contai
         List<String> command = new ArrayList<>();
         command.add(javaExecutable.toString());
         command.addAll(javaArgs);
-        return new ProcessBuilder(command).inheritIO().start().waitFor();
+        ProcessBuilder builder = new ProcessBuilder(command).inheritIO();
+        builder.environment().clear();
+        builder.environment().putAll(ProcessHandler.OfProcess.environment(environment));
+        return builder.start().waitFor();
     }
 
     public static int run(Environment environment,

@@ -147,7 +147,10 @@ for one whose third state is the absence itself. A number refuses a value that i
 `Boolean.getBoolean` and `Integer.getInteger` are not used, because they read `=false` and a bare `-Dkey`
 alike as false and a misspelt value as false or as the default rather than as the mistake it is.
 Environment variables are fallbacks for the repository settings (`MAVEN_REPOSITORY_URI`,
-`JENESIS_REPOSITORY_TOKEN`, …) and for the toolchain installer (`JENESIS_TOOLCHAIN_INSTALLER`) only. `jenesis.properties` at the project root and the profile files are read by
+`JENESIS_REPOSITORY_TOKEN`, …) and for the toolchain installer (`JENESIS_TOOLCHAIN_INSTALLER`) only. In the other
+direction, a JVM the build forks receives none of them but the platform's own, those its module declares with
+`@jenesis.environment` - whose values a test step's key holds - and those `jenesis.environment.pass` names, so a run
+reads what a container would. `jenesis.properties` at the project root and the profile files are read by
 `Make.settings`, which layers them under whatever the entry point already holds and hands
 the result down as one provider; nothing is ever copied into the JVM's own properties, so
 two builds in one JVM never see each other's settings. A new property is added in three places - the constructor that reads it, the catalogue behind the

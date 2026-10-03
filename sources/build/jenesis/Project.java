@@ -930,6 +930,17 @@ public record Project(
                           verbatim as agent options. MAVEN modules declare the same lines in a
                           project-level <!--jenesis.attach ... --> comment, where a test-scoped match
                           attaches to test runs only and &#45;&#45; escapes a double dash.
+                      @jenesis.environment <pattern>...
+                          Name the environment variables this module's runs read, * standing for
+                          any characters: a test module's for its test runs, a main module's for
+                          Execute. Every JVM the build forks otherwise receives no variable but the
+                          platform's own (PATH, HOME, LANG, LC_*, TMPDIR, TEMP, TMP and Windows'
+                          SystemRoot, ...) and those -Djenesis.environment.pass names, as a container
+                          would, so a run reads nothing it did not declare. The values of what a test
+                          module declares are part of its test step's cache key: change one and the
+                          tests run again rather than a result recorded under another value being
+                          reused. MAVEN modules declare <!--jenesis.environment [test] <pattern>...-->,
+                          where test confines the variables to the test runs.
                       @jenesis.native <token>...
                           Grant native access (--enable-native-access) to the modules named, this
                           one included only when it names itself, on this module's Execute run, its
@@ -2688,6 +2699,7 @@ public record Project(
                 executor.aggregate|false|Collect independent step failures into one report
                 process.concurrency|0|Run at most this many JDK tool runs at once; 0 is unbounded
                 process.factory|tool|tool|fork; fork runs a JDK tool in a process of its own
+                environment.pass||Comma-separated environment variables, * standing for any characters, that every JVM the build forks and the program Execute runs receive beside the platform's own (PATH, HOME, LANG, LC_*, TMPDIR, TEMP, TMP and Windows' SystemRoot, SystemDrive, windir, ComSpec, PATHEXT, USERPROFILE) and those a module declares with @jenesis.environment; as JAVA_TOOL_OPTIONS for a proxy, or * for all of them; it never reaches a step's cache key, and only the command line or ~/.jenesis/jenesis.properties may set it
                 legal.notices|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries taken as legal notices into a jmod, a linked or packaged image and beside a native image, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
                 archive.timestamp|1980-02-01T00:00:00Z|ISO-8601 date-time with an offset recorded on every entry of the jars, jmods and zips the build writes; empty keeps the times the tools record and makes the archives unreproducible; set explicitly, it is also the creation time a generated Docker image is labelled with
                 print.progress|true|The build progress lines

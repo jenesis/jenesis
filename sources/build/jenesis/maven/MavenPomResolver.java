@@ -611,6 +611,7 @@ public class MavenPomResolver implements MavenResolver {
                     pom.qualifiedDependencies(),
                     pom.attachments(),
                     pom.natives(),
+                    pom.environment(),
                     plugins,
                     pom.signatures(),
                     property(pom.properties().get("mainClass"), pom.properties())));
@@ -885,6 +886,9 @@ public class MavenPomResolver implements MavenResolver {
                                 ? toNatives(document.getDocumentElement())
                                 : Collections.emptyNavigableSet(),
                         extended
+                                ? toEnvironment(document.getDocumentElement())
+                                : Collections.emptyNavigableMap(),
+                        extended
                                 ? toPlugins(document.getDocumentElement())
                                 : Collections.emptyNavigableMap(),
                         extended
@@ -931,6 +935,7 @@ public class MavenPomResolver implements MavenResolver {
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableSet(),
+                            Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
                             Collections.emptyNavigableMap(),
                             List.of());
@@ -1390,6 +1395,37 @@ public class MavenPomResolver implements MavenResolver {
         return entries;
     }
 
+    private static SequencedMap<String, String> toEnvironment(Node node) {
+        SequencedMap<String, String> entries = new LinkedHashMap<>();
+        toChildren(node)
+                .filter(child -> child.getNodeType() == Node.COMMENT_NODE)
+                .map(Node::getNodeValue)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(text -> text.startsWith("jenesis.environment"))
+                .forEach(text -> {
+                    List<String> tokens = new ArrayList<>(List.of(text.substring("jenesis.environment".length()).trim().split("\\s+")));
+                    String scope = tokens.getFirst().equals("test") ? tokens.removeFirst() : "main";
+                    tokens.removeIf(String::isEmpty);
+                    if (tokens.isEmpty()) {
+                        throw new IllegalArgumentException("A jenesis.environment comment names no variable:"
+                                + " name each environment variable the runs read, as JENREPO_TEST_* or AWS_REGION,"
+                                + " after test where only the test runs read it");
+                    }
+                    for (String pattern : tokens) {
+                        if (!pattern.matches("[A-Za-z0-9_*]+")) {
+                            throw new IllegalArgumentException("Illegal jenesis.environment pattern '"
+                                    + pattern
+                                    + "': name a variable, with * standing for any characters");
+                        }
+                        if (scope.equals("main") || !entries.containsKey(pattern)) {
+                            entries.put(pattern, scope);
+                        }
+                    }
+                });
+        return entries;
+    }
+
     private static SequencedSet<String> toNatives(Node node) {
         SequencedSet<String> entries = new LinkedHashSet<>();
         toChildren(node)
@@ -1567,6 +1603,7 @@ public class MavenPomResolver implements MavenResolver {
                                  SequencedMap<String, String> qualifiedDependencies,
                                  SequencedMap<String, String> attachments,
                                  SequencedSet<String> natives,
+                                 SequencedMap<String, String> environment,
                                  SequencedMap<String, String> plugins,
                                  SequencedMap<String, String> signatures,
                                  List<License> licenses) {

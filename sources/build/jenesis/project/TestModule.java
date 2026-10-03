@@ -576,6 +576,23 @@ public class TestModule implements BuildExecutorModule {
         if (skip) {
             return;
         }
+        SequencedSet<String> patterns = new LinkedHashSet<>();
+        for (Path folder : inherited.values()) {
+            Path file = folder.resolve(BuildStep.ENVIRONMENT);
+            if (Files.isRegularFile(file)) {
+                patterns.addAll(SequencedProperties.ofFiles(file).stringPropertyNames());
+            }
+        }
+        SortedMap<String, String> environment = new TreeMap<>();
+        ProcessHandler.OfProcess.matching(patterns).forEach((name, value) -> {
+            try {
+                environment.put(name, HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                        .digest(value.getBytes(StandardCharsets.UTF_8))));
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        patterns.stream().filter(pattern -> !pattern.contains("*")).forEach(name -> environment.putIfAbsent(name, ""));
         buildExecutor.addStep(EXECUTED, new Run(terms,
                         factory,
                         resolved,
@@ -590,7 +607,8 @@ public class TestModule implements BuildExecutorModule {
                         reporting,
                         group,
                         observers,
-                        incrementalDigest),
+                        incrementalDigest,
+                        environment),
                 Stream.concat(upstream.stream(), Stream.of(DEPENDENCIES)));
     }
 
@@ -736,6 +754,7 @@ public class TestModule implements BuildExecutorModule {
         private final String group;
         private final List<ObservabilityEngine> observers;
         private final transient String incrementalDigest;
+        private final SortedMap<String, String> environment;
 
         private Run(ProcessBuildStep.Terms terms,
                     Function<List<String>, ProcessHandler.OfProcess> factory,
@@ -751,7 +770,8 @@ public class TestModule implements BuildExecutorModule {
                     boolean reporting,
                     String group,
                     List<ObservabilityEngine> observers,
-                    String incrementalDigest) {
+                    String incrementalDigest,
+                    SortedMap<String, String> environment) {
             super(factory == null ? ProcessHandler.OfProcess.ofJavaHome("bin/java") : factory,
                   pathPlacement,
                   jarsOnly,
@@ -768,6 +788,12 @@ public class TestModule implements BuildExecutorModule {
             this.group = group;
             this.observers = observers;
             this.incrementalDigest = incrementalDigest;
+            this.environment = environment;
+        }
+
+        @Override
+        protected Collection<String> declared() {
+            return environment.keySet();
         }
 
         @Override

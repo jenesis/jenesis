@@ -274,6 +274,34 @@ public class MavenProjectTest {
     }
 
     @Test
+    public void test_scoped_environment_is_declared_for_the_test_module_only() throws IOException {
+        Files.writeString(project.resolve("pom.xml"), """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <!--jenesis.environment AWS_REGION-->
+                    <!--jenesis.environment test JENREPO_TEST_*-->
+                </project>
+                """);
+        Files.writeString(Files.createDirectories(project.resolve("src/main/java")).resolve("source"), "foo");
+        Files.writeString(Files.createDirectories(project.resolve("src/test/java")).resolve("source"), "bar");
+        BuildExecutor executor = BuildExecutor.of(build,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+        executor.addModule("maven", new MavenProject(project, "maven", mavenRepository, mavenPomResolver));
+        SequencedMap<String, Path> results = executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(results.get("maven/module-/manifests").resolve(BuildStep.ENVIRONMENT))
+                .stringPropertyNames()).containsExactly("AWS_REGION");
+        assertThat(SequencedProperties.ofFiles(results.get("maven/test-module-/manifests").resolve(BuildStep.ENVIRONMENT))
+                .stringPropertyNames()).containsExactlyInAnyOrder("AWS_REGION", "JENREPO_TEST_*");
+    }
+
+    @Test
     public void attach_of_managed_dependency_uses_managed_version() throws IOException {
         Files.writeString(project.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>

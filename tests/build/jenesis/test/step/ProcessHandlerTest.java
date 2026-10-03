@@ -151,4 +151,43 @@ public class ProcessHandlerTest {
         }
         assertThat(codes).containsOnly(0);
     }
+
+    @Test
+    public void matches_variables_by_name_with_a_star_for_any_characters() {
+        Map<String, String> variables = Map.of("JENREPO_TEST_SIZE", "3", "JENREPO_TEST_STORE", "s3", "JENREPO_TOKEN", "x",
+                "AWS_REGION", "eu-west-1");
+        assertThat(ProcessHandler.OfProcess.matching(variables, List.of("JENREPO_TEST_*", "AWS_REGION")))
+                .containsExactly(Map.entry("AWS_REGION", "eu-west-1"),
+                        Map.entry("JENREPO_TEST_SIZE", "3"),
+                        Map.entry("JENREPO_TEST_STORE", "s3"));
+    }
+
+    @Test
+    public void hands_a_process_only_the_environment_it_is_given() throws Exception {
+        Path source = root.resolve("Printer.java");
+        Files.writeString(source, """
+                public class Printer {
+                    public static void main(String[] args) {
+                        System.out.println(System.getenv("GIVEN") + " " + System.getenv("PATH"));
+                    }
+                }
+                """);
+        Path output = root.resolve("output"), error = root.resolve("error");
+        int code = ProcessHandler.OfProcess.ofJavaHome("bin/java")
+                .apply(List.of(source.toString()))
+                .environment(new TreeMap<>(Map.of("GIVEN", "value")))
+                .execute(output, error, null);
+        assertThat(code).isZero();
+        assertThat(Files.readString(output).strip())
+                .as("a variable the build holds but did not hand over never reaches the process")
+                .isEqualTo("value null");
+    }
+
+    @Test
+    public void composes_the_platform_baseline_with_what_is_named() {
+        assertThat(ProcessHandler.OfProcess.environment(List.of()).keySet())
+                .as("nothing beyond the platform's own variables reaches a run that names none")
+                .allSatisfy(name -> assertThat(name).matches("(?i)PATH|HOME|LANG|LC_.*|TMPDIR|TEMP|TMP|SystemRoot"
+                        + "|SystemDrive|windir|ComSpec|PATHEXT|USERPROFILE"));
+    }
 }
