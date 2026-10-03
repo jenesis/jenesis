@@ -181,11 +181,51 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
     final class OfProcess implements ProcessHandler {
 
         private static final boolean WINDOWS = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        private static final List<String> BASELINE = List.of("PATH", "HOME", "LANG", "LC_*", "TMPDIR", "TEMP", "TMP",
+                "SystemRoot", "SystemDrive", "windir", "ComSpec", "PATHEXT", "USERPROFILE");
 
         private final List<String> commands;
+        private final SequencedMap<String, String> environment;
 
         private OfProcess(List<String> commands) {
+            this(commands, null);
+        }
+
+        private OfProcess(List<String> commands, SequencedMap<String, String> environment) {
             this.commands = commands;
+            this.environment = environment;
+        }
+
+        public static SequencedMap<String, String> environment(Collection<String> patterns) {
+            return matching(System.getenv(), Stream.concat(BASELINE.stream(), patterns.stream()).toList());
+        }
+
+        public static SequencedMap<String, String> matching(Collection<String> patterns) {
+            return matching(System.getenv(), patterns);
+        }
+
+        public static SequencedMap<String, String> matching(Map<String, String> variables, Collection<String> patterns) {
+            List<Pattern> matchers = patterns.stream()
+                    .map(pattern -> Pattern.compile(Stream.of(pattern.split("\\*", -1))
+                            .map(Pattern::quote)
+                            .collect(Collectors.joining(".*")), WINDOWS ? Pattern.CASE_INSENSITIVE : 0))
+                    .toList();
+            SequencedMap<String, String> environment = new TreeMap<>();
+            variables.forEach((name, value) -> {
+                if (matchers.stream().anyMatch(matcher -> matcher.matcher(name).matches())) {
+                    environment.put(name, value);
+                }
+            });
+            return environment;
+        }
+
+        public OfProcess environment(SequencedMap<String, String> environment) {
+            return new OfProcess(commands, environment);
+        }
+
+        public boolean java() {
+            return !commands.isEmpty() && Path.of(commands.getFirst()).toAbsolutePath().normalize().equals(
+                    Path.of(System.getProperty("java.home"), "bin", WINDOWS ? "java.exe" : "java").toAbsolutePath().normalize());
         }
 
         public static Function<List<String>, OfProcess> ofJavaHome(String command) {
@@ -295,6 +335,10 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             ProcessBuilder builder = new ProcessBuilder(commands);
             if (tee == null) {
                 builder.redirectOutput(output.toFile()).redirectError(error.toFile());
+            }
+            if (environment != null) {
+                builder.environment().clear();
+                builder.environment().putAll(environment);
             }
             builder.environment().putIfAbsent("COLUMNS", "80");
             builder.environment().putIfAbsent("LINES", "24");

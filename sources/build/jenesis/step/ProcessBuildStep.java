@@ -41,7 +41,14 @@ public abstract class ProcessBuildStep implements BuildStep {
         this.terms = terms;
     }
 
-    public record Terms(BiConsumer<Boolean, String> printing, Semaphore permits, Consumer<String> announcing) {
+    public record Terms(BiConsumer<Boolean, String> printing,
+                        Semaphore permits,
+                        Consumer<String> announcing,
+                        List<String> passed) {
+
+        public Terms(BiConsumer<Boolean, String> printing, Semaphore permits, Consumer<String> announcing) {
+            this(printing, permits, announcing, List.of());
+        }
 
         public static Terms of(String command) {
             return ofEnvironment(Environment.NONE, command, false);
@@ -70,11 +77,16 @@ public abstract class ProcessBuildStep implements BuildStep {
                             + command + " >>>> " + line + BuildExecutorCallback.RESET)
                     : null,
                     concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Semaphore::new),
-                    environment.flag("print.command") ? out : null);
+                    environment.flag("print.command") ? out : null,
+                    environment.entries("environment.pass") == null ? List.of() : environment.entries("environment.pass"));
         }
 
         public Terms printing(BiConsumer<Boolean, String> printing) {
-            return new Terms(printing, permits, announcing);
+            return new Terms(printing, permits, announcing, passed);
+        }
+
+        public Terms passed(List<String> passed) {
+            return new Terms(printing, permits, announcing, passed);
         }
     }
 
@@ -95,7 +107,16 @@ public abstract class ProcessBuildStep implements BuildStep {
     }
 
     protected ProcessHandler handler(BuildStepContext context, List<String> commands) throws IOException {
-        return factory.apply(commands);
+        ProcessHandler handler = factory.apply(commands);
+        if (handler instanceof ProcessHandler.OfProcess process && process.java()) {
+            return process.environment(ProcessHandler.OfProcess.environment(
+                    Stream.concat(terms.passed().stream(), declared().stream()).toList()));
+        }
+        return handler;
+    }
+
+    protected Collection<String> declared() {
+        return List.of();
     }
 
     protected int execute(ProcessHandler handler, Path output, Path error, ProcessHandler.Tee tee)

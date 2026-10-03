@@ -360,6 +360,14 @@ public class MavenProject implements BuildExecutorModule {
                                     }
                                     natives.store(context.next().resolve(BuildStep.NATIVES));
                                 }
+                                String variables = properties.getProperty("environment", "");
+                                if (!variables.isEmpty()) {
+                                    SequencedProperties environment = new SequencedProperties();
+                                    for (String pattern : variables.split("\t")) {
+                                        environment.setProperty(pattern, "");
+                                    }
+                                    environment.store(context.next().resolve(BuildStep.ENVIRONMENT));
+                                }
                                 String named = properties.getProperty("named"), release = properties.getProperty("release");
                                 boolean preview = release != null && release.endsWith("-preview");
                                 if (named != null || preview) {
@@ -786,6 +794,15 @@ public class MavenProject implements BuildExecutorModule {
                         .collect(Collectors.joining("\t"));
                 if (!natives.isEmpty()) {
                     properties.setProperty("natives", natives);
+                }
+            }
+            if (value.environment() != null) {
+                String environment = value.environment().entrySet().stream()
+                        .filter(entry -> test || entry.getValue().equals("main"))
+                        .map(Map.Entry::getKey)
+                        .collect(Collectors.joining("\t"));
+                if (!environment.isEmpty()) {
+                    properties.setProperty("environment", environment);
                 }
             }
             if (value.plugins() != null && !value.plugins().isEmpty()) {

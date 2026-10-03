@@ -412,6 +412,11 @@ public class ModularProject implements BuildExecutorModule {
             if (!natives.isEmpty()) {
                 natives.store(context.next().resolve(BuildStep.NATIVES));
             }
+            if (!info.environment().isEmpty()) {
+                SequencedProperties environment = new SequencedProperties();
+                info.environment().forEach(pattern -> environment.setProperty(pattern, ""));
+                environment.store(context.next().resolve(BuildStep.ENVIRONMENT));
+            }
             if (!targets.isEmpty()) {
                 SequencedProperties aliases = new SequencedProperties();
                 for (Map.Entry<String, String> entry : targets.entrySet()) {

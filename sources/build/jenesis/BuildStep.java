@@ -24,6 +24,7 @@ public interface BuildStep extends Serializable {
             OVERRIDES = "overrides.properties",
             ATTACHMENTS = "attachments.properties",
             NATIVES = "natives.properties",
+            ENVIRONMENT = "environment.properties",
             LAYERS = "layers.properties",
             DEPENDENCIES = "dependencies.properties",
             RELEASE = "release";

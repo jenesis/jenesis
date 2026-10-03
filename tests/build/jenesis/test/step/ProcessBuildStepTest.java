@@ -192,6 +192,49 @@ public class ProcessBuildStepTest {
         };
     }
 
+    @Test
+    public void forks_a_jvm_with_the_platform_baseline_and_what_the_step_declares() throws IOException {
+        Path source = root.resolve("Printer.java"), next = Files.createDirectory(root.resolve("next")),
+                supplement = Files.createDirectory(root.resolve("supplement"));
+        Files.writeString(source, """
+                public class Printer {
+                    public static void main(String[] args) {
+                        System.getenv().keySet().forEach(System.out::println);
+                    }
+                }
+                """);
+        new Declaring(source).apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join();
+        assertThat(Files.readAllLines(supplement.resolve("output")))
+                .as("a variable this JVM holds but the step does not declare stays behind, as it would outside a container")
+                .allSatisfy(name -> assertThat(name).matches("(?i)PATH|HOME|LANG|LC_.*|TMPDIR|TEMP|TMP|SystemRoot"
+                        + "|SystemDrive|windir|ComSpec|PATHEXT|USERPROFILE|COLUMNS|LINES|TERM|__CF_USER_TEXT_ENCODING|DECLARED_.*"));
+    }
+
+    private static final class Declaring extends ProcessBuildStep {
+
+        private final String source;
+
+        private Declaring(Path source) {
+            super("java", ProcessHandler.OfProcess.ofJavaHome("bin/java"));
+            this.source = source.toString();
+        }
+
+        @Override
+        protected Collection<String> declared() {
+            return List.of("DECLARED_*");
+        }
+
+        @Override
+        protected CompletionStage<List<String>> process(Executor executor,
+                                                        BuildStepContext context,
+                                                        SequencedMap<String, BuildStepArgument> arguments,
+                                                        SequencedMap<String, SequencedMap<String, String>> properties) {
+            return CompletableFuture.completedStage(List.of(source));
+        }
+    }
+
     private static final class Gated extends ProcessBuildStep {
 
         private Gated(ToolProvider provider) {

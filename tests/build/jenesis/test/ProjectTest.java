@@ -1122,6 +1122,15 @@ public class ProjectTest {
     }
 
     @Test
+    public void the_layered_settings_rejects_passing_the_environment_from_a_project_file() throws IOException {
+        Files.writeString(root.resolve("jenesis.properties"), "jenesis.environment.pass=*\n");
+        assertThatThrownBy(() -> Make.settings(root, settings))
+                .as("which of this machine's variables a JVM receives is the machine's choice, never the project's")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("jenesis.environment.pass cannot be set in");
+    }
+
+    @Test
     public void the_layered_settings_rejects_root_in_a_profile() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
         Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.make.root=elsewhere\n");

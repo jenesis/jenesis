@@ -3,6 +3,8 @@
  *
  * @jenesis.release 25
  * @jenesis.test build.jenesis
+ * @jenesis.environment MAVEN_REPOSITORY_URI MAVEN_REPOSITORY_LOCAL JENESIS_REPOSITORY_URI JENESIS_REPOSITORY_LOCAL
+ * @jenesis.environment OPENPGP_REPOSITORY_URI OPENPGP_REPOSITORY_LOCAL GRAALVM_HOME
  * @jenesis.pin net.bytebuddy 1.15.11 SHA-256/fa08998aae1e7bdae83bde0712c50e8444d71c0e0c196bb2247ade8d4ad0eb90
  * @jenesis.pin net.bytebuddy/byte-buddy 1.15.11 SHA-256/fa08998aae1e7bdae83bde0712c50e8444d71c0e0c196bb2247ade8d4ad0eb90
  * @jenesis.pin org.apiguardian.api 1.1.2 SHA-256/b509448ac506d607319f182537f0b35d71007582ec741832a1f111e5b5b70b38

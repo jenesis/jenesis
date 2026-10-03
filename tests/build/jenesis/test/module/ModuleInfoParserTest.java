@@ -512,6 +512,34 @@ public class ModuleInfoParserTest {
     }
 
     @Test
+    public void jenesis_environment_names_the_variables_its_runs_read() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.environment JENREPO_TEST_* AWS_REGION
+                 * @jenesis.environment CANARY_SIZE
+                 */
+                module foo {
+                }
+                """);
+        assertThat(new ModuleInfoParser().identify(folder.resolve("module-info.java")).environment())
+                .containsExactly("JENREPO_TEST_*", "AWS_REGION", "CANARY_SIZE");
+    }
+
+    @Test
+    public void jenesis_environment_refuses_what_names_no_variable() throws IOException {
+        Files.writeString(folder.resolve("module-info.java"), """
+                /**
+                 * @jenesis.environment AWS-REGION
+                 */
+                module foo {
+                }
+                """);
+        assertThatThrownBy(() -> new ModuleInfoParser().identify(folder.resolve("module-info.java")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Illegal @jenesis.environment pattern 'AWS-REGION'");
+    }
+
+    @Test
     public void jenesis_native_without_a_token_names_nothing_and_is_refused() throws IOException {
         Files.writeString(folder.resolve("module-info.java"), """
                 /**

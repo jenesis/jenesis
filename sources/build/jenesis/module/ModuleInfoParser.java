@@ -12,6 +12,7 @@ import static java.util.Objects.requireNonNull;
 public class ModuleInfoParser {
 
     private static final Pattern COORDINATE = Pattern.compile("[A-Za-z0-9_.:+~@*/-]+");
+    private static final Pattern ENVIRONMENT = Pattern.compile("[A-Za-z0-9_*]+");
     private static final Set<String> BLOCKS = Set.of("p", "div", "pre", "ul", "ol", "dl", "table", "blockquote",
             "h1", "h2", "h3", "h4", "h5", "h6", "hr");
 
@@ -66,7 +67,7 @@ public class ModuleInfoParser {
             SequencedMap<String, String> layerApis = new LinkedHashMap<>();
             SequencedMap<String, SequencedSet<String>> layers = new LinkedHashMap<>();
             SequencedMap<String, String> attachments = new LinkedHashMap<>();
-            SequencedSet<String> natives = new LinkedHashSet<>();
+            SequencedSet<String> natives = new LinkedHashSet<>(), environment = new LinkedHashSet<>();
             String release = null;
             String name = null;
             String description = null;
@@ -407,6 +408,22 @@ public class ModuleInfoParser {
                                     natives.add(expand("jenesis.native", token));
                                 }
                             }
+                            case "jenesis.environment" -> {
+                                if (content.isEmpty()) {
+                                    throw new IllegalArgumentException("@jenesis.environment of "
+                                            + module.getName()
+                                            + " names no variable: name each environment variable its runs read,"
+                                            + " as JENREPO_TEST_* or AWS_REGION");
+                                }
+                                for (String pattern : content.split("\\s+")) {
+                                    if (!ENVIRONMENT.matcher(pattern).matches()) {
+                                        throw new IllegalArgumentException("Illegal @jenesis.environment pattern '"
+                                                + pattern
+                                                + "': name a variable, with * standing for any characters");
+                                    }
+                                    environment.add(pattern);
+                                }
+                            }
                             case "jenesis.release" -> {
                                 if (!content.isEmpty()) {
                                     release = content;
@@ -514,6 +531,7 @@ public class ModuleInfoParser {
                     layers,
                     attachments,
                     natives,
+                    environment,
                     aliases,
                     excludes,
                     overrides,

@@ -104,6 +104,39 @@ tag overrides that default, so the pinned version always wins. Unlike the `pin` 
 the test module alone rather than propagated project-wide, to keep `greeter` and
 `app` focused on their own dependencies.
 
+What a test reads from the environment
+--------------------------------------
+
+A test run, like every JVM the build forks, receives none of the shell's
+environment variables beyond the platform's own (`PATH`, `HOME`, `LANG`, `LC_*`,
+`TMPDIR`, and on Windows `SystemRoot` and its kin) - the same as it would inside a
+container. A test that reads a variable names it in its module's descriptor:
+
+    /**
+     * @jenesis.environment DEMO_GREETING
+     */
+    module demo.greeter.test { ... }
+
+`GreeterTest` prints what it was handed and asserts that an undeclared variable
+never arrives:
+
+    DEMO_SECRET=s3cret DEMO_GREETING=Hello java build/jenesis/Make.java
+
+The same variables reach the mutation tests PIT runs, where `pitest.properties`
+switches it on. The value of every declared variable is part of the test step's key. Run the
+same command again and the tests are not rerun; change the value and they are,
+rather than a result recorded under another value passing for this one:
+
+    DEMO_GREETING=Hi java build/jenesis/Make.java
+    [EXECUTED]  build/modules/compose/module/module-greeter-test/produce/assemble/observed/test/executed in 1.02 seconds
+
+A `*` stands for any characters, as `JENREPO_TEST_*`. A variable your machine
+must hand to every JVM without the project declaring it - `JAVA_TOOL_OPTIONS`
+carrying a proxy, say - goes into `-Djenesis.environment.pass` on the command
+line or in your own `~/.jenesis/jenesis.properties`; it is never part of a key.
+A POM declares `<!--jenesis.environment [test] <variables>-->`, where `test`
+keeps the variables to the test runs.
+
 Shared test infrastructure
 --------------------------
 
