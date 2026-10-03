@@ -157,12 +157,14 @@ class BuildExecutorDefault implements BuildExecutor {
                     Path nextOutput = Files.createDirectory(next.resolve("output"));
                     Path nextSupplement = Files.createDirectory(next.resolve("supplement"));
                     long fetchStarted = System.nanoTime();
-                    Optional<BuildStepResult> cached = cache.fetch(executor,
-                            location + identity,
-                            currentStepHash,
-                            inputs,
-                            cacheRemotely,
-                            nextOutput);
+                    Optional<BuildStepResult> cached = step.shouldUseCache()
+                            ? cache.fetch(executor,
+                                    location + identity,
+                                    currentStepHash,
+                                    inputs,
+                                    cacheRemotely,
+                                    nextOutput)
+                            : Optional.empty();
                     boolean fromCache = cached.isPresent();
                     if (fromCache) {
                         callback.loaded(location + identity, System.nanoTime() - fetchStarted);

@@ -168,6 +168,45 @@ public class TestModuleTest {
     }
 
     @Test
+    public void a_run_that_requires_tests_fails_where_a_change_reaches_no_test() throws IOException {
+        settings.put("test.incremental", "true");
+        Path sampleClasses = classes.resolve(Javac.CLASSES + "sample");
+        for (String value : List.of("first", "second")) {
+            if (value.equals("second")) {
+                settings.put("test.required", "true");
+            }
+            compileSource(sampleClasses, "Unreached", """
+                    package sample;
+                    public class Unreached {
+                        public String value() { return "%s"; }
+                    }
+                    """.formatted(value), bootModuleJars());
+            BuildExecutor executor = newExecutor();
+            executor.addSource("dependencies", dependencies);
+            executor.addSource("classes", classes);
+            executor.addModule(
+                    "test",
+                    TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                                    URI.create("https://repo1.maven.org/maven2/"),
+                                    null,
+                                    Map.of(),
+                                    null)),
+                            Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                            .isTest(candidate -> candidate.endsWith("TestSample")).jarsOnly(false),
+                    "dependencies", "classes");
+            if (value.equals("first")) {
+                executor.execute();
+            } else {
+                assertThatThrownBy(executor::execute)
+                        .rootCause()
+                        .as("no test reaching the change is no evidence either")
+                        .isInstanceOf(IllegalStateException.class)
+                        .hasMessageStartingWith("Tests were not executed: no test reaches a class that changed");
+            }
+        }
+    }
+
+    @Test
     public void refuses_an_incremental_setting_that_names_no_digest() {
         assertThatThrownBy(() -> TestModule.ofEnvironment(new Environment(Map.of("test.incremental", "yes")), Map.of(), Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -971,6 +1010,22 @@ public class TestModuleTest {
         assertThat(executeTests(null, null))
                 .as("tests run only when needed again once the property is cleared")
                 .doesNotContain(EXECUTED);
+    }
+
+    @Test
+    public void a_run_that_requires_tests_fails_where_it_would_stand_on_a_recorded_result()
+            throws IOException {
+        assertThat(executeTests(null, null)).contains(EXECUTED);
+        settings.put("test.required", "true");
+        assertThatThrownBy(() -> executeTests(null, null))
+                .rootCause()
+                .as("a green build under this setting is evidence of tests that ran in it")
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("Tests were not executed")
+                .hasMessageContaining("jenesis.test.force");
+        assertThat(executeTests(null, null, true))
+                .as("forced, the tests execute and the requirement holds")
+                .contains(EXECUTED);
     }
 
     private SequencedSet<String> executeTests(String filter, String tag) throws IOException {
