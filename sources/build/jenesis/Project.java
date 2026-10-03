@@ -693,6 +693,15 @@ public record Project(
                     staging area, renamed into place on success. One build at a time per target: the
                     root holds an exclusive .jenesis.lock and a second process fails fast.
 
+                    Read the outcome of the latest build from %{target}/.jenesis.events.jsonl rather
+                    than from the progress lines, whose [EVENTS] line names the file: one JSON object
+                    per line, each led by its `status`. A step's is executed, skipped, failed, loaded
+                    or stored beside its `step` path, a module's resolved or failed beside its
+                    `module` path; a failure carries its `error` class and `message`, an executed or
+                    skipped step the `folder` holding its output. The first line is `started` and the
+                    last `completed` or `failed`, with how many steps executed, skipped and failed; a
+                    file without that last line is a build that is still running or was killed.
+
                     ## 4. Turn a folder into a selector
 
                     target/build/ mirrors the build graph, so any folder under it is a selector: drop
@@ -2686,6 +2695,7 @@ public record Project(
                 executor.digest|MD5|Algorithm behind the content and step hashes that drive the cache
                 executor.rebuild|false|Wipe target/ before building; prefer letting the cache decide
                 executor.aggregate|false|Collect independent step failures into one report
+                executor.events|true|Write each step's outcome of the latest build as one JSON object per line to .jenesis.events.jsonl in the target folder, replaced by every build
                 process.concurrency|0|Run at most this many JDK tool runs at once; 0 is unbounded
                 process.factory|tool|tool|fork; fork runs a JDK tool in a process of its own
                 legal.notices|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries taken as legal notices into a jmod, a linked or packaged image and beside a native image, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
