@@ -15,14 +15,16 @@ public interface BuildExecutor {
                          boolean verbose,
                          boolean progress,
                          boolean cacheHits,
+                         boolean changes,
                          boolean rebuild,
                          boolean aggregate,
+                         boolean dryRun,
                          int concurrency,
                          BuildExecutorCache cache,
                          Consumer<String> out) {
 
         public Configuration() {
-            this(Duration.ZERO, "MD5", false, true, false, false, false, 0, null, System.out::println);
+            this(Duration.ZERO, "MD5", false, true, false, false, false, false, false, 0, null, System.out::println);
         }
 
         public static Configuration ofEnvironment(Environment environment) {
@@ -47,51 +49,61 @@ public interface BuildExecutor {
                     environment.flag("print.checksum"),
                     environment.flag("print.progress", true),
                     environment.flag("print.cache"),
+                    environment.flag("print.changes"),
                     environment.flag("executor.rebuild"),
                     environment.flag("executor.aggregate"),
+                    environment.flag("executor.dryrun"),
                     environment.number("executor.concurrency", 0),
                     cache,
                     environment.out());
         }
 
         public Configuration timeout(Duration timeout) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, changes, rebuild, aggregate, dryRun, concurrency, cache, out);
         }
 
         public Configuration digest(String digest) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, changes, rebuild, aggregate, dryRun, concurrency, cache, out);
         }
 
         public Configuration verbose(boolean verbose) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, changes, rebuild, aggregate, dryRun, concurrency, cache, out);
         }
 
         public Configuration progress(boolean progress) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, changes, rebuild, aggregate, dryRun, concurrency, cache, out);
         }
 
         public Configuration cacheHits(boolean cacheHits) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, changes, rebuild, aggregate, dryRun, concurrency, cache, out);
+        }
+
+        public Configuration changes(boolean changes) {
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, changes, rebuild, aggregate, dryRun, concurrency, cache, out);
+        }
+
+        public Configuration dryRun(boolean dryRun) {
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, changes, rebuild, aggregate, dryRun, concurrency, cache, out);
         }
 
         public Configuration rebuild(boolean rebuild) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, changes, rebuild, aggregate, dryRun, concurrency, cache, out);
         }
 
         public Configuration aggregate(boolean aggregate) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, changes, rebuild, aggregate, dryRun, concurrency, cache, out);
         }
 
         public Configuration concurrency(int concurrency) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, changes, rebuild, aggregate, dryRun, concurrency, cache, out);
         }
 
         public Configuration cache(BuildExecutorCache cache) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, changes, rebuild, aggregate, dryRun, concurrency, cache, out);
         }
 
         public Configuration out(Consumer<String> out) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, cacheHits, changes, rebuild, aggregate, dryRun, concurrency, cache, out);
         }
 
         public BuildExecutor of(Path target) throws IOException {
@@ -100,11 +112,12 @@ public interface BuildExecutor {
                     new HashDigestFunction(digest),
                     BuildStepHashFunction.ofSerializationDigest(digest),
                     progress
-                            ? BuildExecutorCallback.printing(out, verbose, cacheHits, target)
+                            ? BuildExecutorCallback.printing(out, verbose, cacheHits, changes, target)
                             : BuildExecutorCallback.nop(),
                     cache == null ? BuildExecutorCache.nop() : cache,
                     rebuild,
                     aggregate,
+                    dryRun,
                     concurrency);
         }
     }
@@ -118,8 +131,25 @@ public interface BuildExecutor {
                             boolean rebuild,
                             boolean aggregate,
                             int concurrency) throws IOException {
+        return of(target, timeout, hash, stepHash, callback, cache, rebuild, aggregate, false, concurrency);
+    }
+
+    static BuildExecutor of(Path target,
+                            Duration timeout,
+                            HashDigestFunction hash,
+                            BuildStepHashFunction stepHash,
+                            BuildExecutorCallback callback,
+                            BuildExecutorCache cache,
+                            boolean rebuild,
+                            boolean aggregate,
+                            boolean dryRun,
+                            int concurrency) throws IOException {
         if (concurrency < 0) {
             throw new IllegalArgumentException("Concurrency must not be negative: " + concurrency);
+        }
+        if (rebuild && dryRun) {
+            throw new IllegalArgumentException("A dry run cannot rebuild, since it changes nothing in the target folder"
+                    + " - drop jenesis.executor.rebuild or jenesis.executor.dryrun");
         }
         if (rebuild && Files.isDirectory(target)) {
             Files.walkFileTree(target, new SimpleFileVisitor<>() {
@@ -139,7 +169,7 @@ public interface BuildExecutor {
                 }
             });
         }
-        BuildExecutor executor = new BuildExecutorDefault(target, timeout, hash, stepHash, callback, cache, aggregate, concurrency == 0 ? null : new BuildExecutorDefault.Permits(concurrency), "", Map.of());
+        BuildExecutor executor = new BuildExecutorDefault(target, timeout, hash, stepHash, callback, cache, aggregate, dryRun, concurrency == 0 ? null : new BuildExecutorDefault.Permits(concurrency), "", Map.of());
         if (!Files.exists(target.resolve(SKIP_MARKER))) {
             Files.createFile(target.resolve(SKIP_MARKER));
         }

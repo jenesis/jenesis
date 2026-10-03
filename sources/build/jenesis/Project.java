@@ -535,6 +535,8 @@ public record Project(
                                                 one no key covers
                       %{name}-Djenesis.print.checksum%{reset}  Print each step's input and output checksums, to
                                                 see what made a step re-run
+                      %{name}-Djenesis.print.changes%{reset}   Say why each step runs: which of its inputs changed
+                      %{name}-Djenesis.executor.dryrun%{reset} Run nothing, but list what would run and why
                       %{name}-Djenesis.print.progress=false%{reset}
                                                 Drop the progress lines themselves
 
@@ -1039,6 +1041,9 @@ public record Project(
                                                        print.<command>, as print.javac
                       -Djenesis.dependency.pin=strict  fail the build on any unpinned artifact
                       -Djenesis.test.filter=<regex>    run one test class or method
+                      -Djenesis.executor.dryrun        list what a build would run, and why, running
+                                                       nothing; up-to-date steps print as SKIPPED
+                      -Djenesis.print.changes          say why each step runs: which inputs changed
                       -Djenesis.executor.rebuild       wipe target/ - avoid it, see section 7
 
                     ## 11. Run a built main class with Execute
@@ -2686,6 +2691,7 @@ public record Project(
                 executor.digest|MD5|Algorithm behind the content and step hashes that drive the cache
                 executor.rebuild|false|Wipe target/ before building; prefer letting the cache decide
                 executor.aggregate|false|Collect independent step failures into one report
+                executor.dryrun|false|Resolve every module and run no step: print each step that runs, and why, each that may run after one that does, since that one's output may come out unchanged, and each that is up to date; a module that reads what a pending step would write is reported rather than resolved
                 process.concurrency|0|Run at most this many JDK tool runs at once; 0 is unbounded
                 process.factory|tool|tool|fork; fork runs a JDK tool in a process of its own
                 legal.notices|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries taken as legal notices into a jmod, a linked or packaged image and beside a native image, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
@@ -2697,6 +2703,7 @@ public record Project(
                 print.checksum|false|Each step's input and output checksums
                 print.fetch|false|Each artifact downloaded from a repository
                 print.cache|false|Each step served from or written to the build cache
+                print.changes|false|Why each step runs: that it never ran, its definition or output changed, or which of its inputs were added, altered or removed
                 print.signatures|false|Each verified dependency with its signer, and each one no declaration covers
                 print.pins|false|Each pin a refresh kept although no closure resolved it
                 print.divergence|false|Each coordinate the project pins at more than one version

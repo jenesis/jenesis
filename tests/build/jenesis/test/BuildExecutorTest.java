@@ -6,6 +6,7 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildExecutorException;
+import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -366,6 +367,104 @@ public class BuildExecutorTest implements Serializable {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("baz");
         assertThat(root.resolve("step")).doesNotExist();
+    }
+
+    @Test
+    public void a_dry_run_runs_no_step_and_names_why_each_would_run() throws IOException {
+        RUNS.set(0);
+        Files.writeString(source.resolve("file"), "foo");
+        buildExecutor.addSource("source", source);
+        buildExecutor.addStep("first", counting(), "source");
+        buildExecutor.addStep("second", counting(), "first");
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        Files.writeString(source.resolve("file"), "bar");
+        SequencedMap<String, List<String>> pending = new LinkedHashMap<>();
+        BuildExecutor dry = dryRun(pending);
+        dry.addSource("source", source);
+        dry.addStep("first", counting(), "source");
+        dry.addStep("second", counting(), "first");
+        dry.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(RUNS.get()).as("a dry run runs nothing").isEqualTo(2);
+        assertThat(root.resolve("first").resolve("output").resolve("file")).hasContent("value1");
+        assertThat(pending).containsOnlyKeys("first", "second");
+        assertThat(pending.get("first")).containsExactly("source altered file");
+        assertThat(pending.get("second"))
+                .as("a step reading what a pending step would write is pending in turn")
+                .containsExactly("it may run after first");
+    }
+
+    @Test
+    public void a_dry_run_of_an_unchanged_build_names_nothing() throws IOException {
+        RUNS.set(0);
+        Files.writeString(source.resolve("file"), "foo");
+        buildExecutor.addSource("source", source);
+        buildExecutor.addStep("step", counting(), "source");
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        SequencedMap<String, List<String>> pending = new LinkedHashMap<>();
+        BuildExecutor dry = dryRun(pending);
+        dry.addSource("source", source);
+        dry.addStep("step", counting(), "source");
+        dry.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(pending).isEmpty();
+        assertThat(RUNS.get()).isEqualTo(1);
+    }
+
+    @Test
+    public void a_dry_run_reports_a_module_that_reads_what_a_pending_step_would_write() throws IOException {
+        SequencedMap<String, List<String>> pending = new LinkedHashMap<>();
+        BuildExecutor dry = dryRun(pending);
+        dry.addStep("produce", counting());
+        dry.addModule("consume", (executor, inherited) -> {
+            Files.readString(inherited.get(BuildExecutorModule.PREVIOUS + "produce").resolve("file"));
+            executor.addStep("step", counting());
+        }, "produce");
+        dry.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(pending.get("produce")).containsExactly("it never ran");
+        assertThat(pending.get("consume"))
+                .as("a module that cannot resolve before a step has run is reported rather than failing the dry run")
+                .singleElement()
+                .asString()
+                .startsWith("it resolves only once produce has run: ");
+        assertThat(root.resolve("produce")).doesNotExist();
+    }
+
+    @Test
+    public void refuses_a_dry_run_that_rebuilds() {
+        assertThatThrownBy(() -> BuildExecutor.of(root,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), true, false, true, 0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.executor.dryrun");
+    }
+
+    private BuildExecutor dryRun(SequencedMap<String, List<String>> pending) throws IOException {
+        return BuildExecutor.of(root,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                new BuildExecutorCallback() {
+                    @Override
+                    public BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys) {
+                        return (_, _) -> {
+                        };
+                    }
+
+                    @Override
+                    public void pending(String identity, List<String> reasons, boolean certain) {
+                        synchronized (pending) {
+                            pending.put(identity, reasons);
+                        }
+                    }
+
+                    @Override
+                    public void unresolved(String identity, String reason) {
+                        synchronized (pending) {
+                            pending.put(identity, List.of(reason));
+                        }
+                    }
+                }, BuildExecutorCache.nop(), false, false, true, 0);
     }
 
     @Test

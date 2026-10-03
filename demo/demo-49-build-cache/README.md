@@ -62,6 +62,28 @@ prints a `[LOADED]` line and each one written to it a `[STORED]` line. On this t
 project the saving is tiny; on a real module the compile that took seconds returns
 instantly. Delete `.jenesis/cache` to start over.
 
+What a build would run, and why
+-------------------------------
+
+Before building, ask what would run. `-Djenesis.executor.dryrun` resolves the
+whole build and runs no step: a step that is up to date prints `[SKIPPED]` as
+always, and one that would run prints `[PENDING]` with the reason - that it never
+ran, that its definition or its output changed, or which of its inputs were added,
+altered or removed. Edit `Sample.java` and:
+
+    java -Djenesis.executor.dryrun build/jenesis/Make.java
+
+    [PENDING]   build/maven/identifier/module/module-/sources: :.%2Fsources altered sample/Sample.java
+    [PENDING]   .../compile/javac: it may run after ../../../prepare, ../../../../../sources, ...
+    [PENDING]   2 steps run, 16 more may run after them, and 1 is up to date
+
+A step that only reads what a pending step writes *may* run: if that output comes
+out unchanged, it is skipped after all, which is why a real build often runs fewer.
+Nothing in `target/` changes, so the dry run can be repeated freely. The same
+reasons print in a real build, as each step starts, with `-Djenesis.print.changes`:
+
+    [CHANGED]   .../compile/javac: ../../../../../sources altered sources/sample/Sample.java
+
 A shared cache (the `uri` one)
 ------------------------------
 

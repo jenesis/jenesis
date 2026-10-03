@@ -44,4 +44,29 @@ public class BuildExecutorCallbackTest {
                 .containsExactly(BuildExecutorCallback.RED + "[FAILED]   " + BuildExecutorCallback.RESET
                         + " foo: message");
     }
+
+    @Test
+    public void prints_why_a_step_runs_only_when_asked_to() {
+        List<String> printed = new ArrayList<>();
+        BuildExecutorCallback.printing(printed::add, false, false, false, null).outdated("foo", List.of("a", "b"));
+        assertThat(printed).isEmpty();
+        BuildExecutorCallback.printing(printed::add, false, false, true, null).outdated("foo", List.of("a", "b"));
+        assertThat(printed).containsExactly(BuildExecutorCallback.YELLOW + "[CHANGED]  " + BuildExecutorCallback.RESET
+                + " foo: a; b");
+    }
+
+    @Test
+    public void prints_each_pending_step_and_how_many_would_run() {
+        List<String> printed = new ArrayList<>();
+        BuildExecutorCallback callback = BuildExecutorCallback.printing(printed::add, false, false, false, Path.of("target"));
+        BiConsumer<Boolean, Throwable> build = callback.step(null, new LinkedHashSet<>());
+        callback.step("foo", new LinkedHashSet<>()).accept(false, null);
+        callback.pending("bar", List.of("it never ran"), true);
+        callback.pending("qux", List.of("it may run after bar"), false);
+        build.accept(null, null);
+        assertThat(printed).contains(
+                BuildExecutorCallback.YELLOW + "[PENDING]  " + BuildExecutorCallback.RESET + " bar: it never ran",
+                BuildExecutorCallback.YELLOW + "[PENDING]  " + BuildExecutorCallback.RESET
+                        + " 1 step runs, 1 more may run after it, and 1 is up to date");
+    }
 }
