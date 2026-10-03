@@ -124,6 +124,32 @@ public class BuildExecutorCacheTest {
         assertThat(remote.storeRemote).isTrue();
     }
 
+    @Test
+    public void executes_a_step_that_declines_the_cache_although_the_cache_holds_its_result() throws IOException {
+        Files.writeString(source.resolve("file"), "foo");
+        RecordingCache cache = new RecordingCache(true);
+        runStep(cache, new UncachedStep());
+        assertThat(cache.fetches).as("a step that must execute is never served a recorded result").hasValue(0);
+        assertThat(root.resolve("step").resolve("output").resolve("file")).content().isEqualTo("executed");
+    }
+
+    private static final class UncachedStep implements BuildStep {
+
+        @Override
+        public boolean shouldUseCache() {
+            return false;
+        }
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments)
+                throws IOException {
+            Files.writeString(context.next().resolve("file"), "executed");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
     private static final class LocalOnlyStep implements BuildStep {
 
         @Override

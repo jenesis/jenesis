@@ -36,6 +36,7 @@ public class TestModule implements BuildExecutorModule {
     private final String filter;
     private final String tag;
     private final boolean force;
+    private final boolean requireExecuted;
     private final boolean parallel;
     private final boolean reporting;
     private final String group;
@@ -57,6 +58,7 @@ public class TestModule implements BuildExecutorModule {
                 null,
                 null,
                 null,
+                false,
                 false,
                 false,
                 false,
@@ -83,6 +85,7 @@ public class TestModule implements BuildExecutorModule {
                 environment.getProperty("test.filter"),
                 environment.getProperty("test.tag"),
                 environment.flag("test.force"),
+                environment.flag("test.requireExecuted"),
                 environment.flag("test.parallel"),
                 environment.flag("test.reporting"),
                 "main",
@@ -127,6 +130,7 @@ public class TestModule implements BuildExecutorModule {
                        String filter,
                        String tag,
                        boolean force,
+                       boolean requireExecuted,
                        boolean parallel,
                        boolean reporting,
                        String group,
@@ -148,6 +152,7 @@ public class TestModule implements BuildExecutorModule {
         this.filter = filter;
         this.tag = tag;
         this.force = force;
+        this.requireExecuted = requireExecuted;
         this.parallel = parallel;
         this.reporting = reporting;
         this.group = group;
@@ -170,6 +175,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -193,6 +199,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -216,6 +223,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -239,6 +247,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -262,6 +271,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -285,6 +295,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -308,6 +319,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -331,6 +343,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -354,6 +367,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -377,6 +391,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -400,6 +415,31 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
+                parallel,
+                reporting,
+                group,
+                observers,
+                incrementalDigest,
+                terms,
+                skip);
+    }
+
+    public TestModule requireExecuted(boolean requireExecuted) {
+        return new TestModule(framework,
+                isTest,
+                factory,
+                resolvers,
+                dependencies,
+                jarsOnly,
+                requireFramework,
+                pinning,
+                pathPlacement,
+                moduleName,
+                filter,
+                tag,
+                force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -423,6 +463,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -446,6 +487,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -469,6 +511,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -496,6 +539,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -519,6 +563,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -542,6 +587,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
+                requireExecuted,
                 parallel,
                 reporting,
                 group,
@@ -586,6 +632,7 @@ public class TestModule implements BuildExecutorModule {
                         filter,
                         tag,
                         force,
+                        requireExecuted,
                         parallel,
                         reporting,
                         group,
@@ -731,6 +778,7 @@ public class TestModule implements BuildExecutorModule {
         private final transient String filter;
         private final transient String tag;
         private final transient boolean force;
+        private final transient boolean requireExecuted;
         private final transient boolean parallel;
         private final boolean reporting;
         private final String group;
@@ -747,6 +795,7 @@ public class TestModule implements BuildExecutorModule {
                     String filter,
                     String tag,
                     boolean force,
+                    boolean requireExecuted,
                     boolean parallel,
                     boolean reporting,
                     String group,
@@ -763,6 +812,7 @@ public class TestModule implements BuildExecutorModule {
             this.filter = filter;
             this.tag = tag;
             this.force = force;
+            this.requireExecuted = requireExecuted;
             this.parallel = parallel;
             this.reporting = reporting;
             this.group = group;
@@ -781,6 +831,11 @@ public class TestModule implements BuildExecutorModule {
         }
 
         @Override
+        public boolean shouldUseCache() {
+            return !requireExecuted;
+        }
+
+        @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
@@ -788,6 +843,12 @@ public class TestModule implements BuildExecutorModule {
             TestTags requested = TestTags.parse(tag);
             List<TestTags> ran = ran(context, arguments);
             if (requested.coveredBy(ran)) {
+                if (requireExecuted) {
+                    throw new IllegalStateException("Tests were not executed: the results recorded in "
+                            + context.previous()
+                            + " cover this selection and jenesis.test.requireExecuted is set"
+                            + " - set -Djenesis.test.force=true to execute them again");
+                }
                 return CompletableFuture.completedStage(new BuildStepResult(false));
             }
             List<TestTags> covered = new ArrayList<>(ran);
@@ -953,6 +1014,12 @@ public class TestModule implements BuildExecutorModule {
             if (incrementalDigest != null && filter == null && tags.all() && ran.isEmpty() && !matchedClasses.isEmpty()) {
                 SequencedSet<String> narrowed = selected(arguments, context, matchedClasses);
                 if (narrowed != null && narrowed.isEmpty()) {
+                    if (requireExecuted) {
+                        throw new IllegalStateException("Tests were not executed: no test reaches a class that changed"
+                                + " since the results recorded in " + context.previous()
+                                + " and jenesis.test.requireExecuted is set"
+                                + " - set -Djenesis.test.force=true to execute them again");
+                    }
                     return CompletableFuture.completedFuture(null);
                 } else if (narrowed != null) {
                     selection = narrowed;
