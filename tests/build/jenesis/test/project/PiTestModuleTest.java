@@ -15,10 +15,12 @@ import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.PiTestModule;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.ProcessHandler;
 import javax.tools.ToolProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 public class PiTestModuleTest {
 
@@ -147,6 +149,43 @@ public class PiTestModuleTest {
                 .contains(project.resolve("library.jar").toString());
     }
 
+    @Test
+    public void mutate_step_hands_the_mutation_run_the_environment_its_module_declares() throws IOException {
+        Set<String> platform = new HashSet<>(ProcessHandler.OfProcess.environment(List.of()).keySet());
+        platform.addAll(List.of("COLUMNS", "LINES", "TERM"));
+        String declared = System.getenv().keySet().stream()
+                .filter(name -> !platform.contains(name))
+                .sorted()
+                .findFirst()
+                .orElse(null);
+        assumeTrue(declared != null, "no variable beyond the platform's own is set to declare");
+        Files.createDirectory(project.resolve(BuildStep.SOURCES));
+        SequencedProperties environment = new SequencedProperties();
+        environment.setProperty(declared, "");
+        environment.store(project.resolve(BuildStep.ENVIRONMENT));
+        jar(project.resolve("app.jar"), "app/App.class");
+        SequencedProperties index = new SequencedProperties();
+        index.setProperty("main/runtime/maven/org.example/app/1.0", "app.jar");
+        index.store(project.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("vertex/main/runtime/maven/org.example/app", "1.0\t\tfalse\ttrue");
+        graph.store(project.resolve(Dependencies.GRAPH));
+
+        BuildExecutor executor = newExecutor();
+        executor.addSource("project", project);
+        executor.addModule(
+                "pitest",
+                new PiTestModule(Map.of("maven", serving(cli("System.out.println(String.join(\",\", System.getenv().keySet()));"))),
+                        Map.of("maven", Resolver.identity())),
+                "project");
+        executor.execute("pitest/mutate");
+
+        assertThat(root.resolve("pitest").resolve("mutate").resolve("supplement").resolve("output"))
+                .as("the tests PIT runs read what the tests of the module may read")
+                .content()
+                .contains(declared);
+    }
+
     private static void jar(Path jar, String entry) throws IOException {
         try (JarOutputStream stream = new JarOutputStream(Files.newOutputStream(jar))) {
             stream.putNextEntry(new JarEntry(entry));
@@ -156,14 +195,19 @@ public class PiTestModuleTest {
     }
 
     private Path cli() throws IOException {
+        return cli("");
+    }
+
+    private Path cli(String main) throws IOException {
         Path source = tool.resolve("MutationCoverageReport.java");
         Files.writeString(source, """
                 package org.pitest.mutationtest.commandline;
                 public class MutationCoverageReport {
                     public static void main(String[] args) {
+                        %s
                     }
                 }
-                """);
+                """.formatted(main));
         Path classes = Files.createDirectory(tool.resolve("classes"));
         if (ToolProvider.getSystemJavaCompiler().run(null,
                 null,

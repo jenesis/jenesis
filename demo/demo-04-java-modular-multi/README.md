@@ -122,7 +122,8 @@ never arrives:
 
     DEMO_SECRET=s3cret DEMO_GREETING=Hello java build/jenesis/Make.java
 
-The value of every declared variable is part of the test step's key. Run the
+The same variables reach the mutation tests PIT runs, where `pitest.properties`
+switches it on. The value of every declared variable is part of the test step's key. Run the
 same command again and the tests are not rerun; change the value and they are,
 rather than a result recorded under another value passing for this one:
 

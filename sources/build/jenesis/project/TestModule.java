@@ -576,6 +576,26 @@ public class TestModule implements BuildExecutorModule {
         if (skip) {
             return;
         }
+        buildExecutor.addStep(EXECUTED, new Run(terms,
+                        factory,
+                        resolved,
+                        isTest,
+                        jarsOnly,
+                        pathPlacement,
+                        moduleName,
+                        filter,
+                        tag,
+                        force,
+                        parallel,
+                        reporting,
+                        group,
+                        observers,
+                        incrementalDigest,
+                        declaredEnvironment(inherited)),
+                Stream.concat(upstream.stream(), Stream.of(DEPENDENCIES)));
+    }
+
+    static SortedMap<String, String> declaredEnvironment(SequencedMap<String, Path> inherited) throws IOException {
         SequencedSet<String> patterns = new LinkedHashSet<>();
         for (Path folder : inherited.values()) {
             Path file = folder.resolve(BuildStep.ENVIRONMENT);
@@ -593,23 +613,7 @@ public class TestModule implements BuildExecutorModule {
             }
         });
         patterns.stream().filter(pattern -> !pattern.contains("*")).forEach(name -> environment.putIfAbsent(name, ""));
-        buildExecutor.addStep(EXECUTED, new Run(terms,
-                        factory,
-                        resolved,
-                        isTest,
-                        jarsOnly,
-                        pathPlacement,
-                        moduleName,
-                        filter,
-                        tag,
-                        force,
-                        parallel,
-                        reporting,
-                        group,
-                        observers,
-                        incrementalDigest,
-                        environment),
-                Stream.concat(upstream.stream(), Stream.of(DEPENDENCIES)));
+        return environment;
     }
 
     @Override

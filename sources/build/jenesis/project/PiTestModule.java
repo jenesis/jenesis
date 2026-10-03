@@ -84,7 +84,7 @@ public class PiTestModule implements BuildExecutorModule {
     }
 
     @Override
-    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
+    public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
         buildExecutor.addStep(REQUIRED, new Requires(tool), inherited.sequencedKeySet());
         SequencedSet<String> resolveInputs = new LinkedHashSet<>();
         resolveInputs.add(REQUIRED);
@@ -95,7 +95,7 @@ public class PiTestModule implements BuildExecutorModule {
         SequencedSet<String> mutateInputs = new LinkedHashSet<>();
         mutateInputs.add(DEPENDENCIES);
         mutateInputs.addAll(inherited.sequencedKeySet());
-        buildExecutor.addStep(MUTATE, new Mutate(terms, tool, group, config), mutateInputs);
+        buildExecutor.addStep(MUTATE, new Mutate(terms, tool, group, config, TestModule.declaredEnvironment(inherited)), mutateInputs);
     }
 
     private record Requires(String tool) implements BuildStep {
@@ -149,15 +149,23 @@ public class PiTestModule implements BuildExecutorModule {
         private final String tool;
         private final String group;
         private final SequencedProperties config;
+        private final SortedMap<String, String> environment;
 
         private Mutate(ProcessBuildStep.Terms terms,
                        String tool,
                        String group,
-                       SequencedProperties config) {
+                       SequencedProperties config,
+                       SortedMap<String, String> environment) {
             super("pitest", ProcessHandler.OfProcess.ofJavaHome("bin/java"), terms);
             this.tool = tool;
             this.group = group;
             this.config = config;
+            this.environment = environment;
+        }
+
+        @Override
+        protected Collection<String> declared() {
+            return environment.keySet();
         }
 
         @Override
