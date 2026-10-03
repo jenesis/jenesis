@@ -209,7 +209,7 @@ public class ProcessBuildStepTest {
         assertThat(Files.readAllLines(supplement.resolve("output")))
                 .as("a variable this JVM holds but the step does not declare stays behind, as it would outside a container")
                 .allSatisfy(name -> assertThat(name).matches("(?i)PATH|HOME|LANG|LC_.*|TMPDIR|TEMP|TMP|SystemRoot"
-                        + "|SystemDrive|windir|ComSpec|PATHEXT|USERPROFILE|COLUMNS|LINES|TERM|DECLARED_.*"));
+                        + "|SystemDrive|windir|ComSpec|PATHEXT|USERPROFILE|COLUMNS|LINES|TERM|__CF_USER_TEXT_ENCODING|DECLARED_.*"));
     }
 
     private static final class Declaring extends ProcessBuildStep {
