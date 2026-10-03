@@ -171,14 +171,17 @@ class BuildExecutorDefault implements BuildExecutor {
                                     ? Checksum.diff(HashFunction.read(checksums), summary.checksums(), hash)
                                     : Map.of();
                         }
-                        Map<ChecksumStatus, List<Path>> changed = new EnumMap<>(ChecksumStatus.class);
+                        Map<ChecksumStatus, List<String>> changed = new EnumMap<>(ChecksumStatus.class);
                         files.forEach((file, checksum) -> {
                             if (checksum.status() != ChecksumStatus.RETAINED) {
-                                changed.computeIfAbsent(checksum.status(), _ -> new ArrayList<>()).add(file);
+                                changed.computeIfAbsent(checksum.status(), _ -> new ArrayList<>())
+                                        .add(file.toString().replace(File.separatorChar, '/'));
                             }
                         });
                         if (!changed.isEmpty()) {
-                            reasons.add(entry.getKey() + " " + changed.entrySet().stream()
+                            reasons.add((entry.getKey().startsWith(":")
+                                    ? BuildExecutorModule.decode(entry.getKey().substring(1)).replace(File.separatorChar, '/')
+                                    : entry.getKey()) + " " + changed.entrySet().stream()
                                     .map(change -> change.getValue().size() == 1
                                             ? change.getKey().name().toLowerCase(Locale.ROOT) + " " + change.getValue().getFirst()
                                             : change.getValue().size() + " " + change.getKey().name().toLowerCase(Locale.ROOT)

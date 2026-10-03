@@ -372,12 +372,12 @@ public class BuildExecutorTest implements Serializable {
     @Test
     public void a_dry_run_runs_no_step_and_names_why_each_would_run() throws IOException {
         RUNS.set(0);
-        Files.writeString(source.resolve("file"), "foo");
+        Files.writeString(Files.createDirectory(source.resolve("folder")).resolve("file"), "foo");
         buildExecutor.addSource("source", source);
         buildExecutor.addStep("first", counting(), "source");
         buildExecutor.addStep("second", counting(), "first");
         buildExecutor.execute(Runnable::run).toCompletableFuture().join();
-        Files.writeString(source.resolve("file"), "bar");
+        Files.writeString(source.resolve("folder").resolve("file"), "bar");
         SequencedMap<String, List<String>> pending = new LinkedHashMap<>();
         BuildExecutor dry = dryRun(pending);
         dry.addSource("source", source);
@@ -387,7 +387,8 @@ public class BuildExecutorTest implements Serializable {
         assertThat(RUNS.get()).as("a dry run runs nothing").isEqualTo(2);
         assertThat(root.resolve("first").resolve("output").resolve("file")).hasContent("value1");
         assertThat(pending).containsOnlyKeys("first", "second");
-        assertThat(pending.get("first")).containsExactly("source altered file");
+        assertThat(pending.get("first")).as("a file is named with forward slashes, whatever the platform")
+                .containsExactly("source altered folder/file");
         assertThat(pending.get("second"))
                 .as("a step reading what a pending step would write is pending in turn")
                 .containsExactly("it may run after first");
