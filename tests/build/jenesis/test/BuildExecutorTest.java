@@ -27,6 +27,7 @@ public class BuildExecutorTest implements Serializable {
     private final Map<String, String> settings = new HashMap<>();
 
     private static final AtomicInteger RUNS = new AtomicInteger();
+    private static final AtomicBoolean MARKED = new AtomicBoolean();
     private static final AtomicReference<SequencedMap<String, BuildStepArgument>> APPLIED = new AtomicReference<>();
     private static final AtomicReference<SequencedSet<String>> REMOVED = new AtomicReference<>();
 
@@ -385,6 +386,125 @@ public class BuildExecutorTest implements Serializable {
         buildExecutor.execute(Runnable::run).toCompletableFuture().join();
         assertThat(root.resolve("step~")).doesNotExist();
         assertThat(root.resolve("step").resolve("output")).isDirectory();
+    }
+
+    @Test
+    public void records_the_run_that_produced_a_step_and_keeps_it_while_the_step_is_reused() throws IOException {
+        Files.writeString(source.resolve("file"), "foo");
+        SequencedMap<String, BuildExecutorCallback.Provenance> recorded = new LinkedHashMap<>();
+        List<String> runs = new ArrayList<>();
+        BuildExecutor executor = recording(recorded, runs);
+        executor.addSource("source", source);
+        executor.addStep("step", counting(), "source");
+        executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(SequencedProperties.ofFiles(root.resolve("step/checksum/step.properties")).getProperty("run"))
+                .isEqualTo(runs.getFirst());
+        executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(runs).hasSize(2).doesNotHaveDuplicates();
+        assertThat(recorded.get("step").run())
+                .as("a reused step names the run that produced what it holds, not the run that reused it")
+                .isEqualTo(runs.getFirst());
+        assertThat(recorded.get("step").time()).isNotNull();
+        assertThat(recorded.get("step").summary()).isNull();
+    }
+
+    @Test
+    public void marks_a_failed_step_on_disk_until_it_succeeds_again() throws IOException {
+        Files.writeString(source.resolve("file"), "foo");
+        RUNS.set(0);
+        List<String> runs = new ArrayList<>();
+        BuildExecutor executor = recording(new LinkedHashMap<>(), runs);
+        executor.addSource("source", source);
+        executor.addStep("step", (_, context, _) -> {
+            Files.writeString(context.next().resolve("file"), "value");
+            return RUNS.incrementAndGet() == 2
+                    ? CompletableFuture.failedStage(new IllegalStateException("broke\nfor a reason"))
+                    : CompletableFuture.completedStage(new BuildStepResult(true));
+        }, "source");
+        executor.execute(Runnable::run).toCompletableFuture().join();
+        Files.writeString(source.resolve("file"), "bar");
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join());
+        SequencedProperties failed = SequencedProperties.ofFiles(root.resolve("step/checksum/failed.properties"));
+        assertThat(failed.getProperty("run"))
+                .as("the output a failed run left in place says that a later run failed to replace it")
+                .isEqualTo(runs.getLast());
+        assertThat(failed.getProperty("message")).isEqualTo("broke");
+        assertThat(failed.getProperty("staging")).isEqualTo(root.resolve("step~").toAbsolutePath().normalize().toString());
+        executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(root.resolve("step/checksum/failed.properties")).doesNotExist();
+    }
+
+    @Test
+    public void marks_a_step_on_disk_while_it_runs() throws IOException {
+        Files.writeString(source.resolve("file"), "foo");
+        MARKED.set(false);
+        buildExecutor.addSource("source", source);
+        buildExecutor.addStep("step", (_, context, _) -> {
+            Path running = context.next().getParent().getParent().resolve("step/checksum/running.properties");
+            MARKED.compareAndSet(false, Files.exists(running));
+            Files.writeString(context.next().resolve("file"), "value");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }, "source");
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        Files.writeString(source.resolve("file"), "bar");
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(MARKED.get())
+                .as("a build killed while the step runs leaves the marker behind on the output it did not replace")
+                .isTrue();
+        assertThat(root.resolve("step/checksum/running.properties")).doesNotExist();
+    }
+
+    @Test
+    public void hands_on_what_a_summarizing_step_summarized_and_nothing_from_a_cache() throws IOException {
+        SequencedMap<String, BuildExecutorCallback.Provenance> recorded = new LinkedHashMap<>();
+        BuildExecutor executor = recording(recorded, new ArrayList<>());
+        executor.addStep("step", new Summarizing());
+        executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(recorded.get("step").summary()).containsExactly(Map.entry("result", "1 passed"));
+        assertThat(recorded.get("step").loaded()).isFalse();
+    }
+
+    private record Summarizing() implements BuildStep {
+
+        @Override
+        public boolean summarizes() {
+            return true;
+        }
+
+        @Override
+        public CompletionStage<BuildStepResult> apply(Executor executor,
+                                                      BuildStepContext context,
+                                                      SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            Files.writeString(context.supplement().resolve(BuildStep.SUMMARY), "result=1 passed\n");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
+    }
+
+    private BuildExecutor recording(SequencedMap<String, BuildExecutorCallback.Provenance> recorded,
+                                    List<String> runs) throws IOException {
+        return BuildExecutor.of(root,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                new BuildExecutorCallback() {
+                    @Override
+                    public BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys) {
+                        return (_, _) -> {
+                        };
+                    }
+
+                    @Override
+                    public void run(String id) {
+                        runs.add(id);
+                    }
+
+                    @Override
+                    public void recorded(String identity, Provenance provenance) {
+                        synchronized (recorded) {
+                            recorded.put(identity, provenance);
+                        }
+                    }
+                }, BuildExecutorCache.nop(), false, false, 0);
     }
 
     @Test

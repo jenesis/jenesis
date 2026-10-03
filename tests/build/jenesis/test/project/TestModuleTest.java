@@ -101,6 +101,9 @@ public class TestModuleTest {
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
         assertThat(reportedErrors(supplement)).isEmpty();
+        assertThat(SequencedProperties.ofFiles(supplement.resolve(BuildStep.SUMMARY)).getProperty("result"))
+                .as("what a run counted stays beside its output, where no cache carries it to another machine")
+                .isEqualTo("1 passed, 0 failed, 0 skipped");
     }
 
     @Test
@@ -135,6 +138,8 @@ public class TestModuleTest {
         assertThat(root.resolve("test").resolve("executed~").resolve("supplement").resolve("output"))
                 .content()
                 .contains("FailingSample");
+        assertThat(SequencedProperties.ofFiles(root.resolve("test").resolve("executed~").resolve("supplement")
+                .resolve(BuildStep.SUMMARY)).getProperty("result")).isEqualTo("0 passed, 1 failed, 0 skipped");
     }
 
     @Test

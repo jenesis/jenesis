@@ -26,6 +26,7 @@ public interface BuildStep extends Serializable {
             NATIVES = "natives.properties",
             LAYERS = "layers.properties",
             DEPENDENCIES = "dependencies.properties",
+            SUMMARY = "summary.properties",
             RELEASE = "release";
 
     default BuildExecutorModule asModule(String name) {
@@ -48,6 +49,10 @@ public interface BuildStep extends Serializable {
 
     default boolean shouldCacheRemotely() {
         return true;
+    }
+
+    default boolean summarizes() {
+        return false;
     }
 
     CompletionStage<BuildStepResult> apply(Executor executor,

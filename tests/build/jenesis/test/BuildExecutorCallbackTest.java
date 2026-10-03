@@ -161,4 +161,59 @@ public class BuildExecutorCallbackTest {
                 .map(line -> (Map<String, Object>) Json.parse(line))
                 .toList();
     }
+
+    @Test
+    public void ends_the_build_with_a_row_per_summarizing_step_naming_where_its_result_came_from() {
+        List<String> printed = new ArrayList<>();
+        BuildExecutorCallback callback = BuildExecutorCallback.printing(printed::add, false, false, target, false);
+        callback.run("now");
+        BiConsumer<Boolean, Throwable> build = callback.step(null, new LinkedHashSet<>());
+        callback.recorded("ran", new BuildExecutorCallback.Provenance("now", Instant.now(), false, false,
+                summary("result", "2 passed, 0 failed, 0 skipped")));
+        callback.recorded("reused", new BuildExecutorCallback.Provenance("earlier", Instant.now(), false, false,
+                summary("result", "82 passed, 0 failed, 0 skipped", "scope", "tag \"fast\"")));
+        callback.recorded("cached", new BuildExecutorCallback.Provenance("now", Instant.now(), true, false, summary()));
+        callback.recorded("broken", new BuildExecutorCallback.Provenance("now", Instant.now(), false, true,
+                summary("result", "1 passed, 1 failed, 0 skipped")));
+        callback.recorded("plain", new BuildExecutorCallback.Provenance("now", Instant.now(), false, false, null));
+        build.accept(null, null);
+        List<String> rows = printed.stream().filter(line -> line.contains("[SUMMARY]")).toList();
+        assertThat(rows)
+                .as("a result this run produced and one an earlier run left behind must never read alike")
+                .hasSize(4)
+                .anySatisfy(row -> assertThat(row).endsWith("broken  failed now: 1 passed, 1 failed, 0 skipped"))
+                .anySatisfy(row -> assertThat(row).endsWith("cached  loaded from the build cache"))
+                .anySatisfy(row -> assertThat(row).endsWith("ran     executed now: 2 passed, 0 failed, 0 skipped"))
+                .anySatisfy(row -> assertThat(row).matches(".*reused  reused from the run at [0-9]{2}:[0-9]{2}:[0-9]{2}"
+                        + " \\(tag \"fast\"\\): 82 passed, 0 failed, 0 skipped"));
+        assertThat(printed.getFirst()).endsWith("Building in '" + target + "' as run now...");
+    }
+
+    @Test
+    public void records_the_run_of_each_build_and_the_run_that_produced_each_step() throws IOException {
+        BuildExecutorCallback callback = BuildExecutorCallback.events(target);
+        callback.run("now");
+        BiConsumer<Boolean, Throwable> build = callback.step(null, new LinkedHashSet<>());
+        BiConsumer<Boolean, Throwable> step = callback.step("foo", new LinkedHashSet<>());
+        Instant time = Instant.parse("2026-10-03T12:00:00Z");
+        callback.recorded("foo", new BuildExecutorCallback.Provenance("earlier", time, false, false,
+                summary("result", "82 passed, 0 failed, 0 skipped")));
+        step.accept(false, null);
+        build.accept(null, null);
+        List<Map<String, Object>> events = events();
+        assertThat(events.getFirst()).containsEntry("run", "now");
+        assertThat(events.get(1))
+                .containsEntry("status", "skipped")
+                .containsEntry("run", "earlier")
+                .containsEntry("time", time.toString())
+                .containsEntry("summary", Map.of("result", "82 passed, 0 failed, 0 skipped"));
+    }
+
+    private static SequencedMap<String, String> summary(String... entries) {
+        SequencedMap<String, String> summary = new LinkedHashMap<>();
+        for (int index = 0; index < entries.length; index += 2) {
+            summary.put(entries[index], entries[index + 1]);
+        }
+        return summary;
+    }
 }

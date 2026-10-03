@@ -187,6 +187,27 @@ in `~` is kept until the step runs again, with the command, the whole output and
 the test reports under its `supplement/`. Every failed step is repeated at the
 end of the build, so the last lines printed are the ones to read.
 
+Which run a test result came from
+---------------------------------
+
+A test result on disk looks the same whether this build produced it or an earlier
+one did, so every build ends with a row per test step that says which:
+
+    [STARTED]   Building in 'target' as run 20261003T125204Z-d944...
+    [SUMMARY]   build/maven/compose/module/test-module-greeter/produce/assemble/observed/test/executed  executed now: 2 passed, 0 failed, 0 skipped
+
+Build again without a change and the tests are not run again; the row says whose
+result the build relies on, and with which filter or tag that run selected its tests:
+
+    [SUMMARY]   build/.../test/executed  reused from the run at 12:52:14: 2 passed, 0 failed, 0 skipped
+
+A step served from a build cache reads `loaded from the build cache`, and a
+failing one `failed now` with its counts. The same facts are on disk: the step's
+`checksum/step.properties` names the run that produced its output, and when a
+later run fails, `checksum/failed.properties` beside the output it could not
+replace names that run, its message and the `executed~` folder it left. None of
+it is written into `output/`, so no cache hands one machine's run to another.
+
 Pinned dependencies
 -------------------
 

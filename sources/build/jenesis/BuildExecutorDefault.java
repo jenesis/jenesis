@@ -19,6 +19,7 @@ class BuildExecutorDefault implements BuildExecutor {
     private final boolean aggregate;
     private final Permits permits;
     private final String location;
+    private final AtomicReference<String> run;
 
     private final Map<String, StepSummary> inherited;
     private final SequencedMap<String, Registration> registrations = new LinkedHashMap<>();
@@ -32,6 +33,7 @@ class BuildExecutorDefault implements BuildExecutor {
                          boolean aggregate,
                          Permits permits,
                          String location,
+                         AtomicReference<String> run,
                          Map<String, StepSummary> inherited) throws IOException {
         this.target = Files.isDirectory(target) ? target : Files.createDirectory(target);
         this.timeout = timeout;
@@ -42,6 +44,7 @@ class BuildExecutorDefault implements BuildExecutor {
         this.aggregate = aggregate;
         this.permits = permits;
         this.location = location;
+        this.run = run;
         this.inherited = inherited;
     }
 
@@ -154,6 +157,12 @@ class BuildExecutorDefault implements BuildExecutor {
                         Files.walkFileTree(next, new RecursiveFolderDeletion(null));
                     }
                     Files.createDirectory(next);
+                    if (Files.isDirectory(previous.checksum())) {
+                        SequencedProperties running = new SequencedProperties();
+                        running.setProperty("run", run.get());
+                        running.setProperty("time", Instant.now().toString());
+                        running.storeAtomically(previous.running());
+                    }
                     Path nextOutput = Files.createDirectory(next.resolve("output"));
                     Path nextSupplement = Files.createDirectory(next.resolve("supplement"));
                     long fetchStarted = System.nanoTime();
@@ -198,6 +207,19 @@ class BuildExecutorDefault implements BuildExecutor {
                     }
                     return stepStage.thenComposeAsync(result -> {
                         try {
+                            SequencedProperties stepProperties = new SequencedProperties();
+                            if (result.next()) {
+                                stepProperties.setProperty("run", run.get());
+                                stepProperties.setProperty("time", Instant.now().toString());
+                                stepProperties.setProperty("origin", fromCache ? "loaded" : "executed");
+                            } else if (Files.isRegularFile(previous.stepFile())) {
+                                SequencedProperties kept = SequencedProperties.ofFiles(previous.stepFile());
+                                for (String key : List.of("run", "time", "origin")) {
+                                    if (kept.getProperty(key) != null) {
+                                        stepProperties.setProperty(key, kept.getProperty(key));
+                                    }
+                                }
+                            }
                             if (result.next()) {
                                 Files.move(next, exists
                                         ? Files.walkFileTree(previous.path(), new RecursiveFolderDeletion(null))
@@ -215,9 +237,11 @@ class BuildExecutorDefault implements BuildExecutor {
                             }
                             Map<Path, byte[]> checksums = HashFunction.read(previous.output(), hash, executor);
                             HashFunction.write(previous.outputChecksums(), checksums);
-                            SequencedProperties stepProperties = new SequencedProperties();
                             stepProperties.setProperty("serialization", HexFormat.of().formatHex(currentStepHash));
                             stepProperties.storeAtomically(previous.stepFile());
+                            callback.recorded(location + identity, provenance(stepProperties,
+                                    step.summarizes() ? previous.path().resolve("supplement").resolve(BuildStep.SUMMARY) : null,
+                                    false));
                             if (cache.stores() && !fromCache && result.next()) {
                                 String stored = location + identity;
                                 try {
@@ -252,6 +276,23 @@ class BuildExecutorDefault implements BuildExecutor {
                             case CompletionException e -> new BuildExecutorException(location + identity, e.getCause());
                             default -> new BuildExecutorException(location + identity, t);
                         };
+                        try {
+                            Files.deleteIfExists(previous.running());
+                            SequencedProperties failed = new SequencedProperties();
+                            failed.setProperty("run", run.get());
+                            failed.setProperty("time", Instant.now().toString());
+                            Throwable cause = wrapped.getCause() == null ? wrapped : wrapped.getCause();
+                            failed.setProperty("message", String.valueOf(cause.getMessage()).lines().findFirst().orElse(""));
+                            failed.setProperty("staging", next.toAbsolutePath().normalize().toString());
+                            if (Files.isDirectory(previous.checksum())) {
+                                failed.storeAtomically(previous.failed());
+                            }
+                            callback.recorded(location + identity, provenance(failed,
+                                    step.summarizes() ? next.resolve("supplement").resolve(BuildStep.SUMMARY) : null,
+                                    true));
+                        } catch (IOException | RuntimeException e) {
+                            wrapped.addSuppressed(e);
+                        }
                         completion.accept(null, t);
                         return CompletableFuture.failedStage(wrapped);
                     }, executor);
@@ -259,6 +300,11 @@ class BuildExecutorDefault implements BuildExecutor {
                     for (String key : vanished.keySet()) {
                         Files.deleteIfExists(previous.argument(key));
                     }
+                    Files.deleteIfExists(previous.running());
+                    Files.deleteIfExists(previous.failed());
+                    callback.recorded(location + identity, provenance(SequencedProperties.ofFiles(previous.stepFile()),
+                            step.summarizes() ? previous.path().resolve("supplement").resolve(BuildStep.SUMMARY) : null,
+                            false));
                     completion.accept(false, null);
                     try {
                         cache.touch(executor, location + identity, currentStepHash, inputs, cacheRemotely);
@@ -335,6 +381,7 @@ class BuildExecutorDefault implements BuildExecutor {
                             aggregate,
                             permits,
                             location + prefix + "/",
+                            run,
                             inherited);
                     module.accept(buildExecutor, folders);
                     resolution.accept(null);
@@ -436,6 +483,9 @@ class BuildExecutorDefault implements BuildExecutor {
         FileChannel lock = lock(canonical);
         BiConsumer<Boolean, Throwable> completion;
         try {
+            run.set(DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC).format(Instant.now())
+                    + "-" + HexFormat.of().toHexDigits((short) ThreadLocalRandom.current().nextInt()));
+            callback.run(run.get());
             completion = callback.step(null, registrations.sequencedKeySet());
         } catch (RuntimeException | Error e) {
             release(canonical, lock);
@@ -734,6 +784,23 @@ class BuildExecutorDefault implements BuildExecutor {
     private record Registration(Bound bound, SequencedSet<String> preliminaries, Map<String, String> dependencies) {
     }
 
+    private static BuildExecutorCallback.Provenance provenance(SequencedProperties record, Path summary, boolean failed)
+            throws IOException {
+        SequencedMap<String, String> summarized = null;
+        if (summary != null) {
+            summarized = new LinkedHashMap<>();
+            if (Files.isRegularFile(summary)) {
+                SequencedProperties.ofFiles(summary).forEachProperty(summarized::put);
+            }
+        }
+        String time = record.getProperty("time");
+        return new BuildExecutorCallback.Provenance(record.getProperty("run"),
+                time == null ? null : Instant.parse(time),
+                "loaded".equals(record.getProperty("origin")),
+                failed,
+                summarized);
+    }
+
     private record StepSummary(Path folder, Map<Path, byte[]> checksums) {
     }
 
@@ -752,6 +819,14 @@ class BuildExecutorDefault implements BuildExecutor {
 
         Path argument(String key) {
             return checksum.resolve(ARGUMENT + BuildExecutorModule.encode(key) + PROPERTIES);
+        }
+
+        Path running() {
+            return checksum.resolve("running" + PROPERTIES);
+        }
+
+        Path failed() {
+            return checksum.resolve("failed" + PROPERTIES);
         }
 
         SequencedMap<String, Set<Path>> vanished(Set<String> declared) throws IOException {

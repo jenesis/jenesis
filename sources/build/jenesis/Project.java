@@ -708,6 +708,18 @@ public record Project(
                     jenesis.print.lines lines of each and names the file holding the rest, and the
                     end of the build repeats every failed step with its message.
 
+                    A result on disk does not say which build made it, so ask the records. Every
+                    build has a run id, on the [STARTED] line and the events file's first line. A
+                    step's checksum/step.properties names the run that produced its output (run,
+                    time, origin: executed or loaded from a build cache), and a step that is reused
+                    keeps the run that produced it. checksum/failed.properties beside an output says
+                    a later run failed to replace it - its run, its message and the <step>~ it kept
+                    - and checksum/running.properties that a run was killed while the step ran. A
+                    test step ends the build with a [SUMMARY] row: executed now, reused from the
+                    run at <time> with the filter or tag that run selected, loaded from the build
+                    cache, or failed now, with its counts. None of this is written into output/, so
+                    no cache carries one machine's run to another.
+
                     ## 4. Turn a folder into a selector
 
                     target/build/ mirrors the build graph, so any folder under it is a selector: drop
