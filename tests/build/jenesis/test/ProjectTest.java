@@ -329,6 +329,43 @@ public class ProjectTest {
     }
 
     @Test
+    public void skill_prints_an_overview_that_names_its_pages_rather_than_their_contents() {
+        List<String> printed = new ArrayList<>();
+        assertThat(Project.perform(Environment.NONE.out(printed::add), root, new LinkedHashSet<>(), Project.SKILL)).isEmpty();
+        assertThat(String.join("\n", printed))
+                .contains("## Essentials", "skill/tags", "skill/plugins")
+                .as("the overview is what every task needs, so a page's depth stays on the page")
+                .doesNotContain("@jenesis.layer <name>");
+    }
+
+    @Test
+    public void skill_prints_every_page_its_overview_names() {
+        List<String> overview = new ArrayList<>();
+        Project.perform(Environment.NONE.out(overview::add), root, new LinkedHashSet<>(), Project.SKILL);
+        List<String> pages = String.join("\n", overview).lines()
+                .map(String::strip)
+                .filter(line -> line.startsWith(Project.SKILL + "/"))
+                .map(line -> line.split("\\s+")[0])
+                .toList();
+        assertThat(pages).hasSizeGreaterThan(5);
+        for (String page : pages) {
+            List<String> printed = new ArrayList<>();
+            assertThat(Project.perform(Environment.NONE.out(printed::add), root, new LinkedHashSet<>(), page))
+                    .as(page)
+                    .isEmpty();
+            assertThat(String.join("\n", printed)).as(page).startsWith("# Jenesis - ").doesNotContain("## Essentials");
+        }
+    }
+
+    @Test
+    public void skill_names_its_pages_when_one_does_not_exist() {
+        List<String> errors = new ArrayList<>();
+        assertThat(Project.perform(Environment.NONE.err(errors::add), root, new LinkedHashSet<>(), "skill/nonsense"))
+                .isNull();
+        assertThat(errors).anyMatch(line -> line.contains("Unknown skill page: nonsense - expected one of [skill/invoke"));
+    }
+
+    @Test
     public void configuration_defaults_to_build_jenesis_under_the_root() {
         assertThat(Project.ofEnvironment(new Environment(settings), Path.of(".")).configuration())
                 .containsExactly(Path.of(".").resolve("build.jenesis"));

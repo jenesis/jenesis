@@ -128,7 +128,7 @@ new one and the old one is removed. Two settings configure it:
     -Djenesis.aot.file=.jenesis/engine.aot   # where it lives, relative to the project
     -Djenesis.aot.lifetime=P7D               # train it again once it is this old
 
-`help`, `skill`, `configuration` and `properties` only print, so they never train
+`help`, `skill` and its pages, `configuration` and `properties` only print, so they never train
 or use a cache. The daemon and the cache are two answers to the same cost, so
 naming both - or the cache beside `-Djenesis.make.compile=false`, which leaves
 nothing compiled to cache - stops the build with a message naming both settings.
