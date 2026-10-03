@@ -90,9 +90,9 @@ public interface BuildExecutorCallback {
                 return (executed, throwable) -> {
                     if (throwable != null) {
                         out.accept("%s%-11s%s %s: %s".formatted(RED, "[FAILED]", RESET, identity,
-                                throwable instanceof BuildExecutorException
+                                String.valueOf(throwable instanceof BuildExecutorException
                                         ? throwable.getCause().getMessage()
-                                        : throwable.getMessage()));
+                                        : throwable.getMessage()).lines().findFirst().orElse("")));
                     } else if (executed) {
                         double time = ((double) (System.nanoTime() - started) / 1_000_000) / 1_000;
                         synchronized (out) {

@@ -702,6 +702,12 @@ public record Project(
                     last `completed` or `failed`, with how many steps executed, skipped and failed; a
                     file without that last line is a build that is still running or was killed.
 
+                    A failed step keeps its staging area until it runs again: <step>~/supplement/
+                    holds a forked tool's command, its whole output and error, and the test reports
+                    the failure lists failed tests from. The failure itself inlines at most
+                    jenesis.print.lines lines of each and names the file holding the rest, and the
+                    end of the build repeats every failed step with its message.
+
                     ## 4. Turn a folder into a selector
 
                     target/build/ mirrors the build graph, so any folder under it is a selector: drop
@@ -2701,6 +2707,7 @@ public record Project(
                 legal.notices|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries taken as legal notices into a jmod, a linked or packaged image and beside a native image, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
                 archive.timestamp|1980-02-01T00:00:00Z|ISO-8601 date-time with an offset recorded on every entry of the jars, jmods and zips the build writes; empty keeps the times the tools record and makes the archives unreproducible; set explicitly, it is also the creation time a generated Docker image is labelled with
                 print.progress|true|The build progress lines
+                print.lines|100|At most this many lines of a failed tool's output, and as many of its error, inlined in the failure, the first two fifths and the last three; 0 inlines all of them
                 print.process|false|Stream each external tool's command line and output as it runs
                 print.<command>||The same for one tool only, as print.javac or print.tests
                 print.command|false|Each external tool command line, without its output
@@ -2987,9 +2994,33 @@ public record Project(
         if (t instanceof InterruptedException) {
             Thread.currentThread().interrupt();
         }
-        StringWriter trace = new StringWriter();
-        t.printStackTrace(new PrintWriter(trace));
-        trace.toString().lines().forEach(environment.err());
+        List<Throwable> failures = new ArrayList<>();
+        failures.add(t);
+        failures.addAll(Arrays.asList(t.getSuppressed()));
+        for (Throwable failure : failures) {
+            BuildExecutorException step = null;
+            Throwable cause = failure;
+            while ((cause instanceof CompletionException || cause instanceof InvocationTargetException)
+                    && cause.getCause() != null) {
+                if (cause instanceof BuildExecutorException exception) {
+                    step = exception;
+                }
+                cause = cause.getCause();
+            }
+            if (cause instanceof IllegalArgumentException || cause instanceof IllegalStateException) {
+                if (step != null) {
+                    environment.err().accept(step.getMessage() + ":");
+                }
+                String.valueOf(cause.getMessage()).lines().forEach(environment.err());
+                for (Throwable reason = cause.getCause(); reason != null; reason = reason.getCause()) {
+                    environment.err().accept("Caused by: " + reason);
+                }
+            } else {
+                StringWriter trace = new StringWriter();
+                failure.printStackTrace(new PrintWriter(trace));
+                trace.toString().lines().forEach(environment.err());
+            }
+        }
         environment.err().accept("");
         environment.err().accept("The build failed with the error above. If you meant to look up how to"
                 + " invoke Jenesis, pass `help` as the only argument on the command line, or `skill`"

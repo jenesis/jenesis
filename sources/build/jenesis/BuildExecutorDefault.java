@@ -252,11 +252,6 @@ class BuildExecutorDefault implements BuildExecutor {
                             case CompletionException e -> new BuildExecutorException(location + identity, e.getCause());
                             default -> new BuildExecutorException(location + identity, t);
                         };
-                        try {
-                            Files.delete(Files.walkFileTree(next, new RecursiveFolderDeletion(next)));
-                        } catch (IOException e) {
-                            wrapped.addSuppressed(e);
-                        }
                         completion.accept(null, t);
                         return CompletableFuture.failedStage(wrapped);
                     }, executor);
