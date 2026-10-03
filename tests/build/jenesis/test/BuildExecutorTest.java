@@ -369,6 +369,25 @@ public class BuildExecutorTest implements Serializable {
     }
 
     @Test
+    public void keeps_the_staging_folder_of_a_failed_step_until_it_runs_again() throws IOException {
+        RUNS.set(0);
+        buildExecutor.addStep("step", (_, context, _) -> {
+            Files.writeString(context.supplement().resolve("evidence"), "why");
+            return RUNS.getAndIncrement() == 0
+                    ? CompletableFuture.failedStage(new IllegalStateException("broke"))
+                    : CompletableFuture.completedStage(new BuildStepResult(true));
+        });
+        assertThatThrownBy(() -> buildExecutor.execute(Runnable::run).toCompletableFuture().join())
+                .hasRootCauseMessage("broke");
+        assertThat(root.resolve("step~").resolve("supplement").resolve("evidence"))
+                .as("what a failed step wrote is the evidence of why it failed, so it outlives the build")
+                .hasContent("why");
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(root.resolve("step~")).doesNotExist();
+        assertThat(root.resolve("step").resolve("output")).isDirectory();
+    }
+
+    @Test
     public void fails_fast_by_default_without_aggregating_independent_failures() {
         buildExecutor.addStep("step1", (_, _, _) -> {
             throw new RuntimeException("one");

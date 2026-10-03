@@ -495,13 +495,12 @@ public class Javac extends ProcessBuildStep {
                 if (exitCode == 0) {
                     future.complete(null);
                 } else {
-                    String outputString = Files.exists(output) ? Files.readString(output) : "";
-                    String errorString = Files.exists(error) ? Files.readString(error) : "";
-                    future.completeExceptionally(new IllegalStateException(
-                            "Unexpected exit code: " + exitCode + " (multi-release " + release + ")\n"
-                                    + "To reproduce, execute:\n " + String.join(" ", handler.commands())
-                                    + (outputString.isBlank() ? "" : ("\n\nOutput:\n" + outputString))
-                                    + (errorString.isBlank() ? "" : ("\n\nError:\n" + errorString))));
+                    future.completeExceptionally(new IllegalStateException(failure(
+                            "Unexpected exit code: " + exitCode + " (multi-release " + release + ")",
+                            List.of(),
+                            handler,
+                            output,
+                            error)));
                 }
             } catch (Throwable t) {
                 future.completeExceptionally(t);

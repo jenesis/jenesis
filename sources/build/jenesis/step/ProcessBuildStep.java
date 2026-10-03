@@ -41,7 +41,11 @@ public abstract class ProcessBuildStep implements BuildStep {
         this.terms = terms;
     }
 
-    public record Terms(BiConsumer<Boolean, String> printing, Semaphore permits, Consumer<String> announcing) {
+    public record Terms(BiConsumer<Boolean, String> printing, Semaphore permits, Consumer<String> announcing, int lines) {
+
+        public Terms(BiConsumer<Boolean, String> printing, Semaphore permits, Consumer<String> announcing) {
+            this(printing, permits, announcing, 100);
+        }
 
         public static Terms of(String command) {
             return ofEnvironment(Environment.NONE, command, false);
@@ -58,9 +62,13 @@ public abstract class ProcessBuildStep implements BuildStep {
         public static Terms ofEnvironment(Environment environment,
                                    String command,
                                    boolean printing) {
-            int concurrency = environment.number("process.concurrency", 0);
+            int concurrency = environment.number("process.concurrency", 0), lines = environment.number("print.lines", 100);
             if (concurrency < 0) {
                 throw new IllegalArgumentException("Process concurrency must not be negative: " + concurrency);
+            }
+            if (lines < 0) {
+                throw new IllegalArgumentException("jenesis.print.lines must not be negative: " + lines
+                        + " (0 inlines a failed tool's output whole)");
             }
             boolean streamed = environment.flag("print." + command,
                     environment.flag("print.process", printing));
@@ -70,11 +78,16 @@ public abstract class ProcessBuildStep implements BuildStep {
                             + command + " >>>> " + line + BuildExecutorCallback.RESET)
                     : null,
                     concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Semaphore::new),
-                    environment.flag("print.command") ? out : null);
+                    environment.flag("print.command") ? out : null,
+                    lines);
         }
 
         public Terms printing(BiConsumer<Boolean, String> printing) {
-            return new Terms(printing, permits, announcing);
+            return new Terms(printing, permits, announcing, lines);
+        }
+
+        public Terms lines(int lines) {
+            return new Terms(printing, permits, announcing, lines);
         }
     }
 
@@ -163,6 +176,62 @@ public abstract class ProcessBuildStep implements BuildStep {
         return prepended;
     }
 
+    protected List<String> details(BuildStepContext context) throws IOException {
+        return List.of();
+    }
+
+    protected String failure(String headline,
+                             List<String> details,
+                             ProcessHandler handler,
+                             Path output,
+                             Path error) throws IOException {
+        StringBuilder message = new StringBuilder(headline);
+        details.forEach(line -> message.append('\n').append(line));
+        List<String> commands = new ArrayList<>(handler.commands());
+        String first = commands.getFirst();
+        if (!handler.external() && first.indexOf('/') < 0 && first.indexOf(File.separatorChar) < 0) {
+            Path program = Path.of(System.getProperty("java.home"), "bin", first
+                    + (File.separatorChar == '\\' && !first.endsWith(".exe") ? ".exe" : ""));
+            if (Files.isRegularFile(program)) {
+                commands.set(0, program.toString());
+            }
+        }
+        message.append("\nTo reproduce, execute in ")
+                .append(Path.of("").toAbsolutePath())
+                .append(":\n ")
+                .append(commands.stream()
+                        .map(command -> command.isEmpty() || command.chars().anyMatch(c -> Character.isWhitespace(c) || c == '"')
+                                ? "\"" + command.replace("\"", "\\\"") + "\""
+                                : command)
+                        .collect(Collectors.joining(" ")));
+        excerpt(message, "Output", output);
+        excerpt(message, "Error", error);
+        return message.toString();
+    }
+
+    private void excerpt(StringBuilder message, String title, Path file) throws IOException {
+        if (!Files.exists(file)) {
+            return;
+        }
+        List<String> lines = new String(Files.readAllBytes(file), NATIVE_ENCODING).lines().toList();
+        if (lines.stream().allMatch(String::isBlank)) {
+            return;
+        }
+        int limit = terms.lines();
+        message.append("\n\n").append(title);
+        if (limit == 0 || lines.size() <= limit) {
+            message.append(":\n").append(String.join("\n", lines));
+            return;
+        }
+        int head = limit * 2 / 5, tail = limit - head;
+        message.append(" - the first ").append(head)
+                .append(" and the last ").append(tail)
+                .append(" of ").append(lines.size())
+                .append(" lines, all of them in ").append(file.toAbsolutePath().normalize())
+                .append(":\n").append(String.join("\n", lines.subList(0, head)))
+                .append("\n[...]\n").append(String.join("\n", lines.subList(lines.size() - tail, lines.size())));
+    }
+
     public boolean acceptableExitCode(int code,
                                       Executor executor,
                                       BuildStepContext context,
@@ -204,12 +273,11 @@ public abstract class ProcessBuildStep implements BuildStep {
                         if (acceptableExitCode(exitCode, executor, context, arguments)) {
                             future.complete(new BuildStepResult(true));
                         } else {
-                            String outputString = Files.exists(output) ? new String(Files.readAllBytes(output), NATIVE_ENCODING) : "";
-                            String errorString = Files.exists(error) ? new String(Files.readAllBytes(error), NATIVE_ENCODING) : "";
-                            throw new IllegalStateException("Unexpected exit code: " + exitCode + "\n"
-                                    + "To reproduce, execute:\n " + String.join(" ", handler.commands())
-                                    + (outputString.isBlank() ? "" : ("\n\nOutput:\n" + outputString))
-                                    + (errorString.isBlank() ? "" : ("\n\nError:\n" + errorString)));
+                            throw new IllegalStateException(failure("Unexpected exit code: " + exitCode,
+                                    details(context),
+                                    handler,
+                                    output,
+                                    error));
                         }
                     } catch (Throwable t) {
                         future.completeExceptionally(t);

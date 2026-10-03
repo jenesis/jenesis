@@ -290,6 +290,17 @@ public class SignaturesTest {
     }
 
     @Test
+    public void names_the_command_that_reproduces_a_verification_that_gave_no_verdict() throws IOException {
+        resolved("maven/org.example/lib", "1.0", null);
+        declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
+        assertThatThrownBy(() -> run(step(signature("lib"))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("Unexpected exit code 1 and no signature verdict from ")
+                .as("the command is reproduced in the folder it ran in, as for every other forked tool")
+                .hasMessageContaining("\nTo reproduce, execute in " + Path.of("").toAbsolutePath() + ":\n gpg ");
+    }
+
+    @Test
     public void rejects_an_artifact_whose_signature_does_not_match() throws IOException {
         resolved("maven/org.example/lib", "1.0", null);
         declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
