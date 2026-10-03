@@ -24,6 +24,13 @@ greeting the plugin generated:
 Built without the plugin, `sample.Greeting` would not exist and the project would
 not compile.
 
+Edit the plugin and the next build runs its step again - change the line that
+writes `TEXT` in `GreetingModule.java` to append `+ "!"` and the greeting gains a
+second exclamation mark. A step is keyed by the jar its classes come from as well
+as by its fields, so a change to the code alone is enough, whether it is a plugin
+compiled from a folder like this one, a published plugin at a new version, or a
+new version of Jenesis itself.
+
 Layout
 ------
 
