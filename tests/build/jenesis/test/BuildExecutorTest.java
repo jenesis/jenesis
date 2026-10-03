@@ -27,6 +27,7 @@ public class BuildExecutorTest implements Serializable {
     private final Map<String, String> settings = new HashMap<>();
 
     private static final AtomicInteger RUNS = new AtomicInteger();
+    private static final AtomicReference<String> UNKEYED = new AtomicReference<>();
     private static final AtomicReference<SequencedMap<String, BuildStepArgument>> APPLIED = new AtomicReference<>();
     private static final AtomicReference<SequencedSet<String>> REMOVED = new AtomicReference<>();
 
@@ -366,6 +367,57 @@ public class BuildExecutorTest implements Serializable {
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("baz");
         assertThat(root.resolve("step")).doesNotExist();
+    }
+
+    @Test
+    public void verifies_an_up_to_date_step_by_running_it_again_from_scratch() throws IOException {
+        RUNS.set(0);
+        Files.writeString(source.resolve("file"), "foo");
+        BuildStep step = (_, context, arguments) -> {
+            RUNS.incrementAndGet();
+            Files.writeString(context.next().resolve("file"), Files.readString(arguments.get("source").folder().resolve("file")));
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        };
+        buildExecutor.addSource("source", source);
+        buildExecutor.addStep("step", step, "source");
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        BuildExecutor verifying = verifying();
+        verifying.addSource("source", source);
+        verifying.addStep("step", step, "source");
+        verifying.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(RUNS.get()).as("an up-to-date step runs again when verifying").isEqualTo(2);
+        assertThat(root.resolve("step~verify")).doesNotExist();
+        assertThat(root.resolve("step/output/file")).hasContent("foo");
+    }
+
+    @Test
+    public void fails_an_up_to_date_step_that_reads_something_it_is_not_keyed_on() throws IOException {
+        UNKEYED.set("first");
+        BuildStep step = (_, context, _) -> {
+            Files.writeString(context.next().resolve("file"), UNKEYED.get());
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        };
+        buildExecutor.addStep("step", step);
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        UNKEYED.set("second");
+        BuildExecutor verifying = verifying();
+        verifying.addStep("step", step);
+        assertThatThrownBy(() -> verifying.execute(Runnable::run).toCompletableFuture().join())
+                .as("an output that no longer follows from what the step is keyed on is stale, and the build says so")
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("Up to date by its inputs, but running it again from scratch writes other output:"
+                        + " altered file");
+        assertThat(root.resolve("step/output/file")).hasContent("first");
+        assertThat(root.resolve("step~verify/output/file")).hasContent("second");
+    }
+
+    private BuildExecutor verifying() throws IOException {
+        return BuildExecutor.of(root,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, true, 0);
     }
 
     @Test

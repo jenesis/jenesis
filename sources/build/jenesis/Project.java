@@ -1040,6 +1040,8 @@ public record Project(
                       -Djenesis.dependency.pin=strict  fail the build on any unpinned artifact
                       -Djenesis.test.filter=<regex>    run one test class or method
                       -Djenesis.executor.rebuild       wipe target/ - avoid it, see section 7
+                      -Djenesis.executor.verify        run every up-to-date step again and fail where its
+                                                       output differs - when a cached result is suspect
 
                     ## 11. Run a built main class with Execute
 
@@ -2686,6 +2688,7 @@ public record Project(
                 executor.digest|MD5|Algorithm behind the content and step hashes that drive the cache
                 executor.rebuild|false|Wipe target/ before building; prefer letting the cache decide
                 executor.aggregate|false|Collect independent step failures into one report
+                executor.verify|false|Run every step that is up to date again, from scratch into <step>~verify, and fail the build where it writes other output than the one on record - a step that reads something it is not keyed on, or that is not reproducible; as costly as a build from scratch, it suits a scheduled job
                 process.concurrency|0|Run at most this many JDK tool runs at once; 0 is unbounded
                 process.factory|tool|tool|fork; fork runs a JDK tool in a process of its own
                 legal.notices|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries taken as legal notices into a jmod, a linked or packaged image and beside a native image, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
