@@ -16,7 +16,7 @@ class BuildExecutorDefault implements BuildExecutor {
     private final BuildStepHashFunction stepHash;
     private final BuildExecutorCallback callback;
     private final BuildExecutorCache cache;
-    private final boolean aggregate;
+    private final boolean aggregate, verify;
     private final Permits permits;
     private final String location;
 
@@ -30,6 +30,7 @@ class BuildExecutorDefault implements BuildExecutor {
                          BuildExecutorCallback callback,
                          BuildExecutorCache cache,
                          boolean aggregate,
+                         boolean verify,
                          Permits permits,
                          String location,
                          Map<String, StepSummary> inherited) throws IOException {
@@ -40,6 +41,7 @@ class BuildExecutorDefault implements BuildExecutor {
         this.callback = callback;
         this.cache = cache;
         this.aggregate = aggregate;
+        this.verify = verify;
         this.permits = permits;
         this.location = location;
         this.inherited = inherited;
@@ -257,22 +259,89 @@ class BuildExecutorDefault implements BuildExecutor {
                         return CompletableFuture.failedStage(wrapped);
                     }, executor);
                 } else {
-                    for (String key : vanished.keySet()) {
-                        Files.deleteIfExists(previous.argument(key));
+                    Callable<CompletionStage<Map<String, Map<String, StepSummary>>>> skipped = () -> {
+                        for (String key : vanished.keySet()) {
+                            Files.deleteIfExists(previous.argument(key));
+                        }
+                        completion.accept(false, null);
+                        try {
+                            cache.touch(executor, location + identity, currentStepHash, inputs, cacheRemotely);
+                        } catch (IOException _) {
+                        }
+                        return CompletableFuture.completedStage(Map.of(identity, Map.of(
+                                identity,
+                                new StepSummary(previous.output(), current))));
+                    };
+                    if (!verify) {
+                        return skipped.call();
                     }
-                    completion.accept(false, null);
-                    try {
-                        cache.touch(executor, location + identity, currentStepHash, inputs, cacheRemotely);
-                    } catch (IOException _) {
-                    }
-                    return CompletableFuture.completedStage(Map.of(identity, Map.of(
-                            identity,
-                            new StepSummary(previous.output(), current))));
+                    return verified(executor, step, summaries, current, target.resolve(identity + "~verify"), previous.output())
+                            .handleAsync((_, throwable) -> {
+                                if (throwable == null) {
+                                    try {
+                                        return skipped.call();
+                                    } catch (Throwable t) {
+                                        throwable = t;
+                                    }
+                                }
+                                Throwable cause = throwable instanceof CompletionException && throwable.getCause() != null
+                                        ? throwable.getCause()
+                                        : throwable;
+                                completion.accept(null, cause);
+                                return CompletableFuture.<Map<String, Map<String, StepSummary>>>failedStage(
+                                        new BuildExecutorException(location + identity, cause));
+                            }, executor)
+                            .thenCompose(Function.identity());
                 }
             } catch (Throwable t) {
                 return CompletableFuture.failedFuture(new BuildExecutorException(location + identity, t));
             }
         };
+    }
+
+    private CompletionStage<Void> verified(Executor executor,
+                                           BuildStep step,
+                                           Map<String, StepSummary> summaries,
+                                           Map<Path, byte[]> recorded,
+                                           Path scratch,
+                                           Path output) {
+        try {
+            if (Files.exists(scratch)) {
+                Files.walkFileTree(scratch, new RecursiveFolderDeletion(null));
+            }
+            Path scratchOutput = Files.createDirectories(scratch.resolve("output"));
+            Path scratchSupplement = Files.createDirectories(scratch.resolve("supplement"));
+            SequencedMap<String, BuildStepArgument> fresh = new LinkedHashMap<>();
+            summaries.forEach((key, summary) -> fresh.put(key, new BuildStepArgument(
+                    summary.folder(),
+                    Checksum.added(summary.checksums(), hash))));
+            return step.apply(executor, new BuildStepContext(null, scratchOutput, scratchSupplement), fresh)
+                    .thenApplyAsync(_ -> {
+                        try {
+                            List<String> differences = new ArrayList<>();
+                            Checksum.diff(recorded, HashFunction.read(scratchOutput, hash, executor), hash)
+                                    .forEach((file, checksum) -> {
+                                        if (checksum.status() != ChecksumStatus.RETAINED) {
+                                            differences.add(checksum.status().name().toLowerCase(Locale.ROOT) + " " + file);
+                                        }
+                                    });
+                            if (!differences.isEmpty()) {
+                                throw new IllegalStateException("Up to date by its inputs, but running it again from"
+                                        + " scratch writes other output: "
+                                        + String.join(", ", differences.subList(0, Math.min(10, differences.size())))
+                                        + (differences.size() > 10 ? " and " + (differences.size() - 10) + " more" : "")
+                                        + " - it reads something it is not keyed on, or is not reproducible; compare "
+                                        + output + " with " + scratchOutput);
+                            }
+                            Files.walkFileTree(scratch, new RecursiveFolderDeletion(null));
+                            return null;
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    }, executor);
+        } catch (Throwable t) {
+            return CompletableFuture.failedStage(t);
+        }
     }
 
     @Override
@@ -334,6 +403,7 @@ class BuildExecutorDefault implements BuildExecutor {
                             callback,
                             cache,
                             aggregate,
+                            verify,
                             permits,
                             location + prefix + "/",
                             inherited);

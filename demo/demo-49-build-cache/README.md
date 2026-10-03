@@ -62,6 +62,22 @@ prints a `[LOADED]` line and each one written to it a `[STORED]` line. On this t
 project the saving is tiny; on a real module the compile that took seconds returns
 instantly. Delete `.jenesis/cache` to start over.
 
+Checking that the cache is honest
+---------------------------------
+
+A step is skipped when nothing it is keyed on changed. If a step reads something
+it is not keyed on, its cached output goes stale without anything saying so.
+`-Djenesis.executor.verify` finds such a step: every step that is up to date runs
+again, from scratch, into a folder beside its own ending in `~verify`, and the build
+fails where the output differs from the one on record:
+
+    java -Djenesis.executor.verify build/jenesis/Make.java
+
+On this project every step comes out the same, so the build passes and leaves no
+`~verify` folder behind. A step that fails names the files that differ and keeps
+both outputs to compare. Verifying costs as much as a build from scratch, which is
+why it suits a scheduled job rather than every build.
+
 A shared cache (the `uri` one)
 ------------------------------
 
