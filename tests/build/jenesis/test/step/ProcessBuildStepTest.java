@@ -192,6 +192,125 @@ public class ProcessBuildStepTest {
         };
     }
 
+    @Test
+    public void inlines_the_first_and_the_last_lines_of_a_long_failure_and_names_the_file_holding_them_all()
+            throws IOException {
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        Loud step = new Loud(250, new Environment(Map.of("print.lines", "10")));
+        assertThatThrownBy(() -> step.apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Output - the first 4 and the last 6 of 250 lines, all of them in "
+                        + supplement.resolve("output").toAbsolutePath().normalize() + ":\nline 0\nline 1\nline 2\nline 3\n[...]\nline 244\n")
+                .hasMessageEndingWith("line 248\nline 249")
+                .satisfies(thrown -> assertThat(thrown.getMessage())
+                        .as("the middle of a long output is in the file, not in the failure")
+                        .doesNotContain("line 100\n")
+                        .contains("Error - the first 4 and the last 6 of 250 lines"));
+        assertThat(supplement.resolve("output")).content().contains("line 100");
+    }
+
+    @Test
+    public void inlines_a_short_failure_whole() throws IOException {
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        Loud step = new Loud(3, Environment.NONE);
+        assertThatThrownBy(() -> step.apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .hasMessage("Unexpected exit code: 1\nTo reproduce, execute in " + Path.of("").toAbsolutePath()
+                        + ":\n loud\n\nOutput:\nline 0\nline 1\nline 2\n\nError:\nline 0\nline 1\nline 2");
+    }
+
+    @Test
+    public void quotes_an_argument_a_shell_would_split_in_the_command_that_reproduces_a_failure() throws IOException {
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        Loud step = new Loud(0, Environment.NONE, List.of("-d", "a folder", "", "say \"hi\""));
+        assertThatThrownBy(() -> step.apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .as("the command is pasted as it stands, in the folder the tool ran in")
+                .hasMessage("Unexpected exit code: 1\nTo reproduce, execute in " + Path.of("").toAbsolutePath()
+                        + ":\n loud -d \"a folder\" \"\" \"say \\\"hi\\\"\"");
+    }
+
+    @Test
+    public void names_a_program_given_by_its_path_as_it_stands_in_the_command_that_reproduces_a_failure()
+            throws IOException {
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        String program = Path.of(System.getProperty("java.home"), "bin", "java").toAbsolutePath().toString();
+        Loud step = new Loud(program, 0, Environment.NONE, List.of("-version"));
+        assertThatThrownBy(() -> step.apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .as("a program named by its path is not resolved against the JDK a second time")
+                .hasMessage("Unexpected exit code: 1\nTo reproduce, execute in " + Path.of("").toAbsolutePath()
+                        + ":\n " + (program.contains(" ") ? "\"" + program + "\"" : program) + " -version");
+    }
+
+    @Test
+    public void inlines_a_long_failure_whole_when_asked_to() throws IOException {
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        Loud step = new Loud(250, new Environment(Map.of("print.lines", "0")));
+        assertThatThrownBy(() -> step.apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .hasMessageContaining("\nline 100\n")
+                .hasMessageNotContaining("[...]");
+    }
+
+    @Test
+    public void refuses_a_negative_number_of_lines() {
+        assertThatThrownBy(() -> ProcessBuildStep.Terms.ofEnvironment(new Environment(Map.of("print.lines", "-1")), "loud"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.print.lines");
+    }
+
+    private static final class Loud extends ProcessBuildStep {
+
+        private final List<String> arguments;
+
+        private Loud(int lines, Environment environment) {
+            this(lines, environment, List.of());
+        }
+
+        private Loud(int lines, Environment environment, List<String> arguments) {
+            this("loud", lines, environment, arguments);
+        }
+
+        private Loud(String name, int lines, Environment environment, List<String> arguments) {
+            super("loud", ProcessHandler.OfTool.of(new ToolProvider() {
+                @Override
+                public String name() {
+                    return name;
+                }
+
+                @Override
+                public int run(PrintWriter out, PrintWriter err, String... arguments) {
+                    for (int line = 0; line < lines; line++) {
+                        out.println("line " + line);
+                        err.println("line " + line);
+                    }
+                    return 1;
+                }
+            }), Terms.ofEnvironment(environment, "loud"));
+            this.arguments = arguments;
+        }
+
+        @Override
+        protected CompletionStage<List<String>> process(Executor executor,
+                                                        BuildStepContext context,
+                                                        SequencedMap<String, BuildStepArgument> arguments,
+                                                        SequencedMap<String, SequencedMap<String, String>> properties) {
+            return CompletableFuture.completedStage(this.arguments);
+        }
+    }
+
     private static final class Gated extends ProcessBuildStep {
 
         private Gated(ToolProvider provider) {

@@ -329,6 +329,18 @@ public class ProjectTest {
     }
 
     @Test
+    public void reports_a_mistake_it_names_the_fix_for_by_its_message_alone() {
+        List<String> errors = new ArrayList<>();
+        assertThat(Project.perform(new Environment(Map.of("print.progress", "false")).err(errors::add),
+                root,
+                new LinkedHashSet<>())).isNull();
+        assertThat(errors)
+                .as("a folder without a project is the reader's mistake, which a stack trace of the engine does not help with")
+                .anyMatch(line -> line.startsWith("No build descriptor found under"))
+                .noneMatch(line -> line.startsWith("\tat "));
+    }
+
+    @Test
     public void configuration_defaults_to_build_jenesis_under_the_root() {
         assertThat(Project.ofEnvironment(new Environment(settings), Path.of(".")).configuration())
                 .containsExactly(Path.of(".").resolve("build.jenesis"));

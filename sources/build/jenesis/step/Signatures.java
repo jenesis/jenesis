@@ -500,14 +500,12 @@ public class Signatures extends ProcessBuildStep {
             failure = "the public key " + missing + " is not available";
         }
         if (exitCode != 0 && fingerprint == null && failure == null) {
-            throw new IllegalStateException("Unexpected exit code " + exitCode + " and no signature verdict from "
-                    + command
-                    + " for " + file
-                    + "\nTo reproduce, execute:\n "
-                    + String.join(" ", handler.commands())
-                    + (Files.isRegularFile(error)
-                            ? "\n\nError:\n" + new String(Files.readAllBytes(error), NATIVE_ENCODING)
-                            : ""));
+            throw new IllegalStateException(failure("Unexpected exit code " + exitCode
+                            + " and no signature verdict from " + command + " for " + file,
+                    List.of(),
+                    handler,
+                    output,
+                    error));
         }
         return new Status(fingerprint, failure, signed, keyExpired ? expired : -1, missing);
     }

@@ -101,6 +101,45 @@ public class TestModuleTest {
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
         assertThat(reportedErrors(supplement)).isEmpty();
+        assertThat(SequencedProperties.ofFiles(supplement.resolve(BuildStep.SUMMARY)).getProperty("result"))
+                .as("what a run counted stays beside its output, where no cache carries it to another machine")
+                .isEqualTo("1 passed, 0 failed, 0 skipped");
+    }
+
+    @Test
+    public void names_each_failed_test_in_the_failure_and_keeps_the_run_that_failed() throws IOException {
+        compileSource(classes.resolve(Javac.CLASSES + "sample"), "FailingSample", """
+                package sample;
+                public class FailingSample {
+                    @org.junit.jupiter.api.Test
+                    public void fails() { org.junit.jupiter.api.Assertions.assertEquals("expected", "actual"); }
+                }
+                """, bootModuleJars());
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .isTest(candidate -> candidate.endsWith("FailingSample")).jarsOnly(false),
+                "dependencies", "classes");
+
+        assertThatThrownBy(executor::execute)
+                .rootCause()
+                .as("the tests that failed lead the failure, ahead of the console output a reader would otherwise search")
+                .hasMessageStartingWith("Unexpected exit code: 1\n1 test failed:\n"
+                        + "  sample.FailingSample#fails(): expected: <expected> but was: <actual>\nTo reproduce, execute in "
+                        + Path.of("").toAbsolutePath() + ":\n " + Path.of(System.getProperty("java.home"), "bin", "java"));
+        assertThat(root.resolve("test").resolve("executed~").resolve("supplement").resolve("output"))
+                .content()
+                .contains("FailingSample");
+        assertThat(SequencedProperties.ofFiles(root.resolve("test").resolve("executed~").resolve("supplement")
+                .resolve(BuildStep.SUMMARY)).getProperty("result")).isEqualTo("0 passed, 1 failed, 0 skipped");
     }
 
     @Test

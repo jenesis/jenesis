@@ -1,6 +1,7 @@
 package build.jenesis.project;
 
 import module java.base;
+import module java.xml;
 import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
@@ -781,6 +782,11 @@ public class TestModule implements BuildExecutorModule {
         }
 
         @Override
+        public boolean summarizes() {
+            return true;
+        }
+
+        @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
                                                       BuildStepContext context,
                                                       SequencedMap<String, BuildStepArgument> arguments)
@@ -793,7 +799,91 @@ public class TestModule implements BuildExecutorModule {
             List<TestTags> covered = new ArrayList<>(ran);
             covered.add(requested);
             new Scope(filter, covered).store(context.next().resolve("testscope.properties"));
-            return super.apply(executor, context, arguments);
+            return super.apply(executor, context, arguments).handle((result, throwable) -> {
+                try {
+                    Outcomes outcomes = Outcomes.of(context);
+                    SequencedProperties summary = new SequencedProperties();
+                    if (outcomes.reports() > 0) {
+                        summary.setProperty("result", (outcomes.tests() - outcomes.skipped() - outcomes.failed().size())
+                                + " passed, " + outcomes.failed().size() + " failed, " + outcomes.skipped() + " skipped");
+                    } else if (!Files.exists(context.supplement().resolve("command"))) {
+                        summary.setProperty("result", "no test ran, as none is reached by what changed");
+                    } else if (throwable == null) {
+                        summary.setProperty("result", "the tests ran without writing a report to count");
+                    }
+                    List<String> scope = new ArrayList<>();
+                    if (filter != null) {
+                        scope.add("filter " + filter);
+                    }
+                    if (tag != null) {
+                        scope.add("tag \"" + tag + "\"");
+                    }
+                    if (!scope.isEmpty()) {
+                        summary.setProperty("scope", String.join(", ", scope));
+                    }
+                    summary.store(context.supplement().resolve(SUMMARY));
+                } catch (IOException e) {
+                    if (throwable == null) {
+                        throw new UncheckedIOException(e);
+                    }
+                    throwable.addSuppressed(e);
+                }
+                if (throwable != null) {
+                    throw throwable instanceof CompletionException completion ? completion : new CompletionException(throwable);
+                }
+                return result;
+            });
+        }
+
+        private record Outcomes(int reports, int tests, int skipped, List<String> failed, List<String> unreadable) {
+
+            private static Outcomes of(BuildStepContext context) throws IOException {
+                int found = 0, tests = 0, skipped = 0;
+                List<String> failed = new ArrayList<>(), unreadable = new ArrayList<>();
+                for (Path folder : List.of(context.supplement(), context.next())) {
+                    List<Path> reports;
+                    try (Stream<Path> files = Files.walk(folder)) {
+                        reports = files.filter(file -> file.getFileName().toString().startsWith("TEST-")
+                                && file.getFileName().toString().endsWith(".xml")).sorted().toList();
+                    }
+                    found += reports.size();
+                    for (Path report : reports) {
+                        Document document;
+                        try {
+                            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+                            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+                            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+                            document = factory.newDocumentBuilder().parse(report.toFile());
+                        } catch (ParserConfigurationException | SAXException e) {
+                            unreadable.add(report + " is no readable test report: " + e.getMessage());
+                            continue;
+                        }
+                        NodeList cases = document.getElementsByTagName("testcase");
+                        for (int index = 0; index < cases.getLength(); index++) {
+                            Element testcase = (Element) cases.item(index);
+                            tests++;
+                            NodeList children = testcase.getChildNodes();
+                            for (int child = 0; child < children.getLength(); child++) {
+                                if (children.item(child) instanceof Element outcome) {
+                                    if (outcome.getTagName().equals("skipped")) {
+                                        skipped++;
+                                        break;
+                                    } else if (outcome.getTagName().equals("failure") || outcome.getTagName().equals("error")) {
+                                        String message = outcome.getAttribute("message").strip().lines().findFirst().orElse("");
+                                        if (message.length() > 200) {
+                                            message = message.substring(0, 200) + " [...]";
+                                        }
+                                        failed.add(testcase.getAttribute("classname") + "#" + testcase.getAttribute("name")
+                                                + (message.isEmpty() ? "" : ": " + message));
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                return new Outcomes(found, tests, skipped, failed, unreadable);
+            }
         }
 
         private List<TestTags> ran(BuildStepContext context, SequencedMap<String, BuildStepArgument> arguments)
@@ -807,6 +897,21 @@ public class TestModule implements BuildExecutorModule {
             }
             Scope scope = Scope.ofFile(recorded);
             return scope.filters(filter) ? scope.covered() : List.of();
+        }
+
+        @Override
+        protected List<String> details(BuildStepContext context) throws IOException {
+            Outcomes outcomes = Outcomes.of(context);
+            List<String> failed = outcomes.failed(), details = new ArrayList<>();
+            if (!failed.isEmpty()) {
+                details.add(failed.size() == 1 ? "1 test failed:" : failed.size() + " tests failed:");
+                failed.stream().limit(20).map(line -> "  " + line).forEach(details::add);
+                if (failed.size() > 20) {
+                    details.add("  and " + (failed.size() - 20) + " more, listed in the reports below " + context.supplement());
+                }
+            }
+            details.addAll(outcomes.unreadable());
+            return details;
         }
 
         @Override

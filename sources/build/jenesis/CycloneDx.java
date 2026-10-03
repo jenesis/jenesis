@@ -114,7 +114,7 @@ public class CycloneDx {
                 String serialNumber = "urn:uuid:" + UUID.nameUUIDFromBytes(serialLess.getBytes(StandardCharsets.UTF_8));
                 int insert = serialLess.indexOf("  \"version\": 1,\n");
                 yield serialLess.substring(0, insert)
-                        + "  \"serialNumber\": \"" + escapeJson(serialNumber) + "\",\n"
+                        + "  \"serialNumber\": \"" + Json.escaped(serialNumber) + "\",\n"
                         + serialLess.substring(insert);
             }
         };
@@ -146,12 +146,12 @@ public class CycloneDx {
             builder.append(",\n  \"dependencies\": [\n");
             for (int index = 0; index < dependencies.size(); index++) {
                 Dependency dependency = dependencies.get(index);
-                builder.append("    { \"ref\": \"").append(escapeJson(dependency.ref())).append("\"");
+                builder.append("    { \"ref\": \"").append(Json.escaped(dependency.ref())).append("\"");
                 if (!dependency.dependsOn().isEmpty()) {
                     builder.append(", \"dependsOn\": [");
                     for (int on = 0; on < dependency.dependsOn().size(); on++) {
                         builder.append(on > 0 ? ", " : "")
-                                .append("\"").append(escapeJson(dependency.dependsOn().get(on))).append("\"");
+                                .append("\"").append(Json.escaped(dependency.dependsOn().get(on))).append("\"");
                     }
                     builder.append("]");
                 }
@@ -166,37 +166,37 @@ public class CycloneDx {
     private void appendJsonComponent(StringBuilder builder, Component component, int indent) {
         String pad = " ".repeat(indent);
         builder.append("{\n");
-        builder.append(pad).append("  \"type\": \"").append(escapeJson(component.type())).append("\",\n");
+        builder.append(pad).append("  \"type\": \"").append(Json.escaped(component.type())).append("\",\n");
         if (component.bomRef() != null) {
-            builder.append(pad).append("  \"bom-ref\": \"").append(escapeJson(component.bomRef())).append("\",\n");
+            builder.append(pad).append("  \"bom-ref\": \"").append(Json.escaped(component.bomRef())).append("\",\n");
         }
         for (Map.Entry<String, Organization> entry : component.organizations().entrySet()) {
             Organization organization = entry.getValue();
             builder.append(pad).append("  \"").append(entry.getKey()).append("\": {");
             if (organization.name() != null) {
-                builder.append(" \"name\": \"").append(escapeJson(organization.name())).append("\"");
+                builder.append(" \"name\": \"").append(Json.escaped(organization.name())).append("\"");
             }
             if (organization.url() != null) {
                 builder.append(organization.name() != null ? "," : "")
-                        .append(" \"url\": [\"").append(escapeJson(organization.url())).append("\"]");
+                        .append(" \"url\": [\"").append(Json.escaped(organization.url())).append("\"]");
             }
             builder.append(" },\n");
         }
         if (component.publisher() != null) {
-            builder.append(pad).append("  \"publisher\": \"").append(escapeJson(component.publisher())).append("\",\n");
+            builder.append(pad).append("  \"publisher\": \"").append(Json.escaped(component.publisher())).append("\",\n");
         }
         if (component.group() != null) {
-            builder.append(pad).append("  \"group\": \"").append(escapeJson(component.group())).append("\",\n");
+            builder.append(pad).append("  \"group\": \"").append(Json.escaped(component.group())).append("\",\n");
         }
-        builder.append(pad).append("  \"name\": \"").append(escapeJson(component.name())).append("\"");
+        builder.append(pad).append("  \"name\": \"").append(Json.escaped(component.name())).append("\"");
         if (component.version() != null) {
-            builder.append(",\n").append(pad).append("  \"version\": \"").append(escapeJson(component.version())).append("\"");
+            builder.append(",\n").append(pad).append("  \"version\": \"").append(Json.escaped(component.version())).append("\"");
         }
         if (component.description() != null) {
-            builder.append(",\n").append(pad).append("  \"description\": \"").append(escapeJson(component.description())).append("\"");
+            builder.append(",\n").append(pad).append("  \"description\": \"").append(Json.escaped(component.description())).append("\"");
         }
         if (component.scope() != null) {
-            builder.append(",\n").append(pad).append("  \"scope\": \"").append(escapeJson(component.scope())).append("\"");
+            builder.append(",\n").append(pad).append("  \"scope\": \"").append(Json.escaped(component.scope())).append("\"");
         }
         if (component.authors() != null && !component.authors().isEmpty()) {
             builder.append(",\n").append(pad).append("  \"authors\": [\n");
@@ -204,11 +204,11 @@ public class CycloneDx {
                 Author author = component.authors().get(index);
                 builder.append(pad).append("    {");
                 if (author.name() != null) {
-                    builder.append(" \"name\": \"").append(escapeJson(author.name())).append("\"");
+                    builder.append(" \"name\": \"").append(Json.escaped(author.name())).append("\"");
                 }
                 if (author.email() != null) {
                     builder.append(author.name() != null ? "," : "")
-                            .append(" \"email\": \"").append(escapeJson(author.email())).append("\"");
+                            .append(" \"email\": \"").append(Json.escaped(author.email())).append("\"");
                 }
                 builder.append(" }").append(index + 1 < component.authors().size() ? ",\n" : "\n");
             }
@@ -217,7 +217,7 @@ public class CycloneDx {
         if (component.sha256() != null) {
             builder.append(",\n").append(pad).append("  \"hashes\": [\n");
             builder.append(pad).append("    { \"alg\": \"SHA-256\", \"content\": \"")
-                    .append(escapeJson(component.sha256())).append("\" }\n");
+                    .append(Json.escaped(component.sha256())).append("\" }\n");
             builder.append(pad).append("  ]");
         }
         if (component.licenses() != null && !component.licenses().isEmpty()) {
@@ -226,12 +226,12 @@ public class CycloneDx {
                 License license = component.licenses().get(index);
                 builder.append(pad).append("    { \"license\": { ");
                 if (license.id() != null && identifiers.contains(license.id())) {
-                    builder.append("\"id\": \"").append(escapeJson(license.id())).append("\"");
+                    builder.append("\"id\": \"").append(Json.escaped(license.id())).append("\"");
                 } else {
                     String name = license.id() != null ? license.id() : license.name();
-                    builder.append("\"name\": \"").append(escapeJson(name == null ? "" : name)).append("\"");
+                    builder.append("\"name\": \"").append(Json.escaped(name == null ? "" : name)).append("\"");
                     if (license.url() != null) {
-                        builder.append(", \"url\": \"").append(escapeJson(license.url())).append("\"");
+                        builder.append(", \"url\": \"").append(Json.escaped(license.url())).append("\"");
                     }
                 }
                 builder.append(" } }").append(index + 1 < component.licenses().size() ? ",\n" : "\n");
@@ -239,15 +239,15 @@ public class CycloneDx {
             builder.append(pad).append("  ]");
         }
         if (component.copyright() != null) {
-            builder.append(",\n").append(pad).append("  \"copyright\": \"").append(escapeJson(component.copyright())).append("\"");
+            builder.append(",\n").append(pad).append("  \"copyright\": \"").append(Json.escaped(component.copyright())).append("\"");
         }
         if (component.purl() != null) {
-            builder.append(",\n").append(pad).append("  \"purl\": \"").append(escapeJson(component.purl())).append("\"");
+            builder.append(",\n").append(pad).append("  \"purl\": \"").append(Json.escaped(component.purl())).append("\"");
         }
         if (component.swhids() != null && !component.swhids().isEmpty()) {
             builder.append(",\n").append(pad).append("  \"swhid\": [")
                     .append(component.swhids().stream()
-                            .map(swhid -> "\"" + escapeJson(swhid) + "\"")
+                            .map(swhid -> "\"" + Json.escaped(swhid) + "\"")
                             .collect(Collectors.joining(", ")))
                     .append("]");
         }
@@ -255,8 +255,8 @@ public class CycloneDx {
             builder.append(",\n").append(pad).append("  \"externalReferences\": [\n");
             for (int index = 0; index < component.externalReferences().size(); index++) {
                 ExternalReference reference = component.externalReferences().get(index);
-                builder.append(pad).append("    { \"type\": \"").append(escapeJson(reference.type()))
-                        .append("\", \"url\": \"").append(escapeJson(reference.url())).append("\" }")
+                builder.append(pad).append("    { \"type\": \"").append(Json.escaped(reference.type()))
+                        .append("\", \"url\": \"").append(Json.escaped(reference.url())).append("\" }")
                         .append(index + 1 < component.externalReferences().size() ? ",\n" : "\n");
             }
             builder.append(pad).append("  ]");
@@ -265,8 +265,8 @@ public class CycloneDx {
             builder.append(",\n").append(pad).append("  \"properties\": [\n");
             for (int index = 0; index < component.properties().size(); index++) {
                 Property property = component.properties().get(index);
-                builder.append(pad).append("    { \"name\": \"").append(escapeJson(property.name()))
-                        .append("\", \"value\": \"").append(escapeJson(property.value())).append("\" }")
+                builder.append(pad).append("    { \"name\": \"").append(Json.escaped(property.name()))
+                        .append("\", \"value\": \"").append(Json.escaped(property.value())).append("\" }")
                         .append(index + 1 < component.properties().size() ? ",\n" : "\n");
             }
             builder.append(pad).append("  ]");
@@ -427,27 +427,5 @@ public class CycloneDx {
 
     private static void appendXmlText(Document document, Node parent, String name, String text) {
         parent.appendChild(document.createElementNS(NAMESPACE, name)).setTextContent(text);
-    }
-
-    private static String escapeJson(String text) {
-        StringBuilder builder = new StringBuilder(text.length());
-        for (int index = 0; index < text.length(); index++) {
-            char c = text.charAt(index);
-            switch (c) {
-                case '"' -> builder.append("\\\"");
-                case '\\' -> builder.append("\\\\");
-                case '\n' -> builder.append("\\n");
-                case '\r' -> builder.append("\\r");
-                case '\t' -> builder.append("\\t");
-                default -> {
-                    if (c < 0x20) {
-                        builder.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        builder.append(c);
-                    }
-                }
-            }
-        }
-        return builder.toString();
     }
 }

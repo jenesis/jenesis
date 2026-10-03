@@ -2,11 +2,19 @@ package build.jenesis.test;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCallback;
+import build.jenesis.BuildExecutorException;
+import build.jenesis.BuildStepResult;
+import build.jenesis.Json;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class BuildExecutorCallbackTest {
+
+    @TempDir
+    private Path target;
 
     @Test
     public void can_print_executed() {
@@ -43,5 +51,169 @@ public class BuildExecutorCallbackTest {
                 .as("a line is handed to the consumer as it stands, so what ends it is the caller's business")
                 .containsExactly(BuildExecutorCallback.RED + "[FAILED]   " + BuildExecutorCallback.RESET
                         + " foo: message");
+    }
+
+    @Test
+    public void announces_the_events_file_where_the_build_starts() {
+        List<String> printed = new ArrayList<>();
+        BuildExecutorCallback.printing(printed::add, false, false, target, true).step(null, new LinkedHashSet<>());
+        assertThat(printed)
+                .as("a reader of the progress lines learns from the second one where the outcome is recorded")
+                .hasSize(2)
+                .last()
+                .asString()
+                .contains("[EVENTS]", target.resolve(BuildExecutor.EVENTS).toString());
+    }
+
+    @Test
+    public void writes_each_outcome_as_one_json_object_per_line() throws IOException {
+        BuildExecutorCallback callback = BuildExecutorCallback.events(target);
+        BiConsumer<Boolean, Throwable> build = callback.step(null, new LinkedHashSet<>());
+        callback.step("foo", new LinkedHashSet<>()).accept(true, null);
+        callback.step("bar", new LinkedHashSet<>()).accept(false, null);
+        callback.loaded("baz", 1_500_000_000L);
+        callback.step("baz", new LinkedHashSet<>()).accept(true, null);
+        callback.module("qux").accept(null);
+        callback.step("qux/quux", new LinkedHashSet<>())
+                .accept(null, new BuildExecutorException("qux/quux", new IllegalStateException("broke \"here\"")));
+        build.accept(null, new IllegalStateException("broke"));
+        List<Map<String, Object>> events = events();
+        assertThat(events).hasSize(8);
+        assertThat(events)
+                .as("status leads every line, so a reader scanning the file sees what happened before where")
+                .allSatisfy(event -> assertThat(event.keySet()).first().isEqualTo("status"));
+        assertThat(events.getFirst()).containsEntry("status", "started")
+                .containsEntry("target", target.toAbsolutePath().normalize().toString());
+        assertThat(events.get(1)).containsEntry("step", "foo")
+                .containsEntry("status", "executed")
+                .containsEntry("folder", target.toAbsolutePath().normalize().resolve("foo").toString())
+                .containsKey("seconds");
+        assertThat(events.get(2)).containsEntry("step", "bar").containsEntry("status", "skipped");
+        assertThat(events.get(3)).containsEntry("step", "baz")
+                .containsEntry("status", "loaded")
+                .containsEntry("seconds", 1.5);
+        assertThat(events.get(5)).containsEntry("module", "qux").containsEntry("status", "resolved");
+        assertThat(events.get(6))
+                .as("a failure names the exception that caused it rather than the executor's wrapper")
+                .containsEntry("step", "qux/quux")
+                .containsEntry("status", "failed")
+                .containsEntry("error", IllegalStateException.class.getName())
+                .containsEntry("message", "broke \"here\"");
+        assertThat(events.getLast()).containsEntry("status", "failed")
+                .containsEntry("executed", 2.0)
+                .containsEntry("skipped", 1.0)
+                .containsEntry("failed", 1.0)
+                .containsEntry("message", "broke");
+    }
+
+    @Test
+    public void replaces_the_events_of_the_previous_build() throws IOException {
+        BuildExecutorCallback callback = BuildExecutorCallback.events(target);
+        BiConsumer<Boolean, Throwable> first = callback.step(null, new LinkedHashSet<>());
+        callback.step("foo", new LinkedHashSet<>()).accept(true, null);
+        first.accept(null, null);
+        BiConsumer<Boolean, Throwable> second = callback.step(null, new LinkedHashSet<>());
+        callback.step("bar", new LinkedHashSet<>()).accept(false, null);
+        second.accept(null, null);
+        assertThat(events()).extracting(event -> event.get("step")).containsExactly(null, "bar", null);
+        assertThat(events().getLast()).containsEntry("status", "completed").containsEntry("skipped", 1.0);
+    }
+
+    @Test
+    public void a_build_records_its_steps_in_the_target_folder() throws IOException {
+        BuildExecutor executor = new BuildExecutor.Configuration().progress(false).of(target);
+        executor.addStep("foo", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+        executor.addStep("bar", (_, _, _) -> {
+            throw new IllegalArgumentException("bar is broken");
+        }, "foo");
+        assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
+                .hasRootCauseMessage("bar is broken");
+        List<Map<String, Object>> events = events();
+        assertThat(events).extracting(event -> event.get("step")).containsExactly(null, "foo", "bar", null);
+        assertThat(events.get(2)).containsEntry("status", "failed")
+                .containsEntry("error", IllegalArgumentException.class.getName());
+        assertThat(events.getLast()).containsEntry("status", "failed")
+                .containsEntry("executed", 1.0)
+                .containsEntry("failed", 1.0);
+    }
+
+    @Test
+    public void a_build_records_a_selector_it_refuses() throws IOException {
+        BuildExecutor executor = new BuildExecutor.Configuration().progress(false).of(target);
+        executor.addStep("foo", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+        assertThatThrownBy(() -> executor.execute(Runnable::run, "bar")).hasMessageContaining("Unknown selector: bar");
+        assertThat(events().getLast())
+                .as("a selector refused before any step ran still ends the file, so a reader is not left waiting")
+                .containsEntry("status", "failed")
+                .containsEntry("error", IllegalArgumentException.class.getName());
+    }
+
+    @Test
+    public void a_build_records_no_events_when_switched_off() throws IOException {
+        BuildExecutor executor = new BuildExecutor.Configuration().progress(false).events(false).of(target);
+        executor.addStep("foo", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+        executor.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(target.resolve(BuildExecutor.EVENTS)).doesNotExist();
+    }
+
+    private List<Map<String, Object>> events() throws IOException {
+        return Files.readAllLines(target.resolve(BuildExecutor.EVENTS)).stream()
+                .map(line -> (Map<String, Object>) Json.parse(line))
+                .toList();
+    }
+
+    @Test
+    public void ends_the_build_with_a_row_per_summarizing_step_naming_where_its_result_came_from() {
+        List<String> printed = new ArrayList<>();
+        BuildExecutorCallback callback = BuildExecutorCallback.printing(printed::add, false, false, target, false);
+        callback.run("now");
+        BiConsumer<Boolean, Throwable> build = callback.step(null, new LinkedHashSet<>());
+        callback.recorded("ran", new BuildExecutorCallback.Provenance("now", Instant.now(), false, false,
+                summary("result", "2 passed, 0 failed, 0 skipped")));
+        callback.recorded("reused", new BuildExecutorCallback.Provenance("earlier", Instant.now(), false, false,
+                summary("result", "82 passed, 0 failed, 0 skipped", "scope", "tag \"fast\"")));
+        callback.recorded("cached", new BuildExecutorCallback.Provenance("now", Instant.now(), true, false, summary()));
+        callback.recorded("broken", new BuildExecutorCallback.Provenance("now", Instant.now(), false, true,
+                summary("result", "1 passed, 1 failed, 0 skipped")));
+        callback.recorded("plain", new BuildExecutorCallback.Provenance("now", Instant.now(), false, false, null));
+        build.accept(null, null);
+        List<String> rows = printed.stream().filter(line -> line.contains("[SUMMARY]")).toList();
+        assertThat(rows)
+                .as("a result this run produced and one an earlier run left behind must never read alike")
+                .hasSize(4)
+                .anySatisfy(row -> assertThat(row).endsWith("broken  failed now: 1 passed, 1 failed, 0 skipped"))
+                .anySatisfy(row -> assertThat(row).endsWith("cached  loaded from the build cache"))
+                .anySatisfy(row -> assertThat(row).endsWith("ran     executed now: 2 passed, 0 failed, 0 skipped"))
+                .anySatisfy(row -> assertThat(row).matches(".*reused  reused from the run at [0-9]{2}:[0-9]{2}:[0-9]{2}"
+                        + " \\(tag \"fast\"\\): 82 passed, 0 failed, 0 skipped"));
+        assertThat(printed.getFirst()).endsWith("Building in '" + target + "' as run now...");
+    }
+
+    @Test
+    public void records_the_run_of_each_build_and_the_run_that_produced_each_step() throws IOException {
+        BuildExecutorCallback callback = BuildExecutorCallback.events(target);
+        callback.run("now");
+        BiConsumer<Boolean, Throwable> build = callback.step(null, new LinkedHashSet<>());
+        BiConsumer<Boolean, Throwable> step = callback.step("foo", new LinkedHashSet<>());
+        Instant time = Instant.parse("2026-10-03T12:00:00Z");
+        callback.recorded("foo", new BuildExecutorCallback.Provenance("earlier", time, false, false,
+                summary("result", "82 passed, 0 failed, 0 skipped")));
+        step.accept(false, null);
+        build.accept(null, null);
+        List<Map<String, Object>> events = events();
+        assertThat(events.getFirst()).containsEntry("run", "now");
+        assertThat(events.get(1))
+                .containsEntry("status", "skipped")
+                .containsEntry("run", "earlier")
+                .containsEntry("time", time.toString())
+                .containsEntry("summary", Map.of("result", "82 passed, 0 failed, 0 skipped"));
+    }
+
+    private static SequencedMap<String, String> summary(String... entries) {
+        SequencedMap<String, String> summary = new LinkedHashMap<>();
+        for (int index = 0; index < entries.length; index += 2) {
+            summary.put(entries[index], entries[index + 1]);
+        }
+        return summary;
     }
 }

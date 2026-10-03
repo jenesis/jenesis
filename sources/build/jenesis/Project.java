@@ -693,6 +693,33 @@ public record Project(
                     staging area, renamed into place on success. One build at a time per target: the
                     root holds an exclusive .jenesis.lock and a second process fails fast.
 
+                    Read the outcome of the latest build from %{target}/.jenesis.events.jsonl rather
+                    than from the progress lines, whose [EVENTS] line names the file: one JSON object
+                    per line, each led by its `status`. A step's is executed, skipped, failed, loaded
+                    or stored beside its `step` path, a module's resolved or failed beside its
+                    `module` path; a failure carries its `error` class and `message`, an executed or
+                    skipped step the `folder` holding its output. The first line is `started` and the
+                    last `completed` or `failed`, with how many steps executed, skipped and failed; a
+                    file without that last line is a build that is still running or was killed.
+
+                    A failed step keeps its staging area until it runs again: <step>~/supplement/
+                    holds a forked tool's command, its whole output and error, and the test reports
+                    the failure lists failed tests from. The failure itself inlines at most
+                    jenesis.print.lines lines of each and names the file holding the rest, and the
+                    end of the build repeats every failed step with its message.
+
+                    A result on disk does not say which build made it, so ask the records. Every
+                    build has a run id, on the [STARTED] line and the events file's first line. A
+                    step's checksum/step.properties names the run that produced its output (run,
+                    time, origin: executed or loaded from a build cache), and a step that is reused
+                    keeps the run that produced it. checksum/failed.properties beside an output says
+                    a later run failed to replace it - its run, its message and the <step>~ it kept
+                    - and checksum/running.properties that a run was killed while the step ran. A
+                    test step ends the build with a [SUMMARY] row: executed now, reused from the
+                    run at <time> with the filter or tag that run selected, loaded from the build
+                    cache, or failed now, with its counts. None of this is written into output/, so
+                    no cache carries one machine's run to another.
+
                     ## 4. Turn a folder into a selector
 
                     target/build/ mirrors the build graph, so any folder under it is a selector: drop
@@ -2686,11 +2713,13 @@ public record Project(
                 executor.digest|MD5|Algorithm behind the content and step hashes that drive the cache
                 executor.rebuild|false|Wipe target/ before building; prefer letting the cache decide
                 executor.aggregate|false|Collect independent step failures into one report
+                executor.events|true|Write each step's outcome of the latest build as one JSON object per line to .jenesis.events.jsonl in the target folder, replaced by every build
                 process.concurrency|0|Run at most this many JDK tool runs at once; 0 is unbounded
                 process.factory|tool|tool|fork; fork runs a JDK tool in a process of its own
                 legal.notices|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries taken as legal notices into a jmod, a linked or packaged image and beside a native image, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
                 archive.timestamp|1980-02-01T00:00:00Z|ISO-8601 date-time with an offset recorded on every entry of the jars, jmods and zips the build writes; empty keeps the times the tools record and makes the archives unreproducible; set explicitly, it is also the creation time a generated Docker image is labelled with
                 print.progress|true|The build progress lines
+                print.lines|100|At most this many lines of a failed tool's output, and as many of its error, inlined in the failure, the first two fifths and the last three; 0 inlines all of them
                 print.process|false|Stream each external tool's command line and output as it runs
                 print.<command>||The same for one tool only, as print.javac or print.tests
                 print.command|false|Each external tool command line, without its output
@@ -2977,9 +3006,33 @@ public record Project(
         if (t instanceof InterruptedException) {
             Thread.currentThread().interrupt();
         }
-        StringWriter trace = new StringWriter();
-        t.printStackTrace(new PrintWriter(trace));
-        trace.toString().lines().forEach(environment.err());
+        List<Throwable> failures = new ArrayList<>();
+        failures.add(t);
+        failures.addAll(Arrays.asList(t.getSuppressed()));
+        for (Throwable failure : failures) {
+            BuildExecutorException step = null;
+            Throwable cause = failure;
+            while ((cause instanceof CompletionException || cause instanceof InvocationTargetException)
+                    && cause.getCause() != null) {
+                if (cause instanceof BuildExecutorException exception) {
+                    step = exception;
+                }
+                cause = cause.getCause();
+            }
+            if (cause instanceof IllegalArgumentException || cause instanceof IllegalStateException) {
+                if (step != null) {
+                    environment.err().accept(step.getMessage() + ":");
+                }
+                String.valueOf(cause.getMessage()).lines().forEach(environment.err());
+                for (Throwable reason = cause.getCause(); reason != null; reason = reason.getCause()) {
+                    environment.err().accept("Caused by: " + reason);
+                }
+            } else {
+                StringWriter trace = new StringWriter();
+                failure.printStackTrace(new PrintWriter(trace));
+                trace.toString().lines().forEach(environment.err());
+            }
+        }
         environment.err().accept("");
         environment.err().accept("The build failed with the error above. If you meant to look up how to"
                 + " invoke Jenesis, pass `help` as the only argument on the command line, or `skill`"
