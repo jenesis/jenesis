@@ -603,7 +603,9 @@ public record Project(
                       new Project(root).build(selectors...)        embedding it in Java
 
                     `Make` is the entry point, `Project` the configuration API and has no `main`. No
-                    selector runs `build`; several, space-separated, run in one invocation.
+                    selector runs `build`; several, space-separated, run in one invocation. Output
+                    that goes to a pipe or a file is plain text: colour is written only to a
+                    terminal, unless -Djenesis.print.color says otherwise.
 
                     The installed `jenesis` verifies `build/jenesis` against the released sources
                     named in `build/jenesis/jenesis.version` and refuses a tree that differs, while
@@ -2691,6 +2693,7 @@ public record Project(
                 legal.notices|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries taken as legal notices into a jmod, a linked or packaged image and beside a native image, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
                 archive.timestamp|1980-02-01T00:00:00Z|ISO-8601 date-time with an offset recorded on every entry of the jars, jmods and zips the build writes; empty keeps the times the tools record and makes the archives unreproducible; set explicitly, it is also the creation time a generated Docker image is labelled with
                 print.progress|true|The build progress lines
+                print.color||true colours what the build prints and false never does; unset, it is coloured only where it goes to a terminal, which a pipe, a file and a tool's writer are not
                 print.process|false|Stream each external tool's command line and output as it runs
                 print.<command>||The same for one tool only, as print.javac or print.tests
                 print.command|false|Each external tool command line, without its output
@@ -2829,6 +2832,7 @@ public record Project(
         if (environment.flag("project.docker")) {
             SortedMap<String, String> properties = new TreeMap<>(settings(environment));
             properties.keySet().removeIf(name -> name.startsWith("jenesis.project.docker"));
+            properties.putIfAbsent("jenesis.print.color", Boolean.toString(Make.terminal()));
             String image = environment.getProperty("project.docker.image");
             Path root = this.root().toAbsolutePath().normalize();
             DockerizedJava docker = image == null ? new DockerizedJava(root) : new DockerizedJava(root, image);

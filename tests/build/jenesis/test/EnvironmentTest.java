@@ -2,6 +2,7 @@ package build.jenesis.test;
 
 import module java.base;
 import module org.junit.jupiter.api;
+import build.jenesis.BuildExecutorCallback;
 import build.jenesis.Environment;
 import build.jenesis.Make;
 
@@ -129,5 +130,60 @@ public class EnvironmentTest {
         assertThat(new Environment(keys).keys())
                 .as("a setting whose key is a pattern is found by listing the settings rather than by a derived list")
                 .containsOnlyKeys("platform.fips", "test.sample.value");
+    }
+
+    @Test
+    public void writes_no_colour_to_the_writers_of_a_tool() {
+        StringWriter out = new StringWriter();
+        new Environment(Map.of(), new PrintWriter(out, true), new PrintWriter(new StringWriter(), true)).out()
+                .accept(BuildExecutorCallback.GREEN + "[EXECUTED]" + BuildExecutorCallback.RESET + " foo");
+        assertThat(out.toString().strip())
+                .as("a writer a program hands a tool is no terminal, so an escape sequence is noise in what it collects")
+                .isEqualTo("[EXECUTED] foo");
+    }
+
+    @Test
+    public void writes_colour_to_the_writers_of_a_tool_when_asked_to() {
+        StringWriter out = new StringWriter();
+        new Environment(Map.of("print.color", "true"), new PrintWriter(out, true), new PrintWriter(new StringWriter(), true))
+                .out()
+                .accept(BuildExecutorCallback.GREEN + "[EXECUTED]" + BuildExecutorCallback.RESET);
+        assertThat(out.toString().strip())
+                .isEqualTo(BuildExecutorCallback.GREEN + "[EXECUTED]" + BuildExecutorCallback.RESET);
+    }
+
+    @Test
+    public void writes_no_colour_to_the_streams_of_the_jvm_unless_they_are_a_terminal() {
+        Console console = System.console();
+        Assumptions.assumeFalse(console != null && console.isTerminal(), "the test runs without a terminal");
+        PrintStream original = System.out;
+        ByteArrayOutputStream printed = new ByteArrayOutputStream();
+        System.setOut(new PrintStream(printed, true, StandardCharsets.UTF_8));
+        try {
+            new Environment(Map.of()).out().accept("\033[38;5;131mjavac >>>> error" + BuildExecutorCallback.RESET);
+            new Environment(Map.of("print.color", "true")).out().accept(BuildExecutorCallback.RED + "kept");
+        } finally {
+            System.setOut(original);
+        }
+        assertThat(printed.toString(StandardCharsets.UTF_8).lines().toList())
+                .as("a pipe or a file is what a script or an agent reads, and the setting overrides the guess")
+                .containsExactly("javac >>>> error", BuildExecutorCallback.RED + "kept");
+    }
+
+    @Test
+    public void hands_its_own_consumer_every_line_as_it_stands() {
+        List<String> printed = new ArrayList<>();
+        new Environment(Map.of("print.color", "false")).out(printed::add).out()
+                .accept(BuildExecutorCallback.RED + "raw");
+        assertThat(printed)
+                .as("a consumer of the caller's own is handed the line unchanged, whatever the setting says")
+                .containsExactly(BuildExecutorCallback.RED + "raw");
+    }
+
+    @Test
+    public void refuses_a_colour_setting_that_is_no_boolean() {
+        assertThatThrownBy(() -> new Environment(Map.of("print.color", "auto")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("jenesis.print.color");
     }
 }
