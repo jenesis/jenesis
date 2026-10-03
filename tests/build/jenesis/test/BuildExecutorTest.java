@@ -369,6 +369,74 @@ public class BuildExecutorTest implements Serializable {
     }
 
     @Test
+    public void refuses_a_wildcard_that_matches_no_step_anywhere_and_names_the_nearest() {
+        buildExecutor.addModule("first", (executor, _) -> {
+            executor.addStep("jar", counting());
+            executor.addStep("javac", counting());
+        });
+        buildExecutor.addModule("second", (executor, _) -> executor.addStep("javadoc", counting()));
+        assertThatThrownBy(() -> buildExecutor.execute(Runnable::run, "::/jra").toCompletableFuture().join())
+                .as("a wildcard that runs nothing would otherwise finish green, which reads as a pass")
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Unknown selector: ::/jra - it matches no step - did you mean jar?");
+    }
+
+    @Test
+    public void runs_a_wildcard_that_matches_in_one_branch_alone() {
+        RUNS.set(0);
+        buildExecutor.addModule("first", (executor, _) -> executor.addStep("jar", counting()));
+        buildExecutor.addModule("second", (executor, _) -> executor.addStep("javadoc", counting()));
+        buildExecutor.execute(Runnable::run, ":/jar").toCompletableFuture().join();
+        assertThat(RUNS.get()).isEqualTo(1);
+    }
+
+    @Test
+    public void runs_an_any_depth_wildcard_that_matches_a_nested_step() {
+        RUNS.set(0);
+        buildExecutor.addModule("outer", (outer, _) -> outer.addModule("inner", (inner, _) -> {
+            inner.addStep("jar", counting());
+            inner.addStep("javac", counting());
+        }));
+        buildExecutor.execute(Runnable::run, "::/jar").toCompletableFuture().join();
+        assertThat(RUNS.get()).isEqualTo(1);
+    }
+
+    @Test
+    public void refuses_a_wildcard_typo_inside_a_module_that_runs_in_full_as_a_dependency() {
+        buildExecutor.addModule("build", (executor, _) -> executor.addStep("jar", counting()));
+        buildExecutor.addModule("stage", (executor, _) -> executor.addStep("copy", counting()), "build");
+        assertThatThrownBy(() -> buildExecutor.execute(Runnable::run, "::/jra").toCompletableFuture().join())
+                .as("a module that runs whole because another needs it still compares the selector with what it holds")
+                .rootCause()
+                .hasMessage("Unknown selector: ::/jra - it matches no step - did you mean jar?");
+    }
+
+    @Test
+    public void refuses_a_narrower_selector_beside_its_whole_module_when_it_names_nothing() {
+        buildExecutor.addModule("module", (executor, _) -> executor.addStep("step", counting()));
+        assertThatThrownBy(() -> buildExecutor.execute(Runnable::run, "module/stpe", "module").toCompletableFuture().join())
+                .rootCause()
+                .hasMessage("Unknown selector: module/stpe - it matches no step - did you mean step?");
+    }
+
+    @Test
+    public void refuses_a_single_segment_wildcard_whose_tail_matches_nothing() {
+        buildExecutor.addModule("first", (executor, _) -> executor.addStep("jar", counting()));
+        assertThatThrownBy(() -> buildExecutor.execute(Runnable::run, ":/nothing").toCompletableFuture().join())
+                .rootCause()
+                .hasMessage("Unknown selector: :/nothing - it matches no step");
+    }
+
+    @Test
+    public void names_the_nearest_step_of_an_unknown_selector() {
+        buildExecutor.addStep("compile", counting());
+        buildExecutor.addStep("package", counting());
+        assertThatThrownBy(() -> buildExecutor.execute(Runnable::run, "compiel"))
+                .hasMessage("Unknown selector: compiel - expected one of [compile, package] - did you mean compile?");
+    }
+
+    @Test
     public void fails_fast_by_default_without_aggregating_independent_failures() {
         buildExecutor.addStep("step1", (_, _, _) -> {
             throw new RuntimeException("one");
@@ -1580,7 +1648,7 @@ public class BuildExecutorTest implements Serializable {
                 .as("a selector that runs a module's preliminaries before it fails is expensive to get"
                         + " wrong twice, so the failure carries what would have matched")
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Unknown selector: step - expected one of [step1, step2]");
+                .hasMessage("Unknown selector: step - expected one of [step1, step2] - did you mean step1 or step2?");
     }
 
     @Test
@@ -1805,13 +1873,14 @@ public class BuildExecutorTest implements Serializable {
     }
 
     @Test
-    public void wildcard_with_no_match_runs_nothing() throws IOException {
+    public void wildcard_with_no_match_runs_nothing_and_is_refused() {
         buildExecutor.addModule("module", (inner, _) -> inner.addStep("step", (_, _, _) -> {
             throw new AssertionError("step should not run");
         }));
-        Map<String, ?> build = buildExecutor.execute(Runnable::run, ":/nonexistent")
-                .toCompletableFuture().join();
-        assertThat(build).isEmpty();
+        assertThatThrownBy(() -> buildExecutor.execute(Runnable::run, ":/nonexistent").toCompletableFuture().join())
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Unknown selector: :/nonexistent - it matches no step");
     }
 
     @Test
