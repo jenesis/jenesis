@@ -162,6 +162,31 @@ And on a `stage` build, `-Djenesis.stage.tests=true` also stages the module's
 `tests`-classifier variant beside the main jar, so the test artifact is published
 too (by default only the main artifact is staged).
 
+When a test fails
+-----------------
+
+A failing test fails the build, and the failure leads with the tests that
+failed, each with the first line of its assertion message, before the command
+that reproduces the run, with the folder to run it in, and the runner's own
+output:
+
+    Failed to execute build/maven/compose/module/test-module-greeter/produce/assemble/observed/test/executed:
+    Unexpected exit code: 1
+    1 test failed:
+      sample.greeter.GreeterTest#prefix_is_a_greeting(): expected: <true> but was: <false>
+    To reproduce, execute in /.../demo-03-java-pom-multi:
+     /.../bin/java @target/build/maven/compose/module/test-module-greeter/produce/assemble/observed/test/executed~/supplement/java.args
+
+    Output:
+    ...
+
+A long output is cut to its first and last lines, `-Djenesis.print.lines` of
+each (100 unless set, `0` for all of them), and the failure names the file that
+holds the rest. That file stays where the run left it: the step's folder ending
+in `~` is kept until the step runs again, with the command, the whole output and
+the test reports under its `supplement/`. Every failed step is repeated at the
+end of the build, so the last lines printed are the ones to read.
+
 Pinned dependencies
 -------------------
 

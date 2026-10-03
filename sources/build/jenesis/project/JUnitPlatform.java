@@ -73,6 +73,8 @@ public record JUnitPlatform() implements TestFramework {
             commands.add("--reports-dir=" + reports);
             commands.add("--config=junit.platform.reporting.open.xml.enabled=true");
             commands.add("--config=junit.platform.reporting.output.dir=" + reports);
+        } else {
+            commands.add("--reports-dir=" + supplement.resolve("reports"));
         }
         for (String className : classes) {
             commands.add("--select-class=" + className);

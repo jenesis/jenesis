@@ -236,6 +236,7 @@ public class TestFrameworkTest {
                 false,
                 false))
                 .containsExactly("execute", "--disable-banner", "--disable-ansi-colors",
+                        "--reports-dir=" + root.resolve("reports"),
                         "--select-class=sample.BetaTest",
                         "--select-method=sample.AlphaTest#first",
                         "--select-method=sample.AlphaTest#second");
@@ -288,14 +289,15 @@ public class TestFrameworkTest {
                 .contains("--reports-dir=" + root.resolve(BuildStep.REPORTS + "tests"),
                         "--config=junit.platform.reporting.open.xml.enabled=true",
                         "--config=junit.platform.reporting.output.dir=" + root.resolve(BuildStep.REPORTS + "tests"));
-        assertThat(new JUnitPlatform().arguments(root,
-                root,
+        assertThat(new JUnitPlatform().arguments(root.resolve("supplement"),
+                root.resolve("output"),
                 Collections.emptyNavigableSet(),
                 Collections.emptyNavigableMap(),
                 false,
                 false))
-                .noneMatch(command -> command.startsWith("--reports-dir")
-                        || command.startsWith("--config=junit.platform.reporting."));
+                .as("the legacy report always lands in the supplement, where a failure is summarised from")
+                .contains("--reports-dir=" + root.resolve("supplement").resolve("reports"))
+                .noneMatch(command -> command.startsWith("--config=junit.platform.reporting."));
     }
 
     @Test
