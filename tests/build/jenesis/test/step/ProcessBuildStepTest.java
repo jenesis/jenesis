@@ -238,6 +238,21 @@ public class ProcessBuildStepTest {
     }
 
     @Test
+    public void names_a_program_given_by_its_path_as_it_stands_in_the_command_that_reproduces_a_failure()
+            throws IOException {
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        String program = Path.of(System.getProperty("java.home"), "bin", "java").toAbsolutePath().toString();
+        Loud step = new Loud(program, 0, Environment.NONE, List.of("-version"));
+        assertThatThrownBy(() -> step.apply(Runnable::run, new BuildStepContext(null, next, supplement), new LinkedHashMap<>())
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .as("a program named by its path is not resolved against the JDK a second time")
+                .hasMessage("Unexpected exit code: 1\nTo reproduce, execute in " + Path.of("").toAbsolutePath()
+                        + ":\n " + (program.contains(" ") ? "\"" + program + "\"" : program) + " -version");
+    }
+
+    @Test
     public void inlines_a_long_failure_whole_when_asked_to() throws IOException {
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
         Loud step = new Loud(250, new Environment(Map.of("print.lines", "0")));
@@ -265,10 +280,14 @@ public class ProcessBuildStepTest {
         }
 
         private Loud(int lines, Environment environment, List<String> arguments) {
+            this("loud", lines, environment, arguments);
+        }
+
+        private Loud(String name, int lines, Environment environment, List<String> arguments) {
             super("loud", ProcessHandler.OfTool.of(new ToolProvider() {
                 @Override
                 public String name() {
-                    return "loud";
+                    return name;
                 }
 
                 @Override

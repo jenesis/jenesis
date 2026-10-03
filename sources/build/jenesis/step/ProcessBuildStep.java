@@ -188,10 +188,13 @@ public abstract class ProcessBuildStep implements BuildStep {
         StringBuilder message = new StringBuilder(headline);
         details.forEach(line -> message.append('\n').append(line));
         List<String> commands = new ArrayList<>(handler.commands());
-        Path program = Path.of(System.getProperty("java.home"), "bin", commands.getFirst()
-                + (File.separatorChar == '\\' ? ".exe" : ""));
-        if (!handler.external() && Files.isRegularFile(program)) {
-            commands.set(0, program.toString());
+        String first = commands.getFirst();
+        if (!handler.external() && first.indexOf('/') < 0 && first.indexOf(File.separatorChar) < 0) {
+            Path program = Path.of(System.getProperty("java.home"), "bin", first
+                    + (File.separatorChar == '\\' && !first.endsWith(".exe") ? ".exe" : ""));
+            if (Files.isRegularFile(program)) {
+                commands.set(0, program.toString());
+            }
         }
         message.append("\nTo reproduce, execute in ")
                 .append(Path.of("").toAbsolutePath())
