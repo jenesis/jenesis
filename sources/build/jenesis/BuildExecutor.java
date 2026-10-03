@@ -4,7 +4,7 @@ import module java.base;
 
 public interface BuildExecutor {
 
-    String SKIP_MARKER = ".jenesis.skip", LOCK_MARKER = ".jenesis.lock";
+    String SKIP_MARKER = ".jenesis.skip", LOCK_MARKER = ".jenesis.lock", EVENTS = ".jenesis.events.jsonl";
 
     static BuildExecutor of(Path target) throws IOException {
         return new Configuration().of(target);
@@ -14,6 +14,7 @@ public interface BuildExecutor {
                          String digest,
                          boolean verbose,
                          boolean progress,
+                         boolean events,
                          boolean cacheHits,
                          boolean rebuild,
                          boolean aggregate,
@@ -22,7 +23,7 @@ public interface BuildExecutor {
                          Consumer<String> out) {
 
         public Configuration() {
-            this(Duration.ZERO, "MD5", false, true, false, false, false, 0, null, System.out::println);
+            this(Duration.ZERO, "MD5", false, true, true, false, false, false, 0, null, System.out::println);
         }
 
         public static Configuration ofEnvironment(Environment environment) {
@@ -46,6 +47,7 @@ public interface BuildExecutor {
                     environment.getProperty("executor.digest", "MD5"),
                     environment.flag("print.checksum"),
                     environment.flag("print.progress", true),
+                    environment.flag("executor.events", true),
                     environment.flag("print.cache"),
                     environment.flag("executor.rebuild"),
                     environment.flag("executor.aggregate"),
@@ -55,53 +57,58 @@ public interface BuildExecutor {
         }
 
         public Configuration timeout(Duration timeout) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public Configuration digest(String digest) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public Configuration verbose(boolean verbose) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public Configuration progress(boolean progress) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out);
+        }
+
+        public Configuration events(boolean events) {
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public Configuration cacheHits(boolean cacheHits) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public Configuration rebuild(boolean rebuild) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public Configuration aggregate(boolean aggregate) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public Configuration concurrency(int concurrency) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public Configuration cache(BuildExecutorCache cache) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public Configuration out(Consumer<String> out) {
-            return new Configuration(timeout, digest, verbose, progress, cacheHits, rebuild, aggregate, concurrency, cache, out);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out);
         }
 
         public BuildExecutor of(Path target) throws IOException {
+            BuildExecutorCallback printing = progress
+                    ? BuildExecutorCallback.printing(out, verbose, cacheHits, target, events)
+                    : BuildExecutorCallback.nop();
             return BuildExecutor.of(target,
                     timeout,
                     new HashDigestFunction(digest),
                     BuildStepHashFunction.ofSerializationDigest(digest),
-                    progress
-                            ? BuildExecutorCallback.printing(out, verbose, cacheHits, target)
-                            : BuildExecutorCallback.nop(),
+                    events ? printing.andThen(BuildExecutorCallback.events(target)) : printing,
                     cache == null ? BuildExecutorCache.nop() : cache,
                     rebuild,
                     aggregate,
