@@ -66,6 +66,50 @@ public class BuildStepHashFunctionTest {
     }
 
     @Test
+    public void a_step_is_keyed_by_the_code_that_defines_it_as_well_as_by_its_fields(@TempDir Path root)
+            throws Exception {
+        BuildStepHashFunction hash = BuildStepHashFunction.ofSerializationDigest("MD5");
+        Path first = probe(root.resolve("first"), "true"), second = probe(root.resolve("second"), "false");
+        assertThat(hash.hash(load(first)))
+                .as("a step whose code changed but whose name, serialVersionUID and fields did not is another step,"
+                        + " as a step of an upgraded engine or plugin is")
+                .isNotEqualTo(hash.hash(load(second)));
+        assertThat(hash.hash(load(first))).isEqualTo(hash.hash(load(first)));
+    }
+
+    private static Path probe(Path folder, String next) throws Exception {
+        Path source = Files.createDirectories(folder.resolve("source")).resolve("Probe.java");
+        Files.writeString(source, """
+                package probe;
+
+                public class Probe implements build.jenesis.BuildStep {
+
+                    private static final long serialVersionUID = 1L;
+
+                    private final String value = "unchanged";
+
+                    @Override
+                    public java.util.concurrent.CompletionStage<build.jenesis.BuildStepResult> apply(
+                            java.util.concurrent.Executor executor,
+                            build.jenesis.BuildStepContext context,
+                            java.util.SequencedMap<String, build.jenesis.BuildStepArgument> arguments) {
+                        return java.util.concurrent.CompletableFuture.completedStage(new build.jenesis.BuildStepResult(%s));
+                    }
+                }
+                """.formatted(next));
+        Path classes = Files.createDirectories(folder.resolve("classes"));
+        String engine = Path.of(BuildStep.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toString();
+        assertThat(javax.tools.ToolProvider.getSystemJavaCompiler()
+                .run(null, null, null, "-d", classes.toString(), "-cp", engine, source.toString())).isZero();
+        return classes;
+    }
+
+    private static BuildStep load(Path classes) throws Exception {
+        URLClassLoader loader = new URLClassLoader(new URL[]{classes.toUri().toURL()}, BuildStep.class.getClassLoader());
+        return (BuildStep) loader.loadClass("probe.Probe").getConstructor().newInstance();
+    }
+
+    @Test
     public void throws_for_non_serializable_step() {
         BuildStepHashFunction hash = BuildStepHashFunction.ofSerializationDigest("MD5");
         BuildStep step = new NonSerializableStep();

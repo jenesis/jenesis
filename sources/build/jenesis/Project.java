@@ -749,12 +749,14 @@ public record Project(
                                             -> the versions it is pinned at and the modules holding
                                             each, for every coordinate pinned at more than one
 
-                    ## 7. Bump serialVersionUID after editing a build step
+                    ## 7. Edit a build step and it runs again
 
-                    A step is keyed by the digest of its serialized form plus every predecessor's
-                    checksums. Project sources are always detected, but editing a step's *code* does
-                    not change its serialized form, so its output stays cached. Bump that class's
-                    `serialVersionUID` to force it to re-run; prefer that over executor.rebuild.
+                    A step is keyed by the digest of its serialized form, the jar or class folder
+                    each class it holds was loaded from, and every predecessor's checksums. Editing a
+                    step's code - in this engine, in a plugin compiled from a folder of the project,
+                    or in a build entry point of your own - changes where that class comes from, so
+                    the step runs again; a new engine or plugin version runs the steps it defines
+                    once. Nothing needs bumping, and executor.rebuild is never the remedy.
 
                     ## 8. Configure a module with @jenesis tags on module-info.java
 
@@ -1039,7 +1041,7 @@ public record Project(
                                                        print.<command>, as print.javac
                       -Djenesis.dependency.pin=strict  fail the build on any unpinned artifact
                       -Djenesis.test.filter=<regex>    run one test class or method
-                      -Djenesis.executor.rebuild       wipe target/ - avoid it, see section 7
+                      -Djenesis.executor.rebuild       wipe target/ - avoid it, see section 3
 
                     ## 11. Run a built main class with Execute
 

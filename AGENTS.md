@@ -272,7 +272,9 @@ reader.
 
 **Steps are pure functions of folders.** A `BuildStep` reads its `arguments` (one folder per predecessor) and
 writes into `context.next()`, nothing else. It is `Serializable` and its serialised form is part of the cache
-key, so every value that should trigger a re-run is a non-`transient` field and every field is serialisable
+key, together with a digest of the jar or class folder each class in that form was loaded from - so editing a
+step's code, or upgrading the engine or a plugin, runs it again without a `serialVersionUID` to bump - and so every
+value that should trigger a re-run is a non-`transient` field and every field is serialisable
 (`Path` is hashed by its string form; a lambda field must be typed as a serialisable functional interface).
 What a step holds is serialised with it - a `Resolver`, a version negotiator, a lambda typed as a
 serialisable functional interface - so those types are `Serializable` too, and their scaffolding (a parser
