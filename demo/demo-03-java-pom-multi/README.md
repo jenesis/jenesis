@@ -150,11 +150,11 @@ for `slow,io` next, the build runs only the tests tagged `io` that are not tagge
 `slow`, because the others already passed; asked for `slow` alone, it runs nothing.
 `-Djenesis.test.force=true` forgets what ran and runs the whole selection.
 Where a green build must be evidence of tests that ran in it - a CI lane that
-runs a narrower selection after a wider one - `-Djenesis.test.requireExecuted=true`
+runs a narrower selection after a wider one - `-Djenesis.test.required=true`
 fails a test step that would otherwise stand on what an earlier run covered, and
 fetches no test result from the build cache:
 
-    java -Djenesis.test.requireExecuted=true build/jenesis/Make.java
+    java -Djenesis.test.required=true build/jenesis/Make.java
 
 Run right after a build, it fails, naming the recorded results it refused to reuse.
 

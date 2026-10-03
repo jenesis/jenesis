@@ -36,7 +36,7 @@ public class TestModule implements BuildExecutorModule {
     private final String filter;
     private final String tag;
     private final boolean force;
-    private final boolean requireExecuted;
+    private final boolean required;
     private final boolean parallel;
     private final boolean reporting;
     private final String group;
@@ -85,7 +85,7 @@ public class TestModule implements BuildExecutorModule {
                 environment.getProperty("test.filter"),
                 environment.getProperty("test.tag"),
                 environment.flag("test.force"),
-                environment.flag("test.requireExecuted"),
+                environment.flag("test.required"),
                 environment.flag("test.parallel"),
                 environment.flag("test.reporting"),
                 "main",
@@ -130,7 +130,7 @@ public class TestModule implements BuildExecutorModule {
                        String filter,
                        String tag,
                        boolean force,
-                       boolean requireExecuted,
+                       boolean required,
                        boolean parallel,
                        boolean reporting,
                        String group,
@@ -152,7 +152,7 @@ public class TestModule implements BuildExecutorModule {
         this.filter = filter;
         this.tag = tag;
         this.force = force;
-        this.requireExecuted = requireExecuted;
+        this.required = required;
         this.parallel = parallel;
         this.reporting = reporting;
         this.group = group;
@@ -175,7 +175,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -199,7 +199,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -223,7 +223,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -247,7 +247,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -271,7 +271,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -295,7 +295,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -319,7 +319,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -343,7 +343,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -367,7 +367,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -391,7 +391,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -415,7 +415,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -425,7 +425,7 @@ public class TestModule implements BuildExecutorModule {
                 skip);
     }
 
-    public TestModule requireExecuted(boolean requireExecuted) {
+    public TestModule required(boolean required) {
         return new TestModule(framework,
                 isTest,
                 factory,
@@ -439,7 +439,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -463,7 +463,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -487,7 +487,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -511,7 +511,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -539,7 +539,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -563,7 +563,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -587,7 +587,7 @@ public class TestModule implements BuildExecutorModule {
                 filter,
                 tag,
                 force,
-                requireExecuted,
+                required,
                 parallel,
                 reporting,
                 group,
@@ -632,7 +632,7 @@ public class TestModule implements BuildExecutorModule {
                         filter,
                         tag,
                         force,
-                        requireExecuted,
+                        required,
                         parallel,
                         reporting,
                         group,
@@ -778,7 +778,7 @@ public class TestModule implements BuildExecutorModule {
         private final transient String filter;
         private final transient String tag;
         private final transient boolean force;
-        private final transient boolean requireExecuted;
+        private final transient boolean required;
         private final transient boolean parallel;
         private final boolean reporting;
         private final String group;
@@ -795,7 +795,7 @@ public class TestModule implements BuildExecutorModule {
                     String filter,
                     String tag,
                     boolean force,
-                    boolean requireExecuted,
+                    boolean required,
                     boolean parallel,
                     boolean reporting,
                     String group,
@@ -812,7 +812,7 @@ public class TestModule implements BuildExecutorModule {
             this.filter = filter;
             this.tag = tag;
             this.force = force;
-            this.requireExecuted = requireExecuted;
+            this.required = required;
             this.parallel = parallel;
             this.reporting = reporting;
             this.group = group;
@@ -832,7 +832,7 @@ public class TestModule implements BuildExecutorModule {
 
         @Override
         public boolean shouldUseCache() {
-            return !requireExecuted;
+            return !required;
         }
 
         @Override
@@ -843,10 +843,10 @@ public class TestModule implements BuildExecutorModule {
             TestTags requested = TestTags.parse(tag);
             List<TestTags> ran = ran(context, arguments);
             if (requested.coveredBy(ran)) {
-                if (requireExecuted) {
+                if (required) {
                     throw new IllegalStateException("Tests were not executed: the results recorded in "
                             + context.previous()
-                            + " cover this selection and jenesis.test.requireExecuted is set"
+                            + " cover this selection and jenesis.test.required is set"
                             + " - set -Djenesis.test.force=true to execute them again");
                 }
                 return CompletableFuture.completedStage(new BuildStepResult(false));
@@ -1014,10 +1014,10 @@ public class TestModule implements BuildExecutorModule {
             if (incrementalDigest != null && filter == null && tags.all() && ran.isEmpty() && !matchedClasses.isEmpty()) {
                 SequencedSet<String> narrowed = selected(arguments, context, matchedClasses);
                 if (narrowed != null && narrowed.isEmpty()) {
-                    if (requireExecuted) {
+                    if (required) {
                         throw new IllegalStateException("Tests were not executed: no test reaches a class that changed"
                                 + " since the results recorded in " + context.previous()
-                                + " and jenesis.test.requireExecuted is set"
+                                + " and jenesis.test.required is set"
                                 + " - set -Djenesis.test.force=true to execute them again");
                     }
                     return CompletableFuture.completedFuture(null);

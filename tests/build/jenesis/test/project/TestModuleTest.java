@@ -168,12 +168,12 @@ public class TestModuleTest {
     }
 
     @Test
-    public void a_run_that_requires_executed_tests_fails_where_a_change_reaches_no_test() throws IOException {
+    public void a_run_that_requires_tests_fails_where_a_change_reaches_no_test() throws IOException {
         settings.put("test.incremental", "true");
         Path sampleClasses = classes.resolve(Javac.CLASSES + "sample");
         for (String value : List.of("first", "second")) {
             if (value.equals("second")) {
-                settings.put("test.requireExecuted", "true");
+                settings.put("test.required", "true");
             }
             compileSource(sampleClasses, "Unreached", """
                     package sample;
@@ -1013,10 +1013,10 @@ public class TestModuleTest {
     }
 
     @Test
-    public void a_run_that_requires_executed_tests_fails_where_it_would_stand_on_a_recorded_result()
+    public void a_run_that_requires_tests_fails_where_it_would_stand_on_a_recorded_result()
             throws IOException {
         assertThat(executeTests(null, null)).contains(EXECUTED);
-        settings.put("test.requireExecuted", "true");
+        settings.put("test.required", "true");
         assertThatThrownBy(() -> executeTests(null, null))
                 .rootCause()
                 .as("a green build under this setting is evidence of tests that ran in it")
