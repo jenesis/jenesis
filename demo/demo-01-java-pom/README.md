@@ -23,6 +23,25 @@ compiles, packages and tests every module. Everything else is named explicitly -
 `pin`, `stage`, `dependencies` below - so a command with nothing after it is
 always the whole build, and the demos never spell `build` out.
 
+Reading the outcome
+-------------------
+
+Besides the progress lines, every build writes what happened to
+`target/.jenesis.events.jsonl`, one JSON object per line, replaced by the next
+build. A script or a coding agent reads it instead of parsing the console:
+
+    {"status":"started","target":"/.../demo-01-java-pom/target"}
+    {"module":"build","status":"resolved","seconds":0.063}
+    {"step":"build/maven/compose/module/module-/produce/assemble/binary/compiled/compile/javac","status":"executed","seconds":0.207,"folder":"/.../target/build/maven/compose/module/module-/produce/assemble/binary/compiled/compile/javac"}
+    {"step":"build/maven/compose/module/module-/produce/assemble/binary/artifacts/jar","status":"executed","seconds":0.020,"folder":"/.../target/build/maven/compose/module/module-/produce/assemble/binary/artifacts/jar"}
+    {"status":"completed","seconds":6.152,"executed":19,"skipped":0,"failed":0}
+
+A step is `executed`, `skipped` because nothing it reads changed, or `failed`
+with the `error` and `message` that stopped it, and `folder` is where its
+`output/` lives. The last line says whether the build `completed` or `failed`;
+a file without one belongs to a build that is still running or was killed.
+`-Djenesis.executor.events=false` writes no file.
+
 Layout
 ------
 

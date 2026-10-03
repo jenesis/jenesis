@@ -25,6 +25,33 @@ public interface BuildExecutorCallback {
     default void stored(String identity, long duration) {
     }
 
+    default BuildExecutorCallback andThen(BuildExecutorCallback other) {
+        BuildExecutorCallback first = this;
+        return new BuildExecutorCallback() {
+            @Override
+            public BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys) {
+                return first.step(identity, keys).andThen(other.step(identity, keys));
+            }
+
+            @Override
+            public Consumer<Throwable> module(String identity) {
+                return first.module(identity).andThen(other.module(identity));
+            }
+
+            @Override
+            public void loaded(String identity, long duration) {
+                first.loaded(identity, duration);
+                other.loaded(identity, duration);
+            }
+
+            @Override
+            public void stored(String identity, long duration) {
+                first.stored(identity, duration);
+                other.stored(identity, duration);
+            }
+        };
+    }
+
     static BuildExecutorCallback nop() {
         return (_, _) -> (_, _) -> {
         };
@@ -109,5 +136,122 @@ public interface BuildExecutorCallback {
                 }
             }
         };
+    }
+
+    static BuildExecutorCallback events(Path target) {
+        Path root = target.toAbsolutePath().normalize(), file = root.resolve(BuildExecutor.EVENTS);
+        return new BuildExecutorCallback() {
+
+            private Writer writer;
+            private int executed, skipped, failed;
+
+            @Override
+            public BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys) {
+                long started = System.nanoTime();
+                if (identity == null) {
+                    synchronized (this) {
+                        close();
+                        try {
+                            writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException("Cannot write the build events to " + file, e);
+                        }
+                        executed = 0;
+                        skipped = 0;
+                        failed = 0;
+                        write("{\"status\":\"started\",\"target\":\"" + Json.escaped(root.toString()) + "\"}");
+                    }
+                    return (_, throwable) -> {
+                        synchronized (this) {
+                            write("{\"status\":\"" + (throwable == null ? "completed" : "failed") + "\""
+                                    + ",\"seconds\":" + seconds(System.nanoTime() - started)
+                                    + ",\"executed\":" + executed
+                                    + ",\"skipped\":" + skipped
+                                    + ",\"failed\":" + failed
+                                    + (throwable == null ? "" : failure(throwable)) + "}");
+                            close();
+                        }
+                    };
+                }
+                String step = "{\"step\":\"" + Json.escaped(identity) + "\"",
+                        folder = ",\"folder\":\"" + Json.escaped(root.resolve(identity).toString()) + "\"";
+                return (ran, throwable) -> {
+                    synchronized (this) {
+                        if (throwable != null) {
+                            failed++;
+                            write(step + ",\"status\":\"failed\"" + failure(throwable) + "}");
+                        } else if (ran) {
+                            executed++;
+                            write(step + ",\"status\":\"executed\",\"seconds\":"
+                                    + seconds(System.nanoTime() - started) + folder + "}");
+                        } else {
+                            skipped++;
+                            write(step + ",\"status\":\"skipped\"" + folder + "}");
+                        }
+                    }
+                };
+            }
+
+            @Override
+            public Consumer<Throwable> module(String identity) {
+                long started = System.nanoTime();
+                return throwable -> write("{\"module\":\"" + Json.escaped(identity) + "\""
+                        + (throwable == null
+                        ? ",\"status\":\"resolved\",\"seconds\":" + seconds(System.nanoTime() - started)
+                        : ",\"status\":\"failed\"" + failure(throwable)) + "}");
+            }
+
+            @Override
+            public void loaded(String identity, long duration) {
+                write("{\"step\":\"" + Json.escaped(identity) + "\",\"status\":\"loaded\",\"seconds\":"
+                        + seconds(duration) + "}");
+            }
+
+            @Override
+            public void stored(String identity, long duration) {
+                write("{\"step\":\"" + Json.escaped(identity) + "\",\"status\":\"stored\",\"seconds\":"
+                        + seconds(duration) + "}");
+            }
+
+            private synchronized void write(String line) {
+                if (writer == null) {
+                    return;
+                }
+                try {
+                    writer.write(line);
+                    writer.write('\n');
+                    writer.flush();
+                } catch (IOException e) {
+                    throw new UncheckedIOException("Cannot write the build events to " + file, e);
+                }
+            }
+
+            private synchronized void close() {
+                if (writer == null) {
+                    return;
+                }
+                try {
+                    writer.close();
+                } catch (IOException e) {
+                    throw new UncheckedIOException("Cannot write the build events to " + file, e);
+                } finally {
+                    writer = null;
+                }
+            }
+        };
+    }
+
+    private static String seconds(long nanos) {
+        return String.format(Locale.ROOT, "%.3f", nanos / 1_000_000_000d);
+    }
+
+    private static String failure(Throwable throwable) {
+        Throwable cause = throwable;
+        while ((cause instanceof BuildExecutorException || cause instanceof CompletionException)
+                && cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        return ",\"error\":\"" + cause.getClass().getName() + "\",\"message\":\""
+                + Json.escaped(cause.getMessage() == null ? cause.toString() : cause.getMessage()) + "\"";
     }
 }
