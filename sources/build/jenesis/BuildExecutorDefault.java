@@ -16,7 +16,7 @@ class BuildExecutorDefault implements BuildExecutor {
     private final BuildStepHashFunction stepHash;
     private final BuildExecutorCallback callback;
     private final BuildExecutorCache cache;
-    private final boolean aggregate;
+    private final boolean aggregate, dryRun;
     private final Permits permits;
     private final String location;
 
@@ -30,6 +30,7 @@ class BuildExecutorDefault implements BuildExecutor {
                          BuildExecutorCallback callback,
                          BuildExecutorCache cache,
                          boolean aggregate,
+                         boolean dryRun,
                          Permits permits,
                          String location,
                          Map<String, StepSummary> inherited) throws IOException {
@@ -40,6 +41,7 @@ class BuildExecutorDefault implements BuildExecutor {
         this.callback = callback;
         this.cache = cache;
         this.aggregate = aggregate;
+        this.dryRun = dryRun;
         this.permits = permits;
         this.location = location;
         this.inherited = inherited;
@@ -148,7 +150,64 @@ class BuildExecutorDefault implements BuildExecutor {
                         location + identity,
                         new LinkedHashSet<>(summaries.keySet()));
                 boolean cacheRemotely = step.shouldCacheRemotely();
-                if (!consistent || step.shouldRun(arguments)) {
+                List<String> waiting = summaries.entrySet().stream()
+                        .filter(entry -> entry.getValue().pending())
+                        .map(Map.Entry::getKey)
+                        .toList();
+                if (!consistent || !waiting.isEmpty() || step.shouldRun(arguments)) {
+                    List<String> reasons = new ArrayList<>();
+                    if (!exists) {
+                        reasons.add("it never ran");
+                    }
+                    for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
+                        StepSummary summary = summaries.get(entry.getKey());
+                        if (summary != null && summary.pending()) {
+                            continue;
+                        }
+                        Map<Path, Checksum> files = entry.getValue().files();
+                        if (!consistent && summary != null) {
+                            Path checksums = previous.argument(entry.getKey());
+                            files = Files.exists(checksums)
+                                    ? Checksum.diff(HashFunction.read(checksums), summary.checksums(), hash)
+                                    : Map.of();
+                        }
+                        Map<ChecksumStatus, List<String>> changed = new EnumMap<>(ChecksumStatus.class);
+                        files.forEach((file, checksum) -> {
+                            if (checksum.status() != ChecksumStatus.RETAINED) {
+                                changed.computeIfAbsent(checksum.status(), _ -> new ArrayList<>())
+                                        .add(file.toString().replace(File.separatorChar, '/'));
+                            }
+                        });
+                        if (!changed.isEmpty()) {
+                            reasons.add((entry.getKey().startsWith(":")
+                                    ? BuildExecutorModule.decode(entry.getKey().substring(1)).replace(File.separatorChar, '/')
+                                    : entry.getKey()) + " " + changed.entrySet().stream()
+                                    .map(change -> change.getValue().size() == 1
+                                            ? change.getKey().name().toLowerCase(Locale.ROOT) + " " + change.getValue().getFirst()
+                                            : change.getValue().size() + " " + change.getKey().name().toLowerCase(Locale.ROOT)
+                                            + " (" + change.getValue().getFirst() + ", ...)")
+                                    .collect(Collectors.joining(", ")));
+                        }
+                    }
+                    if (exists && !consistent) {
+                        reasons.add(record.reason());
+                    }
+                    boolean certain = !reasons.isEmpty() || waiting.isEmpty();
+                    if (!waiting.isEmpty()) {
+                        reasons.add((certain ? "it runs after " : "it may run after ")
+                                + String.join(", ", waiting.subList(0, Math.min(3, waiting.size())))
+                                + (waiting.size() > 3 ? " and " + (waiting.size() - 3) + " more" : ""));
+                    }
+                    if (reasons.isEmpty()) {
+                        reasons.add("it runs every time");
+                    }
+                    if (dryRun) {
+                        callback.pending(location + identity, reasons, certain);
+                        return CompletableFuture.completedStage(Map.of(identity, Map.of(
+                                identity,
+                                new StepSummary(previous.output(), record.checksums(), true))));
+                    }
+                    callback.outdated(location + identity, reasons);
                     Path next = target.resolve(identity + "~");
                     if (Files.exists(next)) {
                         Files.walkFileTree(next, new RecursiveFolderDeletion(null));
@@ -257,13 +316,15 @@ class BuildExecutorDefault implements BuildExecutor {
                         return CompletableFuture.failedStage(wrapped);
                     }, executor);
                 } else {
-                    for (String key : vanished.keySet()) {
-                        Files.deleteIfExists(previous.argument(key));
-                    }
                     completion.accept(false, null);
-                    try {
-                        cache.touch(executor, location + identity, currentStepHash, inputs, cacheRemotely);
-                    } catch (IOException _) {
+                    if (!dryRun) {
+                        for (String key : vanished.keySet()) {
+                            Files.deleteIfExists(previous.argument(key));
+                        }
+                        try {
+                            cache.touch(executor, location + identity, currentStepHash, inputs, cacheRemotely);
+                        } catch (IOException _) {
+                        }
                     }
                     return CompletableFuture.completedStage(Map.of(identity, Map.of(
                             identity,
@@ -334,10 +395,26 @@ class BuildExecutorDefault implements BuildExecutor {
                             callback,
                             cache,
                             aggregate,
+                            dryRun,
                             permits,
                             location + prefix + "/",
                             inherited);
-                    module.accept(buildExecutor, folders);
+                    try {
+                        module.accept(buildExecutor, folders);
+                    } catch (Throwable t) {
+                        List<String> waiting = inherited.entrySet().stream()
+                                .filter(entry -> entry.getValue().pending())
+                                .map(entry -> entry.getKey().substring(BuildExecutorModule.PREVIOUS.length()))
+                                .toList();
+                        if (!dryRun || waiting.isEmpty()) {
+                            throw t;
+                        }
+                        callback.unresolved(location + prefix, "it resolves only once " + String.join(", ", waiting)
+                                + (waiting.size() == 1 ? " has" : " have") + " run: " + t.getMessage());
+                        return CompletableFuture.completedStage(Map.of(prefix, Map.of(
+                                prefix,
+                                new StepSummary(null, Map.of(), true))));
+                    }
                     resolution.accept(null);
                     return buildExecutor.doExecute(executor, selectors).thenComposeAsync(results -> {
                         try {
@@ -592,9 +669,13 @@ class BuildExecutorDefault implements BuildExecutor {
                                 } else {
                                     int index = dependency.indexOf('/');
                                     if (index != -1) {
-                                        StepSummary summary = summaries.getOrDefault(
+                                        Map<String, StepSummary> resolved = summaries.getOrDefault(
                                                 dependency.substring(0, index),
-                                                Map.of()).get(dependency);
+                                                Map.of());
+                                        StepSummary summary = resolved.get(dependency);
+                                        if (summary == null && dryRun) {
+                                            summary = resolved.get(dependency.substring(0, index));
+                                        }
                                         if (summary == null) {
                                             throw new IllegalArgumentException("Did not find dependency: " + dependency);
                                         }
@@ -722,7 +803,11 @@ class BuildExecutorDefault implements BuildExecutor {
     private record Registration(Bound bound, SequencedSet<String> preliminaries, Map<String, String> dependencies) {
     }
 
-    private record StepSummary(Path folder, Map<Path, byte[]> checksums) {
+    private record StepSummary(Path folder, Map<Path, byte[]> checksums, boolean pending) {
+
+        private StepSummary(Path folder, Map<Path, byte[]> checksums) {
+            this(folder, checksums, false);
+        }
     }
 
     private record StepFolder(Path path, Path checksum, Path output, Path stepFile, Path outputChecksums) {
@@ -759,9 +844,9 @@ class BuildExecutorDefault implements BuildExecutor {
         }
     }
 
-    private record StepRecord(Map<Path, byte[]> checksums, boolean consistent) {
+    private record StepRecord(Map<Path, byte[]> checksums, boolean consistent, String reason) {
 
-        private static final StepRecord INCOMPLETE = new StepRecord(Map.of(), false);
+        private static final StepRecord INCOMPLETE = new StepRecord(Map.of(), false, "its last run did not complete");
     }
 
     private StepRecord completed(StepFolder folder, byte[] step, Executor executor) {
@@ -771,10 +856,12 @@ class BuildExecutorDefault implements BuildExecutor {
         try {
             String serialization = SequencedProperties.ofFiles(folder.stepFile()).getProperty("serialization");
             if (serialization == null || !Arrays.equals(step, HexFormat.of().parseHex(serialization))) {
-                return StepRecord.INCOMPLETE;
+                return new StepRecord(Map.of(), false, "its definition changed");
             }
             Map<Path, byte[]> checksums = HashFunction.read(folder.outputChecksums());
-            return new StepRecord(checksums, HashFunction.areConsistent(folder.output(), checksums, hash, executor));
+            return HashFunction.areConsistent(folder.output(), checksums, hash, executor)
+                    ? new StepRecord(checksums, true, null)
+                    : new StepRecord(checksums, false, "its output changed since it ran");
         } catch (IOException | IllegalArgumentException _) {
             return StepRecord.INCOMPLETE;
         }

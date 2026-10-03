@@ -19,6 +19,15 @@ public interface BuildExecutorCallback {
         };
     }
 
+    default void outdated(String identity, List<String> reasons) {
+    }
+
+    default void pending(String identity, List<String> reasons, boolean certain) {
+    }
+
+    default void unresolved(String identity, String reason) {
+    }
+
     default void loaded(String identity, long duration) {
     }
 
@@ -31,13 +40,34 @@ public interface BuildExecutorCallback {
     }
 
     static BuildExecutorCallback printing(Consumer<String> out, boolean verbose, boolean cache, Path target) {
+        return printing(out, verbose, cache, false, target);
+    }
+
+    static BuildExecutorCallback printing(Consumer<String> out,
+                                          boolean verbose,
+                                          boolean cache,
+                                          boolean changes,
+                                          Path target) {
         return new BuildExecutorCallback() {
+
+            private final AtomicInteger skipped = new AtomicInteger(), certain = new AtomicInteger(), possible = new AtomicInteger();
+
             @Override
             public BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys) {
                 long started = System.nanoTime();
                 if (identity == null) {
                     out.accept("%s%-11s%s Building in '%s'...".formatted(GREEN, "[STARTED]", RESET, target));
+                    skipped.set(0);
+                    certain.set(0);
+                    possible.set(0);
                     return (_, throwable) -> {
+                        if (certain.get() + possible.get() > 0) {
+                            out.accept("%s%-11s%s %d %s, %d more may run after %s, and %d %s up to date".formatted(
+                                    YELLOW, "[PENDING]", RESET,
+                                    certain.get(), certain.get() == 1 ? "step runs" : "steps run",
+                                    possible.get(), certain.get() == 1 ? "it" : "them",
+                                    skipped.get(), skipped.get() == 1 ? "is" : "are"));
+                        }
                         double time = ((double) (System.nanoTime() - started) / 1_000_000) / 1_000;
                         out.accept("%s%-11s%s Finished %sin %.2f seconds%s".formatted(
                                 throwable == null ? GREEN : RED,
@@ -76,6 +106,7 @@ public interface BuildExecutorCallback {
                             }
                         }
                     } else {
+                        skipped.incrementAndGet();
                         out.accept("%s%-11s%s %s".formatted(BLUE, "[SKIPPED]", RESET, identity));
                     }
                 };
@@ -91,6 +122,24 @@ public interface BuildExecutorCallback {
                                 GREEN, "[RESOLVED]", RESET, identity, CYAN, time, RESET));
                     }
                 };
+            }
+
+            @Override
+            public void outdated(String identity, List<String> reasons) {
+                if (changes) {
+                    out.accept("%s%-11s%s %s: %s".formatted(YELLOW, "[CHANGED]", RESET, identity, String.join("; ", reasons)));
+                }
+            }
+
+            @Override
+            public void pending(String identity, List<String> reasons, boolean certain) {
+                (certain ? this.certain : possible).incrementAndGet();
+                out.accept("%s%-11s%s %s: %s".formatted(YELLOW, "[PENDING]", RESET, identity, String.join("; ", reasons)));
+            }
+
+            @Override
+            public void unresolved(String identity, String reason) {
+                out.accept("%s%-11s%s %s: %s".formatted(YELLOW, "[PENDING]", RESET, identity, reason));
             }
 
             @Override
