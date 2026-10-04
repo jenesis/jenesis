@@ -952,8 +952,12 @@ public record Project(
                     sources, which the compiler never copies into the artifact, unless folders=<paths>
                     names other folders; each reads only the file kinds it compiles.
 
-                      packaging.properties      jmod/jlink/bundle/launcher/native booleans, jpackage=<type>,
-                                                docker=<image> with docker.label.<name>=<value> lines
+                      packaging.properties      jmod/jlink/bundle/launcher/native booleans,
+                                                jpackage=<type>[,<type>...] packaging and staging each,
+                                                docker=<image> with docker.label.<name>=<value> lines,
+                                                docker.jpackage=app-image|deb|rpm to put that jpackage
+                                                package into the image instead of the jars, built
+                                                and staged only if jpackage lists it too
                       test.properties           framework=junit-platform|junit4|testng, naming what
                                                 this module's tests are written against; absent, it is
                                                 inferred from the resolved dependencies

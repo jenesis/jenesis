@@ -121,8 +121,7 @@ public class InferredMultiProjectAssemblerTest {
                 license.own.name=A licence of our own
                 """);
         Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        assertThat(readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"))
-                .getProperty("--linux-rpm-license-type"))
+        assertThat(formatted(prepareOutput, "rpm").getProperty("--linux-rpm-license-type"))
                 .as("RPM expects SPDX identifiers, so a licence without one leaves the field to jpackage")
                 .isNull();
     }
@@ -153,8 +152,40 @@ public class InferredMultiProjectAssemblerTest {
                 organization.name=Example Ltd
                 copyright=Copyright 2020 Example Ltd
                 """);
-        Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
-        return readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"));
+        return formatted(fixture.execute("sub/prepare").get("sub/prepare"), type);
+    }
+
+    private static SequencedProperties formatted(Path prepareOutput, String type) throws IOException {
+        SequencedProperties properties = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage.properties"));
+        Path typed = prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("jpackage-" + type + ".properties");
+        if (Files.isRegularFile(typed)) {
+            SequencedProperties.ofFiles(typed).forEachProperty(properties::setProperty);
+        }
+        return properties;
+    }
+
+    @Test
+    public void describes_every_format_in_options_of_its_own() throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"),
+                "jpackage=app-image, deb\ndocker=example:latest\ndocker.jpackage=rpm\n");
+        Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), """
+                artifact=demo
+                url=https://example.com/demo
+                developer.dev.email=dev@example.com
+                license.mit.name=MIT
+                """);
+        Path process = fixture.execute("sub/prepare").get("sub/prepare").resolve(ProcessBuildStep.PROCESS);
+        assertThat(readProperties(process.resolve("jpackage.properties")).stringPropertyNames())
+                .as("what one format takes and another refuses stays out of the options every format reads")
+                .contains("--name")
+                .doesNotContain("--about-url", "--linux-deb-maintainer", "--linux-rpm-license-type");
+        assertThat(process.resolve("jpackage-app-image.properties")).doesNotExist();
+        assertThat(readProperties(process.resolve("jpackage-deb.properties")).stringPropertyNames())
+                .containsExactlyInAnyOrder("--about-url", "--linux-deb-maintainer");
+        assertThat(readProperties(process.resolve("jpackage-rpm.properties")).stringPropertyNames())
+                .as("the format the image installs is described like any other")
+                .containsExactlyInAnyOrder("--about-url", "--linux-rpm-license-type");
     }
 
     @Test
@@ -309,6 +340,74 @@ public class InferredMultiProjectAssemblerTest {
         assertThatThrownBy(() -> fixture.execute("package/docker"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("without docker=<image>");
+    }
+
+    @Test
+    public void a_process_command_file_for_one_format_reaches_that_format_alone() throws IOException {
+        Fixture fixture = setUp("main=com.example.Entry\n", false, false, false, "app-image,deb");
+        Files.writeString(fixture.configuration().resolve("process-jpackage-deb.properties"), "--linux-app-release=3\n");
+        Path process = fixture.execute("sub/prepare").get("sub/prepare").resolve(ProcessBuildStep.PROCESS);
+        assertThat(readProperties(process.resolve("jpackage-deb.properties")).getProperty("--linux-app-release")).isEqualTo("3");
+        assertThat(readProperties(process.resolve("jpackage.properties")).getProperty("--linux-app-release")).isNull();
+    }
+
+    @Test
+    public void packages_every_listed_jpackage_format_and_stages_them_together() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false, "app-image,deb");
+        assertThat(fixture.execute("package/jpackage"))
+                .containsKeys("package/jpackage-app-image", "package/jpackage-deb", "package/jpackage");
+    }
+
+    @Test
+    public void docker_jpackage_packages_its_format_beside_the_staged_ones() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"),
+                "jpackage=deb\ndocker=example:latest\ndocker.jpackage=app-image\n");
+        assertThat(fixture.execute("package/docker"))
+                .as("the image is handed an app-image of its own, which is not staged as an installer is")
+                .containsKeys("package/jpackage-app-image", "package/docker")
+                .doesNotContainKey("package/jpackage");
+        assertThat(fixture.execute("package/jpackage"))
+                .doesNotContainKey("package/jpackage-app-image");
+    }
+
+    @Test
+    public void docker_jpackage_alone_stages_no_package() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"),
+                "docker=example:latest\ndocker.jpackage=app-image\n");
+        assertThat(fixture.execute("package/docker")).containsKey("package/jpackage-app-image");
+        assertThatThrownBy(() -> fixture.execute("package/jpackage"))
+                .rootCause()
+                .hasMessageStartingWith("Unknown selector: jpackage - ");
+    }
+
+    @Test
+    public void docker_jpackage_reuses_a_listed_format() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"),
+                "jpackage=app-image,deb\ndocker=example:latest\ndocker.jpackage=deb\n");
+        assertThat(fixture.execute("package/docker"))
+                .containsKeys("package/jpackage-deb", "package/docker")
+                .doesNotContainKey("package/jpackage-app-image");
+    }
+
+    @Test
+    public void refuses_docker_jpackage_without_the_image_it_is_installed_onto() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"), "jpackage=app-image\ndocker.jpackage=app-image\n");
+        assertThatThrownBy(() -> fixture.execute("package/jpackage"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("docker.jpackage without docker=<image>");
+    }
+
+    @Test
+    public void refuses_a_docker_jpackage_format_that_a_linux_image_cannot_run() throws IOException {
+        Fixture fixture = setUp("path=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("packaging.properties"), "docker=example:latest\ndocker.jpackage=msi\n");
+        assertThatThrownBy(() -> fixture.execute("package/docker"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("docker.jpackage=msi");
     }
 
     @Test
