@@ -16,7 +16,7 @@ import build.jenesis.Verification;
 import build.jenesis.maven.MavenDependencyKey;
 import build.jenesis.maven.MavenRepository;
 
-public class Signatures extends ProcessBuildStep implements ProcessBuildStep.Environmental {
+public class Signatures extends EnvironmentalProcessBuildStep {
 
     private static final String STATUS = "[GNUPG:] ";
     private static final List<String> VERIFY = List.of("--status-fd", "1");

@@ -5,6 +5,7 @@ import module org.junit.jupiter.api;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.step.EnvironmentalProcessBuildStep;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -129,7 +130,7 @@ public class ProcessBuildStepTest {
                 .as("a tool sharing the build's JVM cannot be handed variables of its own")
                 .rootCause()
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("[SAMPLE] to probe, which takes no environment");
+                .hasMessageContaining("[SAMPLE] to probe, which runs through the Tools API");
     }
 
     @Test
@@ -332,7 +333,7 @@ public class ProcessBuildStepTest {
         }
     }
 
-    private static class Program extends ProcessBuildStep implements ProcessBuildStep.Environmental {
+    private static class Program extends EnvironmentalProcessBuildStep {
 
         private final List<String> configurations, processed;
 
