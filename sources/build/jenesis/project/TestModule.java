@@ -821,7 +821,26 @@ public class TestModule implements BuildExecutorModule {
                             .map(BuildStepArgument::folder)
                             .iterator())
                     .orElseThrow(() -> new IllegalArgumentException("No test framework found"));
-            List<TestSpec> specs = TestSpec.parse(filter);
+            String path = null;
+            for (BuildStepArgument argument : arguments.values()) {
+                if (argument.removed()) {
+                    continue;
+                }
+                Path module = argument.folder().resolve(BuildStep.MODULE);
+                if (Files.isRegularFile(module)) {
+                    path = SequencedProperties.ofFiles(module).getProperty("path");
+                    break;
+                }
+            }
+            List<TestSpec> requested = TestSpec.parse(filter), specs = new ArrayList<>();
+            for (TestSpec spec : requested) {
+                if (spec.module() == null || spec.module().equals(path)) {
+                    specs.add(spec);
+                }
+            }
+            if (!requested.isEmpty() && specs.isEmpty()) {
+                return CompletableFuture.completedFuture(null);
+            }
             TestTags tags = TestTags.parse(tag);
             List<TestTags> ran = ran(context, arguments);
             List<String> commands = new ArrayList<>();
@@ -1147,7 +1166,7 @@ public class TestModule implements BuildExecutorModule {
 
     }
 
-    private record TestSpec(Pattern classPattern, String method) {
+    private record TestSpec(String module, Pattern classPattern, String method) {
 
         static List<TestSpec> parse(String spec) {
             if (spec == null || spec.isBlank()) {
@@ -1160,13 +1179,11 @@ public class TestModule implements BuildExecutorModule {
                     continue;
                 }
                 int separator = trimmed.indexOf('#');
-                if (separator < 0) {
-                    result.add(new TestSpec(Pattern.compile(trimmed), null));
-                } else {
-                    result.add(new TestSpec(
-                            Pattern.compile(trimmed.substring(0, separator)),
-                            trimmed.substring(separator + 1)));
-                }
+                String selection = separator < 0 ? trimmed : trimmed.substring(0, separator);
+                int slash = selection.lastIndexOf('/');
+                result.add(new TestSpec(slash < 0 ? null : selection.substring(0, slash),
+                        Pattern.compile(selection.substring(slash + 1)),
+                        separator < 0 ? null : trimmed.substring(separator + 1)));
             }
             return result;
         }
