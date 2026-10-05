@@ -58,7 +58,7 @@ Switch the transform off and the inspection refuses the build:
 Layout
 ------
 
-    demo/demo-58-project-plugins
+    demo/demo-59-project-plugins
     |-- build/jenesis                          symlink to ../../../sources/build/jenesis
     |-- build.jenesis/plugin-zip.properties    name=demo-app
     |-- legal/HEADER.txt                       the licence line the notice carries

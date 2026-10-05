@@ -22,7 +22,7 @@ launches the built module, printing the greeting the plugin generated:
 Layout
 ------
 
-    demo/demo-57-external-module
+    demo/demo-58-external-module
     |-- build/jenesis                 symlink to ../../../sources/build/jenesis
     |-- build/Demo.java               publishes the plugin, then builds and runs
     |-- jenesis.plugins.properties    greeting+binary/generated=demo.plugin@greeting
@@ -70,7 +70,7 @@ the plugin, `plugin-greeting`, so the build runs under
 Isolating the build module's Jenesis
 ------------------------------------
 
-Just as in `../demo-56-internal-module`, the resolved build module is loaded into
+Just as in `../demo-57-internal-module`, the resolved build module is loaded into
 its **own `ModuleLayer` with its own class loader** carrying its own
 `build.jenesis`, bridged to the host across class loaders so the two Jenesis
 copies never clash and the module may pin a different version. The build module
