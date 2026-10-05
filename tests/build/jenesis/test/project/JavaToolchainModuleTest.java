@@ -16,6 +16,7 @@ import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.project.JavaToolchainModule;
 import build.jenesis.project.TestModule;
+import build.jenesis.step.ClassPathCompatibility;
 import sample.Sample;
 import build.jenesis.Environment;
 
@@ -231,6 +232,105 @@ public class JavaToolchainModuleTest {
                     .isEqualTo("other/SampleTest.class");
             assertThat(inputStream.getNextJarEntry()).isNull();
         }
+    }
+
+    @Test
+    public void class_path_compatibility_names_each_provider_in_a_service_file() throws IOException {
+        tool("public Tool() { }");
+        buildExecutor.addSource("input", input);
+        buildExecutor.addModule("output", new JavaToolchainModule()
+                .classpath(new ClassPathCompatibility().asModule("services")), "input");
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        try (JarFile jar = new JarFile(steps.get("output/artifacts")
+                .resolve(BuildStep.ARTIFACTS)
+                .resolve("classes.jar")
+                .toFile())) {
+            JarEntry entry = jar.getJarEntry("META-INF/services/java.util.spi.ToolProvider");
+            assertThat(entry).as("a class-path ServiceLoader finds the provider the module-info declares").isNotNull();
+            try (InputStream inputStream = jar.getInputStream(entry)) {
+                assertThat(new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("other.Tool\n");
+            }
+            assertThat(jar.getJarEntry("module-info.class")).isNotNull();
+        }
+    }
+
+    @Test
+    public void class_path_compatibility_refuses_a_provider_the_class_path_cannot_create() throws IOException {
+        tool("private Tool() { } public static Tool provider() { return new Tool(); }");
+        buildExecutor.addSource("input", input);
+        buildExecutor.addModule("output", new JavaToolchainModule()
+                .classpath(new ClassPathCompatibility().asModule("services")), "input");
+        assertThatThrownBy(buildExecutor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("provides java.util.spi.ToolProvider with other.Tool")
+                .hasMessageContaining("public constructor taking no arguments");
+    }
+
+    @Test
+    public void class_path_compatibility_refuses_a_service_file_the_module_ships_itself() throws IOException {
+        tool("public Tool() { }");
+        Files.writeString(Files.createDirectories(input.resolve(BuildStep.RESOURCES + "META-INF/services"))
+                .resolve("java.util.spi.ToolProvider"), "other.Tool\n");
+        buildExecutor.addSource("input", input);
+        buildExecutor.addModule("output", new JavaToolchainModule()
+                .classpath(new ClassPathCompatibility().asModule("services")), "input");
+        assertThatThrownBy(buildExecutor::execute)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ships META-INF/services/java.util.spi.ToolProvider");
+    }
+
+    @Test
+    public void class_path_compatibility_enables_native_access_a_module_grants_itself() throws IOException {
+        tool("public Tool() { }");
+        Files.writeString(input.resolve("manifest.mf"), "Manifest-Version: 1.0\nJenesis-Native-Access: demo.tools\n");
+        buildExecutor.addSource("input", input);
+        buildExecutor.addModule("output", new JavaToolchainModule()
+                .classpath(new ClassPathCompatibility().asModule("services")), "input");
+        SequencedMap<String, Path> steps = buildExecutor.execute();
+        try (JarFile jar = new JarFile(steps.get("output/artifacts")
+                .resolve(BuildStep.ARTIFACTS)
+                .resolve("classes.jar")
+                .toFile())) {
+            assertThat(jar.getManifest().getMainAttributes().getValue("Enable-Native-Access"))
+                    .as("java -jar grants the class path what the module path grants the module by name")
+                    .isEqualTo("ALL-UNNAMED");
+        }
+        assertThat(root.resolve("output/classpath/services/output/manifest.mf")).isRegularFile();
+    }
+
+    @Test
+    public void class_path_compatibility_keeps_a_native_access_the_module_sets_itself() throws IOException {
+        tool("public Tool() { }");
+        Files.writeString(input.resolve("manifest.mf"),
+                "Manifest-Version: 1.0\nJenesis-Native-Access: demo.tools\nEnable-Native-Access: ALL-UNNAMED\n");
+        buildExecutor.addSource("input", input);
+        buildExecutor.addModule("output", new JavaToolchainModule()
+                .classpath(new ClassPathCompatibility().asModule("services")), "input");
+        buildExecutor.execute();
+        assertThat(root.resolve("output/classpath/services/output/manifest.mf"))
+                .as("an attribute another input sets already is not written again")
+                .doesNotExist();
+    }
+
+    private void tool(String constructor) throws IOException {
+        Path sources = Files.createDirectories(input.resolve(BuildStep.SOURCES + "other"));
+        Files.writeString(input.resolve(BuildStep.SOURCES + "module-info.java"), """
+                module demo.tools {
+                    provides java.util.spi.ToolProvider with other.Tool;
+                }
+                """);
+        Files.writeString(sources.resolve("Tool.java"), """
+                package other;
+                public class Tool implements java.util.spi.ToolProvider {
+                    %s
+                    public String name() { return "tool"; }
+                    public int run(java.io.PrintWriter out, java.io.PrintWriter err, String... arguments) {
+                        return 0;
+                    }
+                }
+                """.formatted(constructor));
     }
 
     private static final BuildExecutorModule TRANSFORMER = ((BuildStep) (_, context, arguments) -> {
