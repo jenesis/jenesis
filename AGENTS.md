@@ -287,7 +287,7 @@ Steps compose by folder conventions - `sources/`, `classes/`, `artifacts/` - nev
 names. A step that forks a JDK tool extends `ProcessBuildStep` and thereby accepts `process-<tool>.properties`.
 A forked process is handed the platform's own variables (`PATH`, `HOME`, `LANG`, `TMPDIR`, Windows' `SystemRoot`
 and its kin) and nothing else of the build's environment, because a variable is no input of its step. A step that
-runs a program - `java`, the tests, an external binary - implements `ProcessBuildStep.Environmental` and so also
+runs a program - `java`, the tests, an external binary - extends `EnvironmentalProcessBuildStep` and so also
 accepts `environment-<tool>.properties`, whose variables it is handed beyond those, and one whose contract is a
 variable, as JReleaser's credentials are, names it in `inherits`. A JDK tool such as `javac` takes none: it may run
 in the build's own JVM, which no environment reaches. The program `Execute` or `jpx` runs is no step but what the

@@ -13,6 +13,7 @@ import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Dependencies;
+import build.jenesis.step.EnvironmentalProcessBuildStep;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -144,7 +145,7 @@ public class PiTestModule implements BuildExecutorModule {
         }
     }
 
-    private static class Mutate extends ProcessBuildStep implements ProcessBuildStep.Environmental {
+    private static class Mutate extends EnvironmentalProcessBuildStep {
 
         private final String tool;
         private final String group;

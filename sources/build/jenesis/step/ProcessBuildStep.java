@@ -41,13 +41,6 @@ public abstract class ProcessBuildStep implements BuildStep {
         this.terms = terms;
     }
 
-    public interface Environmental {
-
-        default boolean inherits(String variable) {
-            return false;
-        }
-    }
-
     public record Terms(BiConsumer<Boolean, String> printing, Semaphore permits, Consumer<String> announcing) {
 
         public static Terms of(String command) {
@@ -107,6 +100,34 @@ public abstract class ProcessBuildStep implements BuildStep {
 
     protected ProcessHandler handler(BuildStepContext context, List<String> commands) throws IOException {
         return factory.apply(commands);
+    }
+
+    protected ProcessHandler environment(ProcessHandler handler, SequencedMap<String, BuildStepArgument> arguments)
+            throws IOException {
+        SequencedMap<String, String> variables = variables(arguments);
+        if (!variables.isEmpty()) {
+            throw new IllegalStateException("An environment file hands " + variables.keySet() + " to " + command
+                    + ", which takes no environment: only a program the build runs in a process of its own does"
+                    + " - java, the tests, PIT, native-image, gpgv and jreleaser");
+        }
+        return handler;
+    }
+
+    protected SequencedMap<String, String> variables(SequencedMap<String, BuildStepArgument> arguments)
+            throws IOException {
+        SequencedMap<String, String> variables = new LinkedHashMap<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            for (String name : configurations()) {
+                Path file = argument.folder().resolve(ENVIRONMENT + name + ".properties");
+                if (Files.exists(file)) {
+                    SequencedProperties.ofFiles(file).forEachProperty(variables::put);
+                }
+            }
+        }
+        return variables;
     }
 
     protected int execute(ProcessHandler handler, Path output, Path error, ProcessHandler.Tee tee)
@@ -197,41 +218,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                 List<String> commands = prepended(properties);
                 commands.addAll(processed);
                 Path output = context.supplement().resolve("output"), error = context.supplement().resolve("error");
-                SequencedMap<String, String> variables = new LinkedHashMap<>();
-                for (BuildStepArgument argument : arguments.values()) {
-                    if (argument.removed()) {
-                        continue;
-                    }
-                    for (String name : configurations()) {
-                        Path file = argument.folder().resolve(ENVIRONMENT + name + ".properties");
-                        if (Files.exists(file)) {
-                            SequencedProperties.ofFiles(file).forEachProperty(variables::put);
-                        }
-                    }
-                }
-                ProcessHandler created = handler(context, commands), handler;
-                if (this instanceof Environmental environmental
-                        && created instanceof ProcessHandler.OfProcess process) {
-                    SortedMap<String, String> environment = new TreeMap<>(process.environment());
-                    System.getenv().forEach((name, value) -> {
-                        if (environmental.inherits(name)) {
-                            environment.put(name, value);
-                        }
-                    });
-                    variables.forEach((name, value) -> {
-                        String resolved = value.isEmpty() ? System.getenv(name) : value;
-                        if (resolved != null) {
-                            environment.put(name, resolved);
-                        }
-                    });
-                    handler = process.environment(environment);
-                } else if (variables.isEmpty()) {
-                    handler = created;
-                } else {
-                    throw new IllegalStateException("An environment file hands " + variables.keySet() + " to "
-                            + command + ", which takes no environment: only a program the build runs in a process of"
-                            + " its own does - java, the tests, PIT, native-image, gpgv and jreleaser");
-                }
+                ProcessHandler handler = environment(handler(context, commands), arguments);
                 Files.writeString(context.supplement().resolve("command"), String.join(" ", handler.commands()));
                 ProcessHandler.Tee tee = tee(executor, handler);
                 Consumer<String> announcing = terms.announcing();
