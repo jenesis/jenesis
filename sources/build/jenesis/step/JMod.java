@@ -8,7 +8,9 @@ import build.jenesis.Environment;
 
 public class JMod extends ProcessBuildStep {
 
-    public static final String JMODS = "jmods/", CONFIG = "jmodconfig/", LIBRARIES = "jmodlibs/",
+    public static final String JMODS = "jmods/",
+            CONFIG = "jmodconfig/",
+            LIBRARIES = "jmodlibs/",
             COMMANDS = "jmodcmds/";
 
     private final OffsetDateTime timestamp;
@@ -47,7 +49,10 @@ public class JMod extends ProcessBuildStep {
                                                     SequencedMap<String, BuildStepArgument> arguments,
                                                     SequencedMap<String, SequencedMap<String, String>> properties)
             throws IOException {
-        List<String> classPath = new ArrayList<>(), config = new ArrayList<>(), libs = new ArrayList<>(), cmds = new ArrayList<>(),
+        List<String> classPath = new ArrayList<>(),
+                config = new ArrayList<>(),
+                libs = new ArrayList<>(),
+                cmds = new ArrayList<>(),
                 legal = new ArrayList<>();
         String moduleName = null;
         for (BuildStepArgument argument : arguments.values()) {

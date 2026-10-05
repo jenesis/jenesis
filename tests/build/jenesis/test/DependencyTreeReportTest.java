@@ -54,7 +54,10 @@ public class DependencyTreeReportTest {
                 new Resolver.Edge(null, "maven/g/a/1.0", "1.0", "compile", true),
                 new Resolver.Edge("maven/g/a/1.0", "maven/g/b/2.0", "2.0", "compile", true),
                 new Resolver.Edge(null, "maven/g/b/2.0", "2.0", "compile", false)),
-                vertices), "module/greeter", "compile", new Resolver.Vertex("1.0", "greeter", false, true,
+                vertices), "module/greeter", "compile", new Resolver.Vertex("1.0",
+                "greeter",
+                false,
+                true,
                 List.of(new License(null, null, "Apache-2.0", null))));
         assertThat(output().lines().toList()).containsSequence(
                 "module/greeter 1.0 [compile] (module greeter, local) {Apache-2.0}",
@@ -201,12 +204,21 @@ public class DependencyTreeReportTest {
     @Test
     public void summary_aggregates_licenses_permissiveness_and_module_kinds() {
         SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
-        vertices.put("maven/g/a", new Resolver.Vertex("1.0", "g.a", false,
-                false, List.of(new License("Apache-2.0", "permissive", "Apache License 2.0", null))));
-        vertices.put("maven/g/b", new Resolver.Vertex("1.0", "g.b", true,
-                false, List.of(new License("Apache-2.0", "permissive", "Apache License 2.0", null))));
-        vertices.put("maven/g/c", new Resolver.Vertex("1.0", null, false,
-                false, List.of(new License("GPL-3.0-only", "strong-copyleft", "GNU GPL v3", null))));
+        vertices.put("maven/g/a", new Resolver.Vertex("1.0",
+                "g.a",
+                false,
+                false,
+                List.of(new License("Apache-2.0", "permissive", "Apache License 2.0", null))));
+        vertices.put("maven/g/b", new Resolver.Vertex("1.0",
+                "g.b",
+                true,
+                false,
+                List.of(new License("Apache-2.0", "permissive", "Apache License 2.0", null))));
+        vertices.put("maven/g/c", new Resolver.Vertex("1.0",
+                null,
+                false,
+                false,
+                List.of(new License("GPL-3.0-only", "strong-copyleft", "GNU GPL v3", null))));
         vertices.put("maven/g/d", new Resolver.Vertex("1.0", null, false, false, List.of()));
         report.summary(vertices);
         String text = output();

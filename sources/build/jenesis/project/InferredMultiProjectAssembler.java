@@ -300,7 +300,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     Stream.of(descriptor.sources().stream(), descriptor.spdx().stream(), descriptor.manifests().stream())
                             .flatMap(Function.identity()));
             if (sbom != null) {
-                sub.addStep("sbom", sbom,
+                sub.addStep("sbom",
+                        sbom,
                         Stream.of(descriptor.manifests().stream(),
                                         descriptor.artifacts().stream(),
                                         descriptor.sources().stream(),
@@ -308,7 +309,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                         descriptor.spdx().stream())
                                 .flatMap(Function.identity()));
             }
-            sub.addModule("compliance", compliance.apply(InferredComplianceModule.ofEnvironment(environment, descriptor.configuration())
+            sub.addModule("compliance",
+                          compliance.apply(InferredComplianceModule.ofEnvironment(environment, descriptor.configuration())
                             .custom(hooks.getOrDefault("compliance", none))),
                           Stream.concat(descriptor.manifests().stream(), descriptor.artifacts().stream()));
             InferredJavaToolchainModule toolchainModule = InferredJavaToolchainModule.ofEnvironment(environment,
@@ -341,7 +343,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 resources.forEach((target, source) -> bound.put(Path.of(BuildStep.RESOURCES).resolve(target), source));
                 sub.addModule("include", Bind.asInputs(new LinkedHashMap<>(Map.of("resources", bound))));
             }
-            sub.addModule("binary", toolchain.apply(toolchainModule),
+            sub.addModule("binary",
+                    toolchain.apply(toolchainModule),
                     Stream.of(
                             Stream.of("prepare"),
                             inputs(descriptor, closure),
@@ -371,7 +374,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 if (module != null) {
                     SequencedProperties properties = SequencedProperties.ofFiles(module);
                     if (properties.getProperty("test") != null && !properties.flag("abstract")) {
-                        sub.addModule("observed", observe.apply(
+                        sub.addModule("observed",
+                                observe.apply(
                                 InferredTestObservationModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
                                         .pinning(descriptor.pinning())
                                         .pathPlacement(descriptor.pathPlacement())
@@ -383,7 +387,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
             }
             if (descriptor.source()) {
-                sub.addModule("sources", (module, inherited) ->
+                sub.addModule("sources",
+                        (module, inherited) ->
                         module.addStep("archive",
                                 Jar.ofEnvironment(environment, factory, Jar.Sort.SOURCES),
                                 inherited.sequencedKeySet()),
@@ -509,7 +514,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 }
                 if (packaging.nativeImage()) {
                     sub.addStep("reachability", new NativeImageMetadata(), inputs);
-                    sub.addStep("native-image", NativeImage.ofEnvironment(environment, descriptor.pathPlacement()),
+                    sub.addStep("native-image",
+                                NativeImage.ofEnvironment(environment, descriptor.pathPlacement()),
                                 Stream.concat(inputs.stream(), Stream.of("reachability")));
                     if (sbom == null) {
                         images.add("native-image");
@@ -842,8 +848,10 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     jpackage.setProperty("--app-version", version);
                 }
                 if (described != null) {
-                    String description = described.value("description"), url = described.value("url"),
-                            vendor = described.value("organization.name"), copyright = described.value("copyright");
+                    String description = described.value("description"),
+                            url = described.value("url"),
+                            vendor = described.value("organization.name"),
+                            copyright = described.value("copyright");
                     if (description != null) {
                         jpackage.setProperty("--description", description.replaceAll("\\s+", " "));
                     }
@@ -878,7 +886,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                 .toList());
                         List<String> identifiers = new ArrayList<>();
                         for (String license : licenses) {
-                            identifiers.add(new License(null, null,
+                            identifiers.add(new License(null,
+                                    null,
                                     described.value(license + ".name"),
                                     described.value(license + ".url")).identified(aliases).id());
                         }

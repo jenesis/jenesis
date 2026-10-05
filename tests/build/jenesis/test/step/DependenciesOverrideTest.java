@@ -138,8 +138,10 @@ public class DependenciesOverrideTest {
         int result = ToolProvider.findFirst("javac").orElseThrow().run(
                 new PrintWriter(Writer.nullWriter()),
                 new PrintWriter(errors),
-                "--module-version", version,
-                "-d", classes.toString(),
+                "--module-version",
+                version,
+                "-d",
+                classes.toString(),
                 sources.resolve("module-info.java").toString(),
                 folder.resolve("Value.java").toString());
         if (result != 0) {
@@ -200,7 +202,11 @@ public class DependenciesOverrideTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         executor.addSource("dependencies", dependencies);
         executor.addModule("resolved", module, "dependencies");
         next = executor.execute().get("resolved");

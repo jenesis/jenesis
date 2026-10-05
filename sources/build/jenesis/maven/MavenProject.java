@@ -145,7 +145,8 @@ public class MavenProject implements BuildExecutorModule {
                     for (Path file : spdx) {
                         String source = MultiProjectModule.SPDX + "-" + spdxIndex++;
                         buildExecutor.addSource(source,
-                                new Bind(Map.of(Path.of(""), Path.of(Dependencies.SPDX))), file);
+                                new Bind(Map.of(Path.of(""), Path.of(Dependencies.SPDX))),
+                                file);
                         spdxSources.add(source);
                     }
                     SequencedMap<String, String> dependencyDeps = new LinkedHashMap<>();

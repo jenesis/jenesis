@@ -5339,7 +5339,8 @@ public class MavenPomResolverTest {
                 </project>
                 """;
         SequencedMap<MavenDependencyKey, MavenDependencyValue> deps = mavenPomResolver.dependencies(
-                Runnable::run, mavenRepository,
+                Runnable::run,
+                mavenRepository,
                 List.of(new MavenResolver.RootPom(new ByteArrayInputStream(rootPom.getBytes(StandardCharsets.UTF_8)))),
                 Map.of(),
                 MavenDependencyScope.COMPILE,
@@ -5681,7 +5682,8 @@ public class MavenPomResolverTest {
                 </project>
                 """;
         assertThatThrownBy(() -> mavenPomResolver.dependencies(
-                Runnable::run, mavenRepository,
+                Runnable::run,
+                mavenRepository,
                 List.of(new MavenResolver.RootPom(new ByteArrayInputStream(rootPom.getBytes(StandardCharsets.UTF_8)))),
                 Map.of(),
                 MavenDependencyScope.COMPILE,

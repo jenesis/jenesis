@@ -22,10 +22,12 @@ import build.jenesis.step.Versions;
 public class GroovyCompilerModule implements BuildExecutorModule {
 
     public static final String ARTIFACTS = "artifacts", CLASSES = "classes";
-    private static final String REQUIRED = "required", COMPILED = "compiled",
+    private static final String REQUIRED = "required",
+            COMPILED = "compiled",
             DEPENDENCIES = "dependencies";
     private static final List<String> PREFERRED_PREFIXES = List.of("maven", "module");
-    private static final String MODULE_NAME = "org.apache.groovy", MAVEN_GROUP = "org.apache.groovy",
+    private static final String MODULE_NAME = "org.apache.groovy",
+            MAVEN_GROUP = "org.apache.groovy",
             MAVEN_ARTIFACT = "groovy";
 
     private final Map<String, Resolver> resolvers;
@@ -39,7 +41,8 @@ public class GroovyCompilerModule implements BuildExecutorModule {
 
     public GroovyCompilerModule(Map<String, Repository> repositories,
                                 Map<String, Resolver> resolvers) {
-        this(resolvers, new Dependencies(repositories, resolvers),
+        this(resolvers,
+             new Dependencies(repositories, resolvers),
              null,
              true,
              "groovyc",
@@ -51,7 +54,8 @@ public class GroovyCompilerModule implements BuildExecutorModule {
     public static GroovyCompilerModule ofEnvironment(Environment environment,
                                                      Map<String, Repository> repositories,
                                                      Map<String, Resolver> resolvers) {
-        return new GroovyCompilerModule(resolvers, Dependencies.ofEnvironment(environment, repositories, resolvers),
+        return new GroovyCompilerModule(resolvers,
+                Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 true,
                 "groovyc",

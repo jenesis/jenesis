@@ -60,7 +60,10 @@ public class MavenModuleRepository implements JenesisRepository {
     }
 
     public MavenModuleRepository mapping(Map<String, MavenDependencyKey> mapping) {
-        return new MavenModuleRepository(repository, group, segments, mapping == null ? null : Map.copyOf(mapping),
+        return new MavenModuleRepository(repository,
+                group,
+                segments,
+                mapping == null ? null : Map.copyOf(mapping),
                 documentBuilderFactory);
     }
 

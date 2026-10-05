@@ -85,7 +85,11 @@ public class DependenciesMavenBomTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         executor.addSource("dependencies", dependencies);
         executor.addModule("resolved", module, "dependencies");
         next = executor.execute().get("resolved");

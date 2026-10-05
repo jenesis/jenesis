@@ -345,25 +345,46 @@ public class InferredSourceCodeQualityModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-        Bind.configured(buildExecutor, inherited.sequencedKeySet(), CHECKSTYLE, checkstyle,
+        Bind.configured(buildExecutor,
+                inherited.sequencedKeySet(),
+                CHECKSTYLE,
+                checkstyle,
                 CheckstyleModule.configurationFile(configuration),
                 () -> checkstyleModule.pinning(pinning));
-        Bind.configured(buildExecutor, inherited.sequencedKeySet(), PMD, pmd,
+        Bind.configured(buildExecutor,
+                inherited.sequencedKeySet(),
+                PMD,
+                pmd,
                 PmdModule.configurationFile(configuration),
                 () -> pmdModule.pinning(pinning));
-        Bind.configured(buildExecutor, inherited.sequencedKeySet(), DETEKT, detekt,
+        Bind.configured(buildExecutor,
+                inherited.sequencedKeySet(),
+                DETEKT,
+                detekt,
                 DetektModule.configurationFile(configuration),
                 () -> detektModule.pinning(pinning));
-        Bind.configured(buildExecutor, inherited.sequencedKeySet(), KTLINT, ktlint,
+        Bind.configured(buildExecutor,
+                inherited.sequencedKeySet(),
+                KTLINT,
+                ktlint,
                 KtlintModule.configurationFile(configuration),
                 () -> ktlintModule.pinning(pinning));
-        Bind.configured(buildExecutor, inherited.sequencedKeySet(), SCALASTYLE, scalastyle,
+        Bind.configured(buildExecutor,
+                inherited.sequencedKeySet(),
+                SCALASTYLE,
+                scalastyle,
                 ScalastyleModule.configurationFile(configuration),
                 () -> scalastyleModule.pinning(pinning));
-        Bind.configured(buildExecutor, inherited.sequencedKeySet(), SCALAFMT, scalafmt,
+        Bind.configured(buildExecutor,
+                inherited.sequencedKeySet(),
+                SCALAFMT,
+                scalafmt,
                 ScalafmtModule.configurationFile(configuration),
                 () -> scalafmtModule.pinning(pinning));
-        Bind.configured(buildExecutor, inherited.sequencedKeySet(), CODENARC, codenarc,
+        Bind.configured(buildExecutor,
+                inherited.sequencedKeySet(),
+                CODENARC,
+                codenarc,
                 CodeNarcModule.configurationFile(configuration),
                 () -> codenarcModule.pinning(pinning));
         if (!custom.isEmpty()) {

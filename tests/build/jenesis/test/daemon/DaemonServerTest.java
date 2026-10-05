@@ -109,7 +109,10 @@ public class DaemonServerTest {
 
     @Test
     public void lists_every_setting_with_the_value_in_force() throws IOException {
-        Exchange exchange = request(token(), "fingerprint", false, Map.of("jenesis.test.skip", "true"),
+        Exchange exchange = request(token(),
+                "fingerprint",
+                false,
+                Map.of("jenesis.test.skip", "true"),
                 "configuration");
         assertThat(exchange.code()).isEqualTo(0);
         assertThat(exchange.out().lines().filter(line -> line.startsWith("jenesis.")).count())
@@ -148,13 +151,20 @@ public class DaemonServerTest {
         return file;
     }
 
-    private Exchange request(String token, String digest, boolean stop, Map<String, String> properties,
+    private Exchange request(String token,
+                             String digest,
+                             boolean stop,
+                             Map<String, String> properties,
                              String... selectors) throws IOException {
         return request(token, digest, "build.jenesis.Project", stop, properties, selectors);
     }
 
-    private Exchange request(String token, String digest, String mainClass, boolean stop,
-                             Map<String, String> properties, String... selectors) throws IOException {
+    private Exchange request(String token,
+                             String digest,
+                             String mainClass,
+                             boolean stop,
+                             Map<String, String> properties,
+                             String... selectors) throws IOException {
         int port = Integer.parseInt(Files.readString(awaited("daemon.port")).trim());
         try (Socket socket = new Socket(InetAddress.getLoopbackAddress(), port);
              DataOutputStream out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));

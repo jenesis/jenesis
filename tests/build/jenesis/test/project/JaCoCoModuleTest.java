@@ -88,7 +88,8 @@ public class JaCoCoModuleTest {
         if (ToolProvider.getSystemJavaCompiler().run(null,
                 null,
                 null,
-                "-d", classes.toString(),
+                "-d",
+                classes.toString(),
                 source.toString()) != 0) {
             throw new IllegalStateException("Failed to compile the JaCoCo CLI double");
         }
@@ -114,6 +115,10 @@ public class JaCoCoModuleTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
     }
 }

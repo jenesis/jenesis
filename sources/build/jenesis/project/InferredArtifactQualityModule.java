@@ -112,7 +112,10 @@ public class InferredArtifactQualityModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-        Bind.configuredByProperties(buildExecutor, inherited.sequencedKeySet(), JAPICMP, japicmp,
+        Bind.configuredByProperties(buildExecutor,
+                inherited.sequencedKeySet(),
+                JAPICMP,
+                japicmp,
                 BuildStep.locate(configuration, "japicmp.properties"),
                 properties -> {
                     for (String key : properties.stringPropertyNames()) {

@@ -22,10 +22,12 @@ import build.jenesis.step.ProcessHandler;
 public class GroovyDocumentationModule implements BuildExecutorModule {
 
     public static final String DOCUMENTED = "documented";
-    private static final String REQUIRED = "required", ARTIFACTS = "artifacts",
+    private static final String REQUIRED = "required",
+            ARTIFACTS = "artifacts",
             DEPENDENCIES = "dependencies";
     private static final List<String> PREFERRED_PREFIXES = List.of("maven", "module");
-    private static final String MODULE_NAME = "org.apache.groovy.groovydoc", MAVEN_GROUP = "org.apache.groovy",
+    private static final String MODULE_NAME = "org.apache.groovy.groovydoc",
+            MAVEN_GROUP = "org.apache.groovy",
             MAVEN_ARTIFACT = "groovy-groovydoc";
 
     private final Map<String, Resolver> resolvers;
@@ -41,7 +43,8 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
 
     public GroovyDocumentationModule(Map<String, Repository> repositories,
                                      Map<String, Resolver> resolvers) {
-        this(resolvers, new Dependencies(repositories, resolvers),
+        this(resolvers,
+             new Dependencies(repositories, resolvers),
              null,
              "groovydoc",
              "main",
@@ -55,7 +58,8 @@ public class GroovyDocumentationModule implements BuildExecutorModule {
     public static GroovyDocumentationModule ofEnvironment(Environment environment,
                                                    Map<String, Repository> repositories,
                                                    Map<String, Resolver> resolvers) {
-        return new GroovyDocumentationModule(resolvers, Dependencies.ofEnvironment(environment, repositories, resolvers),
+        return new GroovyDocumentationModule(resolvers,
+                Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "groovydoc",
                 "main",

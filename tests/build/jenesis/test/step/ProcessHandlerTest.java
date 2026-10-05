@@ -71,7 +71,8 @@ public class ProcessHandlerTest {
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try {
             ProcessHandler handler = ProcessHandler.OfProcess.ofJavaHome("bin/java").apply(List.of(source.toString()));
-            assertThat(handler.execute(output, error,
+            assertThat(handler.execute(output,
+                    error,
                     new ProcessHandler.Tee(executor, outLines::add, errLines::add))).isZero();
         } finally {
             executor.shutdown();
@@ -131,7 +132,8 @@ public class ProcessHandlerTest {
         Path output = root.resolve("output"), error = root.resolve("error");
         List<String> outLines = new CopyOnWriteArrayList<>(), errLines = new CopyOnWriteArrayList<>();
         ProcessHandler handler = ProcessHandler.OfTool.of(tool).apply(List.of());
-        assertThat(handler.execute(output, error,
+        assertThat(handler.execute(output,
+                error,
                 new ProcessHandler.Tee(Runnable::run, outLines::add, errLines::add))).isZero();
         assertThat(Files.readString(output)).contains("out-one").contains("out-two");
         assertThat(Files.readString(error)).contains("err-one");

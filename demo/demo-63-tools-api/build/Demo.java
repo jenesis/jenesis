@@ -54,7 +54,10 @@ public class Demo {
                 throw new IllegalStateException("Build for " + version + " failed with " + code + "\n" + out + err);
             }
             System.out.printf("jenesis-make -Djenesis.project.version=%s @%s -> %d, produced %s%n",
-                    version, arguments, code, stamped(Path.of("target")));
+                    version,
+                    arguments,
+                    code,
+                    stamped(Path.of("target")));
         }
         StringWriter out = new StringWriter(), err = new StringWriter();
         System.out.println("jenesis-exec builds and runs the program, which prints on its own:");

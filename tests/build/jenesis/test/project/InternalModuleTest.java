@@ -58,7 +58,11 @@ public class InternalModuleTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
     }
 
     @AfterEach
@@ -123,7 +127,8 @@ public class InternalModuleTest {
                 }
                 """;
         String moduleInfo = "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }";
-        Path source = writeModuleSource(work.resolve("plugin"), moduleInfo,
+        Path source = writeModuleSource(work.resolve("plugin"),
+                moduleInfo,
                 Map.of("test/plugin/Plugin.java", plugin.formatted("before")));
         buildExecutor.addModule("internal", new InternalModule("module", null, source)
                 .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
@@ -141,7 +146,11 @@ public class InternalModuleTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         buildExecutor.addModule("internal", new InternalModule("module", null, source)
                 .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
                 .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
