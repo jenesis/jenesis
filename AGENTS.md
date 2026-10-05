@@ -286,9 +286,11 @@ and never reaches a key at all, so a field of one is never `transient`.
 Steps compose by folder conventions - `sources/`, `classes/`, `artifacts/` - never by inspecting predecessor
 names. A step that forks a JDK tool extends `ProcessBuildStep` and thereby accepts `process-<tool>.properties`.
 A forked process is handed the platform's own variables (`PATH`, `HOME`, `LANG`, `TMPDIR`, Windows' `SystemRoot`
-and its kin) and nothing else of the build's environment, because a variable is no input of its step; a tool whose
-contract is a variable, as JReleaser's credentials are, implements `ProcessBuildStep.Environmental` and names it
-in `inherits`.
+and its kin) and nothing else of the build's environment, because a variable is no input of its step. A step that
+runs a program - `java`, the tests, an external binary - implements `ProcessBuildStep.Environmental` and so also
+accepts `environment-<tool>.properties`, whose variables it is handed beyond those, and one whose contract is a
+variable, as JReleaser's credentials are, names it in `inherits`. A JDK tool such as `javac` takes none: it may run
+in the build's own JVM, which no environment reaches.
 
 **Modules activate on a file.** A build module under `project/` (`CheckstyleModule`, `JaCoCoModule`, …)
 switches itself on when its configuration file is present in a configuration folder

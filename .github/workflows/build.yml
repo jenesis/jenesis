@@ -113,10 +113,11 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
 
-  # A JAVA_TOOL_OPTIONS in the environment makes every JVM the build forks print
-  # a "Picked up ..." notice on its stderr, which tests reading a forked JVM's
-  # output have to tolerate. No other job sets the variable, so this one runs the
-  # suite with it set and nothing else.
+  # A JAVA_TOOL_OPTIONS makes every JVM handed it print a "Picked up ..." notice
+  # on its stderr - the program Execute runs, and the test JVM, which
+  # build.jenesis/environment-test.properties passes it on to - and tests reading
+  # such a JVM's output have to tolerate it. No other job sets the variable, so
+  # this one runs the suite with it set and nothing else.
   forked-jvm-notices:
     runs-on: ubuntu-latest
     steps:
