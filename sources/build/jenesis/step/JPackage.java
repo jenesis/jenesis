@@ -49,6 +49,13 @@ public class JPackage extends ProcessBuildStep {
     }
 
     @Override
+    protected List<String> configurations() {
+        return type == null || super.configurations().isEmpty()
+                ? super.configurations()
+                : List.of("jpackage", "jpackage-" + type);
+    }
+
+    @Override
     protected SequencedMap<String, SequencedMap<String, String>> properties(
             SequencedMap<String, BuildStepArgument> arguments) throws IOException {
         SequencedMap<String, SequencedMap<String, String>> properties = super.properties(arguments);

@@ -284,7 +284,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 closure = new LinkedHashSet<>(Set.of("modules"));
             }
             sub.addStep("prepare",
-                    new Prepare(descriptor.pathPlacement(), packaging.jpackage(), overrides),
+                    new Prepare(descriptor.pathPlacement(), List.copyOf(packaging.formats()), overrides),
                     outerInherited.sequencedKeySet().stream());
             sub.addModule("check",
                     check.apply(InferredSourceCodeQualityModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
@@ -403,7 +403,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         documentation.apply(documentationModule),
                         Stream.concat(Stream.of("binary"), inputs(descriptor, closure)));
             }
-            if (packaging.jmod() || packaging.jlink() || packaging.jpackage() != null || packaging.nativeImage()) {
+            if (packaging.jmod() || packaging.jlink() || packaging.jpackaged() || packaging.nativeImage()) {
                 sub.addStep("legal", Legal.ofEnvironment(environment), Stream.concat(Stream.of("binary"), closure.stream()));
             }
             if (packaging.jmod()) {
@@ -423,7 +423,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
             }
         });
         SequencedMap<String, BuildExecutorModule> packagers = hooks.getOrDefault("package", none);
-        if (packaging.jlink() || packaging.jpackage() != null || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || packaging.docker() != null
+        if (packaging.jlink() || packaging.jpackaged() || packaging.bundle() || packaging.launcher() || packaging.nativeImage() || packaging.docker() != null
                 || !packagers.isEmpty()) {
             assembly = assembly.then("package", (sub, inherited) -> {
                 SequencedSet<String> images = new LinkedHashSet<>();
@@ -443,7 +443,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     inputs.removeIf(key -> replaced.contains(local(key)));
                 }
                 SequencedSet<String> linked = new LinkedHashSet<>(inputs);
-                if (!packaging.jmod() && (packaging.jlink() || packaging.jpackage() != null)) {
+                if (!packaging.jmod() && (packaging.jlink() || packaging.jpackaged())) {
                     SequencedSet<String> packed = descriptor.resources().stream()
                             .map(InferredMultiProjectAssembler::local)
                             .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -455,10 +455,15 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     sub.addStep("jlink", JLink.ofEnvironment(environment, factory), linked);
                     images.add("jlink");
                 }
-                if (packaging.jpackage() != null) {
-                    sub.addStep("jpackage", JPackage.ofEnvironment(environment, factory).type(packaging.jpackage()), packaging.jlink()
+                for (String format : packaging.formats()) {
+                    sub.addStep(packaging.step(format), JPackage.ofEnvironment(environment, factory).type(format), packaging.jlink()
                                 ? Stream.concat(Stream.of("jlink"), linked.stream())
                                 : linked.stream());
+                }
+                if (packaging.jpackage().size() > 1) {
+                    sub.addStep("jpackage", new Packaged(), packaging.jpackage().stream().map(packaging::step));
+                }
+                if (!packaging.jpackage().isEmpty()) {
                     images.add("jpackage");
                 }
                 if (packaging.bundle()) {
@@ -490,9 +495,15 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     SequencedSet<String> manifests = descriptor.manifests().stream()
                             .map(InferredMultiProjectAssembler::local)
                             .collect(Collectors.toCollection(LinkedHashSet::new));
-                    sub.addStep("docker", Docker.ofEnvironment(environment, packaging.docker()).labels(packaging.dockerLabels()), Stream.concat(
-                            inputs.stream(),
-                            inherited.sequencedKeySet().stream().filter(key -> manifests.contains(local(key)))));
+                    sub.addStep("docker", Docker.ofEnvironment(environment, packaging.docker())
+                            .labels(packaging.dockerLabels())
+                            .jpackage(packaging.dockerJPackage()), Stream.of(
+                                    packaging.dockerJPackage() == null
+                                            ? Stream.<String>empty()
+                                            : Stream.of(packaging.step(packaging.dockerJPackage())),
+                                    inputs.stream(),
+                                    inherited.sequencedKeySet().stream().filter(key -> manifests.contains(local(key))))
+                            .flatMap(Function.identity()));
                     images.add("docker");
                 }
                 if (packaging.nativeImage()) {
@@ -629,15 +640,33 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             boolean bundle,
                             boolean launcher,
                             boolean nativeImage,
-                            String jpackage,
+                            SequencedSet<String> jpackage,
                             String docker,
+                            String dockerJPackage,
                             SequencedMap<String, String> dockerLabels) {
 
         private static final String DOCKER_LABEL = "docker.label.";
 
+        private boolean jpackaged() {
+            return !formats().isEmpty();
+        }
+
+        private SequencedSet<String> formats() {
+            SequencedSet<String> formats = new LinkedHashSet<>(jpackage);
+            if (dockerJPackage != null) {
+                formats.add(dockerJPackage);
+            }
+            return formats;
+        }
+
+        private String step(String format) {
+            return jpackage.size() == 1 && jpackage.contains(format) ? "jpackage" : "jpackage-" + format;
+        }
+
         private static Packaging configured(Path properties) throws IOException {
             if (properties == null) {
-                return new Packaging(false, false, false, false, false, null, null, Collections.emptyNavigableMap());
+                return new Packaging(false, false, false, false, false, Collections.emptyNavigableSet(), null, null,
+                        Collections.emptyNavigableMap());
             }
             SequencedProperties configuration = SequencedProperties.ofFiles(properties);
             SequencedMap<String, String> labels = new LinkedHashMap<>();
@@ -655,13 +684,23 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 throw new IllegalArgumentException(properties + " sets " + DOCKER_LABEL + "* without docker=<image>,"
                         + " which names the image the labels belong to");
             }
+            List<String> formats = configuration.entries("jpackage");
+            String dockerJPackage = configuration.value("docker.jpackage");
+            if (dockerJPackage != null && docker == null) {
+                throw new IllegalArgumentException(properties + " sets docker.jpackage without docker=<image>,"
+                        + " which names the base image the jpackage package is installed onto");
+            } else if (dockerJPackage != null && !Docker.FORMATS.contains(dockerJPackage)) {
+                throw new IllegalArgumentException(properties + " sets docker.jpackage=" + dockerJPackage
+                        + ", which a Linux image cannot run - name one of " + Docker.FORMATS);
+            }
             return new Packaging(configuration.flag("jmod"),
                     configuration.flag("jlink"),
                     configuration.flag("bundle"),
                     configuration.flag("launcher"),
                     configuration.flag("native"),
-                    configuration.value("jpackage"),
+                    formats == null ? Collections.emptyNavigableSet() : new LinkedHashSet<>(formats),
                     docker,
+                    dockerJPackage,
                     labels);
         }
     }
@@ -705,7 +744,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
     }
 
     private record Prepare(PathPlacement pathPlacement,
-                           String packageType,
+                           List<String> packageTypes,
                            SequencedMap<String, SequencedMap<String, String>> overrides) implements BuildStep {
 
         @Override
@@ -765,6 +804,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 jar.setProperty("--main-class", main);
                 jar.store(processFolder.resolve("jar.properties"));
                 SequencedProperties jpackage = new SequencedProperties();
+                SequencedMap<String, SequencedProperties> typed = new TreeMap<>();
                 if (artifact != null) {
                     jpackage.setProperty("--name", artifact);
                 }
@@ -789,8 +829,10 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                     if (copyright != null) {
                         jpackage.setProperty("--copyright", copyright);
                     }
-                    if (url != null && packageType != null && !packageType.equals("app-image")) {
-                        jpackage.setProperty("--about-url", url);
+                    if (url != null) {
+                        packageTypes.stream()
+                                .filter(type -> !type.equals("app-image"))
+                                .forEach(type -> typed.computeIfAbsent(type, _ -> new SequencedProperties()).setProperty("--about-url", url));
                     }
                     List<String> emails = new ArrayList<>();
                     SequencedSet<String> licenses = new LinkedHashSet<>();
@@ -801,10 +843,11 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                             licenses.add(key.substring(0, key.lastIndexOf('.')));
                         }
                     });
-                    if ("deb".equals(packageType) && !emails.isEmpty()) {
-                        jpackage.setProperty("--linux-deb-maintainer", emails.getFirst());
+                    if (packageTypes.contains("deb") && !emails.isEmpty()) {
+                        typed.computeIfAbsent("deb", _ -> new SequencedProperties())
+                                .setProperty("--linux-deb-maintainer", emails.getFirst());
                     }
-                    if ("rpm".equals(packageType) && !licenses.isEmpty()) {
+                    if (packageTypes.contains("rpm") && !licenses.isEmpty()) {
                         Map<String, String> aliases = Dependencies.aliases(arguments.values().stream()
                                 .filter(argument -> !argument.removed())
                                 .map(BuildStepArgument::folder)
@@ -816,11 +859,15 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                                     described.value(license + ".url")).identified(aliases).id());
                         }
                         if (!identifiers.contains(null)) {
-                            jpackage.setProperty("--linux-rpm-license-type", String.join(" OR ", identifiers));
+                            typed.computeIfAbsent("rpm", _ -> new SequencedProperties())
+                                    .setProperty("--linux-rpm-license-type", String.join(" OR ", identifiers));
                         }
                     }
                 }
                 jpackage.store(processFolder.resolve("jpackage.properties"));
+                for (Map.Entry<String, SequencedProperties> type : typed.entrySet()) {
+                    type.getValue().store(processFolder.resolve("jpackage-" + type.getKey() + ".properties"));
+                }
                 SequencedProperties launcher = new SequencedProperties();
                 launcher.setProperty("mainClass", main);
                 if (pathPlacement.modular() && moduleName != null) {

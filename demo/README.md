@@ -236,12 +236,13 @@ Packaging is turned on by a `packaging.properties` file in the configuration
 location - a module's `META-INF/build.jenesis/` folder, its `build.jenesis/`
 folder, or the project root. Its keys are the packaging menu:
 
-    jpackage=app-image   # a native application image; any jpackage --type value
+    jpackage=app-image   # a native application image; any jpackage --type values, comma-separated
     jmod=true            # a .jmod beside the modular jar
     jlink=true           # a runtime image trimmed to the module graph
     bundle=true          # a zip of jars to unpack onto a stock JRE
     launcher=true        # a single executable jar you run with java -jar
     docker=<base image>  # a Dockerfile and its build context
+    docker.jpackage=deb  # ... that holds a jpackage app-image, deb or rpm instead of the jars
 
 Both executable demos commit `jpackage=app-image` and run the packaged image with
 the arguments you pass:
@@ -258,6 +259,10 @@ Docker yourself:
 
     java -Djenesis.make.profiles=docker build/jenesis/Make.java stage
     docker build -t sample target/stage/docker/output/module
+
+The modular demo's `container` profile adds `docker.jpackage=app-image`, so the image
+is the jpackage app-image with its own trimmed runtime on a base without Java. That
+type is built for the image and staged only if `jpackage` lists it too.
 
 Staged output lands beside the other staging trees: `stage/packages` for images,
 `stage/runtime` for a `jlink` runtime, `stage/docker` for a build context.
