@@ -1,8 +1,8 @@
 package build.jenesis.module;
 
 import module java.base;
-import build.jenesis.BuildExecutorCallback;
 import build.jenesis.Environment;
+import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SafeSegment;
@@ -23,6 +23,7 @@ public class JenesisModuleRepository implements JenesisRepository {
     private final Boolean prerelease;
     private final Boolean speculative;
     private final Consumer<String> printing;
+    private final Palette palette;
 
     public static JenesisRepository of(Scope scope) {
         return ofEnvironment(Environment.NONE, scope);
@@ -322,7 +323,8 @@ public class JenesisModuleRepository implements JenesisRepository {
                                                        System.getenv("MAVEN_REPOSITORY_URI"))),
              environment.flagOrNull("module.prerelease"),
              environment.flagOrNull("module.speculative"),
-             environment.flag("print.fetch") ? environment.out() : null);
+             environment.flag("print.fetch") ? environment.out() : null,
+             Palette.ofEnvironment(environment));
     }
 
     private JenesisModuleRepository(URI root,
@@ -331,7 +333,8 @@ public class JenesisModuleRepository implements JenesisRepository {
                                     URI maven,
                                     Boolean prerelease,
                                     Boolean speculative,
-                                    Consumer<String> printing) {
+                                    Consumer<String> printing,
+                                    Palette palette) {
         String text = root.toString();
         this.root = text.endsWith("/") ? root : URI.create(text + "/");
         this.token = token;
@@ -340,26 +343,27 @@ public class JenesisModuleRepository implements JenesisRepository {
         this.prerelease = prerelease;
         this.speculative = speculative;
         this.printing = printing;
+        this.palette = palette;
     }
 
     public JenesisModuleRepository connection(Repository.Connection connection) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing);
+        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing, palette);
     }
 
     public JenesisModuleRepository maven(URI maven) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing);
+        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing, palette);
     }
 
     public JenesisModuleRepository prerelease(Boolean prerelease) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing);
+        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing, palette);
     }
 
     public JenesisModuleRepository speculative(Boolean speculative) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing);
+        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing, palette);
     }
 
-    public JenesisModuleRepository printing(Consumer<String> printing) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing);
+    public JenesisModuleRepository printing(Consumer<String> printing, Palette palette) {
+        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing, palette);
     }
 
     private static URI toMavenRepository(String declaration) {
@@ -438,9 +442,9 @@ public class JenesisModuleRepository implements JenesisRepository {
             return Optional.empty();
         }
         if (printing != null) {
-            printing.accept("%s%-11s%s %s".formatted(BuildExecutorCallback.YELLOW,
+            printing.accept("%s%-11s%s %s".formatted(palette.info(),
                     "[FETCHED]",
-                    BuildExecutorCallback.RESET,
+                    palette.reset(),
                     uri));
         }
         AtomicReference<InputStream> first = new AtomicReference<>(stream);

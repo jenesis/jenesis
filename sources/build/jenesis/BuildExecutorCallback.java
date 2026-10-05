@@ -5,13 +5,6 @@ import module java.base;
 @FunctionalInterface
 public interface BuildExecutorCallback {
 
-    String RESET = "\033[0m";
-    String RED = "\033[31m";
-    String GREEN = "\033[32m";
-    String YELLOW = "\033[33m";
-    String BLUE = "\033[34m";
-    String CYAN = "\033[36m";
-
     BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys);
 
     default Consumer<Throwable> module(String identity) {
@@ -57,11 +50,16 @@ public interface BuildExecutorCallback {
         };
     }
 
-    static BuildExecutorCallback printing(Consumer<String> out, boolean verbose, boolean cache, Path target) {
-        return printing(out, verbose, cache, target, false);
+    static BuildExecutorCallback printing(Consumer<String> out,
+                                          Palette palette,
+                                          boolean verbose,
+                                          boolean cache,
+                                          Path target) {
+        return printing(out, palette, verbose, cache, target, false);
     }
 
     static BuildExecutorCallback printing(Consumer<String> out,
+                                          Palette palette,
                                           boolean verbose,
                                           boolean cache,
                                           Path target,
@@ -71,25 +69,26 @@ public interface BuildExecutorCallback {
             public BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys) {
                 long started = System.nanoTime();
                 if (identity == null) {
-                    out.accept("%s%-11s%s Building in '%s'...".formatted(GREEN, "[STARTED]", RESET, target));
+                    out.accept("%s%-11s%s Building in '%s'...".formatted(
+                            palette.status(), "[STARTED]", palette.reset(), target));
                     if (events) {
                         out.accept("%s%-11s%s Recording each step's outcome as a JSON line in '%s'".formatted(
-                                GREEN, "[EVENTS]", RESET, target.resolve(BuildExecutor.EVENTS)));
+                                palette.status(), "[EVENTS]", palette.reset(), target.resolve(BuildExecutor.EVENTS)));
                     }
                     return (_, throwable) -> {
                         double time = ((double) (System.nanoTime() - started) / 1_000_000) / 1_000;
                         out.accept("%s%-11s%s Finished %sin %.2f seconds%s".formatted(
-                                throwable == null ? GREEN : RED,
+                                throwable == null ? palette.status() : palette.failure(),
                                 throwable == null ? "[COMPLETED]" : "[FAILED]",
-                                RESET,
-                                CYAN,
+                                palette.reset(),
+                                palette.detail(),
                                 time,
-                                RESET));
+                                palette.reset()));
                     };
                 }
                 return (executed, throwable) -> {
                     if (throwable != null) {
-                        out.accept("%s%-11s%s %s: %s".formatted(RED, "[FAILED]", RESET, identity,
+                        out.accept("%s%-11s%s %s: %s".formatted(palette.failure(), "[FAILED]", palette.reset(), identity,
                                 throwable instanceof BuildExecutorException
                                         ? throwable.getCause().getMessage()
                                         : throwable.getMessage()));
@@ -97,7 +96,8 @@ public interface BuildExecutorCallback {
                         double time = ((double) (System.nanoTime() - started) / 1_000_000) / 1_000;
                         synchronized (out) {
                             out.accept("%s%-11s%s %s %sin %.2f seconds%s".formatted(
-                                    GREEN, "[EXECUTED]", RESET, identity, CYAN, time, RESET));
+                                    palette.status(), "[EXECUTED]", palette.reset(),
+                                    identity, palette.detail(), time, palette.reset()));
                             if (verbose) {
                                 Path checksums = target.resolve(identity)
                                         .resolve("checksum")
@@ -115,7 +115,7 @@ public interface BuildExecutorCallback {
                             }
                         }
                     } else {
-                        out.accept("%s%-11s%s %s".formatted(BLUE, "[SKIPPED]", RESET, identity));
+                        out.accept("%s%-11s%s %s".formatted(palette.skipped(), "[SKIPPED]", palette.reset(), identity));
                     }
                 };
             }
@@ -127,7 +127,8 @@ public interface BuildExecutorCallback {
                     if (throwable == null) {
                         double time = ((double) (System.nanoTime() - started) / 1_000_000) / 1_000;
                         out.accept("%s%-11s%s %s %sin %.2f seconds%s".formatted(
-                                GREEN, "[RESOLVED]", RESET, identity, CYAN, time, RESET));
+                                palette.status(), "[RESOLVED]", palette.reset(),
+                                identity, palette.detail(), time, palette.reset()));
                     }
                 };
             }
@@ -136,7 +137,8 @@ public interface BuildExecutorCallback {
             public void loaded(String identity, long duration) {
                 if (cache) {
                     out.accept("%s%-11s%s %s %sin %.2f seconds%s".formatted(
-                            YELLOW, "[LOADED]", RESET, identity, CYAN, ((double) duration / 1_000_000) / 1_000, RESET));
+                            palette.info(), "[LOADED]", palette.reset(),
+                            identity, palette.detail(), ((double) duration / 1_000_000) / 1_000, palette.reset()));
                 }
             }
 
@@ -144,7 +146,8 @@ public interface BuildExecutorCallback {
             public void stored(String identity, long duration) {
                 if (cache) {
                     out.accept("%s%-11s%s %s %sin %.2f seconds%s".formatted(
-                            YELLOW, "[STORED]", RESET, identity, CYAN, ((double) duration / 1_000_000) / 1_000, RESET));
+                            palette.info(), "[STORED]", palette.reset(),
+                            identity, palette.detail(), ((double) duration / 1_000_000) / 1_000, palette.reset()));
                 }
             }
         };

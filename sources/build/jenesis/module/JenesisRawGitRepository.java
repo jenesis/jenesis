@@ -1,8 +1,8 @@
 package build.jenesis.module;
 
 import module java.base;
-import build.jenesis.BuildExecutorCallback;
 import build.jenesis.Environment;
+import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SafeSegment;
@@ -23,6 +23,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
     private final Boolean prerelease;
     private final Boolean speculative;
     private final Consumer<String> printing;
+    private final Palette palette;
     private final Map<String, Optional<String>> tsvCache = new ConcurrentHashMap<>();
 
     public JenesisRawGitRepository(Scope scope, URI data, URI repository) {
@@ -54,7 +55,8 @@ public class JenesisRawGitRepository implements JenesisRepository {
              Repository.Connection.ofEnvironment(environment),
              environment.flagOrNull("module.prerelease"),
              environment.flagOrNull("module.speculative"),
-             environment.flag("print.fetch") ? environment.out() : null);
+             environment.flag("print.fetch") ? environment.out() : null,
+             Palette.ofEnvironment(environment));
     }
 
     private JenesisRawGitRepository(Scope scope,
@@ -65,7 +67,8 @@ public class JenesisRawGitRepository implements JenesisRepository {
                                     Repository.Connection connection,
                                     Boolean prerelease,
                                     Boolean speculative,
-                                    Consumer<String> printing) {
+                                    Consumer<String> printing,
+                                    Palette palette) {
         this.scope = scope;
         this.data = data;
         this.repository = repository;
@@ -75,6 +78,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
         this.prerelease = prerelease;
         this.speculative = speculative;
         this.printing = printing;
+        this.palette = palette;
     }
 
     public JenesisRawGitRepository groups(Predicate<String> predicate) {
@@ -86,7 +90,8 @@ public class JenesisRawGitRepository implements JenesisRepository {
                                            connection,
                                            prerelease,
                                            speculative,
-                                           printing);
+                                           printing,
+                                           palette);
     }
 
     public JenesisRawGitRepository connection(Repository.Connection connection) {
@@ -98,7 +103,8 @@ public class JenesisRawGitRepository implements JenesisRepository {
                                            connection,
                                            prerelease,
                                            speculative,
-                                           printing);
+                                           printing,
+                                           palette);
     }
 
     public JenesisRawGitRepository prerelease(Boolean prerelease) {
@@ -110,7 +116,8 @@ public class JenesisRawGitRepository implements JenesisRepository {
                                            connection,
                                            prerelease,
                                            speculative,
-                                           printing);
+                                           printing,
+                                           palette);
     }
 
     public JenesisRawGitRepository speculative(Boolean speculative) {
@@ -122,10 +129,11 @@ public class JenesisRawGitRepository implements JenesisRepository {
                                            connection,
                                            prerelease,
                                            speculative,
-                                           printing);
+                                           printing,
+                                           palette);
     }
 
-    public JenesisRawGitRepository printing(Consumer<String> printing) {
+    public JenesisRawGitRepository printing(Consumer<String> printing, Palette palette) {
         return new JenesisRawGitRepository(scope,
                                            data,
                                            repository,
@@ -134,7 +142,8 @@ public class JenesisRawGitRepository implements JenesisRepository {
                                            connection,
                                            prerelease,
                                            speculative,
-                                           printing);
+                                           printing,
+                                           palette);
     }
 
     public static JenesisRepository of(Scope scope) {
@@ -306,9 +315,9 @@ public class JenesisRawGitRepository implements JenesisRepository {
         }
         return open(connection, location, token).map(stream -> {
             if (printing != null) {
-                printing.accept("%s%-11s%s %s".formatted(BuildExecutorCallback.YELLOW,
+                printing.accept("%s%-11s%s %s".formatted(palette.info(),
                         "[FETCHED]",
-                        BuildExecutorCallback.RESET,
+                        palette.reset(),
                         location));
             }
             AtomicReference<InputStream> first = new AtomicReference<>(stream);

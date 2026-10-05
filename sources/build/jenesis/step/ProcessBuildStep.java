@@ -1,12 +1,12 @@
 package build.jenesis.step;
 
 import module java.base;
-import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Palette;
 import build.jenesis.SequencedProperties;
 
 public abstract class ProcessBuildStep implements BuildStep {
@@ -65,12 +65,16 @@ public abstract class ProcessBuildStep implements BuildStep {
             boolean streamed = environment.flag("print." + command,
                     environment.flag("print.process", printing));
             Consumer<String> out = environment.out();
+            Palette palette = Palette.ofEnvironment(environment);
             return new Terms(streamed
-                    ? (error, line) -> out.accept("\033[38;5;" + (error ? 131 : 244) + "m"
-                            + command + " >>>> " + line + BuildExecutorCallback.RESET)
+                    ? (error, line) -> out.accept((error ? palette.error() : palette.output())
+                            + command + " >>>> " + line + palette.reset())
                     : null,
                     concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Semaphore::new),
-                    environment.flag("print.command") ? out : null);
+                    environment.flag("print.command")
+                            ? executed -> out.accept("%s%-11s%s %s".formatted(
+                                    palette.info(), "[EXECUTED]", palette.reset(), executed))
+                            : null);
         }
 
         public Terms printing(BiConsumer<Boolean, String> printing) {
@@ -191,11 +195,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                 ProcessHandler.Tee tee = tee(executor, handler);
                 Consumer<String> announcing = terms.announcing();
                 if (announcing != null) {
-                    announcing.accept("%s%-11s%s %s".formatted(
-                            BuildExecutorCallback.YELLOW,
-                            "[EXECUTED]",
-                            BuildExecutorCallback.RESET,
-                            String.join(" ", handler.commands())));
+                    announcing.accept(String.join(" ", handler.commands()));
                 }
                 executor.execute(() -> {
                     worker.set(Thread.currentThread());

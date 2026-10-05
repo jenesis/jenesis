@@ -1,9 +1,9 @@
 package build.jenesis.maven;
 
 import module java.base;
-import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.Environment;
+import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SequencedProperties;
@@ -85,14 +85,15 @@ public class MavenDefaultRepository implements MavenRepository {
         validations.put("SHA512", uri);
         validations.put("SHA256", uri);
         validations.put("SHA1", uri);
+        Palette palette = Palette.ofEnvironment(environment);
         return ofEnvironment(environment,
                 uri,
                 local,
                 Collections.unmodifiableMap(validations),
                 printing == null ? null : path -> printing.accept("%s%-11s%s %s".formatted(
-                        BuildExecutorCallback.YELLOW,
+                        palette.info(),
                         "[FETCHED]",
-                        BuildExecutorCallback.RESET,
+                        palette.reset(),
                         uri.resolve(path))),
                 token);
     }
@@ -229,13 +230,13 @@ public class MavenDefaultRepository implements MavenRepository {
         return new MavenDefaultRepository(repository, local, validations, callback, token, connection);
     }
 
-    public MavenDefaultRepository printing(Consumer<String> printing) {
+    public MavenDefaultRepository printing(Consumer<String> printing, Palette palette) {
         return new MavenDefaultRepository(repository, local, validations, printing == null
                 ? null
                 : path -> printing.accept("%s%-11s%s %s".formatted(
-                        BuildExecutorCallback.YELLOW,
+                        palette.info(),
                         "[FETCHED]",
-                        BuildExecutorCallback.RESET,
+                        palette.reset(),
                         repository.resolve(path))), token, connection);
     }
 

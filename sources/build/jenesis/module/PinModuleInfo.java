@@ -6,12 +6,12 @@ import build.jenesis.BuildStep;
 import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
 import javax.tools.ToolProvider;
-import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Palette;
 import build.jenesis.Platform;
 import build.jenesis.Pinning;
 import build.jenesis.step.Inventory;
@@ -29,10 +29,11 @@ public class PinModuleInfo implements BuildStep {
     private final boolean flatten;
     private final Retain retain;
     private final transient Consumer<String> printing;
+    private final transient Palette palette;
 
     public PinModuleInfo(String prefix, String path, List<Path> moduleInfoFiles, HashDigestFunction hashFunction) {
         this(prefix, path, moduleInfoFiles, hashFunction, new Platform(),
-                true, false, Retain.GROUPS, Pinning.permits(), null);
+                true, false, Retain.GROUPS, Pinning.permits(), null, Palette.NONE);
     }
 
     public static PinModuleInfo ofEnvironment(Environment environment,
@@ -47,7 +48,7 @@ public class PinModuleInfo implements BuildStep {
                 .permits(Pinning.permits(environment))
                 .platform(Platform.ofEnvironment(environment));
         Boolean pins = environment.flagOrNull("print.pins");
-        return pins == null || !pins ? pin : pin.printing(environment.out());
+        return pins == null || !pins ? pin : pin.printing(environment.out(), Palette.ofEnvironment(environment));
     }
 
     private PinModuleInfo(String prefix,
@@ -59,7 +60,8 @@ public class PinModuleInfo implements BuildStep {
                           boolean flatten,
                           Retain retain,
                           Semaphore permits,
-                          Consumer<String> printing) {
+                          Consumer<String> printing,
+                          Palette palette) {
         this.permits = permits;
         this.prefix = prefix;
         this.path = path;
@@ -70,30 +72,31 @@ public class PinModuleInfo implements BuildStep {
         this.flatten = flatten;
         this.retain = retain;
         this.printing = printing;
+        this.palette = palette;
     }
 
     public PinModuleInfo permits(Semaphore permits) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
     }
 
     public PinModuleInfo platform(Platform platform) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
     }
 
     public PinModuleInfo checksum(boolean checksum) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
     }
 
     public PinModuleInfo flatten(boolean flatten) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
     }
 
     public PinModuleInfo retain(Retain retain) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing);
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
     }
 
-    public PinModuleInfo printing(Consumer<String> printing) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing);
+    public PinModuleInfo printing(Consumer<String> printing, Palette palette) {
+        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
     }
 
     private static boolean checksumFrom(Environment environment) {
@@ -199,9 +202,9 @@ public class PinModuleInfo implements BuildStep {
             updateModuleInfo(file, entries, covered, retained, references, flatten, platform, carried);
             if (printing != null && !carried.isEmpty()) {
                 printing.accept("%s%-11s%s %s".formatted(
-                        BuildExecutorCallback.YELLOW,
+                        palette.warning(),
                         "[KEPT]",
-                        BuildExecutorCallback.RESET,
+                        palette.reset(),
                         file + ": kept, resolved by no closure: "
                                 + String.join(", ", carried)));
             }

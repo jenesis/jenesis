@@ -10,6 +10,7 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.KeyExpiry;
 import build.jenesis.Environment;
 import build.jenesis.OpenPgpRepository;
+import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SequencedProperties;
@@ -121,7 +122,7 @@ public class SignaturesTest {
 
     private String printed(Signatures signatures) throws IOException {
         StringBuilder captured = new StringBuilder();
-        run(signatures.printing(line -> captured.append(line).append(System.lineSeparator())));
+        run(signatures.printing(line -> captured.append(line).append(System.lineSeparator()), Palette.ANSI));
         return captured.toString();
     }
 
@@ -169,7 +170,7 @@ public class SignaturesTest {
         resolved("maven/org.example/lib", "1.0", null);
         declared("OpenPGP/" + PRIMARY, "main/maven/org.example/lib");
         List<String> printed = new ArrayList<>();
-        run(step(signature("lib"), validated(PRIMARY)).printing(printed::add).printing(null));
+        run(step(signature("lib"), validated(PRIMARY)).printing(printed::add, Palette.ANSI).printing(null, Palette.ANSI));
         assertThat(printed)
                 .as("a step with no consumer writes nowhere, rather than to a consumer that discards")
                 .isEmpty();

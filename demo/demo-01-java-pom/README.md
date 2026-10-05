@@ -67,6 +67,10 @@ the declared license:
     maven/build.jenesis.demo/java-demo 1.0.0 [compile] (local ./)
     └─ maven/org.apache.commons/commons-lang3 3.14.0 [compile] (module org.apache.commons.lang3) {Apache-2.0}
 
+The tree is coloured, as is everything the build prints. To read the output as
+plain text, as a script or a coding agent does from a file or a pipe, pass
+`-Djenesis.palette.colors=none`.
+
 The tree starts from the project itself, drawn like any module built here: its
 coordinate, version and scope, tagged `local` with the folder it is built from.
 Each node below it shows the property-file key, the requested version (with the
