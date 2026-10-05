@@ -31,20 +31,21 @@ Besides the progress lines, every build writes what happened to
 build; the second progress line, `[EVENTS]`, names the file. A script or a coding
 agent reads it instead of parsing the console:
 
-    {"status":"started","target":"/.../demo-01-java-pom/target"}
+    {"status":"started","target":"/.../demo-01-java-pom/target","directory":"/.../demo-01-java-pom"}
     {"status":"resolved","module":"build","seconds":0.063}
     {"status":"executed","step":"build/maven/compose/module/module-/produce/assemble/binary/compiled/compile/javac","seconds":0.207,"folder":"/.../target/build/maven/compose/module/module-/produce/assemble/binary/compiled/compile/javac"}
     {"status":"executed","step":"build/maven/compose/module/module-/produce/assemble/binary/artifacts/jar","seconds":0.020,"folder":"/.../target/build/maven/compose/module/module-/produce/assemble/binary/artifacts/jar"}
     {"status":"completed","seconds":6.152,"executed":19,"skipped":0,"failed":0}
 
-A step is `executed`, `skipped` because nothing it reads changed, or `failed`
-with the `error` and `message` that stopped it, and `folder` is where its
-`output/` lives. A failed step's `folder` ends in `~` and holds what it wrote
-before it failed - its `output/`, and a forked tool's command, output and
-reports under `supplement/` - beside a `.jenesis.failed` marker, until the step
-runs again. The last line says
-whether the build `completed` or `failed`;
-a file without one belongs to a build that is still running or was killed.
+The first line names the `target` folder and the `directory` the build ran in,
+which a relative path in a failure's command line resolves against. A step is
+`executed`, `skipped` because nothing it reads changed, or `failed` with the
+`error` and `message` that stopped it, and `folder` is where its `output/`
+lives. A failed step's `folder` ends in `~` and holds what it wrote before it
+failed - its `output/`, and a forked tool's command, output and reports under
+`supplement/` - beside a `.jenesis.failed` marker, until the step runs again.
+The last line says whether the build `completed` or `failed`; a file without
+one belongs to a build that is still running or was killed.
 `-Djenesis.executor.events=false` writes no file.
 
 Layout

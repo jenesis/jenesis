@@ -93,7 +93,9 @@ public class BuildExecutorCallbackTest {
                 .as("status leads every line, so a reader scanning the file sees what happened before where")
                 .allSatisfy(event -> assertThat(event.keySet()).first().isEqualTo("status"));
         assertThat(events.getFirst()).containsEntry("status", "started")
-                .containsEntry("target", target.toAbsolutePath().normalize().toString());
+                .containsEntry("target", target.toAbsolutePath().normalize().toString())
+                .as("a relative path in a step's command line resolves against the build's working directory")
+                .containsEntry("directory", Path.of("").toAbsolutePath().toString());
         assertThat(events.get(1)).containsEntry("step", "foo")
                 .containsEntry("status", "executed")
                 .containsEntry("folder", target.toAbsolutePath().normalize().resolve("foo").toString())

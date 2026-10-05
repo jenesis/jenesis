@@ -154,7 +154,8 @@ public interface BuildExecutorCallback {
     }
 
     static BuildExecutorCallback events(Path target) {
-        Path root = target.toAbsolutePath().normalize(), file = root.resolve(BuildExecutor.EVENTS);
+        Path root = target.toAbsolutePath().normalize(), file = root.resolve(BuildExecutor.EVENTS),
+                directory = Path.of("").toAbsolutePath();
         return new BuildExecutorCallback() {
 
             private Writer writer;
@@ -174,7 +175,8 @@ public interface BuildExecutorCallback {
                         executed = 0;
                         skipped = 0;
                         failed = 0;
-                        write("{\"status\":\"started\",\"target\":\"" + Json.escaped(root.toString()) + "\"}");
+                        write("{\"status\":\"started\",\"target\":\"" + Json.escaped(root.toString())
+                                + "\",\"directory\":\"" + Json.escaped(directory.toString()) + "\"}");
                     }
                     return (_, throwable) -> {
                         synchronized (this) {
