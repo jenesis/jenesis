@@ -9,6 +9,7 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.Environment;
+import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisModuleRepositoryRelease;
@@ -189,13 +190,13 @@ public class JenesisModuleRepositoryReleaseTest {
         URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/repository/releases");
 
         assertThatThrownBy(() -> run(JenesisModuleRepositoryRelease.ofEnvironment(
-                new Environment(Map.of("release.uri", uri.toString())), uri).printing(null)))
+                new Environment(Map.of("release.uri", uri.toString())), uri).printing(null, Palette.ANSI)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("jenesis.repository.insecure");
         assertThat(requests).isEmpty();
 
         run(JenesisModuleRepositoryRelease.ofEnvironment(
-                new Environment(Map.of("release.uri", uri.toString(), "repository.insecure", "true")), uri).printing(null));
+                new Environment(Map.of("release.uri", uri.toString(), "repository.insecure", "true")), uri).printing(null, Palette.ANSI));
 
         assertThat(received).containsEntry("/repository/releases/module/demo.greeter/1.0.0/demo.greeter.jar", "classes");
     }
@@ -216,7 +217,7 @@ public class JenesisModuleRepositoryReleaseTest {
                 "repository.insecure", "true",
                 "make.provided", "release.uri"));
 
-        run(JenesisModuleRepositoryRelease.ofEnvironment(environment, JenesisModuleRepositoryRelease.configured(environment)).printing(null));
+        run(JenesisModuleRepositoryRelease.ofEnvironment(environment, JenesisModuleRepositoryRelease.configured(environment)).printing(null, Palette.ANSI));
 
         assertThat(requests).allMatch(request -> request.endsWith(" null"));
     }
@@ -229,7 +230,7 @@ public class JenesisModuleRepositoryReleaseTest {
                 "release.token", "Bearer secret",
                 "repository.insecure", "true"));
 
-        run(JenesisModuleRepositoryRelease.ofEnvironment(environment, JenesisModuleRepositoryRelease.configured(environment)).printing(null));
+        run(JenesisModuleRepositoryRelease.ofEnvironment(environment, JenesisModuleRepositoryRelease.configured(environment)).printing(null, Palette.ANSI));
 
         assertThat(requests).allMatch(request -> request.endsWith(" Bearer secret"));
     }
@@ -239,7 +240,7 @@ public class JenesisModuleRepositoryReleaseTest {
         stage("demo.greeter", "1.0.0", "demo.greeter.jar", "classes");
         List<String> printed = new ArrayList<>();
 
-        run(release().printing(printed::add));
+        run(release().printing(printed::add, Palette.ANSI));
 
         assertThat(printed).hasSize(1);
         assertThat(printed.getFirst())
@@ -250,7 +251,7 @@ public class JenesisModuleRepositoryReleaseTest {
     private JenesisModuleRepositoryRelease release() {
         return new JenesisModuleRepositoryRelease(URI.create("http://localhost:" + server.getAddress().getPort() + "/repository/releases"))
                 .connection(new Repository.Connection().insecure(true).retries(0))
-                .printing(null);
+                .printing(null, Palette.ANSI);
     }
 
     private void stage(String module, String version, String name, String content) throws IOException {

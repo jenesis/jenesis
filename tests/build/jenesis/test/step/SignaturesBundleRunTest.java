@@ -7,6 +7,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.Palette;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SequencedProperties;
 import build.jenesis.Verification;
@@ -149,7 +150,7 @@ public class SignaturesBundleRunTest {
 
     private String printed() throws IOException {
         StringBuilder captured = new StringBuilder();
-        run(step().printing(line -> captured.append(line).append(System.lineSeparator())));
+        run(step().printing(line -> captured.append(line).append(System.lineSeparator()), Palette.ANSI));
         return captured.toString();
     }
 }

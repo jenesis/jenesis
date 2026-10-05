@@ -866,7 +866,7 @@ These two drive a multi-module build from a hand-written `build/Demo.java`, with
 no layout and no goals, while reusing the whole standard toolchain:
 
     Environment environment = new Environment(Make.settings(Path.of(".")).keys());
-    BuildExecutor root = BuildExecutor.of(Path.of("target"));
+    BuildExecutor root = BuildExecutor.Configuration.ofEnvironment(environment).of(Path.of("target"));
     root.addModule("maven", MavenProject.make(environment, Path.of("."), assembler));
     root.execute(args);
 

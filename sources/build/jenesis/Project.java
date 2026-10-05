@@ -121,7 +121,10 @@ public record Project(
         }
 
         Layout MAVEN = (executor, project, assembler) -> {
-            executor.addModule(HELP, new HelpModule("maven", assembler.getClass().getName(), project.environment().out()));
+            executor.addModule(HELP, new HelpModule("maven",
+                    assembler.getClass().getName(),
+                    project.environment().out(),
+                    Palette.ofEnvironment(project.environment())));
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
             MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler, null, null, false,
@@ -197,7 +200,10 @@ public record Project(
         };
 
         Layout MODULAR = (executor, project, assembler) -> {
-            executor.addModule(HELP, new HelpModule("modular", assembler.getClass().getName(), project.environment().out()));
+            executor.addModule(HELP, new HelpModule("modular",
+                    assembler.getClass().getName(),
+                    project.environment().out(),
+                    Palette.ofEnvironment(project.environment())));
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
             MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(assembler, project.hashFunction());
@@ -280,7 +286,10 @@ public record Project(
         };
 
         Layout MODULAR_TO_MAVEN = (executor, project, assembler) -> {
-            executor.addModule(HELP, new HelpModule("modular_to_maven", assembler.getClass().getName(), project.environment().out()));
+            executor.addModule(HELP, new HelpModule("modular_to_maven",
+                    assembler.getClass().getName(),
+                    project.environment().out(),
+                    Palette.ofEnvironment(project.environment())));
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
             MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler,
@@ -475,7 +484,8 @@ public record Project(
         }
     }
 
-    private record HelpModule(String layout, String assembler, Consumer<String> out) implements BuildExecutorModule {
+    private record HelpModule(String layout, String assembler, Consumer<String> out, Palette palette)
+            implements BuildExecutorModule {
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
@@ -578,10 +588,10 @@ public record Project(
                     """)
                                      .replace("%{layout}", layout)
                                      .replace("%{assembler}", assembler)
-                                     .replace("%{reset}", BuildExecutorCallback.RESET)
-                                     .replace("%{header}", BuildExecutorCallback.YELLOW)
-                                     .replace("%{name}", BuildExecutorCallback.CYAN)
-                                     .replace("%{title}", BuildExecutorCallback.GREEN));
+                                     .replace("%{reset}", palette.reset())
+                                     .replace("%{header}", palette.heading())
+                                     .replace("%{name}", palette.detail())
+                                     .replace("%{title}", palette.status()));
         }
     }
 
@@ -649,15 +659,21 @@ public record Project(
 
                       java build/jenesis/Make.java [selectors...]  source mode, always available
                       jenesis [selectors...]                       installed CLI
-                      new Project(root).build(selectors...)        embedding it in Java
+                      ToolProvider.findFirst("jenesis-make").orElseThrow().run(out, err, selectors...)
+                                                                   embedding it in a Java program
 
                     `Make` is the entry point, `Project` the configuration API and has no `main`. No
-                    selector runs `build`; several, space-separated, run in one invocation.
+                    selector runs `build`; several, space-separated, run in one invocation. Pass
+                    -Djenesis.palette.colors=none to read the output as plain text, without the
+                    escape sequences that colour it. The `jenesis-make` ToolProvider takes leading
+                    -Djenesis.* arguments as that run's settings and prints to the writers it is
+                    handed, so a program builds in its own JVM without touching its properties.
 
                     The installed `jenesis` verifies `build/jenesis` against the released sources
                     named in `build/jenesis/jenesis.version` and refuses a tree that differs, while
-                    `jenesis-make` runs the installed engine as it stands. Only source mode and
-                    embedding run the project's vendored build code.
+                    `jenesis-make` runs the installed engine as it stands. Only source mode runs the
+                    project's vendored build code; a ToolProvider runs the build.jenesis that the
+                    embedding program resolved.
 
                     `Make` compiles the engine once and reuses those classes. Drive them yourself:
 
@@ -1281,6 +1297,7 @@ public record Project(
                              SequencedSet<Path> provided,
                              HashDigestFunction hashFunction,
                              Consumer<String> printing,
+                             Palette palette,
                              ProjectPlugins plugins)
             implements BuildExecutorModule {
 
@@ -1304,19 +1321,20 @@ public record Project(
                                  provided,
                                  hashFunction,
                                  environment.flag("print.divergence") ? environment.out() : null,
+                                 Palette.ofEnvironment(environment),
                                  new ProjectPlugins());
         }
 
         PinModule file(Path file) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, plugins);
+            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, palette, plugins);
         }
 
         PinModule provided(SequencedSet<Path> provided) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, plugins);
+            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, palette, plugins);
         }
 
         PinModule plugins(ProjectPlugins plugins) {
-            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, plugins);
+            return new PinModule(root, fileName, stepFactory, file, provided, hashFunction, printing, palette, plugins);
         }
 
         @Override
@@ -1350,7 +1368,7 @@ public record Project(
                         new LinkedHashSet<>(inherited.sequencedKeySet()));
             }
             buildExecutor.addStep("divergence",
-                    new Divergence(paths, printing),
+                    new Divergence(paths, printing, palette),
                     new LinkedHashSet<>(inherited.sequencedKeySet()));
             if (!plugins.resolutions().isEmpty()) {
                 SequencedSet<String> groups = new LinkedHashSet<>();
@@ -1504,10 +1522,12 @@ public record Project(
 
         private final SequencedSet<String> paths;
         private final transient Consumer<String> printing;
+        private final transient Palette palette;
 
-        private Divergence(SequencedSet<String> paths, Consumer<String> printing) {
+        private Divergence(SequencedSet<String> paths, Consumer<String> printing, Palette palette) {
             this.paths = paths;
             this.printing = printing;
+            this.palette = palette;
         }
 
         @Override
@@ -1541,9 +1561,9 @@ public record Project(
                     return;
                 }
                 printing.accept("%s%-11s%s %s is pinned at %s".formatted(
-                        BuildExecutorCallback.YELLOW,
+                        palette.warning(),
                         "[DIVERGED]",
-                        BuildExecutorCallback.RESET,
+                        palette.reset(),
                         coordinate,
                         String.join(", ", rendered)));
             });
@@ -2797,6 +2817,7 @@ public record Project(
                 process.factory|tool|tool|fork; fork runs a JDK tool in a process of its own
                 legal.notices|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries taken as legal notices into a jmod, a linked or packaged image and beside a native image, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
                 archive.timestamp|1980-02-01T00:00:00Z|ISO-8601 date-time with an offset recorded on every entry of the jars, jmods and zips the build writes; empty keeps the times the tools record and makes the archives unreproducible; set explicitly, it is also the creation time a generated Docker image is labelled with
+                palette.colors|ansi|ansi colours what the build prints with ANSI escape sequences; none prints plain text
                 print.progress|true|The build progress lines
                 print.process|false|Stream each external tool's command line and output as it runs
                 print.<command>||The same for one tool only, as print.javac or print.tests

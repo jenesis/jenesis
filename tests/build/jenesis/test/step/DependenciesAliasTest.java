@@ -10,6 +10,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
@@ -472,7 +473,7 @@ public class DependenciesAliasTest {
         executor.addModule("resolved", new Dependencies(
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
                 Map.of("maven", new MavenPomResolver(MavenDefaultVersionNegotiator.maven())))
-                .printing(printing), "dependencies");
+                .printing(printing, Palette.ANSI), "dependencies");
         next = executor.execute().get("resolved");
         return next;
     }

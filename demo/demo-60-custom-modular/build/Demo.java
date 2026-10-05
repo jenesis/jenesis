@@ -36,7 +36,7 @@ public class Demo {
 
     static void main(String[] args) throws Exception {
         Environment environment = new Environment(Make.settings(Path.of(".")).keys());
-        BuildExecutor root = BuildExecutor.of(Path.of("target"));
+        BuildExecutor root = BuildExecutor.Configuration.ofEnvironment(environment).of(Path.of("target"));
         root.addModule("modules", ModularProject.make(environment,
                 Path.of("."),
                 (descriptor, repositories, resolvers) -> new InferredMultiProjectAssembler().apply(

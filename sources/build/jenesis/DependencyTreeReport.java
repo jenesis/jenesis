@@ -8,25 +8,30 @@ public final class DependencyTreeReport {
             39, 44, 48, 83, 113, 148, 184, 214, 208, 203, 168, 134};
 
     private final Consumer<String> out;
+    private final Palette palette;
     private final boolean compact;
     private final Map<String, String> locations;
 
-    public DependencyTreeReport(Consumer<String> out) {
-        this(out, false, Map.of());
+    public DependencyTreeReport(Consumer<String> out, Palette palette) {
+        this(out, palette, false, Map.of());
     }
 
-    private DependencyTreeReport(Consumer<String> out, boolean compact, Map<String, String> locations) {
+    private DependencyTreeReport(Consumer<String> out,
+                                 Palette palette,
+                                 boolean compact,
+                                 Map<String, String> locations) {
         this.out = out;
+        this.palette = palette;
         this.compact = compact;
         this.locations = locations;
     }
 
     public DependencyTreeReport compact(boolean compact) {
-        return new DependencyTreeReport(out, compact, locations);
+        return new DependencyTreeReport(out, palette, compact, locations);
     }
 
     public DependencyTreeReport locations(Map<String, String> locations) {
-        return new DependencyTreeReport(out, compact, locations);
+        return new DependencyTreeReport(out, palette, compact, locations);
     }
 
     public void render(Resolver.Resolution resolution) {
@@ -65,13 +70,13 @@ public final class DependencyTreeReport {
                         SequencedMap<String, Resolver.Vertex> resolved) {
         StringBuilder builder = new StringBuilder(System.lineSeparator());
         if (title != null) {
-            builder.append(BuildExecutorCallback.YELLOW).append(title).append(BuildExecutorCallback.RESET)
+            builder.append(palette.heading()).append(title).append(palette.reset())
                     .append(System.lineSeparator());
         }
         builder.append(render(edges, nodes));
         if (!resolved.isEmpty()) {
             builder.append(System.lineSeparator())
-                    .append(BuildExecutorCallback.YELLOW).append("Resolved dependencies:").append(BuildExecutorCallback.RESET)
+                    .append(palette.heading()).append("Resolved dependencies:").append(palette.reset())
                     .append(System.lineSeparator());
             int[] external = {0};
             resolved.forEach((coordinate, node) -> {
@@ -154,20 +159,20 @@ public final class DependencyTreeReport {
         }
         StringBuilder builder = new StringBuilder();
         builder.append(System.lineSeparator())
-                .append(BuildExecutorCallback.YELLOW).append("Licenses:").append(BuildExecutorCallback.RESET)
+                .append(palette.heading()).append("Licenses:").append(palette.reset())
                 .append(System.lineSeparator())
                 .append("  ").append(paint(245, tally)).append(System.lineSeparator());
         for (Map.Entry<String, Integer> entry : distribution(licenses)) {
             builder.append(row(entry.getKey(), entry.getValue(), total, width, categoryColor(categories.get(entry.getKey()))));
         }
         builder.append(System.lineSeparator())
-                .append(BuildExecutorCallback.YELLOW).append("Permissiveness:").append(BuildExecutorCallback.RESET)
+                .append(palette.heading()).append("Permissiveness:").append(palette.reset())
                 .append(System.lineSeparator());
         for (Map.Entry<String, Integer> entry : distribution(permissiveness)) {
             builder.append(row(entry.getKey(), entry.getValue(), total, width, categoryColor(entry.getKey())));
         }
         builder.append(System.lineSeparator())
-                .append(BuildExecutorCallback.YELLOW).append("Modules:").append(BuildExecutorCallback.RESET)
+                .append(palette.heading()).append("Modules:").append(palette.reset())
                 .append(System.lineSeparator())
                 .append(row("named", named, total, width, 71))
                 .append(row("automatic", automatic, total, width, 214))
@@ -196,7 +201,7 @@ public final class DependencyTreeReport {
         };
     }
 
-    private static String row(String label, int count, int total, int width, int color) {
+    private String row(String label, int count, int total, int width, int color) {
         int bar = count == 0 ? 0 : Math.max(1, count * 20 / total);
         return "  " + paint(color, String.format(Locale.ROOT, "%-" + width + "s", label))
                 + "  " + paint(245, String.format(Locale.ROOT, "%3d (%3d%%)", count, count * 100 / total))
@@ -295,7 +300,7 @@ public final class DependencyTreeReport {
         }
     }
 
-    private static String externalSummary(int count) {
+    private String externalSummary(int count) {
         return paint(245, count + " external " + (count == 1 ? "dependency" : "dependencies"));
     }
 
@@ -338,7 +343,7 @@ public final class DependencyTreeReport {
         if (!edge.followed()) {
             line.append(paint(240, key));
         } else if (root) {
-            line.append("\033[1;38;5;").append(treeColor).append('m').append(key).append(BuildExecutorCallback.RESET);
+            line.append(palette.bold(treeColor)).append(key).append(palette.reset());
         } else {
             line.append(key);
         }
@@ -384,7 +389,7 @@ public final class DependencyTreeReport {
         return line.toString();
     }
 
-    private static String paint(int code, String text) {
-        return "\033[38;5;" + code + "m" + text + BuildExecutorCallback.RESET;
+    private String paint(int code, String text) {
+        return palette.color(code) + text + palette.reset();
     }
 }

@@ -7,6 +7,7 @@ import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildExecutorException;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Json;
+import build.jenesis.Palette;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -19,44 +20,53 @@ public class BuildExecutorCallbackTest {
     @Test
     public void can_print_executed() {
         List<String> printed = new ArrayList<>();
-        BuildExecutorCallback.printing(printed::add, false, false, null)
+        BuildExecutorCallback.printing(printed::add, Palette.ANSI, false, false, null)
                 .step("foo", new LinkedHashSet<>(Set.of("bar")))
                 .accept(true, null);
         assertThat(printed).hasSize(1);
         assertThat(printed.getFirst())
-                .matches(Pattern.quote(BuildExecutorCallback.GREEN + "[EXECUTED] " + BuildExecutorCallback.RESET)
+                .matches(Pattern.quote(Palette.ANSI.status() + "[EXECUTED] " + Palette.ANSI.reset())
                         + " foo "
-                        + Pattern.quote(BuildExecutorCallback.CYAN)
+                        + Pattern.quote(Palette.ANSI.detail())
                         + "in [0-9]+.[0-9]{2} seconds"
-                        + Pattern.quote(BuildExecutorCallback.RESET));
+                        + Pattern.quote(Palette.ANSI.reset()));
+    }
+
+    @Test
+    public void prints_plain_text_without_colors() {
+        List<String> printed = new ArrayList<>();
+        BuildExecutorCallback.printing(printed::add, Palette.NONE, false, false, null)
+                .step("foo", new LinkedHashSet<>(Set.of("bar")))
+                .accept(false, null);
+        assertThat(printed).containsExactly("[SKIPPED]   foo");
     }
 
     @Test
     public void can_print_skipped() {
         List<String> printed = new ArrayList<>();
-        BuildExecutorCallback.printing(printed::add, false, false, null)
+        BuildExecutorCallback.printing(printed::add, Palette.ANSI, false, false, null)
                 .step("foo", new LinkedHashSet<>(Set.of("bar")))
                 .accept(false, null);
         assertThat(printed).containsExactly(
-                BuildExecutorCallback.BLUE + "[SKIPPED]  " + BuildExecutorCallback.RESET + " foo");
+                Palette.ANSI.skipped() + "[SKIPPED]  " + Palette.ANSI.reset() + " foo");
     }
 
     @Test
     public void can_print_failed() {
         List<String> printed = new ArrayList<>();
-        BuildExecutorCallback.printing(printed::add, false, false, null)
+        BuildExecutorCallback.printing(printed::add, Palette.ANSI, false, false, null)
                 .step("foo", new LinkedHashSet<>(Set.of("bar")))
                 .accept(null, new RuntimeException("message"));
         assertThat(printed)
                 .as("a line is handed to the consumer as it stands, so what ends it is the caller's business")
-                .containsExactly(BuildExecutorCallback.RED + "[FAILED]   " + BuildExecutorCallback.RESET
+                .containsExactly(Palette.ANSI.failure() + "[FAILED]   " + Palette.ANSI.reset()
                         + " foo: message");
     }
 
     @Test
     public void announces_the_events_file_where_the_build_starts() {
         List<String> printed = new ArrayList<>();
-        BuildExecutorCallback.printing(printed::add, false, false, target, true).step(null, new LinkedHashSet<>());
+        BuildExecutorCallback.printing(printed::add, Palette.ANSI, false, false, target, true).step(null, new LinkedHashSet<>());
         assertThat(printed)
                 .as("a reader of the progress lines learns from the second one where the outcome is recorded")
                 .hasSize(2)
