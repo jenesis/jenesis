@@ -162,6 +162,16 @@ And on a `stage` build, `-Djenesis.stage.tests=true` also stages the module's
 `tests`-classifier variant beside the main jar, so the test artifact is published
 too (by default only the main artifact is staged).
 
+When a test fails
+-----------------
+
+A failing test fails the build. The `failed` line of the test step in
+`target/.jenesis.events.jsonl` names a `folder` ending in `~`, which keeps the
+run as it ended: the command under `supplement/command`, the runner's output
+under `supplement/output` and `supplement/error`, and the reports with
+`-Djenesis.test.reporting=true`, beside a `.jenesis.failed` marker. It stays
+until the step runs again.
+
 Pinned dependencies
 -------------------
 

@@ -190,11 +190,15 @@ public interface BuildExecutorCallback {
                 }
                 String step = ",\"step\":\"" + Json.escaped(identity) + "\"",
                         folder = ",\"folder\":\"" + Json.escaped(root.resolve(identity).toString()) + "\"";
+                Path next = root.resolve(identity + BuildExecutor.NEXT);
                 return (ran, throwable) -> {
                     synchronized (this) {
                         if (throwable != null) {
                             failed++;
-                            write("{\"status\":\"failed\"" + step + failure(throwable) + "}");
+                            write("{\"status\":\"failed\"" + step + failure(throwable)
+                                    + (Files.exists(next.resolve(BuildExecutor.FAILED_MARKER))
+                                    ? ",\"folder\":\"" + Json.escaped(next.toString()) + "\""
+                                    : "") + "}");
                         } else if (ran) {
                             executed++;
                             write("{\"status\":\"executed\"" + step + ",\"seconds\":"
