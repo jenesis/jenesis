@@ -206,6 +206,7 @@ public interface BuildExecutorCallback {
                 }
                 String step = ",\"step\":\"" + Json.escaped(identity) + "\"",
                         folder = ",\"folder\":\"" + Json.escaped(root.resolve(identity).toString()) + "\"";
+                Path local = root.resolve(identity).resolve(BuildExecutor.LOCAL);
                 return (ran, throwable) -> {
                     synchronized (this) {
                         if (throwable != null) {
@@ -217,7 +218,15 @@ public interface BuildExecutorCallback {
                                     + seconds(System.nanoTime() - started) + folder + "}");
                         } else {
                             skipped++;
-                            write("{\"status\":\"skipped\"" + step + folder + produced(identity) + "}");
+                            String producer = null;
+                            if (Files.isRegularFile(local)) {
+                                try {
+                                    producer = SequencedProperties.ofFiles(local).value("run");
+                                } catch (IOException _) {
+                                }
+                            }
+                            write("{\"status\":\"skipped\"" + step + folder
+                                    + (producer == null ? "" : ",\"run\":\"" + Json.escaped(producer) + "\"") + "}");
                         }
                     }
                 };
@@ -243,19 +252,6 @@ public interface BuildExecutorCallback {
             public void stored(String identity, long duration) {
                 write("{\"status\":\"stored\",\"step\":\"" + Json.escaped(identity) + "\",\"seconds\":"
                         + seconds(duration) + "}");
-            }
-
-            private String produced(String identity) {
-                Path local = root.resolve(identity).resolve(BuildExecutor.LOCAL);
-                if (!Files.isRegularFile(local)) {
-                    return "";
-                }
-                try {
-                    String producer = SequencedProperties.ofFiles(local).value("run");
-                    return producer == null ? "" : ",\"run\":\"" + Json.escaped(producer) + "\"";
-                } catch (IOException _) {
-                    return "";
-                }
             }
 
             private synchronized void write(String line) {
