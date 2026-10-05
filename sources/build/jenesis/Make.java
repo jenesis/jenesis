@@ -366,7 +366,7 @@ public final class Make {
             if (!daemon) {
                 if (aot && collected == null && location != null && mainClass.equals("build.jenesis.Project")
                         && (selectors.length == 0 || !Stream.of(selectors).allMatch(
-                                selector -> PRINTING.contains(selector) || selector.startsWith("skill/")))) {
+                                selector -> PRINTING.contains(selector.split("/", 2)[0])))) {
                     return cached(location, selectors);
                 }
                 return invoke(Make.class.getClassLoader(), collected, selectors);

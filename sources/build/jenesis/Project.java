@@ -511,7 +511,7 @@ public record Project(
                       %{name}configuration%{reset} Print every setting with the value in force, one per line
                       %{name}properties%{reset}    Print only the %{name}-Djenesis.*%{reset} properties that are set
                       %{name}help%{reset}          Print this message
-                      %{name}skill%{reset}         Print the briefing for a coding agent; %{name}skill/<page>%{reset} one of its pages
+                      %{name}skill%{reset}         Print the briefing for a coding agent; %{name}skill/start%{reset} where to begin
 
                       %{name}+<module>%{reset} narrows %{name}build%{reset} to one module, not %{name}stage%{reset}, %{name}export%{reset} or
                       %{name}pin%{reset}, and %{name}+<module>/<step>%{reset} narrows it to a single step inside that
@@ -588,23 +588,30 @@ public record Project(
     private record SkillModule(Path target, Consumer<String> out) implements BuildExecutorModule {
 
         private static final List<String> PAGES = List.of(
-                "invoke", "layout", "target", "selectors", "tags", "tools",
+                "start", "invoke", "layout", "target", "selectors", "tags", "tools",
                 "settings", "execute", "pinning", "plugins", "demos", "engine");
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-            print("");
+            for (String page : PAGES) {
+                buildExecutor.addModule(page, new SkillPage(target, out, page));
+            }
         }
+    }
 
-        private void print(String page) {
+    private record SkillPage(Path target, Consumer<String> out, String page) implements BuildExecutorModule {
+
+        @Override
+        public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
             out.accept((switch (page) {
-                case "" -> """
+                case "start" -> """
                     # Jenesis build tool - operating instructions
 
                     You are in a Jenesis-built Java project. This overview is what every task needs;
-                    each page below goes deeper and is printed by naming it as the only selector, as
-                    `java build/jenesis/Make.java skill/tags`. Full documentation:
-                    https://jenesis.build/tool. `help` prints a short human orientation.
+                    each page below goes deeper and is printed by naming it as a selector, as
+                    `java build/jenesis/Make.java skill/tags`, and `skill` alone prints them all.
+                    Full documentation: https://jenesis.build/tool. `help` prints a short human
+                    orientation.
 
                     ## Essentials
 
@@ -673,7 +680,7 @@ public record Project(
                     documentation: it needs reachability metadata captured from a real build, a JDK
                     on PATH, and it cannot load foreign build modules.
 
-                    The overview and the other pages: java build/jenesis/Make.java skill
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
                 case "layout" -> """
                     # Jenesis - Take the layout the project infers
@@ -685,7 +692,7 @@ public record Project(
                     `auto` picks maven for a root pom.xml, else modular_to_maven; it never picks
                     plain modular. Override only with cause: -Djenesis.project.layout=<name>.
 
-                    The overview and the other pages: java build/jenesis/Make.java skill
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
                 case "target" -> """
                     # Jenesis - Read target/
@@ -752,14 +759,14 @@ public record Project(
                                             -> the versions it is pinned at and the modules holding
                                             each, for every coordinate pinned at more than one
 
-                    The overview and the other pages: java build/jenesis/Make.java skill
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
                 case "selectors" -> """
                     # Jenesis - Address the graph
 
                       build stage export pin dependencies ide metadata configuration properties help skill
                           Top-level entry points; ide[/idea|/vscode|/eclipse] drills into one tool,
-                          and skill/<page> prints one page of this briefing, as the only selector.
+                          and skill/<page> prints one page of this briefing.
                       +<module>         module subgraph inside `build` (not stage/export/pin).
                                         <module> is the source folder holding its pom.xml or
                                         module-info.java; nested, foo/bar is written +foo+bar.
@@ -773,7 +780,7 @@ public record Project(
                       ::                any depth, e.g. ::/test. Lenient: a typo matches nothing
                                         silently, so confirm a selector ran what you meant.
 
-                    The overview and the other pages: java build/jenesis/Make.java skill
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
                 case "tags" -> """
                     # Jenesis - Configure a module with @jenesis tags
@@ -964,7 +971,7 @@ public record Project(
                           grants the library alone. MAVEN modules declare tokens in a
                           <!--jenesis.native ... --> comment.
 
-                    The overview and the other pages: java build/jenesis/Make.java skill
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
                 case "tools" -> """
                     # Jenesis - Activate a tool
@@ -1032,7 +1039,7 @@ public record Project(
                     files instead (checkstyle.xml, pmd.xml, spotbugs-exclude.xml, .editorconfig,
                     .scalafmt.conf, ...).
 
-                    The overview and the other pages: java build/jenesis/Make.java skill
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
                 case "settings" -> """
                     # Jenesis - Override a build with -Djenesis.* settings
@@ -1071,7 +1078,7 @@ public record Project(
                       -Djenesis.test.filter=<regex>    run one test class or method
                       -Djenesis.executor.rebuild       wipe target/ - avoid it, see skill/engine
 
-                    The overview and the other pages: java build/jenesis/Make.java skill
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
                 case "execute" -> """
                     # Jenesis - Run what was built
@@ -1109,7 +1116,7 @@ public record Project(
                     argument that starts with an @. A file is not expanded again from within a file,
                     which is how the JDK's own tools read one.
 
-                    The overview and the other pages: java build/jenesis/Make.java skill
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
                 case "pinning" -> """
                     # Jenesis - Pin dependencies
@@ -1139,7 +1146,7 @@ public record Project(
                     recorded rather than for today, checked in process against a
                     sigstore-trusted-root.json held beside the key lists.
 
-                    The overview and the other pages: java build/jenesis/Make.java skill
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
                 case "plugins" -> """
                     # Jenesis - Add to the stock build with plugins
@@ -1183,7 +1190,7 @@ public record Project(
                     into stage/project; an inspection fails the build by throwing and changes nothing
                     it was handed.
 
-                    The overview and the other pages: java build/jenesis/Make.java skill
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
                 case "demos" -> """
                     # Jenesis - Copy a demo
@@ -1240,7 +1247,7 @@ public record Project(
                                          61 custom-build (no Project at all),
                                          62 tools-api (a build inside another program's JVM)
 
-                    The overview and the other pages: java build/jenesis/Make.java skill
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
                 case "engine" -> """
                     # Jenesis - Change the engine
@@ -1260,10 +1267,9 @@ public record Project(
                       https://jenesis.build/tool          documentation, including the full reference
                       https://github.com/jenesis/jenesis  source, issues and releases
 
-                    The overview and the other pages: java build/jenesis/Make.java skill
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
-                default -> throw new IllegalArgumentException("Unknown skill page: " + page
-                        + " - expected one of " + PAGES.stream().map(name -> SKILL + "/" + name).toList());
+                default -> throw new IllegalStateException("No skill page " + page);
             }).replace("%{target}", target.toAbsolutePath().normalize().toString()));
         }
     }
@@ -2923,11 +2929,6 @@ public record Project(
             printConfiguration(environment);
             return Collections.emptyNavigableMap();
         }
-        if (selectors.length == 1 && (selectors[0].equals(SKILL) || selectors[0].startsWith(SKILL + "/"))) {
-            new SkillModule(target(), environment.out())
-                    .print(selectors[0].equals(SKILL) ? "" : selectors[0].substring(SKILL.length() + 1));
-            return Collections.emptyNavigableMap();
-        }
         if (selectors.length == 1 && selectors[0].equals(PROPERTIES)) {
             settings(environment).forEach((name, value) -> environment.out().accept(name + "=" + value));
             return Collections.emptyNavigableMap();
@@ -3088,7 +3089,7 @@ public record Project(
         trace.toString().lines().forEach(environment.err());
         environment.err().accept("");
         environment.err().accept("The build failed with the error above. If you meant to look up how to"
-                + " invoke Jenesis, pass `help` as the only argument on the command line, or `skill`"
+                + " invoke Jenesis, pass `help` as the only argument on the command line, or `skill/start`"
                 + " for an agent-oriented briefing.");
     }
 }
