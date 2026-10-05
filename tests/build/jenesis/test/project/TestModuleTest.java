@@ -38,7 +38,7 @@ public class TestModuleTest {
     private final Map<String, String> settings = new HashMap<>();
 
     @TempDir
-    private Path root, dependencies, classes, module, emptyDependencies, junit4Dependencies, testngDependencies;
+    private Path root, dependencies, classes, module, manifests, emptyDependencies, junit4Dependencies, testngDependencies;
 
     @BeforeEach
     public void setUp() throws Exception {
@@ -553,6 +553,61 @@ public class TestModuleTest {
         Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
         assertThat(supplement.resolve("output")).content().contains("Hello world!");
         assertThat(supplement.resolve("java.args")).content().contains("--select-method=sample.TestSample#test");
+    }
+
+    @Test
+    public void a_filter_entry_naming_a_module_selects_the_tests_of_that_module() throws IOException {
+        Files.writeString(manifests.resolve(BuildStep.MODULE), "path=greeter\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addSource("manifests", manifests);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnitPlatform())
+                        .isTest((Predicate<String> & Serializable) _ -> false)
+                        .filter("other/sample\\.Missing,greeter/sample\\.TestSample#test").jarsOnly(false),
+                "dependencies", "classes", "manifests");
+        executor.execute();
+
+        Path supplement = root.resolve("test").resolve("executed").resolve("supplement");
+        assertThat(supplement.resolve("output")).content().contains("Hello world!");
+        assertThat(supplement.resolve("java.args")).content()
+                .as("an entry naming another module does not apply to this one")
+                .contains("--select-method=sample.TestSample#test")
+                .doesNotContain("Missing");
+    }
+
+    @Test
+    public void a_test_module_that_no_filter_entry_reaches_runs_no_tests() throws IOException {
+        Files.writeString(manifests.resolve(BuildStep.MODULE), "path=greeter\n");
+        BuildExecutor executor = newExecutor();
+        executor.addSource("dependencies", dependencies);
+        executor.addSource("classes", classes);
+        executor.addSource("manifests", manifests);
+        executor.addModule(
+                "test",
+                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                                URI.create("https://repo1.maven.org/maven2/"),
+                                null,
+                                Map.of(),
+                                null)),
+                        Map.of("maven", MavenPomResolver.ofEnvironment(new Environment(settings))))
+                        .framework(new JUnitPlatform())
+                        .isTest((Predicate<String> & Serializable) _ -> false)
+                        .filter("other/sample\\.TestSample").jarsOnly(false),
+                "dependencies", "classes", "manifests");
+        executor.execute();
+
+        assertThat(root.resolve("test").resolve("executed").resolve("supplement").resolve("java.args"))
+                .as("a module that every entry of the filter leaves out runs no tests, rather than failing")
+                .doesNotExist();
     }
 
     @Test
