@@ -214,7 +214,7 @@ public interface BuildExecutorCallback {
                         } else if (ran) {
                             executed++;
                             write("{\"status\":\"executed\"" + step + ",\"seconds\":"
-                                    + seconds(System.nanoTime() - started) + folder + produced(identity) + "}");
+                                    + seconds(System.nanoTime() - started) + folder + "}");
                         } else {
                             skipped++;
                             write("{\"status\":\"skipped\"" + step + folder + produced(identity) + "}");

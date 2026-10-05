@@ -736,10 +736,10 @@ public record Project(
                     last `completed` or `failed`, with how many steps executed, skipped and failed; a
                     file without that last line is a build that is still running or was killed.
 
-                    Every build is a `run`, named on the `started` line, and an executed or skipped
-                    step names the `run` that produced its output: a skipped step's is an earlier
-                    one, so its output, and a test step's report under supplement/, came from that
-                    run and not this one. The same `run` is in local.properties beside the step's
+                    Every build is a `run`, named on the `started` line. An executed step is this
+                    run's; a skipped step names the earlier `run` that produced its output, so its
+                    output, and a test step's report under supplement/, came from that run and not
+                    this one. The run that produced a step is in local.properties beside the step's
                     output/, with `cached=true` when it came from a build cache. That file never
                     reaches a checksum or a build cache.
 
