@@ -149,6 +149,43 @@ class BuildExecutorDefault implements BuildExecutor {
                         new LinkedHashSet<>(summaries.keySet()));
                 boolean cacheRemotely = step.shouldCacheRemotely();
                 if (!consistent || step.shouldRun(arguments)) {
+                    List<String> reasons = new ArrayList<>();
+                    if (!exists) {
+                        reasons.add("it never ran");
+                    } else if (!consistent) {
+                        reasons.add(record.reason());
+                    }
+                    for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
+                        StepSummary summary = summaries.get(entry.getKey());
+                        Map<Path, Checksum> files = entry.getValue().files();
+                        if (exists && !consistent && summary != null) {
+                            Path checksums = previous.argument(entry.getKey());
+                            files = Files.exists(checksums)
+                                    ? Checksum.diff(HashFunction.read(checksums), summary.checksums(), hash)
+                                    : Map.of();
+                        }
+                        SequencedMap<ChecksumStatus, List<String>> changed = new TreeMap<>();
+                        files.forEach((file, checksum) -> {
+                            if (checksum.status() != ChecksumStatus.RETAINED) {
+                                changed.computeIfAbsent(checksum.status(), _ -> new ArrayList<>())
+                                        .add(file.toString().replace(File.separatorChar, '/'));
+                            }
+                        });
+                        if (!changed.isEmpty() && exists) {
+                            reasons.add((entry.getKey().startsWith(":")
+                                    ? BuildExecutorModule.decode(entry.getKey().substring(1)).replace(File.separatorChar, '/')
+                                    : entry.getKey()) + " " + changed.entrySet().stream()
+                                    .map(change -> change.getValue().size() == 1
+                                            ? change.getKey().name().toLowerCase(Locale.ROOT) + " " + change.getValue().getFirst()
+                                            : change.getValue().size() + " " + change.getKey().name().toLowerCase(Locale.ROOT)
+                                            + " (" + change.getValue().getFirst() + ", ...)")
+                                    .collect(Collectors.joining(", ")));
+                        }
+                    }
+                    if (reasons.isEmpty()) {
+                        reasons.add("it runs every time");
+                    }
+                    callback.outdated(location + identity, reasons);
                     Path next = target.resolve(identity + "~");
                     if (Files.exists(next)) {
                         Files.walkFileTree(next, new RecursiveFolderDeletion(null));
@@ -776,9 +813,9 @@ class BuildExecutorDefault implements BuildExecutor {
         }
     }
 
-    private record StepRecord(Map<Path, byte[]> checksums, boolean consistent) {
+    private record StepRecord(Map<Path, byte[]> checksums, boolean consistent, String reason) {
 
-        private static final StepRecord INCOMPLETE = new StepRecord(Map.of(), false);
+        private static final StepRecord INCOMPLETE = new StepRecord(Map.of(), false, "its last run did not complete");
     }
 
     private StepRecord completed(StepFolder folder, byte[] step, Executor executor) {
@@ -788,10 +825,12 @@ class BuildExecutorDefault implements BuildExecutor {
         try {
             String serialization = SequencedProperties.ofFiles(folder.stepFile()).getProperty("serialization");
             if (serialization == null || !Arrays.equals(step, HexFormat.of().parseHex(serialization))) {
-                return StepRecord.INCOMPLETE;
+                return new StepRecord(Map.of(), false, "its definition changed");
             }
             Map<Path, byte[]> checksums = HashFunction.read(folder.outputChecksums());
-            return new StepRecord(checksums, HashFunction.areConsistent(folder.output(), checksums, hash, executor));
+            return HashFunction.areConsistent(folder.output(), checksums, hash, executor)
+                    ? new StepRecord(checksums, true, null)
+                    : new StepRecord(checksums, false, "its output changed since it ran");
         } catch (IOException | IllegalArgumentException _) {
             return StepRecord.INCOMPLETE;
         }

@@ -42,6 +42,17 @@ public class BuildExecutorCallbackTest {
     }
 
     @Test
+    public void prints_why_a_step_runs_only_when_asked_to() {
+        List<String> printed = new ArrayList<>();
+        BuildExecutorCallback.printing(printed::add, Palette.NONE, false, false, false, null, false)
+                .outdated("foo", List.of("a", "b"));
+        assertThat(printed).isEmpty();
+        BuildExecutorCallback.printing(printed::add, Palette.NONE, false, false, true, null, false)
+                .outdated("foo", List.of("a", "b"));
+        assertThat(printed).containsExactly("[CHANGED]   foo: a; b");
+    }
+
+    @Test
     public void can_print_skipped() {
         List<String> printed = new ArrayList<>();
         BuildExecutorCallback.printing(printed::add, Palette.ANSI, false, false, null)

@@ -12,6 +12,9 @@ public interface BuildExecutorCallback {
         };
     }
 
+    default void outdated(String identity, List<String> reasons) {
+    }
+
     default void loaded(String identity, long duration) {
     }
 
@@ -29,6 +32,12 @@ public interface BuildExecutorCallback {
             @Override
             public Consumer<Throwable> module(String identity) {
                 return first.module(identity).andThen(other.module(identity));
+            }
+
+            @Override
+            public void outdated(String identity, List<String> reasons) {
+                first.outdated(identity, reasons);
+                other.outdated(identity, reasons);
             }
 
             @Override
@@ -62,6 +71,16 @@ public interface BuildExecutorCallback {
                                           Palette palette,
                                           boolean verbose,
                                           boolean cache,
+                                          Path target,
+                                          boolean events) {
+        return printing(out, palette, verbose, cache, false, target, events);
+    }
+
+    static BuildExecutorCallback printing(Consumer<String> out,
+                                          Palette palette,
+                                          boolean verbose,
+                                          boolean cache,
+                                          boolean changes,
                                           Path target,
                                           boolean events) {
         return new BuildExecutorCallback() {
@@ -131,6 +150,14 @@ public interface BuildExecutorCallback {
                                 identity, palette.detail(), time, palette.reset()));
                     }
                 };
+            }
+
+            @Override
+            public void outdated(String identity, List<String> reasons) {
+                if (changes) {
+                    out.accept("%s%-11s%s %s: %s".formatted(
+                            palette.info(), "[CHANGED]", palette.reset(), identity, String.join("; ", reasons)));
+                }
             }
 
             @Override

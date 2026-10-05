@@ -280,6 +280,43 @@ public class BuildExecutorTest implements Serializable {
         };
     }
 
+    @Test
+    public void names_why_each_step_runs_again() throws IOException {
+        RUNS.set(0);
+        Files.writeString(Files.createDirectory(source.resolve("folder")).resolve("file"), "foo");
+        buildExecutor.addSource("source", source);
+        buildExecutor.addStep("first", counting(), "source");
+        buildExecutor.execute(Runnable::run).toCompletableFuture().join();
+        Files.writeString(source.resolve("folder").resolve("file"), "bar");
+        SequencedMap<String, List<String>> outdated = new LinkedHashMap<>();
+        BuildExecutor rebuilt = BuildExecutor.of(root,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                new BuildExecutorCallback() {
+                    @Override
+                    public BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys) {
+                        return (_, _) -> {
+                        };
+                    }
+
+                    @Override
+                    public void outdated(String identity, List<String> reasons) {
+                        synchronized (outdated) {
+                            outdated.put(identity, reasons);
+                        }
+                    }
+                }, BuildExecutorCache.nop(), false, false, 0);
+        rebuilt.addSource("source", source);
+        rebuilt.addStep("first", counting(), "source");
+        rebuilt.addStep("second", counting(), "first");
+        rebuilt.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(outdated.get("first"))
+                .as("a changed input is named with forward slashes, whatever the platform")
+                .containsExactly("source altered folder/file");
+        assertThat(outdated.get("second")).containsExactly("it never ran");
+    }
+
     private Path interrupted(Interruption interruption) throws IOException {
         RUNS.set(0);
         Files.writeString(source.resolve("file"), "foo");

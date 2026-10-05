@@ -16,6 +16,7 @@ public interface BuildExecutor {
                          boolean progress,
                          boolean events,
                          boolean cacheHits,
+                         boolean changes,
                          boolean rebuild,
                          boolean aggregate,
                          int concurrency,
@@ -24,7 +25,7 @@ public interface BuildExecutor {
                          Palette palette) {
 
         public Configuration() {
-            this(Duration.ZERO, "MD5", false, true, true, false, false, false, 0, null, null, Palette.NONE);
+            this(Duration.ZERO, "MD5", false, true, true, false, false, false, false, 0, null, null, Palette.NONE);
         }
 
         public static Configuration ofEnvironment(Environment environment) {
@@ -50,6 +51,7 @@ public interface BuildExecutor {
                     environment.flag("print.progress", true),
                     environment.flag("executor.events", true),
                     environment.flag("print.cache"),
+                    environment.flag("print.changes"),
                     environment.flag("executor.rebuild"),
                     environment.flag("executor.aggregate"),
                     environment.number("executor.concurrency", 0),
@@ -59,52 +61,56 @@ public interface BuildExecutor {
         }
 
         public Configuration timeout(Duration timeout) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, changes, rebuild, aggregate, concurrency, cache, out, palette);
         }
 
         public Configuration digest(String digest) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, changes, rebuild, aggregate, concurrency, cache, out, palette);
         }
 
         public Configuration verbose(boolean verbose) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, changes, rebuild, aggregate, concurrency, cache, out, palette);
         }
 
         public Configuration progress(boolean progress) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, changes, rebuild, aggregate, concurrency, cache, out, palette);
         }
 
         public Configuration events(boolean events) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, changes, rebuild, aggregate, concurrency, cache, out, palette);
         }
 
         public Configuration cacheHits(boolean cacheHits) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, changes, rebuild, aggregate, concurrency, cache, out, palette);
+        }
+
+        public Configuration changes(boolean changes) {
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, changes, rebuild, aggregate, concurrency, cache, out, palette);
         }
 
         public Configuration rebuild(boolean rebuild) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, changes, rebuild, aggregate, concurrency, cache, out, palette);
         }
 
         public Configuration aggregate(boolean aggregate) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, changes, rebuild, aggregate, concurrency, cache, out, palette);
         }
 
         public Configuration concurrency(int concurrency) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, changes, rebuild, aggregate, concurrency, cache, out, palette);
         }
 
         public Configuration cache(BuildExecutorCache cache) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, changes, rebuild, aggregate, concurrency, cache, out, palette);
         }
 
         public Configuration out(Consumer<String> out, Palette palette) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
+            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, changes, rebuild, aggregate, concurrency, cache, out, palette);
         }
 
         public BuildExecutor of(Path target) throws IOException {
             BuildExecutorCallback printing = progress && out != null
-                    ? BuildExecutorCallback.printing(out, palette, verbose, cacheHits, target, events)
+                    ? BuildExecutorCallback.printing(out, palette, verbose, cacheHits, changes, target, events)
                     : BuildExecutorCallback.nop();
             return BuildExecutor.of(target,
                     timeout,

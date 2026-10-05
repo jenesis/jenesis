@@ -62,6 +62,21 @@ prints a `[LOADED]` line and each one written to it a `[STORED]` line. On this t
 project the saving is tiny; on a real module the compile that took seconds returns
 instantly. Delete `.jenesis/cache` to start over.
 
+Why a step runs again
+---------------------
+
+When a build runs more than you expected, ask it why. `-Djenesis.print.changes`
+prints a `[CHANGED]` line as each step starts, naming what made it run: that it
+never ran, that its definition or its output changed since its last run, or which
+of its inputs were added, altered or removed. Edit `Sample.java` and:
+
+    java -Djenesis.print.changes build/jenesis/Make.java
+
+    [CHANGED]   build/maven/identifier/scan: it runs every time
+    [CHANGED]   build/maven/identifier/module/module-/sources: its output changed since it ran; ./sources altered sample/Sample.java
+    ...
+    [CHANGED]   .../compile/javac: ../../../../../sources altered sources/sample/Sample.java
+
 A shared cache (the `uri` one)
 ------------------------------
 

@@ -545,6 +545,7 @@ public record Project(
                                                 one no key covers
                       %{name}-Djenesis.print.checksum%{reset}  Print each step's input and output checksums, to
                                                 see what made a step re-run
+                      %{name}-Djenesis.print.changes%{reset}   Say why each step runs: which of its inputs changed
                       %{name}-Djenesis.print.progress=false%{reset}
                                                 Drop the progress lines themselves
 
@@ -1092,6 +1093,7 @@ public record Project(
                                                        print.<command>, as print.javac
                       -Djenesis.dependency.pin=strict  fail the build on any unpinned artifact
                       -Djenesis.test.filter=<regex>    run one test class or method
+                      -Djenesis.print.changes          say why each step runs: which inputs changed
                       -Djenesis.executor.rebuild       wipe target/ - avoid it, see skill/engine
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
@@ -2825,6 +2827,7 @@ public record Project(
                 print.checksum|false|Each step's input and output checksums
                 print.fetch|false|Each artifact downloaded from a repository
                 print.cache|false|Each step served from or written to the build cache
+                print.changes|false|Why each step runs: that it never ran, its definition or output changed, or which of its inputs were added, altered or removed
                 print.signatures|false|Each verified dependency with its signer, and each one no declaration covers
                 print.pins|false|Each pin a refresh kept although no closure resolved it
                 print.divergence|false|Each coordinate the project pins at more than one version
