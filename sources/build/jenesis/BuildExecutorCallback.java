@@ -154,7 +154,8 @@ public interface BuildExecutorCallback {
     }
 
     static BuildExecutorCallback events(Path target) {
-        Path root = target.toAbsolutePath().normalize(), file = root.resolve(BuildExecutor.EVENTS),
+        Path root = target.toAbsolutePath().normalize(),
+                file = root.resolve(BuildExecutor.EVENTS),
                 directory = Path.of("").toAbsolutePath();
         return new BuildExecutorCallback() {
 
