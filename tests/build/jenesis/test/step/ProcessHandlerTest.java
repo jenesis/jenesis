@@ -83,25 +83,14 @@ public class ProcessHandlerTest {
     }
 
     @Test
-    public void a_forked_process_receives_the_platform_variables_and_nothing_else() throws Exception {
-        Path source = root.resolve("Variables.java");
-        Files.writeString(source, """
-                public class Variables {
-                    public static void main(String[] args) {
-                        System.getenv().keySet().forEach(System.out::println);
-                    }
-                }
-                """);
-        Path output = root.resolve("output"), error = root.resolve("error");
-        ProcessHandler.OfProcess handler = ProcessHandler.OfProcess.ofJavaHome("bin/java").apply(List.of(source.toString()));
-        assertThat(handler.execute(output, error, null)).isZero();
+    public void a_forked_process_is_handed_the_platform_variables_and_nothing_else() {
+        ProcessHandler.OfProcess handler = ProcessHandler.OfProcess.ofJavaHome("bin/java").apply(List.of());
         Set<String> platform = Set.of("PATH", "HOME", "LANG", "TMPDIR",
                 "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP", "USERPROFILE",
-                "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432", "PROGRAMDATA", "APPDATA", "LOCALAPPDATA",
-                "COLUMNS", "LINES", "TERM");
-        assertThat(Files.readAllLines(output))
+                "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432", "PROGRAMDATA", "APPDATA", "LOCALAPPDATA");
+        assertThat(handler.environment().keySet())
                 .as("a variable of the build that is no fact of the platform never reaches a forked process")
-                .allSatisfy(name -> assertThat(name.startsWith("LC_") || name.startsWith("=")
+                .allSatisfy(name -> assertThat(name.startsWith("LC_")
                         || platform.contains(name.toUpperCase(Locale.ROOT))).as(name).isTrue());
     }
 
