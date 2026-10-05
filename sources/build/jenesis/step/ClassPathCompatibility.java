@@ -28,7 +28,6 @@ public class ClassPathCompatibility implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        Path classes = null;
         ModuleDescriptor descriptor = null;
         for (BuildStepArgument argument : arguments.values()) {
             if (argument.removed()) {
@@ -39,14 +38,12 @@ public class ClassPathCompatibility implements BuildStep {
                 try (InputStream inputStream = Files.newInputStream(candidate)) {
                     descriptor = ModuleDescriptor.read(inputStream);
                 }
-                classes = argument.folder().resolve(CLASSES);
                 break;
             }
         }
         if (descriptor == null) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
-        ClassFile classFile = ClassFile.of();
         for (ModuleDescriptor.Provides provides : descriptor.provides()) {
             for (BuildStepArgument argument : arguments.values()) {
                 Path shipped = argument.removed()
@@ -56,23 +53,6 @@ public class ClassPathCompatibility implements BuildStep {
                     throw new IllegalArgumentException("The module " + descriptor.name() + " ships " + SERVICES
                             + provides.service() + " beside its provides clause, which " + CONFIGURATION
                             + " generates from module-info - remove the file from the module's resources");
-                }
-            }
-            for (String provider : provides.providers()) {
-                Path file = classes.resolve(provider.replace('.', '/') + ".class");
-                if (!Files.isRegularFile(file)) {
-                    throw new IllegalStateException("The module " + descriptor.name() + " provides "
-                            + provides.service() + " with " + provider + ", but " + file + " does not exist");
-                }
-                ClassModel model = classFile.parse(file);
-                if ((model.flags().flagsMask() & ClassFile.ACC_PUBLIC) == 0 || model.methods().stream().noneMatch(
-                        method -> method.methodName().equalsString(ConstantDescs.INIT_NAME)
-                                && method.methodType().equalsString("()V")
-                                && (method.flags().flagsMask() & ClassFile.ACC_PUBLIC) != 0)) {
-                    throw new IllegalStateException("The module " + descriptor.name() + " provides "
-                            + provides.service() + " with " + provider + ", which a ServiceLoader on the class path"
-                            + " cannot create: it needs a public class with a public constructor taking no arguments,"
-                            + " where the module path would also accept a public static provider() method");
                 }
             }
             Path service = context.next().resolve(RESOURCES + SERVICES + provides.service());
