@@ -21,6 +21,28 @@ public final class Json {
         return value;
     }
 
+    public static String escaped(String text) {
+        StringBuilder builder = new StringBuilder(text.length());
+        for (int index = 0; index < text.length(); index++) {
+            char c = text.charAt(index);
+            switch (c) {
+                case '"' -> builder.append("\\\"");
+                case '\\' -> builder.append("\\\\");
+                case '\n' -> builder.append("\\n");
+                case '\r' -> builder.append("\\r");
+                case '\t' -> builder.append("\\t");
+                default -> {
+                    if (c < 0x20) {
+                        builder.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        builder.append(c);
+                    }
+                }
+            }
+        }
+        return builder.toString();
+    }
+
     private Object value(int depth) {
         if (depth > MAX_DEPTH) {
             throw new IllegalStateException("JSON nesting exceeds " + MAX_DEPTH + " levels");

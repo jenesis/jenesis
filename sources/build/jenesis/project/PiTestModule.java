@@ -102,7 +102,7 @@ public class PiTestModule implements BuildExecutorModule {
 
         @Override
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
-            return false;
+            return arguments.values().stream().anyMatch(argument -> argument.hasChanged(Path.of(BuildStep.VERSIONS)));
         }
 
         @Override

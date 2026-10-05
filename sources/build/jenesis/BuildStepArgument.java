@@ -4,7 +4,7 @@ import module java.base;
 
 public record BuildStepArgument(Path folder, Map<Path, Checksum> files) {
 
-    private static final Path WILDCARD = Path.of(".");
+    private static final Set<Path> WILDCARDS = Set.of(Path.of("."), Path.of(""));
 
     public boolean removed() {
         return folder == null;
@@ -26,7 +26,7 @@ public record BuildStepArgument(Path folder, Map<Path, Checksum> files) {
     public boolean hasChanged(Collection<Path> prefixes) {
         return files.entrySet().stream()
                 .filter(entry -> prefixes.stream().anyMatch(prefix ->
-                        WILDCARD.equals(prefix) || entry.getKey().startsWith(prefix)))
+                        WILDCARDS.contains(prefix) || entry.getKey().startsWith(prefix)))
                 .anyMatch(entry -> entry.getValue().status() != ChecksumStatus.RETAINED);
     }
 }

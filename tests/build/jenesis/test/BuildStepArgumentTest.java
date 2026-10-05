@@ -42,6 +42,15 @@ public class BuildStepArgumentTest {
     }
 
     @Test
+    public void hasChanged_with_empty_prefix_matches_any_file() {
+        BuildStepArgument argument = new BuildStepArgument(Path.of("/tmp"),
+                Map.of(Path.of("folder/added.txt"), Checksum.of(ChecksumStatus.ADDED)));
+        assertThat(argument.hasChanged(Path.of("")))
+                .as("the empty path names the whole folder, as a binding of a folder is keyed")
+                .isTrue();
+    }
+
+    @Test
     public void hasChanged_with_dot_prefix_is_false_when_all_retained() {
         BuildStepArgument argument = new BuildStepArgument(Path.of("/tmp"),
                 Map.of(Path.of("module-info.java"), Checksum.of(ChecksumStatus.RETAINED),

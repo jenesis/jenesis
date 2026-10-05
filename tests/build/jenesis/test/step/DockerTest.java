@@ -11,8 +11,10 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Docker;
+import build.jenesis.step.JPackage;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class DockerTest {
 
@@ -251,6 +253,131 @@ public class DockerTest {
         writePlainJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"));
 
         BuildStepResult result = new Docker("example:latest").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        assertThat(next.resolve(Docker.DOCKER)).doesNotExist();
+    }
+
+    @Test
+    public void copies_a_jpackage_app_image_in_place_of_the_jars() throws IOException {
+        Path image = Files.createDirectories(input.resolve(JPackage.PACKAGES).resolve("sample"));
+        Files.writeString(Files.createDirectory(image.resolve("bin")).resolve("sample"), "launcher");
+        Path lib = Files.createDirectory(image.resolve("lib"));
+        Files.writeString(Files.createDirectory(lib.resolve("app")).resolve("sample.cfg"), "[Application]");
+        Files.writeString(Files.createDirectories(lib.resolve("runtime").resolve("bin")).resolve("java"), "runtime");
+        writePlainJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"));
+        SequencedProperties launcher = new SequencedProperties();
+        launcher.setProperty("mainClass", "sample.Sample");
+        launcher.store(input.resolve("launcher.properties"));
+
+        BuildStepResult result = new Docker("debian:stable-slim").jpackage("app-image").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("packages/sample/bin/sample"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        Path folder = next.resolve(Docker.DOCKER);
+        assertThat(folder.resolve("sample/bin/sample")).hasContent("launcher");
+        assertThat(folder.resolve("sample/lib/app/sample.cfg")).isRegularFile();
+        assertThat(folder.resolve("sample/lib/runtime/bin/java")).isRegularFile();
+        assertThat(folder.resolve("jars"))
+                .as("the app-image carries the application and its runtime, so no jar is copied beside it")
+                .doesNotExist();
+        assertThat(folder.resolve("application.args")).doesNotExist();
+        assertThat(dockerfile(folder)).containsSubsequence(
+                "FROM debian:stable-slim",
+                "WORKDIR /app",
+                "COPY [\"sample/\", \"/app/\"]",
+                "ENTRYPOINT [\"/app/bin/sample\"]");
+    }
+
+    @Test
+    public void installs_a_jpackage_debian_package_and_starts_its_launcher() throws IOException {
+        Files.writeString(Files.createDirectories(input.resolve(JPackage.PACKAGES)).resolve("sample_1.0_amd64.deb"), "package");
+        SequencedProperties jpackage = new SequencedProperties();
+        jpackage.setProperty("--name", "sample");
+        jpackage.store(Files.createDirectory(input.resolve("process")).resolve("jpackage.properties"));
+
+        BuildStepResult result = new Docker("debian:stable-slim").jpackage("deb").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("packages/sample_1.0_amd64.deb"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(result.next()).isTrue();
+        Path folder = next.resolve(Docker.DOCKER);
+        assertThat(folder.resolve("sample_1.0_amd64.deb")).hasContent("package");
+        assertThat(dockerfile(folder)).containsSubsequence(
+                "FROM debian:stable-slim",
+                "WORKDIR /app",
+                "COPY [\"sample_1.0_amd64.deb\", \"/tmp/jpackage/\"]",
+                "RUN apt-get update \\",
+                "    && apt-get install -y --no-install-recommends /tmp/jpackage/'sample_1.0_amd64.deb' \\",
+                "    && dpkg --listfiles \"$package\" | while IFS= read -r file; do case \"$file\" in */lib/app/'sample'.cfg) \\",
+                "       ln -s \"${file%/lib/app/*}/bin/\"'sample' /app/launcher;; esac; done \\",
+                "ENTRYPOINT [\"/app/launcher\"]");
+    }
+
+    @Test
+    public void installs_a_jpackage_rpm_package_with_the_launcher_its_format_names() throws IOException {
+        Files.writeString(Files.createDirectories(input.resolve(JPackage.PACKAGES)).resolve("sample-1.0-1.x86_64.rpm"), "package");
+        Path process = Files.createDirectory(input.resolve("process"));
+        SequencedProperties shared = new SequencedProperties();
+        shared.setProperty("--name", "sample");
+        shared.store(process.resolve("jpackage.properties"));
+        SequencedProperties typed = new SequencedProperties();
+        typed.setProperty("--name", "Sample's");
+        typed.store(process.resolve("jpackage-rpm.properties"));
+
+        new Docker("fedora:latest").jpackage("rpm").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("packages/sample-1.0-1.x86_64.rpm"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+
+        assertThat(dockerfile(next.resolve(Docker.DOCKER))).containsSubsequence(
+                "COPY [\"sample-1.0-1.x86_64.rpm\", \"/tmp/jpackage/\"]",
+                "RUN package=\"$(rpm --query --package --queryformat '%{NAME}' /tmp/jpackage/'sample-1.0-1.x86_64.rpm')\" \\",
+                "    && rpm --query --list \"$package\" | while IFS= read -r file; do case \"$file\" in */lib/app/'Sample'\\''s'.cfg) \\",
+                "ENTRYPOINT [\"/app/launcher\"]");
+    }
+
+    @Test
+    public void refuses_a_jpackage_format_that_a_linux_image_cannot_run() {
+        assertThatThrownBy(() -> new Docker("debian:stable-slim").jpackage("msi"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("[app-image, deb, rpm]");
+    }
+
+    @Test
+    public void refuses_a_jpackage_output_that_is_no_linux_app_image() throws IOException {
+        Files.createDirectories(input.resolve(JPackage.PACKAGES).resolve("sample.app").resolve("Contents"));
+
+        assertThatThrownBy(() -> new Docker("debian:stable-slim").jpackage("app-image").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("input", new BuildStepArgument(
+                        input,
+                        Map.of(Path.of("packages/sample.app/Contents"), Checksum.of(ChecksumStatus.ADDED)))))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("[sample.app]")
+                .hasMessageContaining("-Djenesis.project.docker=true");
+    }
+
+    @Test
+    public void skips_a_jpackage_image_when_nothing_was_packaged() throws IOException {
+        writePlainJar(Files.createDirectory(input.resolve(BuildStep.ARTIFACTS)).resolve("app.jar"));
+
+        BuildStepResult result = new Docker("debian:stable-slim").jpackage("app-image").apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("input", new BuildStepArgument(

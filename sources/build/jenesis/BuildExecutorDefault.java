@@ -176,7 +176,11 @@ class BuildExecutorDefault implements BuildExecutor {
                                 nextOutput,
                                 nextSupplement);
                         if (permits == null) {
-                            stepStage = step.apply(executor, context, arguments);
+                            try {
+                                stepStage = step.apply(executor, context, arguments);
+                            } catch (Throwable t) {
+                                stepStage = CompletableFuture.failedStage(t);
+                            }
                         } else {
                             stepStage = permits.acquire().thenComposeAsync(_ -> {
                                 try {
@@ -430,12 +434,18 @@ class BuildExecutorDefault implements BuildExecutor {
 
     @Override
     public CompletionStage<SequencedMap<String, Path>> execute(Executor executor, String... selectors) {
-        BiConsumer<Boolean, Throwable> completion = callback.step(null, registrations.sequencedKeySet());
         Set<Selector> initial = Arrays.stream(selectors)
                 .map(s -> new Selector(s, false))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Path canonical = target.toAbsolutePath().normalize();
         FileChannel lock = lock(canonical);
+        BiConsumer<Boolean, Throwable> completion;
+        try {
+            completion = callback.step(null, registrations.sequencedKeySet());
+        } catch (RuntimeException | Error e) {
+            release(canonical, lock);
+            throw e;
+        }
         try {
             return doExecute(executor, initial).thenApplyAsync(summaries -> {
                 SequencedMap<String, Path> translated = new LinkedHashMap<>();
@@ -444,11 +454,18 @@ class BuildExecutorDefault implements BuildExecutor {
                 }
                 return translated;
             }, executor).whenComplete((_, throwable) -> {
-                release(canonical, lock);
-                completion.accept(null, throwable);
+                try {
+                    completion.accept(null, throwable);
+                } finally {
+                    release(canonical, lock);
+                }
             });
         } catch (RuntimeException | Error e) {
-            release(canonical, lock);
+            try {
+                completion.accept(null, e);
+            } finally {
+                release(canonical, lock);
+            }
             throw e;
         }
     }

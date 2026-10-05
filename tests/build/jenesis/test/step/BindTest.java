@@ -52,6 +52,28 @@ public class BindTest {
     }
 
     @Test
+    public void binds_a_file_added_to_a_bound_folder_since_the_last_build() throws IOException {
+        Path schemas = Files.createDirectory(root.resolve("schemas"));
+        Files.writeString(schemas.resolve("order.xsd"), "<order/>");
+        SequencedMap<Path, Path> bindings = new LinkedHashMap<>();
+        bindings.put(Path.of(""), schemas);
+        for (String name : List.of("order.xsd", "invoice.xsd")) {
+            Files.writeString(schemas.resolve(name), "<" + name + "/>");
+            BuildExecutor buildExecutor = BuildExecutor.of(root.resolve("target"),
+                    Duration.ZERO,
+                    new HashDigestFunction("MD5"),
+                    BuildStepHashFunction.ofSerializationDigest("MD5"),
+                    BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+            buildExecutor.addModule("inputs", Bind.asInputs(new LinkedHashMap<>(Map.of("contracts", bindings))));
+            Path input = buildExecutor.execute().get("inputs/contracts");
+            assertThat(input.resolve(name))
+                    .as("a folder bound whole is rebound when a file is added to it")
+                    .content()
+                    .isEqualTo("<" + name + "/>");
+        }
+    }
+
+    @Test
     public void can_link_files() throws IOException {
         Files.writeString(original.resolve("file"), "foo");
         Files.writeString(Files.createDirectories(original.resolve("folder/sub")).resolve("file"), "bar");
