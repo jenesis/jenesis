@@ -372,7 +372,7 @@ public class ProjectTest {
     @Test
     public void skill_alone_prints_every_page() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
-        List<String> printed = new ArrayList<>();
+        List<String> printed = new CopyOnWriteArrayList<>();
         assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).out(printed::add), root, new LinkedHashSet<>(), Project.SKILL))
                 .isEmpty();
         assertThat(printed.stream().filter(page -> page.startsWith("# Jenesis - ")))
