@@ -285,6 +285,10 @@ factory, a lookup cache) is `transient` rather than left to drift into the key. 
 and never reaches a key at all, so a field of one is never `transient`.
 Steps compose by folder conventions - `sources/`, `classes/`, `artifacts/` - never by inspecting predecessor
 names. A step that forks a JDK tool extends `ProcessBuildStep` and thereby accepts `process-<tool>.properties`.
+A forked process is handed the platform's own variables (`PATH`, `HOME`, `LANG`, `TMPDIR`, Windows' `SystemRoot`
+and its kin) and nothing else of the build's environment, because a variable is no input of its step; a tool whose
+contract is a variable, as JReleaser's credentials are, implements `ProcessBuildStep.Environmental` and names it
+in `inherits`.
 
 **Modules activate on a file.** A build module under `project/` (`CheckstyleModule`, `JaCoCoModule`, …)
 switches itself on when its configuration file is present in a configuration folder

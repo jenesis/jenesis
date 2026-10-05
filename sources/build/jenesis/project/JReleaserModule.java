@@ -136,7 +136,7 @@ public class JReleaserModule implements BuildExecutorModule {
         }
     }
 
-    private static class Execute extends ProcessBuildStep {
+    private static class Execute extends ProcessBuildStep implements ProcessBuildStep.Environmental {
 
         private final Path root;
         private final Path configuration;
@@ -159,6 +159,11 @@ public class JReleaserModule implements BuildExecutorModule {
         @Override
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
             return true;
+        }
+
+        @Override
+        public boolean inherits(String variable) {
+            return variable.startsWith("JRELEASER_");
         }
 
         @Override
