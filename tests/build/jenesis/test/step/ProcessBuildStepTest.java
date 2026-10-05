@@ -60,14 +60,17 @@ public class ProcessBuildStepTest {
         Files.writeString(source, """
                 public class Variables {
                     public static void main(String[] args) {
-                        for (String name : new String[] {"SAMPLE_LITERAL", "SAMPLE_SHARED", "SAMPLE_UNSET_IN_THE_BUILD"}) {
+                        for (String name : args) {
                             System.out.println(name + "=" + System.getenv(name));
                         }
                     }
                 }
                 """);
         Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
-        new Program("java", ProcessHandler.OfProcess.ofJavaHome("bin/java"), List.of("java", "test"), List.of(source.toString()))
+        new Program("java",
+                ProcessHandler.OfProcess.ofJavaHome("bin/java"),
+                List.of("java", "test"),
+                List.of(source.toString(), "SAMPLE_LITERAL", "SAMPLE_SHARED", "SAMPLE_UNSET_IN_THE_BUILD"))
                 .apply(Runnable::run,
                         new BuildStepContext(null, next, supplement),
                         new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(folder, Map.of()))))
