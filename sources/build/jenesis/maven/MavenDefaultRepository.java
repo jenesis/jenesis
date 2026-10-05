@@ -91,7 +91,7 @@ public class MavenDefaultRepository implements MavenRepository {
                 local,
                 Collections.unmodifiableMap(validations),
                 printing == null ? null : path -> printing.accept("%s%-11s%s %s".formatted(
-                        palette.yellow(),
+                        palette.info(),
                         "[FETCHED]",
                         palette.reset(),
                         uri.resolve(path))),
@@ -234,7 +234,7 @@ public class MavenDefaultRepository implements MavenRepository {
         return new MavenDefaultRepository(repository, local, validations, printing == null
                 ? null
                 : path -> printing.accept("%s%-11s%s %s".formatted(
-                        palette.yellow(),
+                        palette.info(),
                         "[FETCHED]",
                         palette.reset(),
                         repository.resolve(path))), token, connection);

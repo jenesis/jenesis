@@ -4,34 +4,56 @@ import module java.base;
 
 public enum Palette {
 
-    ANSI, PLAIN;
+    ANSI, NONE;
 
     public static Palette ofEnvironment(Environment environment) {
-        return environment.flag("print.color", true) ? ANSI : PLAIN;
+        String colors = environment.value("palette.colors", "ansi");
+        return switch (colors) {
+            case "ansi" -> ANSI;
+            case "none" -> NONE;
+            default -> throw new IllegalArgumentException(
+                    "Unknown jenesis.palette.colors '" + colors + "', expected 'ansi' or 'none'");
+        };
     }
 
     public String reset() {
         return escape("0");
     }
 
-    public String red() {
-        return escape("31");
-    }
-
-    public String green() {
+    public String status() {
         return escape("32");
     }
 
-    public String yellow() {
-        return escape("33");
+    public String failure() {
+        return escape("31");
     }
 
-    public String blue() {
+    public String skipped() {
         return escape("34");
     }
 
-    public String cyan() {
+    public String info() {
+        return escape("33");
+    }
+
+    public String warning() {
+        return escape("33");
+    }
+
+    public String heading() {
+        return escape("33");
+    }
+
+    public String detail() {
         return escape("36");
+    }
+
+    public String output() {
+        return escape("38;5;244");
+    }
+
+    public String error() {
+        return escape("38;5;131");
     }
 
     public String color(int code) {

@@ -589,9 +589,9 @@ public record Project(
                                      .replace("%{layout}", layout)
                                      .replace("%{assembler}", assembler)
                                      .replace("%{reset}", palette.reset())
-                                     .replace("%{header}", palette.yellow())
-                                     .replace("%{name}", palette.cyan())
-                                     .replace("%{title}", palette.green()));
+                                     .replace("%{header}", palette.heading())
+                                     .replace("%{name}", palette.detail())
+                                     .replace("%{title}", palette.status()));
         }
     }
 
@@ -614,7 +614,7 @@ public record Project(
 
                     `Make` is the entry point, `Project` the configuration API and has no `main`. No
                     selector runs `build`; several, space-separated, run in one invocation. Pass
-                    -Djenesis.print.color=false to read the output as plain text, without the
+                    -Djenesis.palette.colors=none to read the output as plain text, without the
                     escape sequences that colour it.
 
                     The installed `jenesis` verifies `build/jenesis` against the released sources
@@ -1464,7 +1464,7 @@ public record Project(
                     return;
                 }
                 printing.accept("%s%-11s%s %s is pinned at %s".formatted(
-                        palette.yellow(),
+                        palette.warning(),
                         "[DIVERGED]",
                         palette.reset(),
                         coordinate,
@@ -2720,8 +2720,8 @@ public record Project(
                 process.factory|tool|tool|fork; fork runs a JDK tool in a process of its own
                 legal.notices|META-INF/NOTICE,META-INF/LICENSE,META-INF/license/,META-INF/licenses/,LICENSE,about.html|Comma-separated jar entries taken as legal notices into a jmod, a linked or packaged image and beside a native image, from the module's jar at the root and from each runtime dependency's jar in a folder named after it; names match regardless of case and also with an extension, as META-INF/LICENSE.txt, and an entry ending in / takes the folder below it
                 archive.timestamp|1980-02-01T00:00:00Z|ISO-8601 date-time with an offset recorded on every entry of the jars, jmods and zips the build writes; empty keeps the times the tools record and makes the archives unreproducible; set explicitly, it is also the creation time a generated Docker image is labelled with
+                palette.colors|ansi|ansi colours what the build prints with ANSI escape sequences; none prints plain text
                 print.progress|true|The build progress lines
-                print.color|true|Colour what the build prints with ANSI escape sequences; false prints plain text
                 print.process|false|Stream each external tool's command line and output as it runs
                 print.<command>||The same for one tool only, as print.javac or print.tests
                 print.command|false|Each external tool command line, without its output

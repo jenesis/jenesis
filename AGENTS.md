@@ -82,8 +82,9 @@ well, so a caller that names no strings configures the same object programmatica
 things a run is given - the immutable `Map<String, String>` of the settings in force, and the `Consumer<String>` for
 its output and for its errors - and it is the single argument every `ofEnvironment` takes. Nothing in the
 engine writes to `System.out` or `System.err`; a line goes to the consumer the run was handed. Colour is a
-`Palette` resolved from `jenesis.print.color` where the printing object is built, kept beside its consumer and
-`transient` in a step, and no escape sequence is written anywhere but in `Palette`, so `PLAIN` leaves plain text.
+`Palette` resolved from `jenesis.palette.colors` where the printing object is built and handed over with the consumer
+it colours, `transient` in a step. It names roles - `status`, `failure`, `info`, `warning`, … - rather than colours,
+and no escape sequence is written anywhere but in `Palette`, so `NONE` leaves plain text.
 `Environment.NONE` holds no setting and writes to the JVM's streams, `new Environment(keys)` is a map of
 settings with the JVM's streams, and `new Environment(keys, out, err)` is a tool's writers. There is deliberately no
 environment that reads the JVM's properties as they stand: code running inside a build - a plugin, an

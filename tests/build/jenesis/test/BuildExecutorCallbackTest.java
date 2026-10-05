@@ -25,17 +25,17 @@ public class BuildExecutorCallbackTest {
                 .accept(true, null);
         assertThat(printed).hasSize(1);
         assertThat(printed.getFirst())
-                .matches(Pattern.quote(Palette.ANSI.green() + "[EXECUTED] " + Palette.ANSI.reset())
+                .matches(Pattern.quote(Palette.ANSI.status() + "[EXECUTED] " + Palette.ANSI.reset())
                         + " foo "
-                        + Pattern.quote(Palette.ANSI.cyan())
+                        + Pattern.quote(Palette.ANSI.detail())
                         + "in [0-9]+.[0-9]{2} seconds"
                         + Pattern.quote(Palette.ANSI.reset()));
     }
 
     @Test
-    public void prints_plain_text_with_a_plain_palette() {
+    public void prints_plain_text_without_colors() {
         List<String> printed = new ArrayList<>();
-        BuildExecutorCallback.printing(printed::add, Palette.PLAIN, false, false, null)
+        BuildExecutorCallback.printing(printed::add, Palette.NONE, false, false, null)
                 .step("foo", new LinkedHashSet<>(Set.of("bar")))
                 .accept(false, null);
         assertThat(printed).containsExactly("[SKIPPED]   foo");
@@ -48,7 +48,7 @@ public class BuildExecutorCallbackTest {
                 .step("foo", new LinkedHashSet<>(Set.of("bar")))
                 .accept(false, null);
         assertThat(printed).containsExactly(
-                Palette.ANSI.blue() + "[SKIPPED]  " + Palette.ANSI.reset() + " foo");
+                Palette.ANSI.skipped() + "[SKIPPED]  " + Palette.ANSI.reset() + " foo");
     }
 
     @Test
@@ -59,7 +59,7 @@ public class BuildExecutorCallbackTest {
                 .accept(null, new RuntimeException("message"));
         assertThat(printed)
                 .as("a line is handed to the consumer as it stands, so what ends it is the caller's business")
-                .containsExactly(Palette.ANSI.red() + "[FAILED]   " + Palette.ANSI.reset()
+                .containsExactly(Palette.ANSI.failure() + "[FAILED]   " + Palette.ANSI.reset()
                         + " foo: message");
     }
 

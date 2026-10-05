@@ -315,7 +315,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
         }
         return open(connection, location, token).map(stream -> {
             if (printing != null) {
-                printing.accept("%s%-11s%s %s".formatted(palette.yellow(),
+                printing.accept("%s%-11s%s %s".formatted(palette.info(),
                         "[FETCHED]",
                         palette.reset(),
                         location));

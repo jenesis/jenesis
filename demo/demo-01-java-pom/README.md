@@ -69,7 +69,7 @@ the declared license:
 
 The tree is coloured, as is everything the build prints. To read the output as
 plain text, as a script or a coding agent does from a file or a pipe, pass
-`-Djenesis.print.color=false`.
+`-Djenesis.palette.colors=none`.
 
 The tree starts from the project itself, drawn like any module built here: its
 coordinate, version and scope, tagged `local` with the folder it is built from.

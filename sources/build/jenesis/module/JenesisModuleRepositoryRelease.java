@@ -130,7 +130,7 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
             URI target = repository.resolve(entry.getKey());
             upload(target, entry.getValue());
             if (printing != null) {
-                printing.accept("%s%-11s%s %s".formatted(palette.green(),
+                printing.accept("%s%-11s%s %s".formatted(palette.status(),
                         "[RELEASED]",
                         palette.reset(),
                         target));

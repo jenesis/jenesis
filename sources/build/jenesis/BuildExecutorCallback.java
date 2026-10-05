@@ -70,25 +70,25 @@ public interface BuildExecutorCallback {
                 long started = System.nanoTime();
                 if (identity == null) {
                     out.accept("%s%-11s%s Building in '%s'...".formatted(
-                            palette.green(), "[STARTED]", palette.reset(), target));
+                            palette.status(), "[STARTED]", palette.reset(), target));
                     if (events) {
                         out.accept("%s%-11s%s Recording each step's outcome as a JSON line in '%s'".formatted(
-                                palette.green(), "[EVENTS]", palette.reset(), target.resolve(BuildExecutor.EVENTS)));
+                                palette.status(), "[EVENTS]", palette.reset(), target.resolve(BuildExecutor.EVENTS)));
                     }
                     return (_, throwable) -> {
                         double time = ((double) (System.nanoTime() - started) / 1_000_000) / 1_000;
                         out.accept("%s%-11s%s Finished %sin %.2f seconds%s".formatted(
-                                throwable == null ? palette.green() : palette.red(),
+                                throwable == null ? palette.status() : palette.failure(),
                                 throwable == null ? "[COMPLETED]" : "[FAILED]",
                                 palette.reset(),
-                                palette.cyan(),
+                                palette.detail(),
                                 time,
                                 palette.reset()));
                     };
                 }
                 return (executed, throwable) -> {
                     if (throwable != null) {
-                        out.accept("%s%-11s%s %s: %s".formatted(palette.red(), "[FAILED]", palette.reset(), identity,
+                        out.accept("%s%-11s%s %s: %s".formatted(palette.failure(), "[FAILED]", palette.reset(), identity,
                                 throwable instanceof BuildExecutorException
                                         ? throwable.getCause().getMessage()
                                         : throwable.getMessage()));
@@ -96,8 +96,8 @@ public interface BuildExecutorCallback {
                         double time = ((double) (System.nanoTime() - started) / 1_000_000) / 1_000;
                         synchronized (out) {
                             out.accept("%s%-11s%s %s %sin %.2f seconds%s".formatted(
-                                    palette.green(), "[EXECUTED]", palette.reset(),
-                                    identity, palette.cyan(), time, palette.reset()));
+                                    palette.status(), "[EXECUTED]", palette.reset(),
+                                    identity, palette.detail(), time, palette.reset()));
                             if (verbose) {
                                 Path checksums = target.resolve(identity)
                                         .resolve("checksum")
@@ -115,7 +115,7 @@ public interface BuildExecutorCallback {
                             }
                         }
                     } else {
-                        out.accept("%s%-11s%s %s".formatted(palette.blue(), "[SKIPPED]", palette.reset(), identity));
+                        out.accept("%s%-11s%s %s".formatted(palette.skipped(), "[SKIPPED]", palette.reset(), identity));
                     }
                 };
             }
@@ -127,8 +127,8 @@ public interface BuildExecutorCallback {
                     if (throwable == null) {
                         double time = ((double) (System.nanoTime() - started) / 1_000_000) / 1_000;
                         out.accept("%s%-11s%s %s %sin %.2f seconds%s".formatted(
-                                palette.green(), "[RESOLVED]", palette.reset(),
-                                identity, palette.cyan(), time, palette.reset()));
+                                palette.status(), "[RESOLVED]", palette.reset(),
+                                identity, palette.detail(), time, palette.reset()));
                     }
                 };
             }
@@ -137,8 +137,8 @@ public interface BuildExecutorCallback {
             public void loaded(String identity, long duration) {
                 if (cache) {
                     out.accept("%s%-11s%s %s %sin %.2f seconds%s".formatted(
-                            palette.yellow(), "[LOADED]", palette.reset(),
-                            identity, palette.cyan(), ((double) duration / 1_000_000) / 1_000, palette.reset()));
+                            palette.info(), "[LOADED]", palette.reset(),
+                            identity, palette.detail(), ((double) duration / 1_000_000) / 1_000, palette.reset()));
                 }
             }
 
@@ -146,8 +146,8 @@ public interface BuildExecutorCallback {
             public void stored(String identity, long duration) {
                 if (cache) {
                     out.accept("%s%-11s%s %s %sin %.2f seconds%s".formatted(
-                            palette.yellow(), "[STORED]", palette.reset(),
-                            identity, palette.cyan(), ((double) duration / 1_000_000) / 1_000, palette.reset()));
+                            palette.info(), "[STORED]", palette.reset(),
+                            identity, palette.detail(), ((double) duration / 1_000_000) / 1_000, palette.reset()));
                 }
             }
         };

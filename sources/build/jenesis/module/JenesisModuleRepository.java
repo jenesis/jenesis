@@ -442,7 +442,7 @@ public class JenesisModuleRepository implements JenesisRepository {
             return Optional.empty();
         }
         if (printing != null) {
-            printing.accept("%s%-11s%s %s".formatted(palette.yellow(),
+            printing.accept("%s%-11s%s %s".formatted(palette.info(),
                     "[FETCHED]",
                     palette.reset(),
                     uri));

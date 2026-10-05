@@ -74,13 +74,13 @@ public final class DependencyTreeReport {
                         SequencedMap<String, Resolver.Vertex> resolved) {
         StringBuilder builder = new StringBuilder(System.lineSeparator());
         if (title != null) {
-            builder.append(palette.yellow()).append(title).append(palette.reset())
+            builder.append(palette.heading()).append(title).append(palette.reset())
                     .append(System.lineSeparator());
         }
         builder.append(render(edges, nodes));
         if (!resolved.isEmpty()) {
             builder.append(System.lineSeparator())
-                    .append(palette.yellow()).append("Resolved dependencies:").append(palette.reset())
+                    .append(palette.heading()).append("Resolved dependencies:").append(palette.reset())
                     .append(System.lineSeparator());
             int[] external = {0};
             resolved.forEach((coordinate, node) -> {
@@ -163,20 +163,20 @@ public final class DependencyTreeReport {
         }
         StringBuilder builder = new StringBuilder();
         builder.append(System.lineSeparator())
-                .append(palette.yellow()).append("Licenses:").append(palette.reset())
+                .append(palette.heading()).append("Licenses:").append(palette.reset())
                 .append(System.lineSeparator())
                 .append("  ").append(paint(245, tally)).append(System.lineSeparator());
         for (Map.Entry<String, Integer> entry : distribution(licenses)) {
             builder.append(row(entry.getKey(), entry.getValue(), total, width, categoryColor(categories.get(entry.getKey()))));
         }
         builder.append(System.lineSeparator())
-                .append(palette.yellow()).append("Permissiveness:").append(palette.reset())
+                .append(palette.heading()).append("Permissiveness:").append(palette.reset())
                 .append(System.lineSeparator());
         for (Map.Entry<String, Integer> entry : distribution(permissiveness)) {
             builder.append(row(entry.getKey(), entry.getValue(), total, width, categoryColor(entry.getKey())));
         }
         builder.append(System.lineSeparator())
-                .append(palette.yellow()).append("Modules:").append(palette.reset())
+                .append(palette.heading()).append("Modules:").append(palette.reset())
                 .append(System.lineSeparator())
                 .append(row("named", named, total, width, 71))
                 .append(row("automatic", automatic, total, width, 214))

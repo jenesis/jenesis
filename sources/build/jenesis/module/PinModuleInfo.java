@@ -202,7 +202,7 @@ public class PinModuleInfo implements BuildStep {
             updateModuleInfo(file, entries, covered, retained, references, flatten, platform, carried);
             if (printing != null && !carried.isEmpty()) {
                 printing.accept("%s%-11s%s %s".formatted(
-                        palette.yellow(),
+                        palette.warning(),
                         "[KEPT]",
                         palette.reset(),
                         file + ": kept, resolved by no closure: "

@@ -67,13 +67,13 @@ public abstract class ProcessBuildStep implements BuildStep {
             Consumer<String> out = environment.out();
             Palette palette = Palette.ofEnvironment(environment);
             return new Terms(streamed
-                    ? (error, line) -> out.accept(palette.color(error ? 131 : 244)
+                    ? (error, line) -> out.accept((error ? palette.error() : palette.output())
                             + command + " >>>> " + line + palette.reset())
                     : null,
                     concurrency == 0 ? null : PERMITS.computeIfAbsent(concurrency, Semaphore::new),
                     environment.flag("print.command")
                             ? executed -> out.accept("%s%-11s%s %s".formatted(
-                                    palette.yellow(), "[EXECUTED]", palette.reset(), executed))
+                                    palette.info(), "[EXECUTED]", palette.reset(), executed))
                             : null);
         }
 

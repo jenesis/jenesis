@@ -969,7 +969,7 @@ public class Dependencies implements BuildExecutorModule {
             if (descriptor != null && descriptor.name().equals(alias)) {
                 if (printing != null) {
                     printing.accept("%s%-11s%s %s already declares %s, so the alias declared by %s"
-                                    .formatted(palette.yellow(),
+                                    .formatted(palette.warning(),
                                             "[ALIAS]",
                                             palette.reset(),
                                             coordinate,

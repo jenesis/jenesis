@@ -12,40 +12,45 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 public class PaletteTest {
 
     @Test
-    public void colours_unless_told_otherwise() {
+    public void colors_with_ansi_unless_told_otherwise() {
         assertThat(Palette.ofEnvironment(Environment.NONE)).isEqualTo(Palette.ANSI);
-        assertThat(Palette.ofEnvironment(new Environment(Map.of("print.color", "true")))).isEqualTo(Palette.ANSI);
-        assertThat(Palette.ANSI.green()).isEqualTo("\033[32m");
-        assertThat(Palette.ANSI.color(244)).isEqualTo("\033[38;5;244m");
+        assertThat(Palette.ofEnvironment(new Environment(Map.of("palette.colors", "ansi")))).isEqualTo(Palette.ANSI);
+        assertThat(Palette.ANSI.status()).isEqualTo("\033[32m");
+        assertThat(Palette.ANSI.output()).isEqualTo("\033[38;5;244m");
     }
 
     @Test
-    public void prints_plain_text_when_switched_off() {
-        Palette palette = Palette.ofEnvironment(new Environment(Map.of("print.color", "false")));
-        assertThat(palette).isEqualTo(Palette.PLAIN);
+    public void prints_plain_text_without_colors() {
+        Palette palette = Palette.ofEnvironment(new Environment(Map.of("palette.colors", "none")));
+        assertThat(palette).isEqualTo(Palette.NONE);
         assertThat(Stream.of(palette.reset(),
-                        palette.red(),
-                        palette.green(),
-                        palette.yellow(),
-                        palette.blue(),
-                        palette.cyan(),
+                        palette.status(),
+                        palette.failure(),
+                        palette.skipped(),
+                        palette.info(),
+                        palette.warning(),
+                        palette.heading(),
+                        palette.detail(),
+                        palette.output(),
+                        palette.error(),
                         palette.color(244),
                         palette.bold(39)))
-                .as("a plain palette writes nothing where a colour would go, so the text around it stays as it is")
+                .as("without colors a palette writes nothing where a color would go, so the text around it stays as it is")
                 .allMatch(String::isEmpty);
     }
 
     @Test
-    public void refuses_a_value_that_is_no_flag() {
-        assertThatThrownBy(() -> Palette.ofEnvironment(new Environment(Map.of("print.color", "auto"))))
+    public void refuses_an_unknown_palette_naming_the_known_ones() {
+        assertThatThrownBy(() -> Palette.ofEnvironment(new Environment(Map.of("palette.colors", "auto"))))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("print.color");
+                .hasMessageContaining("jenesis.palette.colors 'auto'")
+                .hasMessageContaining("'ansi' or 'none'");
     }
 
     @Test
     public void the_executor_configuration_takes_the_palette_of_its_environment() {
         assertThat(new BuildExecutor.Configuration().palette()).isEqualTo(Palette.ANSI);
-        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(Map.of("print.color", "false"))).palette())
-                .isEqualTo(Palette.PLAIN);
+        assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(Map.of("palette.colors", "none"))).palette())
+                .isEqualTo(Palette.NONE);
     }
 }

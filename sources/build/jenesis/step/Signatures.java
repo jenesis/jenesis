@@ -234,7 +234,7 @@ public class Signatures extends ProcessBuildStep {
             if (accepted.isEmpty()) {
                 if (printing != null) {
                     print("[UNDECLARED]",
-                            palette.yellow(),
+                            palette.warning(),
                             token + " " + version,
                             "no @jenesis.signature line covers it");
                 }
@@ -246,7 +246,7 @@ public class Signatures extends ProcessBuildStep {
             if (accepted.stream().anyMatch("unsigned/ignored"::equalsIgnoreCase)) {
                 if (printing != null) {
                     print("[UNVERIFIED]",
-                            palette.yellow(),
+                            palette.warning(),
                             token + " " + version,
                             "unsigned/ignored accepts it signed or not");
                 }
@@ -305,7 +305,7 @@ public class Signatures extends ProcessBuildStep {
                     }
                     if (printing != null) {
                         print("[VERIFIED]",
-                                palette.green(),
+                                palette.status(),
                                 token + " " + version,
                                 matched + " as " + attestation.identity() + ", recorded " + attestation.recorded());
                     }
@@ -328,7 +328,7 @@ public class Signatures extends ProcessBuildStep {
                 acknowledged.removeIf(declaration -> !unsigned(declaration));
                 if (printing != null) {
                     print(acknowledged.isEmpty() ? "[UNSIGNED]" : "[UNVERIFIED]",
-                            palette.yellow(),
+                            palette.warning(),
                             token + " " + version,
                             acknowledged.isEmpty()
                                     ? (identity
@@ -361,7 +361,7 @@ public class Signatures extends ProcessBuildStep {
             String fingerprint = "OpenPGP/" + status.fingerprint().toUpperCase(Locale.ROOT);
             if (printing != null && accepted.stream().anyMatch(fingerprint::equalsIgnoreCase)) {
                 print(status.expired() < 0 ? "[VERIFIED]" : "[EXPIRED]",
-                        status.expired() < 0 ? palette.green() : palette.yellow(),
+                        status.expired() < 0 ? palette.status() : palette.warning(),
                         token + " " + version,
                         fingerprint + status.dates());
             }
@@ -543,7 +543,7 @@ public class Signatures extends ProcessBuildStep {
                 } catch (IOException e) {
                     if (printing != null) {
                         print("[UNFETCHED]",
-                                palette.yellow(),
+                                palette.warning(),
                                 declaration,
                                 e.getMessage() == null ? e.toString() : e.getMessage());
                     }
