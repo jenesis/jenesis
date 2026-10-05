@@ -108,7 +108,7 @@ public abstract class ProcessBuildStep implements BuildStep {
         if (!variables.isEmpty()) {
             throw new IllegalStateException("An environment file hands " + variables.keySet() + " to " + command
                     + ", which takes no environment: only a program the build runs in a process of its own does"
-                    + " - java, the tests, PIT, native-image, gpgv and jreleaser");
+                    + " - a forked JVM, the test run, PIT and native-image");
         }
         return handler;
     }

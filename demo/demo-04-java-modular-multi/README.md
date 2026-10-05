@@ -150,8 +150,8 @@ not, which suits a credential or a proxy but not a parameter a result depends
 on - make that one a `@<key>`. A resolved value is written into the build's
 output like the rest of the file, so a credential stays a bare name.
 Only a program the build runs in a process of its own takes variables this way:
-`java`, the test run, PIT's mutation run (`environment-pitest.properties`),
-`native-image` and `gpgv`. A JDK tool such as `javac` or `javadoc` takes none,
+`java`, the test run, PIT's mutation run (`environment-pitest.properties`) and
+`native-image`. A JDK tool such as `javac` or `javadoc` takes none,
 as it may run inside the build's own JVM, and a file naming one fails the build.
 
 Shared test infrastructure
