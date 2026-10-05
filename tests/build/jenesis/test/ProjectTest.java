@@ -329,6 +329,60 @@ public class ProjectTest {
     }
 
     @Test
+    public void skill_start_prints_an_overview_that_names_the_pages_rather_than_their_contents() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        List<String> printed = new ArrayList<>();
+        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).out(printed::add), root, new LinkedHashSet<>(), Project.SKILL + "/start")).isEmpty();
+        assertThat(String.join("\n", printed))
+                .contains("## Essentials", "skill/tags", "skill/plugins")
+                .as("the overview is what every task needs, so a page's depth stays on the page")
+                .doesNotContain("@jenesis.layer <name>");
+    }
+
+    @Test
+    public void skill_prints_every_page_its_overview_names() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        List<String> overview = new ArrayList<>();
+        Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).out(overview::add), root, new LinkedHashSet<>(), Project.SKILL + "/start");
+        List<String> pages = String.join("\n", overview).lines()
+                .map(String::strip)
+                .filter(line -> line.startsWith(Project.SKILL + "/"))
+                .map(line -> line.split("\\s+")[0])
+                .toList();
+        assertThat(pages).hasSizeGreaterThan(5);
+        for (String page : pages) {
+            List<String> printed = new ArrayList<>();
+            assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).out(printed::add), root, new LinkedHashSet<>(), page))
+                    .as(page)
+                    .isEmpty();
+            assertThat(printed).as(page).anyMatch(text -> text.startsWith("# Jenesis - "));
+            assertThat(String.join("\n", printed)).as(page).doesNotContain("## Essentials");
+        }
+    }
+
+    @Test
+    public void skill_names_its_pages_when_one_does_not_exist() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        List<String> errors = new ArrayList<>();
+        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).err(errors::add), root, new LinkedHashSet<>(), "skill/nonsense"))
+                .isNull();
+        assertThat(errors).anyMatch(line -> line.contains("Unknown selector: nonsense - expected one of [start, invoke, layout"));
+    }
+
+    @Test
+    public void skill_alone_prints_every_page() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        List<String> printed = new ArrayList<>();
+        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).out(printed::add), root, new LinkedHashSet<>(), Project.SKILL))
+                .isEmpty();
+        assertThat(printed.stream().filter(page -> page.startsWith("# Jenesis - ")))
+                .as("each page is printed as one text, so pages printed at once never tear one another")
+                .hasSize(12)
+                .allMatch(page -> page.strip().endsWith("java build/jenesis/Make.java skill/start"));
+        assertThat(String.join("\n", printed)).contains("## Essentials");
+    }
+
+    @Test
     public void configuration_defaults_to_build_jenesis_under_the_root() {
         assertThat(Project.ofEnvironment(new Environment(settings), Path.of(".")).configuration())
                 .containsExactly(Path.of(".").resolve("build.jenesis"));

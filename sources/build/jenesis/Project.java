@@ -511,7 +511,7 @@ public record Project(
                       %{name}configuration%{reset} Print every setting with the value in force, one per line
                       %{name}properties%{reset}    Print only the %{name}-Djenesis.*%{reset} properties that are set
                       %{name}help%{reset}          Print this message
-                      %{name}skill%{reset}         Print the briefing for a coding agent
+                      %{name}skill%{reset}         Print the briefing for a coding agent; %{name}skill/start%{reset} where to begin
 
                       %{name}+<module>%{reset} narrows %{name}build%{reset} to one module, not %{name}stage%{reset}, %{name}export%{reset} or
                       %{name}pin%{reset}, and %{name}+<module>/<step>%{reset} narrows it to a single step inside that
@@ -574,7 +574,7 @@ public record Project(
                     %{header}Reading further:%{reset}
                       %{name}https://jenesis.build/tool%{reset}  The documentation
                       %{name}configuration%{reset}               Every setting, its value and what it does
-                      %{name}skill%{reset}                       The whole tool as a briefing for a coding agent
+                      %{name}skill%{reset}                       The tool as a briefing for a coding agent, by page
                     """)
                                      .replace("%{layout}", layout)
                                      .replace("%{assembler}", assembler)
@@ -587,16 +587,65 @@ public record Project(
 
     private record SkillModule(Path target, Consumer<String> out) implements BuildExecutorModule {
 
+        private static final List<String> PAGES = List.of(
+                "start", "invoke", "layout", "target", "selectors", "tags", "tools",
+                "settings", "execute", "pinning", "plugins", "demos", "engine");
+
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
-            out.accept(("""
+            for (String page : PAGES) {
+                buildExecutor.addModule(page, new SkillPage(target, out, page));
+            }
+        }
+    }
+
+    private record SkillPage(Path target, Consumer<String> out, String page) implements BuildExecutorModule {
+
+        @Override
+        public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
+            out.accept((switch (page) {
+                case "start" -> """
                     # Jenesis build tool - operating instructions
 
-                    You are in a Jenesis-built Java project. Use this to drive the build, read its
-                    state, and avoid the cache mistakes that catch agents. Full documentation:
-                    https://jenesis.build/tool. `help` prints a short human orientation.
+                    You are in a Jenesis-built Java project. This overview is what every task needs;
+                    each page below goes deeper and is printed by naming it as a selector, as
+                    `java build/jenesis/Make.java skill/tags`, and `skill` alone prints them all.
+                    Full documentation: https://jenesis.build/tool. `help` prints a short human
+                    orientation.
 
-                    ## 1. Invoke the build
+                    ## Essentials
+
+                      java build/jenesis/Make.java [selectors...]  build; no selector runs `build`
+                      java build/jenesis/Make.java configuration    every setting and the value in force
+                      java build/jenesis/Execute.java [args...]     build and run the main class
+
+                    - Never delete target/ and never pass -Djenesis.executor.rebuild=true: every step
+                      is keyed by its inputs, so a build re-runs exactly what changed.
+                    - What a step produced is in %{target}/build/<step path>/output/, and
+                      that path without the target/ prefix and /output is a selector of its own.
+                    - After editing a build step's code, bump its serialVersionUID, or its cached
+                      output is reused.
+                    - Whenever you add or change a dependency, offer to run `pin`.
+                    - Find the demo that matches the task and copy its shape rather than inventing
+                      configuration.
+
+                    ## Pages
+
+                      skill/invoke     entry points, the installed CLI, embedding, the JDK it runs on
+                      skill/layout     maven, modular or modular_to_maven, and how one is picked
+                      skill/target     what target/ holds, folders as selectors, per-module properties
+                      skill/selectors  the entry points, +<module>, : and ::
+                      skill/tags       pins, BOMs, aliases, layers, agents, native access, signatures
+                      skill/tools      a file in a module switches a tool on: tests, quality, generators
+                      skill/settings   the configuration selector, where settings live, the useful ones
+                      skill/execute    Execute, the ToolProvider services, @<file> arguments
+                      skill/pinning    versions, checksums, signatures, and when to offer them
+                      skill/plugins    jenesis.plugins.properties, its hook points, inputs and arguments
+                      skill/demos      the demos as a recipe book, by topic
+                      skill/engine     editing a build step, and reading the source when stuck
+                    """;
+                case "invoke" -> """
+                    # Jenesis - Invoke the build
 
                       java build/jenesis/Make.java [selectors...]  source mode, always available
                       jenesis [selectors...]                       installed CLI
@@ -626,51 +675,15 @@ public record Project(
                     JDK matches; the jenesis command names its jenesis-jdk there, for the run it starts,
                     where SDKMAN, mise or Scoop installed it, and that calls the tool back.
 
-                    To add to the stock build, name plugins in jenesis.plugins.properties beside
-                    jenesis.properties, one line each: <name>+<hook point>=<module name>, or =./<folder>
-                    for a plugin compiled from source, where the hook point is a module of the build (check,
-                    binary/generated, artifact, package, ...) or left out for the module build itself, and
-                    =<module>@<provider> selects the provider annotated @BuildModuleName. A plugin
-                    runs in a module only where plugin-<name>.properties is found in its configuration
-                    locations; a provider is created with that file's values when it declares a
-                    public constructor taking a SequencedMap of them, and with its no-argument one when
-                    the file is empty. A key @<input>[/<target>]=<path> binds a file or folder of the
-                    project, relative to the module, into an input the plugin reads as ../inputs/<input>,
-                    placed at <target> inside it; one input takes a key per target, and @@<key> is the
-                    value @<key>. A path must stay within the project. A plugin adds to its module and replaces nothing; a build that
-                    changes what the stock steps do is an entry point of its own. A plugin runs the
-                    project's code, as its tests do, so build an untrusted project with
-                    -Djenesis.project.docker=true.
-
-                    Eight hook points run a plugin once for the whole project. preprocess runs as
-                    build/preprocess/custom/<name> before any module is built, sees only the inputs it
-                    binds and hands the build nothing, so it can only stop it. postprocess/transform
-                    and postprocess/inspect run over every module built, as
-                    build/postprocess/transform/<name> and build/postprocess/inspect/<name>, before
-                    anything is staged. export and release run as export/custom/<name> and
-                    release/custom/<name> beside the stock steps of their goal, and are handed
-                    everything staged. stage/transform runs after the stock staging, and
-                    what it writes under a folder named after a staged tree joins that tree, so export
-                    and release ship it; stage/inspect checks the result before either runs. plugin
-                    runs as plugin/<name> only when that selector is named, depends on nothing and is
-                    handed only what it binds. Switch an expensive one off with
-                    -Djenesis.plugin.<name>=false or in a profile, and every plugin with
-                    -Djenesis.project.plugins=false. Such a plugin
-                    reads its values as <name>.<key> from jenesis.plugins.arguments.properties, and
-                    from a jenesis.plugins.arguments-<profile>.properties per active profile, and pin
-                    writes its pins to jenesis.plugins.pin.properties. A transform adds files to a
-                    module by naming them in an inventory.properties of its own under any
-                    <module>.<key>, such as <module>.attachment.<classifier> or <module>.report.<name>,
-                    and what belongs to no module in a project/ folder that stage copies as it stands
-                    into stage/project; an inspection fails the build by throwing and changes nothing
-                    it was handed.
-
                     A project with its own entry point calls `new Make("build.Demo").run(selectors)`,
                     which returns the status to exit with. For a GraalVM native launcher, read the
                     documentation: it needs reachability metadata captured from a real build, a JDK
                     on PATH, and it cannot load foreign build modules.
 
-                    ## 2. Take the layout the project infers
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
+                    """;
+                case "layout" -> """
+                    # Jenesis - Take the layout the project infers
 
                       maven             pom.xml per module; jar plus pom.xml
                       modular           module-info.java per module; modular jar, no pom
@@ -679,7 +692,12 @@ public record Project(
                     `auto` picks maven for a root pom.xml, else modular_to_maven; it never picks
                     plain modular. Override only with cause: -Djenesis.project.layout=<name>.
 
-                    ## 3. Read target/, never delete it
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
+                    """;
+                case "target" -> """
+                    # Jenesis - Read target/
+
+                    ## Read target/, never delete it
 
                     Outputs live under %{target}:
 
@@ -702,7 +720,7 @@ public record Project(
                     last `completed` or `failed`, with how many steps executed, skipped and failed; a
                     file without that last line is a build that is still running or was killed.
 
-                    ## 4. Turn a folder into a selector
+                    ## Turn a folder into a selector
 
                     target/build/ mirrors the build graph, so any folder under it is a selector: drop
                     the `target/` prefix and any trailing `/output` or `/supplement`.
@@ -710,24 +728,7 @@ public record Project(
                       target/build/maven/compose/module/<m>/produce/assemble/binary/artifacts/output
                       -> build/maven/compose/module/<m>/produce/assemble/binary/artifacts
 
-                    ## 5. Address the graph
-
-                      build stage export pin dependencies ide metadata configuration properties help skill
-                          Top-level entry points; ide[/idea|/vscode|/eclipse] drills into one tool.
-                      +<module>         module subgraph inside `build` (not stage/export/pin).
-                                        <module> is the source folder holding its pom.xml or
-                                        module-info.java; nested, foo/bar is written +foo+bar.
-                      +<module>/<step>  one step in it, e.g. +foo+bar/compile/dependencies/resolved
-                      pin/module-<path> one module's pins. `pin` is an entry point of its own and
-                                        always rewrites every module, so `pin +foo` runs both and
-                                        narrows nothing. <path> is the module's source folder with
-                                        + for /, as in the folder under target/: foo/bar is
-                                        pin/module-foo+bar.
-                      :                 one path segment, e.g. build/:/java
-                      ::                any depth, e.g. ::/test. Lenient: a typo matches nothing
-                                        silently, so confirm a selector ran what you meant.
-
-                    ## 6. Read per-module state from the properties files
+                    ## Read per-module state from the properties files
 
                     Each per-module step writes these into its output folder. Read them rather than
                     inventing a side channel; the schemas are constants on the writing step.
@@ -758,14 +759,31 @@ public record Project(
                                             -> the versions it is pinned at and the modules holding
                                             each, for every coordinate pinned at more than one
 
-                    ## 7. Bump serialVersionUID after editing a build step
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
+                    """;
+                case "selectors" -> """
+                    # Jenesis - Address the graph
 
-                    A step is keyed by the digest of its serialized form plus every predecessor's
-                    checksums. Project sources are always detected, but editing a step's *code* does
-                    not change its serialized form, so its output stays cached. Bump that class's
-                    `serialVersionUID` to force it to re-run; prefer that over executor.rebuild.
+                      build stage export pin dependencies ide metadata configuration properties help skill
+                          Top-level entry points; ide[/idea|/vscode|/eclipse] drills into one tool,
+                          and skill/<page> prints one page of this briefing.
+                      +<module>         module subgraph inside `build` (not stage/export/pin).
+                                        <module> is the source folder holding its pom.xml or
+                                        module-info.java; nested, foo/bar is written +foo+bar.
+                      +<module>/<step>  one step in it, e.g. +foo+bar/compile/dependencies/resolved
+                      pin/module-<path> one module's pins. `pin` is an entry point of its own and
+                                        always rewrites every module, so `pin +foo` runs both and
+                                        narrows nothing. <path> is the module's source folder with
+                                        + for /, as in the folder under target/: foo/bar is
+                                        pin/module-foo+bar.
+                      :                 one path segment, e.g. build/:/java
+                      ::                any depth, e.g. ::/test. Lenient: a typo matches nothing
+                                        silently, so confirm a selector ran what you meant.
 
-                    ## 8. Configure a module with @jenesis tags on module-info.java
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
+                    """;
+                case "tags" -> """
+                    # Jenesis - Configure a module with @jenesis tags
 
                     Tags are read from the module's documentation comment in either form: the
                     traditional /** ... */ and the Markdown /// of JEP 467. `pin` writes back in
@@ -953,7 +971,10 @@ public record Project(
                           grants the library alone. MAVEN modules declare tokens in a
                           <!--jenesis.native ... --> comment.
 
-                    ## 9. Activate a tool by dropping in its configuration file
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
+                    """;
+                case "tools" -> """
+                    # Jenesis - Activate a tool
 
                     A file in the module's build.jenesis location (its META-INF/build.jenesis/ folder
                     plus the project configuration locations) activates the feature; its contents
@@ -1018,7 +1039,10 @@ public record Project(
                     files instead (checkstyle.xml, pmd.xml, spotbugs-exclude.xml, .editorconfig,
                     .scalafmt.conf, ...).
 
-                    ## 10. Override one build with -Djenesis.* properties
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
+                    """;
+                case "settings" -> """
+                    # Jenesis - Override a build with -Djenesis.* settings
 
                     Run `configuration` for every setting with the value in force, one per line and
                     built to grep:
@@ -1052,9 +1076,12 @@ public record Project(
                                                        print.<command>, as print.javac
                       -Djenesis.dependency.pin=strict  fail the build on any unpinned artifact
                       -Djenesis.test.filter=<regex>    run one test class or method
-                      -Djenesis.executor.rebuild       wipe target/ - avoid it, see section 7
+                      -Djenesis.executor.rebuild       wipe target/ - avoid it, see skill/engine
 
-                    ## 11. Run a built main class with Execute
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
+                    """;
+                case "execute" -> """
+                    # Jenesis - Run what was built
 
                       java build/jenesis/Execute.java [-J<option>...] [args...]
                       jenesis-exec [-J<option>...] [args...]
@@ -1089,7 +1116,10 @@ public record Project(
                     argument that starts with an @. A file is not expanded again from within a file,
                     which is how the JDK's own tools read one.
 
-                    ## 12. Recommend pinning dependencies
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
+                    """;
+                case "pinning" -> """
+                    # Jenesis - Pin dependencies
 
                     Pin external dependencies so every machine resolves the same artifacts, and offer
                     to pin whenever you add or change one. `pin` records resolved versions and
@@ -1116,7 +1146,54 @@ public record Project(
                     recorded rather than for today, checked in process against a
                     sigstore-trusted-root.json held beside the key lists.
 
-                    ## 13. Copy a demo: they are the recipe book
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
+                    """;
+                case "plugins" -> """
+                    # Jenesis - Add to the stock build with plugins
+
+                    To add to the stock build, name plugins in jenesis.plugins.properties beside
+                    jenesis.properties, one line each: <name>+<hook point>=<module name>, or =./<folder>
+                    for a plugin compiled from source, where the hook point is a module of the build (check,
+                    binary/generated, artifact, package, ...) or left out for the module build itself, and
+                    =<module>@<provider> selects the provider annotated @BuildModuleName. A plugin
+                    runs in a module only where plugin-<name>.properties is found in its configuration
+                    locations; a provider is created with that file's values when it declares a
+                    public constructor taking a SequencedMap of them, and with its no-argument one when
+                    the file is empty. A key @<input>[/<target>]=<path> binds a file or folder of the
+                    project, relative to the module, into an input the plugin reads as ../inputs/<input>,
+                    placed at <target> inside it; one input takes a key per target, and @@<key> is the
+                    value @<key>. A path must stay within the project. A plugin adds to its module and replaces nothing; a build that
+                    changes what the stock steps do is an entry point of its own. A plugin runs the
+                    project's code, as its tests do, so build an untrusted project with
+                    -Djenesis.project.docker=true.
+
+                    Eight hook points run a plugin once for the whole project. preprocess runs as
+                    build/preprocess/custom/<name> before any module is built, sees only the inputs it
+                    binds and hands the build nothing, so it can only stop it. postprocess/transform
+                    and postprocess/inspect run over every module built, as
+                    build/postprocess/transform/<name> and build/postprocess/inspect/<name>, before
+                    anything is staged. export and release run as export/custom/<name> and
+                    release/custom/<name> beside the stock steps of their goal, and are handed
+                    everything staged. stage/transform runs after the stock staging, and
+                    what it writes under a folder named after a staged tree joins that tree, so export
+                    and release ship it; stage/inspect checks the result before either runs. plugin
+                    runs as plugin/<name> only when that selector is named, depends on nothing and is
+                    handed only what it binds. Switch an expensive one off with
+                    -Djenesis.plugin.<name>=false or in a profile, and every plugin with
+                    -Djenesis.project.plugins=false. Such a plugin
+                    reads its values as <name>.<key> from jenesis.plugins.arguments.properties, and
+                    from a jenesis.plugins.arguments-<profile>.properties per active profile, and pin
+                    writes its pins to jenesis.plugins.pin.properties. A transform adds files to a
+                    module by naming them in an inventory.properties of its own under any
+                    <module>.<key>, such as <module>.attachment.<classifier> or <module>.report.<name>,
+                    and what belongs to no module in a project/ folder that stage copies as it stands
+                    into stage/project; an inspection fails the build by throwing and changes nothing
+                    it was handed.
+
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
+                    """;
+                case "demos" -> """
+                    # Jenesis - Copy a demo
 
                     69 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
@@ -1170,14 +1247,30 @@ public record Project(
                                          61 custom-build (no Project at all),
                                          62 tools-api (a build inside another program's JVM)
 
-                    ## 14. When stuck, read the source
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
+                    """;
+                case "engine" -> """
+                    # Jenesis - Change the engine
+
+                    ## Bump serialVersionUID after editing a build step
+
+                    A step is keyed by the digest of its serialized form plus every predecessor's
+                    checksums. Project sources are always detected, but editing a step's *code* does
+                    not change its serialized form, so its output stays cached. Bump that class's
+                    `serialVersionUID` to force it to re-run; prefer that over executor.rebuild.
+
+                    ## When stuck, read the source
 
                     Every public type lives under `sources/build/jenesis/` and is short enough to read
                     end to end; `tests/` documents the public API by example.
 
                       https://jenesis.build/tool          documentation, including the full reference
                       https://github.com/jenesis/jenesis  source, issues and releases
-                    """).replace("%{target}", target.toAbsolutePath().normalize().toString()));
+
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
+                    """;
+                default -> throw new IllegalStateException("No skill page " + page);
+            }).replace("%{target}", target.toAbsolutePath().normalize().toString()));
         }
     }
 
@@ -2996,7 +3089,7 @@ public record Project(
         trace.toString().lines().forEach(environment.err());
         environment.err().accept("");
         environment.err().accept("The build failed with the error above. If you meant to look up how to"
-                + " invoke Jenesis, pass `help` as the only argument on the command line, or `skill`"
+                + " invoke Jenesis, pass `help` as the only argument on the command line, or `skill/start`"
                 + " for an agent-oriented briefing.");
     }
 }
