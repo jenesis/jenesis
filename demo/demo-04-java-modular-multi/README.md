@@ -117,6 +117,10 @@ input of the build, so a result never depends on one the build cannot see.
 
     DEMO_SECRET=s3cret java build/jenesis/Make.java
 
+What `java build/jenesis/Execute.java` runs is no step of the build but the
+program you asked for, so it is handed the shell's whole environment, as a
+program `jpx` runs is.
+
 A test that needs a variable is handed it by an `environment-<tool>.properties`
 in a configuration folder, named after the tool as a `process-<tool>.properties`
 is: `environment-java.properties` reaches every forked JVM and

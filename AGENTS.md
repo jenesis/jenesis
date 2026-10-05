@@ -290,7 +290,8 @@ and its kin) and nothing else of the build's environment, because a variable is 
 runs a program - `java`, the tests, an external binary - implements `ProcessBuildStep.Environmental` and so also
 accepts `environment-<tool>.properties`, whose variables it is handed beyond those, and one whose contract is a
 variable, as JReleaser's credentials are, names it in `inherits`. A JDK tool such as `javac` takes none: it may run
-in the build's own JVM, which no environment reaches.
+in the build's own JVM, which no environment reaches. The program `Execute` or `jpx` runs is no step but what the
+user asked to run, and is handed the whole environment, as a shell would hand it.
 
 **Modules activate on a file.** A build module under `project/` (`CheckstyleModule`, `JaCoCoModule`, …)
 switches itself on when its configuration file is present in a configuration folder
