@@ -55,7 +55,7 @@ be, without deleting the file.
 Layout
 ------
 
-    demo/demo-70-class-path
+    demo/demo-54-class-path
     |-- build/jenesis                     symlink to ../../../sources/build/jenesis
     |-- build.jenesis/
     |   `-- classpath.properties          empty: write META-INF/services from module-info
