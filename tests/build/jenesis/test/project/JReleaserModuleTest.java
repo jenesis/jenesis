@@ -32,7 +32,7 @@ public class JReleaserModuleTest {
     public void tearDown() {
         settings.remove("jreleaser.config");
         settings.remove("jreleaser.executable");
-        settings.remove("jreleaser.dryRun");
+        settings.remove("jreleaser.dry");
     }
 
     @Test

@@ -1133,9 +1133,9 @@ public record Project(
                     what process-java.properties gives it, and the first other argument starts the
                     program's own. Where more than one declares a main, name it with
                     -Djenesis.execute.module=<source folder> (nested: server/ui or server+ui) and
-                    -Djenesis.execute.mainClass=<fqcn>. Wrap the program alone in Docker with
-                    -Djenesis.execute.docker=true, plus .docker.image, .docker.mount (read-only),
-                    .docker.mountWritable and .docker.env. Execute is its own entry point: build
+                    -Djenesis.execute.main=<fqcn>. Wrap the program alone in Docker with
+                    -Djenesis.execute.docker=true, plus .docker.image, .docker.readable,
+                    .docker.writable and .docker.env. Execute is its own entry point: build
                     selectors do not apply to it, nor its properties to a plain build.
 
                     To run a build, or a published program, inside your own JVM rather than as a
@@ -2816,8 +2816,8 @@ public record Project(
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache; a file a project provides names only a folder inside the project
                 project.docker|false|Run the whole build inside a container
                 project.docker.image||Image for that container
-                project.docker.mount||Extra read-only container mounts, host[:container],...
-                project.docker.mountWritable||Extra writable container mounts
+                project.docker.readable||Extra read-only container mounts, host[:container],...
+                project.docker.writable||Extra writable container mounts
                 project.docker.env||Host environment variables to forward, name[=value],...
                 make.root|.|Folder Make looks for the project in; only settable on the command line
                 make.profiles||Comma-separated profiles layered over jenesis.properties
@@ -2907,11 +2907,11 @@ public record Project(
                 tree.format|full|full|compact: what the dependencies selector prints
                 tree.tests|true|Include test-variant modules in that output
                 execute.module||Module to run, named by its source folder (server/ui or server+ui)
-                execute.mainClass||Main class to run, overriding the module's @jenesis.main
+                execute.main||Main class to run, overriding the module's @jenesis.main
                 execute.docker|false|Run the launched program in a container, independently of the build
                 execute.docker.image||Image for that container
-                execute.docker.mount||Extra read-only container mounts
-                execute.docker.mountWritable||Extra writable container mounts
+                execute.docker.readable||Extra read-only container mounts
+                execute.docker.writable||Extra writable container mounts
                 execute.docker.env||Host environment variables to forward
                 sbom.cyclonedx|true|Emit a CycloneDX SBOM; sbom.properties selects its format
                 graalvm.license||Licence the SBOM beside a native image records for the GraalVM that compiled it, as an SPDX identifier or a name; empty records none
@@ -2953,7 +2953,7 @@ public record Project(
                 jreleaser.executable|jreleaser|The JReleaser executable a release runs; only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 jreleaser.command|full-release|The JReleaser command a release runs
                 jreleaser.config||JReleaser configuration file
-                jreleaser.dryRun|true|Run JReleaser without actually publishing
+                jreleaser.dry|true|Run JReleaser without actually publishing
                 """;
 
     private static SortedMap<String, String> settings(Environment environment) {
@@ -3026,8 +3026,8 @@ public record Project(
                     docker = docker.mount(Files.createDirectories(cache), cache.toString(), false);
                 }
             }
-            docker = docker.mounts(environment.getProperty("project.docker.mount"), root, true);
-            docker = docker.mounts(environment.getProperty("project.docker.mountWritable"), root, false);
+            docker = docker.mounts(environment.getProperty("project.docker.readable"), root, true);
+            docker = docker.mounts(environment.getProperty("project.docker.writable"), root, false);
             docker = docker.envs(environment.getProperty("project.docker.env"));
             String mavenRepositoryUri = environment.getProperty("maven.uri", System.getenv("MAVEN_REPOSITORY_URI"));
             if (mavenRepositoryUri != null) {

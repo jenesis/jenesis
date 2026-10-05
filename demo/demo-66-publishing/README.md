@@ -163,7 +163,7 @@ at the project root adds a `release/jreleaser` step to the `release` goal:
 
 It is a rehearsal by default - JReleaser runs with `--dry-run`, performing every
 local phase and skipping every remote one - and publishing takes the explicit
-`-Djenesis.jreleaser.dryRun=false`. Of the shell's environment, JReleaser is
+`-Djenesis.jreleaser.dry=false`. Of the shell's environment, JReleaser is
 handed the platform's own variables and every `JRELEASER_*` one, which is where
 it reads its credentials. The tool itself is expected on the `PATH`
 rather than resolved as a pinned dependency, because unlike a compiler or a linter

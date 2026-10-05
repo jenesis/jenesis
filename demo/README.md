@@ -1072,7 +1072,7 @@ local Maven and module repositories, including what the transform plugins added;
 prints the resolved graph; `ide` writes IntelliJ, Eclipse and VS Code project
 files; `configuration` prints every setting with the value in force.
 `java build/jenesis/Execute.java` builds and then runs the entry point, with
-`-Djenesis.execute.module` and `-Djenesis.execute.mainClass` picking which one in
+`-Djenesis.execute.module` and `-Djenesis.execute.main` picking which one in
 a multi-module build.
 
 **Configuration locations.** A tool is switched on by its configuration file, and
