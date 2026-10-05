@@ -5,6 +5,7 @@ import module org.junit.jupiter.api;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.step.EnvironmentalProcessBuildStep;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -48,6 +49,88 @@ public class ProcessBuildStepTest {
                 Map.entry("-Xmx", "512m"),
                 Map.entry("-Dshared", "test"),
                 Map.entry("-Dextra", "test"));
+    }
+
+    @Test
+    public void a_forked_program_receives_the_variables_of_each_of_its_configurations() throws IOException {
+        Path folder = Files.createDirectories(root.resolve("argument/environment")).getParent();
+        Files.writeString(folder.resolve("environment/java.properties"),
+                "SAMPLE_LITERAL=java\nSAMPLE_SHARED=java\nSAMPLE_UNSET_IN_THE_BUILD\n");
+        Files.writeString(folder.resolve("environment/test.properties"), "SAMPLE_SHARED=test\n");
+        Path source = root.resolve("Variables.java");
+        Files.writeString(source, """
+                public class Variables {
+                    public static void main(String[] args) {
+                        for (String name : args) {
+                            System.out.println(name + "=" + System.getenv(name));
+                        }
+                    }
+                }
+                """);
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        new Program("java",
+                ProcessHandler.OfProcess.ofJavaHome("bin/java"),
+                List.of("java", "test"),
+                List.of(source.toString(), "SAMPLE_LITERAL", "SAMPLE_SHARED", "SAMPLE_UNSET_IN_THE_BUILD"))
+                .apply(Runnable::run,
+                        new BuildStepContext(null, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(folder, Map.of()))))
+                .toCompletableFuture()
+                .join();
+        assertThat(Files.readAllLines(supplement.resolve("output"))).containsExactly(
+                "SAMPLE_LITERAL=java",
+                "SAMPLE_SHARED=test",
+                "SAMPLE_UNSET_IN_THE_BUILD=null");
+    }
+
+    @Test
+    public void a_jdk_tool_refuses_an_environment_even_when_forked() throws IOException {
+        Path folder = Files.createDirectories(root.resolve("argument/environment")).getParent();
+        Files.writeString(folder.resolve("environment/javac.properties"), "SAMPLE=value\n");
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        ProcessBuildStep step = new ProcessBuildStep("javac", ProcessHandler.OfProcess.ofJavaHome("bin/javac")) {
+            @Override
+            protected CompletionStage<List<String>> process(Executor executor,
+                                                            BuildStepContext context,
+                                                            SequencedMap<String, BuildStepArgument> arguments,
+                                                            SequencedMap<String, SequencedMap<String, String>> properties) {
+                return CompletableFuture.completedStage(List.of("--version"));
+            }
+        };
+        assertThatThrownBy(() -> step.apply(Runnable::run,
+                new BuildStepContext(null, next, supplement),
+                new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(folder, Map.of())))).toCompletableFuture().join())
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("[SAMPLE] to javac, which takes no environment");
+    }
+
+    @Test
+    public void a_program_run_through_the_tools_api_refuses_an_environment() throws IOException {
+        Path folder = Files.createDirectories(root.resolve("argument/environment")).getParent();
+        Files.writeString(folder.resolve("environment/probe.properties"), "SAMPLE=value\n");
+        Path next = Files.createDirectory(root.resolve("next")), supplement = Files.createDirectory(root.resolve("supplement"));
+        ToolProvider tool = new ToolProvider() {
+            @Override
+            public String name() {
+                return "probe";
+            }
+
+            @Override
+            public int run(PrintWriter out, PrintWriter err, String... arguments) {
+                return 0;
+            }
+        };
+        assertThatThrownBy(() -> new Program("probe", ProcessHandler.OfTool.of(tool), List.of("probe"), List.of())
+                .apply(Runnable::run,
+                        new BuildStepContext(null, next, supplement),
+                        new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(folder, Map.of()))))
+                .toCompletableFuture()
+                .join())
+                .as("a tool sharing the build's JVM cannot be handed variables of its own")
+                .rootCause()
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("[SAMPLE] to probe, which runs through the Tools API");
     }
 
     @Test
@@ -247,6 +330,33 @@ public class ProcessBuildStepTest {
                                                         SequencedMap<String, BuildStepArgument> arguments,
                                                         SequencedMap<String, SequencedMap<String, String>> properties) {
             return CompletableFuture.completedStage(List.of());
+        }
+    }
+
+    private static class Program extends EnvironmentalProcessBuildStep {
+
+        private final List<String> configurations, processed;
+
+        private Program(String command,
+                        Function<List<String>, ? extends ProcessHandler> factory,
+                        List<String> configurations,
+                        List<String> processed) {
+            super(command, factory);
+            this.configurations = configurations;
+            this.processed = processed;
+        }
+
+        @Override
+        protected List<String> configurations() {
+            return configurations;
+        }
+
+        @Override
+        protected CompletionStage<List<String>> process(Executor executor,
+                                                        BuildStepContext context,
+                                                        SequencedMap<String, BuildStepArgument> arguments,
+                                                        SequencedMap<String, SequencedMap<String, String>> properties) {
+            return CompletableFuture.completedStage(processed);
         }
     }
 }

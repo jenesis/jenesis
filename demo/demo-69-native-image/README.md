@@ -40,6 +40,12 @@ managed by [SDKMAN](https://sdkman.io/), `sdk install java 25.0.3-graal`):
 
     GRAALVM_HOME=~/.sdkman/candidates/java/25.0.3-graal java build/jenesis/Make.java stage
 
+`native-image` compiles with the platform's C toolchain, so of the shell's
+environment it is handed, beside the platform's own variables, those the
+compiler reads: `INCLUDE`, `LIB` and `LIBPATH` that a Visual Studio developer
+prompt sets on Windows, `CPATH`, `C_INCLUDE_PATH` and `LIBRARY_PATH`, and
+`SDKROOT` on macOS.
+
 The build compiles the modules, runs the test under the agent, then runs
 `native-image` over the produced module path. The image build is the slow step (a
 minute or two - it analyses the whole reachable program), after which the `stage`

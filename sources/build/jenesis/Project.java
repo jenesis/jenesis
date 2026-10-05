@@ -742,6 +742,13 @@ public record Project(
                     `completed` or `failed`, with how many steps executed, skipped and failed; a file
                     without that last line is a build that is still running or was killed.
 
+                    Every build is a `run`, named on the `started` line. An executed step is this
+                    run's; a skipped step names the earlier `run` that produced its output, so its
+                    output, and a test step's report under supplement/, came from that run and not
+                    this one. The run that produced a step is in local.properties beside the step's
+                    output/, with `cached=true` when it came from a build cache. That file never
+                    reaches a checksum or a build cache.
+
                     ## Turn a folder into a selector
 
                     target/build/ mirrors the build graph, so any folder under it is a selector: drop
@@ -1060,6 +1067,14 @@ public record Project(
                       process-<tool>.properties extra arguments for a forked tool (javac, javadoc, jar,
                                                 jlink, jpackage, ...); process-test.properties targets
                                                 the test JVM, merged over process-java.properties
+                      environment-<tool>.properties
+                                                variables for a program the build forks (java, test,
+                                                pitest, native-image), which otherwise sees only
+                                                PATH, HOME, LANG and the platform's own; NAME=value
+                                                sets one, a bare NAME passes on the build's own
+
+                    In both files a value @<key> or @<key>/<default> is the setting
+                    -Djenesis.variable.<key>, part of the key of every step it reaches.
 
                     Linters and the ktlint/scalafmt formatters activate from their own native config
                     files instead (checkstyle.xml, pmd.xml, spotbugs-exclude.xml, .editorconfig,
@@ -2853,6 +2868,7 @@ public record Project(
                 pin.bom|keep|keep|flatten: whether pinning keeps BOM references or resolves them away
                 pin.retain|groups|groups|all|none: which pins no closure resolved a refresh keeps - those of groups it did not resolve, all, or none
                 platform.<token>||true adds a platform token and false removes one, selecting guarded pins
+                variable.<key>||What a value @<key> or @<key>/<default> in a process-<tool>.properties or environment-<tool>.properties stands for, and so part of the key of every step it reaches; @@ writes a literal @
                 plugin.<name>|true|false leaves out the plugin <name> that jenesis.plugins.properties names
                 repository.insecure|false|Allow plaintext http:// repositories, and over https accept a certificate that does not verify, as a self-signed one; only the command line or ~/.jenesis/jenesis.properties may allow it, never a file a project provides
                 repository.retries|2|Retries after a failed fetch; 0 disables

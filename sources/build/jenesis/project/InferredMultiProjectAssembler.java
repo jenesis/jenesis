@@ -250,7 +250,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         Boolean modules = descriptor.pathPlacement() == PathPlacement.MODULE_PATH
                 ? null
                 : ModularizeModule.configured(BuildStep.locate(descriptor.configuration(), "modules.properties"));
-        SequencedMap<String, SequencedMap<String, String>> overrides = overridesOf(descriptor.configuration());
+        SequencedMap<String, SequencedMap<String, String>> overrides = perTool(descriptor.configuration(), "process-"),
+                environments = perTool(descriptor.configuration(), "environment-");
         ProcessHandler.Factory factory = ProcessHandler.Factory.ofEnvironment(environment);
         SequencedMap<String, SequencedMap<String, BuildExecutorModule>> hooks = new LinkedHashMap<>();
         hooks.put("", new LinkedHashMap<>(custom));
@@ -284,7 +285,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 closure = new LinkedHashSet<>(Set.of("modules"));
             }
             sub.addStep("prepare",
-                    new Prepare(descriptor.pathPlacement(), List.copyOf(packaging.formats()), overrides),
+                    new Prepare(descriptor.pathPlacement(), List.copyOf(packaging.formats()), overrides, environments),
                     outerInherited.sequencedKeySet().stream());
             sub.addModule("check",
                     check.apply(InferredSourceCodeQualityModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
@@ -726,33 +727,49 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 descriptor.spdx()).flatMap(SequencedSet::stream);
     }
 
-    private static SequencedMap<String, SequencedMap<String, String>> overridesOf(SequencedSet<Path> configuration)
+    private SequencedMap<String, SequencedMap<String, String>> perTool(SequencedSet<Path> configuration, String prefix)
             throws IOException {
         SequencedMap<String, Path> files = new LinkedHashMap<>();
         for (Path folder : configuration) {
             if (!Files.isDirectory(folder)) {
                 continue;
             }
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(folder, "process-*.properties")) {
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(folder, prefix + "*.properties")) {
                 for (Path file : stream) {
                     String fileName = file.getFileName().toString();
-                    String command = fileName.substring("process-".length(), fileName.length() - ".properties".length());
-                    files.putIfAbsent(command, file);
+                    String tool = fileName.substring(prefix.length(), fileName.length() - ".properties".length());
+                    files.putIfAbsent(tool, file);
                 }
             }
         }
-        SequencedMap<String, SequencedMap<String, String>> overrides = new LinkedHashMap<>();
-        for (String command : new TreeSet<>(files.keySet())) {
+        SequencedMap<String, SequencedMap<String, String>> perTool = new LinkedHashMap<>();
+        for (String tool : new TreeSet<>(files.keySet())) {
             SequencedMap<String, String> values = new LinkedHashMap<>();
-            SequencedProperties.ofFiles(files.get(command)).forEachProperty(values::put);
-            overrides.put(command, values);
+            SequencedProperties.ofFiles(files.get(tool)).forEachProperty((key, value) -> {
+                if (!value.startsWith("@") || value.startsWith("@@")) {
+                    values.put(key, value.startsWith("@") ? value.substring(1) : value);
+                    return;
+                }
+                int slash = value.indexOf('/');
+                String name = value.substring(1, slash == -1 ? value.length() : slash),
+                        fallback = slash == -1 ? null : value.substring(slash + 1),
+                        resolved = environment.value("variable." + name, fallback);
+                if (resolved == null) {
+                    throw new IllegalArgumentException(files.get(tool) + " sets " + key + " to " + value
+                            + ", but jenesis.variable." + name + " is not set - set it, or give a default as @"
+                            + name + "/<default>");
+                }
+                values.put(key, resolved);
+            });
+            perTool.put(tool, values);
         }
-        return overrides;
+        return perTool;
     }
 
     private record Prepare(PathPlacement pathPlacement,
                            List<String> packageTypes,
-                           SequencedMap<String, SequencedMap<String, String>> overrides) implements BuildStep {
+                           SequencedMap<String, SequencedMap<String, String>> overrides,
+                           SequencedMap<String, SequencedMap<String, String>> environments) implements BuildStep {
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
@@ -911,6 +928,14 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         : new SequencedProperties();
                 override.getValue().forEach(merged::setProperty);
                 merged.store(target);
+            }
+            if (!environments.isEmpty()) {
+                Path environmentFolder = Files.createDirectories(context.next().resolve(ProcessBuildStep.ENVIRONMENT));
+                for (Map.Entry<String, SequencedMap<String, String>> tool : environments.entrySet()) {
+                    SequencedProperties variables = new SequencedProperties();
+                    tool.getValue().forEach(variables::setProperty);
+                    variables.store(environmentFolder.resolve(tool.getKey() + ".properties"));
+                }
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }

@@ -11,7 +11,7 @@ import build.jenesis.SequencedProperties;
 
 public abstract class ProcessBuildStep implements BuildStep {
 
-    public static final String PROCESS = "process/";
+    public static final String PROCESS = "process/", ENVIRONMENT = "environment/";
     protected static final Charset NATIVE_ENCODING = nativeEncoding();
     private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
 
@@ -102,6 +102,34 @@ public abstract class ProcessBuildStep implements BuildStep {
         return factory.apply(commands);
     }
 
+    protected ProcessHandler environment(ProcessHandler handler, SequencedMap<String, BuildStepArgument> arguments)
+            throws IOException {
+        SequencedMap<String, String> variables = variables(arguments);
+        if (!variables.isEmpty()) {
+            throw new IllegalStateException("An environment file hands " + variables.keySet() + " to " + command
+                    + ", which takes no environment: only a program the build runs in a process of its own does"
+                    + " - a forked JVM, the test run, PIT and native-image");
+        }
+        return handler;
+    }
+
+    protected SequencedMap<String, String> variables(SequencedMap<String, BuildStepArgument> arguments)
+            throws IOException {
+        SequencedMap<String, String> variables = new LinkedHashMap<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            for (String name : configurations()) {
+                Path file = argument.folder().resolve(ENVIRONMENT + name + ".properties");
+                if (Files.exists(file)) {
+                    SequencedProperties.ofFiles(file).forEachProperty(variables::put);
+                }
+            }
+        }
+        return variables;
+    }
+
     protected int execute(ProcessHandler handler, Path output, Path error, ProcessHandler.Tee tee)
             throws IOException, InterruptedException {
         Semaphore permits = terms.permits();
@@ -190,7 +218,7 @@ public abstract class ProcessBuildStep implements BuildStep {
                 List<String> commands = prepended(properties);
                 commands.addAll(processed);
                 Path output = context.supplement().resolve("output"), error = context.supplement().resolve("error");
-                ProcessHandler handler = handler(context, commands);
+                ProcessHandler handler = environment(handler(context, commands), arguments);
                 Files.writeString(context.supplement().resolve("command"), String.join(" ", handler.commands()));
                 ProcessHandler.Tee tee = tee(executor, handler);
                 Consumer<String> announcing = terms.announcing();

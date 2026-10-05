@@ -18,6 +18,7 @@ class BuildExecutorDefault implements BuildExecutor {
     private final BuildExecutorCache cache;
     private final boolean aggregate;
     private final Permits permits;
+    private final String run;
     private final String location;
 
     private final Map<String, StepSummary> inherited;
@@ -31,6 +32,7 @@ class BuildExecutorDefault implements BuildExecutor {
                          BuildExecutorCache cache,
                          boolean aggregate,
                          Permits permits,
+                         String run,
                          String location,
                          Map<String, StepSummary> inherited) throws IOException {
         this.target = Files.isDirectory(target) ? target : Files.createDirectory(target);
@@ -41,6 +43,7 @@ class BuildExecutorDefault implements BuildExecutor {
         this.cache = cache;
         this.aggregate = aggregate;
         this.permits = permits;
+        this.run = run;
         this.location = location;
         this.inherited = inherited;
     }
@@ -203,6 +206,10 @@ class BuildExecutorDefault implements BuildExecutor {
                                         ? Files.walkFileTree(previous.path(), new RecursiveFolderDeletion(null))
                                         : previous.path());
                                 Files.createDirectory(previous.checksum());
+                                SequencedProperties local = new SequencedProperties();
+                                local.setProperty("run", run);
+                                local.setProperty("cached", Boolean.toString(fromCache));
+                                local.store(previous.path().resolve(BuildExecutor.LOCAL));
                             } else if (consistent) {
                                 Files.delete(Files.walkFileTree(next, new RecursiveFolderDeletion(next)));
                                 Files.deleteIfExists(previous.stepFile());
@@ -341,6 +348,7 @@ class BuildExecutorDefault implements BuildExecutor {
                             cache,
                             aggregate,
                             permits,
+                            run,
                             location + prefix + "/",
                             inherited);
                     module.accept(buildExecutor, folders);
@@ -443,6 +451,7 @@ class BuildExecutorDefault implements BuildExecutor {
         FileChannel lock = lock(canonical);
         BiConsumer<Boolean, Throwable> completion;
         try {
+            callback.run(run);
             completion = callback.step(null, registrations.sequencedKeySet());
         } catch (RuntimeException | Error e) {
             release(canonical, lock);

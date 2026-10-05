@@ -285,6 +285,15 @@ factory, a lookup cache) is `transient` rather than left to drift into the key. 
 and never reaches a key at all, so a field of one is never `transient`.
 Steps compose by folder conventions - `sources/`, `classes/`, `artifacts/` - never by inspecting predecessor
 names. A step that forks a JDK tool extends `ProcessBuildStep` and thereby accepts `process-<tool>.properties`.
+A forked process is handed the platform's own variables (`PATH`, `HOME`, `LANG`, `TMPDIR`, Windows' `SystemRoot`
+and its kin) and nothing else of the build's environment, because a variable is no input of its step. A step that
+runs a program - `java`, the tests, an external binary - extends `EnvironmentalProcessBuildStep` and so also
+accepts `environment-<tool>.properties`, whose variables it is handed beyond those, and one whose contract is a
+variable, as JReleaser's credentials are, names it in `inherits`. A JDK tool such as `javac` takes none: it may run
+in the build's own JVM, which no environment reaches. The program `Execute` or `jpx` runs is no step but what the
+user asked to run, and is handed the whole environment, as a shell would hand it. In either file a value `@<key>` or
+`@<key>/<default>` is the setting `jenesis.variable.<key>`, resolved where the assembler reads the file, so it is
+part of the key of `prepare` and of every step reading what it writes; `@@` is a literal `@`.
 
 **Modules activate on a file.** A build module under `project/` (`CheckstyleModule`, `JaCoCoModule`, …)
 switches itself on when its configuration file is present in a configuration folder
