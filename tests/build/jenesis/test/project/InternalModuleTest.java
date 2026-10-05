@@ -103,6 +103,44 @@ public class InternalModuleTest {
     }
 
     @Test
+    public void runs_a_plugin_step_again_when_only_the_code_of_the_plugin_changed() throws Exception {
+        String plugin = """
+                package test.plugin;
+                import build.jenesis.BuildExecutor;
+                import build.jenesis.BuildExecutorModule;
+                import build.jenesis.BuildStepResult;
+                import java.nio.file.Files;
+                import java.nio.file.Path;
+                import java.util.SequencedMap;
+                import java.util.concurrent.CompletableFuture;
+                public class Plugin implements BuildExecutorModule {
+                    public void accept(BuildExecutor executor, SequencedMap<String, Path> inherited) {
+                        executor.addStep("marker", (_, context, _) -> {
+                            Files.writeString(context.next().resolve("out.txt"), "%s");
+                            return CompletableFuture.completedStage(new BuildStepResult(true));
+                        });
+                    }
+                }
+                """;
+        String moduleInfo = "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }";
+        Path source = writeModuleSource(work.resolve("plugin"), moduleInfo,
+                Map.of("test/plugin/Plugin.java", plugin.formatted("before")));
+        buildExecutor.addModule("internal", new InternalModule("module", null, source)
+                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
+                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+        assertThat(buildExecutor.execute().get("internal/marker").resolve("out.txt")).content().isEqualTo("before");
+
+        writeModuleSource(work.resolve("plugin"), moduleInfo, Map.of("test/plugin/Plugin.java", plugin.formatted("after")));
+        setUp();
+        buildExecutor.addModule("internal", new InternalModule("module", null, source)
+                .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
+                .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
+        assertThat(buildExecutor.execute().get("internal/marker").resolve("out.txt")).content()
+                .as("the step's serialised form is unchanged, so only the code of the plugin can tell it apart")
+                .isEqualTo("after");
+    }
+
+    @Test
     public void hands_its_properties_to_the_constructor_of_a_plugin_that_takes_them() throws IOException {
         Path source = writeModuleSource(work.resolve("plugin"),
                 "module test.plugin { requires build.jenesis; provides build.jenesis.BuildExecutorModule with test.plugin.Plugin; }",

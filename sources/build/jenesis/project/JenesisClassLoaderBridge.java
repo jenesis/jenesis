@@ -38,7 +38,9 @@ class JenesisClassLoaderBridge implements AutoCloseable {
 
     private Map<String, Object> foreignChecksums;
 
-    JenesisClassLoaderBridge(Collection<Path> artifacts) throws ReflectiveOperationException {
+    private byte[] origin;
+
+    JenesisClassLoaderBridge(Collection<Path> artifacts) throws ReflectiveOperationException, IOException {
         ModuleFinder finder = ModuleFinder.of(artifacts.toArray(Path[]::new));
         Set<String> roots = finder.findAll().stream()
                 .map(ref -> ref.descriptor().name())
@@ -92,6 +94,25 @@ class JenesisClassLoaderBridge implements AutoCloseable {
             values.put(status.name(), foreignChecksumOf.invoke(null, field.get(null)));
         }
         foreignChecksums = Map.copyOf(values);
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        for (Path artifact : artifacts) {
+            List<Path> files;
+            try (Stream<Path> walk = Files.walk(artifact)) {
+                files = walk.filter(Files::isRegularFile).sorted().toList();
+            }
+            for (Path file : files) {
+                digest.update(artifact.relativize(file).toString().replace('\\', '/').getBytes(StandardCharsets.UTF_8));
+                try (InputStream in = new DigestInputStream(Files.newInputStream(file), digest)) {
+                    in.transferTo(OutputStream.nullOutputStream());
+                }
+            }
+        }
+        origin = digest.digest();
     }
 
     @Override
@@ -219,17 +240,19 @@ class JenesisClassLoaderBridge implements AutoCloseable {
     }
 
     private BuildStep wrapStep(Object foreignStep) {
-        return new ForeignBuildStep(this, foreignStep);
+        return new ForeignBuildStep(this, foreignStep, origin);
     }
 
     private static final class ForeignBuildStep implements BuildStep {
 
         private final transient JenesisClassLoaderBridge bridge;
         private final Object foreignStep;
+        private final byte[] origin;
 
-        ForeignBuildStep(JenesisClassLoaderBridge bridge, Object foreignStep) {
+        ForeignBuildStep(JenesisClassLoaderBridge bridge, Object foreignStep, byte[] origin) {
             this.bridge = bridge;
             this.foreignStep = foreignStep;
+            this.origin = origin;
         }
 
         @Override

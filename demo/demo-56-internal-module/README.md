@@ -24,6 +24,12 @@ greeting the plugin generated:
 Built without the plugin, `sample.Greeting` would not exist and the project would
 not compile.
 
+Edit the plugin and the next build runs its step again: append `+ "?"` to the
+line that writes `TEXT` in `GreetingModule.java`, and the greeting ends in `!?`.
+A plugin's steps are keyed by the jars the plugin runs on as well as by their
+fields, so a change to the plugin's code alone is enough - and the same holds for
+a published plugin at a new version.
+
 Layout
 ------
 
