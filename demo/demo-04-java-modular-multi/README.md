@@ -104,6 +104,17 @@ tag overrides that default, so the pinned version always wins. Unlike the `pin` 
 the test module alone rather than propagated project-wide, to keep `greeter` and
 `app` focused on their own dependencies.
 
+What a test reads from the environment
+--------------------------------------
+
+A test run, like every program the build forks, receives none of the shell's
+environment variables beyond the platform's own: `PATH`, `HOME`, `LANG`, `LC_*`,
+`TMPDIR`, and on Windows `SystemRoot`, `TEMP` and their kin. A variable is no
+input of the build, so a result never depends on one the build cannot see.
+`GreeterTest` asserts that a variable set in the shell does not arrive:
+
+    DEMO_SECRET=s3cret java build/jenesis/Make.java
+
 Shared test infrastructure
 --------------------------
 

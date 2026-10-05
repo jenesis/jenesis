@@ -181,11 +181,28 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
     final class OfProcess implements ProcessHandler {
 
         private static final boolean WINDOWS = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("win");
+        private static final Set<String> PLATFORM = Set.of("PATH", "HOME", "LANG", "TMPDIR",
+                "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP", "USERPROFILE",
+                "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432", "PROGRAMDATA", "APPDATA", "LOCALAPPDATA");
 
         private final List<String> commands;
+        private final SortedMap<String, String> environment;
 
         private OfProcess(List<String> commands) {
+            SortedMap<String, String> environment = WINDOWS
+                    ? new TreeMap<>(String.CASE_INSENSITIVE_ORDER)
+                    : new TreeMap<>();
+            System.getenv().forEach((name, value) -> {
+                if (name.startsWith("LC_") || PLATFORM.contains(WINDOWS ? name.toUpperCase(Locale.ROOT) : name)) {
+                    environment.put(name, value);
+                }
+            });
+            this(commands, environment);
+        }
+
+        private OfProcess(List<String> commands, SortedMap<String, String> environment) {
             this.commands = commands;
+            this.environment = Collections.unmodifiableSortedMap(environment);
         }
 
         public static Function<List<String>, OfProcess> ofJavaHome(String command) {
@@ -285,6 +302,14 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             return commands;
         }
 
+        public SortedMap<String, String> environment() {
+            return environment;
+        }
+
+        public OfProcess environment(SortedMap<String, String> environment) {
+            return new OfProcess(commands, new TreeMap<>(environment));
+        }
+
         @Override
         public boolean external() {
             return true;
@@ -296,6 +321,8 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             if (tee == null) {
                 builder.redirectOutput(output.toFile()).redirectError(error.toFile());
             }
+            builder.environment().clear();
+            builder.environment().putAll(environment);
             builder.environment().putIfAbsent("COLUMNS", "80");
             builder.environment().putIfAbsent("LINES", "24");
             builder.environment().putIfAbsent("TERM", "dumb");

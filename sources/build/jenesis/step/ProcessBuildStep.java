@@ -41,6 +41,13 @@ public abstract class ProcessBuildStep implements BuildStep {
         this.terms = terms;
     }
 
+    public interface Environmental {
+
+        default boolean inherits(String variable) {
+            return false;
+        }
+    }
+
     public record Terms(BiConsumer<Boolean, String> printing, Semaphore permits, Consumer<String> announcing) {
 
         public static Terms of(String command) {
@@ -190,7 +197,19 @@ public abstract class ProcessBuildStep implements BuildStep {
                 List<String> commands = prepended(properties);
                 commands.addAll(processed);
                 Path output = context.supplement().resolve("output"), error = context.supplement().resolve("error");
-                ProcessHandler handler = handler(context, commands);
+                ProcessHandler created = handler(context, commands), handler;
+                if (this instanceof Environmental environmental
+                        && created instanceof ProcessHandler.OfProcess process) {
+                    SortedMap<String, String> environment = new TreeMap<>(process.environment());
+                    System.getenv().forEach((name, value) -> {
+                        if (environmental.inherits(name)) {
+                            environment.put(name, value);
+                        }
+                    });
+                    handler = process.environment(environment);
+                } else {
+                    handler = created;
+                }
                 Files.writeString(context.supplement().resolve("command"), String.join(" ", handler.commands()));
                 ProcessHandler.Tee tee = tee(executor, handler);
                 Consumer<String> announcing = terms.announcing();

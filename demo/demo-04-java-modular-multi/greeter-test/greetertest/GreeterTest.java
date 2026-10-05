@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import sample.greeter.Greeter;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GreeterTest {
@@ -17,6 +18,11 @@ class GreeterTest {
     @Test
     void prefix_is_not_blank() {
         assertFalse(new Greeter().prefix().isBlank());
+    }
+
+    @Test
+    void reads_no_variable_it_is_not_handed() {
+        assertNull(System.getenv("DEMO_SECRET"));
     }
 
     @Test
