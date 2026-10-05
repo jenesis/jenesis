@@ -39,7 +39,11 @@ agent reads it instead of parsing the console:
 
 A step is `executed`, `skipped` because nothing it reads changed, or `failed`
 with the `error` and `message` that stopped it, and `folder` is where its
-`output/` lives. The last line says whether the build `completed` or `failed`;
+`output/` lives. A failed step's `folder` ends in `~` and holds what it wrote
+before it failed - its `output/`, and a forked tool's command, output and
+reports under `supplement/` - beside a `.jenesis.failed` marker, until the step
+runs again. The last line says
+whether the build `completed` or `failed`;
 a file without one belongs to a build that is still running or was killed.
 `-Djenesis.executor.events=false` writes no file.
 

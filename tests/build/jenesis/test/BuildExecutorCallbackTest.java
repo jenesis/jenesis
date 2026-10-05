@@ -133,7 +133,8 @@ public class BuildExecutorCallbackTest {
     public void a_build_records_its_steps_in_the_target_folder() throws IOException {
         BuildExecutor executor = new BuildExecutor.Configuration().progress(false).of(target);
         executor.addStep("foo", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
-        executor.addStep("bar", (_, _, _) -> {
+        executor.addStep("bar", (_, context, _) -> {
+            Files.writeString(context.supplement().resolve("log"), "evidence");
             throw new IllegalArgumentException("bar is broken");
         }, "foo");
         assertThatThrownBy(() -> executor.execute(Runnable::run).toCompletableFuture().join())
@@ -141,7 +142,11 @@ public class BuildExecutorCallbackTest {
         List<Map<String, Object>> events = events();
         assertThat(events).extracting(event -> event.get("step")).containsExactly(null, "foo", "bar", null);
         assertThat(events.get(2)).containsEntry("status", "failed")
-                .containsEntry("error", IllegalArgumentException.class.getName());
+                .containsEntry("error", IllegalArgumentException.class.getName())
+                .as("a failed step points at what it wrote before it failed")
+                .containsEntry("folder", target.toAbsolutePath().normalize().resolve("bar" + BuildExecutor.NEXT).toString());
+        assertThat(target.resolve("bar" + BuildExecutor.NEXT).resolve("supplement").resolve("log")).content()
+                .isEqualTo("evidence");
         assertThat(events.getLast()).containsEntry("status", "failed")
                 .containsEntry("executed", 1.0)
                 .containsEntry("failed", 1.0);
