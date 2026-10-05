@@ -23,7 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         demo:
-          - { name: java-pom, dir: demo-01-java-pom, entry: build/jenesis/Make.java, verify: 'find target -path "*/output/artifacts/*.jar" | grep -q .' }
+          - { name: java-pom, dir: demo-01-java-pom, entry: build/jenesis/Make.java, verify: 'find target -path "*/output/artifacts/*.jar" | grep -q . && tail -1 target/.jenesis.events.jsonl | grep -q "\"status\":\"completed\"" && grep -q "\"status\":\"executed\"" target/.jenesis.events.jsonl' }
           - { name: java-pom-dependencies, dir: demo-01-java-pom, entry: build/jenesis/Make.java dependencies, verify: 'find target -name graph.properties | grep -q .' }
           - { name: java-modular, dir: demo-02-java-modular, entry: build/jenesis/Make.java, verify: 'find target -path "*/output/artifacts/*.jar" | grep -q .' }
           - { name: java-modular-as-modular, dir: demo-02-java-modular, entry: build/jenesis/Make.java, flags: -Djenesis.project.layout=modular, verify: 'find target -path "*/output/artifacts/*.jar" | grep -q .' }
