@@ -151,11 +151,11 @@ class BuildExecutorDefault implements BuildExecutor {
                         location + identity,
                         new LinkedHashSet<>(summaries.keySet()));
                 boolean cacheRemotely = step.shouldCacheRemotely();
+                Path next = target.resolve(identity + BuildExecutor.NEXT);
+                if (Files.exists(next)) {
+                    Files.walkFileTree(next, new RecursiveFolderDeletion(null));
+                }
                 if (!consistent || step.shouldRun(arguments)) {
-                    Path next = target.resolve(identity + "~");
-                    if (Files.exists(next)) {
-                        Files.walkFileTree(next, new RecursiveFolderDeletion(null));
-                    }
                     Files.createDirectory(next);
                     Path nextOutput = Files.createDirectory(next.resolve("output"));
                     Path nextSupplement = Files.createDirectory(next.resolve("supplement"));
@@ -260,7 +260,9 @@ class BuildExecutorDefault implements BuildExecutor {
                             default -> new BuildExecutorException(location + identity, t);
                         };
                         try {
-                            Files.delete(Files.walkFileTree(next, new RecursiveFolderDeletion(next)));
+                            if (Files.isDirectory(next)) {
+                                Files.createFile(next.resolve(BuildExecutor.FAILED_MARKER));
+                            }
                         } catch (IOException e) {
                             wrapped.addSuppressed(e);
                         }

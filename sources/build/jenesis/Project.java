@@ -724,17 +724,23 @@ public record Project(
                     Never delete target/ and never pass -Djenesis.executor.rebuild=true for a clean
                     slate: each step is keyed by its inputs, so a build re-runs exactly what changed
                     and wiping only forces repeated work. A folder ending in `~` is a running step's
-                    staging area, renamed into place on success. One build at a time per target: the
-                    root holds an exclusive .jenesis.lock and a second process fails fast.
+                    staging area, renamed into place on success. When the step fails, it stays with
+                    what the step wrote and a .jenesis.failed marker beside its output/ and
+                    supplement/, until the step runs again. One build at a time per target: the root
+                    holds an exclusive .jenesis.lock and a second process fails fast.
 
                     Read the outcome of the latest build from %{target}/.jenesis.events.jsonl rather
                     than from the progress lines, whose [EVENTS] line names the file: one JSON object
                     per line, each led by its `status`. A step's is executed, skipped, failed, loaded
                     or stored beside its `step` path, a module's resolved or failed beside its
                     `module` path; a failure carries its `error` class and `message`, an executed or
-                    skipped step the `folder` holding its output. The first line is `started` and the
-                    last `completed` or `failed`, with how many steps executed, skipped and failed; a
-                    file without that last line is a build that is still running or was killed.
+                    skipped step the `folder` holding its output, and a failed step the `folder` ending
+                    in `~` that holds what it wrote before it failed, such as a tool's reports and its
+                    argument files. The first line is `started`, with the `target` folder and the
+                    `directory` the build ran in, which a relative path in a step's command line,
+                    such as the one a failure says to execute, resolves against. The last line is
+                    `completed` or `failed`, with how many steps executed, skipped and failed; a file
+                    without that last line is a build that is still running or was killed.
 
                     Every build is a `run`, named on the `started` line. An executed step is this
                     run's; a skipped step names the earlier `run` that produced its output, so its
