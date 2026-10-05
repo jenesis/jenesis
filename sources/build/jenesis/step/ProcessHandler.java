@@ -189,9 +189,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         private final SortedMap<String, String> environment;
 
         private OfProcess(List<String> commands) {
-            SortedMap<String, String> environment = WINDOWS
-                    ? new TreeMap<>(String.CASE_INSENSITIVE_ORDER)
-                    : new TreeMap<>();
+            SortedMap<String, String> environment = new TreeMap<>(WINDOWS ? String.CASE_INSENSITIVE_ORDER : null);
             System.getenv().forEach((name, value) -> {
                 if (name.startsWith("LC_") || PLATFORM.contains(WINDOWS ? name.toUpperCase(Locale.ROOT) : name)) {
                     environment.put(name, value);
