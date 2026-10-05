@@ -25,7 +25,7 @@ public class JReleaserModule implements BuildExecutorModule {
     private final String version;
     private final String executable;
     private final String command;
-    private final boolean dryRun;
+    private final boolean dry;
     private final ProcessBuildStep.Terms terms;
 
     public JReleaserModule(Path root, Path configuration, String version) {
@@ -42,7 +42,7 @@ public class JReleaserModule implements BuildExecutorModule {
                 version,
                 environment.getProperty("jreleaser.executable", "jreleaser"),
                 environment.getProperty("jreleaser.command", "full-release"),
-                environment.flag("jreleaser.dryRun", true),
+                environment.flag("jreleaser.dry", true),
                 ProcessBuildStep.Terms.ofEnvironment(environment, "jreleaser", true));
     }
 
@@ -51,35 +51,35 @@ public class JReleaserModule implements BuildExecutorModule {
                             String version,
                             String executable,
                             String command,
-                            boolean dryRun,
+                            boolean dry,
                             ProcessBuildStep.Terms terms) {
         this.root = root;
         this.configuration = configuration;
         this.version = version;
         this.executable = executable;
         this.command = command;
-        this.dryRun = dryRun;
+        this.dry = dry;
         this.terms = terms;
     }
 
     public JReleaserModule configuration(Path configuration) {
-        return new JReleaserModule(root, configuration, version, executable, command, dryRun, terms);
+        return new JReleaserModule(root, configuration, version, executable, command, dry, terms);
     }
 
     public JReleaserModule executable(String executable) {
-        return new JReleaserModule(root, configuration, version, executable, command, dryRun, terms);
+        return new JReleaserModule(root, configuration, version, executable, command, dry, terms);
     }
 
     public JReleaserModule command(String command) {
-        return new JReleaserModule(root, configuration, version, executable, command, dryRun, terms);
+        return new JReleaserModule(root, configuration, version, executable, command, dry, terms);
     }
 
-    public JReleaserModule dryRun(boolean dryRun) {
-        return new JReleaserModule(root, configuration, version, executable, command, dryRun, terms);
+    public JReleaserModule dry(boolean dry) {
+        return new JReleaserModule(root, configuration, version, executable, command, dry, terms);
     }
 
     public JReleaserModule printing(BiConsumer<Boolean, String> printing) {
-        return new JReleaserModule(root, configuration, version, executable, command, dryRun, terms.printing(printing));
+        return new JReleaserModule(root, configuration, version, executable, command, dry, terms.printing(printing));
     }
 
     public static Path configured(Environment environment, Path root) {
@@ -111,7 +111,7 @@ public class JReleaserModule implements BuildExecutorModule {
                         root,
                         configuration,
                         command,
-                        dryRun,
+                        dry,
                         terms),
                 inputs);
     }
@@ -142,19 +142,19 @@ public class JReleaserModule implements BuildExecutorModule {
         private final Path root;
         private final Path configuration;
         private final String command;
-        private final boolean dryRun;
+        private final boolean dry;
 
         private Execute(Function<List<String>, ? extends ProcessHandler> factory,
                         Path root,
                         Path configuration,
                         String command,
-                        boolean dryRun,
+                        boolean dry,
                         ProcessBuildStep.Terms terms) {
             super("jreleaser", factory, terms);
             this.root = root;
             this.configuration = configuration;
             this.command = command;
-            this.dryRun = dryRun;
+            this.dry = dry;
         }
 
         @Override
@@ -180,7 +180,7 @@ public class JReleaserModule implements BuildExecutorModule {
             commands.add(configuration.toAbsolutePath().normalize().toString());
             commands.add("--output-directory");
             commands.add(context.next().toAbsolutePath().normalize().toString());
-            if (dryRun) {
+            if (dry) {
                 commands.add("--dry-run");
             }
             return CompletableFuture.completedStage(commands);

@@ -19,7 +19,7 @@ public class ExecutionTest {
 
     @AfterEach
     public void clearProperties() {
-        System.clearProperty("jenesis.execute.mainClass");
+        System.clearProperty("jenesis.execute.main");
         System.clearProperty("jenesis.execute.module");
     }
 
@@ -48,7 +48,7 @@ public class ExecutionTest {
 
     @Test
     public void system_property_picks_up_main_class() {
-        Execution execute = Execution.ofEnvironment(new Environment(Map.of("execute.mainClass", "foo.Bar")), Project.ofEnvironment(new Environment(Map.of("execute.mainClass", "foo.Bar")), Path.of(".")));
+        Execution execute = Execution.ofEnvironment(new Environment(Map.of("execute.main", "foo.Bar")), Project.ofEnvironment(new Environment(Map.of("execute.main", "foo.Bar")), Path.of(".")));
         assertThat(execute.mainClass()).isEqualTo("foo.Bar");
     }
 
@@ -60,7 +60,7 @@ public class ExecutionTest {
 
     @Test
     public void explicit_overrides_win_over_system_properties() {
-        Execution execute = Execution.ofEnvironment(new Environment(Map.of("execute.mainClass", "ignored.Main", "execute.module", "ignored")), Project.ofEnvironment(new Environment(Map.of("execute.mainClass", "ignored.Main", "execute.module", "ignored")), Path.of(".")))
+        Execution execute = Execution.ofEnvironment(new Environment(Map.of("execute.main", "ignored.Main", "execute.module", "ignored")), Project.ofEnvironment(new Environment(Map.of("execute.main", "ignored.Main", "execute.module", "ignored")), Path.of(".")))
                 .mainClass("a.B")
                 .module("sub");
         assertThat(execute.mainClass()).isEqualTo("a.B");
@@ -189,7 +189,7 @@ public class ExecutionTest {
                         "project.target", root.resolve("target").toString(),
                         "project.artifacts", root.resolve("artifacts").toString(),
                         "test.skip", "true",
-                        "execute.mainClass", "sample.Sample")),
+                        "execute.main", "sample.Sample")),
                 Execution.class.getName(),
                 root,
                 new LinkedHashSet<>());

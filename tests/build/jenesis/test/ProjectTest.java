@@ -1286,10 +1286,10 @@ public class ProjectTest {
     @Test
     public void the_layered_settings_rejects_docker_settings_in_a_profile() throws IOException {
         Files.writeString(root.resolve("jenesis.properties"), "jenesis.make.profiles=ci\n");
-        Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.execute.docker.mountWritable=/\n");
+        Files.writeString(root.resolve("jenesis-ci.properties"), "jenesis.execute.docker.writable=/\n");
         assertThatThrownBy(() -> Make.settings(root, Map.of()))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("jenesis.execute.docker.mountWritable cannot be set in");
+                .hasMessageContaining("jenesis.execute.docker.writable cannot be set in");
     }
 
     @Test
