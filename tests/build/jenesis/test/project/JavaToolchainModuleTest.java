@@ -236,7 +236,7 @@ public class JavaToolchainModuleTest {
 
     @Test
     public void class_path_compatibility_names_each_provider_in_a_service_file() throws IOException {
-        tool("public Tool() { }");
+        tool();
         buildExecutor.addSource("input", input);
         buildExecutor.addModule("output", new JavaToolchainModule()
                 .classpath(new ClassPathCompatibility().asModule("services")), "input");
@@ -255,21 +255,8 @@ public class JavaToolchainModuleTest {
     }
 
     @Test
-    public void class_path_compatibility_refuses_a_provider_the_class_path_cannot_create() throws IOException {
-        tool("private Tool() { } public static Tool provider() { return new Tool(); }");
-        buildExecutor.addSource("input", input);
-        buildExecutor.addModule("output", new JavaToolchainModule()
-                .classpath(new ClassPathCompatibility().asModule("services")), "input");
-        assertThatThrownBy(buildExecutor::execute)
-                .rootCause()
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("provides java.util.spi.ToolProvider with other.Tool")
-                .hasMessageContaining("public constructor taking no arguments");
-    }
-
-    @Test
     public void class_path_compatibility_refuses_a_service_file_the_module_ships_itself() throws IOException {
-        tool("public Tool() { }");
+        tool();
         Files.writeString(Files.createDirectories(input.resolve(BuildStep.RESOURCES + "META-INF/services"))
                 .resolve("java.util.spi.ToolProvider"), "other.Tool\n");
         buildExecutor.addSource("input", input);
@@ -283,7 +270,7 @@ public class JavaToolchainModuleTest {
 
     @Test
     public void class_path_compatibility_enables_native_access_a_module_grants_itself() throws IOException {
-        tool("public Tool() { }");
+        tool();
         Files.writeString(input.resolve("manifest.mf"), "Manifest-Version: 1.0\nJenesis-Native-Access: demo.tools\n");
         buildExecutor.addSource("input", input);
         buildExecutor.addModule("output", new JavaToolchainModule()
@@ -302,7 +289,7 @@ public class JavaToolchainModuleTest {
 
     @Test
     public void class_path_compatibility_keeps_a_native_access_the_module_sets_itself() throws IOException {
-        tool("public Tool() { }");
+        tool();
         Files.writeString(input.resolve("manifest.mf"),
                 "Manifest-Version: 1.0\nJenesis-Native-Access: demo.tools\nEnable-Native-Access: ALL-UNNAMED\n");
         buildExecutor.addSource("input", input);
@@ -314,7 +301,7 @@ public class JavaToolchainModuleTest {
                 .doesNotExist();
     }
 
-    private void tool(String constructor) throws IOException {
+    private void tool() throws IOException {
         Path sources = Files.createDirectories(input.resolve(BuildStep.SOURCES + "other"));
         Files.writeString(input.resolve(BuildStep.SOURCES + "module-info.java"), """
                 module demo.tools {
@@ -324,13 +311,12 @@ public class JavaToolchainModuleTest {
         Files.writeString(sources.resolve("Tool.java"), """
                 package other;
                 public class Tool implements java.util.spi.ToolProvider {
-                    %s
                     public String name() { return "tool"; }
                     public int run(java.io.PrintWriter out, java.io.PrintWriter err, String... arguments) {
                         return 0;
                     }
                 }
-                """.formatted(constructor));
+                """);
     }
 
     private static final BuildExecutorModule TRANSFORMER = ((BuildStep) (_, context, arguments) -> {

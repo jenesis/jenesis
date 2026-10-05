@@ -40,14 +40,8 @@ attribute already. The main class needs nothing: `@jenesis.main` puts it into th
 manifest and into `module-info` alike. A module without a `module-info` is a
 class-path jar already and gets nothing.
 
-Two things the class path cannot do fail the build instead of failing at run
-time:
-
-- a provider must be a public class with a public constructor taking no
-  arguments. The module path also accepts a public static `provider()` method,
-  which a class-path `ServiceLoader` ignores;
-- a module that ships its own `META-INF/services/<service>` for a service it also
-  `provides` is refused, since the build writes that file itself.
+A module that ships its own `META-INF/services/<service>` for a service it also
+`provides` fails the build, since the build writes that file itself.
 
 `-Djenesis.generate.classpath=false` switches the step off, in a profile if need
 be, without deleting the file.

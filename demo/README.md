@@ -802,11 +802,9 @@ never for the module in its layer.
 A module declares its services in `module-info.java`, which a class-path
 `ServiceLoader` never reads. An empty `classpath.properties` in a configuration
 folder makes the build write a `META-INF/services/<service>` file for each
-`provides` clause, so the same jar works on either path. A provider that only the
-module path could create - one with a static `provider()` method instead of a
-public constructor taking no arguments - fails the build rather than the
-program. A module that grants native access to itself also gets the
-`Enable-Native-Access` manifest attribute that `java -jar` reads.
+`provides` clause, so the same jar works on either path. A module that grants
+native access to itself also gets the `Enable-Native-Access` manifest attribute
+that `java -jar` reads.
 
 ## 40. Customizing the build - [`custom-assembler`](demo-55-custom-assembler/README.md), [`custom-jmod`](demo-56-custom-jmod/README.md)
 
