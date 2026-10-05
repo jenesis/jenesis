@@ -793,8 +793,9 @@ public record Project(
                                         + for /, as in the folder under target/: foo/bar is
                                         pin/module-foo+bar.
                       :                 one path segment, e.g. build/:/java
-                      ::                any depth, e.g. ::/test. Lenient: a typo matches nothing
-                                        silently, so confirm a selector ran what you meant.
+                      ::                any depth, e.g. ::/test. Lenient where a branch holds no
+                                        match, but a selector that matches no step anywhere
+                                        fails the build once it ends.
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;

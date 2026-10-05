@@ -1805,13 +1805,60 @@ public class BuildExecutorTest implements Serializable {
     }
 
     @Test
-    public void wildcard_with_no_match_runs_nothing() throws IOException {
+    public void wildcard_with_no_match_runs_nothing_and_is_refused() {
         buildExecutor.addModule("module", (inner, _) -> inner.addStep("step", (_, _, _) -> {
             throw new AssertionError("step should not run");
         }));
-        Map<String, ?> build = buildExecutor.execute(Runnable::run, ":/nonexistent")
-                .toCompletableFuture().join();
-        assertThat(build).isEmpty();
+        assertThatThrownBy(() -> buildExecutor.execute(Runnable::run, ":/nonexistent").toCompletableFuture().join())
+                .as("a wildcard that runs nothing would otherwise finish green, which reads as a pass")
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Unknown selector: :/nonexistent - it matches no step");
+    }
+
+    @Test
+    public void refuses_a_wildcard_typo_although_a_module_it_pulled_in_ran_in_full() {
+        buildExecutor.addModule("build", (executor, _) -> executor.addStep("jar", counting()));
+        buildExecutor.addModule("stage", (executor, _) -> executor.addStep("copy", counting()), "build");
+        assertThatThrownBy(() -> buildExecutor.execute(Runnable::run, "::/jra").toCompletableFuture().join())
+                .as("steps ran because stage needs build, but none of them because of the selector")
+                .rootCause()
+                .hasMessage("Unknown selector: ::/jra - it matches no step");
+    }
+
+    @Test
+    public void runs_a_wildcard_that_matches_in_one_branch_alone() {
+        RUNS.set(0);
+        buildExecutor.addModule("first", (executor, _) -> executor.addStep("jar", counting()));
+        buildExecutor.addModule("second", (executor, _) -> executor.addStep("javadoc", counting()));
+        buildExecutor.execute(Runnable::run, ":/jar").toCompletableFuture().join();
+        assertThat(RUNS.get()).isEqualTo(1);
+    }
+
+    @Test
+    public void runs_an_any_depth_wildcard_that_matches_a_nested_step() {
+        RUNS.set(0);
+        buildExecutor.addModule("outer", (outer, _) -> outer.addModule("inner", (inner, _) -> {
+            inner.addStep("jar", counting());
+            inner.addStep("javac", counting());
+        }));
+        buildExecutor.execute(Runnable::run, "::/jar").toCompletableFuture().join();
+        assertThat(RUNS.get()).isEqualTo(1);
+    }
+
+    @Test
+    public void refuses_a_narrower_selector_beside_its_whole_module_when_it_names_nothing() {
+        buildExecutor.addModule("module", (executor, _) -> executor.addStep("step", counting()));
+        assertThatThrownBy(() -> buildExecutor.execute(Runnable::run, "module/stpe", "module").toCompletableFuture().join())
+                .rootCause()
+                .hasMessage("Unknown selector: module/stpe - it matches no step");
+    }
+
+    @Test
+    public void accepts_a_selector_naming_a_module_that_holds_no_step() {
+        buildExecutor.addModule("empty", (_, _) -> {
+        });
+        assertThat(buildExecutor.execute(Runnable::run, "empty").toCompletableFuture().join()).isEmpty();
     }
 
     @Test

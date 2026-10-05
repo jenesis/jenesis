@@ -19,6 +19,7 @@ class BuildExecutorDefault implements BuildExecutor {
     private final boolean aggregate;
     private final Permits permits;
     private final String location;
+    private final Set<String> reached;
 
     private final Map<String, StepSummary> inherited;
     private final SequencedMap<String, Registration> registrations = new LinkedHashMap<>();
@@ -32,6 +33,7 @@ class BuildExecutorDefault implements BuildExecutor {
                          boolean aggregate,
                          Permits permits,
                          String location,
+                         Set<String> reached,
                          Map<String, StepSummary> inherited) throws IOException {
         this.target = Files.isDirectory(target) ? target : Files.createDirectory(target);
         this.timeout = timeout;
@@ -42,6 +44,7 @@ class BuildExecutorDefault implements BuildExecutor {
         this.aggregate = aggregate;
         this.permits = permits;
         this.location = location;
+        this.reached = reached;
         this.inherited = inherited;
     }
 
@@ -74,6 +77,7 @@ class BuildExecutorDefault implements BuildExecutor {
                 });
                 return CompletableFuture.completedStage(Map.of(identity, Map.of()));
             }
+            reached.add(location + identity);
             CompletableFuture<Map<String, Map<String, StepSummary>>> future = new CompletableFuture<>();
             executor.execute(() -> {
                 try {
@@ -118,6 +122,7 @@ class BuildExecutorDefault implements BuildExecutor {
                     });
                     return CompletableFuture.completedStage(Map.of(identity, Map.of()));
                 }
+                reached.add(location + identity);
                 StepFolder previous = StepFolder.of(target.resolve(identity));
                 boolean exists = Files.exists(previous.path());
                 byte[] currentStepHash = stepHash.hash(step);
@@ -340,8 +345,10 @@ class BuildExecutorDefault implements BuildExecutor {
                             aggregate,
                             permits,
                             location + prefix + "/",
+                            reached,
                             inherited);
                     module.accept(buildExecutor, folders);
+                    reached.add(location + prefix);
                     resolution.accept(null);
                     return buildExecutor.doExecute(executor, selectors).thenComposeAsync(results -> {
                         try {
@@ -437,6 +444,7 @@ class BuildExecutorDefault implements BuildExecutor {
         Set<Selector> initial = Arrays.stream(selectors)
                 .map(s -> new Selector(s, false))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
+        reached.clear();
         Path canonical = target.toAbsolutePath().normalize();
         FileChannel lock = lock(canonical);
         BiConsumer<Boolean, Throwable> completion;
@@ -448,6 +456,12 @@ class BuildExecutorDefault implements BuildExecutor {
         }
         try {
             return doExecute(executor, initial).thenApplyAsync(summaries -> {
+                for (String selector : selectors) {
+                    List<String> segments = List.of(selector.split("/"));
+                    if (reached.stream().noneMatch(path -> matches(segments, List.of(path.split("/"))))) {
+                        throw new IllegalArgumentException("Unknown selector: " + selector + " - it matches no step");
+                    }
+                }
                 SequencedMap<String, Path> translated = new LinkedHashMap<>();
                 for (Map.Entry<String, StepSummary> entry : summaries.entrySet()) {
                     translated.put(entry.getKey(), entry.getValue().folder());
@@ -672,6 +686,20 @@ class BuildExecutorDefault implements BuildExecutor {
             }
             return merged;
         }, executor);
+    }
+
+    private static boolean matches(List<String> selector, List<String> path) {
+        if (selector.isEmpty()) {
+            return true;
+        }
+        String first = selector.getFirst();
+        if (first.equals("::")) {
+            return matches(selector.subList(1, selector.size()), path)
+                    || !path.isEmpty() && matches(selector, path.subList(1, path.size()));
+        }
+        return !path.isEmpty()
+                && (first.equals(":") || first.equals(path.getFirst()))
+                && matches(selector.subList(1, selector.size()), path.subList(1, path.size()));
     }
 
     private static String validated(String identity, Pattern pattern) {

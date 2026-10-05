@@ -119,7 +119,9 @@ wildcards: `:` matches a single path segment and `::` matches any depth. So
 
     java build/jenesis/Make.java '::/jar'
 
-Wildcards are lenient (non-matching branches are skipped), and once a module is
+Wildcards are lenient (non-matching branches are skipped), but a selector that
+matches no step anywhere fails the build once it ends, so a typo such as `::/jra`
+is reported rather than passed over. Once a module is
 reached its own pipeline steps run - so a wildcard chooses *which steps* you ask
 for across the tree, not how much of each matched module is rebuilt.
 
