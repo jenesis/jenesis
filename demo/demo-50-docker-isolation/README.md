@@ -160,7 +160,7 @@ launched program needs a host path made visible.
 
 When a sandboxed build or program legitimately needs to *write* to a host path -
 say a generated-output directory you want to keep after the container exits -
-`jenesis.project.docker.mountWritable` (and its `jenesis.execute.docker.mountWritable`
+`jenesis.project.docker.writable` (and its `jenesis.execute.docker.writable`
 twin) add **read-write** bind mounts, the counterpart to the read-only `.mount`
 above. Reach for it sparingly: every writable mount is a hole in the very
 confinement this demo is about, so widen the sandbox only for the exact path that

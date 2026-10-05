@@ -14,18 +14,18 @@ public record Execution(Project project, String mainClass, String module, Contai
 
     public static Execution ofEnvironment(Environment environment, Project project) {
         return new Execution(project,
-                environment.getProperty("execute.mainClass"),
+                environment.getProperty("execute.main"),
                 environment.getProperty("execute.module"),
                 Container.ofEnvironment(environment));
     }
 
-    public record Container(String image, String mount, String mountWritable, String env, boolean announcing) {
+    public record Container(String image, String mount, String writable, String env, boolean announcing) {
 
         public static Container ofEnvironment(Environment environment) {
             return environment.flag("execute.docker")
                     ? new Container(environment.getProperty("execute.docker.image"),
                                     environment.getProperty("execute.docker.mount"),
-                                    environment.getProperty("execute.docker.mountWritable"),
+                                    environment.getProperty("execute.docker.writable"),
                                     environment.getProperty("execute.docker.env"),
                                     environment.flag("print.docker", true))
                     : null;
@@ -260,7 +260,7 @@ public record Execution(Project project, String mainClass, String module, Contai
                 }
             }
             docker = docker.mounts(container.mount(), root, true)
-                    .mounts(container.mountWritable(), root, false)
+                    .mounts(container.writable(), root, false)
                     .envs(container.env());
             if (container.announcing()) {
                 project.environment().out().accept("Launching Java execution within Docker image: " + docker.image());
