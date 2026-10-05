@@ -159,7 +159,9 @@ public interface BuildExecutor {
                 cache,
                 aggregate,
                 concurrency == 0 ? null : new BuildExecutorDefault.Permits(concurrency),
-                new AtomicReference<>(),
+                DateTimeFormatter.ofPattern("uuuuMMdd'T'HHmmss.SSSSSS'Z'")
+                        .withZone(ZoneOffset.UTC)
+                        .format(Instant.now()),
                 "",
                 Map.of());
         if (!Files.exists(target.resolve(SKIP_MARKER))) {
