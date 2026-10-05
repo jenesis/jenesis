@@ -1097,7 +1097,8 @@ public record Project(
                                                        will not finish; narrow it with
                                                        print.<command>, as print.javac
                       -Djenesis.dependency.pin=strict  fail the build on any unpinned artifact
-                      -Djenesis.test.filter=<regex>    run one test class or method
+                      -Djenesis.test.filter=<regex>    run one test class or method; <module>/<regex>
+                                                       runs it in that module alone
                       -Djenesis.executor.rebuild       wipe target/ - avoid it, see skill/engine
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
@@ -2875,7 +2876,7 @@ public record Project(
                 cache.read|PT10S|Read timeout for a cache server
                 cache.insecure|false|Permit the cache key over plaintext http off loopback, and over https accept a certificate that does not verify; likewise yours alone to allow
                 test.skip|false|Skip executing tests, still resolving what running them needs
-                test.filter||Comma-separated <classRegex>[#<method>] entries restricting which tests run
+                test.filter||Comma-separated [<module>/]<classRegex>[#<method>] entries restricting which tests run; an entry naming a module applies to its tests alone, and a test module no entry reaches runs none
                 test.tag||Comma-separated alternatives, a test running when it matches any of them: a tag, several joined by + for the tests carrying all of them, and -<tag> for the tests not carrying it, as -container or release+-soak,-container, with nothing to quote on a command line and translated for the test framework; a run remembers what it covered until the tests' inputs change, so a later selection runs only the tests no earlier one ran
                 test.force|false|Execute tests even where a previous run already covered them
                 test.incremental||Run only the tests a change can reach: true, or the setting named with no value, detects changes with MD5, the name of another message digest with that one, and false runs every test

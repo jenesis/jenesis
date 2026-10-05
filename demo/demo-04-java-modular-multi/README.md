@@ -174,6 +174,16 @@ The test step's summary then reports `1 tests successful` instead of the default
 `2`. The `-D` flag must come **before** the source file - anything after it is
 read as a selector.
 
+An entry applies to every test module, and one where it matches no test fails the
+build. Prefixing an entry with a module's folder and a `/` keeps it to that
+module's tests, and a test module that no entry reaches then runs none rather than
+failing:
+
+    java -Djenesis.test.filter='greeter-test/.*GreeterTest#prefix_is_a_greeting' build/jenesis/Make.java
+
+The filter is recorded with the results, so a later build with another filter, or
+none, runs the tests again rather than taking this selection for a full run.
+
 Pure modular layout
 -------------------
 
