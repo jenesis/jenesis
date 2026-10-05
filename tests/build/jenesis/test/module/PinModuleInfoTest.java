@@ -7,6 +7,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.HashDigestFunction;
+import build.jenesis.Palette;
 import build.jenesis.Platform;
 import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
@@ -578,7 +579,7 @@ public class PinModuleInfoTest {
                 """);
         writeResolved(Map.of("module/bar", "1.0 SHA-256/cafebabe"));
         StringBuilder captured = new StringBuilder();
-        run(file, pin -> pin.printing(line -> captured.append(line).append('\n')));
+        run(file, pin -> pin.printing(line -> captured.append(line).append('\n'), Palette.ANSI));
         assertThat(captured.toString())
                 .as("a kept line is either a pin for a closure this run did not resolve or a leftover,"
                         + " and jenesis.print.pins is what names it")

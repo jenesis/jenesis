@@ -72,11 +72,7 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
         return new JenesisModuleRepositoryRelease(repository, token, connection, printing, palette);
     }
 
-    public JenesisModuleRepositoryRelease printing(Consumer<String> printing) {
-        return new JenesisModuleRepositoryRelease(repository, token, connection, printing, palette);
-    }
-
-    public JenesisModuleRepositoryRelease palette(Palette palette) {
+    public JenesisModuleRepositoryRelease printing(Consumer<String> printing, Palette palette) {
         return new JenesisModuleRepositoryRelease(repository, token, connection, printing, palette);
     }
 

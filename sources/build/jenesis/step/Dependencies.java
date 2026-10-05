@@ -101,11 +101,7 @@ public class Dependencies implements BuildExecutorModule {
         return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
     }
 
-    public Dependencies printing(Consumer<String> printing) {
-        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
-    }
-
-    public Dependencies palette(Palette palette) {
+    public Dependencies printing(Consumer<String> printing, Palette palette) {
         return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
     }
 

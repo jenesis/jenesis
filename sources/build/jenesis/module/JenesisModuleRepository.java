@@ -362,11 +362,7 @@ public class JenesisModuleRepository implements JenesisRepository {
         return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing, palette);
     }
 
-    public JenesisModuleRepository printing(Consumer<String> printing) {
-        return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing, palette);
-    }
-
-    public JenesisModuleRepository palette(Palette palette) {
+    public JenesisModuleRepository printing(Consumer<String> printing, Palette palette) {
         return new JenesisModuleRepository(root, token, connection, maven, prerelease, speculative, printing, palette);
     }
 

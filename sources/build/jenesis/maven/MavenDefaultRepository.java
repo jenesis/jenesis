@@ -17,7 +17,6 @@ public class MavenDefaultRepository implements MavenRepository {
     private final Consumer<String> callback;
     private final String token;
     private final Repository.Connection connection;
-    private final Palette palette;
 
     public static MavenRepository of() {
         return ofEnvironment(Environment.NONE);
@@ -209,13 +208,7 @@ public class MavenDefaultRepository implements MavenRepository {
                                    Map<String, URI> validations,
                                    Consumer<String> callback,
                                    String token) {
-        this(repository,
-             local,
-             validations,
-             callback,
-             token,
-             Repository.Connection.ofEnvironment(environment),
-             Palette.ofEnvironment(environment));
+        this(repository, local, validations, callback, token, Repository.Connection.ofEnvironment(environment));
     }
 
     private MavenDefaultRepository(URI repository,
@@ -223,8 +216,7 @@ public class MavenDefaultRepository implements MavenRepository {
                                    Map<String, URI> validations,
                                    Consumer<String> callback,
                                    String token,
-                                   Repository.Connection connection,
-                                   Palette palette) {
+                                   Repository.Connection connection) {
         this.repository = repository;
         this.local = local;
         this.writable = local != null && Files.isWritable(local);
@@ -232,25 +224,20 @@ public class MavenDefaultRepository implements MavenRepository {
         this.callback = callback;
         this.token = token;
         this.connection = connection;
-        this.palette = palette;
     }
 
     public MavenDefaultRepository connection(Repository.Connection connection) {
-        return new MavenDefaultRepository(repository, local, validations, callback, token, connection, palette);
+        return new MavenDefaultRepository(repository, local, validations, callback, token, connection);
     }
 
-    public MavenDefaultRepository palette(Palette palette) {
-        return new MavenDefaultRepository(repository, local, validations, callback, token, connection, palette);
-    }
-
-    public MavenDefaultRepository printing(Consumer<String> printing) {
+    public MavenDefaultRepository printing(Consumer<String> printing, Palette palette) {
         return new MavenDefaultRepository(repository, local, validations, printing == null
                 ? null
                 : path -> printing.accept("%s%-11s%s %s".formatted(
                         palette.yellow(),
                         "[FETCHED]",
                         palette.reset(),
-                        repository.resolve(path))), token, connection, palette);
+                        repository.resolve(path))), token, connection);
     }
 
     @SuppressWarnings("unchecked")

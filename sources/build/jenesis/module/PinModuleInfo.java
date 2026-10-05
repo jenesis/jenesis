@@ -46,10 +46,9 @@ public class PinModuleInfo implements BuildStep {
                 .flatten(flattenFrom(environment))
                 .retain(retainFrom(environment))
                 .permits(Pinning.permits(environment))
-                .platform(Platform.ofEnvironment(environment))
-                .palette(Palette.ofEnvironment(environment));
+                .platform(Platform.ofEnvironment(environment));
         Boolean pins = environment.flagOrNull("print.pins");
-        return pins == null || !pins ? pin : pin.printing(environment.out());
+        return pins == null || !pins ? pin : pin.printing(environment.out(), Palette.ofEnvironment(environment));
     }
 
     private PinModuleInfo(String prefix,
@@ -96,11 +95,7 @@ public class PinModuleInfo implements BuildStep {
         return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
     }
 
-    public PinModuleInfo printing(Consumer<String> printing) {
-        return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
-    }
-
-    public PinModuleInfo palette(Palette palette) {
+    public PinModuleInfo printing(Consumer<String> printing, Palette palette) {
         return new PinModuleInfo(prefix, path, moduleInfoFiles, hashFunction, platform, checksum, flatten, retain, permits, printing, palette);
     }
 

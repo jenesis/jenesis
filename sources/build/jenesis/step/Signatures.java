@@ -47,8 +47,7 @@ public class Signatures extends ProcessBuildStep {
                                     Map<String, Repository> repositories) {
         Signatures signatures = new Signatures(repositories)
                 .verification(Verification.ofEnvironment(environment))
-                .expiry(KeyExpiry.ofEnvironment(environment))
-                .palette(Palette.ofEnvironment(environment));
+                .expiry(KeyExpiry.ofEnvironment(environment));
         String command = environment.getProperty("openpgp.command");
         if (command != null) {
             signatures = signatures.command(command);
@@ -62,7 +61,7 @@ public class Signatures extends ProcessBuildStep {
             signatures = signatures.trustedRoot(URI.create(sigstore));
         }
         Boolean print = environment.flagOrNull("print.signatures");
-        return print == null || !print ? signatures : signatures.printing(environment.out());
+        return print == null || !print ? signatures : signatures.printing(environment.out(), Palette.ofEnvironment(environment));
     }
 
     private Signatures(Map<String, Repository> repositories,
@@ -114,11 +113,7 @@ public class Signatures extends ProcessBuildStep {
         return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, factory, printing, palette);
     }
 
-    public Signatures printing(Consumer<String> printing) {
-        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing, palette);
-    }
-
-    public Signatures palette(Palette palette) {
+    public Signatures printing(Consumer<String> printing, Palette palette) {
         return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing, palette);
     }
 

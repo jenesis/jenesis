@@ -133,20 +133,7 @@ public class JenesisRawGitRepository implements JenesisRepository {
                                            palette);
     }
 
-    public JenesisRawGitRepository printing(Consumer<String> printing) {
-        return new JenesisRawGitRepository(scope,
-                                           data,
-                                           repository,
-                                           token,
-                                           predicate,
-                                           connection,
-                                           prerelease,
-                                           speculative,
-                                           printing,
-                                           palette);
-    }
-
-    public JenesisRawGitRepository palette(Palette palette) {
+    public JenesisRawGitRepository printing(Consumer<String> printing, Palette palette) {
         return new JenesisRawGitRepository(scope,
                                            data,
                                            repository,
