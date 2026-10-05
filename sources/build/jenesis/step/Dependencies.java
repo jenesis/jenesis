@@ -42,7 +42,7 @@ public class Dependencies implements BuildExecutorModule {
     private final Palette palette;
 
     public Dependencies(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, new Signatures(repositories), null, null, BuildStep.timestamp(), null, Palette.ANSI);
+        this(repositories, resolvers, new Signatures(repositories), null, null, BuildStep.timestamp(), null, Palette.NONE);
     }
 
     public static Dependencies ofEnvironment(Environment environment,

@@ -24,7 +24,7 @@ public interface BuildExecutor {
                          Palette palette) {
 
         public Configuration() {
-            this(Duration.ZERO, "MD5", false, true, true, false, false, false, 0, null, System.out::println, Palette.ANSI);
+            this(Duration.ZERO, "MD5", false, true, true, false, false, false, 0, null, null, Palette.NONE);
         }
 
         public static Configuration ofEnvironment(Environment environment) {
@@ -98,16 +98,12 @@ public interface BuildExecutor {
             return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
         }
 
-        public Configuration out(Consumer<String> out) {
-            return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
-        }
-
-        public Configuration palette(Palette palette) {
+        public Configuration out(Consumer<String> out, Palette palette) {
             return new Configuration(timeout, digest, verbose, progress, events, cacheHits, rebuild, aggregate, concurrency, cache, out, palette);
         }
 
         public BuildExecutor of(Path target) throws IOException {
-            BuildExecutorCallback printing = progress
+            BuildExecutorCallback printing = progress && out != null
                     ? BuildExecutorCallback.printing(out, palette, verbose, cacheHits, target, events)
                     : BuildExecutorCallback.nop();
             return BuildExecutor.of(target,

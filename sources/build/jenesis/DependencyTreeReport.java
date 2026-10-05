@@ -12,8 +12,8 @@ public final class DependencyTreeReport {
     private final boolean compact;
     private final Map<String, String> locations;
 
-    public DependencyTreeReport(Consumer<String> out) {
-        this(out, Palette.ANSI, false, Map.of());
+    public DependencyTreeReport(Consumer<String> out, Palette palette) {
+        this(out, palette, false, Map.of());
     }
 
     private DependencyTreeReport(Consumer<String> out,
@@ -24,10 +24,6 @@ public final class DependencyTreeReport {
         this.palette = palette;
         this.compact = compact;
         this.locations = locations;
-    }
-
-    public DependencyTreeReport palette(Palette palette) {
-        return new DependencyTreeReport(out, palette, compact, locations);
     }
 
     public DependencyTreeReport compact(boolean compact) {

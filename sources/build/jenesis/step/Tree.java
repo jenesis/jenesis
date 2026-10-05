@@ -19,7 +19,7 @@ public class Tree implements BuildStep {
     private final transient boolean compact, tests;
 
     public Tree() {
-        this(System.out::println, Palette.ANSI, false, true);
+        this(null, Palette.NONE, false, true);
     }
 
     public static Tree ofEnvironment(Environment environment) {
@@ -44,7 +44,7 @@ public class Tree implements BuildStep {
         this.tests = tests;
     }
 
-    public Tree palette(Palette palette) {
+    public Tree printing(Consumer<String> out, Palette palette) {
         return new Tree(out, palette, compact, tests);
     }
 
@@ -66,6 +66,9 @@ public class Tree implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
+        if (out == null) {
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }
         Map<Path, SequencedProperties> inventories = new HashMap<>();
         SequencedMap<Path, String> prefixes = new LinkedHashMap<>();
         SequencedMap<String, String> locations = new LinkedHashMap<>();
@@ -90,7 +93,7 @@ public class Tree implements BuildStep {
                 }
             }
         }
-        DependencyTreeReport report = new DependencyTreeReport(out).palette(palette).compact(compact).locations(locations);
+        DependencyTreeReport report = new DependencyTreeReport(out, palette).compact(compact).locations(locations);
         SequencedMap<String, Resolver.Vertex> aggregated = new LinkedHashMap<>();
         for (Map.Entry<Path, String> entry : prefixes.entrySet()) {
             SequencedProperties inventory = inventories.get(entry.getKey());

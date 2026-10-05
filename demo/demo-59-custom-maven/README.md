@@ -50,7 +50,7 @@ How the convenience make is wired
 `MavenProject.make(environment, root, assembler)` as a module, and executes it:
 
     Environment environment = new Environment(Make.settings(Path.of(".")).keys());
-    BuildExecutor root = BuildExecutor.of(Path.of("target"));
+    BuildExecutor root = BuildExecutor.Configuration.ofEnvironment(environment).of(Path.of("target"));
     root.addModule("maven", MavenProject.make(environment,
             Path.of("."),
             (descriptor, repositories, resolvers) -> new InferredMultiProjectAssembler().apply(

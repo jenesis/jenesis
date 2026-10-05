@@ -4,6 +4,7 @@ import module java.base;
 import module org.junit.jupiter.api;
 import build.jenesis.DependencyTreeReport;
 import build.jenesis.License;
+import build.jenesis.Palette;
 import build.jenesis.Resolver;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -16,7 +17,7 @@ public class DependencyTreeReportTest {
     @BeforeEach
     public void setUp() {
         bytes = new ByteArrayOutputStream();
-        report = new DependencyTreeReport(new PrintStream(bytes, true, StandardCharsets.UTF_8)::println);
+        report = new DependencyTreeReport(new PrintStream(bytes, true, StandardCharsets.UTF_8)::println, Palette.ANSI);
     }
 
     private String output() {
@@ -117,7 +118,7 @@ public class DependencyTreeReportTest {
         vertices.put("maven/g/b", new Resolver.Vertex("1.0", null, false, false, List.of()));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         DependencyTreeReport compact = new DependencyTreeReport(
-                new PrintStream(out, true, StandardCharsets.UTF_8)::println).compact(true);
+                new PrintStream(out, true, StandardCharsets.UTF_8)::println, Palette.ANSI).compact(true);
         compact.render(resolution(List.of(
                 new Resolver.Edge(null, "module/foo/1.0", "1.0", "compile", true),
                 new Resolver.Edge("module/foo/1.0", "module/bar/1.0", "1.0", "compile", true),
@@ -141,7 +142,7 @@ public class DependencyTreeReportTest {
         vertices.put("module/qux", new Resolver.Vertex("1.0", "qux", false, true, List.of()));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         DependencyTreeReport compact = new DependencyTreeReport(
-                new PrintStream(out, true, StandardCharsets.UTF_8)::println).compact(true);
+                new PrintStream(out, true, StandardCharsets.UTF_8)::println, Palette.ANSI).compact(true);
         compact.render(resolution(List.of(
                 new Resolver.Edge(null, "module/foo/1.0", "1.0", "compile", true),
                 new Resolver.Edge(null, "module/bar/1.0", "1.0", "compile", true),
@@ -163,7 +164,7 @@ public class DependencyTreeReportTest {
         vertices.put("module/log", new Resolver.Vertex("1.0", "log", false, true, List.of()));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         DependencyTreeReport compact = new DependencyTreeReport(
-                new PrintStream(out, true, StandardCharsets.UTF_8)::println).compact(true);
+                new PrintStream(out, true, StandardCharsets.UTF_8)::println, Palette.ANSI).compact(true);
         compact.render(resolution(List.of(
                 new Resolver.Edge(null, "module/core/1.0", "1.0", "compile", true),
                 new Resolver.Edge("module/core/1.0", "module/util/1.0", "1.0", "compile", true),

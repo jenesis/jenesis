@@ -21,7 +21,7 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
     private final transient Palette palette;
 
     public JenesisModuleRepositoryRelease(URI repository) {
-        this(repository, null, new Repository.Connection(), Environment.NONE.out(), Palette.ANSI);
+        this(repository, null, new Repository.Connection(), null, Palette.NONE);
     }
 
     public static URI configured(Environment environment) {

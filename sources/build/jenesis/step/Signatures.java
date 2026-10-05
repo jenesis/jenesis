@@ -40,7 +40,7 @@ public class Signatures extends ProcessBuildStep {
                 null,
                 null,
                 null,
-                Palette.ANSI);
+                Palette.NONE);
     }
 
     public static Signatures ofEnvironment(Environment environment,

@@ -49,7 +49,11 @@ public class PaletteTest {
 
     @Test
     public void the_executor_configuration_takes_the_palette_of_its_environment() {
-        assertThat(new BuildExecutor.Configuration().palette()).isEqualTo(Palette.ANSI);
+        assertThat(new BuildExecutor.Configuration().out())
+                .as("a configuration built without an environment prints nothing, so it needs no colors either")
+                .isNull();
+        assertThat(new BuildExecutor.Configuration().palette()).isEqualTo(Palette.NONE);
+        assertThat(BuildExecutor.Configuration.ofEnvironment(Environment.NONE).palette()).isEqualTo(Palette.ANSI);
         assertThat(BuildExecutor.Configuration.ofEnvironment(new Environment(Map.of("palette.colors", "none"))).palette())
                 .isEqualTo(Palette.NONE);
     }

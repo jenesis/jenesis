@@ -6,6 +6,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Palette;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Jar;
 import build.jenesis.step.Javac;
@@ -33,7 +34,9 @@ import build.jenesis.step.ProcessHandler;
 public class Demo {
 
     static void main(String[] args) throws Exception {
-        BuildExecutor root = BuildExecutor.of(Path.of("target"));
+        BuildExecutor root = new BuildExecutor.Configuration()
+                .out(System.out::println, Palette.ANSI)
+                .of(Path.of("target"));
 
         root.addSource("sources", Bind.asSources(), Path.of("sources"));
 
