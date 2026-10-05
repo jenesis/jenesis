@@ -148,6 +148,24 @@ public class BuildExecutorCallbackTest {
     }
 
     @Test
+    public void a_build_records_which_run_produced_each_step() throws IOException {
+        List<List<Map<String, Object>>> builds = new ArrayList<>();
+        for (int build = 0; build < 2; build++) {
+            BuildExecutor executor = new BuildExecutor.Configuration().progress(false).of(target);
+            executor.addStep("foo", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));
+            executor.execute(Runnable::run).toCompletableFuture().join();
+            builds.add(events());
+        }
+        Object first = builds.getFirst().getFirst().get("run"), second = builds.getLast().getFirst().get("run");
+        assertThat(first).isNotNull().isNotEqualTo(second);
+        assertThat(builds.getFirst().get(1)).containsEntry("status", "executed").containsEntry("run", first);
+        assertThat(builds.getLast().get(1))
+                .as("a skipped step names the earlier run that produced its output, not the one that skipped it")
+                .containsEntry("status", "skipped")
+                .containsEntry("run", first);
+    }
+
+    @Test
     public void a_build_records_a_selector_it_refuses() throws IOException {
         BuildExecutor executor = new BuildExecutor.Configuration().progress(false).of(target);
         executor.addStep("foo", (_, _, _) -> CompletableFuture.completedStage(new BuildStepResult(true)));

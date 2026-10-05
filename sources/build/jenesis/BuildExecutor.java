@@ -4,7 +4,10 @@ import module java.base;
 
 public interface BuildExecutor {
 
-    String SKIP_MARKER = ".jenesis.skip", LOCK_MARKER = ".jenesis.lock", EVENTS = ".jenesis.events.jsonl";
+    String SKIP_MARKER = ".jenesis.skip",
+            LOCK_MARKER = ".jenesis.lock",
+            EVENTS = ".jenesis.events.jsonl",
+            LOCAL = "local.properties";
 
     static BuildExecutor of(Path target) throws IOException {
         return new Configuration().of(target);
@@ -148,7 +151,17 @@ public interface BuildExecutor {
                 }
             });
         }
-        BuildExecutor executor = new BuildExecutorDefault(target, timeout, hash, stepHash, callback, cache, aggregate, concurrency == 0 ? null : new BuildExecutorDefault.Permits(concurrency), "", Map.of());
+        BuildExecutor executor = new BuildExecutorDefault(target,
+                timeout,
+                hash,
+                stepHash,
+                callback,
+                cache,
+                aggregate,
+                concurrency == 0 ? null : new BuildExecutorDefault.Permits(concurrency),
+                new AtomicReference<>(),
+                "",
+                Map.of());
         if (!Files.exists(target.resolve(SKIP_MARKER))) {
             Files.createFile(target.resolve(SKIP_MARKER));
         }

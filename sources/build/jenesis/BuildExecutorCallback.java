@@ -7,6 +7,9 @@ public interface BuildExecutorCallback {
 
     BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys);
 
+    default void run(String run) {
+    }
+
     default Consumer<Throwable> module(String identity) {
         return _ -> {
         };
@@ -24,6 +27,12 @@ public interface BuildExecutorCallback {
             @Override
             public BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys) {
                 return first.step(identity, keys).andThen(other.step(identity, keys));
+            }
+
+            @Override
+            public void run(String run) {
+                first.run(run);
+                other.run(run);
             }
 
             @Override
@@ -158,7 +167,13 @@ public interface BuildExecutorCallback {
         return new BuildExecutorCallback() {
 
             private Writer writer;
+            private String run;
             private int executed, skipped, failed;
+
+            @Override
+            public void run(String run) {
+                this.run = run;
+            }
 
             @Override
             public BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys) {
@@ -174,7 +189,8 @@ public interface BuildExecutorCallback {
                         executed = 0;
                         skipped = 0;
                         failed = 0;
-                        write("{\"status\":\"started\",\"target\":\"" + Json.escaped(root.toString()) + "\"}");
+                        write("{\"status\":\"started\",\"target\":\"" + Json.escaped(root.toString()) + "\""
+                                + (run == null ? "" : ",\"run\":\"" + Json.escaped(run) + "\"") + "}");
                     }
                     return (_, throwable) -> {
                         synchronized (this) {
@@ -198,10 +214,10 @@ public interface BuildExecutorCallback {
                         } else if (ran) {
                             executed++;
                             write("{\"status\":\"executed\"" + step + ",\"seconds\":"
-                                    + seconds(System.nanoTime() - started) + folder + "}");
+                                    + seconds(System.nanoTime() - started) + folder + produced(identity) + "}");
                         } else {
                             skipped++;
-                            write("{\"status\":\"skipped\"" + step + folder + "}");
+                            write("{\"status\":\"skipped\"" + step + folder + produced(identity) + "}");
                         }
                     }
                 };
@@ -227,6 +243,19 @@ public interface BuildExecutorCallback {
             public void stored(String identity, long duration) {
                 write("{\"status\":\"stored\",\"step\":\"" + Json.escaped(identity) + "\",\"seconds\":"
                         + seconds(duration) + "}");
+            }
+
+            private String produced(String identity) {
+                Path local = root.resolve(identity).resolve(BuildExecutor.LOCAL);
+                if (!Files.isRegularFile(local)) {
+                    return "";
+                }
+                try {
+                    String producer = SequencedProperties.ofFiles(local).value("run");
+                    return producer == null ? "" : ",\"run\":\"" + Json.escaped(producer) + "\"";
+                } catch (IOException _) {
+                    return "";
+                }
             }
 
             private synchronized void write(String line) {
