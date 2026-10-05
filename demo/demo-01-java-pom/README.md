@@ -31,7 +31,7 @@ Besides the progress lines, every build writes what happened to
 build; the second progress line, `[EVENTS]`, names the file. A script or a coding
 agent reads it instead of parsing the console:
 
-    {"status":"started","target":"/.../demo-01-java-pom/target","directory":"/.../demo-01-java-pom"}
+    {"status":"started","target":"/.../demo-01-java-pom/target","directory":"/.../demo-01-java-pom","run":"20261005T152001.123456Z"}
     {"status":"resolved","module":"build","seconds":0.063}
     {"status":"executed","step":"build/maven/compose/module/module-/produce/assemble/binary/compiled/compile/javac","seconds":0.207,"folder":"/.../target/build/maven/compose/module/module-/produce/assemble/binary/compiled/compile/javac"}
     {"status":"executed","step":"build/maven/compose/module/module-/produce/assemble/binary/artifacts/jar","seconds":0.020,"folder":"/.../target/build/maven/compose/module/module-/produce/assemble/binary/artifacts/jar"}
@@ -47,6 +47,14 @@ failed - its `output/`, and a forked tool's command, output and reports under
 The last line says whether the build `completed` or `failed`; a file without
 one belongs to a build that is still running or was killed.
 `-Djenesis.executor.events=false` writes no file.
+
+Every build is a `run`, named on the first line. A step that ran is this run's;
+a skipped one names the earlier `run` whose output it kept, so what its folder
+holds - a test report, say - is that run's result, not this one's. The run that
+produced a step is written to a `local.properties` beside the step's `output/`,
+with `cached=true` when the output came from a build cache, so a folder says
+where it came from without the events file. That file stays on this machine: no
+checksum and no build cache carries it.
 
 Layout
 ------
