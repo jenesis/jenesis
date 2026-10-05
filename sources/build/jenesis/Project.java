@@ -736,9 +736,11 @@ public record Project(
                     `module` path; a failure carries its `error` class and `message`, an executed or
                     skipped step the `folder` holding its output, and a failed step the `folder` ending
                     in `~` that holds what it wrote before it failed, such as a tool's reports and its
-                    argument files. The first line is `started` and the
-                    last `completed` or `failed`, with how many steps executed, skipped and failed; a
-                    file without that last line is a build that is still running or was killed.
+                    argument files. The first line is `started`, with the `target` folder and the
+                    `directory` the build ran in, which a relative path in a step's command line,
+                    such as the one a failure says to execute, resolves against. The last line is
+                    `completed` or `failed`, with how many steps executed, skipped and failed; a file
+                    without that last line is a build that is still running or was killed.
 
                     ## Turn a folder into a selector
 
