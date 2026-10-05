@@ -665,7 +665,14 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
 
         private static Packaging configured(Path properties) throws IOException {
             if (properties == null) {
-                return new Packaging(false, false, false, false, false, Collections.emptyNavigableSet(), null, null,
+                return new Packaging(false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        Collections.emptyNavigableSet(),
+                        null,
+                        null,
                         Collections.emptyNavigableMap());
             }
             SequencedProperties configuration = SequencedProperties.ofFiles(properties);
