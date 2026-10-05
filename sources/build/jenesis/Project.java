@@ -1053,6 +1053,10 @@ public record Project(
                                                 only its source folder is collected
                                                 (folders, generator, package, sources, arguments)
                       spdx.properties           extend the license alias/category tables
+                      classpath.properties      make a module's jar serve the class path too: a
+                                                META-INF/services file per provides clause, checking
+                                                each provider can be created there, and
+                                                Enable-Native-Access for a module granting itself
                       process-<tool>.properties extra arguments for a forked tool (javac, javadoc, jar,
                                                 jlink, jpackage, ...); process-test.properties targets
                                                 the test JVM, merged over process-java.properties
@@ -1232,7 +1236,8 @@ public record Project(
                       Starting a build   06 startup (what launching costs, the daemon, the AOT cache),
                                          07 toolchain (the JDK the build runs on)
                       Runnable output    08, 09 java-*-executable (jpackage), 10 bundle (jars for a
-                                         stock JRE), 11 java-multi-release, 68 native-image (GraalVM)
+                                         stock JRE), 11 java-multi-release, 68 native-image (GraalVM),
+                                         70 class-path (a modular jar's services on the class path)
                       Compiler control   12 javac-arguments (process-javac.properties),
                                          13 annotations (an annotation processor via @jenesis.plugin),
                                          14 error-prone (a javac plugin),
@@ -2913,6 +2918,7 @@ public record Project(
                 generate.wsimport|true|JAX-WS generation, activated by a wsimport.properties
                 generate.openapi|true|OpenAPI generation, activated by an openapi.properties
                 generate.antlr|true|ANTLR generation, activated by an antlr.properties
+                generate.classpath|true|META-INF/services entries generated from a module-info's provides, and Enable-Native-Access for a module granting itself, so its jar also serves the class path, activated by a classpath.properties
                 observe.jacoco|true|JaCoCo coverage, activated by a jacoco.properties
                 observe.native|true|native-image reachability agent, activated by a graal.properties
                 observe.jfr|true|Java Flight Recorder in the test JVM, activated by a jfr.properties whose lines are the options of the recording

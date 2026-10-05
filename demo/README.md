@@ -118,6 +118,7 @@ Quick index
 | 67 | [`reproducible`](demo-67-reproducible/README.md)                  | Build the same bytes on every machine, checked against a recorded digest     | `java build/Demo.java`            |
 | 68 | [`native-image`](demo-68-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
 | 69 | [`jpx`](demo-69-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
+| 70 | [`class-path`](demo-70-class-path/README.md)                      | Let a modular jar's services work from the class path too                    | `java build/jenesis/Make.java`    |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -1043,6 +1044,16 @@ be pointed at a mirror with `JENESIS_REPOSITORY_URI` and `MAVEN_REPOSITORY_URI`.
 
 The demo runs those same commands from `java build/Demo.java`, with the
 installation directed at its own `target/` so your home directory is left alone.
+
+## 52. A modular jar on the class path - [`class-path`](demo-70-class-path/README.md)
+
+A module declares its services in `module-info.java`, which a class-path
+`ServiceLoader` never reads. An empty `classpath.properties` in a configuration
+folder makes the build write a `META-INF/services/<service>` file for each
+`provides` clause, so the same jar works on either path. A provider that only the
+module path could create - one with a static `provider()` method instead of a
+public constructor taking no arguments - fails the build rather than the
+program.
 
 Cross-cutting concepts
 ----------------------
