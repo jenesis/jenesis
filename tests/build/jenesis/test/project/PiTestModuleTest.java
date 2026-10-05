@@ -70,6 +70,22 @@ public class PiTestModuleTest {
     }
 
     @Test
+    public void requires_step_pins_the_launcher_again_when_the_engine_version_changes() throws IOException {
+        for (String version : List.of("1.11.0", "1.12.0")) {
+            SequencedProperties versions = new SequencedProperties();
+            versions.setProperty("main/maven/org.junit.platform/junit-platform-engine", version);
+            versions.store(project.resolve(BuildStep.VERSIONS));
+            BuildExecutor executor = newExecutor();
+            executor.addSource("project", project);
+            executor.addModule("pitest", new PiTestModule(Map.of(), Map.of()), "project");
+            executor.execute("pitest/required");
+        }
+        assertThat(requiresOutput().stringPropertyNames())
+                .as("the launcher follows the engine it runs")
+                .contains("pitest/classpath/maven/org.junit.platform/junit-platform-launcher/1.12.0");
+    }
+
+    @Test
     public void requires_step_pins_the_launcher_from_commons_and_trims_at_the_first_space() throws IOException {
         SequencedProperties versions = new SequencedProperties();
         versions.setProperty("main/maven/org.junit.platform/junit-platform-commons", "1.11.0 SHA-256/abc");

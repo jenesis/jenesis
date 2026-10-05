@@ -67,6 +67,44 @@ public class JPackageTest {
         assertThat(imageDirectory()).isDirectory();
     }
 
+    @Test
+    public void reads_the_options_of_its_own_format_beside_the_shared_ones() throws IOException {
+        Path artifacts = Files.createDirectory(bundle.resolve(BuildStep.ARTIFACTS));
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(artifacts.resolve("app.jar")), manifest)) {
+            jar.putNextEntry(new JarEntry("sample/Sample.class"));
+            try (InputStream in = Sample.class.getResourceAsStream("Sample.class")) {
+                requireNonNull(in).transferTo(jar);
+            }
+            jar.closeEntry();
+        }
+        Path process = Files.createDirectory(bundle.resolve("process"));
+        SequencedProperties shared = new SequencedProperties();
+        shared.setProperty("--name", "Sample");
+        shared.setProperty("--main-jar", "app.jar");
+        shared.store(process.resolve("jpackage.properties"));
+        SequencedProperties image = new SequencedProperties();
+        image.setProperty("--main-class", "sample.Sample");
+        image.store(process.resolve("jpackage-app-image.properties"));
+        SequencedProperties installer = new SequencedProperties();
+        installer.setProperty("--linux-deb-maintainer", "dev@example.com");
+        installer.store(process.resolve("jpackage-deb.properties"));
+        BuildStepResult result = new JPackage(ProcessHandler.Factory.TOOL).type("app-image").apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("artifacts", new BuildStepArgument(
+                        bundle,
+                        Map.of(Path.of("artifacts/app.jar"), Checksum.of(ChecksumStatus.ADDED),
+                                Path.of("process/jpackage.properties"), Checksum.of(ChecksumStatus.ADDED)))))).toCompletableFuture().join();
+        assertThat(result.next()).isTrue();
+        assertThat(Files.readString(supplement.resolve("command")))
+                .as("an application image takes its own options and none of an installer, which jpackage would refuse")
+                .contains("--main-class sample.Sample")
+                .doesNotContain("--linux-deb-maintainer");
+        assertThat(imageDirectory()).isDirectory();
+    }
+
     @ParameterizedTest
     @CsvSource({
             "1-SNAPSHOT,        1",

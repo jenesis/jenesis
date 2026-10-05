@@ -14,6 +14,7 @@ import build.jenesis.SequencedProperties;
 public class Docker implements BuildStep {
 
     public static final String DOCKER = "docker/";
+    public static final Set<String> FORMATS = Set.of("app-image", "deb", "rpm");
     private static final String MODULE_PATH = "/app/extensions/modulepath", CLASS_PATH = "/app/extensions/classpath/*",
             ANNOTATION = "org.opencontainers.image.";
 
@@ -21,11 +22,13 @@ public class Docker implements BuildStep {
     private final String group;
     private final SequencedMap<String, String> labels;
     private final OffsetDateTime created;
+    private final String jpackage;
 
     public Docker(String from) {
         this(from,
              "main",
              Collections.emptyNavigableMap(),
+             null,
              null);
     }
 
@@ -33,29 +36,40 @@ public class Docker implements BuildStep {
         return new Docker(from,
                 "main",
                 Collections.emptyNavigableMap(),
-                environment.value("archive.timestamp") == null ? null : BuildStep.timestamp(environment));
+                environment.value("archive.timestamp") == null ? null : BuildStep.timestamp(environment),
+                null);
     }
 
     private Docker(String from,
                    String group,
                    SequencedMap<String, String> labels,
-                   OffsetDateTime created) {
+                   OffsetDateTime created,
+                   String jpackage) {
         this.from = from;
         this.group = group;
         this.labels = labels;
         this.created = created;
+        this.jpackage = jpackage;
     }
 
     public Docker group(String group) {
-        return new Docker(from, group, labels, created);
+        return new Docker(from, group, labels, created, jpackage);
     }
 
     public Docker labels(SequencedMap<String, String> labels) {
-        return new Docker(from, group, new LinkedHashMap<>(labels), created);
+        return new Docker(from, group, new LinkedHashMap<>(labels), created, jpackage);
     }
 
     public Docker created(OffsetDateTime created) {
-        return new Docker(from, group, labels, created);
+        return new Docker(from, group, labels, created, jpackage);
+    }
+
+    public Docker jpackage(String jpackage) {
+        if (jpackage != null && !FORMATS.contains(jpackage)) {
+            throw new IllegalArgumentException("A Docker image cannot run a jpackage " + jpackage
+                    + " package - name one of " + new TreeSet<>(FORMATS));
+        }
+        return new Docker(from, group, labels, created, jpackage);
     }
 
     @Override
@@ -63,116 +77,11 @@ public class Docker implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
-        String mainClass = null, mainModule = null;
-        for (BuildStepArgument argument : arguments.values()) {
-            if (argument.removed()) {
-                continue;
-            }
-            Path properties = argument.folder().resolve("launcher.properties");
-            if (!Files.isRegularFile(properties)) {
-                continue;
-            }
-            SequencedProperties launcher = SequencedProperties.ofFiles(properties);
-            if (mainClass == null) {
-                mainClass = launcher.getProperty("mainClass");
-            }
-            if (mainModule == null) {
-                mainModule = launcher.getProperty("mainModule");
-            }
-        }
-        if (mainClass == null) {
+        Path folder = context.next().resolve(DOCKER);
+        String instructions = jpackage == null ? launched(folder, arguments) : packaged(folder, jpackage, arguments);
+        if (instructions == null) {
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }
-        SequencedMap<String, Path> jars = new TreeMap<>();
-        SequencedSet<Path> granted = new LinkedHashSet<>();
-        SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
-        SequencedMap<String, String> agents = new LinkedHashMap<>();
-        for (BuildStepArgument argument : arguments.values()) {
-            if (argument.removed()) {
-                continue;
-            }
-            Path artifacts = argument.folder().resolve(BuildStep.ARTIFACTS);
-            if (Files.isDirectory(artifacts)) {
-                try (DirectoryStream<Path> files = Files.newDirectoryStream(artifacts)) {
-                    for (Path file : files) {
-                        jars.putIfAbsent(file.getFileName().toString(), file);
-                    }
-                }
-            }
-            for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
-                jars.putIfAbsent(file.getFileName().toString(), file);
-            }
-            granted.addAll(Inventory.nativeAccess(argument.folder()));
-            layers.putAll(Layers.membership(argument.folder()));
-            agents.putAll(Inventory.agents(argument.folder()));
-        }
-        if (jars.isEmpty()) {
-            return CompletableFuture.completedStage(new BuildStepResult(true));
-        }
-        SequencedMap<String, Path> classpath = new LinkedHashMap<>(), modulepath = new LinkedHashMap<>();
-        ModuleGraph graph = new ModuleGraph();
-        for (Map.Entry<String, Path> entry : jars.entrySet()) {
-            boolean placed = graph.place(mainModule == null ? PathPlacement.CLASS_PATH : PathPlacement.INFERRED, entry.getValue());
-            (placed ? modulepath : classpath).put(entry.getKey(), entry.getValue());
-            if (granted.contains(entry.getValue().toAbsolutePath().normalize())) {
-                graph.enableNativeAccess(entry.getValue(), placed);
-            }
-        }
-        if (layers.values().stream().anyMatch(membership -> !membership.classpath().isEmpty())) {
-            graph.unnamed();
-        }
-        SequencedMap<String, Path> stored = new TreeMap<>(classpath);
-        stored.putAll(modulepath);
-        SequencedMap<String, Path> resolved = new TreeMap<>();
-        for (BuildStepArgument argument : arguments.values()) {
-            if (argument.removed()) {
-                continue;
-            }
-            for (Path jar : Dependencies.all(argument.folder())) {
-                resolved.putIfAbsent(jar.getFileName().toString(), jar);
-            }
-        }
-        for (Map.Entry<String, Layers.Membership> layer : layers.entrySet()) {
-            for (String name : layer.getValue().all()) {
-                Path jar = resolved.get(name);
-                if (jar == null) {
-                    throw new IllegalStateException("Layer " + layer.getKey() + " names " + name
-                            + ", which was not resolved for this application");
-                }
-                stored.putIfAbsent(name, jar);
-            }
-        }
-        layers.forEach((layer, membership) -> membership.nativeAccess(resolved, granted)
-                .forEach((jar, module) -> graph.enableNativeAccess(layer, jar, module)));
-        agents.keySet().retainAll(stored.sequencedKeySet());
-        Path folder = Files.createDirectory(context.next().resolve(DOCKER)), store = folder.resolve("jars");
-        Files.createDirectories(store);
-        for (Map.Entry<String, Path> entry : stored.entrySet()) {
-            BuildStep.linkOrCopy(store.resolve(entry.getKey()), entry.getValue());
-        }
-        List<String> command = new ArrayList<>();
-        agents.forEach((jar, options) -> command.add("-javaagent:/app/jars/" + jar
-                + (options.isEmpty() ? "" : "=" + options)));
-        layers.forEach((layer, membership) -> {
-            command.add("-Djlayer.modulepath." + layer + "=" + path(membership.modulepath()));
-            if (!membership.classpath().isEmpty()) {
-                command.add("-Djlayer.classpath." + layer + "=" + path(membership.classpath()));
-            }
-        });
-        command.add("--class-path");
-        command.add(classpath.isEmpty() ? CLASS_PATH : path(classpath.sequencedKeySet()) + ":" + CLASS_PATH);
-        command.add("--module-path");
-        if (modulepath.isEmpty()) {
-            command.add(MODULE_PATH);
-            command.addAll(graph.arguments());
-            command.add(mainClass);
-        } else {
-            command.add(path(modulepath.sequencedKeySet()) + ":" + MODULE_PATH);
-            command.addAll(graph.arguments());
-            command.add("--module");
-            command.add(mainModule + "/" + mainClass);
-        }
-        ProcessBuildStep.argumentFile(folder.resolve("application.args"), command);
         List<Path> folders = arguments.values().stream()
                 .filter(argument -> !argument.removed())
                 .map(BuildStepArgument::folder)
@@ -226,17 +135,219 @@ public class Docker implements BuildStep {
             dockerfile.append(separator).append(label(annotation.getKey())).append('=').append(label(annotation.getValue()));
             separator = " \\\n      ";
         }
-        Files.writeString(folder.resolve("Dockerfile"), dockerfile
-                .append("\nWORKDIR /app\nCOPY jars/ /app/jars/\nCOPY application.args /app/\n")
-                .append("ENTRYPOINT [")
-                .append(quoted(List.of("java", "@/app/application.args")))
-                .append("]\n")
-                .toString());
+        Files.writeString(folder.resolve("Dockerfile"), dockerfile.append('\n').append(instructions).toString());
         return CompletableFuture.completedStage(new BuildStepResult(true));
+    }
+
+    private static String packaged(Path folder,
+                                   String format,
+                                   SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+        Path packages = null;
+        String name = null;
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            Path candidate = argument.folder().resolve(JPackage.PACKAGES);
+            if (packages == null && Files.isDirectory(candidate)) {
+                packages = candidate;
+            }
+            for (String configuration : List.of("jpackage-" + format, "jpackage")) {
+                Path file = argument.folder().resolve(ProcessBuildStep.PROCESS + configuration + ".properties");
+                if (name == null && Files.isRegularFile(file)) {
+                    name = SequencedProperties.ofFiles(file).value("--name");
+                }
+            }
+        }
+        if (packages == null) {
+            return null;
+        }
+        SequencedSet<String> written = new TreeSet<>(), matched = new TreeSet<>();
+        try (DirectoryStream<Path> files = Files.newDirectoryStream(packages)) {
+            for (Path file : files) {
+                String candidate = file.getFileName().toString();
+                written.add(candidate);
+                if (format.equals("app-image")
+                        ? Files.isRegularFile(file.resolve("bin").resolve(candidate)) && Files.isDirectory(file.resolve("lib").resolve("runtime"))
+                        : Files.isRegularFile(file) && candidate.endsWith("." + format)) {
+                    matched.add(candidate);
+                }
+            }
+        }
+        if (matched.isEmpty()) {
+            throw new IllegalStateException("A Docker image of a jpackage " + format + " needs one built for Linux, but jpackage wrote "
+                    + written + " - jpackage packages for the platform it runs on, so build on Linux,"
+                    + " for instance with -Djenesis.project.docker=true");
+        } else if (matched.size() > 1) {
+            throw new IllegalStateException("A Docker image holds one jpackage application, but jpackage wrote "
+                    + matched + " - give the image one application to run");
+        }
+        String file = matched.getFirst();
+        if (format.equals("app-image")) {
+            Path image = packages.resolve(file), target = Files.createDirectories(folder.resolve(file));
+            Files.walkFileTree(image, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) throws IOException {
+                    Files.createDirectories(target.resolve(image.relativize(directory).toString()));
+                    return FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                    BuildStep.linkOrCopy(target.resolve(image.relativize(file).toString()), file);
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+            return "WORKDIR /app\nCOPY [" + quoted(List.of(file + "/", "/app/")) + "]\n"
+                    + "ENTRYPOINT [" + quoted(List.of("/app/bin/" + file)) + "]\n";
+        }
+        if (name == null) {
+            throw new IllegalStateException("The jpackage " + format + " package " + file + " is installed into the Docker image,"
+                    + " but no --name tells which launcher to start - set it in process-jpackage.properties");
+        }
+        BuildStep.linkOrCopy(Files.createDirectories(folder).resolve(file), packages.resolve(file));
+        String installed = "/tmp/jpackage/" + shell(file);
+        return "WORKDIR /app\nCOPY [" + quoted(List.of(file, "/tmp/jpackage/")) + "]\nRUN " + switch (format) {
+            case "deb" -> "apt-get update \\\n"
+                    + "    && apt-get install -y --no-install-recommends " + installed + " \\\n"
+                    + "    && package=\"$(dpkg-deb --field " + installed + " Package)\" \\\n"
+                    + "    && rm -rf /tmp/jpackage /var/lib/apt/lists/* \\\n"
+                    + "    && dpkg --listfiles \"$package\"";
+            case "rpm" -> "package=\"$(rpm --query --package --queryformat '%{NAME}' " + installed + ")\" \\\n"
+                    + "    && if command -v dnf > /dev/null; then dnf install -y " + installed + " && dnf clean all; \\\n"
+                    + "       elif command -v yum > /dev/null; then yum install -y " + installed + " && yum clean all; \\\n"
+                    + "       elif command -v zypper > /dev/null; then zypper --non-interactive install --allow-unsigned-rpm "
+                    + installed + " && zypper clean --all; \\\n"
+                    + "       else rpm --install " + installed + "; fi \\\n"
+                    + "    && rm -rf /tmp/jpackage \\\n"
+                    + "    && rpm --query --list \"$package\"";
+            default -> throw new IllegalStateException("Unexpected jpackage format: " + format);
+        } + " | while IFS= read -r file; do case \"$file\" in */lib/app/" + shell(name) + ".cfg) \\\n"
+                + "       ln -s \"${file%/lib/app/*}/bin/\"" + shell(name) + " /app/launcher;; esac; done \\\n"
+                + "    && test -x /app/launcher\n"
+                + "ENTRYPOINT [" + quoted(List.of("/app/launcher")) + "]\n";
+    }
+
+    private String launched(Path folder, SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+        String mainClass = null, mainModule = null;
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            Path properties = argument.folder().resolve("launcher.properties");
+            if (!Files.isRegularFile(properties)) {
+                continue;
+            }
+            SequencedProperties launcher = SequencedProperties.ofFiles(properties);
+            if (mainClass == null) {
+                mainClass = launcher.getProperty("mainClass");
+            }
+            if (mainModule == null) {
+                mainModule = launcher.getProperty("mainModule");
+            }
+        }
+        if (mainClass == null) {
+            return null;
+        }
+        SequencedMap<String, Path> jars = new TreeMap<>();
+        SequencedSet<Path> granted = new LinkedHashSet<>();
+        SequencedMap<String, Layers.Membership> layers = new TreeMap<>();
+        SequencedMap<String, String> agents = new LinkedHashMap<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            Path artifacts = argument.folder().resolve(BuildStep.ARTIFACTS);
+            if (Files.isDirectory(artifacts)) {
+                try (DirectoryStream<Path> files = Files.newDirectoryStream(artifacts)) {
+                    for (Path file : files) {
+                        jars.putIfAbsent(file.getFileName().toString(), file);
+                    }
+                }
+            }
+            for (Path file : Dependencies.select(argument.folder(), group, "runtime")) {
+                jars.putIfAbsent(file.getFileName().toString(), file);
+            }
+            granted.addAll(Inventory.nativeAccess(argument.folder()));
+            layers.putAll(Layers.membership(argument.folder()));
+            agents.putAll(Inventory.agents(argument.folder()));
+        }
+        if (jars.isEmpty()) {
+            return null;
+        }
+        SequencedMap<String, Path> classpath = new LinkedHashMap<>(), modulepath = new LinkedHashMap<>();
+        ModuleGraph graph = new ModuleGraph();
+        for (Map.Entry<String, Path> entry : jars.entrySet()) {
+            boolean placed = graph.place(mainModule == null ? PathPlacement.CLASS_PATH : PathPlacement.INFERRED, entry.getValue());
+            (placed ? modulepath : classpath).put(entry.getKey(), entry.getValue());
+            if (granted.contains(entry.getValue().toAbsolutePath().normalize())) {
+                graph.enableNativeAccess(entry.getValue(), placed);
+            }
+        }
+        if (layers.values().stream().anyMatch(membership -> !membership.classpath().isEmpty())) {
+            graph.unnamed();
+        }
+        SequencedMap<String, Path> stored = new TreeMap<>(classpath);
+        stored.putAll(modulepath);
+        SequencedMap<String, Path> resolved = new TreeMap<>();
+        for (BuildStepArgument argument : arguments.values()) {
+            if (argument.removed()) {
+                continue;
+            }
+            for (Path jar : Dependencies.all(argument.folder())) {
+                resolved.putIfAbsent(jar.getFileName().toString(), jar);
+            }
+        }
+        for (Map.Entry<String, Layers.Membership> layer : layers.entrySet()) {
+            for (String name : layer.getValue().all()) {
+                Path jar = resolved.get(name);
+                if (jar == null) {
+                    throw new IllegalStateException("Layer " + layer.getKey() + " names " + name
+                            + ", which was not resolved for this application");
+                }
+                stored.putIfAbsent(name, jar);
+            }
+        }
+        layers.forEach((layer, membership) -> membership.nativeAccess(resolved, granted)
+                .forEach((jar, module) -> graph.enableNativeAccess(layer, jar, module)));
+        agents.keySet().retainAll(stored.sequencedKeySet());
+        Path store = Files.createDirectories(folder.resolve("jars"));
+        for (Map.Entry<String, Path> entry : stored.entrySet()) {
+            BuildStep.linkOrCopy(store.resolve(entry.getKey()), entry.getValue());
+        }
+        List<String> command = new ArrayList<>();
+        agents.forEach((jar, options) -> command.add("-javaagent:/app/jars/" + jar
+                + (options.isEmpty() ? "" : "=" + options)));
+        layers.forEach((layer, membership) -> {
+            command.add("-Djlayer.modulepath." + layer + "=" + path(membership.modulepath()));
+            if (!membership.classpath().isEmpty()) {
+                command.add("-Djlayer.classpath." + layer + "=" + path(membership.classpath()));
+            }
+        });
+        command.add("--class-path");
+        command.add(classpath.isEmpty() ? CLASS_PATH : path(classpath.sequencedKeySet()) + ":" + CLASS_PATH);
+        command.add("--module-path");
+        if (modulepath.isEmpty()) {
+            command.add(MODULE_PATH);
+            command.addAll(graph.arguments());
+            command.add(mainClass);
+        } else {
+            command.add(path(modulepath.sequencedKeySet()) + ":" + MODULE_PATH);
+            command.addAll(graph.arguments());
+            command.add("--module");
+            command.add(mainModule + "/" + mainClass);
+        }
+        ProcessBuildStep.argumentFile(folder.resolve("application.args"), command);
+        return "WORKDIR /app\nCOPY jars/ /app/jars/\nCOPY application.args /app/\n"
+                + "ENTRYPOINT [" + quoted(List.of("java", "@/app/application.args")) + "]\n";
     }
 
     private static String path(SequencedSet<String> names) {
         return names.stream().map(name -> "/app/jars/" + name).collect(Collectors.joining(":"));
+    }
+
+    private static String shell(String value) {
+        return "'" + value.replace("'", "'\\''") + "'";
     }
 
     private static String label(String value) {

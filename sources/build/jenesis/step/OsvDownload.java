@@ -288,32 +288,10 @@ public class OsvDownload implements BuildStep {
                 builder.append(",");
             }
             builder.append("{\"package\":{\"ecosystem\":\"Maven\",\"name\":\"")
-                    .append(escape(parts[0])).append(":").append(escape(parts[1]))
-                    .append("\"},\"version\":\"").append(escape(parts[2])).append("\"}");
+                    .append(Json.escaped(parts[0])).append(":").append(Json.escaped(parts[1]))
+                    .append("\"},\"version\":\"").append(Json.escaped(parts[2])).append("\"}");
         }
         return builder.append("]}").toString();
-    }
-
-    private static String escape(String value) {
-        StringBuilder builder = new StringBuilder();
-        for (int index = 0; index < value.length(); index++) {
-            char character = value.charAt(index);
-            switch (character) {
-                case '"' -> builder.append("\\\"");
-                case '\\' -> builder.append("\\\\");
-                case '\n' -> builder.append("\\n");
-                case '\r' -> builder.append("\\r");
-                case '\t' -> builder.append("\\t");
-                default -> {
-                    if (character < 0x20) {
-                        builder.append(String.format("\\u%04x", (int) character));
-                    } else {
-                        builder.append(character);
-                    }
-                }
-            }
-        }
-        return builder.toString();
     }
 
     private static String request(URI uri, String body, boolean insecure) throws IOException {

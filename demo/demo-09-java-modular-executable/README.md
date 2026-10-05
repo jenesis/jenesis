@@ -379,6 +379,20 @@ macOS. On Linux it prints:
       demo.modular.executable_0_amd64.deb (13 MiB)
     Unlike the app-image, this is a deliverable to install with the platform's package manager, not a directory to launch in place.
 
+`jpackage` also takes several types, separated by commas, and builds one package per
+type, all staged side by side in `stage/packages`:
+
+    jpackage=app-image,deb
+
+    target/stage/packages/output/
+    |-- demo.modular.executable/              the app-image
+    `-- demo.modular.executable_0_amd64.deb   the installer
+
+Each type is a jpackage run of its own, and each is handed only the options it takes:
+what `process-jpackage.properties` sets reaches every type, and a
+`process-jpackage-<type>.properties` beside it adds options for one type alone, such
+as `--linux-deb-maintainer` in `process-jpackage-deb.properties`.
+
 This package is much smaller than the classpath sibling `../demo-08-java-pom-executable`
 produces (tens of megabytes): because this is a modular application, jpackage's internal
 `jlink` trims the bundled runtime down to the module graph (`demo.modular.executable`,
@@ -395,27 +409,59 @@ Where to go from here?
 
 The `app-image` is self-contained - it bundles its own (`jlink`-trimmed) Java
 runtime - so a deployable container needs no JDK, only a minimal base with a C
-library. Stage a **Linux** app-image (run `java build/Demo.java` on Linux or in
-CI), then copy it into an image with a small `Dockerfile` (Podman reads the same
-file):
+library. The generated Dockerfile from above can ship exactly that: a
+`docker.jpackage=<type>` line beside `docker=<image>` puts a jpackage package into
+the image instead of the jars, and the base image then needs no Java at all. This
+demo commits it as a `container` profile:
+
+    docker=debian:stable-slim
+    docker.jpackage=app-image
+
+    java -Djenesis.make.profiles=container build/jenesis/Make.java stage
+
+    target/stage/docker/output/module-sources/
+    |-- Dockerfile
+    `-- demo.modular.executable/   the app-image: bin/, lib/app/ and lib/runtime/
+
+The image is the app-image under `/app`, started by its own launcher:
 
     FROM debian:stable-slim
-    COPY target/stage/packages/output/demo.modular.executable /opt/app
-    ENTRYPOINT ["/opt/app/bin/demo.modular.executable"]
+    LABEL ...                      the metadata, as before
+    WORKDIR /app
+    COPY ["demo.modular.executable/", "/app/"]
+    ENTRYPOINT ["/app/bin/demo.modular.executable"]
 
-From this directory, build and run it with Docker:
+The type is one a Linux image can run: `app-image`, copied in as it is, or `deb` or
+`rpm`, installed with the base image's package manager - `apt-get` for a `deb`, and
+`dnf`, `yum`, `zypper` or plain `rpm` for an `rpm` - which also installs the system
+libraries the package declares. The image then starts the launcher the package
+installed, through `/app/launcher`:
 
-    docker build -t demo-modular-executable .
+    docker=debian:stable-slim
+    docker.jpackage=deb
+
+The type is added to those `jpackage` builds, and it is staged only when `jpackage`
+lists it as well: this profile stages no package, `jpackage=deb` beside
+`docker.jpackage=app-image` stages the installer and hands the image an app-image, and
+`jpackage=app-image,deb` beside `docker.jpackage=deb` stages both and builds each once.
+jpackage packages for the platform it runs on, so this needs a build on **Linux** -
+on macOS or Windows the build stops and says so, and `-Djenesis.project.docker=true`
+runs it in a Linux container instead. The staged folder is again a complete build
+context (Podman reads the same file):
+
+    docker build -t demo-modular-executable target/stage/docker/output/module-sources
     docker run --rm demo-modular-executable Ada Lovelace
 
 or, identically, with Podman:
 
-    podman build -t demo-modular-executable .
+    podman build -t demo-modular-executable target/stage/docker/output/module-sources
     podman run --rm demo-modular-executable Ada Lovelace
 
 Either prints the same greeting the local launcher does, and because the bundled
 runtime is trimmed to the module graph (`demo.modular.executable`, `org.slf4j`,
-`java.base`) the resulting image stays small.
+`java.base`) the resulting image stays small. The `/app/extensions/` folders of the
+jar-based image have no counterpart here: the application and its runtime are fixed
+when jpackage links them.
 
 This is where a modular project pays off for deployment. jpackage runs `jlink`
 over the resolved module graph, so it ships only the part of the standard library
