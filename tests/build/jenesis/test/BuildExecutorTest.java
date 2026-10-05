@@ -65,7 +65,11 @@ public class BuildExecutorTest implements Serializable {
                 Duration.ZERO,
                 hash,
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
     }
 
     @Test
@@ -108,7 +112,11 @@ public class BuildExecutorTest implements Serializable {
                 Duration.ZERO,
                 hash,
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         Files.writeString(source.resolve("file"), "foo");
         second.addSource("source", source);
         second.addStep("step", (_, context, _) -> {
@@ -154,7 +162,11 @@ public class BuildExecutorTest implements Serializable {
                     Duration.ZERO,
                     hash,
                     BuildStepHashFunction.ofSerializationDigest("MD5"),
-                    BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                    BuildExecutorCallback.nop(),
+                    BuildExecutorCache.nop(),
+                    false,
+                    false,
+                    0);
             assertThatThrownBy(() -> foreign.execute(Runnable::run))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("Another build process is already building");
@@ -293,7 +305,11 @@ public class BuildExecutorTest implements Serializable {
                 Duration.ZERO,
                 hash,
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         resumed.addSource("source", source);
         resumed.addStep("step", counting(), "source");
         resumed.execute(Runnable::run).toCompletableFuture().join();
@@ -413,6 +429,41 @@ public class BuildExecutorTest implements Serializable {
     }
 
     @Test
+    public void keeps_what_a_failed_step_wrote_until_it_runs_again() throws IOException {
+        Files.writeString(source.resolve("file"), "foo");
+        buildExecutor.addSource("source", source);
+        buildExecutor.addStep("step", (_, context, _) -> {
+            Files.writeString(context.next().resolve("file"), "partial");
+            Files.writeString(context.supplement().resolve("log"), "evidence");
+            throw new RuntimeException("baz");
+        }, "source");
+        assertThatThrownBy(() -> buildExecutor.execute(Runnable::run).toCompletableFuture().join())
+                .isInstanceOf(BuildExecutorException.class);
+        Path next = root.resolve("step" + BuildExecutor.NEXT);
+        assertThat(next.resolve("output").resolve("file")).content().isEqualTo("partial");
+        assertThat(next.resolve("supplement").resolve("log")).content().isEqualTo("evidence");
+        assertThat(next.resolve(BuildExecutor.FAILED_MARKER)).isRegularFile();
+        assertThat(root.resolve("step")).doesNotExist();
+        BuildExecutor repaired = BuildExecutor.of(root,
+                Duration.ZERO,
+                hash,
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
+        repaired.addSource("source", source);
+        repaired.addStep("step", (_, context, _) -> {
+            Files.writeString(context.next().resolve("file"), "complete");
+            return CompletableFuture.completedStage(new BuildStepResult(true));
+        }, "source");
+        repaired.execute(Runnable::run).toCompletableFuture().join();
+        assertThat(root.resolve("step").resolve("output").resolve("file")).content().isEqualTo("complete");
+        assertThat(next).as("evidence of an earlier failure is stale once the step ran again").doesNotExist();
+    }
+
+    @Test
     public void fails_fast_by_default_without_aggregating_independent_failures() {
         buildExecutor.addStep("step1", (_, _, _) -> {
             throw new RuntimeException("one");
@@ -431,7 +482,11 @@ public class BuildExecutorTest implements Serializable {
                 Duration.ZERO,
                 hash,
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, true, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                true,
+                0);
         executor.addStep("step1", (_, _, _) -> {
             throw new RuntimeException("one");
         });
@@ -726,7 +781,11 @@ public class BuildExecutorTest implements Serializable {
                 Duration.ZERO,
                 hash,
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         second.addSource("source1", source);
         second.addStep("step", step, "source1");
         second.execute(Runnable::run).toCompletableFuture().join();
@@ -776,7 +835,11 @@ public class BuildExecutorTest implements Serializable {
                 Duration.ZERO,
                 hash,
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         second.addSource("source1", source);
         second.addStep("step", step, "source1");
         second.execute(Runnable::run).toCompletableFuture().join();
@@ -793,7 +856,11 @@ public class BuildExecutorTest implements Serializable {
                 Duration.ZERO,
                 hash,
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         third.addSource("source1", source);
         third.addStep("step", step, "source1");
         third.execute(Runnable::run).toCompletableFuture().join();

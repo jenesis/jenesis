@@ -6,7 +6,9 @@ public interface BuildExecutor {
 
     String SKIP_MARKER = ".jenesis.skip",
             LOCK_MARKER = ".jenesis.lock",
+            FAILED_MARKER = ".jenesis.failed",
             EVENTS = ".jenesis.events.jsonl",
+            NEXT = "~",
             LOCAL = "local.properties";
 
     static BuildExecutor of(Path target) throws IOException {

@@ -163,7 +163,9 @@ public interface BuildExecutorCallback {
     }
 
     static BuildExecutorCallback events(Path target) {
-        Path root = target.toAbsolutePath().normalize(), file = root.resolve(BuildExecutor.EVENTS);
+        Path root = target.toAbsolutePath().normalize(),
+                file = root.resolve(BuildExecutor.EVENTS),
+                directory = Path.of("").toAbsolutePath();
         return new BuildExecutorCallback() {
 
             private Writer writer;
@@ -189,7 +191,8 @@ public interface BuildExecutorCallback {
                         executed = 0;
                         skipped = 0;
                         failed = 0;
-                        write("{\"status\":\"started\",\"target\":\"" + Json.escaped(root.toString()) + "\""
+                        write("{\"status\":\"started\",\"target\":\"" + Json.escaped(root.toString())
+                                + "\",\"directory\":\"" + Json.escaped(directory.toString()) + "\""
                                 + (run == null ? "" : ",\"run\":\"" + Json.escaped(run) + "\"") + "}");
                     }
                     return (_, throwable) -> {
@@ -206,12 +209,16 @@ public interface BuildExecutorCallback {
                 }
                 String step = ",\"step\":\"" + Json.escaped(identity) + "\"",
                         folder = ",\"folder\":\"" + Json.escaped(root.resolve(identity).toString()) + "\"";
-                Path local = root.resolve(identity).resolve(BuildExecutor.LOCAL);
+                Path local = root.resolve(identity).resolve(BuildExecutor.LOCAL),
+                        next = root.resolve(identity + BuildExecutor.NEXT);
                 return (ran, throwable) -> {
                     synchronized (this) {
                         if (throwable != null) {
                             failed++;
-                            write("{\"status\":\"failed\"" + step + failure(throwable) + "}");
+                            write("{\"status\":\"failed\"" + step + failure(throwable)
+                                    + (Files.exists(next.resolve(BuildExecutor.FAILED_MARKER))
+                                    ? ",\"folder\":\"" + Json.escaped(next.toString()) + "\""
+                                    : "") + "}");
                         } else if (ran) {
                             executed++;
                             write("{\"status\":\"executed\"" + step + ",\"seconds\":"
