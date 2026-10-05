@@ -610,17 +610,21 @@ public record Project(
 
                       java build/jenesis/Make.java [selectors...]  source mode, always available
                       jenesis [selectors...]                       installed CLI
-                      new Project(root).build(selectors...)        embedding it in Java
+                      ToolProvider.findFirst("jenesis-make").orElseThrow().run(out, err, selectors...)
+                                                                   embedding it in a Java program
 
                     `Make` is the entry point, `Project` the configuration API and has no `main`. No
                     selector runs `build`; several, space-separated, run in one invocation. Pass
                     -Djenesis.palette.colors=none to read the output as plain text, without the
-                    escape sequences that colour it.
+                    escape sequences that colour it. The `jenesis-make` ToolProvider takes leading
+                    -Djenesis.* arguments as that run's settings and prints to the writers it is
+                    handed, so a program builds in its own JVM without touching its properties.
 
                     The installed `jenesis` verifies `build/jenesis` against the released sources
                     named in `build/jenesis/jenesis.version` and refuses a tree that differs, while
-                    `jenesis-make` runs the installed engine as it stands. Only source mode and
-                    embedding run the project's vendored build code.
+                    `jenesis-make` runs the installed engine as it stands. Only source mode runs the
+                    project's vendored build code; a ToolProvider runs the build.jenesis that the
+                    embedding program resolved.
 
                     `Make` compiles the engine once and reuses those classes. Drive them yourself:
 
