@@ -24,7 +24,7 @@ which builds the module and prints
 Layout
 ------
 
-    demo/demo-67-reproducible
+    demo/demo-68-reproducible
     |-- build/Demo.java            builds, then compares the jar's SHA-256 with the recorded one
     |-- build/jenesis              symlink to ../../../sources/build/jenesis
     `-- sources

@@ -21,7 +21,7 @@ produced under `target/`.
 Layout
 ------
 
-    demo/demo-59-custom-maven
+    demo/demo-60-custom-maven
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- build/Demo.java      the launcher: BuildExecutor + MavenProject.make(...)
     |-- pom.xml              aggregator (packaging pom); lists the two modules
