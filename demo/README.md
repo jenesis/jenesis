@@ -27,7 +27,7 @@ That runs the default `build` goal. Any other goal is a command-line argument:
     java build/jenesis/Make.java stage    # lay the artifacts out as local repositories
     java build/jenesis/Make.java export   # publish them into the local repositories
     java build/jenesis/Make.java ide      # write IntelliJ, Eclipse and VS Code project files
-    java build/jenesis/Make.java help     # usage; `skill` prints a longer briefing
+    java build/jenesis/Make.java help     # usage; `skill/start` an agent's briefing
 
 An installed CLI takes the same arguments (`jenesis stage`), and so does a demo
 whose entry point is `build/Demo.java`.

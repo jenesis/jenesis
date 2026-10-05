@@ -219,8 +219,8 @@ Working on the code
 Read [jenesis.build](https://jenesis.build) first: the concepts a contributor needs - the step graph, layouts,
 incremental change detection, the extension points - are documented there rather than duplicated here. Beyond
 that the source is the reference, every public type under `sources/build/jenesis/` being small enough to read
-end to end, with the tests as executable documentation of the API. `java build/jenesis/Make.java skill`
-prints the same material as an agent briefing.
+end to end, with the tests as executable documentation of the API. `java build/jenesis/Make.java skill/start`
+prints the same material as an agent briefing, an overview with a page per topic, as `skill/tags`.
 
 Two conventions govern the code here:
 
