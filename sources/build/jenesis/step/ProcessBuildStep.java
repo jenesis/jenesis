@@ -11,7 +11,7 @@ import build.jenesis.SequencedProperties;
 
 public abstract class ProcessBuildStep implements BuildStep {
 
-    public static final String PROCESS = "process/";
+    public static final String PROCESS = "process/", ENVIRONMENT = "environment/";
     protected static final Charset NATIVE_ENCODING = nativeEncoding();
     private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
 
@@ -197,6 +197,18 @@ public abstract class ProcessBuildStep implements BuildStep {
                 List<String> commands = prepended(properties);
                 commands.addAll(processed);
                 Path output = context.supplement().resolve("output"), error = context.supplement().resolve("error");
+                SequencedMap<String, String> variables = new LinkedHashMap<>();
+                for (BuildStepArgument argument : arguments.values()) {
+                    if (argument.removed()) {
+                        continue;
+                    }
+                    for (String name : configurations()) {
+                        Path file = argument.folder().resolve(ENVIRONMENT + name + ".properties");
+                        if (Files.exists(file)) {
+                            SequencedProperties.ofFiles(file).forEachProperty(variables::put);
+                        }
+                    }
+                }
                 ProcessHandler created = handler(context, commands), handler;
                 if (this instanceof Environmental environmental
                         && created instanceof ProcessHandler.OfProcess process) {
@@ -206,9 +218,19 @@ public abstract class ProcessBuildStep implements BuildStep {
                             environment.put(name, value);
                         }
                     });
+                    variables.forEach((name, value) -> {
+                        String resolved = value.isEmpty() ? System.getenv(name) : value;
+                        if (resolved != null) {
+                            environment.put(name, resolved);
+                        }
+                    });
                     handler = process.environment(environment);
-                } else {
+                } else if (variables.isEmpty()) {
                     handler = created;
+                } else {
+                    throw new IllegalStateException("An environment file hands " + variables.keySet() + " to "
+                            + command + ", which takes no environment: only a program the build runs in a process of"
+                            + " its own does - java, the tests, PIT, native-image, gpgv and jreleaser");
                 }
                 Files.writeString(context.supplement().resolve("command"), String.join(" ", handler.commands()));
                 ProcessHandler.Tee tee = tee(executor, handler);

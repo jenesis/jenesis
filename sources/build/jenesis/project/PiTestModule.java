@@ -144,7 +144,7 @@ public class PiTestModule implements BuildExecutorModule {
         }
     }
 
-    private static class Mutate extends ProcessBuildStep {
+    private static class Mutate extends ProcessBuildStep implements ProcessBuildStep.Environmental {
 
         private final String tool;
         private final String group;

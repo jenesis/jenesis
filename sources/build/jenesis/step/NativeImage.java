@@ -9,7 +9,7 @@ import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 
-public class NativeImage extends ProcessBuildStep {
+public class NativeImage extends ProcessBuildStep implements ProcessBuildStep.Environmental {
 
     public static final String NATIVE = "native/", METADATA = "nativeimage/", LICENSES = "licenses";
 

@@ -23,6 +23,8 @@ The project is four module directories, each with its own `module-info.java`:
 
     demo/demo-04-java-modular-multi
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
+    |-- build.jenesis/
+    |   `-- environment-test.properties  the variables the test run is handed
     |-- greeter/             the library module
     |   |-- module-info.java     module demo.greeter { exports sample.greeter; }
     |   |-- messages.properties  a root resource, packaged into the jar and read at run time
@@ -114,6 +116,30 @@ input of the build, so a result never depends on one the build cannot see.
 `GreeterTest` asserts that a variable set in the shell does not arrive:
 
     DEMO_SECRET=s3cret java build/jenesis/Make.java
+
+A test that needs a variable is handed it by an `environment-<tool>.properties`
+in a configuration folder, named after the tool as a `process-<tool>.properties`
+is: `environment-java.properties` reaches every forked JVM and
+`environment-test.properties` the test run alone, merged over the `java` file. This
+demo's `build.jenesis/environment-test.properties` sets one variable and passes
+another on:
+
+    DEMO_GREETING=Hello
+    DEMO_TOKEN
+
+A value is what the variable is set to. A name without one is taken from the
+build's own environment when the tool runs, and left unset when the build has
+none:
+
+    DEMO_TOKEN=t0ken java build/jenesis/Make.java
+
+The file is an input of the tools it names, so a changed value runs them again;
+a value taken from the build's environment is not, which suits a credential or a
+proxy but not a parameter a result depends on - write that one into the file.
+Only a program the build runs in a process of its own takes variables this way:
+`java`, the test run, PIT's mutation run (`environment-pitest.properties`),
+`native-image` and `gpgv`. A JDK tool such as `javac` or `javadoc` takes none,
+as it may run inside the build's own JVM, and a file naming one fails the build.
 
 Shared test infrastructure
 --------------------------

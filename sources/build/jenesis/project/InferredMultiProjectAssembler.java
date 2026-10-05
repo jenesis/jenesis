@@ -250,7 +250,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         Boolean modules = descriptor.pathPlacement() == PathPlacement.MODULE_PATH
                 ? null
                 : ModularizeModule.configured(BuildStep.locate(descriptor.configuration(), "modules.properties"));
-        SequencedMap<String, SequencedMap<String, String>> overrides = overridesOf(descriptor.configuration());
+        SequencedMap<String, SequencedMap<String, String>> overrides = overridesOf(descriptor.configuration(), "process-"),
+                environments = overridesOf(descriptor.configuration(), "environment-");
         ProcessHandler.Factory factory = ProcessHandler.Factory.ofEnvironment(environment);
         SequencedMap<String, SequencedMap<String, BuildExecutorModule>> hooks = new LinkedHashMap<>();
         hooks.put("", new LinkedHashMap<>(custom));
@@ -284,7 +285,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 closure = new LinkedHashSet<>(Set.of("modules"));
             }
             sub.addStep("prepare",
-                    new Prepare(descriptor.pathPlacement(), List.copyOf(packaging.formats()), overrides),
+                    new Prepare(descriptor.pathPlacement(), List.copyOf(packaging.formats()), overrides, environments),
                     outerInherited.sequencedKeySet().stream());
             sub.addModule("check",
                     check.apply(InferredSourceCodeQualityModule.ofEnvironment(environment, descriptor.configuration(), repositories, resolvers)
@@ -726,17 +727,17 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                 descriptor.spdx()).flatMap(SequencedSet::stream);
     }
 
-    private static SequencedMap<String, SequencedMap<String, String>> overridesOf(SequencedSet<Path> configuration)
-            throws IOException {
+    private static SequencedMap<String, SequencedMap<String, String>> overridesOf(SequencedSet<Path> configuration,
+                                                                                String prefix) throws IOException {
         SequencedMap<String, Path> files = new LinkedHashMap<>();
         for (Path folder : configuration) {
             if (!Files.isDirectory(folder)) {
                 continue;
             }
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(folder, "process-*.properties")) {
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(folder, prefix + "*.properties")) {
                 for (Path file : stream) {
                     String fileName = file.getFileName().toString();
-                    String command = fileName.substring("process-".length(), fileName.length() - ".properties".length());
+                    String command = fileName.substring(prefix.length(), fileName.length() - ".properties".length());
                     files.putIfAbsent(command, file);
                 }
             }
@@ -752,7 +753,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
 
     private record Prepare(PathPlacement pathPlacement,
                            List<String> packageTypes,
-                           SequencedMap<String, SequencedMap<String, String>> overrides) implements BuildStep {
+                           SequencedMap<String, SequencedMap<String, String>> overrides,
+                           SequencedMap<String, SequencedMap<String, String>> environments) implements BuildStep {
 
         @Override
         public CompletionStage<BuildStepResult> apply(Executor executor,
@@ -911,6 +913,14 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         : new SequencedProperties();
                 override.getValue().forEach(merged::setProperty);
                 merged.store(target);
+            }
+            if (!environments.isEmpty()) {
+                Path environmentFolder = Files.createDirectories(context.next().resolve(ProcessBuildStep.ENVIRONMENT));
+                for (Map.Entry<String, SequencedMap<String, String>> environment : environments.entrySet()) {
+                    SequencedProperties variables = new SequencedProperties();
+                    environment.getValue().forEach(variables::setProperty);
+                    variables.store(environmentFolder.resolve(environment.getKey() + ".properties"));
+                }
             }
             return CompletableFuture.completedStage(new BuildStepResult(true));
         }

@@ -249,6 +249,21 @@ public class InferredMultiProjectAssemblerTest {
     }
 
     @Test
+    public void an_environment_file_in_configuration_yields_the_variables_of_a_tool() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("environment-test.properties"), "SAMPLE=value\nINHERITED\n");
+        Files.writeString(fixture.profile().resolve("environment-java.properties"), "OTHER=value\n");
+        Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
+        SequencedProperties variables = readProperties(prepareOutput.resolve(ProcessBuildStep.ENVIRONMENT).resolve("test.properties"));
+        assertThat(variables.getProperty("SAMPLE")).isEqualTo("value");
+        assertThat(variables.getProperty("INHERITED"))
+                .as("a variable without a value is taken from the build's environment when the tool runs")
+                .isEqualTo("");
+        assertThat(readProperties(prepareOutput.resolve(ProcessBuildStep.ENVIRONMENT).resolve("java.properties"))
+                .getProperty("OTHER")).isEqualTo("value");
+    }
+
+    @Test
     public void a_process_command_file_adds_to_and_overrides_generated_arguments() throws IOException {
         Fixture fixture = setUp("main=\n", false, false, false);
         Files.writeString(fixture.manifests().resolve(BuildStep.METADATA), "version=1.0\n");
