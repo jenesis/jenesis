@@ -755,8 +755,6 @@ public record Project(
                     checksums. Project sources are always detected, but editing a step's *code* does
                     not change its serialized form, so its output stays cached. Bump that class's
                     `serialVersionUID` to force it to re-run; prefer that over executor.rebuild.
-                    A plugin's steps need no bump: they are keyed by the jars the plugin runs on
-                    as well, so a plugin rebuilt from its folder or at a new version runs again.
 
                     ## 8. Configure a module with @jenesis tags on module-info.java
 
