@@ -4,7 +4,11 @@ import module java.base;
 
 public interface BuildExecutor {
 
-    String SKIP_MARKER = ".jenesis.skip", LOCK_MARKER = ".jenesis.lock", EVENTS = ".jenesis.events.jsonl";
+    String SKIP_MARKER = ".jenesis.skip",
+            LOCK_MARKER = ".jenesis.lock",
+            FAILED_MARKER = ".jenesis.failed",
+            EVENTS = ".jenesis.events.jsonl",
+            NEXT = "~";
 
     static BuildExecutor of(Path target) throws IOException {
         return new Configuration().of(target);
