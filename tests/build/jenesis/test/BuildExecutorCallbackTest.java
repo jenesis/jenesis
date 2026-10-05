@@ -158,7 +158,10 @@ public class BuildExecutorCallbackTest {
         }
         Object first = builds.getFirst().getFirst().get("run"), second = builds.getLast().getFirst().get("run");
         assertThat(first).isNotNull().isNotEqualTo(second);
-        assertThat(builds.getFirst().get(1)).containsEntry("status", "executed").containsEntry("run", first);
+        assertThat(builds.getFirst().get(1))
+                .as("an executed step is the run of the build that executed it")
+                .containsEntry("status", "executed")
+                .doesNotContainKey("run");
         assertThat(builds.getLast().get(1))
                 .as("a skipped step names the earlier run that produced its output, not the one that skipped it")
                 .containsEntry("status", "skipped")
