@@ -31,6 +31,19 @@ public class InventoryTest {
     }
 
     @Test
+    public void shouldRun_fires_when_a_docker_context_or_a_layer_declaration_changed() {
+        for (Path changed : List.of(Path.of("docker/Dockerfile"), Path.of(BuildStep.LAYERS))) {
+            BuildStepArgument argument = new BuildStepArgument(root, Map.of(
+                    changed, Checksum.of(ChecksumStatus.ADDED)));
+            SequencedMap<String, BuildStepArgument> arguments = new LinkedHashMap<>();
+            arguments.put("input", argument);
+            assertThat(new Inventory().shouldRun(arguments))
+                    .as("the inventory records what " + changed + " holds")
+                    .isTrue();
+        }
+    }
+
+    @Test
     public void shouldRun_fires_when_identity_properties_changed() {
         BuildStepArgument argument = new BuildStepArgument(root, Map.of(
                 Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED)));

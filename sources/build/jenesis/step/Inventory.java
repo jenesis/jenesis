@@ -120,6 +120,8 @@ public class Inventory implements BuildStep {
                 Path.of(JMod.JMODS),
                 Path.of(JLink.RUNTIME),
                 Path.of(Layers.MEMBERSHIP),
+                Path.of(LAYERS),
+                Path.of(Docker.DOCKER),
                 Path.of(NativeImage.NATIVE),
                 Path.of(NativeImage.METADATA),
                 Path.of(REPORTS)));
