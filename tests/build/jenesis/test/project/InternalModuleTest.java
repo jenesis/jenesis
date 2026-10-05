@@ -131,12 +131,23 @@ public class InternalModuleTest {
         assertThat(buildExecutor.execute().get("internal/marker").resolve("out.txt")).content().isEqualTo("before");
 
         writeModuleSource(work.resolve("plugin"), moduleInfo, Map.of("test/plugin/Plugin.java", plugin.formatted("after")));
-        setUp();
+        Path copy = work.resolve("copy");
+        try (Stream<Path> files = Files.walk(root)) {
+            for (Path file : files.toList()) {
+                Files.copy(file, copy.resolve(root.relativize(file).toString()), LinkOption.NOFOLLOW_LINKS);
+            }
+        }
+        buildExecutor = BuildExecutor.of(copy,
+                Duration.ZERO,
+                new HashDigestFunction("MD5"),
+                BuildStepHashFunction.ofSerializationDigest("MD5"),
+                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
         buildExecutor.addModule("internal", new InternalModule("module", null, source)
                 .repositories(Map.of("module", versionInsensitive(Map.of("build.jenesis", jenesisJar))))
                 .resolvers(Map.of("module", ModularJarResolver.ofEnvironment(Environment.NONE, true))));
         assertThat(buildExecutor.execute().get("internal/marker").resolve("out.txt")).content()
-                .as("the step's serialised form is unchanged, so only the code of the plugin can tell it apart")
+                .as("a copy of the first build's target holds the old output, and the step's serialised form is unchanged,"
+                        + " so only the code of the plugin can tell it apart")
                 .isEqualTo("after");
     }
 
