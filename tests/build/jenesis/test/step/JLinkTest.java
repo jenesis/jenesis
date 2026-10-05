@@ -39,8 +39,10 @@ public class JLinkTest {
         Files.writeString(Files.createDirectory(sources.resolve("sample")).resolve("Sample.java"),
                 "package sample; public class Sample { }\n");
         Path classes = Files.createDirectory(root.resolve("classes"));
-        int compiled = ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(),
+        int compiled = ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
                 sources.resolve("module-info.java").toString(),
                 sources.resolve("sample/Sample.java").toString());
         assertThat(compiled).isZero();
@@ -71,8 +73,11 @@ public class JLinkTest {
         Path sources = Files.createDirectory(root.resolve("sources"));
         Files.writeString(sources.resolve("module-info.java"), "module sample { }\n");
         Path classes = Files.createDirectory(root.resolve("classes"));
-        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(), sources.resolve("module-info.java").toString())).isZero();
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
+                sources.resolve("module-info.java").toString())).isZero();
         Path manifest = Files.writeString(root.resolve("manifest.mf"), PathPlacement.PREVIEW + ": 25\n");
         Path artifacts = Files.createDirectory(bundle.resolve(BuildStep.ARTIFACTS));
         assertThat(ToolProvider.findFirst("jar").orElseThrow().run(System.out, System.err,
@@ -97,16 +102,22 @@ public class JLinkTest {
         Path sources = Files.createDirectory(root.resolve("sources"));
         Files.writeString(sources.resolve("module-info.java"), "module sample { }\n");
         Path classes = Files.createDirectory(root.resolve("classes"));
-        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(), sources.resolve("module-info.java").toString())).isZero();
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
+                sources.resolve("module-info.java").toString())).isZero();
         Path artifacts = Files.createDirectory(bundle.resolve(BuildStep.ARTIFACTS));
         assertThat(ToolProvider.findFirst("jar").orElseThrow().run(System.out, System.err,
                 "--create", "--file", artifacts.resolve("sample.jar").toString(), "-C", classes.toString(), ".")).isZero();
         Path layered = Files.createDirectory(root.resolve("layered"));
         Files.writeString(layered.resolve("module-info.java"), "module layered { requires java.logging; }\n");
         Path layeredClasses = Files.createDirectory(root.resolve("layered-classes"));
-        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", layeredClasses.toString(), layered.resolve("module-info.java").toString())).isZero();
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                layeredClasses.toString(),
+                layered.resolve("module-info.java").toString())).isZero();
         Path resolved = Files.createDirectory(bundle.resolve("resolved"));
         assertThat(ToolProvider.findFirst("jar").orElseThrow().run(System.out, System.err,
                 "--create", "--file", resolved.resolve("layered.jar").toString(), "-C", layeredClasses.toString(), ".")).isZero();

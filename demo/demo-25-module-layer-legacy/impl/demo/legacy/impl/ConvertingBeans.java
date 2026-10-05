@@ -24,7 +24,8 @@ public class ConvertingBeans implements Beans {
      */
     private static String logging() {
         try {
-            Class<?> factory = Class.forName("org.apache.commons.logging.LogFactory", false,
+            Class<?> factory = Class.forName("org.apache.commons.logging.LogFactory",
+                    false,
                     ConvertUtils.class.getClassLoader());
             CodeSource source = factory.getProtectionDomain().getCodeSource();
             if (source == null) {

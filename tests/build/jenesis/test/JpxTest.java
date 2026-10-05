@@ -84,7 +84,8 @@ public class JpxTest {
                     builder.requires(ModuleRequireInfo.of(ModuleDesc.of("java.base"), 0, null));
                     builder.exports(ModuleExportInfo.of(PackageDesc.of("toollib"), 0));
                 })), null, libClasses);
-        toolJar = jar("tool-main-1.0.jar", ClassFile.of().buildModule(ModuleAttribute.of(
+        toolJar = jar("tool-main-1.0.jar",
+                ClassFile.of().buildModule(ModuleAttribute.of(
                         ModuleDesc.of("tool.main"),
                         builder -> {
                             builder.moduleVersion("1.0");
@@ -92,7 +93,8 @@ public class JpxTest {
                             builder.requires(ModuleRequireInfo.of(ModuleDesc.of("tool.lib"), 0, "1.0"));
                         }),
                 classBuilder -> classBuilder.with(ModuleMainClassAttribute.of(ClassDesc.of("toolmain.Main")))),
-                null, compile("toolmain/Main.java", MAIN_SOURCE, libClasses));
+                null,
+                compile("toolmain/Main.java", MAIN_SOURCE, libClasses));
         plainJar = jar("plain-tool.jar", null, "plaintool.Main", compile("plaintool/Main.java", PLAIN_SOURCE));
     }
 

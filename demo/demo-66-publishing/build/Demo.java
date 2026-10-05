@@ -74,7 +74,12 @@ public class Demo {
                                String type,
                                String classifier) throws IOException {
         Optional<RepositoryItem> item = repository.fetch(Runnable::run,
-                groupId, artifactId, version, type, classifier, null);
+                groupId,
+                artifactId,
+                version,
+                type,
+                classifier,
+                null);
         String name = artifactId + "-" + version + (classifier == null ? "" : "-" + classifier) + "." + type;
         System.out.println("  " + (item.isPresent() ? "[resolved] " : "[MISSING]  ") + name);
     }

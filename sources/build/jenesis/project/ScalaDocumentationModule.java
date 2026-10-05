@@ -22,10 +22,12 @@ import build.jenesis.step.ProcessHandler;
 public class ScalaDocumentationModule implements BuildExecutorModule {
 
     public static final String DOCUMENTED = "documented";
-    private static final String REQUIRED = "required", ARTIFACTS = "artifacts",
+    private static final String REQUIRED = "required",
+            ARTIFACTS = "artifacts",
             DEPENDENCIES = "dependencies";
     private static final List<String> PREFERRED_PREFIXES = List.of("maven", "module");
-    private static final String MODULE_NAME = "org.scala.lang.scaladoc", MAVEN_GROUP = "org.scala-lang",
+    private static final String MODULE_NAME = "org.scala.lang.scaladoc",
+            MAVEN_GROUP = "org.scala-lang",
             MAVEN_ARTIFACT = "scaladoc_3";
 
     private final Map<String, Resolver> resolvers;
@@ -39,7 +41,8 @@ public class ScalaDocumentationModule implements BuildExecutorModule {
 
     public ScalaDocumentationModule(Map<String, Repository> repositories,
                                     Map<String, Resolver> resolvers) {
-        this(resolvers, new Dependencies(repositories, resolvers),
+        this(resolvers,
+             new Dependencies(repositories, resolvers),
              null,
              "scaladoc",
              "main",
@@ -51,7 +54,8 @@ public class ScalaDocumentationModule implements BuildExecutorModule {
     public static ScalaDocumentationModule ofEnvironment(Environment environment,
                                                   Map<String, Repository> repositories,
                                                   Map<String, Resolver> resolvers) {
-        return new ScalaDocumentationModule(resolvers, Dependencies.ofEnvironment(environment, repositories, resolvers),
+        return new ScalaDocumentationModule(resolvers,
+                Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "scaladoc",
                 "main",
@@ -213,7 +217,9 @@ public class ScalaDocumentationModule implements BuildExecutorModule {
                 throws IOException {
             Path documentation = context.next().resolve(Javadoc.JAVADOC);
             Path output = Files.createDirectories(within == null ? documentation : documentation.resolve(within));
-            List<String> files = new ArrayList<>(), jars = new ArrayList<>(), classRoots = new ArrayList<>(),
+            List<String> files = new ArrayList<>(),
+                    jars = new ArrayList<>(),
+                    classRoots = new ArrayList<>(),
                     classpath = new ArrayList<>();
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {

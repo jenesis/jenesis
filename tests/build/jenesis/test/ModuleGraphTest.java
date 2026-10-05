@@ -231,7 +231,8 @@ public class ModuleGraphTest {
         int result = ToolProvider.findFirst("javac").orElseThrow().run(
                 new PrintWriter(Writer.nullWriter()),
                 new PrintWriter(errors),
-                "-d", classes.toString(),
+                "-d",
+                classes.toString(),
                 sources.resolve("module-info.java").toString(),
                 sources.resolve("shared/Type.java").toString());
         if (result != 0) {

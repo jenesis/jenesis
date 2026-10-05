@@ -267,8 +267,10 @@ public class LauncherTest {
         Files.writeString(Files.createDirectory(sources.resolve("sample")).resolve("Sample.java"),
                 "package sample; public class Sample { public static void main(String[] args) { } }\n");
         Path classes = Files.createDirectory(root.resolve("module-classes"));
-        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(),
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
                 sources.resolve("module-info.java").toString(),
                 sources.resolve("sample/Sample.java").toString())).isZero();
         assertThat(ToolProvider.findFirst("jar").orElseThrow().run(System.out, System.err,

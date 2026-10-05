@@ -468,7 +468,11 @@ public class DependenciesAliasTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         executor.addSource("dependencies", dependencies);
         executor.addModule("resolved", new Dependencies(
                 Map.of("maven", new MavenDefaultRepository(mavenRepoFolder.toUri(), mavenRepoFolder, Map.of(), null)),
@@ -488,8 +492,10 @@ public class DependenciesAliasTest {
         int result = ToolProvider.findFirst("javac").orElseThrow().run(
                 new PrintWriter(Writer.nullWriter()),
                 new PrintWriter(errors),
-                "-d", classes.toString(),
-                "-p", modulePath.toString(),
+                "-d",
+                classes.toString(),
+                "-p",
+                modulePath.toString(),
                 sources.resolve("module-info.java").toString(),
                 sources.resolve("myapp/Main.java").toString());
         if (result != 0) {
@@ -558,7 +564,8 @@ public class DependenciesAliasTest {
         int result = ToolProvider.findFirst("javac").orElseThrow().run(
                 new PrintWriter(Writer.nullWriter()),
                 new PrintWriter(errors),
-                "-d", classes.toString(),
+                "-d",
+                classes.toString(),
                 java.toString());
         if (result != 0) {
             throw new IllegalStateException("Compilation failed: " + errors);

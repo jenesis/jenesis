@@ -42,7 +42,11 @@ public class BindTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         buildExecutor.addModule("inputs", Bind.asInputs(new LinkedHashMap<>(Map.of("contracts", bindings))));
 
         Path input = buildExecutor.execute().get("inputs/contracts");
@@ -63,7 +67,11 @@ public class BindTest {
                     Duration.ZERO,
                     new HashDigestFunction("MD5"),
                     BuildStepHashFunction.ofSerializationDigest("MD5"),
-                    BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                    BuildExecutorCallback.nop(),
+                    BuildExecutorCache.nop(),
+                    false,
+                    false,
+                    0);
             buildExecutor.addModule("inputs", Bind.asInputs(new LinkedHashMap<>(Map.of("contracts", bindings))));
             Path input = buildExecutor.execute().get("inputs/contracts");
             assertThat(input.resolve(name))

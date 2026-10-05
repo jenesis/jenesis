@@ -220,8 +220,10 @@ public class JPackageTest {
         Files.writeString(Files.createDirectory(sources.resolve("sample")).resolve("Sample.java"),
                 "package sample; public class Sample { public static void main(String[] args) { } }\n");
         Path classes = Files.createDirectory(root.resolve("classes"));
-        int compiled = ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(),
+        int compiled = ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
                 sources.resolve("module-info.java").toString(),
                 sources.resolve("sample/Sample.java").toString());
         assertThat(compiled).isZero();
@@ -252,8 +254,10 @@ public class JPackageTest {
         Files.writeString(Files.createDirectory(sources.resolve("sample")).resolve("Sample.java"),
                 "package sample; public class Sample { public static void main(String[] args) { } }\n");
         Path classes = Files.createDirectory(root.resolve("classes"));
-        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(),
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
                 sources.resolve("module-info.java").toString(),
                 sources.resolve("sample/Sample.java").toString())).isZero();
         Path modules = Files.createDirectory(root.resolve("modules"));
@@ -296,8 +300,10 @@ public class JPackageTest {
         Files.writeString(Files.createDirectory(sources.resolve("sample")).resolve("Sample.java"),
                 "package sample; public class Sample { public static void main(String[] args) { } }\n");
         Path classes = Files.createDirectory(root.resolve("classes"));
-        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(),
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
                 sources.resolve("module-info.java").toString(),
                 sources.resolve("sample/Sample.java").toString())).isZero();
         Path modules = Files.createDirectory(root.resolve("modules"));

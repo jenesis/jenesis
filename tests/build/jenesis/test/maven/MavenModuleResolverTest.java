@@ -709,7 +709,11 @@ public class MavenModuleResolverTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         executor.addSource("dependencies", folder);
         executor.addModule("resolved", new Dependencies(
                 Map.of("module", discovery,

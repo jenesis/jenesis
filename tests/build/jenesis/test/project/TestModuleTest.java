@@ -88,7 +88,8 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -111,7 +112,8 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -149,7 +151,8 @@ public class TestModuleTest {
             executor.addSource("classes", classes);
             executor.addModule(
                     "test",
-                    TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                    TestModule.ofEnvironment(new Environment(settings),
+                            Map.of("maven", new MavenDefaultRepository(
                                     URI.create("https://repo1.maven.org/maven2/"),
                                     null,
                                     Map.of(),
@@ -182,7 +185,8 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -205,7 +209,8 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -229,7 +234,8 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -252,7 +258,8 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -307,7 +314,8 @@ public class TestModuleTest {
         executor.addSource("module", module);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -356,7 +364,8 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -415,7 +424,8 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -437,7 +447,8 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -460,7 +471,8 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -481,7 +493,8 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -514,7 +527,8 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -538,7 +552,8 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -564,7 +579,8 @@ public class TestModuleTest {
         executor.addSource("manifests", manifests);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -593,7 +609,8 @@ public class TestModuleTest {
         executor.addSource("manifests", manifests);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -617,7 +634,8 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -676,7 +694,8 @@ public class TestModuleTest {
         executor.addSource("classes", classes);
         executor.addModule(
                 "test",
-                TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+                TestModule.ofEnvironment(new Environment(settings),
+                        Map.of("maven", new MavenDefaultRepository(
                                 URI.create("https://repo1.maven.org/maven2/"),
                                 null,
                                 Map.of(),
@@ -1048,10 +1067,14 @@ public class TestModuleTest {
                         };
                     }
                 },
-                BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         executor.addSource("dependencies", dependencies);
         executor.addSource("classes", classes);
-        TestModule module = TestModule.ofEnvironment(new Environment(settings), Map.of("maven", new MavenDefaultRepository(
+        TestModule module = TestModule.ofEnvironment(new Environment(settings),
+                Map.of("maven", new MavenDefaultRepository(
                         URI.create("https://repo1.maven.org/maven2/"),
                         null,
                         Map.of(),
@@ -1071,7 +1094,11 @@ public class TestModuleTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
     }
 
     private static SequencedProperties readRequires(Path stepFolder) throws IOException {

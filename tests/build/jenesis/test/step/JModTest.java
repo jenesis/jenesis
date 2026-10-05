@@ -38,8 +38,10 @@ public class JModTest {
         Files.writeString(Files.createDirectory(sources.resolve("sample")).resolve("Sample.java"),
                 "package sample; public class Sample { }\n");
         Path classes = Files.createDirectory(bundle.resolve(BuildStep.CLASSES));
-        int code = ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(),
+        int code = ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
                 sources.resolve("module-info.java").toString(),
                 sources.resolve("sample/Sample.java").toString());
         assertThat(code).isZero();
@@ -58,8 +60,10 @@ public class JModTest {
         Path sources = Files.createDirectory(root.resolve("sources"));
         Files.writeString(sources.resolve("module-info.java"), "module sample { }\n");
         Path classes = Files.createDirectory(bundle.resolve(BuildStep.CLASSES));
-        int code = ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(),
+        int code = ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
                 sources.resolve("module-info.java").toString());
         assertThat(code).isZero();
         BuildStepResult result = JMod.ofEnvironment(Environment.NONE, ProcessHandler.Factory.TOOL).apply(
@@ -81,8 +85,10 @@ public class JModTest {
         Path sources = Files.createDirectory(root.resolve("sources"));
         Files.writeString(sources.resolve("module-info.java"), "module sample { }\n");
         Path classes = Files.createDirectory(bundle.resolve(BuildStep.CLASSES));
-        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(),
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
                 sources.resolve("module-info.java").toString())).isZero();
         Path sbom = Files.createDirectory(root.resolve("sbom"));
         Files.writeString(Files.createDirectories(sbom.resolve(BuildStep.RESOURCES + "META-INF/sbom")).resolve("sample.cdx.json"), "{}");
@@ -111,8 +117,10 @@ public class JModTest {
         Path sources = Files.createDirectory(root.resolve("sources"));
         Files.writeString(sources.resolve("module-info.java"), "module sample { }\n");
         Path classes = Files.createDirectory(bundle.resolve(BuildStep.CLASSES));
-        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(),
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
                 sources.resolve("module-info.java").toString())).isZero();
         JMod jmod;
         jmod = JMod.ofEnvironment(new Environment(Map.of("archive.timestamp", "")), ProcessHandler.Factory.TOOL);
@@ -133,8 +141,10 @@ public class JModTest {
         Files.writeString(Files.createDirectory(sources.resolve("sample")).resolve("Sample.java"),
                 "package sample; public class Sample { }\n");
         Path classes = Files.createDirectory(bundle.resolve(BuildStep.CLASSES));
-        int code = ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(),
+        int code = ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
                 sources.resolve("module-info.java").toString(),
                 sources.resolve("sample/Sample.java").toString());
         assertThat(code).isZero();
@@ -178,8 +188,10 @@ public class JModTest {
         Path sources = Files.createDirectory(root.resolve("sources"));
         Files.writeString(sources.resolve("module-info.java"), "module sample { }\n");
         Path classes = Files.createDirectory(bundle.resolve(BuildStep.CLASSES));
-        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(),
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
                 sources.resolve("module-info.java").toString())).isZero();
         Path legal = Files.createDirectories(root.resolve("legal").resolve(Legal.LEGAL).resolve("org.dep-1.0"));
         Files.writeString(legal.resolveSibling("LICENSE"), "own licence");

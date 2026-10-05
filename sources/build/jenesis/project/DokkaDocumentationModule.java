@@ -22,7 +22,8 @@ import build.jenesis.step.ProcessHandler;
 public class DokkaDocumentationModule implements BuildExecutorModule {
 
     public static final String DOCUMENTED = "documented";
-    private static final String REQUIRED = "required", ARTIFACTS = "artifacts",
+    private static final String REQUIRED = "required",
+            ARTIFACTS = "artifacts",
             DEPENDENCIES = "dependencies";
     private static final String MAVEN_GROUP = "org.jetbrains.dokka";
     private static final List<String> CLI_ARTIFACTS = List.of(
@@ -39,7 +40,8 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
 
     public DokkaDocumentationModule(Map<String, Repository> repositories,
                                     Map<String, Resolver> resolvers) {
-        this(resolvers, new Dependencies(repositories, resolvers),
+        this(resolvers,
+             new Dependencies(repositories, resolvers),
              null,
              "dokka",
              "main",
@@ -51,7 +53,8 @@ public class DokkaDocumentationModule implements BuildExecutorModule {
     public static DokkaDocumentationModule ofEnvironment(Environment environment,
                                                   Map<String, Repository> repositories,
                                                   Map<String, Resolver> resolvers) {
-        return new DokkaDocumentationModule(resolvers, Dependencies.ofEnvironment(environment, repositories, resolvers),
+        return new DokkaDocumentationModule(resolvers,
+                Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 "dokka",
                 "main",

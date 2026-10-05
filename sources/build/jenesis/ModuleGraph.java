@@ -6,9 +6,12 @@ public class ModuleGraph {
 
     public static final String JAVA_OPTIONS = "javaOptions";
     private static final String SELF_CONTAINED = "selfContainedModuleGraph";
-    private static final String ADD_MODULES = "--add-modules", ROOTS = "ALL-MODULE-PATH,ALL-DEFAULT",
-            ENABLE_NATIVE_ACCESS = "--enable-native-access", ALL_UNNAMED = "ALL-UNNAMED",
-            LAYER_NATIVE_ACCESS = "-Djlayer.enableNativeAccess.", ENABLE_PREVIEW = "--enable-preview";
+    private static final String ADD_MODULES = "--add-modules",
+            ROOTS = "ALL-MODULE-PATH,ALL-DEFAULT",
+            ENABLE_NATIVE_ACCESS = "--enable-native-access",
+            ALL_UNNAMED = "ALL-UNNAMED",
+            LAYER_NATIVE_ACCESS = "-Djlayer.enableNativeAccess.",
+            ENABLE_PREVIEW = "--enable-preview";
 
     private final SequencedSet<String> nativeAccess = new LinkedHashSet<>();
     private final SequencedMap<String, SequencedSet<String>> layerAccess = new TreeMap<>();

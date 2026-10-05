@@ -54,15 +54,35 @@ public class ModularStaging implements BuildStep {
             }
             SAFE_SEGMENT.accept("module name", moduleName);
             Path artifact = single(Inventory.paths(inventory, argument.folder(), prefix + ".artifacts"),
-                    prefix, "artifacts", true, ".jar", inventoryFile);
+                    prefix,
+                    "artifacts",
+                    true,
+                    ".jar",
+                    inventoryFile);
             Path sources = single(Inventory.paths(inventory, argument.folder(), prefix + ".sources"),
-                    prefix, "sources", false, ".jar", inventoryFile);
+                    prefix,
+                    "sources",
+                    false,
+                    ".jar",
+                    inventoryFile);
             Path javadoc = single(Inventory.paths(inventory, argument.folder(), prefix + ".documentation"),
-                    prefix, "documentation", false, ".jar", inventoryFile);
+                    prefix,
+                    "documentation",
+                    false,
+                    ".jar",
+                    inventoryFile);
             Path jmod = single(Inventory.paths(inventory, argument.folder(), prefix + ".jmod"),
-                    prefix, "jmod", false, ".jmod", inventoryFile);
+                    prefix,
+                    "jmod",
+                    false,
+                    ".jmod",
+                    inventoryFile);
             Path bom = single(Inventory.paths(inventory, argument.folder(), prefix + ".bomfile"),
-                    prefix, "bomfile", false, ".properties", inventoryFile);
+                    prefix,
+                    "bomfile",
+                    false,
+                    ".properties",
+                    inventoryFile);
             String pomRelative = inventory.getProperty(prefix + ".pom");
             Path pom = pomRelative == null ? null : argument.folder().resolve(pomRelative).normalize();
             String version = inventory.getProperty(prefix + ".version");
