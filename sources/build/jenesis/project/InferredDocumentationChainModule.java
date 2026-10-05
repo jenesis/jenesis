@@ -304,38 +304,62 @@ public class InferredDocumentationChainModule implements BuildExecutorModule {
 
             SequencedSet<String> outputs = new LinkedHashSet<>();
             if (hasKotlin && !hasScala && !hasGroovy) {
-                document(buildExecutor, sourceInputs, outputs, DOKKA,
+                document(buildExecutor,
+                         sourceInputs,
+                         outputs,
+                         DOKKA,
                          dokka.apply(dokkaModule.pinning(pinning)));
             } else if (hasGroovy && !hasScala && !hasKotlin) {
-                document(buildExecutor, sourceInputs, outputs, GROOVYDOC,
+                document(buildExecutor,
+                         sourceInputs,
+                         outputs,
+                         GROOVYDOC,
                          groovydoc.apply(groovydocModule
                                 .pinning(pinning)
                                 .includeJava(hasJava)));
             } else if (hasScala && !hasJava && !hasKotlin && !hasGroovy) {
-                document(buildExecutor, sourceInputs, outputs, SCALADOC,
+                document(buildExecutor,
+                         sourceInputs,
+                         outputs,
+                         SCALADOC,
                          scaladoc.apply(scaladocModule.pinning(pinning)));
             } else if (hasJava && !hasKotlin && !hasScala && !hasGroovy) {
-                document(buildExecutor, sourceInputs, outputs, JAVADOC,
+                document(buildExecutor,
+                         sourceInputs,
+                         outputs,
+                         JAVADOC,
                          javadoc.apply(javadocStep.classpath(true)));
             } else {
                 if (hasJava) {
-                    document(buildExecutor, sourceInputs, outputs, JAVADOC,
+                    document(buildExecutor,
+                             sourceInputs,
+                             outputs,
+                             JAVADOC,
                              javadoc.apply(javadocStep.classpath(true)));
                 }
                 if (hasKotlin) {
-                    document(buildExecutor, sourceInputs, outputs, DOKKA,
+                    document(buildExecutor,
+                             sourceInputs,
+                             outputs,
+                             DOKKA,
                              dokka.apply(dokkaModule
                                     .pinning(pinning)
                                     .within(DOKKA)));
                 }
                 if (hasScala) {
-                    document(buildExecutor, sourceInputs, outputs, SCALADOC,
+                    document(buildExecutor,
+                             sourceInputs,
+                             outputs,
+                             SCALADOC,
                              scaladoc.apply(scaladocModule
                                     .pinning(pinning)
                                     .within(SCALADOC)));
                 }
                 if (hasGroovy) {
-                    document(buildExecutor, sourceInputs, outputs, GROOVYDOC,
+                    document(buildExecutor,
+                             sourceInputs,
+                             outputs,
+                             GROOVYDOC,
                              groovydoc.apply(groovydocModule
                                     .pinning(pinning)
                                     .within(GROOVYDOC)));

@@ -309,8 +309,12 @@ public class Signatures extends ProcessBuildStep {
                                 token + " " + version,
                                 matched + " as " + attestation.identity() + ", recorded " + attestation.recorded());
                     }
-                    String violation = attests(executor, context, repository, sigstore,
-                            descriptor(repository, relative, version), attestation);
+                    String violation = attests(executor,
+                            context,
+                            repository,
+                            sigstore,
+                            descriptor(repository, relative, version),
+                            attestation);
                     if (violation != null) {
                         violations.add(token + " " + version + ": " + violation);
                         continue;

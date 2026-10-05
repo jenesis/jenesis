@@ -457,7 +457,11 @@ public record Jpx(Path storage,
                 if (version == null) {
                     version = MavenDefaultVersionNegotiator.maven().get().resolve(executor,
                             MavenRepository.of(repositories.get("maven")),
-                            groupId, artifactId, "jar", null, "RELEASE");
+                            groupId,
+                            artifactId,
+                            "jar",
+                            null,
+                            "RELEASE");
                 }
                 resolution = resolvers.get("maven").dependencies(executor,
                         "maven",

@@ -94,7 +94,11 @@ public class JApiCmpModuleTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         executor.addSource("project", project);
         executor.addModule("japicmp", new JApiCmpModule(Map.of(), Map.of()).config(config), "project");
         executor.execute("japicmp/required");

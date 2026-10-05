@@ -33,7 +33,11 @@ public class MultiProjectModuleTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
     }
 
     @Test
@@ -380,7 +384,8 @@ public class MultiProjectModuleTest {
             buildExecutor.addSource("5-module", module5);
             buildExecutor.addSource("5-source", Files.writeString(Files.createDirectory(source5
                     .resolve(BuildStep.SOURCES)).resolve("source"), "e"));
-        }, identifier -> Optional.of(identifier.substring(0, identifier.indexOf('-')).replace('-', '/')),
+        },
+                identifier -> Optional.of(identifier.substring(0, identifier.indexOf('-')).replace('-', '/')),
                 _ -> (name, _, _) -> new AssemblyDescriptor((module, _) -> {
             built.add(name);
             module.addStep("step", (_, context, _) -> {
@@ -410,7 +415,8 @@ public class MultiProjectModuleTest {
             buildExecutor.addSource("2-module", module2);
             buildExecutor.addSource("2-source", Files.writeString(Files.createDirectory(source2
                     .resolve(BuildStep.SOURCES)).resolve("source"), "bar"));
-        }, identifier -> Optional.of(identifier.substring(0, identifier.indexOf('-')).replace('-', '/')),
+        },
+                identifier -> Optional.of(identifier.substring(0, identifier.indexOf('-')).replace('-', '/')),
                 _ -> (name, _, _) -> {
             BuildExecutorModule build = (module, _) -> module.addStep(MultiProjectModule.INVENTORY, (_, context, _) -> {
                 Files.writeString(context.next().resolve(Inventory.INVENTORY), name);
@@ -455,7 +461,8 @@ public class MultiProjectModuleTest {
             dependencies2.put("main/compile/foo/bar", "");
             dependencies2.store(module2.resolve(BuildStep.REQUIRES));
             buildExecutor.addSource("2-module", module2);
-        }, identifier -> Optional.of(identifier.substring(0, identifier.indexOf('-')).replace('-', '/')),
+        },
+                identifier -> Optional.of(identifier.substring(0, identifier.indexOf('-')).replace('-', '/')),
                 _ -> (name, _, _) -> new AssemblyDescriptor((module, _) -> {
             throw new AssertionError("Unexpected module: " + name);
         })));

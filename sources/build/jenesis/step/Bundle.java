@@ -130,9 +130,14 @@ public class Bundle implements BuildStep {
         )) {
             descriptors.put("application." + platform.getKey() + ".args", ProcessBuildStep.argumentFile(
                     context.supplement().resolve("application." + platform.getKey() + ".args"),
-                    command(mainClass, mainModule, graph.arguments(),
-                            classpath.sequencedKeySet(), modulepath.sequencedKeySet(),
-                            layers, agents, platform.getValue())));
+                    command(mainClass,
+                            mainModule,
+                            graph.arguments(),
+                            classpath.sequencedKeySet(),
+                            modulepath.sequencedKeySet(),
+                            layers,
+                            agents,
+                            platform.getValue())));
         }
         SequencedMap<String, Path> stored = new TreeMap<>(classpath);
         stored.putAll(modulepath);

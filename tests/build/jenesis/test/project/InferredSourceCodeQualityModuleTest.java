@@ -71,7 +71,9 @@ public class InferredSourceCodeQualityModuleTest {
         BuildExecutor executor = newExecutor();
         executor.addSource("project", project);
         executor.addModule("quality", InferredSourceCodeQualityModule.ofEnvironment(new Environment(Map.of("source.checkstyle", "false")),
-                new LinkedHashSet<>(List.of(project)), Map.of(), Map.of()), "project");
+                new LinkedHashSet<>(List.of(project)),
+                Map.of(),
+                Map.of()), "project");
         executor.execute();
 
         assertThat(root.resolve("quality").resolve("checkstyle"))
@@ -104,6 +106,10 @@ public class InferredSourceCodeQualityModuleTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
     }
 }

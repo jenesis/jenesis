@@ -22,10 +22,12 @@ import build.jenesis.step.Versions;
 public class KotlinCompilerModule implements BuildExecutorModule {
 
     public static final String ARTIFACTS = "artifacts", CLASSES = "classes";
-    private static final String REQUIRED = "required", COMPILED = "compiled",
+    private static final String REQUIRED = "required",
+            COMPILED = "compiled",
             DEPENDENCIES = "dependencies";
     private static final List<String> PREFERRED_PREFIXES = List.of("maven", "module");
-    private static final String MODULE_NAME = "kotlin.compiler.embeddable", MAVEN_GROUP = "org.jetbrains.kotlin",
+    private static final String MODULE_NAME = "kotlin.compiler.embeddable",
+            MAVEN_GROUP = "org.jetbrains.kotlin",
             MAVEN_ARTIFACT = "kotlin-compiler-embeddable";
 
     private final Map<String, Resolver> resolvers;
@@ -39,7 +41,8 @@ public class KotlinCompilerModule implements BuildExecutorModule {
 
     public KotlinCompilerModule(Map<String, Repository> repositories,
                                 Map<String, Resolver> resolvers) {
-        this(resolvers, new Dependencies(repositories, resolvers),
+        this(resolvers,
+             new Dependencies(repositories, resolvers),
              null,
              true,
              "kotlinc",
@@ -51,7 +54,8 @@ public class KotlinCompilerModule implements BuildExecutorModule {
     public static KotlinCompilerModule ofEnvironment(Environment environment,
                                                      Map<String, Repository> repositories,
                                                      Map<String, Resolver> resolvers) {
-        return new KotlinCompilerModule(resolvers, Dependencies.ofEnvironment(environment, repositories, resolvers),
+        return new KotlinCompilerModule(resolvers,
+                Dependencies.ofEnvironment(environment, repositories, resolvers),
                 null,
                 true,
                 "kotlinc",
@@ -209,7 +213,9 @@ public class KotlinCompilerModule implements BuildExecutorModule {
                                                      SequencedMap<String, SequencedMap<String, String>> properties)
                 throws IOException {
             Path target = Files.createDirectory(context.next().resolve(CLASSES));
-            List<String> files = new ArrayList<>(), jars = new ArrayList<>(), classpath = new ArrayList<>(),
+            List<String> files = new ArrayList<>(),
+                    jars = new ArrayList<>(),
+                    classpath = new ArrayList<>(),
                     plugins = new ArrayList<>();
             String release = null;
             for (BuildStepArgument argument : arguments.values()) {

@@ -576,7 +576,8 @@ public class TestModule implements BuildExecutorModule {
         if (skip) {
             return;
         }
-        buildExecutor.addStep(EXECUTED, new Run(terms,
+        buildExecutor.addStep(EXECUTED,
+                new Run(terms,
                         factory,
                         resolved,
                         isTest,

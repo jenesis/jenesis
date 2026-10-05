@@ -127,7 +127,10 @@ public record Project(
                     Palette.ofEnvironment(project.environment())));
             executor.addModule(SKILL, new SkillModule(project.target(), project.environment().out()));
             executor.addModule(METADATA, project.metadataModule());
-            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler, null, null, false,
+            MultiProjectAssembler<? super ProjectModuleDescriptor> pomAware = new PomAwareAssembler(assembler,
+                    null,
+                    null,
+                    false,
                     project.environment().flag("maven.embed", true));
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
@@ -143,7 +146,8 @@ public record Project(
                         .forEach(mavenDeps::add);
                 sub.addModule(ProjectPlugins.PREPROCESS, project.plugins().preprocess(project.profiles()));
                 mavenDeps.add(ProjectPlugins.PREPROCESS);
-                sub.addModule("maven", MavenProject.make(project.environment(),
+                sub.addModule("maven",
+                              MavenProject.make(project.environment(),
                                                          project.root(),
                                                          "main",
                                                          "maven",
@@ -221,7 +225,8 @@ public record Project(
                         .forEach(modulesDeps::add);
                 sub.addModule(ProjectPlugins.PREPROCESS, project.plugins().preprocess(project.profiles()));
                 modulesDeps.add(ProjectPlugins.PREPROCESS);
-                sub.addModule("modules", ModularProject.make(project.environment(),
+                sub.addModule("modules",
+                              ModularProject.make(project.environment(),
                                                              project.root(),
                                                              "main",
                                                              "module",
@@ -266,7 +271,9 @@ public record Project(
                 project.plugins().export(project.profiles()).accept(export, inherited);
             }, STAGE);
             String prefix = BUILD + "/modules/" + MultiProjectModule.COMPOSE + "/" + MultiProjectModule.MODULE;
-            executor.addModule(PIN, PinModule.ofEnvironment(project.environment(), project.root(), "module-info.java",
+            executor.addModule(PIN, PinModule.ofEnvironment(project.environment(),
+                    project.root(),
+                    "module-info.java",
                     (path, file) -> PinModuleInfo.ofEnvironment(project.environment(), "module", path, List.of(file), project.hashFunction()),
                     project.hashFunction()).plugins(project.plugins()), BUILD);
             executor.addModule(DEPENDENCIES, (tree, inherited) -> tree.addStep(
@@ -310,14 +317,16 @@ public record Project(
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
                 resolvers.putIfAbsent("maven", MavenPomResolver.ofEnvironment(project.environment()));
                 resolvers.putIfAbsent("module", new MavenModuleResolver("maven",
-                        MavenResolver.of(resolvers.get("maven")), repositories.get("module")));
+                        MavenResolver.of(resolvers.get("maven")),
+                        repositories.get("module")));
                 SequencedSet<String> modulesDeps = new LinkedHashSet<>();
                 inherited.sequencedKeySet().stream()
                         .filter(key -> key.startsWith(BuildExecutorModule.PREVIOUS + METADATA + "/"))
                         .forEach(modulesDeps::add);
                 sub.addModule(ProjectPlugins.PREPROCESS, project.plugins().preprocess(project.profiles()));
                 modulesDeps.add(ProjectPlugins.PREPROCESS);
-                sub.addModule("modules", ModularProject.make(project.environment(),
+                sub.addModule("modules",
+                              ModularProject.make(project.environment(),
                                                              project.root(),
                                                              "main",
                                                              "module",
@@ -1615,7 +1624,8 @@ public record Project(
                 synthetics.add(BuildExecutorModule.PREVIOUS + "describe/pom");
             }
             return base.apply(nested.synthetics(synthetics), repositories, resolvers).mapBuild(delegate -> (sub, inherited) -> {
-                sub.addModule("describe", (describe, describeInherited) -> {
+                sub.addModule("describe",
+                        (describe, describeInherited) -> {
                             describe.addStep("pom",
                                     new Pom().resolved(resolved).embedded(embed),
                                     describeInherited.sequencedKeySet().stream());

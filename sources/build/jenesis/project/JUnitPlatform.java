@@ -27,15 +27,21 @@ public record JUnitPlatform() implements TestFramework {
     public SequencedMap<String, String> missingCoordinates(List<ModuleDescriptor> modules) {
         SequencedMap<String, String> coordinates = new LinkedHashMap<>();
         if (!contains(modules, PLATFORM_CONSOLE)) {
-            artifact(coordinates, PLATFORM_CONSOLE, "org.junit.platform/junit-platform-console",
+            artifact(coordinates,
+                    PLATFORM_CONSOLE,
+                    "org.junit.platform/junit-platform-console",
                     version(modules, PLATFORM_ENGINE, PLATFORM_COMMONS));
         }
         if (contains(modules, JUPITER_API) && !contains(modules, JUPITER_ENGINE)) {
-            artifact(coordinates, JUPITER_ENGINE, "org.junit.jupiter/junit-jupiter-engine",
+            artifact(coordinates,
+                    JUPITER_ENGINE,
+                    "org.junit.jupiter/junit-jupiter-engine",
                     version(modules, JUPITER_API));
         }
         if (contains(modules, JUPITER_API) && contains(modules, JUNIT4) && !contains(modules, VINTAGE_ENGINE)) {
-            artifact(coordinates, VINTAGE_ENGINE, "org.junit.vintage/junit-vintage-engine",
+            artifact(coordinates,
+                    VINTAGE_ENGINE,
+                    "org.junit.vintage/junit-vintage-engine",
                     version(modules, JUPITER_API));
         }
         return coordinates;

@@ -78,8 +78,14 @@ public class BuildExecutorHttpCacheTest {
         assertThat(blobs).as("nothing was uploaded").isEmpty();
         assertThat(heads).as("and nothing was asked for").isEmpty();
         assertThat(keys).isEmpty();
-        cache.store(Runnable::run, "step", step, in, true,
-                output, "", Map.of());
+        cache.store(Runnable::run,
+                "step",
+                step,
+                in,
+                true,
+                output,
+                "",
+                Map.of());
         assertThat(blobs).as("the same step without the declaration is stored").hasSize(1);
     }
 

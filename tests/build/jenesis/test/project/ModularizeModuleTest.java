@@ -192,10 +192,14 @@ public class ModularizeModuleTest {
         Path modularized = modularize(true);
         SequencedProperties index = SequencedProperties.ofFiles(modularized.resolve(Dependencies.MODULAR));
         Path image = root.resolve("image");
-        int linked = ToolProvider.findFirst("jlink").orElseThrow().run(System.out, System.err,
-                "--module-path", modularized.resolve(Dependencies.MODULAR_PATH).toString(),
-                "--add-modules", describe(modularized.resolve(index.getProperty(PLAIN))).name(),
-                "--output", image.toString());
+        int linked = ToolProvider.findFirst("jlink").orElseThrow().run(System.out,
+                System.err,
+                "--module-path",
+                modularized.resolve(Dependencies.MODULAR_PATH).toString(),
+                "--add-modules",
+                describe(modularized.resolve(index.getProperty(PLAIN))).name(),
+                "--output",
+                image.toString());
         assertThat(linked).isZero();
         assertThat(image.resolve("release")).isRegularFile();
     }
@@ -205,7 +209,11 @@ public class ModularizeModuleTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         buildExecutor.addSource("closure", closure);
         buildExecutor.addModule("modules",
                 ModularizeModule.ofEnvironment(new Environment(settings), ProcessHandler.Factory.TOOL, synthetic),

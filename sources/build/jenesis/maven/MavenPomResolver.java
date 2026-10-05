@@ -252,9 +252,12 @@ public class MavenPomResolver implements MavenResolver {
                 roots.put(rootPom.identifier(), key);
             }
         }
-        Traversal traversal = dependencies(executor, repository,
+        Traversal traversal = dependencies(executor,
+                repository,
                 new ContextualPom(new ResolvedPom(managedDependencies, dependencies, List.of()), true, scope, Set.of(), null, null),
-                unresolved, resolved, prefix);
+                unresolved,
+                resolved,
+                prefix);
         return new MavenResolver.Closure(traversal.dependencies(), roots, traversal.edges(), traversal.licenses());
     }
 
@@ -953,8 +956,12 @@ public class MavenPomResolver implements MavenResolver {
                             throw new IllegalStateException(e);
                         }
                         DigestInputStream digestStream = new DigestInputStream(candidate.toInputStream(), digest);
-                        pom = assemble(executor, repository, drainAndValidate(digestStream, digest, expected,
-                                groupId, artifactId, version), false, false, localPath, localPaths, children, poms);
+                        pom = assemble(executor, repository, drainAndValidate(digestStream,
+                                digest,
+                                expected,
+                                groupId,
+                                artifactId,
+                                version), false, false, localPath, localPaths, children, poms);
                     } else {
                         pom = assemble(executor, repository, candidate.toInputStream(), false, false, localPath, localPaths, children, poms);
                     }

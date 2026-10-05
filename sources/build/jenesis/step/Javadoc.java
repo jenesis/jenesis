@@ -73,23 +73,25 @@ public class Javadoc extends ProcessBuildStep {
         Path documentation = within == null
                 ? Files.createDirectory(context.next().resolve(JAVADOC))
                 : Files.createDirectories(context.next().resolve(JAVADOC).resolve(within));
-        List<String> files = new ArrayList<>(), path = new ArrayList<>(), commands = new ArrayList<>(List.of(
-                "-d", documentation.toString(),
-                "-quiet",
-                "-Xdoclint:none",
-                "-tag", "jenesis.release:a:Release:",
-                "-tag", "jenesis.main:a:Main class:",
-                "-tag", "jenesis.test:a:Tests the module:",
-                "-tag", "jenesis.pin:a:Pinned dependencies:",
-                "-tag", "jenesis.alias:a:Module aliases:",
-                "-tag", "jenesis.exclude:a:Excluded dependencies:",
-                "-tag", "jenesis.override:a:Overridden modules:",
-                "-tag", "jenesis.attach:a:Attached agents:",
-                "-tag", "jenesis.native:a:Native access:",
-                "-tag", "jenesis.bom:a:Imported bills of materials:",
-                "-tag", "jenesis.plugin:a:Compiler plugins:",
-                "-tag", "jenesis.layer:a:Isolated layers:",
-                "-tag", "jenesis.signature:a:Signing keys:"));
+        List<String> files = new ArrayList<>(),
+                path = new ArrayList<>(),
+                commands = new ArrayList<>(List.of(
+                        "-d", documentation.toString(),
+                        "-quiet",
+                        "-Xdoclint:none",
+                        "-tag", "jenesis.release:a:Release:",
+                        "-tag", "jenesis.main:a:Main class:",
+                        "-tag", "jenesis.test:a:Tests the module:",
+                        "-tag", "jenesis.pin:a:Pinned dependencies:",
+                        "-tag", "jenesis.alias:a:Module aliases:",
+                        "-tag", "jenesis.exclude:a:Excluded dependencies:",
+                        "-tag", "jenesis.override:a:Overridden modules:",
+                        "-tag", "jenesis.attach:a:Attached agents:",
+                        "-tag", "jenesis.native:a:Native access:",
+                        "-tag", "jenesis.bom:a:Imported bills of materials:",
+                        "-tag", "jenesis.plugin:a:Compiler plugins:",
+                        "-tag", "jenesis.layer:a:Isolated layers:",
+                        "-tag", "jenesis.signature:a:Signing keys:"));
         if (!timestamped) {
             commands.add("-notimestamp");
         }

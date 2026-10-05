@@ -17,7 +17,9 @@ import build.jenesis.step.Dependencies;
 
 public class ExternalModule implements BuildExecutorModule {
 
-    public static final String COORDINATE = "coordinate", DEPENDENCIES = "dependencies", DELEGATE = "delegate",
+    public static final String COORDINATE = "coordinate",
+            DEPENDENCIES = "dependencies",
+            DELEGATE = "delegate",
             INPUTS = "inputs";
 
     private final String coordinate;

@@ -109,7 +109,8 @@ public final class Sigstore {
                 + "\",\"integratedTime\":" + recorded.getEpochSecond()
                 + ",\"logID\":\"" + hex(logId)
                 + "\",\"logIndex\":" + index + "}";
-        if (!signed(key, promise.getBytes(StandardCharsets.UTF_8),
+        if (!signed(key,
+                promise.getBytes(StandardCharsets.UTF_8),
                 binary(entry, "inclusionPromise", "signedEntryTimestamp"))) {
             throw new IllegalStateException("The log did not countersign entry " + index + " of " + bundle);
         }
@@ -121,7 +122,9 @@ public final class Sigstore {
                 .toList();
         long size = number(entry, "inclusionProof", "treeSize");
         if (!Arrays.equals(published, root(digest(concat(new byte[] {0}, body)),
-                number(entry, "inclusionProof", "logIndex"), size, hashes))) {
+                number(entry, "inclusionProof", "logIndex"),
+                size,
+                hashes))) {
             throw new IllegalStateException("The inclusion proof of entry " + index
                     + " does not reach the root hash the log published");
         }

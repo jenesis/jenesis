@@ -58,8 +58,10 @@ public class JavaTest {
         Files.writeString(Files.createDirectories(root.resolve("named-sources")).resolve("module-info.java"),
                 "module sample.run {\n}\n");
         Path compiled = Files.createDirectories(root.resolve("named-classes"));
-        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", compiled.toString(),
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                compiled.toString(),
                 root.resolve("named-sources/module-info.java").toString())).isZero();
         try (JarOutputStream jar = new JarOutputStream(Files.newOutputStream(artifacts.resolve("named.jar")))) {
             jar.putNextEntry(new JarEntry("module-info.class"));

@@ -22,7 +22,13 @@ public class JarSigner extends ProcessBuildStep {
     }
 
     public static JarSigner ofEnvironment(Environment environment) {
-        JarSigner signer = new JarSigner(null, null, null, null, null, null, List.of(),
+        JarSigner signer = new JarSigner(null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of(),
                 Terms.ofEnvironment(environment, "jarsigner"));
         String keystore = environment.getProperty("jarsigner.keystore");
         if (keystore != null) {

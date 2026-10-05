@@ -63,11 +63,20 @@ public class MavenRepositoryStaging implements BuildStep {
                 continue;
             }
             Path artifact = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".artifacts"),
-                    prefix, "artifacts", true, inventoryFile);
+                    prefix,
+                    "artifacts",
+                    true,
+                    inventoryFile);
             Path sources = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".sources"),
-                    prefix, "sources", false, inventoryFile);
+                    prefix,
+                    "sources",
+                    false,
+                    inventoryFile);
             Path javadoc = singleJar(Inventory.paths(inventory, argument.folder(), prefix + ".documentation"),
-                    prefix, "documentation", false, inventoryFile);
+                    prefix,
+                    "documentation",
+                    false,
+                    inventoryFile);
             Path sbom = sbomReport(inventory, argument.folder(), prefix);
             String testsOf = inventory.getProperty(prefix + ".test");
             Module module = new Module(prefix, coordinates, artifact, sources, javadoc, pom, testsOf, sbom);

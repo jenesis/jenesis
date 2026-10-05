@@ -29,7 +29,12 @@ public class JReleaserModule implements BuildExecutorModule {
     private final ProcessBuildStep.Terms terms;
 
     public JReleaserModule(Path root, Path configuration, String version) {
-        this(root, configuration, version, "jreleaser", "full-release", true,
+        this(root,
+                configuration,
+                version,
+                "jreleaser",
+                "full-release",
+                true,
                 ProcessBuildStep.Terms.of("jreleaser", true));
     }
 

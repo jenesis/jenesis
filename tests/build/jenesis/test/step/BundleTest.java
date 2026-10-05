@@ -71,8 +71,10 @@ public class BundleTest {
         Files.writeString(Files.createDirectory(sources.resolve("sample")).resolve("Sample.java"),
                 "package sample; public class Sample { public static void main(String[] args) { } }\n");
         Path classes = Files.createDirectory(root.resolve("classes"));
-        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(),
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
                 sources.resolve("module-info.java").toString(),
                 sources.resolve("sample/Sample.java").toString())).isZero();
         assertThat(ToolProvider.findFirst("jar").orElseThrow().run(System.out, System.err,
@@ -108,8 +110,10 @@ public class BundleTest {
         Files.writeString(Files.createDirectory(sources.resolve("sample")).resolve("Sample.java"),
                 "package sample; public class Sample { public static void main(String[] args) { } }\n");
         Path classes = Files.createDirectory(root.resolve("classes"));
-        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(),
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
                 sources.resolve("module-info.java").toString(),
                 sources.resolve("sample/Sample.java").toString())).isZero();
         Path artifacts = Files.createDirectory(input.resolve(BuildStep.ARTIFACTS));
@@ -160,9 +164,12 @@ public class BundleTest {
         Files.writeString(Files.createDirectory(sources.resolve("sample")).resolve("Sample.java"),
                 "package sample; public class Sample { public static void main(String[] args) { } }\n");
         Path classes = Files.createDirectory(root.resolve("classes"));
-        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out, System.err,
-                "-d", classes.toString(),
-                "-p", resolved.toString(),
+        assertThat(ToolProvider.findFirst("javac").orElseThrow().run(System.out,
+                System.err,
+                "-d",
+                classes.toString(),
+                "-p",
+                resolved.toString(),
                 sources.resolve("module-info.java").toString(),
                 sources.resolve("sample/Sample.java").toString())).isZero();
         assertThat(ToolProvider.findFirst("jar").orElseThrow().run(System.out, System.err,

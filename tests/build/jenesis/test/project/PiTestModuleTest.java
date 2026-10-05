@@ -184,7 +184,8 @@ public class PiTestModuleTest {
         if (ToolProvider.getSystemJavaCompiler().run(null,
                 null,
                 null,
-                "-d", classes.toString(),
+                "-d",
+                classes.toString(),
                 source.toString()) != 0) {
             throw new IllegalStateException("Failed to compile the PIT double");
         }
@@ -224,6 +225,10 @@ public class PiTestModuleTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
     }
 }

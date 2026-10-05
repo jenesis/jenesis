@@ -46,7 +46,11 @@ public class DependenciesResolutionTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         executor.addSource("dependencies", dependencies);
         SequencedSet<String> inputs = new LinkedHashSet<>();
         inputs.add("dependencies");
@@ -199,8 +203,11 @@ public class DependenciesResolutionTest {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
                     SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
-                    vertices.put(prefix + "/qux", new Resolver.Vertex(null, null, false,
-                            false, List.of(new License(null, null, "Apache License 2.0", "https://www.apache.org/licenses/LICENSE-2.0.txt"))));
+                    vertices.put(prefix + "/qux", new Resolver.Vertex(null,
+                            null,
+                            false,
+                            false,
+                            List.of(new License(null, null, "Apache License 2.0", "https://www.apache.org/licenses/LICENSE-2.0.txt"))));
                     return new Resolver.Resolution(
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
@@ -229,8 +236,11 @@ public class DependenciesResolutionTest {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
                     SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
-                    vertices.put(prefix + "/qux", new Resolver.Vertex(null, null, false,
-                            false, List.of(new License(null, null, null, "http://www.opensource.org/licenses/mit-license.php"))));
+                    vertices.put(prefix + "/qux", new Resolver.Vertex(null,
+                            null,
+                            false,
+                            false,
+                            List.of(new License(null, null, null, "http://www.opensource.org/licenses/mit-license.php"))));
                     return new Resolver.Resolution(
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
@@ -254,8 +264,11 @@ public class DependenciesResolutionTest {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
                     SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
-                    vertices.put(prefix + "/qux", new Resolver.Vertex(null, null, false,
-                            false, List.of(new License(null, null, "Acme-License", null))));
+                    vertices.put(prefix + "/qux", new Resolver.Vertex(null,
+                            null,
+                            false,
+                            false,
+                            List.of(new License(null, null, "Acme-License", null))));
                     return new Resolver.Resolution(
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
@@ -282,8 +295,11 @@ public class DependenciesResolutionTest {
                     SequencedMap<String, String> resolved = new LinkedHashMap<>();
                     descriptors.sequencedKeySet().forEach(descriptor -> resolved.put(prefix + "/" + descriptor, ""));
                     SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
-                    vertices.put(prefix + "/qux", new Resolver.Vertex(null, null, false,
-                            false, List.of(new License("Apache-2.0", null, null, null))));
+                    vertices.put(prefix + "/qux", new Resolver.Vertex(null,
+                            null,
+                            false,
+                            false,
+                            List.of(new License("Apache-2.0", null, null, null))));
                     return new Resolver.Resolution(
                             Resolver.materializeAll(executor, repositories, prefix, resolved),
                             List.of(),
@@ -880,7 +896,10 @@ public class DependenciesResolutionTest {
                         ran.add(identity);
                     }
                 },
-                BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         executor.addSource("dependencies", dependencies);
         executor.addSource("upstream", upstream);
         executor.addModule("resolved", module, "dependencies", "upstream");

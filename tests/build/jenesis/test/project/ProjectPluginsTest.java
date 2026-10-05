@@ -35,7 +35,11 @@ public class ProjectPluginsTest {
                 Duration.ZERO,
                 new HashDigestFunction("MD5"),
                 BuildStepHashFunction.ofSerializationDigest("MD5"),
-                BuildExecutorCallback.nop(), BuildExecutorCache.nop(), false, false, 0);
+                BuildExecutorCallback.nop(),
+                BuildExecutorCache.nop(),
+                false,
+                false,
+                0);
         buildExecutor.addModule("build", (build, _) -> build.addStep("inventory", (_, context, _) -> {
             Files.writeString(context.next().resolve("app.jar"), "jar");
             SequencedProperties inventory = new SequencedProperties();

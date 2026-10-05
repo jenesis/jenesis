@@ -77,8 +77,14 @@ public class Dependencies implements BuildExecutorModule {
     }
 
     public Dependencies repositories(Map<String, Repository> repositories) {
-        return new Dependencies(repositories, resolvers, signatures.repositories(repositories),
-                pinning, group, timestamp, printing, palette);
+        return new Dependencies(repositories,
+                resolvers,
+                signatures.repositories(repositories),
+                pinning,
+                group,
+                timestamp,
+                printing,
+                palette);
     }
 
     public Dependencies resolvers(Map<String, Resolver> resolvers) {

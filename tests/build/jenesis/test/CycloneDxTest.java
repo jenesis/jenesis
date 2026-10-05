@@ -103,7 +103,8 @@ public class CycloneDxTest {
     @Test
     public void is_deterministic_and_order_independent() {
         String first = emitter.emit(CycloneDx.Format.JSON, PROJECT, COMPONENTS, DEPENDENCIES);
-        String reversed = emitter.emit(CycloneDx.Format.JSON, PROJECT,
+        String reversed = emitter.emit(CycloneDx.Format.JSON,
+                PROJECT,
                 List.of(COMPONENTS.get(1), COMPONENTS.get(0)),
                 List.of(DEPENDENCIES.get(2), DEPENDENCIES.get(1), DEPENDENCIES.get(0)));
         assertThat(reversed)
@@ -114,12 +115,23 @@ public class CycloneDxTest {
     @Test
     public void emits_subject_description_authors_and_external_references() {
         CycloneDx.Component subject = new CycloneDx.Component("library",
-                "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", List.of(), null,
+                "build.jenesis/demo/1.0.0",
+                "build.jenesis",
+                "demo",
+                "1.0.0",
+                "pkg:maven/build.jenesis/demo@1.0.0",
+                List.of(),
+                null,
                 List.of(),
                 "A demo project",
                 List.of(new CycloneDx.Author("Rafael Winterhalter", "rafael.wth@gmail.com")),
                 List.of(new CycloneDx.ExternalReference("website", "https://example.com/demo")),
-                List.of(), null, null, null, null, null);
+                List.of(),
+                null,
+                null,
+                null,
+                null,
+                null);
 
         String json = emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of());
         assertThat(json)
@@ -141,12 +153,23 @@ public class CycloneDxTest {
     @Test
     public void emits_the_properties_of_a_component() {
         CycloneDx.Component subject = new CycloneDx.Component("library",
-                "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", List.of(), null,
+                "build.jenesis/demo/1.0.0",
+                "build.jenesis",
+                "demo",
+                "1.0.0",
+                "pkg:maven/build.jenesis/demo@1.0.0",
+                List.of(),
+                null,
                 List.of(),
                 null,
                 List.of(),
                 List.of(),
-                List.of(new CycloneDx.Property("jenesis:scm:tag", "v1.0.0")), null, null, null, null, null);
+                List.of(new CycloneDx.Property("jenesis:scm:tag", "v1.0.0")),
+                null,
+                null,
+                null,
+                null,
+                null);
 
         assertThat(emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of()))
                 .contains("\"properties\": [")
@@ -180,12 +203,23 @@ public class CycloneDxTest {
     @Test
     public void emits_the_type_of_a_component() {
         CycloneDx.Component subject = new CycloneDx.Component("application",
-                "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", List.of(), null,
+                "build.jenesis/demo/1.0.0",
+                "build.jenesis",
+                "demo",
+                "1.0.0",
+                "pkg:maven/build.jenesis/demo@1.0.0",
+                List.of(),
+                null,
                 List.of(),
                 null,
                 List.of(),
                 List.of(),
-                List.of(), null, null, null, null, null);
+                List.of(),
+                null,
+                null,
+                null,
+                null,
+                null);
 
         assertThat(emitter.emit(CycloneDx.Format.JSON, subject, COMPONENTS, List.of()))
                 .contains("\"type\": \"application\",\n      \"bom-ref\": \"build.jenesis/demo/1.0.0\"")
@@ -198,7 +232,13 @@ public class CycloneDxTest {
     @Test
     public void emits_the_supplier_the_manufacturer_the_publisher_and_the_copyright_of_a_component() {
         CycloneDx.Component subject = new CycloneDx.Component("library",
-                "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0", List.of(), null,
+                "build.jenesis/demo/1.0.0",
+                "build.jenesis",
+                "demo",
+                "1.0.0",
+                "pkg:maven/build.jenesis/demo@1.0.0",
+                List.of(),
+                null,
                 List.of(),
                 null,
                 List.of(),
@@ -227,14 +267,23 @@ public class CycloneDxTest {
     @Test
     public void emits_the_swhids_of_a_component() {
         CycloneDx.Component subject = new CycloneDx.Component("library",
-                "build.jenesis/demo/1.0.0", "build.jenesis", "demo", "1.0.0", "pkg:maven/build.jenesis/demo@1.0.0",
+                "build.jenesis/demo/1.0.0",
+                "build.jenesis",
+                "demo",
+                "1.0.0",
+                "pkg:maven/build.jenesis/demo@1.0.0",
                 List.of("swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327", "swh:1:dir:0123456789abcdef0123456789abcdef01234567"),
                 null,
                 List.of(),
                 null,
                 List.of(),
                 List.of(),
-                List.of(), null, null, null, null, null);
+                List.of(),
+                null,
+                null,
+                null,
+                null,
+                null);
 
         assertThat(emitter.emit(CycloneDx.Format.JSON, subject, List.of(), List.of()))
                 .contains("\"swhid\": [\"swh:1:dir:b293ceb1896f112828a70184317caf4f87f7d327\", \"swh:1:dir:0123456789abcdef0123456789abcdef01234567\"]");

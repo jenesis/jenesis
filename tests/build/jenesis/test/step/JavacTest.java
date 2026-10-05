@@ -825,7 +825,8 @@ public class JavacTest {
     }
 
     private Path modularJar(Path file, String name) throws IOException {
-        Path classes = compile(file.getParent().resolve(name + "-classes"), "module-info.java",
+        Path classes = compile(file.getParent().resolve(name + "-classes"),
+                "module-info.java",
                 "module " + name + " {\n}\n");
         jarOf(file, classes);
         return file;
@@ -840,7 +841,8 @@ public class JavacTest {
         int result = ToolProvider.findFirst("javac").orElseThrow().run(
                 new PrintWriter(Writer.nullWriter()),
                 new PrintWriter(errors),
-                "-d", classes.toString(),
+                "-d",
+                classes.toString(),
                 source.toString());
         if (result != 0) {
             throw new IllegalStateException("Compilation failed: " + errors);

@@ -71,7 +71,9 @@ public class InternalModule implements BuildExecutorModule {
     }
 
     public static InternalModule ofEnvironment(Environment environment,
-                                               String prefix, String group, Path source) {
+                                               String prefix,
+                                               String group,
+                                               Path source) {
         Map<String, Repository> repositories = Map.of(prefix,
                 JenesisRepository.ofEnvironment(environment, JenesisRepository.Scope.MODULE));
         Map<String, Resolver> resolvers = Map.of(prefix, ModularJarResolver.ofEnvironment(environment, true));
