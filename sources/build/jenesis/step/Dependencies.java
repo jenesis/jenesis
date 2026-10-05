@@ -3,12 +3,12 @@ package build.jenesis.step;
 import module java.base;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
-import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.DependencyScope;
 import build.jenesis.License;
+import build.jenesis.Palette;
 import build.jenesis.PathPlacement;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
@@ -39,9 +39,10 @@ public class Dependencies implements BuildExecutorModule {
     private final String group;
     private final OffsetDateTime timestamp;
     private final Consumer<String> printing;
+    private final Palette palette;
 
     public Dependencies(Map<String, Repository> repositories, Map<String, Resolver> resolvers) {
-        this(repositories, resolvers, new Signatures(repositories), null, null, BuildStep.timestamp(), null);
+        this(repositories, resolvers, new Signatures(repositories), null, null, BuildStep.timestamp(), null, Palette.ANSI);
     }
 
     public static Dependencies ofEnvironment(Environment environment,
@@ -53,7 +54,8 @@ public class Dependencies implements BuildExecutorModule {
                 null,
                 null,
                 BuildStep.timestamp(environment),
-                environment.flag("print.aliases") ? environment.out() : null);
+                environment.flag("print.aliases") ? environment.out() : null,
+                Palette.ofEnvironment(environment));
     }
 
     private Dependencies(Map<String, Repository> repositories,
@@ -62,7 +64,8 @@ public class Dependencies implements BuildExecutorModule {
                          Pinning pinning,
                          String group,
                          OffsetDateTime timestamp,
-                         Consumer<String> printing) {
+                         Consumer<String> printing,
+                         Palette palette) {
         this.repositories = repositories;
         this.resolvers = new LinkedHashMap<>(resolvers);
         this.signatures = signatures;
@@ -70,35 +73,40 @@ public class Dependencies implements BuildExecutorModule {
         this.group = group;
         this.timestamp = timestamp;
         this.printing = printing;
+        this.palette = palette;
     }
 
     public Dependencies repositories(Map<String, Repository> repositories) {
         return new Dependencies(repositories, resolvers, signatures.repositories(repositories),
-                pinning, group, timestamp, printing);
+                pinning, group, timestamp, printing, palette);
     }
 
     public Dependencies resolvers(Map<String, Resolver> resolvers) {
-        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing);
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
     }
 
     public Dependencies signatures(Signatures signatures) {
-        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing);
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
     }
 
     public Dependencies pinning(Pinning pinning) {
-        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing);
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
     }
 
     public Dependencies group(String group) {
-        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing);
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
     }
 
     public Dependencies timestamp(OffsetDateTime timestamp) {
-        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing);
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
     }
 
     public Dependencies printing(Consumer<String> printing) {
-        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing);
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
+    }
+
+    public Dependencies palette(Palette palette) {
+        return new Dependencies(repositories, resolvers, signatures, pinning, group, timestamp, printing, palette);
     }
 
     public static SequencedMap<String, String> bomEntries(SequencedProperties properties, String group) {
@@ -110,7 +118,7 @@ public class Dependencies implements BuildExecutorModule {
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
         buildExecutor.addStep(RESOLVE,
-                new Resolve(repositories, resolvers, pinning, group, printing, timestamp),
+                new Resolve(repositories, resolvers, pinning, group, printing, palette, timestamp),
                 inherited.sequencedKeySet());
         SequencedSet<String> verified = new LinkedHashSet<>();
         verified.add(RESOLVE);
@@ -131,12 +139,14 @@ public class Dependencies implements BuildExecutorModule {
         private final String group;
         private final OffsetDateTime timestamp;
         private final transient Consumer<String> printing;
+        private final transient Palette palette;
 
         private Resolve(Map<String, Repository> repositories,
                         Map<String, Resolver> resolvers,
                         Pinning pinning,
                         String group,
                         Consumer<String> printing,
+                        Palette palette,
                         OffsetDateTime timestamp) {
             this.repositories = repositories;
             this.resolvers = new LinkedHashMap<>(resolvers);
@@ -144,6 +154,7 @@ public class Dependencies implements BuildExecutorModule {
             this.group = group;
             this.timestamp = timestamp;
             this.printing = printing;
+            this.palette = palette;
         }
 
         @Override
@@ -765,7 +776,7 @@ public class Dependencies implements BuildExecutorModule {
                     return left.isEmpty() ? right : left;
                 });
             }
-            SequencedMap<String, String> aliased = rename(placed, grouped, aliasTargets, modules, explicit, libs, printing);
+            SequencedMap<String, String> aliased = rename(placed, grouped, aliasTargets, modules, explicit, libs, printing, palette);
             for (Map.Entry<String, Overridden> entry : overrideTargets.entrySet()) {
                 for (String carrier : entry.getValue().carriers()) {
                     if (!modules.containsKey(carrier)) {
@@ -924,7 +935,8 @@ public class Dependencies implements BuildExecutorModule {
                                                        SequencedMap<String, String> modules,
                                                        SequencedMap<String, Boolean> explicit,
                                                        Path libs,
-                                                       Consumer<String> printing) throws IOException {
+                                                       Consumer<String> printing,
+                                                       Palette palette) throws IOException {
         SequencedMap<String, String> coordinates = new LinkedHashMap<>();
         for (String dependency : placed.sequencedKeySet()) {
             int first = dependency.indexOf('/'), last = dependency.lastIndexOf('/');
@@ -961,9 +973,9 @@ public class Dependencies implements BuildExecutorModule {
             if (descriptor != null && descriptor.name().equals(alias)) {
                 if (printing != null) {
                     printing.accept("%s%-11s%s %s already declares %s, so the alias declared by %s"
-                                    .formatted(BuildExecutorCallback.YELLOW,
+                                    .formatted(palette.yellow(),
                                             "[ALIAS]",
-                                            BuildExecutorCallback.RESET,
+                                            palette.reset(),
                                             coordinate,
                                             alias,
                                             entry.getValue().origin())

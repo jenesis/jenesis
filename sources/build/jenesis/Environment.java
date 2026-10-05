@@ -4,7 +4,6 @@ import module java.base;
 
 public record Environment(Map<String, String> keys, Consumer<String> out, Consumer<String> err) {
 
-    private static final Pattern ESCAPE = Pattern.compile("\u001B\\[[0-?]*[ -/]*[@-~]");
     public static final Environment NONE = new Environment(Map.of());
 
     public Environment {
@@ -12,13 +11,11 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
     }
 
     public Environment(Map<String, String> keys) {
-        this(keys,
-                colored(keys, Make.terminal(), System.out::println),
-                colored(keys, Make.terminal(), System.err::println));
+        this(keys, System.out::println, System.err::println);
     }
 
     public Environment(Map<String, String> keys, PrintWriter out, PrintWriter err) {
-        this(keys, colored(keys, false, out::println), colored(keys, false, err::println));
+        this(keys, out::println, err::println);
     }
 
     public Environment keys(Map<String, String> keys) {
@@ -118,13 +115,6 @@ public record Environment(Map<String, String> keys, Consumer<String> out, Consum
     public List<String> words(String key) {
         String value = value(key);
         return value == null ? List.of() : List.of(value.split("\\s+"));
-    }
-
-    private static Consumer<String> colored(Map<String, String> keys, boolean terminal, Consumer<String> consumer) {
-        Boolean color = Make.parsed("jenesis.print.color", keys.get("print.color"));
-        return (color == null ? terminal : color)
-                ? consumer
-                : line -> consumer.accept(ESCAPE.matcher(line).replaceAll(""));
     }
 
     private static String trimmed(String value) {

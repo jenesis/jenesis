@@ -1,11 +1,11 @@
 package build.jenesis.step;
 
 import module java.base;
-import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.KeyExpiry;
+import build.jenesis.Palette;
 import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -29,6 +29,7 @@ public class Signatures extends ProcessBuildStep {
     private final transient URI trustedRoot;
     private final transient Function<List<String>, ? extends ProcessHandler> supplied;
     private final transient Consumer<String> printing;
+    private final transient Palette palette;
 
     public Signatures(Map<String, Repository> repositories) {
         this(repositories,
@@ -38,14 +39,16 @@ public class Signatures extends ProcessBuildStep {
                 "github.com=token.actions.githubusercontent.com",
                 null,
                 null,
-                null);
+                null,
+                Palette.ANSI);
     }
 
     public static Signatures ofEnvironment(Environment environment,
                                     Map<String, Repository> repositories) {
         Signatures signatures = new Signatures(repositories)
                 .verification(Verification.ofEnvironment(environment))
-                .expiry(KeyExpiry.ofEnvironment(environment));
+                .expiry(KeyExpiry.ofEnvironment(environment))
+                .palette(Palette.ofEnvironment(environment));
         String command = environment.getProperty("openpgp.command");
         if (command != null) {
             signatures = signatures.command(command);
@@ -69,7 +72,8 @@ public class Signatures extends ProcessBuildStep {
                        String issuers,
                        URI trustedRoot,
                        Function<List<String>, ? extends ProcessHandler> supplied,
-                       Consumer<String> printing) {
+                       Consumer<String> printing,
+                       Palette palette) {
         super("gpgv", supplied == null ? ProcessHandler.OfProcess.ofCommand(command) : supplied);
         this.repositories = repositories;
         this.verification = verification;
@@ -79,38 +83,43 @@ public class Signatures extends ProcessBuildStep {
         this.trustedRoot = trustedRoot;
         this.supplied = supplied;
         this.printing = printing;
+        this.palette = palette;
     }
 
     public Signatures repositories(Map<String, Repository> repositories) {
-        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing);
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing, palette);
     }
 
     public Signatures verification(Verification verification) {
-        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing);
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing, palette);
     }
 
     public Signatures expiry(KeyExpiry expiry) {
-        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing);
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing, palette);
     }
 
     public Signatures command(String command) {
-        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing);
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing, palette);
     }
 
     public Signatures issuers(String issuers) {
-        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing);
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing, palette);
     }
 
     public Signatures trustedRoot(URI trustedRoot) {
-        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing);
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing, palette);
     }
 
     public Signatures factory(Function<List<String>, ? extends ProcessHandler> factory) {
-        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, factory, printing);
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, factory, printing, palette);
     }
 
     public Signatures printing(Consumer<String> printing) {
-        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing);
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing, palette);
+    }
+
+    public Signatures palette(Palette palette) {
+        return new Signatures(repositories, verification, expiry, command, issuers, trustedRoot, supplied, printing, palette);
     }
 
     private void print(String marker, String colour, String coordinate, String detail) {
@@ -120,7 +129,7 @@ public class Signatures extends ProcessBuildStep {
         printing.accept("%s%-11s%s %s %s".formatted(
                 colour,
                 marker,
-                BuildExecutorCallback.RESET,
+                palette.reset(),
                 coordinate,
                 detail));
     }
@@ -230,7 +239,7 @@ public class Signatures extends ProcessBuildStep {
             if (accepted.isEmpty()) {
                 if (printing != null) {
                     print("[UNDECLARED]",
-                            BuildExecutorCallback.YELLOW,
+                            palette.yellow(),
                             token + " " + version,
                             "no @jenesis.signature line covers it");
                 }
@@ -242,7 +251,7 @@ public class Signatures extends ProcessBuildStep {
             if (accepted.stream().anyMatch("unsigned/ignored"::equalsIgnoreCase)) {
                 if (printing != null) {
                     print("[UNVERIFIED]",
-                            BuildExecutorCallback.YELLOW,
+                            palette.yellow(),
                             token + " " + version,
                             "unsigned/ignored accepts it signed or not");
                 }
@@ -301,7 +310,7 @@ public class Signatures extends ProcessBuildStep {
                     }
                     if (printing != null) {
                         print("[VERIFIED]",
-                                BuildExecutorCallback.GREEN,
+                                palette.green(),
                                 token + " " + version,
                                 matched + " as " + attestation.identity() + ", recorded " + attestation.recorded());
                     }
@@ -324,7 +333,7 @@ public class Signatures extends ProcessBuildStep {
                 acknowledged.removeIf(declaration -> !unsigned(declaration));
                 if (printing != null) {
                     print(acknowledged.isEmpty() ? "[UNSIGNED]" : "[UNVERIFIED]",
-                            BuildExecutorCallback.YELLOW,
+                            palette.yellow(),
                             token + " " + version,
                             acknowledged.isEmpty()
                                     ? (identity
@@ -357,7 +366,7 @@ public class Signatures extends ProcessBuildStep {
             String fingerprint = "OpenPGP/" + status.fingerprint().toUpperCase(Locale.ROOT);
             if (printing != null && accepted.stream().anyMatch(fingerprint::equalsIgnoreCase)) {
                 print(status.expired() < 0 ? "[VERIFIED]" : "[EXPIRED]",
-                        status.expired() < 0 ? BuildExecutorCallback.GREEN : BuildExecutorCallback.YELLOW,
+                        status.expired() < 0 ? palette.green() : palette.yellow(),
                         token + " " + version,
                         fingerprint + status.dates());
             }
@@ -539,7 +548,7 @@ public class Signatures extends ProcessBuildStep {
                 } catch (IOException e) {
                     if (printing != null) {
                         print("[UNFETCHED]",
-                                BuildExecutorCallback.YELLOW,
+                                palette.yellow(),
                                 declaration,
                                 e.getMessage() == null ? e.toString() : e.getMessage());
                     }

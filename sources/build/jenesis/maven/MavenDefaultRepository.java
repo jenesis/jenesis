@@ -1,9 +1,9 @@
 package build.jenesis.maven;
 
 import module java.base;
-import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.Environment;
+import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SequencedProperties;
@@ -17,6 +17,7 @@ public class MavenDefaultRepository implements MavenRepository {
     private final Consumer<String> callback;
     private final String token;
     private final Repository.Connection connection;
+    private final Palette palette;
 
     public static MavenRepository of() {
         return ofEnvironment(Environment.NONE);
@@ -85,14 +86,15 @@ public class MavenDefaultRepository implements MavenRepository {
         validations.put("SHA512", uri);
         validations.put("SHA256", uri);
         validations.put("SHA1", uri);
+        Palette palette = Palette.ofEnvironment(environment);
         return ofEnvironment(environment,
                 uri,
                 local,
                 Collections.unmodifiableMap(validations),
                 printing == null ? null : path -> printing.accept("%s%-11s%s %s".formatted(
-                        BuildExecutorCallback.YELLOW,
+                        palette.yellow(),
                         "[FETCHED]",
-                        BuildExecutorCallback.RESET,
+                        palette.reset(),
                         uri.resolve(path))),
                 token);
     }
@@ -207,7 +209,13 @@ public class MavenDefaultRepository implements MavenRepository {
                                    Map<String, URI> validations,
                                    Consumer<String> callback,
                                    String token) {
-        this(repository, local, validations, callback, token, Repository.Connection.ofEnvironment(environment));
+        this(repository,
+             local,
+             validations,
+             callback,
+             token,
+             Repository.Connection.ofEnvironment(environment),
+             Palette.ofEnvironment(environment));
     }
 
     private MavenDefaultRepository(URI repository,
@@ -215,7 +223,8 @@ public class MavenDefaultRepository implements MavenRepository {
                                    Map<String, URI> validations,
                                    Consumer<String> callback,
                                    String token,
-                                   Repository.Connection connection) {
+                                   Repository.Connection connection,
+                                   Palette palette) {
         this.repository = repository;
         this.local = local;
         this.writable = local != null && Files.isWritable(local);
@@ -223,20 +232,25 @@ public class MavenDefaultRepository implements MavenRepository {
         this.callback = callback;
         this.token = token;
         this.connection = connection;
+        this.palette = palette;
     }
 
     public MavenDefaultRepository connection(Repository.Connection connection) {
-        return new MavenDefaultRepository(repository, local, validations, callback, token, connection);
+        return new MavenDefaultRepository(repository, local, validations, callback, token, connection, palette);
+    }
+
+    public MavenDefaultRepository palette(Palette palette) {
+        return new MavenDefaultRepository(repository, local, validations, callback, token, connection, palette);
     }
 
     public MavenDefaultRepository printing(Consumer<String> printing) {
         return new MavenDefaultRepository(repository, local, validations, printing == null
                 ? null
                 : path -> printing.accept("%s%-11s%s %s".formatted(
-                        BuildExecutorCallback.YELLOW,
+                        palette.yellow(),
                         "[FETCHED]",
-                        BuildExecutorCallback.RESET,
-                        repository.resolve(path))), token, connection);
+                        palette.reset(),
+                        repository.resolve(path))), token, connection, palette);
     }
 
     @SuppressWarnings("unchecked")

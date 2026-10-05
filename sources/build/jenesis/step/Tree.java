@@ -8,20 +8,22 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.DependencyTreeReport;
 import build.jenesis.Environment;
 import build.jenesis.License;
+import build.jenesis.Palette;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 
 public class Tree implements BuildStep {
 
     private final transient Consumer<String> out;
+    private final transient Palette palette;
     private final transient boolean compact, tests;
 
     public Tree() {
-        this(System.out::println, false, true);
+        this(System.out::println, Palette.ANSI, false, true);
     }
 
     public static Tree ofEnvironment(Environment environment) {
-        Tree tree = new Tree(environment.out(), false, true);
+        Tree tree = new Tree(environment.out(), Palette.ofEnvironment(environment), false, true);
         String format = environment.getProperty("tree.format");
         if (format != null) {
             tree = tree.compact(switch (format) {
@@ -35,18 +37,23 @@ public class Tree implements BuildStep {
         return tests == null ? tree : tree.tests(tests);
     }
 
-    private Tree(Consumer<String> out, boolean compact, boolean tests) {
+    private Tree(Consumer<String> out, Palette palette, boolean compact, boolean tests) {
         this.out = out;
+        this.palette = palette;
         this.compact = compact;
         this.tests = tests;
     }
 
+    public Tree palette(Palette palette) {
+        return new Tree(out, palette, compact, tests);
+    }
+
     public Tree compact(boolean compact) {
-        return new Tree(out, compact, tests);
+        return new Tree(out, palette, compact, tests);
     }
 
     public Tree tests(boolean tests) {
-        return new Tree(out, compact, tests);
+        return new Tree(out, palette, compact, tests);
     }
 
     @Override
@@ -83,7 +90,7 @@ public class Tree implements BuildStep {
                 }
             }
         }
-        DependencyTreeReport report = new DependencyTreeReport(out).compact(compact).locations(locations);
+        DependencyTreeReport report = new DependencyTreeReport(out).palette(palette).compact(compact).locations(locations);
         SequencedMap<String, Resolver.Vertex> aggregated = new LinkedHashMap<>();
         for (Map.Entry<Path, String> entry : prefixes.entrySet()) {
             SequencedProperties inventory = inventories.get(entry.getKey());

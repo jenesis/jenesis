@@ -1,12 +1,12 @@
 package build.jenesis.module;
 
 import module java.base;
-import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Palette;
 import build.jenesis.Repository;
 import build.jenesis.SafeSegment;
 
@@ -18,9 +18,10 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
     private final transient String token;
     private final transient Repository.Connection connection;
     private final transient Consumer<String> printing;
+    private final transient Palette palette;
 
     public JenesisModuleRepositoryRelease(URI repository) {
-        this(repository, null, new Repository.Connection(), Environment.NONE.out());
+        this(repository, null, new Repository.Connection(), Environment.NONE.out(), Palette.ANSI);
     }
 
     public static URI configured(Environment environment) {
@@ -38,13 +39,15 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
         return new JenesisModuleRepositoryRelease(repository,
                 Repository.Credential.of(environment, "release.token", "JENESIS_RELEASE_TOKEN").grant(origin),
                 Repository.Connection.ofEnvironment(environment),
-                environment.out());
+                environment.out(),
+                Palette.ofEnvironment(environment));
     }
 
     private JenesisModuleRepositoryRelease(URI repository,
                                            String token,
                                            Repository.Connection connection,
-                                           Consumer<String> printing) {
+                                           Consumer<String> printing,
+                                           Palette palette) {
         if (!"https".equals(repository.getScheme()) && !"http".equals(repository.getScheme())) {
             throw new IllegalArgumentException("Cannot release to " + repository
                     + ": a Jenesis module repository is addressed by an https: or http: URI");
@@ -54,22 +57,27 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
         this.token = token;
         this.connection = connection;
         this.printing = printing;
+        this.palette = palette;
     }
 
     public JenesisModuleRepositoryRelease repository(URI repository) {
-        return new JenesisModuleRepositoryRelease(repository, token, connection, printing);
+        return new JenesisModuleRepositoryRelease(repository, token, connection, printing, palette);
     }
 
     public JenesisModuleRepositoryRelease token(String token) {
-        return new JenesisModuleRepositoryRelease(repository, token, connection, printing);
+        return new JenesisModuleRepositoryRelease(repository, token, connection, printing, palette);
     }
 
     public JenesisModuleRepositoryRelease connection(Repository.Connection connection) {
-        return new JenesisModuleRepositoryRelease(repository, token, connection, printing);
+        return new JenesisModuleRepositoryRelease(repository, token, connection, printing, palette);
     }
 
     public JenesisModuleRepositoryRelease printing(Consumer<String> printing) {
-        return new JenesisModuleRepositoryRelease(repository, token, connection, printing);
+        return new JenesisModuleRepositoryRelease(repository, token, connection, printing, palette);
+    }
+
+    public JenesisModuleRepositoryRelease palette(Palette palette) {
+        return new JenesisModuleRepositoryRelease(repository, token, connection, printing, palette);
     }
 
     @Override
@@ -126,9 +134,9 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
             URI target = repository.resolve(entry.getKey());
             upload(target, entry.getValue());
             if (printing != null) {
-                printing.accept("%s%-11s%s %s".formatted(BuildExecutorCallback.GREEN,
+                printing.accept("%s%-11s%s %s".formatted(palette.green(),
                         "[RELEASED]",
-                        BuildExecutorCallback.RESET,
+                        palette.reset(),
                         target));
             }
         }

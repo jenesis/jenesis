@@ -67,10 +67,9 @@ the declared license:
     maven/build.jenesis.demo/java-demo 1.0.0 [compile] (local ./)
     └─ maven/org.apache.commons/commons-lang3 3.14.0 [compile] (module org.apache.commons.lang3) {Apache-2.0}
 
-In a terminal the tree is coloured. Redirected to a file or piped into another
-program, as a script or a coding agent reads it, the same output is plain text;
-`-Djenesis.print.color=true` keeps the colour there and `=false` drops it in a
-terminal as well.
+The tree is coloured, as is everything the build prints. To read the output as
+plain text, as a script or a coding agent does from a file or a pipe, pass
+`-Djenesis.print.color=false`.
 
 The tree starts from the project itself, drawn like any module built here: its
 coordinate, version and scope, tagged `local` with the folder it is built from.

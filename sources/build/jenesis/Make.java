@@ -104,11 +104,6 @@ public final class Make {
         return value == null ? defaultValue : value;
     }
 
-    static boolean terminal() {
-        Console console = System.console();
-        return console != null && console.isTerminal();
-    }
-
     static Boolean parsed(String name, String value) {
         if (value == null) {
             return null;
@@ -557,9 +552,6 @@ public final class Make {
             if (value != null) {
                 supplied.put("jenesis." + key, value);
             }
-        }
-        if (!settings.keys().containsKey("print.color")) {
-            supplied.put("jenesis.print.color", Boolean.toString(terminal()));
         }
         return supplied;
     }
