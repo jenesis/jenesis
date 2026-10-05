@@ -7,6 +7,9 @@ public interface BuildExecutorCallback {
 
     BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys);
 
+    default void run(String run) {
+    }
+
     default Consumer<Throwable> module(String identity) {
         return _ -> {
         };
@@ -24,6 +27,12 @@ public interface BuildExecutorCallback {
             @Override
             public BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys) {
                 return first.step(identity, keys).andThen(other.step(identity, keys));
+            }
+
+            @Override
+            public void run(String run) {
+                first.run(run);
+                other.run(run);
             }
 
             @Override
@@ -160,7 +169,13 @@ public interface BuildExecutorCallback {
         return new BuildExecutorCallback() {
 
             private Writer writer;
+            private String run;
             private int executed, skipped, failed;
+
+            @Override
+            public void run(String run) {
+                this.run = run;
+            }
 
             @Override
             public BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys) {
@@ -177,7 +192,8 @@ public interface BuildExecutorCallback {
                         skipped = 0;
                         failed = 0;
                         write("{\"status\":\"started\",\"target\":\"" + Json.escaped(root.toString())
-                                + "\",\"directory\":\"" + Json.escaped(directory.toString()) + "\"}");
+                                + "\",\"directory\":\"" + Json.escaped(directory.toString()) + "\""
+                                + (run == null ? "" : ",\"run\":\"" + Json.escaped(run) + "\"") + "}");
                     }
                     return (_, throwable) -> {
                         synchronized (this) {
@@ -193,7 +209,8 @@ public interface BuildExecutorCallback {
                 }
                 String step = ",\"step\":\"" + Json.escaped(identity) + "\"",
                         folder = ",\"folder\":\"" + Json.escaped(root.resolve(identity).toString()) + "\"";
-                Path next = root.resolve(identity + BuildExecutor.NEXT);
+                Path local = root.resolve(identity).resolve(BuildExecutor.LOCAL),
+                        next = root.resolve(identity + BuildExecutor.NEXT);
                 return (ran, throwable) -> {
                     synchronized (this) {
                         if (throwable != null) {
@@ -208,7 +225,15 @@ public interface BuildExecutorCallback {
                                     + seconds(System.nanoTime() - started) + folder + "}");
                         } else {
                             skipped++;
-                            write("{\"status\":\"skipped\"" + step + folder + "}");
+                            String producer = null;
+                            if (Files.isRegularFile(local)) {
+                                try {
+                                    producer = SequencedProperties.ofFiles(local).value("run");
+                                } catch (IOException _) {
+                                }
+                            }
+                            write("{\"status\":\"skipped\"" + step + folder
+                                    + (producer == null ? "" : ",\"run\":\"" + Json.escaped(producer) + "\"") + "}");
                         }
                     }
                 };

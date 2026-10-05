@@ -9,6 +9,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.EnvironmentalProcessBuildStep;
 import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.step.ProcessHandler;
 
@@ -136,7 +137,7 @@ public class JReleaserModule implements BuildExecutorModule {
         }
     }
 
-    private static class Execute extends ProcessBuildStep {
+    private static class Execute extends EnvironmentalProcessBuildStep {
 
         private final Path root;
         private final Path configuration;
@@ -159,6 +160,11 @@ public class JReleaserModule implements BuildExecutorModule {
         @Override
         public boolean shouldRun(SequencedMap<String, BuildStepArgument> arguments) {
             return true;
+        }
+
+        @Override
+        protected boolean inherits(String variable) {
+            return variable.startsWith("JRELEASER_");
         }
 
         @Override

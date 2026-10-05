@@ -11,6 +11,7 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.BuildExecutorModule;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -246,6 +247,54 @@ public class InferredMultiProjectAssemblerTest {
         SequencedProperties javacArguments = readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("javac.properties"));
         assertThat(javacArguments.getProperty("-g")).isEqualTo("");
         assertThat(javacArguments.getProperty("-parameters")).isEqualTo("");
+    }
+
+    @Test
+    public void an_environment_file_in_configuration_yields_the_variables_of_a_tool() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("environment-test.properties"), "SAMPLE=value\nINHERITED\n");
+        Files.writeString(fixture.profile().resolve("environment-java.properties"), "OTHER=value\n");
+        Path prepareOutput = fixture.execute("sub/prepare").get("sub/prepare");
+        SequencedProperties variables = readProperties(prepareOutput.resolve(ProcessBuildStep.ENVIRONMENT).resolve("test.properties"));
+        assertThat(variables.getProperty("SAMPLE")).isEqualTo("value");
+        assertThat(variables.getProperty("INHERITED"))
+                .as("a variable without a value is taken from the build's environment when the tool runs")
+                .isEqualTo("");
+        assertThat(readProperties(prepareOutput.resolve(ProcessBuildStep.ENVIRONMENT).resolve("java.properties"))
+                .getProperty("OTHER")).isEqualTo("value");
+    }
+
+    @Test
+    public void a_variable_in_a_process_or_environment_file_is_the_setting_it_names() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("process-javac.properties"), "-Xmaxwarns=@warnings\n");
+        Files.writeString(fixture.configuration().resolve("environment-test.properties"),
+                "GREETING=@greeting/Hello\nLITERAL=@@literal\n");
+        Path prepareOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
+                new Environment(Map.of("variable.warnings", "500"))), "sub/prepare").get("sub/prepare");
+        assertThat(readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("javac.properties"))
+                .getProperty("-Xmaxwarns")).isEqualTo("500");
+        SequencedProperties variables = readProperties(prepareOutput.resolve(ProcessBuildStep.ENVIRONMENT).resolve("test.properties"));
+        assertThat(variables.getProperty("GREETING"))
+                .as("a variable that is not set takes its default")
+                .isEqualTo("Hello");
+        assertThat(variables.getProperty("LITERAL")).isEqualTo("@literal");
+        prepareOutput = fixture.execute(InferredMultiProjectAssembler.ofEnvironment(
+                new Environment(Map.of("variable.warnings", "600"))), "sub/prepare").get("sub/prepare");
+        assertThat(readProperties(prepareOutput.resolve(ProcessBuildStep.PROCESS).resolve("javac.properties"))
+                .getProperty("-Xmaxwarns"))
+                .as("a resolved variable is part of the step's key, so another value runs it again")
+                .isEqualTo("600");
+    }
+
+    @Test
+    public void a_variable_that_is_not_set_and_has_no_default_names_the_setting() throws IOException {
+        Fixture fixture = setUp("main=\n", false, false, false);
+        Files.writeString(fixture.configuration().resolve("environment-test.properties"), "GREETING=@greeting\n");
+        assertThatThrownBy(() -> fixture.execute("sub/prepare"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("GREETING to @greeting, but jenesis.variable.greeting is not set")
+                .hasMessageContaining("@greeting/<default>");
     }
 
     @Test

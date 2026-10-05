@@ -7,7 +7,7 @@ import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 
-public abstract class Java extends ProcessBuildStep {
+public abstract class Java extends EnvironmentalProcessBuildStep {
 
     private static final String MODULE_PATH = "--module-path", CLASS_PATH = "--class-path";
 

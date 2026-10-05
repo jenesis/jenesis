@@ -8,7 +8,8 @@ public interface BuildExecutor {
             LOCK_MARKER = ".jenesis.lock",
             FAILED_MARKER = ".jenesis.failed",
             EVENTS = ".jenesis.events.jsonl",
-            NEXT = "~";
+            NEXT = "~",
+            LOCAL = "local.properties";
 
     static BuildExecutor of(Path target) throws IOException {
         return new Configuration().of(target);
@@ -152,7 +153,19 @@ public interface BuildExecutor {
                 }
             });
         }
-        BuildExecutor executor = new BuildExecutorDefault(target, timeout, hash, stepHash, callback, cache, aggregate, concurrency == 0 ? null : new BuildExecutorDefault.Permits(concurrency), "", Map.of());
+        BuildExecutor executor = new BuildExecutorDefault(target,
+                timeout,
+                hash,
+                stepHash,
+                callback,
+                cache,
+                aggregate,
+                concurrency == 0 ? null : new BuildExecutorDefault.Permits(concurrency),
+                DateTimeFormatter.ofPattern("uuuuMMdd'T'HHmmss.SSSSSS'Z'")
+                        .withZone(ZoneOffset.UTC)
+                        .format(Instant.now()),
+                "",
+                Map.of());
         if (!Files.exists(target.resolve(SKIP_MARKER))) {
             Files.createFile(target.resolve(SKIP_MARKER));
         }

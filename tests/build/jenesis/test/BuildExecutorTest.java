@@ -364,6 +364,50 @@ public class BuildExecutorTest implements Serializable {
     }
 
     @Test
+    public void records_the_run_that_produced_a_step_beside_its_output() throws IOException {
+        List<String> runs = new ArrayList<>();
+        BuildExecutorCallback recording = new BuildExecutorCallback() {
+            @Override
+            public BiConsumer<Boolean, Throwable> step(String identity, SequencedSet<String> keys) {
+                return (_, _) -> {
+                };
+            }
+
+            @Override
+            public void run(String run) {
+                runs.add(run);
+            }
+        };
+        List<String> contents = List.of("foo", "foo", "bar");
+        List<Integer> producers = List.of(0, 0, 2);
+        for (int build = 0; build < contents.size(); build++) {
+            Files.writeString(source.resolve("file"), contents.get(build));
+            BuildExecutor executor = BuildExecutor.of(root,
+                    Duration.ZERO,
+                    hash,
+                    BuildStepHashFunction.ofSerializationDigest("MD5"),
+                    recording,
+                    BuildExecutorCache.nop(),
+                    false,
+                    false,
+                    0);
+            executor.addSource("source", source);
+            executor.addStep("step", (_, context, arguments) -> {
+                Files.copy(arguments.get("source").folder().resolve("file"), context.next().resolve("file"));
+                return CompletableFuture.completedStage(new BuildStepResult(true));
+            }, "source");
+            executor.execute(Runnable::run).toCompletableFuture().join();
+            assertThat(SequencedProperties.ofFiles(root.resolve("step").resolve(BuildExecutor.LOCAL)).value("run"))
+                    .as("a step that did not run keeps naming the run that produced its output")
+                    .isEqualTo(runs.get(producers.get(build)));
+        }
+        assertThat(runs).doesNotHaveDuplicates().hasSize(3);
+        assertThat(root.resolve("step").resolve("output").resolve(BuildExecutor.LOCAL))
+                .as("the record stays beside the output, so no checksum and no build cache carries it")
+                .doesNotExist();
+    }
+
+    @Test
     public void handles_error_in_step() throws IOException {
         Files.writeString(source.resolve("file"), "foo");
         buildExecutor.addSource("source", source);

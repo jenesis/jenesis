@@ -9,9 +9,11 @@ import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 
-public class NativeImage extends ProcessBuildStep {
+public class NativeImage extends EnvironmentalProcessBuildStep {
 
     public static final String NATIVE = "native/", METADATA = "nativeimage/", LICENSES = "licenses";
+    private static final Set<String> COMPILER = Set.of("INCLUDE", "LIB", "LIBPATH",
+            "CPATH", "C_INCLUDE_PATH", "LIBRARY_PATH", "SDKROOT");
 
     private final PathPlacement pathPlacement;
     private final String group;
@@ -50,6 +52,11 @@ public class NativeImage extends ProcessBuildStep {
 
     public NativeImage verbose(BiConsumer<Boolean, String> printing) {
         return new NativeImage(pathPlacement, factory, group, terms.printing(printing));
+    }
+
+    @Override
+    protected boolean inherits(String variable) {
+        return COMPILER.contains(variable.toUpperCase(Locale.ROOT));
     }
 
     @Override
