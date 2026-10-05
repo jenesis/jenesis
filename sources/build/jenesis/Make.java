@@ -144,7 +144,15 @@ public final class Make {
 
     public Make root(Path root) {
         try {
-            return new Make(mainClass, ambient, root, classes, daemon, compile, aot, aotFile, aotLifetime,
+            return new Make(mainClass,
+                    ambient,
+                    root,
+                    classes,
+                    daemon,
+                    compile,
+                    aot,
+                    aotFile,
+                    aotLifetime,
                     settings(root, ambient));
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot read the properties that configure this build", e);
@@ -541,8 +549,14 @@ public final class Make {
                            SequencedMap<String, String> collected,
                            String... selectors) throws Exception {
         return (int) Class.forName("build.jenesis.daemon.DaemonClient", true, loader)
-                .getMethod("doDispatch", Path.class, List.class, String.class, String.class,
-                        SequencedMap.class, SequencedMap.class, String[].class)
+                .getMethod("doDispatch",
+                        Path.class,
+                        List.class,
+                        String.class,
+                        String.class,
+                        SequencedMap.class,
+                        SequencedMap.class,
+                        String[].class)
                 .invoke(null, root, path, mainClass, seed, supplied(), collected, selectors);
     }
 

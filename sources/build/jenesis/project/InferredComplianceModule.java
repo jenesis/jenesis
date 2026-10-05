@@ -101,16 +101,23 @@ public class InferredComplianceModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-        Bind.configuredByProperties(buildExecutor, inherited.sequencedKeySet(), LICENSE, license,
+        Bind.configuredByProperties(buildExecutor,
+                inherited.sequencedKeySet(),
+                LICENSE,
+                license,
                 BuildStep.locate(configuration, "licensing.properties"),
                 properties -> {
                     if (properties.stringPropertyNames().isEmpty()) {
                         return null;
                     }
                     return (nested, nestedInherited) -> nested.addStep("check",
-                            licenseCheck(properties), nestedInherited.sequencedKeySet().stream());
+                            licenseCheck(properties),
+                            nestedInherited.sequencedKeySet().stream());
                 });
-        Bind.configuredByProperties(buildExecutor, inherited.sequencedKeySet(), VULNERABILITY, vulnerability,
+        Bind.configuredByProperties(buildExecutor,
+                inherited.sequencedKeySet(),
+                VULNERABILITY,
+                vulnerability,
                 BuildStep.locate(configuration, "vulnerability.properties"),
                 properties -> {
                     if (properties.stringPropertyNames().isEmpty()) {
@@ -118,7 +125,8 @@ public class InferredComplianceModule implements BuildExecutorModule {
                     }
                     return (nested, nestedInherited) -> {
                         nested.addStep("osv", osvDownload(properties), nestedInherited.sequencedKeySet().stream());
-                        nested.addStep("check", vulnerabilityCheck(properties),
+                        nested.addStep("check",
+                                vulnerabilityCheck(properties),
                                 Stream.concat(nestedInherited.sequencedKeySet().stream(), Stream.of("osv")));
                     };
                 });

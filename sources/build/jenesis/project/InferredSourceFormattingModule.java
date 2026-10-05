@@ -203,7 +203,10 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
 
     @Override
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
-        Bind.configuredByProperties(buildExecutor, inherited.sequencedKeySet(), JAVA, java,
+        Bind.configuredByProperties(buildExecutor,
+                inherited.sequencedKeySet(),
+                JAVA,
+                java,
                 BuildStep.locate(configuration, "javaformat.properties"),
                 properties -> switch (properties.value("formatter")) {
                     case "google" -> googleModule.pinning(pinning).verify(verify);
@@ -211,10 +214,16 @@ public class InferredSourceFormattingModule implements BuildExecutorModule {
                     case null -> null;
                     default -> throw new IllegalArgumentException("Unknown Java format: " + properties.value("formatter"));
                 });
-        Bind.configured(buildExecutor, inherited.sequencedKeySet(), KTLINT, ktlint,
+        Bind.configured(buildExecutor,
+                inherited.sequencedKeySet(),
+                KTLINT,
+                ktlint,
                 KtlintFormatModule.configurationFile(configuration),
                 () -> ktlintModule.pinning(pinning).verify(verify));
-        Bind.configured(buildExecutor, inherited.sequencedKeySet(), SCALAFMT, scalafmt,
+        Bind.configured(buildExecutor,
+                inherited.sequencedKeySet(),
+                SCALAFMT,
+                scalafmt,
                 ScalafmtFormatModule.configurationFile(configuration),
                 () -> scalafmtModule.pinning(pinning).verify(verify));
         if (!custom.isEmpty()) {

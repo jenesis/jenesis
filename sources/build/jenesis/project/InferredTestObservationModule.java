@@ -328,7 +328,10 @@ public class InferredTestObservationModule implements BuildExecutorModule {
                 reports.forEach((name, report) -> buildExecutor.addModule(name, report, reportInputs));
             }
         }
-        Bind.configuredByProperties(buildExecutor, inherited.sequencedKeySet(), MUTATE, pitest,
+        Bind.configuredByProperties(buildExecutor,
+                inherited.sequencedKeySet(),
+                MUTATE,
+                pitest,
                 BuildStep.locate(configuration, "pitest.properties"),
                 properties -> pitestModule.pinning(pinning).config(properties));
         if (!custom.isEmpty()) {

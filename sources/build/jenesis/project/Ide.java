@@ -446,7 +446,8 @@ public class Ide implements BuildExecutorModule {
             }
             entry(content, "kind=\"con\" path=\"" + container(release()) + "\"", onModulePath);
             for (String dependency : moduleDependencies()) {
-                entry(content, "combineaccessrules=\"false\" kind=\"src\" path=\"/" + escape(dependency) + "\"",
+                entry(content,
+                        "combineaccessrules=\"false\" kind=\"src\" path=\"/" + escape(dependency) + "\"",
                         List.of());
             }
             for (Path library : libraries()) {

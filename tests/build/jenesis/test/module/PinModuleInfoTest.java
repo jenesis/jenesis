@@ -535,7 +535,10 @@ public class PinModuleInfoTest {
     @Test
     public void refuses_an_unknown_retention() {
         assertThatThrownBy(() -> PinModuleInfo.ofEnvironment(new Environment(Map.of("pin.retain", "some")),
-                "module", "", List.of(), new HashDigestFunction("SHA-256")))
+                "module",
+                "",
+                List.of(),
+                new HashDigestFunction("SHA-256")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Unknown pin retention: some (expected groups, all or none)");
     }

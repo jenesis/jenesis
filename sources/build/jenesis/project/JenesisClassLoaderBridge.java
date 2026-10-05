@@ -68,23 +68,29 @@ class JenesisClassLoaderBridge {
         Class<?> foreignBuildStepResult = Class.forName(BuildStepResult.class.getName(), false, loader);
         Class<?> foreignChecksumStatus = Class.forName(ChecksumStatus.class.getName(), false, loader);
         MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(foreignBuildExecutorModule, MethodHandles.lookup());
-        foreignAccept = lookup.findVirtual(foreignBuildExecutorModule, "accept",
+        foreignAccept = lookup.findVirtual(foreignBuildExecutorModule,
+                "accept",
                 MethodType.methodType(void.class, foreignBuildExecutor, SequencedMap.class));
-        foreignApply = lookup.findVirtual(foreignBuildStep, "apply",
+        foreignApply = lookup.findVirtual(foreignBuildStep,
+                "apply",
                 MethodType.methodType(CompletionStage.class, Executor.class, foreignBuildStepContext, SequencedMap.class));
-        foreignShouldRun = lookup.findVirtual(foreignBuildStep, "shouldRun",
+        foreignShouldRun = lookup.findVirtual(foreignBuildStep,
+                "shouldRun",
                 MethodType.methodType(boolean.class, SequencedMap.class));
-        foreignShouldCacheRemotely = lookup.findVirtual(foreignBuildStep, "shouldCacheRemotely",
+        foreignShouldCacheRemotely = lookup.findVirtual(foreignBuildStep,
+                "shouldCacheRemotely",
                 MethodType.methodType(boolean.class));
         foreignContextCtor = lookup.findConstructor(foreignBuildStepContext,
                 MethodType.methodType(void.class, Path.class, Path.class, Path.class));
         foreignArgumentCtor = lookup.findConstructor(foreignBuildStepArgument,
                 MethodType.methodType(void.class, Path.class, Map.class));
-        foreignResultNext = lookup.findVirtual(foreignBuildStepResult, "next",
+        foreignResultNext = lookup.findVirtual(foreignBuildStepResult,
+                "next",
                 MethodType.methodType(boolean.class));
         foreignBuildModuleName = Class.forName(BuildModuleName.class.getName(), false, loader)
                 .asSubclass(Annotation.class);
-        foreignBuildModuleNameValue = lookup.findVirtual(foreignBuildModuleName, "value",
+        foreignBuildModuleNameValue = lookup.findVirtual(foreignBuildModuleName,
+                "value",
                 MethodType.methodType(String.class));
         Class<?> foreignChecksum = Class.forName(Checksum.class.getName(), false, loader);
         Method foreignChecksumOf = foreignChecksum.getMethod("of", foreignChecksumStatus);

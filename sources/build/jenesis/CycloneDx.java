@@ -46,20 +46,65 @@ public class CycloneDx {
         return new CycloneDx(identifiers);
     }
 
-    public record Component(String type, String bomRef, String group, String name, String version, String purl, List<String> swhids,
-                            String sha256, List<License> licenses, String description, List<Author> authors,
-                            List<ExternalReference> externalReferences, List<Property> properties,
-                            Organization supplier, String copyright, Organization manufacturer, String publisher,
+    public record Component(String type,
+                            String bomRef,
+                            String group,
+                            String name,
+                            String version,
+                            String purl,
+                            List<String> swhids,
+                            String sha256,
+                            List<License> licenses,
+                            String description,
+                            List<Author> authors,
+                            List<ExternalReference> externalReferences,
+                            List<Property> properties,
+                            Organization supplier,
+                            String copyright,
+                            Organization manufacturer,
+                            String publisher,
                             String scope) {
 
         public Component(String bomRef, String group, String name, String version, String purl, String sha256, List<License> licenses) {
-            this("library", bomRef, group, name, version, purl, List.of(), sha256, licenses, null, List.of(), List.of(), List.of(),
-                    null, null, null, null, null);
+            this("library",
+                    bomRef,
+                    group,
+                    name,
+                    version,
+                    purl,
+                    List.of(),
+                    sha256,
+                    licenses,
+                    null,
+                    List.of(),
+                    List.of(),
+                    List.of(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null);
         }
 
         public Component scope(String scope) {
-            return new Component(type, bomRef, group, name, version, purl, swhids, sha256, licenses, description, authors,
-                    externalReferences, properties, supplier, copyright, manufacturer, publisher, scope);
+            return new Component(type,
+                    bomRef,
+                    group,
+                    name,
+                    version,
+                    purl,
+                    swhids,
+                    sha256,
+                    licenses,
+                    description,
+                    authors,
+                    externalReferences,
+                    properties,
+                    supplier,
+                    copyright,
+                    manufacturer,
+                    publisher,
+                    scope);
         }
 
         private SequencedMap<String, Organization> organizations() {

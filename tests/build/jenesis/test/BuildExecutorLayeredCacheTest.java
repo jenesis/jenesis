@@ -57,8 +57,13 @@ public class BuildExecutorLayeredCacheTest {
         RecordingCache back = new RecordingCache(false, true, false);
         byte[] step = {1};
         new BuildExecutorLayeredCache(front, back).store(Runnable::run,
-                "step", step, inputs(), true,
-                target, "", Map.of());
+                "step",
+                step,
+                inputs(),
+                true,
+                target,
+                "",
+                Map.of());
         assertThat(front.stores).hasValue(1);
         assertThat(back.stores).hasValue(1);
         assertThat(back.lastStoreStep).isEqualTo(step);

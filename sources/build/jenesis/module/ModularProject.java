@@ -53,9 +53,16 @@ public class ModularProject implements BuildExecutorModule {
     private final boolean maven;
 
     public ModularProject(String prefix, Path root) {
-        this("main", prefix, root, _ -> true, true, new Platform(),
-                Collections.emptyNavigableSet(), Collections.emptyNavigableSet(),
-                MavenModuleRepository.segments(), true);
+        this("main",
+                prefix,
+                root,
+                _ -> true,
+                true,
+                new Platform(),
+                Collections.emptyNavigableSet(),
+                Collections.emptyNavigableSet(),
+                MavenModuleRepository.segments(),
+                true);
     }
 
     public static ModularProject ofEnvironment(Environment environment, String prefix, Path root) {
@@ -111,8 +118,16 @@ public class ModularProject implements BuildExecutorModule {
     }
 
     public ModularProject segments(int segments) {
-        return new ModularProject(group, prefix, root, filter, modular, platform, boms, signatures,
-                MavenModuleRepository.checkedSegments(segments), maven);
+        return new ModularProject(group,
+                prefix,
+                root,
+                filter,
+                modular,
+                platform,
+                boms,
+                signatures,
+                MavenModuleRepository.checkedSegments(segments),
+                maven);
     }
 
     public ModularProject maven(boolean maven) {
@@ -183,7 +198,8 @@ public class ModularProject implements BuildExecutorModule {
                     for (Path file : spdx) {
                         String source = MultiProjectModule.SPDX + "-" + spdxIndex++;
                         buildExecutor.addSource(source,
-                                new Bind(Map.of(Path.of(""), Path.of(Dependencies.SPDX))), file);
+                                new Bind(Map.of(Path.of(""), Path.of(Dependencies.SPDX))),
+                                file);
                         spdxSources.add(source);
                     }
                     SequencedMap<String, String> dependencyDeps = new LinkedHashMap<>();

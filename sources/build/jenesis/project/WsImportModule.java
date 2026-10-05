@@ -18,7 +18,9 @@ import build.jenesis.step.ProcessHandler;
 
 public class WsImportModule implements BuildExecutorModule {
 
-    public static final String FOLDER = "wsimport/", DESCRIPTION = ".wsdl", BINDING = ".xjb",
+    public static final String FOLDER = "wsimport/",
+            DESCRIPTION = ".wsdl",
+            BINDING = ".xjb",
             CATALOG = "catalog";
     public static final String GENERATE = "generate";
     private static final String REQUIRED = "required", DEPENDENCIES = "dependencies";

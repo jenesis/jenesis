@@ -139,7 +139,9 @@ public class Bind implements BuildStep {
                         Files.createDirectories(target.getParent());
                     }
                     boolean filtered = extensions != null && Files.isDirectory(source);
-                    Files.walkFileTree(source, Set.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE,
+                    Files.walkFileTree(source,
+                            Set.of(FileVisitOption.FOLLOW_LINKS),
+                            Integer.MAX_VALUE,
                             new SimpleFileVisitor<>() {
                                 @Override
                                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)

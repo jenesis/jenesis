@@ -78,8 +78,11 @@ public class MakeToolTest {
     public void writes_what_the_build_prints_to_the_writers_it_is_handed() throws IOException {
         Files.writeString(root.resolve("module-info.java"), "module foo {}");
         StringWriter out = new StringWriter(), err = new StringWriter();
-        int code = ToolProvider.findFirst("jenesis-make").orElseThrow().run(new PrintWriter(out), new PrintWriter(err),
-                "-Djenesis.make.root=" + root, "-Djenesis.print.progress=false", "configuration");
+        int code = ToolProvider.findFirst("jenesis-make").orElseThrow().run(new PrintWriter(out),
+                new PrintWriter(err),
+                "-Djenesis.make.root=" + root,
+                "-Djenesis.print.progress=false",
+                "configuration");
         assertThat(code).isEqualTo(0);
         assertThat(out.toString())
                 .as("the tool hands the build its own writers rather than the streams of the JVM it runs in")
@@ -92,8 +95,11 @@ public class MakeToolTest {
     @Test
     public void the_exec_tool_refuses_a_container_it_cannot_relaunch_into() {
         StringWriter out = new StringWriter(), err = new StringWriter();
-        int code = ToolProvider.findFirst("jenesis-exec").orElseThrow().run(new PrintWriter(out), new PrintWriter(err),
-                "-Djenesis.make.root=" + root, "-Djenesis.execute.docker", "build");
+        int code = ToolProvider.findFirst("jenesis-exec").orElseThrow().run(new PrintWriter(out),
+                new PrintWriter(err),
+                "-Djenesis.make.root=" + root,
+                "-Djenesis.execute.docker",
+                "build");
         assertThat(code).isEqualTo(1);
         assertThat(out.toString() + err)
                 .as("running a program in a container replaces the process it runs in, which a tool cannot do")
@@ -116,8 +122,11 @@ public class MakeToolTest {
     @Test
     public void refuses_a_toolchain_it_cannot_relaunch_onto() {
         StringWriter out = new StringWriter(), err = new StringWriter();
-        int code = ToolProvider.findFirst("jenesis-make").orElseThrow().run(new PrintWriter(out), new PrintWriter(err),
-                "-Djenesis.make.root=" + root, "-Djenesis.toolchain.version=25", "configuration");
+        int code = ToolProvider.findFirst("jenesis-make").orElseThrow().run(new PrintWriter(out),
+                new PrintWriter(err),
+                "-Djenesis.make.root=" + root,
+                "-Djenesis.toolchain.version=25",
+                "configuration");
         assertThat(code).isEqualTo(1);
         assertThat(out.toString() + err)
                 .contains("jenesis.toolchain.version cannot be honored by the jenesis-make tool");
@@ -126,8 +135,11 @@ public class MakeToolTest {
     @Test
     public void refuses_an_ahead_of_time_cache_it_cannot_relaunch_into() {
         StringWriter out = new StringWriter(), err = new StringWriter();
-        int code = ToolProvider.findFirst("jenesis-make").orElseThrow().run(new PrintWriter(out), new PrintWriter(err),
-                "-Djenesis.make.root=" + root, "-Djenesis.make.aot=true", "configuration");
+        int code = ToolProvider.findFirst("jenesis-make").orElseThrow().run(new PrintWriter(out),
+                new PrintWriter(err),
+                "-Djenesis.make.root=" + root,
+                "-Djenesis.make.aot=true",
+                "configuration");
         assertThat(code).isEqualTo(1);
         assertThat(out.toString() + err)
                 .as("a cache is handed to a JVM on its command line, which a tool running in another JVM cannot do")

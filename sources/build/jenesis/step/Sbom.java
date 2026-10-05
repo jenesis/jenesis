@@ -107,9 +107,24 @@ public class Sbom implements BuildStep {
                         graalvm = unquote(runtime.value("GRAALVM_VERSION", runtime.value("JAVA_RUNTIME_VERSION")));
                 String ref = (implementor == null ? "" : implementor + "/") + "GraalVM" + (graalvm == null ? "" : "/" + graalvm);
                 if (platforms.add(ref)) {
-                    components.put(ref, new CycloneDx.Component("platform", ref, implementor, "GraalVM", graalvm, null, List.of(), null,
+                    components.put(ref, new CycloneDx.Component("platform",
+                            ref,
+                            implementor,
+                            "GraalVM",
+                            graalvm,
+                            null,
+                            List.of(),
+                            null,
                             graalvmLicense == null ? List.of() : List.of(new License(graalvmLicense, null, null, null)),
-                            null, List.of(), List.of(), List.of(), null, null, null, null, "required"));
+                            null,
+                            List.of(),
+                            List.of(),
+                            List.of(),
+                            null,
+                            null,
+                            null,
+                            null,
+                            "required"));
                 }
             }
             Path index = argument.folder().resolve(DEPENDENCIES);
@@ -199,13 +214,24 @@ public class Sbom implements BuildStep {
             Map<String, String> aliases = Dependencies.aliases(folders);
             List<License> licenses = new ArrayList<>();
             for (String license : declared) {
-                licenses.add(new License(null, null,
+                licenses.add(new License(null,
+                        null,
                         metadata.getProperty(license + ".name"),
                         metadata.getProperty(license + ".url")).identified(aliases));
             }
-            project = new CycloneDx.Component(type, projectRef, groupId, artifactId, version, purl, swhids, null,
-                    licenses, metadata.getProperty("description"), developers(metadata),
-                    references(metadata, revision == null ? tag : revision), properties,
+            project = new CycloneDx.Component(type,
+                    projectRef,
+                    groupId,
+                    artifactId,
+                    version,
+                    purl,
+                    swhids,
+                    null,
+                    licenses,
+                    metadata.getProperty("description"),
+                    developers(metadata),
+                    references(metadata, revision == null ? tag : revision),
+                    properties,
                     organization(metadata, "organization"),
                     metadata.value("copyright"),
                     organization(metadata, "manufacturer"),
@@ -249,8 +275,13 @@ public class Sbom implements BuildStep {
                 if (!qualifiers.isEmpty()) {
                     purl.append("?").append(String.join("&", qualifiers));
                 }
-                return new CycloneDx.Component(coordinate, key.groupId(), key.artifactId(), parsed.version(),
-                        purl.toString(), sha256, licenses);
+                return new CycloneDx.Component(coordinate,
+                        key.groupId(),
+                        key.artifactId(),
+                        parsed.version(),
+                        purl.toString(),
+                        sha256,
+                        licenses);
             }
         } catch (RuntimeException _) {
         }

@@ -304,8 +304,11 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
     public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) throws IOException {
         SequencedProperties properties = read(XJC, XJC_KEYS, xjc);
         if (properties != null) {
-            generate(buildExecutor, inherited.sequencedKeySet(), XJC,
-                    prepare(properties, XjcModule.FOLDER,
+            generate(buildExecutor,
+                    inherited.sequencedKeySet(),
+                    XJC,
+                    prepare(properties,
+                            XjcModule.FOLDER,
                             Set.of(XjcModule.SCHEMA, XjcModule.BINDING),
                             named(properties, "catalog", XjcModule.CATALOG)),
                      xjc.apply(xjcModule
@@ -320,16 +323,22 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                     .plugins(plugins(properties))
                     .arguments(properties.words("arguments"));
             String classifier = properties.value("classifier");
-            generate(buildExecutor, inherited.sequencedKeySet(), PROTOC,
-                    prepare(properties, ProtocModule.FOLDER,
+            generate(buildExecutor,
+                    inherited.sequencedKeySet(),
+                    PROTOC,
+                    prepare(properties,
+                            ProtocModule.FOLDER,
                             Set.of(ProtocModule.DEFINITION),
                             new LinkedHashMap<>()),
                     protoc.apply(classifier == null ? module : module.classifier(classifier)));
         }
         properties = read(AVRO, AVRO_KEYS, avro);
         if (properties != null) {
-            generate(buildExecutor, inherited.sequencedKeySet(), AVRO,
-                    prepare(properties, AvroModule.FOLDER,
+            generate(buildExecutor,
+                    inherited.sequencedKeySet(),
+                    AVRO,
+                    prepare(properties,
+                            AvroModule.FOLDER,
                             Set.of(AvroModule.SCHEMA, AvroModule.PROTOCOL),
                             new LinkedHashMap<>()),
                      avro.apply(avroModule
@@ -338,8 +347,11 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
         }
         properties = read(WSIMPORT, WSIMPORT_KEYS, wsimport);
         if (properties != null) {
-            generate(buildExecutor, inherited.sequencedKeySet(), WSIMPORT,
-                    prepare(properties, WsImportModule.FOLDER,
+            generate(buildExecutor,
+                    inherited.sequencedKeySet(),
+                    WSIMPORT,
+                    prepare(properties,
+                            WsImportModule.FOLDER,
                             Set.of(WsImportModule.DESCRIPTION, WsImportModule.BINDING),
                             named(properties, "catalog", WsImportModule.CATALOG)),
                      wsimport.apply(wsimportModule
@@ -359,16 +371,22 @@ public class InferredSourceGenerationModule implements BuildExecutorModule {
                 module = module.generator(generator);
             }
             String sources = properties.value("sources");
-            generate(buildExecutor, inherited.sequencedKeySet(), OPENAPI,
-                    prepare(properties, OpenApiModule.FOLDER,
+            generate(buildExecutor,
+                    inherited.sequencedKeySet(),
+                    OPENAPI,
+                    prepare(properties,
+                            OpenApiModule.FOLDER,
                             OpenApiModule.DOCUMENTS,
                             named(properties, "specification", OpenApiModule.SPECIFICATION)),
                     openapi.apply(sources == null ? module : module.sourceFolder(sources)));
         }
         properties = read(ANTLR, ANTLR_KEYS, antlr);
         if (properties != null) {
-            generate(buildExecutor, inherited.sequencedKeySet(), ANTLR,
-                    prepare(properties, AntlrModule.FOLDER,
+            generate(buildExecutor,
+                    inherited.sequencedKeySet(),
+                    ANTLR,
+                    prepare(properties,
+                            AntlrModule.FOLDER,
                             Set.of(AntlrModule.GRAMMAR),
                             new LinkedHashMap<>()),
                      antlr.apply(antlrModule

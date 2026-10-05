@@ -32,8 +32,17 @@ public class PinModuleInfo implements BuildStep {
     private final transient Palette palette;
 
     public PinModuleInfo(String prefix, String path, List<Path> moduleInfoFiles, HashDigestFunction hashFunction) {
-        this(prefix, path, moduleInfoFiles, hashFunction, new Platform(),
-                true, false, Retain.GROUPS, Pinning.permits(), null, Palette.NONE);
+        this(prefix,
+                path,
+                moduleInfoFiles,
+                hashFunction,
+                new Platform(),
+                true,
+                false,
+                Retain.GROUPS,
+                Pinning.permits(),
+                null,
+                Palette.NONE);
     }
 
     public static PinModuleInfo ofEnvironment(Environment environment,

@@ -280,9 +280,20 @@ public class InferredCompilerChainModule implements BuildExecutorModule {
         SequencedSet<String> compileInputs = new LinkedHashSet<>(inherited.sequencedKeySet());
         compileInputs.add(SCAN);
         buildExecutor.addModule(COMPILE,
-                new Compile(configuration, repositories, resolvers, pinning, pathPlacement,
-                        javacStep, kotlincModule, scalacModule, groovycModule,
-                        javac, kotlinc, scalac, groovyc, errorprone),
+                new Compile(configuration,
+                        repositories,
+                        resolvers,
+                        pinning,
+                        pathPlacement,
+                        javacStep,
+                        kotlincModule,
+                        scalacModule,
+                        groovycModule,
+                        javac,
+                        kotlinc,
+                        scalac,
+                        groovyc,
+                        errorprone),
                 compileInputs);
         if (!custom.isEmpty()) {
             buildExecutor.addModule("custom", (nested, nestedInherited) -> custom.forEach((name, module) ->

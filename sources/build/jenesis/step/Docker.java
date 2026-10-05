@@ -15,7 +15,8 @@ public class Docker implements BuildStep {
 
     public static final String DOCKER = "docker/";
     public static final Set<String> FORMATS = Set.of("app-image", "deb", "rpm");
-    private static final String MODULE_PATH = "/app/extensions/modulepath", CLASS_PATH = "/app/extensions/classpath/*",
+    private static final String MODULE_PATH = "/app/extensions/modulepath",
+            CLASS_PATH = "/app/extensions/classpath/*",
             ANNOTATION = "org.opencontainers.image.";
 
     private final String from;
