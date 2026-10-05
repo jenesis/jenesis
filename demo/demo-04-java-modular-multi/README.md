@@ -128,7 +128,7 @@ is: `environment-java.properties` reaches every forked JVM and
 demo's `build.jenesis/environment-test.properties` sets one variable and passes
 another on:
 
-    DEMO_GREETING=Hello
+    DEMO_GREETING=@greeting/Hello
     DEMO_TOKEN
 
 A value is what the variable is set to. A name without one is taken from the
@@ -137,9 +137,18 @@ none:
 
     DEMO_TOKEN=t0ken java build/jenesis/Make.java
 
-The file is an input of the tools it names, so a changed value runs them again;
-a value taken from the build's environment is not, which suits a credential or a
-proxy but not a parameter a result depends on - write that one into the file.
+A value `@<key>` is the setting `jenesis.variable.<key>`, and `@<key>/<default>`
+falls back to what follows the slash where the setting is absent; `@@` writes a
+literal `@`. Without a default, a missing setting fails the build. The setting
+comes from the command line, a `jenesis.properties` or a profile, like any other:
+
+    java -Djenesis.variable.greeting=Hi build/jenesis/Make.java
+
+The file is an input of the tools it names, with every `@<key>` resolved, so
+another value runs them again. A value taken from the build's environment is
+not, which suits a credential or a proxy but not a parameter a result depends
+on - make that one a `@<key>`. A resolved value is written into the build's
+output like the rest of the file, so a credential stays a bare name.
 Only a program the build runs in a process of its own takes variables this way:
 `java`, the test run, PIT's mutation run (`environment-pitest.properties`),
 `native-image` and `gpgv`. A JDK tool such as `javac` or `javadoc` takes none,

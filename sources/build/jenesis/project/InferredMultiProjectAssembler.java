@@ -250,8 +250,8 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         Boolean modules = descriptor.pathPlacement() == PathPlacement.MODULE_PATH
                 ? null
                 : ModularizeModule.configured(BuildStep.locate(descriptor.configuration(), "modules.properties"));
-        SequencedMap<String, SequencedMap<String, String>> overrides = overridesOf(descriptor.configuration(), "process-"),
-                environments = overridesOf(descriptor.configuration(), "environment-");
+        SequencedMap<String, SequencedMap<String, String>> overrides = overridesOf(descriptor.configuration(), "process-", environment),
+                environments = overridesOf(descriptor.configuration(), "environment-", environment);
         ProcessHandler.Factory factory = ProcessHandler.Factory.ofEnvironment(environment);
         SequencedMap<String, SequencedMap<String, BuildExecutorModule>> hooks = new LinkedHashMap<>();
         hooks.put("", new LinkedHashMap<>(custom));
@@ -728,7 +728,9 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
     }
 
     private static SequencedMap<String, SequencedMap<String, String>> overridesOf(SequencedSet<Path> configuration,
-                                                                                String prefix) throws IOException {
+                                                                                String prefix,
+                                                                                Environment environment)
+            throws IOException {
         SequencedMap<String, Path> files = new LinkedHashMap<>();
         for (Path folder : configuration) {
             if (!Files.isDirectory(folder)) {
@@ -744,11 +746,30 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
         }
         SequencedMap<String, SequencedMap<String, String>> overrides = new LinkedHashMap<>();
         for (String command : new TreeSet<>(files.keySet())) {
+            Path file = files.get(command);
             SequencedMap<String, String> values = new LinkedHashMap<>();
-            SequencedProperties.ofFiles(files.get(command)).forEachProperty(values::put);
+            SequencedProperties.ofFiles(file).forEachProperty((key, value) -> values.put(key,
+                    variable(file, key, value, environment)));
             overrides.put(command, values);
         }
         return overrides;
+    }
+
+    private static String variable(Path file, String key, String value, Environment environment) {
+        if (!value.startsWith("@")) {
+            return value;
+        } else if (value.startsWith("@@")) {
+            return value.substring(1);
+        }
+        int slash = value.indexOf('/');
+        String name = value.substring(1, slash == -1 ? value.length() : slash), resolved = environment.value("variable." + name);
+        if (resolved != null) {
+            return resolved;
+        } else if (slash != -1) {
+            return value.substring(slash + 1);
+        }
+        throw new IllegalArgumentException(file + " sets " + key + " to " + value + ", but jenesis.variable." + name
+                + " is not set - set it, or give a default as @" + name + "/<default>");
     }
 
     private record Prepare(PathPlacement pathPlacement,
