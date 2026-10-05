@@ -232,6 +232,14 @@ Two conventions govern the code here:
   serialized state, so a knob in a non-`transient` field re-runs the step when it changes while a value
   hard-coded in a method body does not - changing a step's *logic* invalidates nothing on its own.
 
+### A plugin's steps follow its code
+
+A step a plugin defines - an `InternalModule` compiled from a folder, or an `ExternalModule` resolved by name -
+is keyed as well by a digest of the jars its module layer is loaded from: the plugin, its dependencies and the
+`build.jenesis` it runs on. Editing a plugin, moving it to another version or changing what it depends on
+therefore runs its steps again, without a `serialVersionUID` to bump. The engine's own steps are keyed by
+their serialized state alone, as above.
+
 Bugs, questions and design discussion belong in the [issue tracker](https://github.com/jenesis/jenesis/issues).
 
 License
