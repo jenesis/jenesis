@@ -23,6 +23,8 @@ The project is four module directories, each with its own `module-info.java`:
 
     demo/demo-04-java-modular-multi
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
+    |-- build.jenesis/
+    |   `-- environment-test.properties  the variables the test run is handed
     |-- greeter/             the library module
     |   |-- module-info.java     module demo.greeter { exports sample.greeter; }
     |   |-- messages.properties  a root resource, packaged into the jar and read at run time
@@ -103,6 +105,54 @@ line the tests compile against - though the `@jenesis.pin org.junit.platform.con
 tag overrides that default, so the pinned version always wins. Unlike the `pin` runs of the other demos, the JUnit closure is kept on
 the test module alone rather than propagated project-wide, to keep `greeter` and
 `app` focused on their own dependencies.
+
+What a test reads from the environment
+--------------------------------------
+
+A test run, like every program the build forks, receives none of the shell's
+environment variables beyond the platform's own: `PATH`, `HOME`, `LANG`, `LC_*`,
+`TMPDIR`, and on Windows `SystemRoot`, `TEMP` and their kin. A variable is no
+input of the build, so a result never depends on one the build cannot see.
+`GreeterTest` asserts that a variable set in the shell does not arrive:
+
+    DEMO_SECRET=s3cret java build/jenesis/Make.java
+
+What `java build/jenesis/Execute.java` runs is no step of the build but the
+program you asked for, so it is handed the shell's whole environment, as a
+program `jpx` runs is.
+
+A test that needs a variable is handed it by an `environment-<tool>.properties`
+in a configuration folder, named after the tool as a `process-<tool>.properties`
+is: `environment-java.properties` reaches every forked JVM and
+`environment-test.properties` the test run alone, merged over the `java` file. This
+demo's `build.jenesis/environment-test.properties` sets one variable and passes
+another on:
+
+    DEMO_GREETING=@greeting/Hello
+    DEMO_TOKEN
+
+A value is what the variable is set to. A name without one is taken from the
+build's own environment when the tool runs, and left unset when the build has
+none:
+
+    DEMO_TOKEN=t0ken java build/jenesis/Make.java
+
+A value `@<key>` is the setting `jenesis.variable.<key>`, and `@<key>/<default>`
+falls back to what follows the slash where the setting is absent; `@@` writes a
+literal `@`. Without a default, a missing setting fails the build. The setting
+comes from the command line, a `jenesis.properties` or a profile, like any other:
+
+    java -Djenesis.variable.greeting=Hi build/jenesis/Make.java
+
+The file is an input of the tools it names, with every `@<key>` resolved, so
+another value runs them again. A value taken from the build's environment is
+not, which suits a credential or a proxy but not a parameter a result depends
+on - make that one a `@<key>`. A resolved value is written into the build's
+output like the rest of the file, so a credential stays a bare name.
+Only a program the build runs in a process of its own takes variables this way:
+`java`, the test run, PIT's mutation run (`environment-pitest.properties`) and
+`native-image`. A JDK tool such as `javac` or `javadoc` takes none,
+as it may run inside the build's own JVM, and a file naming one fails the build.
 
 Shared test infrastructure
 --------------------------
