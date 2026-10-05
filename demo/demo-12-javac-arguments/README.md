@@ -38,7 +38,10 @@ build runs: `javac`, `kotlinc`, `scalac`, `jar`, `jmod`, `jlink`, `jpackage`, or
 while `process-test.properties` targets only the forked test JVM, merged over the
 `java` file with test keys winning. Each key is a flag and its value the flag's argument; an empty
 value (as here) emits a bare flag, and a value with embedded newlines repeats the
-flag once per line.
+flag once per line. A value `@<key>` or `@<key>/<default>` is the setting
+`jenesis.variable.<key>`, as the environment file of `demo-04` shows, so
+`-Xmaxwarns=@warnings/100` takes `-Djenesis.variable.warnings=500` from the
+command line and reruns `javac` when it changes.
 
 The default assembler's `prepare` step reads the file - resolving each command's
 file by **first match** across the configuration locations, so a profile's file,
