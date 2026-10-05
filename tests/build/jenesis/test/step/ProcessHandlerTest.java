@@ -83,6 +83,36 @@ public class ProcessHandlerTest {
     }
 
     @Test
+    public void a_forked_process_is_handed_the_platform_variables_and_nothing_else() {
+        ProcessHandler.OfProcess handler = ProcessHandler.OfProcess.ofJavaHome("bin/java").apply(List.of());
+        Set<String> platform = Set.of("PATH", "HOME", "LANG", "TMPDIR",
+                "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP", "USERPROFILE",
+                "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432", "PROGRAMDATA", "APPDATA", "LOCALAPPDATA");
+        assertThat(handler.environment().keySet())
+                .as("a variable of the build that is no fact of the platform never reaches a forked process")
+                .allSatisfy(name -> assertThat(name.startsWith("LC_")
+                        || platform.contains(name.toUpperCase(Locale.ROOT))).as(name).isTrue());
+    }
+
+    @Test
+    public void a_forked_process_receives_the_environment_it_is_handed() throws Exception {
+        Path source = root.resolve("Variable.java");
+        Files.writeString(source, """
+                public class Variable {
+                    public static void main(String[] args) {
+                        System.out.println(System.getenv("SAMPLE_VARIABLE"));
+                    }
+                }
+                """);
+        Path output = root.resolve("output"), error = root.resolve("error");
+        ProcessHandler.OfProcess handler = ProcessHandler.OfProcess.ofJavaHome("bin/java").apply(List.of(source.toString()));
+        SortedMap<String, String> environment = new TreeMap<>(handler.environment());
+        environment.put("SAMPLE_VARIABLE", "sample");
+        assertThat(handler.environment(environment).execute(output, error, null)).isZero();
+        assertThat(Files.readAllLines(output)).containsExactly("sample");
+    }
+
+    @Test
     public void teeing_a_tool_writes_the_files_and_streams_each_line() throws Exception {
         ToolProvider tool = new ToolProvider() {
             @Override
