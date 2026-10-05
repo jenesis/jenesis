@@ -30,7 +30,7 @@ the build produced:
 Layout
 ------
 
-    demo/demo-54-custom-assembler
+    demo/demo-55-custom-assembler
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- build/Demo.java      the entry point: wraps the stock assembler, builds and runs
     `-- sources/

@@ -131,7 +131,7 @@ name, as `GraalVM Free Terms and Conditions` would be for Oracle GraalVM.
 Layout
 ------
 
-    demo/demo-68-native-image
+    demo/demo-69-native-image
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- graal.properties     marker file; presence enables the GraalVM tracing agent
     |-- sources/

@@ -27,7 +27,7 @@ not compile.
 Layout
 ------
 
-    demo/demo-56-internal-module
+    demo/demo-57-internal-module
     |-- build/jenesis                 symlink to ../../../sources/build/jenesis
     |-- jenesis.plugins.properties    greeting+binary/generated=./plugin
     |-- build.jenesis/

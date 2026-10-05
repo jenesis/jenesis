@@ -102,22 +102,23 @@ Quick index
 | 51 | [`agents`](demo-51-agents/README.md)                              | Attach a library as a Java agent with `@jenesis.attach`                      | `java build/Demo.java`            |
 | 52 | [`native-access`](demo-52-native-access/README.md)                | Grant native access with `@jenesis.native`, and discover what to redeclare  | `java build/jenesis/Execute.java` |
 | 53 | [`native-access-layer`](demo-53-native-access-layer/README.md)    | Grant a library native access, which it passes on to the modules of its layer | `java build/Demo.java`            |
-| 54 | [`custom-assembler`](demo-54-custom-assembler/README.md)          | Wrap the assembler to preprocess sources before the regular flow             | `java build/Demo.java`            |
-| 55 | [`custom-jmod`](demo-55-custom-jmod/README.md)                    | Pack extra content into a `.jmod` and carry it into a packaged app           | `java build/Demo.java`            |
-| 56 | [`internal-module`](demo-56-internal-module/README.md)            | Move that preprocessing into a build module loaded from local source         | `java build/Demo.java`            |
-| 57 | [`external-module`](demo-57-external-module/README.md)            | Resolve the same build module as a published coordinate                      | `java build/Demo.java`            |
-| 58 | [`project-plugins`](demo-58-project-plugins/README.md)            | Hook plugins into the build of the whole project, from a first check to release | `java build/jenesis/Make.java stage`|
-| 59 | [`custom-maven`](demo-59-custom-maven/README.md)                  | Drive a multi-module Maven build without `Project`                           | `java build/Demo.java`            |
-| 60 | [`custom-modular`](demo-60-custom-modular/README.md)              | The same for `module-info.java` modules                                      | `java build/Demo.java`            |
-| 61 | [`custom-build`](demo-61-custom-build/README.md)                  | No template at all: wire the build by hand                                   | `java build/Demo.java`            |
-| 62 | [`tools-api`](demo-62-tools-api/README.md)                        | Run a build, or a published program, inside another program's JVM            | `java build/Demo.java`            |
-| 63 | [`code-signing`](demo-63-code-signing/README.md)                  | Sign the produced jar with `jarsigner`, keyed by the environment             | `java build/Demo.java`            |
-| 64 | [`export`](demo-64-export/README.md)                              | Install a build into the local repositories, for other projects to require   | `java build/jenesis/Make.java export`|
-| 65 | [`publishing`](demo-65-publishing/README.md)                      | Assemble a Maven Central ready bundle and resolve it back                    | `java build/Demo.java`            |
-| 66 | [`module-convention`](demo-66-module-convention/README.md)        | Resolve your own modules from your own Maven repository                      | `java build/Demo.java`            |
-| 67 | [`reproducible`](demo-67-reproducible/README.md)                  | Build the same bytes on every machine, checked against a recorded digest     | `java build/Demo.java`            |
-| 68 | [`native-image`](demo-68-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
-| 69 | [`jpx`](demo-69-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
+| 54 | [`class-path`](demo-54-class-path/README.md)                      | Let a modular jar's services work from the class path too                    | `java build/jenesis/Make.java`    |
+| 55 | [`custom-assembler`](demo-55-custom-assembler/README.md)          | Wrap the assembler to preprocess sources before the regular flow             | `java build/Demo.java`            |
+| 56 | [`custom-jmod`](demo-56-custom-jmod/README.md)                    | Pack extra content into a `.jmod` and carry it into a packaged app           | `java build/Demo.java`            |
+| 57 | [`internal-module`](demo-57-internal-module/README.md)            | Move that preprocessing into a build module loaded from local source         | `java build/Demo.java`            |
+| 58 | [`external-module`](demo-58-external-module/README.md)            | Resolve the same build module as a published coordinate                      | `java build/Demo.java`            |
+| 59 | [`project-plugins`](demo-59-project-plugins/README.md)            | Hook plugins into the build of the whole project, from a first check to release | `java build/jenesis/Make.java stage`|
+| 60 | [`custom-maven`](demo-60-custom-maven/README.md)                  | Drive a multi-module Maven build without `Project`                           | `java build/Demo.java`            |
+| 61 | [`custom-modular`](demo-61-custom-modular/README.md)              | The same for `module-info.java` modules                                      | `java build/Demo.java`            |
+| 62 | [`custom-build`](demo-62-custom-build/README.md)                  | No template at all: wire the build by hand                                   | `java build/Demo.java`            |
+| 63 | [`tools-api`](demo-63-tools-api/README.md)                        | Run a build, or a published program, inside another program's JVM            | `java build/Demo.java`            |
+| 64 | [`code-signing`](demo-64-code-signing/README.md)                  | Sign the produced jar with `jarsigner`, keyed by the environment             | `java build/Demo.java`            |
+| 65 | [`export`](demo-65-export/README.md)                              | Install a build into the local repositories, for other projects to require   | `java build/jenesis/Make.java export`|
+| 66 | [`publishing`](demo-66-publishing/README.md)                      | Assemble a Maven Central ready bundle and resolve it back                    | `java build/Demo.java`            |
+| 67 | [`module-convention`](demo-67-module-convention/README.md)        | Resolve your own modules from your own Maven repository                      | `java build/Demo.java`            |
+| 68 | [`reproducible`](demo-68-reproducible/README.md)                  | Build the same bytes on every machine, checked against a recorded digest     | `java build/Demo.java`            |
+| 69 | [`native-image`](demo-69-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
+| 70 | [`jpx`](demo-70-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -796,7 +797,16 @@ and the application grants access to the library alone, as it would a library
 that had shaded the module. `jenesis.dependency.native` asks for the library,
 never for the module in its layer.
 
-## 39. Customizing the build - [`custom-assembler`](demo-54-custom-assembler/README.md), [`custom-jmod`](demo-55-custom-jmod/README.md)
+## 39. A modular jar on the class path - [`class-path`](demo-54-class-path/README.md)
+
+A module declares its services in `module-info.java`, which a class-path
+`ServiceLoader` never reads. An empty `classpath.properties` in a configuration
+folder makes the build write a `META-INF/services/<service>` file for each
+`provides` clause, so the same jar works on either path. A module that grants
+native access to itself also gets the `Enable-Native-Access` manifest attribute
+that `java -jar` reads.
+
+## 40. Customizing the build - [`custom-assembler`](demo-55-custom-assembler/README.md), [`custom-jmod`](demo-56-custom-jmod/README.md)
 
 The next demos open up the template, and each is launched with
 `java build/Demo.java`. `custom-assembler` keeps the standard flow but wraps the
@@ -817,7 +827,7 @@ and adds a step that emits a configuration directory, which travels with the jmo
 into the linked runtime and into the packaged application, where the program
 reads it back from its own `<java.home>/conf/` - content a jar cannot carry.
 
-## 40. Plugins - [`internal-module`](demo-56-internal-module/README.md), [`external-module`](demo-57-external-module/README.md)
+## 41. Plugins - [`internal-module`](demo-57-internal-module/README.md), [`external-module`](demo-58-external-module/README.md)
 
 A plugin adds to the stock build without an entry point of its own. It is named in
 one line of `jenesis.plugins.properties`, beside `jenesis.properties`, with the
@@ -836,7 +846,7 @@ name and resolved from a repository instead of compiled from source. Build logic
 is just another module: written inline, loaded from source, or consumed as a
 published one.
 
-## 41. Plugins for the whole project - [`project-plugins`](demo-58-project-plugins/README.md)
+## 42. Plugins for the whole project - [`project-plugins`](demo-59-project-plugins/README.md)
 
 The plugins of the `internal-module` demo join one module of the build. This demo
 hooks plugins into the build of the whole project instead, one for each point:
@@ -860,7 +870,7 @@ under `plugin` runs only when it is named, as `plugin/lines`, without a build. T
 values from `jenesis.plugins.arguments.properties`, and `pin` records their own
 closures in `jenesis.plugins.pin.properties`.
 
-## 42. Driving the build without `Project` - [`custom-maven`](demo-59-custom-maven/README.md), [`custom-modular`](demo-60-custom-modular/README.md)
+## 43. Driving the build without `Project` - [`custom-maven`](demo-60-custom-maven/README.md), [`custom-modular`](demo-61-custom-modular/README.md)
 
 These two drive a multi-module build from a hand-written `build/Demo.java`, with
 no layout and no goals, while reusing the whole standard toolchain:
@@ -874,7 +884,7 @@ no layout and no goals, while reusing the whole standard toolchain:
 `module-info.java` modules. The three-argument `make` discovers the modules and
 supplies the defaults a normal build would configure.
 
-## 43. Dropping the template entirely - [`custom-build`](demo-61-custom-build/README.md)
+## 44. Dropping the template entirely - [`custom-build`](demo-62-custom-build/README.md)
 
 The last of the customization demos removes the template altogether and wires the
 build by hand in one `main` method - no `pom.xml`, no `module-info.java`, just
@@ -885,7 +895,7 @@ model:
     java build/Demo.java
     java -cp target/jar/output/artifacts/classes.jar sample.Sample
 
-## 44. Running a build from another program - [`tools-api`](demo-62-tools-api/README.md)
+## 45. Running a build from another program - [`tools-api`](demo-63-tools-api/README.md)
 
 A build does not have to be a process of its own. `build.jenesis` publishes three
 `java.util.spi.ToolProvider` tools, named after the commands they answer to, so a
@@ -908,7 +918,7 @@ build runs in - naming another JDK with `jenesis.toolchain.version`, or a contai
 with `jenesis.project.docker` or `jenesis.execute.docker` - and each is refused by
 name rather than ignored. Reach for the `jenesis` command there.
 
-## 45. Signing the jar you publish - [`code-signing`](demo-63-code-signing/README.md)
+## 46. Signing the jar you publish - [`code-signing`](demo-64-code-signing/README.md)
 
 Where `openpgp` and `sigstore` ask who produced the dependencies coming in,
 `code-signing` answers the same question about what goes out, and answers it
@@ -931,7 +941,7 @@ The password is never a value: `storepass` takes `env <variable>` or
 `file <path>`, and anything else is refused. The signed jar replaces the unsigned
 one before the inventory, the staged repositories or a publication ever see it.
 
-## 46. Requiring a build from another local project - [`export`](demo-64-export/README.md)
+## 47. Requiring a build from another local project - [`export`](demo-65-export/README.md)
 
 Before anything is published, `export` installs what `stage` laid out into this
 machine's local repositories: the modular tree into `~/.jenesis`, the Maven tree
@@ -948,7 +958,7 @@ and pinning that version fixes the dependency. A consumer resolves again when wh
 it declares changes, not when a new export appears, so `jenesis.executor.rebuild`
 is how it takes one.
 
-## 47. Publishing to Maven Central - [`publishing`](demo-65-publishing/README.md)
+## 48. Publishing to Maven Central - [`publishing`](demo-66-publishing/README.md)
 
 Publishing is two jobs - produce a correct bundle and upload it - and Jenesis
 does the first. A `module-info.java` plus a `project.properties` supply the
@@ -963,7 +973,7 @@ staged tree - which is how Jenesis itself releases - so the demo needs no
 credentials, no key and no network. A `jreleaser.yml` at the project root adds that step to the `release`
 goal, a rehearsal unless told otherwise.
 
-## 48. Your own modules from your own Maven repository - [`module-convention`](demo-66-module-convention/README.md)
+## 49. Your own modules from your own Maven repository - [`module-convention`](demo-67-module-convention/README.md)
 
 `publishing` showed the coordinate a module is published under: the groupId from
 the first two dotted segments of its name, the artifactId from the whole name.
@@ -980,7 +990,7 @@ group reaches into the name is configuration too:
 
     jenesis.maven.segments=3
 
-## 49. The same bytes on every machine - [`reproducible`](demo-67-reproducible/README.md)
+## 50. The same bytes on every machine - [`reproducible`](demo-68-reproducible/README.md)
 
 What you publish, anyone holding the sources should be able to build again and
 get the same bytes. `reproducible` turns that into a check: it builds a module
@@ -995,7 +1005,7 @@ the time of the release commit - and the recorded digest moves with it:
 
     jenesis.archive.timestamp=2026-09-01T12:00:00Z
 
-## 50. Ahead-of-time native image - [`native-image`](demo-68-native-image/README.md)
+## 51. Ahead-of-time native image - [`native-image`](demo-69-native-image/README.md)
 
 Where `jpackage` bundles your bytecode with a trimmed JVM, GraalVM
 `native-image` compiles the program and the runtime it touches into a single
@@ -1016,7 +1026,7 @@ Native image is an alternative to `jpackage`, not a successor: `jpackage` for a
 faithful bundle of the JVM you tested against, native image when startup and
 footprint dominate. It needs GraalVM, so it is a local exercise.
 
-## 51. Running a released program - [`jpx`](demo-69-jpx/README.md)
+## 52. Running a released program - [`jpx`](demo-70-jpx/README.md)
 
 Every demo so far built something. `jpx` builds nothing: it resolves a published
 module or Maven artifact, installs its runtime closure once under
