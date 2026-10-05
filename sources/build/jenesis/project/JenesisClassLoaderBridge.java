@@ -14,33 +14,33 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 
-class JenesisClassLoaderBridge implements AutoCloseable {
+class JenesisClassLoaderBridge {
 
-    private ModuleLayer layer;
-    private ModuleLayer.Controller controller;
-    private ClassLoader loader;
+    private final ModuleLayer layer;
+    private final ModuleLayer.Controller controller;
+    private final ClassLoader loader;
 
-    private Class<?> foreignBuildExecutorModule;
+    private final Class<?> foreignBuildExecutorModule;
 
-    private MethodHandle foreignAccept;
-    private MethodHandle foreignApply;
-    private MethodHandle foreignShouldRun;
-    private MethodHandle foreignShouldCacheRemotely;
+    private final MethodHandle foreignAccept;
+    private final MethodHandle foreignApply;
+    private final MethodHandle foreignShouldRun;
+    private final MethodHandle foreignShouldCacheRemotely;
 
-    private MethodHandle foreignContextCtor;
-    private MethodHandle foreignArgumentCtor;
-    private MethodHandle foreignResultNext;
+    private final MethodHandle foreignContextCtor;
+    private final MethodHandle foreignArgumentCtor;
+    private final MethodHandle foreignResultNext;
 
-    private Class<?> foreignBuildExecutor;
+    private final Class<?> foreignBuildExecutor;
 
-    private Class<? extends Annotation> foreignBuildModuleName;
-    private MethodHandle foreignBuildModuleNameValue;
+    private final Class<? extends Annotation> foreignBuildModuleName;
+    private final MethodHandle foreignBuildModuleNameValue;
 
-    private Map<String, Object> foreignChecksums;
+    private final Map<String, Object> foreignChecksums;
 
-    private byte[] origin;
+    private final byte[] origin;
 
-    JenesisClassLoaderBridge(Collection<Path> artifacts) throws ReflectiveOperationException, IOException {
+    JenesisClassLoaderBridge(List<Path> artifacts) throws ReflectiveOperationException, IOException {
         ModuleFinder finder = ModuleFinder.of(artifacts.toArray(Path[]::new));
         Set<String> roots = finder.findAll().stream()
                 .map(ref -> ref.descriptor().name())
@@ -115,29 +115,7 @@ class JenesisClassLoaderBridge implements AutoCloseable {
         origin = digest.digest();
     }
 
-    @Override
-    public void close() {
-        layer = null;
-        controller = null;
-        loader = null;
-        foreignBuildExecutorModule = null;
-        foreignAccept = null;
-        foreignApply = null;
-        foreignShouldRun = null;
-        foreignShouldCacheRemotely = null;
-        foreignContextCtor = null;
-        foreignArgumentCtor = null;
-        foreignResultNext = null;
-        foreignBuildExecutor = null;
-        foreignBuildModuleName = null;
-        foreignBuildModuleNameValue = null;
-        foreignChecksums = null;
-    }
-
     Object findProvider(String name, SequencedMap<String, String> properties) throws ReflectiveOperationException {
-        if (loader == null) {
-            throw new IllegalStateException("Build module class loader bridge was already closed");
-        }
         ServiceLoader.Provider<?> match = null;
         for (ServiceLoader.Provider<?> provider : ServiceLoader.load(layer, foreignBuildExecutorModule).stream().toList()) {
             Annotation annotation = provider.type().getAnnotation(foreignBuildModuleName);
