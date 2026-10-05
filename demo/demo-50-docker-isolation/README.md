@@ -116,7 +116,7 @@ still leaked. To sandbox the build too, run it in a container as well - but with
 one extra flag in this repository, explained next:
 
     java -Djenesis.project.docker=true \
-         -Djenesis.project.docker.mount=../../sources \
+         -Djenesis.project.docker.readable=../../sources \
          build/jenesis/Make.java
 
 `jenesis.project.docker` runs the whole build - the test included - inside the
@@ -141,7 +141,7 @@ Why the extra mount is needed here. The demos share one engine through the
 `build/jenesis -> ../../../sources/build/jenesis` symlink, which points outside
 the project root. `jenesis.project.docker` mounts only the project root, so inside
 the container that symlink dangles and the build cannot even start
-(`ClassNotFoundException: build.jenesis.Project.java`). `jenesis.project.docker.mount`
+(`ClassNotFoundException: build.jenesis.Project.java`). `jenesis.project.docker.readable`
 adds bind mounts to the container; pointing it at the shared `sources/` tree
 (`../../sources`, resolved against the project root) makes the symlink target
 present at the same path inside the container, so the engine resolves. The mount
@@ -155,7 +155,7 @@ A normally vendored project (a real `build/jenesis/` directory inside the root,
 from the curl or SDKMAN install) has the engine under the mounted root and needs
 no extra mount. `jenesis.execute.docker` is unaffected here either way, since the
 build runs on the host and only the finished artifact is launched in the
-container. The same `jenesis.execute.docker.mount` flag exists for symmetry when a
+container. The same `jenesis.execute.docker.readable` flag exists for symmetry when a
 launched program needs a host path made visible.
 
 When a sandboxed build or program legitimately needs to *write* to a host path -

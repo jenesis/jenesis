@@ -19,12 +19,12 @@ public record Execution(Project project, String mainClass, String module, Contai
                 Container.ofEnvironment(environment));
     }
 
-    public record Container(String image, String mount, String writable, String env, boolean announcing) {
+    public record Container(String image, String readable, String writable, String env, boolean announcing) {
 
         public static Container ofEnvironment(Environment environment) {
             return environment.flag("execute.docker")
                     ? new Container(environment.getProperty("execute.docker.image"),
-                                    environment.getProperty("execute.docker.mount"),
+                                    environment.getProperty("execute.docker.readable"),
                                     environment.getProperty("execute.docker.writable"),
                                     environment.getProperty("execute.docker.env"),
                                     environment.flag("print.docker", true))
@@ -259,7 +259,7 @@ public record Execution(Project project, String mainClass, String module, Contai
                     docker = docker.mount(absolute, absolute.toString(), false);
                 }
             }
-            docker = docker.mounts(container.mount(), root, true)
+            docker = docker.mounts(container.readable(), root, true)
                     .mounts(container.writable(), root, false)
                     .envs(container.env());
             if (container.announcing()) {

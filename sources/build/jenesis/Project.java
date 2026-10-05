@@ -1134,7 +1134,7 @@ public record Project(
                     program's own. Where more than one declares a main, name it with
                     -Djenesis.execute.module=<source folder> (nested: server/ui or server+ui) and
                     -Djenesis.execute.main=<fqcn>. Wrap the program alone in Docker with
-                    -Djenesis.execute.docker=true, plus .docker.image, .docker.mount (read-only),
+                    -Djenesis.execute.docker=true, plus .docker.image, .docker.readable,
                     .docker.writable and .docker.env. Execute is its own entry point: build
                     selectors do not apply to it, nor its properties to a plain build.
 
@@ -2816,7 +2816,7 @@ public record Project(
                 project.cache||Project-local disk cache, layered in front of a remote; empty means .jenesis/cache; a file a project provides names only a folder inside the project
                 project.docker|false|Run the whole build inside a container
                 project.docker.image||Image for that container
-                project.docker.mount||Extra read-only container mounts, host[:container],...
+                project.docker.readable||Extra read-only container mounts, host[:container],...
                 project.docker.writable||Extra writable container mounts
                 project.docker.env||Host environment variables to forward, name[=value],...
                 make.root|.|Folder Make looks for the project in; only settable on the command line
@@ -2910,7 +2910,7 @@ public record Project(
                 execute.main||Main class to run, overriding the module's @jenesis.main
                 execute.docker|false|Run the launched program in a container, independently of the build
                 execute.docker.image||Image for that container
-                execute.docker.mount||Extra read-only container mounts
+                execute.docker.readable||Extra read-only container mounts
                 execute.docker.writable||Extra writable container mounts
                 execute.docker.env||Host environment variables to forward
                 sbom.cyclonedx|true|Emit a CycloneDX SBOM; sbom.properties selects its format
@@ -3026,7 +3026,7 @@ public record Project(
                     docker = docker.mount(Files.createDirectories(cache), cache.toString(), false);
                 }
             }
-            docker = docker.mounts(environment.getProperty("project.docker.mount"), root, true);
+            docker = docker.mounts(environment.getProperty("project.docker.readable"), root, true);
             docker = docker.mounts(environment.getProperty("project.docker.writable"), root, false);
             docker = docker.envs(environment.getProperty("project.docker.env"));
             String mavenRepositoryUri = environment.getProperty("maven.uri", System.getenv("MAVEN_REPOSITORY_URI"));
