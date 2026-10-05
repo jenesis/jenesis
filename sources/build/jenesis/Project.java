@@ -1052,7 +1052,7 @@ public record Project(
                                                 the test JVM, merged over process-java.properties
                       environment-<tool>.properties
                                                 variables for a program the build forks (java, test,
-                                                pitest, native-image, gpgv), which otherwise sees only
+                                                pitest, native-image), which otherwise sees only
                                                 PATH, HOME, LANG and the platform's own; NAME=value
                                                 sets one, a bare NAME passes on the build's own
 
