@@ -73,7 +73,7 @@ way, so the same rule applies to it.
 Layout
 ------
 
-    demo/demo-55-custom-jmod
+    demo/demo-56-custom-jmod
     |-- build/jenesis        symlink to ../../../sources/build/jenesis
     |-- build/Demo.java      the entry point: adds the config step to the assembler, builds stage
     `-- sources/

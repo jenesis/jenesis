@@ -1060,6 +1060,10 @@ public record Project(
                                                 only its source folder is collected
                                                 (folders, generator, package, sources, arguments)
                       spdx.properties           extend the license alias/category tables
+                      classpath.properties      make a module's jar serve the class path too: a
+                                                META-INF/services file per provides clause, checking
+                                                each provider can be created there, and
+                                                Enable-Native-Access for a module granting itself
                       process-<tool>.properties extra arguments for a forked tool (javac, javadoc, jar,
                                                 jlink, jpackage, ...); process-test.properties targets
                                                 the test JVM, merged over process-java.properties
@@ -1145,7 +1149,7 @@ public record Project(
                     than the JVM, so two runs in one program never clash; everything after them is
                     what the command line would take. A setting that replaces the process a build
                     runs in - toolchain.version, project.docker, execute.docker - is refused by name
-                    there, and so is a -J option, as the JDK's own tools refuse one; demo-62-tools-api
+                    there, and so is a -J option, as the JDK's own tools refuse one; demo-63-tools-api
                     shows the whole contract.
 
                     Every command line here, the commands and the tools alike, reads @<file> as the
@@ -1233,7 +1237,7 @@ public record Project(
                 case "demos" -> """
                     # Jenesis - Copy a demo
 
-                    69 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
+                    70 demos under `demo/`, each self-contained, runnable and minimal, ordered so the
                     sequence doubles as a tutorial; `demo/README.md` indexes them. Find the one
                     matching the task and copy its shape rather than inventing configuration.
 
@@ -1248,7 +1252,8 @@ public record Project(
                       Starting a build   06 startup (what launching costs, the daemon, the AOT cache),
                                          07 toolchain (the JDK the build runs on)
                       Runnable output    08, 09 java-*-executable (jpackage), 10 bundle (jars for a
-                                         stock JRE), 11 java-multi-release, 68 native-image (GraalVM)
+                                         stock JRE), 11 java-multi-release, 69 native-image (GraalVM),
+                                         54 class-path (a modular jar's services on the class path)
                       Compiler control   12 javac-arguments (process-javac.properties),
                                          13 annotations (an annotation processor via @jenesis.plugin),
                                          14 error-prone (a javac plugin),
@@ -1273,17 +1278,17 @@ public record Project(
                                          51 agents (@jenesis.attach),
                                          52 native-access (@jenesis.native),
                                          53 native-access-layer (passed on to a layer)
-                      Shipping it        63 code-signing (jarsigner), 64 export (into the local repositories),
-                                         65 publishing (Maven Central),
-                                         66 module-convention (resolving what you published),
-                                         67 reproducible (a jar checked against a recorded digest),
-                                         69 jpx (run a released program without building)
-                      Extending it       54 custom-assembler, 55 custom-jmod, 56 internal-module,
-                                         57 external-module,
-                                         58 project-plugins (hooks from a first check to release),
-                                         59 custom-maven, 60 custom-modular,
-                                         61 custom-build (no Project at all),
-                                         62 tools-api (a build inside another program's JVM)
+                      Shipping it        64 code-signing (jarsigner), 65 export (into the local repositories),
+                                         66 publishing (Maven Central),
+                                         67 module-convention (resolving what you published),
+                                         68 reproducible (a jar checked against a recorded digest),
+                                         70 jpx (run a released program without building)
+                      Extending it       55 custom-assembler, 56 custom-jmod, 57 internal-module,
+                                         58 external-module,
+                                         59 project-plugins (hooks from a first check to release),
+                                         60 custom-maven, 61 custom-modular,
+                                         62 custom-build (no Project at all),
+                                         63 tools-api (a build inside another program's JVM)
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
@@ -2930,6 +2935,7 @@ public record Project(
                 generate.wsimport|true|JAX-WS generation, activated by a wsimport.properties
                 generate.openapi|true|OpenAPI generation, activated by an openapi.properties
                 generate.antlr|true|ANTLR generation, activated by an antlr.properties
+                generate.classpath|true|META-INF/services entries generated from a module-info's provides, and Enable-Native-Access for a module granting itself, so its jar also serves the class path, activated by a classpath.properties
                 observe.jacoco|true|JaCoCo coverage, activated by a jacoco.properties
                 observe.native|true|native-image reachability agent, activated by a graal.properties
                 observe.jfr|true|Java Flight Recorder in the test JVM, activated by a jfr.properties whose lines are the options of the recording
