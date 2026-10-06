@@ -28,8 +28,9 @@ Reading the outcome
 
 Besides the progress lines, every build writes what happened to
 `target/.jenesis.events.jsonl`, one JSON object per line, replaced by the next
-build; the second progress line, `[EVENTS]`, names the file. A script or a coding
-agent reads it instead of parsing the console:
+build; the second progress line, `[EVENTS]`, names the file, and the third,
+`[AGENTS]`, names the selector `skill/start` that briefs a coding agent on the build.
+A script or a coding agent reads the file instead of parsing the console:
 
     {"status":"started","target":"/.../demo-01-java-pom/target","directory":"/.../demo-01-java-pom","run":"20261005T152001.123456Z"}
     {"status":"resolved","module":"build","seconds":0.063}

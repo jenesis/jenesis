@@ -83,6 +83,8 @@ public interface BuildExecutorCallback {
                     if (events) {
                         out.accept("%s%-11s%s Recording each step's outcome as a JSON line in '%s'".formatted(
                                 palette.status(), "[EVENTS]", palette.reset(), target.resolve(BuildExecutor.EVENTS)));
+                        out.accept("%s%-11s%s A coding agent passes the selector skill/start for its briefing on this build"
+                                .formatted(palette.status(), "[AGENTS]", palette.reset()));
                     }
                     return (_, throwable) -> {
                         double time = ((double) (System.nanoTime() - started) / 1_000_000) / 1_000;
