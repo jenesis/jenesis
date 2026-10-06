@@ -329,6 +329,18 @@ public class ProjectTest {
     }
 
     @Test
+    public void help_sends_a_coding_agent_to_the_briefing_before_anything_else() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        List<String> printed = new ArrayList<>();
+        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).out(printed::add), root, new LinkedHashSet<>(), Project.HELP)).isEmpty();
+        String help = String.join("\n", printed);
+        assertThat(help.indexOf("skill/start"))
+                .as("an agent reads help from the top, so the way to its own briefing comes before the configuration")
+                .isPositive()
+                .isLessThan(help.indexOf("Active configuration:"));
+    }
+
+    @Test
     public void skill_start_prints_an_overview_that_names_the_pages_rather_than_their_contents() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
         List<String> printed = new ArrayList<>();
