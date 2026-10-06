@@ -377,9 +377,19 @@ public class ProjectTest {
                 .isEmpty();
         assertThat(printed.stream().filter(page -> page.startsWith("# Jenesis - ")))
                 .as("each page is printed as one text, so pages printed at once never tear one another")
-                .hasSize(12)
+                .hasSize(15)
                 .allMatch(page -> page.strip().endsWith("java build/jenesis/Make.java skill/start"));
         assertThat(String.join("\n", printed)).contains("## Essentials");
+    }
+
+    @Test
+    public void skill_registry_names_what_replaces_a_maven_plugin_and_its_gradle_counterpart() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        List<String> printed = new ArrayList<>();
+        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).out(printed::add), root, new LinkedHashSet<>(), Project.SKILL + "/registry")).isEmpty();
+        assertThat(String.join("\n", printed))
+                .as("a migrating build is read plugin by plugin, so each line starts from the plugin it replaces")
+                .contains("maven-checkstyle-plugin / checkstyle -> checkstyle.xml (34)", "skill/extend");
     }
 
     @Test
