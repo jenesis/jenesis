@@ -136,17 +136,35 @@ public class Tree implements BuildStep {
                 licenses.add(new License(null, null, inventory.value(prefix + "license." + index), null));
             }
             Resolver.Vertex root = new Resolver.Vertex(version, inventory.value(prefix + "module"), false, true, licenses);
+            List<Path> graphs = Inventory.paths(inventory, entry.getKey(), prefix + "graph");
+            SequencedMap<String, String> declarations = Dependencies.layers(graphs);
             SequencedMap<String, SequencedMap<String, Resolver.Resolution>> groups = new LinkedHashMap<>();
+            SequencedMap<String, Resolver.Resolution> layered = new LinkedHashMap<>();
+            SequencedMap<String, String> layers = new LinkedHashMap<>();
             Dependencies.graph(
-                    Inventory.paths(inventory, entry.getKey(), prefix + "graph"),
+                    graphs,
                     Inventory.paths(inventory, entry.getKey(), prefix + "licenses")).forEach((groupScope, resolution) -> {
-                groups.computeIfAbsent(groupScope.substring(0, groupScope.indexOf('/')), _ -> new TreeMap<>())
-                        .put(groupScope.substring(groupScope.indexOf('/') + 1), resolution);
+                String group = groupScope.substring(0, groupScope.indexOf('/')),
+                        scope = groupScope.substring(groupScope.indexOf('/') + 1);
+                if (key != null && group.startsWith("layer:")) {
+                    String name = scope.equals("runtime") ? group : groupScope;
+                    layered.put(name, resolution);
+                    layers.put(name, declarations.getOrDefault(group.substring("layer:".length()), key));
+                } else {
+                    groups.computeIfAbsent(group, _ -> new TreeMap<>()).put(scope, resolution);
+                }
                 aggregated.putAll(resolution.vertices());
             });
+            if (!layered.isEmpty()) {
+                groups.computeIfAbsent("main", _ -> new TreeMap<>());
+            }
             groups.forEach((group, scopes) -> {
                 if (key == null) {
                     report.render(group, scopes);
+                } else if (group.equals("main")) {
+                    SequencedMap<String, Resolver.Resolution> merged = new LinkedHashMap<>(scopes);
+                    merged.putAll(layered);
+                    report.render(merged, key, root, layers);
                 } else {
                     report.render(scopes, key, root);
                 }
