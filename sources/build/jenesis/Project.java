@@ -501,6 +501,8 @@ public record Project(
             out.accept(("""
                     %{title}Jenesis%{reset} - a Java build tool, written and configured in Java.
 
+                    A coding agent runs %{name}java build/jenesis/Make.java skill/start%{reset} first, the briefing written for it.
+
                     %{header}Active configuration:%{reset}
                       layout      %{name}%{layout}%{reset}
                       assembler   %{name}%{assembler}%{reset}
@@ -648,6 +650,13 @@ public record Project(
                     - Find the demo that matches the task and copy its shape rather than inventing
                       configuration.
                     - Moving a Maven or Gradle build here? Follow skill/migrate step by step.
+
+                    ## First moves in a project you do not know
+
+                      java build/jenesis/Make.java                                 build, then read
+                                                                                   target/.jenesis.events.jsonl
+                      java build/jenesis/Make.java configuration | grep -F "[set]" what this project changed
+                      java build/jenesis/Make.java dependencies                    what each module resolves
 
                     ## Pages
 
