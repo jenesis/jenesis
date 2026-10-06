@@ -69,10 +69,22 @@ public class BuildExecutorCallbackTest {
         BuildExecutorCallback.printing(printed::add, Palette.ANSI, false, false, target, true).step(null, new LinkedHashSet<>());
         assertThat(printed)
                 .as("a reader of the progress lines learns from the second one where the outcome is recorded")
-                .hasSize(2)
-                .last()
+                .hasSize(3)
+                .element(1)
                 .asString()
                 .contains("[EVENTS]", target.resolve(BuildExecutor.EVENTS).toString());
+    }
+
+    @Test
+    public void names_the_briefing_of_a_coding_agent_where_the_build_starts() {
+        List<String> printed = new ArrayList<>();
+        BuildExecutorCallback.printing(printed::add, Palette.NONE, false, false, target, true).step(null, new LinkedHashSet<>());
+        assertThat(printed)
+                .as("an agent that only ever runs a build still learns from its opening lines where its briefing is")
+                .last()
+                .asString()
+                .startsWith("[AGENTS]")
+                .contains("skill/start");
     }
 
     @Test

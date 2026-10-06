@@ -3438,8 +3438,6 @@ public record Project(
         t.printStackTrace(new PrintWriter(trace));
         trace.toString().lines().forEach(environment.err());
         environment.err().accept("");
-        environment.err().accept("The build failed with the error above. If you meant to look up how to"
-                + " invoke Jenesis, pass `help` as the only argument on the command line, or `skill/start`"
-                + " for an agent-oriented briefing.");
+        environment.err().accept("The build failed with the error above; `help` explains how to run Jenesis.");
     }
 }

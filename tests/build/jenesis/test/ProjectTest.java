@@ -382,6 +382,18 @@ public class ProjectTest {
     }
 
     @Test
+    public void a_failed_build_ends_by_naming_help_as_the_way_on() throws IOException {
+        Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
+        List<String> errors = new ArrayList<>();
+        assertThat(Project.perform(new Environment(Map.of("project.target", root.resolve("target").toString())).err(errors::add), root, new LinkedHashSet<>(), "nonsense"))
+                .isNull();
+        assertThat(errors)
+                .as("help names the briefing of a coding agent in its second line, so the failure needs to name help alone")
+                .last()
+                .isEqualTo("The build failed with the error above; `help` explains how to run Jenesis.");
+    }
+
+    @Test
     public void skill_alone_prints_every_page() throws IOException {
         Files.writeString(Files.createDirectories(root.resolve("sources")).resolve("module-info.java"), "module example {}");
         List<String> printed = new CopyOnWriteArrayList<>();
