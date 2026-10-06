@@ -372,6 +372,81 @@ public class PinPomTest {
     }
 
     @Test
+    public void keeps_an_imported_bom_when_replacing_dependency_management() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        Files.writeString(pom, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>stale</groupId>
+                                <artifactId>old</artifactId>
+                                <version>0.1</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.example</groupId>
+                                <artifactId>bom</artifactId>
+                                <version>${bom.version}</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """);
+        writeResolved(Map.of("maven/org.example/fresh", "3.0 SHA-256/deadbeef"));
+        String result = run(pom);
+        assertThat(result)
+                .as("an imported BOM is where versions come from rather than a pin, so it outlives the pins it produced")
+                .contains("""
+                                <dependency>
+                                    <groupId>org.example</groupId>
+                                    <artifactId>bom</artifactId>
+                                    <version>${bom.version}</version>
+                                    <type>pom</type>
+                                    <scope>import</scope>
+                                </dependency>
+                    """)
+                .contains("<artifactId>fresh</artifactId>")
+                .doesNotContain("<artifactId>old</artifactId>");
+        assertThat(result.indexOf("<artifactId>bom</artifactId>")).isLessThan(result.indexOf("<artifactId>fresh</artifactId>"));
+        assertThat(run(pom)).isEqualTo(result);
+    }
+
+    @Test
+    public void keeps_an_imported_bom_when_nothing_is_left_to_pin() throws IOException {
+        Path pom = root.resolve("pom.xml");
+        String content = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>group</groupId>
+                    <artifactId>artifact</artifactId>
+                    <version>1</version>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.example</groupId>
+                                <artifactId>bom</artifactId>
+                                <version>1.0</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+                """;
+        Files.writeString(pom, content);
+        writeResolved(Map.of());
+        assertThat(run(pom)).isEqualTo(content);
+    }
+
+    @Test
     public void omits_checksum_comment_when_version_has_no_hash() throws IOException {
         Path pom = root.resolve("pom.xml");
         Files.writeString(pom, """

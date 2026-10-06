@@ -794,9 +794,10 @@ public record Project(
                     ## 5. Pin, then compare
 
                     Commit before the first `pin`. It rewrites each pom.xml's <dependencyManagement>
-                    with the versions and checksums it resolved, replacing what was there, BOM imports
-                    included, so review that diff. Then build with -Djenesis.dependency.pin=strict,
-                    as CI should. Before retiring the old build, compare what both produce: the jar
+                    with the versions and checksums it resolved, keeping only the imported BOMs, so
+                    review that diff. A pinned entry outranks a BOM, as any managed version does: to
+                    move to a new BOM version, change it, delete the entries `pin` wrote and pin
+                    again. Then build with -Djenesis.dependency.pin=strict, as CI should. Before retiring the old build, compare what both produce: the jar
                     contents, the dependency tree (`dependencies` against mvn dependency:tree or
                     gradle dependencies), the number of tests run, and the POM a consumer receives,
                     which is generated and flattened here rather than copied from yours.

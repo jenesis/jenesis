@@ -20,6 +20,8 @@ public class PinPom implements BuildStep {
     private static final Pattern CHECKSUM_COMMENT = Pattern.compile("[ \\t]*<!--\\s*Checksum/[^>]*-->\\s*\\n");
     private static final Pattern INDENT = Pattern.compile("\\n([ \\t]+)<");
     private static final Pattern PIN_COMMENT = Pattern.compile("(?s)([ \\t]*)<!--\\s*jenesis\\.pin\\b(.*?)-->\\s*\\n");
+    private static final Pattern MANAGED_DEPENDENCY = Pattern.compile("(?s)[ \\t]*<dependency>.*?</dependency>[ \\t]*\\n");
+    private static final Pattern IMPORT_SCOPE = Pattern.compile("<scope>\\s*import\\s*</scope>");
 
     private final transient Semaphore permits;
 
@@ -107,8 +109,15 @@ public class PinPom implements BuildStep {
         String existing = Files.readString(pomFile);
         Matcher dependencyManagementMatcher = DEPENDENCY_MANAGEMENT.matcher(existing);
         String indent;
+        List<String> imports = new ArrayList<>();
         if (dependencyManagementMatcher.find()) {
             indent = dependencyManagementMatcher.group(1);
+            Matcher dependencyMatcher = MANAGED_DEPENDENCY.matcher(dependencyManagementMatcher.group());
+            while (dependencyMatcher.find()) {
+                if (IMPORT_SCOPE.matcher(dependencyMatcher.group()).find()) {
+                    imports.add(dependencyMatcher.group());
+                }
+            }
         } else {
             Matcher indentMatcher = INDENT.matcher(existing);
             indent = indentMatcher.find() ? indentMatcher.group(1) : "    ";
@@ -131,7 +140,7 @@ public class PinPom implements BuildStep {
         List<String> preserved = pinMatcher.find()
                 ? preserveGuarded(pinMatcher.group(2), qualified, managed)
                 : List.of();
-        String block = managed.isEmpty() ? "" : renderBlock(managed, indent);
+        String block = managed.isEmpty() && imports.isEmpty() ? "" : renderBlock(imports, managed, indent);
         String updated;
         if (dependencyManagementMatcher.find(0)) {
             updated = dependencyManagementMatcher.replaceFirst(Matcher.quoteReplacement(block));
@@ -322,10 +331,11 @@ public class PinPom implements BuildStep {
         return result.toString();
     }
 
-    private static String renderBlock(SequencedMap<String, String> entries, String indent) {
+    private static String renderBlock(List<String> imports, SequencedMap<String, String> entries, String indent) {
         StringBuilder sb = new StringBuilder();
         sb.append(indent).append("<dependencyManagement>\n");
         sb.append(indent).append(indent).append("<dependencies>\n");
+        imports.forEach(sb::append);
         for (Map.Entry<String, String> entry : entries.entrySet()) {
             String[] elements = entry.getKey().split("/");
             String groupId, artifactId, type, classifier;
