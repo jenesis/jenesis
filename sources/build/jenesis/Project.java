@@ -607,8 +607,8 @@ public record Project(
     private record SkillModule(Path target, Consumer<String> out) implements BuildExecutorModule {
 
         private static final List<String> PAGES = List.of(
-                "start", "invoke", "layout", "target", "selectors", "tags", "tools",
-                "settings", "execute", "pinning", "plugins", "demos", "engine");
+                "start", "invoke", "layout", "migrate", "registry", "target", "selectors", "tags",
+                "tools", "settings", "execute", "pinning", "plugins", "extend", "demos", "engine");
 
         @Override
         public void accept(BuildExecutor buildExecutor, SequencedMap<String, Path> inherited) {
@@ -647,11 +647,14 @@ public record Project(
                     - Whenever you add or change a dependency, offer to run `pin`.
                     - Find the demo that matches the task and copy its shape rather than inventing
                       configuration.
+                    - Moving a Maven or Gradle build here? Follow skill/migrate step by step.
 
                     ## Pages
 
                       skill/invoke     entry points, the installed CLI, embedding, the JDK it runs on
                       skill/layout     maven, modular or modular_to_maven, and how one is picked
+                      skill/migrate    move a Maven or Gradle build here, one concern at a time
+                      skill/registry   the built-in that replaces each Maven or Gradle plugin
                       skill/target     what target/ holds, folders as selectors, per-module properties
                       skill/selectors  the entry points, +<module>, : and ::
                       skill/tags       pins, BOMs, aliases, layers, agents, native access, signatures
@@ -660,6 +663,7 @@ public record Project(
                       skill/execute    Execute, the ToolProvider services, @<file> arguments
                       skill/pinning    versions, checksums, signatures, and when to offer them
                       skill/plugins    jenesis.plugins.properties, its hook points, inputs and arguments
+                      skill/extend     write a plugin for what nothing built in does
                       skill/demos      the demos as a recipe book, by topic
                       skill/engine     editing a build step, and reading the source when stuck
                     """;
@@ -716,6 +720,198 @@ public record Project(
 
                     `auto` picks maven for a root pom.xml, else modular_to_maven; it never picks
                     plain modular. Override only with cause: -Djenesis.project.layout=<name>.
+
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
+                    """;
+                case "migrate" -> """
+                    # Jenesis - Migrate a Maven or Gradle build
+
+                    Move one concern at a time and build after each step, so a failure always has a
+                    single cause, and keep the old build working beside this one until what both
+                    produce compares equal.
+
+                    ## 1. Bring the tool in
+
+                      curl -fsSL https://get.jenesis.build | bash    vendor build/jenesis into the project
+                      sdk install jenesis && jenesis-init            the same through SDKMAN
+
+                    The build runs on JDK 25 or newer and needs nothing else; the release it compiles
+                    for is a setting of its own, so an older target is no obstacle.
+
+                    ## 2. Keep or write the build declaration
+
+                    A Maven build keeps its pom.xml files: the maven layout builds them as they stand,
+                    so the first `java build/jenesis/Make.java` is the baseline every later step is
+                    compared against. A Gradle build has no counterpart, since no build.gradle is
+                    read: write a pom.xml per project, which needs only coordinates, dependencies with
+                    their scopes and maven.compiler.release, or a module-info.java per module, which
+                    the modular_to_maven layout builds and generates the published POM for. Take
+                    module-info.java where the code is already a named module; skill/layout has the
+                    rest.
+
+                    ## 3. Know what a pom.xml keeps
+
+                      read       coordinates; a parent, local when relativePath points at one with the
+                                 same coordinates, fetched otherwise; <modules>; <properties> and
+                                 ${...}; dependencies of compile, provided, runtime and test scope;
+                                 <optional>, <exclusions> with wildcards, <type> and <classifier>;
+                                 <dependencyManagement> with import-scoped BOMs;
+                                 maven.compiler.release and maven.compiler.enablePreview; name,
+                                 description, url, licenses, developers, organization and scm of the
+                                 module's own POM; sourceDirectory, testSourceDirectory and the
+                                 resource directories
+                      ignored    <build><plugins> and <pluginManagement>, <profiles>, <repositories>
+                                 and settings.xml, resource filtering, maven.compiler.source and
+                                 target, system scope, and every packaging but jar - a pom aggregator
+                                 is followed for its modules, a war is not built at all
+
+                    Nothing ignored is reported, so list the old build's plugins, profiles and
+                    repositories before deleting anything: each needs an answer in step 4.
+
+                    ## 4. Replace each plugin
+
+                    Look every plugin up in skill/registry. Most become a file that switches a
+                    built-in tool on, a line of packaging.properties, a @jenesis tag or <!--jenesis-->
+                    comment, or a -Djenesis.* setting; copy the demo it names. Configuration that
+                    lived inside a plugin moves here:
+
+                      compilerArgs, options.compilerArgs   process-javac.properties
+                      annotationProcessorPaths             @jenesis.plugin, or <type>processor</type>
+                      surefire includes and groups         -Djenesis.test.filter, -Djenesis.test.tag
+                      argLine, jvmArgs of the tests        process-test.properties
+                      environment of the tests             environment-test.properties
+                      <profiles>, Gradle properties        jenesis.properties and a
+                                                           jenesis-<profile>.properties each, selected
+                                                           with -Djenesis.make.profiles
+                      <repositories>, settings.xml         -Djenesis.maven.uri or MAVEN_REPOSITORY_URI;
+                                                           its credential, jenesis.maven.token, never
+                                                           in a file the project provides
+                      a toolchain                          -Djenesis.toolchain.version
+
+                    A plugin the registry marks as having no built-in is either something done
+                    differently here, which the line names, or a plugin to write: skill/extend.
+
+                    ## 5. Pin, then compare
+
+                    Commit before the first `pin`. It rewrites each pom.xml's <dependencyManagement>
+                    with the versions and checksums it resolved, replacing what was there, BOM imports
+                    included, so review that diff. Then build with -Djenesis.dependency.pin=strict,
+                    as CI should. Before retiring the old build, compare what both produce: the jar
+                    contents, the dependency tree (`dependencies` against mvn dependency:tree or
+                    gradle dependencies), the number of tests run, and the POM a consumer receives,
+                    which is generated and flattened here rather than copied from yours.
+
+                    ## 6. Retire the old build
+
+                    Remove what Jenesis now replaces - the plugin configuration, the wrapper and the CI
+                    steps that called it - and let `ide` write the IntelliJ, VS Code or Eclipse
+                    project so no IDE depends on the old build. A Maven layout keeps its pom.xml
+                    files, which are now its build declaration.
+
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
+                    """;
+                case "registry" -> """
+                    # Jenesis - Find what replaces a Maven or Gradle plugin
+
+                    One line per capability: the Maven plugin / the Gradle plugin or task -> what
+                    does the same here (the demo that shows it). A file name is found in the
+                    module's configuration locations as skill/tools describes, and its absence
+                    leaves the tool off; `configuration` names the key that switches one off again.
+
+                    ## Compile and generate
+
+                      maven-compiler-plugin release / java toolchain release
+                          -> maven.compiler.release in pom.xml, @jenesis.release (15)
+                      compilerArgs / options.compilerArgs -> process-javac.properties (12)
+                      annotationProcessorPaths / annotationProcessor -> @jenesis.plugin (13, 39)
+                      Error Prone / net.ltgt.errorprone
+                          -> errorprone.properties with @jenesis.plugin javac <coordinate> (14)
+                      kotlin-maven-plugin / kotlin("jvm") -> .kt sources, found on their own (41, 43)
+                      scala-maven-plugin / scala -> .scala sources, compiled by Scala 3 (44)
+                      gmavenplus / groovy -> .groovy sources (46)
+                      jaxb2-maven-plugin / a JAXB plugin -> xjc.properties (16)
+                      protobuf-maven-plugin / com.google.protobuf -> protoc.properties (16)
+                      avro-maven-plugin / an Avro plugin -> avro.properties (16)
+                      jaxws-maven-plugin / a JAX-WS plugin -> wsimport.properties (17)
+                      openapi-generator-maven-plugin / org.openapi.generator
+                          -> openapi.properties (17)
+                      antlr4-maven-plugin / antlr -> antlr.properties (18)
+                      build-helper add-source / sourceSets
+                          -> sourceDirectory in pom.xml, or a plugin at binary/generated
+                      multi-release jar configuration -> sources/META-INF/versions/<N>/ (11)
+
+                    ## Check and test
+
+                      maven-checkstyle-plugin / checkstyle -> checkstyle.xml (34)
+                      maven-pmd-plugin / pmd -> pmd.xml (34)
+                      spotbugs-maven-plugin / com.github.spotbugs -> spotbugs-exclude.xml (34)
+                      fmt-maven-plugin, Spotless for Java / Spotless, com.palantir.java-format
+                          -> javaformat.properties; -Djenesis.format.rewrite=true rewrites (34)
+                      detekt, ktlint / the same -> detekt.yml, .editorconfig (42)
+                      scalastyle, scalafmt / the same -> scalastyle-config.xml, .scalafmt.conf (45)
+                      codenarc / codenarc -> codenarc.xml (47)
+                      maven-surefire-plugin / test -> on by default; test.properties names the
+                          framework where inference does not (35), and only changed tests re-run (37)
+                      maven-failsafe-plugin / an integration test task
+                          -> no phase of its own: -Djenesis.test.tag, or a @jenesis.test module
+                      jacoco-maven-plugin / jacoco -> jacoco.properties, a report (36)
+                      pitest-maven / info.solidsoft.pitest -> pitest.properties (38)
+                      jmh-maven-plugin / me.champeau.jmh -> @jenesis.plugin and @jenesis.main (39)
+                      japicmp-maven-plugin / me.champeau.gradle.japicmp -> japicmp.properties (40)
+
+                    ## Dependencies
+
+                      dependency:tree / dependencies -> the `dependencies` selector
+                      <exclusions> / exclude -> kept in pom.xml, or @jenesis.exclude (19)
+                      an imported BOM / platform() -> kept in pom.xml, or @jenesis.bom (20)
+                      moditect / an extra-java-module-info plugin
+                          -> @jenesis.alias, modules.properties (21)
+                      a relocating shade / shadow -> no relocation: @jenesis.layer keeps two
+                          versions apart without rewriting a class (24, 25)
+                      versions locking, checksums / dependency locking and verification
+                          -> `pin`, -Djenesis.dependency.pin=strict (28)
+                      pgpverify-maven-plugin / verification-metadata.xml signatures
+                          -> @jenesis.signature (29, 30)
+                      maven-enforcer-plugin / dependency constraints -> -Djenesis.dependency.pin,
+                          jenesis.resolver.maven=fail, jenesis.toolchain.version
+                      cyclonedx-maven-plugin / org.cyclonedx.bom -> on by default (31)
+                      license-maven-plugin / a license report plugin -> licensing.properties (32)
+                      dependency-check-maven / org.owasp.dependencycheck
+                          -> vulnerability.properties, checked against OSV (33)
+
+                    ## Package and ship
+
+                      maven-jar-plugin / jar -> on by default; archives are reproducible unless
+                          jenesis.archive.timestamp is emptied (68)
+                      maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (48, 66)
+                      maven-javadoc-plugin / withJavadocJar(), Dokka
+                          -> -Djenesis.project.documentation=true (48, 66)
+                      maven-shade-plugin, Spring Boot repackage / shadow, bootJar
+                          -> launcher=true, one executable jar (08)
+                      maven-assembly-plugin / application, distZip -> bundle=true (10)
+                      exec-maven-plugin / application, run -> java build/jenesis/Execute.java
+                      maven-jlink-plugin / org.beryx.jlink -> jmod=true, jlink=true (09)
+                      jpackage-maven-plugin / org.beryx.runtime -> jpackage=<type> (08, 09)
+                      jib-maven-plugin / com.google.cloud.tools.jib
+                          -> docker=<image>, a build context; the build never runs Docker (08, 09)
+                      native-maven-plugin / org.graalvm.buildtools.native
+                          -> native=true, graal.properties (69)
+                      maven-jarsigner-plugin / jar signing -> jenesis.jarsigner.* (64)
+                      maven-install-plugin / publishToMavenLocal -> `export` (65)
+                      deploy, central-publishing, maven-gpg-plugin / maven-publish, signing
+                          -> `release` with a jreleaser.yml (66)
+                      maven-toolchains-plugin / java toolchains -> jenesis.toolchain.version (07)
+                      <profiles> / properties and conventions -> jenesis-<profile>.properties (48)
+                      a Gradle build cache -> jenesis.cache.uri (49)
+
+                    ## No built-in
+
+                      resource filtering, ${...} in resources -> none; generate the file in a plugin
+                      war, ear -> none; a war module is skipped
+                      git-commit-id, buildnumber -> none; pass -Djenesis.project.revision,
+                          project.tag and project.tree, which the POM and SBOM record
+                      Spotless beyond Java, Kotlin and Scala -> none
+                      any other plugin -> write one: skill/extend
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
@@ -1240,6 +1436,85 @@ public record Project(
                     and what belongs to no module in a project/ folder that stage copies as it stands
                     into stage/project; an inspection fails the build by throwing and changes nothing
                     it was handed.
+
+                    The overview and the other pages: java build/jenesis/Make.java skill/start
+                    """;
+                case "extend" -> """
+                    # Jenesis - Write a plugin for what nothing built in does
+
+                    Write one only when skill/registry has no line for the job. A plugin adds steps
+                    to the stock build and replaces none; skill/plugins wires it in. The smallest
+                    whole example is demo-57-internal-module, the same plugin published is
+                    demo-58-external-module, and demo-59-project-plugins uses every project-wide
+                    hook point.
+
+                    ## The shape
+
+                      plugin/module-info.java    module demo.plugin {
+                                                     requires build.jenesis;
+                                                     provides build.jenesis.BuildExecutorModule
+                                                             with demo.plugin.ToolModule;
+                                                 }
+                      plugin/.jenesis.skip       keeps the project from building plugin/ as a module
+                      jenesis.plugins.properties tool+binary/generated=./plugin
+                      build.jenesis/plugin-tool.properties
+                                                 switches it on in a module, and carries its values
+
+                    The provider implements BuildExecutorModule and adds its steps in accept, with
+                    executor.addStep("<name>", step, inherited.sequencedKeySet()) to be handed what
+                    the hook point reads. It needs a public no-argument constructor, and one taking a
+                    SequencedMap<String, String> when plugin-<name>.properties holds values; a
+                    module offering several providers marks each @BuildModuleName("<name>") and the
+                    plugins file picks one as =<module>@<name>.
+
+                    ## A step is a pure function of folders
+
+                    Each argument is a predecessor's output folder: skip one whose removed() is true,
+                    read the conventional folders - sources/, resources/, classes/, artifacts/, the
+                    constants on BuildStep - and write below context.next() alone. Make the step a
+                    record whose components are every value that should run it again: its serialized
+                    form is its cache key, together with a digest of the plugin's own jars, so a
+                    change to a value or to the plugin's code re-runs it and nothing else does. A
+                    file it reads is bound rather than named: @<input>=<path> in
+                    plugin-<name>.properties hands it over as the argument ../inputs/<input>, whose
+                    checksum then decides whether the step runs.
+
+                    ## Pick the hook point by what the step produces
+
+                      binary/generated       sources/ that the module compiles with its own, the
+                                             place of a code generator
+                      check, format          a verdict on the sources, beside Checkstyle and the
+                                             formatters
+                      compliance             a verdict on the resolved dependencies
+                      binary/compiled        a compiler of its own, beside javac and kotlinc
+                      binary/validate        a verdict on the compiled classes, beside SpotBugs
+                      artifact               a step over the jar, beside japicmp
+                      observed               a step over the tests' run, beside JaCoCo and PIT
+                      package                packages/, staged in stage/packages
+                      documentation          beside javadoc
+                      postprocess/transform  files for every module's inventory, or project/
+                      stage/transform        files joining a staged tree
+                      export, release        delivering what was staged
+                      plugin                 a task that runs only when named, like an exec goal
+
+                    A verdict is a throw: a step that finds a violation fails the build with a message
+                    that names the file and the fix.
+
+                    ## Run a tool
+
+                    Prefer a tool's Java API to a process: require it in the plugin's module-info.java
+                    and it resolves by module name into the plugin's own layer, pinned as
+                    plugin-<name>/module/<module>. A JDK tool is forked by extending ProcessBuildStep,
+                    which also reads process-<tool>.properties; one that runs a program extends
+                    EnvironmentalProcessBuildStep for environment-<tool>.properties. Write nothing
+                    outside context.next(): a step that must, as an exporter does, overrides
+                    shouldRun to say it always runs.
+
+                    ## Prove it
+
+                    Build a demo project that uses the plugin and assert on what it wrote - a file in
+                    the step's output under target/build/, or the failure it reports - then change
+                    one value in plugin-<name>.properties and confirm the step runs again.
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
                     """;
