@@ -286,14 +286,14 @@ launch, with no assumptions about the host:
 
 Because the bundle carries its launch rather than a description of it - the argument
 file names the module path, the class path and the entry point - any JVM base image
-can run it without reading anything. Unzip it into an `eclipse-temurin` (or any
-JDK/JRE) image and hand `java` the file:
+can run it without reading anything. Unzip it into any JDK or JRE image - here the
+hardened, digest-pinned one of `../demo-08-java-pom-executable`, which already runs as an
+unprivileged user - and hand `java` the file:
 
-    FROM eclipse-temurin:25-jre
+    FROM gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629
     COPY jars/ /app/jars/
     COPY application.unix.args /app/
     WORKDIR /app
-    USER 1000:1000
     ENTRYPOINT ["java", "@application.unix.args"]
 
 A classpath-only app needs no change here: the argument file names a `--class-path`

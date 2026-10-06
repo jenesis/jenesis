@@ -54,12 +54,14 @@ public class DockerTest {
         Path folder = next.resolve(Docker.DOCKER);
         assertThat(folder.resolve("jars/app.jar")).isRegularFile();
         assertThat(folder.resolve("jars/lib.jar")).isRegularFile();
-        assertThat(dockerfile(folder)).containsSubsequence(
-                "FROM example:latest",
-                "WORKDIR /app",
-                "COPY jars/ /app/jars/",
-                "COPY application.args /app/",
-                "ENTRYPOINT [\"java\", \"@/app/application.args\"]");
+        assertThat(dockerfile(folder))
+                .as("the copies create /app owned by root before WORKDIR names it, so an unprivileged user cannot replace what starts")
+                .containsSubsequence(
+                        "FROM example:latest",
+                        "COPY jars/ /app/jars/",
+                        "COPY application.args /app/",
+                        "WORKDIR /app",
+                        "ENTRYPOINT [\"java\", \"@/app/application.args\"]");
         assertThat(arguments(folder))
                 .as("the entry point names an argument file, so no path can outgrow the command line")
                 .containsExactly(
@@ -93,9 +95,9 @@ public class DockerTest {
                         "      \"org.opencontainers.image.created\"=\"\" \\");
         assertThat(dockerfile(folder)).containsSubsequence(
                 "FROM example:latest",
-                "WORKDIR /app",
                 "COPY jars/ /app/jars/",
                 "COPY application.args /app/",
+                "WORKDIR /app",
                 "ENTRYPOINT [\"java\", \"@/app/application.args\"]");
         assertThat(arguments(folder))
                 .as("an image built from this one adds a jar by copying it into a folder under /app/extensions")
@@ -162,9 +164,9 @@ public class DockerTest {
                         "      \"org.opencontainers.image.licenses\"=\"Apache-2.0\" \\",
                         "      \"org.opencontainers.image.ref.name\"=\"\" \\",
                         "      \"com.example.team\"=\"core \\\"\\$HOME\\\" \\\\\"",
-                        "WORKDIR /app",
                         "COPY jars/ /app/jars/",
                         "COPY application.args /app/",
+                        "WORKDIR /app",
                         "ENTRYPOINT [\"java\", \"@/app/application.args\"]");
     }
 
@@ -293,8 +295,8 @@ public class DockerTest {
         assertThat(folder.resolve("application.args")).doesNotExist();
         assertThat(dockerfile(folder)).containsSubsequence(
                 "FROM debian:stable-slim",
-                "WORKDIR /app",
                 "COPY [\"sample/\", \"/app/\"]",
+                "WORKDIR /app",
                 "ENTRYPOINT [\"/app/bin/sample\"]");
     }
 
