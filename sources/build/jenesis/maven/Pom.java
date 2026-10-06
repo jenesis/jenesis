@@ -70,23 +70,29 @@ public class Pom implements BuildStep {
         SequencedProperties requires = SequencedProperties.ofFolders(folders, resolved ? DEPENDENCIES : REQUIRES);
         SequencedProperties exclusions = SequencedProperties.ofFolders(folders, EXCLUSIONS);
         SequencedProperties metadata = SequencedProperties.ofFolders(folders, METADATA);
-        SequencedSet<String> isolated = new LinkedHashSet<>(), declared = new LinkedHashSet<>();
+        SequencedMap<String, SequencedSet<String>> held = new LinkedHashMap<>(), declared = new LinkedHashMap<>();
         for (Path folder : folders) {
             Path file = folder.resolve(resolved ? DEPENDENCIES : REQUIRES);
             if (!Files.isRegularFile(file)) {
                 continue;
             }
-            SequencedSet<String> foreign = new LinkedHashSet<>(), own = new LinkedHashSet<>();
+            SequencedSet<String> own = new LinkedHashSet<>(), carried = new LinkedHashSet<>();
             for (String key : SequencedProperties.ofFiles(file).stringPropertyNames()) {
-                int second = key.indexOf('/', key.indexOf('/') + 1);
-                (key.startsWith(group + "/") ? own : foreign).add(key.substring(second + 1));
+                int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
+                String coordinate = key.substring(second + 1);
+                if (key.startsWith(group + "/")) {
+                    own.add(coordinate);
+                } else if (key.startsWith("layer:")) {
+                    carried.add(key.substring(0, first));
+                    held.computeIfAbsent(key.substring(0, first), _ -> new LinkedHashSet<>()).add(coordinate);
+                }
             }
-            if (!foreign.isEmpty()) {
-                isolated.addAll(foreign);
-                declared.addAll(own);
-            }
+            carried.forEach(layer -> declared.computeIfAbsent(layer, _ -> new LinkedHashSet<>()).addAll(own));
         }
-        isolated.removeAll(declared);
+        SequencedSet<String> isolated = new LinkedHashSet<>();
+        held.forEach((layer, coordinates) -> coordinates.stream()
+                .filter(coordinate -> !declared.get(layer).contains(coordinate))
+                .forEach(isolated::add));
         SequencedMap<String, SequencedSet<String>> coordinateScopes = new LinkedHashMap<>();
         for (String key : requires.stringPropertyNames()) {
             int first = key.indexOf('/');

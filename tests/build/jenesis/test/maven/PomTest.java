@@ -74,6 +74,108 @@ public class PomTest {
     }
 
     @Test
+    public void omits_what_a_layer_holds_although_a_member_declaring_a_nested_layer_requires_it()
+            throws IOException {
+        SequencedProperties coordinates = new SequencedProperties();
+        coordinates.setProperty("maven/build.jenesis/jenesis/jar/1.0.0", "");
+        coordinates.store(argument.resolve(BuildStep.IDENTITY));
+        SequencedProperties dependencies = new SequencedProperties();
+        dependencies.setProperty("main/compile/maven/org.example/api/1.2.3", "");
+        dependencies.setProperty("main/runtime/maven/org.example/api/1.2.3", "");
+        dependencies.setProperty("layer:render/runtime/maven/org.example/api/1.2.3", "");
+        dependencies.setProperty("layer:render/runtime/maven/org.example/impl/1.0.0", "");
+        dependencies.setProperty("layer:render/runtime/maven/org.example/legacy/4.5.6", "");
+        dependencies.setProperty("layer:inner/runtime/maven/org.example/api/1.2.3", "");
+        dependencies.setProperty("layer:inner/runtime/maven/org.example/nested/1.0.0", "");
+        dependencies.setProperty("layer:inner/runtime/maven/org.example/legacy/1.0.0", "");
+        dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties member = new SequencedProperties();
+        member.setProperty("main/compile/maven/org.example/api/1.2.3", "");
+        member.setProperty("main/runtime/maven/org.example/api/1.2.3", "");
+        member.setProperty("main/compile/maven/org.example/legacy/4.5.6", "");
+        member.setProperty("main/runtime/maven/org.example/legacy/4.5.6", "");
+        member.setProperty("layer:inner/runtime/maven/org.example/api/1.2.3", "");
+        member.setProperty("layer:inner/runtime/maven/org.example/nested/1.0.0", "");
+        member.setProperty("layer:inner/runtime/maven/org.example/legacy/1.0.0", "");
+        Path impl = Files.createDirectory(root.resolve("impl"));
+        member.store(impl.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+
+        new Pom().resolved(true).apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of(
+                                "argument", new BuildStepArgument(argument, Map.of(
+                                        Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))),
+                                "impl", new BuildStepArgument(impl, Map.of(
+                                        Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+
+        String pom = Files.readString(next.resolve(Pom.POM));
+        assertThat(pom)
+                .as("the API module is shared with both layers, so it is a dependency")
+                .contains("<artifactId>api</artifactId>");
+        assertThat(pom)
+                .as("the member of render requires legacy itself, but only a module carrying render can share"
+                        + " what render holds - the member's own layer is inner")
+                .doesNotContain("<artifactId>legacy</artifactId>")
+                .doesNotContain("<artifactId>impl</artifactId>")
+                .doesNotContain("<artifactId>nested</artifactId>");
+    }
+
+    @Test
+    public void keeps_what_a_consumer_requires_itself_although_a_layer_it_carries_holds_it()
+            throws IOException {
+        SequencedProperties coordinates = new SequencedProperties();
+        coordinates.setProperty("maven/build.jenesis/jenesis/jar/1.0.0", "");
+        coordinates.store(argument.resolve(BuildStep.IDENTITY));
+        SequencedProperties dependencies = new SequencedProperties();
+        dependencies.setProperty("main/compile/maven/org.example/library/1.0.0", "");
+        dependencies.setProperty("main/runtime/maven/org.example/library/1.0.0", "");
+        dependencies.setProperty("main/compile/maven/org.example/legacy/4.5.6", "");
+        dependencies.setProperty("main/runtime/maven/org.example/legacy/4.5.6", "");
+        dependencies.setProperty("layer:render/runtime/maven/org.example/impl/1.0.0", "");
+        dependencies.setProperty("layer:render/runtime/maven/org.example/legacy/4.5.6", "");
+        dependencies.store(argument.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties declaring = new SequencedProperties();
+        declaring.setProperty("layer:render/runtime/maven/org.example/impl/1.0.0", "");
+        declaring.setProperty("layer:render/runtime/maven/org.example/legacy/4.5.6", "");
+        Path library = Files.createDirectory(root.resolve("library"));
+        declaring.store(library.resolve(BuildStep.DEPENDENCIES));
+        SequencedProperties metadata = new SequencedProperties();
+        metadata.setProperty("project", "build.jenesis");
+        metadata.setProperty("artifact", "jenesis");
+        metadata.setProperty("version", "1.0.0");
+        metadata.store(argument.resolve(BuildStep.METADATA));
+
+        new Pom().resolved(true).apply(Runnable::run,
+                        new BuildStepContext(previous, next, supplement),
+                        new LinkedHashMap<>(Map.of(
+                                "argument", new BuildStepArgument(argument, Map.of(
+                                        Path.of(BuildStep.IDENTITY), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED),
+                                        Path.of(BuildStep.METADATA), Checksum.of(ChecksumStatus.ADDED))),
+                                "library", new BuildStepArgument(library, Map.of(
+                                        Path.of(BuildStep.DEPENDENCIES), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join();
+
+        String pom = Files.readString(next.resolve(Pom.POM));
+        assertThat(pom)
+                .as("the consumer carries render and requires legacy itself, so legacy is its own dependency")
+                .contains("<artifactId>legacy</artifactId>");
+        assertThat(pom)
+                .as("what only the layer holds stays out")
+                .doesNotContain("<artifactId>impl</artifactId>");
+    }
+
+    @Test
     public void writes_the_pom_and_its_coordinate_where_a_jar_carries_them() throws IOException {
         SequencedProperties metadata = new SequencedProperties();
         metadata.setProperty("project", "build.jenesis");
