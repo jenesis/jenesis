@@ -332,11 +332,11 @@ declared license:
 Every node names the scopes it is resolved in. JUnit Jupiter is needed both to
 compile the tests and to run them, while the console launcher that runs them is
 resolved for `runtime` alone, and so is everything only it reaches. To see one
-tree per module and scope instead, pass `-Djenesis.tree.scopes=separate`. Each
+tree per module and scope instead, pass `-Djenesis.tree.merge=false`. Each
 tree then starts from the module in that scope, and every node below it carries
 the scope it was declared with:
 
-    java -Djenesis.tree.scopes=separate build/jenesis/Make.java dependencies
+    java -Djenesis.tree.merge=false build/jenesis/Make.java dependencies
 
     maven/demo.app/demo.app 0-SNAPSHOT [compile] (module demo.app, local ./app)
     └─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
@@ -346,7 +346,11 @@ the scope it was declared with:
     └─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
        └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT}
 
-The default `merged` prints one tree per module; any other value is rejected.
+The `Resolved dependencies:` list below each tree, sorted by name, and the
+license and module summary after the last tree leave out the modules the project
+builds itself, so they count only what the build downloads. Pass
+`-Djenesis.tree.internal=true` to list and count the project's own modules as
+well.
 
 Even though every descriptor here is a `module-info.java`, the default
 MODULAR_TO_MAVEN layout resolves each `requires` through Maven, so the tree shows
@@ -392,7 +396,7 @@ project releases, and it does so under either format:
 `greeter-test` declares `@jenesis.test demo.greeter` and `greeter-testing`
 declares `@jenesis.test abstract`, so with the flag their trees are gone and the
 JUnit closure only they reached goes with them: the license and module summary
-below the trees now counts the two modules the project ships rather than the
-fourteen a test run resolves. Passed on its own, the flag prunes the same
+below the trees now counts `org.slf4j`, the one dependency the project ships,
+rather than the twelve a test run resolves. Passed on its own, the flag prunes the same
 modules from the full graph. The default `full` format prints the whole graph;
 any other value is rejected.

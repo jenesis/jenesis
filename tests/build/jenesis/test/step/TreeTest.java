@@ -171,15 +171,6 @@ public class TreeTest {
     }
 
     @Test
-    public void rejects_an_unknown_tree_scopes_value() {
-        assertThatThrownBy(() -> Tree.ofEnvironment(new Environment(Map.of("tree.scopes", "joined"))))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Unknown jenesis.tree.scopes 'joined'")
-                .hasMessageContaining("merged")
-                .hasMessageContaining("separate");
-    }
-
-    @Test
     public void merges_the_scopes_of_a_module_into_one_tree() throws IOException {
         List<String> printed = scoped(Map.of());
         assertThat(printed).containsSequence(
@@ -195,7 +186,7 @@ public class TreeTest {
 
     @Test
     public void heads_a_tree_per_scope_with_the_module_in_that_scope() throws IOException {
-        assertThat(scoped(Map.of("tree.scopes", "separate"))).containsSequence(
+        assertThat(scoped(Map.of("tree.merge", "false"))).containsSequence(
                 "module/foo [compile] (local ./)",
                 "└─ maven/org.foo/bar 1.0 [compile]",
                 "",
@@ -259,6 +250,26 @@ public class TreeTest {
 
     @Test
     public void locates_a_local_dependency_in_the_folder_it_is_built_from() throws IOException {
+        assertThat(local(Map.of())).containsSequence(
+                "maven/g/app 1.0 [compile] (local ./app)",
+                "└─ maven/g/greeter 1.0 [compile] (local ./greeter)");
+    }
+
+    @Test
+    public void leaves_the_project_modules_out_of_the_resolved_dependencies_and_the_summary() throws IOException {
+        List<String> printed = local(Map.of());
+        assertThat(printed).doesNotContain("Resolved dependencies:", "  maven/g/greeter -> 1.0 [compile]");
+        assertThat(printed).doesNotContain("Licenses:");
+    }
+
+    @Test
+    public void lists_the_project_modules_among_the_resolved_dependencies_when_asked() throws IOException {
+        List<String> printed = local(Map.of("tree.internal", "true"));
+        assertThat(printed).containsSequence("Resolved dependencies:", "  maven/g/greeter -> 1.0 [compile]");
+        assertThat(printed).contains("Licenses:");
+    }
+
+    private List<String> local(Map<String, String> keys) throws IOException {
         SequencedProperties graph = new SequencedProperties();
         graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/g/greeter/1.0");
         graph.setProperty("vertex/main/compile/maven/g/greeter", "1.0\t\tfalse\ttrue");
@@ -284,13 +295,11 @@ public class TreeTest {
         arguments.put("greeter", new BuildStepArgument(testArgument,
                 Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))));
         List<String> printed = new ArrayList<>();
-        Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
+        Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 arguments)
                 .toCompletableFuture().join();
-        assertThat(printed.stream().map(line -> line.replaceAll("\033\\[[0-9;]*m", "")).toList()).containsSequence(
-                "maven/g/app 1.0 [compile] (local ./app)",
-                "└─ maven/g/greeter 1.0 [compile] (local ./greeter)");
+        return printed.stream().map(line -> line.replaceAll("\033\\[[0-9;]*m", "")).toList();
     }
 }
