@@ -31,7 +31,7 @@ Declaring a key
 
 ```java
 /**
- * @jenesis.alias org.assertj.core org.assertj/assertj-core
+ * @jenesis.pin org.assertj.core 3.27.0 SHA-256/0b4d1400...
  * @jenesis.pin org.assertj/assertj-core 3.27.0 SHA-256/0b4d1400...
  * @jenesis.signature OpenPGP/BE685132AFD2740D9095F9040CC0B712FEE75827 org.assertj/*
  */
