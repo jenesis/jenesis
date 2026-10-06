@@ -215,7 +215,7 @@ exactly as the jpackage section above describes. Here the closure is
 `demo.modular.executable` + `org.slf4j`, both explicit modules, so those lines are absent.
 Unzipped onto a JRE base, the bundle needs no JDK and no jpackage:
 
-    FROM eclipse-temurin:25-jre
+    FROM gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629
     COPY bundle/ /opt/app/
     WORKDIR /opt/app
     ENTRYPOINT ["java", "@application.unix.args"]
@@ -230,8 +230,8 @@ A generated Dockerfile
 
 That Dockerfile does not have to be written by hand either: a `docker` key in
 `packaging.properties` generates it, taking the base image as its value the way
-`jpackage` takes its type. This demo commits `docker=eclipse-temurin:25-jre` as a
-`docker` profile:
+`jpackage` takes its type. This demo commits the hardened, digest-pinned JRE image of
+`../demo-08-java-pom-executable` as a `docker` profile:
 
     java -Djenesis.make.profiles=docker build/jenesis/Make.java stage
 
@@ -245,7 +245,7 @@ on the module path and the entry point launches the module, not a class - and th
 command travels in the argument file, so the `ENTRYPOINT` is the same three words however
 large the closure grows:
 
-    FROM eclipse-temurin:25-jre
+    FROM gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629
     LABEL ...                      the metadata, as in ../demo-08-java-pom-executable
     WORKDIR /app
     COPY jars/ /app/jars/
@@ -412,9 +412,10 @@ runtime - so a deployable container needs no JDK, only a minimal base with a C
 library. The generated Dockerfile from above can ship exactly that: a
 `docker.jpackage=<type>` line beside `docker=<image>` puts a jpackage package into
 the image instead of the jars, and the base image then needs no Java at all. This
-demo commits it as a `container` profile:
+demo commits it as a `container` profile, on the distroless image that holds just the C
+library, hardened and pinned by its digest as the JRE image is:
 
-    docker=debian:stable-slim
+    docker=gcr.io/distroless/cc-debian13:nonroot@sha256:e792ab3d241a468a4fd7519ddbbebe66b49b5f365771716ea688ad40b6c6f1c2
     docker.jpackage=app-image
 
     java -Djenesis.make.profiles=container build/jenesis/Make.java stage
@@ -425,7 +426,7 @@ demo commits it as a `container` profile:
 
 The image is the app-image under `/app`, started by its own launcher:
 
-    FROM debian:stable-slim
+    FROM gcr.io/distroless/cc-debian13:nonroot@sha256:e792ab3d241a468a4fd7519ddbbebe66b49b5f365771716ea688ad40b6c6f1c2
     LABEL ...                      the metadata, as before
     WORKDIR /app
     COPY ["demo.modular.executable/", "/app/"]
@@ -434,7 +435,8 @@ The image is the app-image under `/app`, started by its own launcher:
 The type is one a Linux image can run: `app-image`, copied in as it is, or `deb` or
 `rpm`, installed with the base image's package manager - `apt-get` for a `deb`, and
 `dnf`, `yum`, `zypper` or plain `rpm` for an `rpm` - which also installs the system
-libraries the package declares. The image then starts the launcher the package
+libraries the package declares. Those two need a base that has the package manager,
+which a distroless one does not, and the image then starts the launcher the package
 installed, through `/app/launcher`:
 
     docker=debian:stable-slim
@@ -477,12 +479,12 @@ an off-the-shelf JVM.
 One caveat, since these app-images bundle the JVM inside the application layer:
 that "smaller" is per artifact. Two *different* services packaged this way share
 only the OS base layer - each carries its own runtime - so at scale you duplicate
-the JVM across services. The alternative is a common `eclipse-temurin:<version>-jre`
-base with only your jars layered on top: image layers are content-addressed, so
-that one JVM layer is stored and pulled once and shared by every image built on
-it, and at run time containers sharing it also share its read-only pages in the
-host page cache (per-process heap and metaspace stay private either way). None of this is
-Docker-specific: it is OCI-image and Linux-kernel behaviour, so Podman shares base
+the JVM across services. The alternative is a common JRE base, such as the distroless
+`java25-debian13` of the `docker` profile, with only your jars layered on top: image
+layers are content-addressed, so that one JVM layer is stored and pulled once and
+shared by every image built on it, and at run time containers sharing it also share its
+read-only pages in the host page cache (per-process heap and metaspace stay private
+either way). None of this is Docker-specific: it is OCI-image and Linux-kernel behaviour, so Podman shares base
 layers and their page cache the same way - rootless Podman on `fuse-overlayfs`
 still deduplicates the layer on disk, with a thin FUSE indirection on top. The
 trade is a larger but shared runtime and coupling to that base's JVM version. The

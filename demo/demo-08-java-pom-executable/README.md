@@ -114,7 +114,7 @@ Every jar is stored once under `jars/`, and the argument file is the launch itse
 
 Unzipped onto a JRE base, it needs no JDK, no jpackage and no descriptor reader:
 
-    FROM eclipse-temurin:25-jre
+    FROM gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629
     COPY bundle/ /opt/app/
     WORKDIR /opt/app
     ENTRYPOINT ["java", "@application.unix.args"]
@@ -126,8 +126,19 @@ A generated Dockerfile
 
 Writing that Dockerfile by hand is the one manual step left, so a `docker` key in
 `packaging.properties` generates it. Its value is the base image, the one thing the
-build cannot infer, and this demo commits `docker=eclipse-temurin:25-jre` as a
-`docker` profile:
+build cannot infer, and this demo commits Google's distroless Java 25 image as a `docker`
+profile:
+
+    docker=gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629
+
+That is a hardened base: it holds a JRE and the C library it runs on and nothing else - no
+shell, no package manager - and its `nonroot` variant starts the application as an
+unprivileged user (uid 65532) rather than as root. The `@sha256:` digest pins it: Docker
+pulls exactly the image the digest names and ignores the tag beside it, which is there for
+the reader, so the build context yields the same base on every machine, and a tag that is
+republished upstream changes nothing until you move the digest yourself. The current one is
+what `docker buildx imagetools inspect gcr.io/distroless/java25-debian13:nonroot` prints as
+its `Digest`.
 
     java -Djenesis.make.profiles=docker build/jenesis/Make.java stage
 
@@ -146,8 +157,8 @@ application: on the class path they come after its own jars, so they can add cla
 `META-INF/services` entries, but a class the application already has is always loaded from the
 application's own jar.
 
-    FROM eclipse-temurin:25-jre
-    LABEL "org.opencontainers.image.base.name"="eclipse-temurin:25-jre" \
+    FROM gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629
+    LABEL "org.opencontainers.image.base.name"="gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629" \
           "org.opencontainers.image.title"="java-pom-executable" \
           "org.opencontainers.image.version"="1.0.0" \
           "org.opencontainers.image.documentation"="https://jenesis.build" \
@@ -161,8 +172,8 @@ The `LABEL` describes the image with the standard `org.opencontainers.image.*` k
 what the project declares: its name, description, version and URL, its source repository and
 revision, its organization, developers and licences - what its SBOM names as well. A licence
 is written as an SPDX identifier, and only when every licence has one. Every standard key is
-written, empty where the project declares nothing, so that none is inherited from the base
-image: `eclipse-temurin` sets `version` and `created` for itself.
+written, empty where the project declares nothing, so that none is inherited from a base
+image that sets its own, as `eclipse-temurin` sets `version` and `created`.
 
 `created` is left empty unless you name the time, since a clock reading would make every build
 differ. The time the archives record is the one it takes, when you set it explicitly - to the
@@ -177,7 +188,7 @@ base image's value is not inherited either. `docker.label.org.opencontainers.ima
 keeps an image without a creation time even where `jenesis.archive.timestamp` is set. This demo's
 `docker` profile adds the documentation:
 
-    docker=eclipse-temurin:25-jre
+    docker=gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629
     docker.label.org.opencontainers.image.documentation=https://jenesis.build
 
 The build never runs a container tool, so nothing here needs Docker installed. The
