@@ -247,9 +247,9 @@ large the closure grows:
 
     FROM gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629
     LABEL ...                      the metadata, as in ../demo-08-java-pom-executable
-    WORKDIR /app
     COPY jars/ /app/jars/
     COPY application.args /app/
+    WORKDIR /app
     ENTRYPOINT ["java", "@/app/application.args"]
 
 The build never runs a container tool, so no Docker installation is involved in
@@ -428,8 +428,8 @@ The image is the app-image under `/app`, started by its own launcher:
 
     FROM gcr.io/distroless/cc-debian13:nonroot@sha256:e792ab3d241a468a4fd7519ddbbebe66b49b5f365771716ea688ad40b6c6f1c2
     LABEL ...                      the metadata, as before
-    WORKDIR /app
     COPY ["demo.modular.executable/", "/app/"]
+    WORKDIR /app
     ENTRYPOINT ["/app/bin/demo.modular.executable"]
 
 The type is one a Linux image can run: `app-image`, copied in as it is, or `deb` or

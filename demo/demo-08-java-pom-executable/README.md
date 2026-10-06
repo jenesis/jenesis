@@ -163,10 +163,15 @@ application's own jar.
           "org.opencontainers.image.version"="1.0.0" \
           "org.opencontainers.image.documentation"="https://jenesis.build" \
           ...
-    WORKDIR /app
     COPY jars/ /app/jars/
     COPY application.args /app/
+    WORKDIR /app
     ENTRYPOINT ["java", "@/app/application.args"]
+
+The copies come before the `WORKDIR`, so they create `/app` and it belongs to root, as
+everything they copy does. On a base that runs as an unprivileged user, as this one does,
+the application can read what the image starts but can neither replace its argument file
+nor add a jar to its extension folders.
 
 The `LABEL` describes the image with the standard `org.opencontainers.image.*` keys, taken from
 what the project declares: its name, description, version and URL, its source repository and
