@@ -199,7 +199,7 @@ public class Docker implements BuildStep {
                     return FileVisitResult.CONTINUE;
                 }
             });
-            return "WORKDIR /app\nCOPY [" + quoted(List.of(file + "/", "/app/")) + "]\n"
+            return "COPY [" + quoted(List.of(file + "/", "/app/")) + "]\nWORKDIR /app\n"
                     + "ENTRYPOINT [" + quoted(List.of("/app/bin/" + file)) + "]\n";
         }
         if (name == null) {
@@ -339,7 +339,7 @@ public class Docker implements BuildStep {
             command.add(mainModule + "/" + mainClass);
         }
         ProcessBuildStep.argumentFile(folder.resolve("application.args"), command);
-        return "WORKDIR /app\nCOPY jars/ /app/jars/\nCOPY application.args /app/\n"
+        return "COPY jars/ /app/jars/\nCOPY application.args /app/\nWORKDIR /app\n"
                 + "ENTRYPOINT [" + quoted(List.of("java", "@/app/application.args")) + "]\n";
     }
 

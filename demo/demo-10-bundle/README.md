@@ -7,8 +7,9 @@ launch - a form every JVM already understands. It is
 the lightweight counterpart of the jpackage app-image in
 `../demo-09-java-modular-executable`: where jpackage bundles a `jlink`-trimmed Java
 runtime into a self-contained launcher, the bundle carries *only your jars*, meant to
-be dropped onto a stock JRE base image (`eclipse-temurin:25-jre`) that supplies the
-JVM. No native tooling, no bundled runtime, no launch script generated.
+be dropped onto a stock JRE base image that supplies the JVM, such as the hardened,
+digest-pinned distroless one of `../demo-08-java-pom-executable`. No native tooling, no
+bundled runtime, no launch script generated.
 
 Run it
 ------
@@ -106,7 +107,7 @@ The bundle's whole point is a JRE-based image: layer your jars over an off-the-s
 runtime instead of carrying your own. Unzipped onto a `-jre` base it needs no JDK and
 no jpackage:
 
-    FROM eclipse-temurin:25-jre
+    FROM gcr.io/distroless/java25-debian13:nonroot@sha256:ca60da1345c0f17b6d019049e6749e15f10fd3c0da86dec938d2b4ec565d0629
     COPY bundle/ /opt/app/
     WORKDIR /opt/app
     ENTRYPOINT ["java", "@application.unix.args"]
