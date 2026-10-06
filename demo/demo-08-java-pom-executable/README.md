@@ -259,11 +259,12 @@ Where to go from here?
 ----------------------
 
 The `app-image` is self-contained - it bundles its own Java runtime - so a
-deployable container needs no JDK, only a minimal base with a C library. Stage a
+deployable container needs no JDK, only a minimal base with a C library, such as the
+distroless `cc` image, hardened and pinned as the JRE image above is. Stage a
 **Linux** app-image (run `java build/Demo.java` on Linux or in CI), then copy it
 into an image with a small `Dockerfile` (Podman reads the same file):
 
-    FROM debian:stable-slim
+    FROM gcr.io/distroless/cc-debian13:nonroot@sha256:e792ab3d241a468a4fd7519ddbbebe66b49b5f365771716ea688ad40b6c6f1c2
     COPY target/stage/packages/output/java-pom-executable /opt/app
     ENTRYPOINT ["/opt/app/bin/java-pom-executable"]
 
@@ -292,5 +293,5 @@ that compiled the code and ran the tests, so the app ships on **exactly the same
 JVM** it was built and verified against - not whatever patch version or
 distribution a base image happens to provide. The flip side - that a self-contained
 image cannot share its JVM layer across *different* services, where a common
-`eclipse-temurin:<version>-jre` base can (deduplicated on disk and in the page
+JRE base such as the distroless one of the `docker` profile can (deduplicated on disk and in the page
 cache) - applies here too.
