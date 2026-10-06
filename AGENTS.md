@@ -187,9 +187,10 @@ leading `-Djenesis.*` arguments as that run's settings, hands the rest to the to
 line would, and builds the `Environment` that writes everything printed to the writers it was given. It
 never flushes them: whoever owns a writer decides when it drains, and an autoflushing one already does.
 `java.util.spi.ToolProvider` is in `java.base`, so this costs no dependency. The three are declared
-twice, by `provides` in `module-info.java` and by `META-INF/services/java.util.spi.ToolProvider`,
-because a named module reads the first and a jar on the class path reads the second, and the tools
-answer to their names either way. A setting that would
+once, by `provides` in `module-info.java`, and the empty `build.jenesis/classpath.properties` has the
+build write `META-INF/services/java.util.spi.ToolProvider` from that clause, because a named module
+reads the first and a jar on the class path reads the second, and the tools answer to their names
+either way. A setting that would
 replace the running process - `jenesis.toolchain.version`, `jenesis.project.docker`, and
 `jenesis.execute.docker` for what `jenesis-exec` runs - is refused by name rather than ignored,
 and `run` reports a failure through `err` and a code rather than throwing. `jenesis-exec` forks
