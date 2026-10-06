@@ -111,6 +111,68 @@ public class DependencyTreeReportTest {
     }
 
     @Test
+    public void merged_tree_hangs_a_layer_below_the_module_that_declares_it() {
+        SequencedMap<String, Resolver.Vertex> runtime = new LinkedHashMap<>();
+        runtime.put("maven/g/library", new Resolver.Vertex("1.0", null, false, false, List.of()));
+        SequencedMap<String, Resolver.Vertex> render = new LinkedHashMap<>();
+        render.put("maven/g/impl", new Resolver.Vertex("1.0", null, false, false, List.of()));
+        render.put("maven/g/legacy", new Resolver.Vertex("2.0", null, false, false, List.of()));
+        SequencedMap<String, Resolver.Vertex> inner = new LinkedHashMap<>();
+        inner.put("maven/g/nested", new Resolver.Vertex("1.0", null, false, false, List.of()));
+        inner.put("maven/g/legacy", new Resolver.Vertex("1.0", null, false, false, List.of()));
+        SequencedMap<String, Resolver.Resolution> scopes = new LinkedHashMap<>();
+        scopes.put("runtime", resolution(List.of(
+                new Resolver.Edge(null, "maven/g/library/1.0", "1.0", "compile", true)), runtime));
+        scopes.put("layer:render", resolution(List.of(
+                new Resolver.Edge(null, "maven/g/impl/1.0", "1.0", "compile", true),
+                new Resolver.Edge("maven/g/impl/1.0", "maven/g/legacy/2.0", "2.0", "compile", true)), render));
+        scopes.put("layer:inner", resolution(List.of(
+                new Resolver.Edge(null, "maven/g/nested/1.0", "1.0", "compile", true),
+                new Resolver.Edge("maven/g/nested/1.0", "maven/g/legacy/1.0", "1.0", "compile", true)), inner));
+        SequencedMap<String, String> layers = new LinkedHashMap<>();
+        layers.put("layer:render", "maven/g/library/1.0");
+        layers.put("layer:inner", "maven/g/impl/1.0");
+        report.render(scopes, "module/app", new Resolver.Vertex(null, null, false, true, List.of()), layers);
+        assertThat(output().lines().toList())
+                .as("a layer is reached through the module that declares it, one layer inside the other")
+                .containsSequence(
+                        "module/app [runtime, layer:render, layer:inner] (local)",
+                        "└─ maven/g/library 1.0 [runtime]",
+                        "   └─ maven/g/impl 1.0 [layer:render]",
+                        "      ├─ maven/g/nested 1.0 [layer:inner]",
+                        "      │  └─ maven/g/legacy 1.0 [layer:inner]",
+                        "      └─ maven/g/legacy 2.0 [layer:render]",
+                        "",
+                        "Resolved dependencies:",
+                        "  maven/g/impl -> 1.0 [layer:render]",
+                        "  maven/g/legacy -> 2.0 [layer:render]",
+                        "  maven/g/legacy -> 1.0 [layer:inner]",
+                        "  maven/g/library -> 1.0 [runtime]",
+                        "  maven/g/nested -> 1.0 [layer:inner]");
+    }
+
+    @Test
+    public void merged_tree_hangs_a_layer_the_module_declares_itself_below_the_module() {
+        SequencedMap<String, Resolver.Vertex> runtime = new LinkedHashMap<>();
+        runtime.put("maven/g/api", new Resolver.Vertex("1.0", null, false, false, List.of()));
+        SequencedMap<String, Resolver.Vertex> render = new LinkedHashMap<>();
+        render.put("maven/g/impl", new Resolver.Vertex("1.0", null, false, false, List.of()));
+        SequencedMap<String, Resolver.Resolution> scopes = new LinkedHashMap<>();
+        scopes.put("runtime", resolution(List.of(
+                new Resolver.Edge(null, "maven/g/api/1.0", "1.0", "compile", true)), runtime));
+        scopes.put("layer:render", resolution(List.of(
+                new Resolver.Edge(null, "maven/g/impl/1.0", "1.0", "compile", true)), render));
+        report.render(scopes,
+                "module/library",
+                new Resolver.Vertex(null, null, false, true, List.of()),
+                new LinkedHashMap<>(Map.of("layer:render", "module/library")));
+        assertThat(output().lines().toList()).containsSequence(
+                "module/library [runtime, layer:render] (local)",
+                "├─ maven/g/impl 1.0 [layer:render]",
+                "└─ maven/g/api 1.0 [runtime]");
+    }
+
+    @Test
     public void separate_trees_render_one_tree_per_scope() {
         SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
         vertices.put("maven/g/a", new Resolver.Vertex("1.0", null, false, false, List.of()));

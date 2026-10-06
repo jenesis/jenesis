@@ -717,6 +717,7 @@ public class Dependencies implements BuildExecutorModule {
                                 + " both declare a layer called " + layer.getKey()
                                 + " - a layer is named on its own, so rename one of them or keep one out");
                     }
+                    graph.setProperty("layer/" + layer.getKey(), coordinate);
                     ModuleDescriptor descriptor = PathPlacement.moduleDescriptor(materialized.get(key).file());
                     Iterator<String> tokens = layer.getValue().iterator();
                     layers.setProperty(layer.getKey(),
@@ -1364,6 +1365,22 @@ public class Dependencies implements BuildExecutorModule {
             Map.entry("GPL-3.0-or-later", "strong-copyleft"),
             Map.entry("AGPL-3.0-only", "network-copyleft"),
             Map.entry("AGPL-3.0-or-later", "network-copyleft"));
+
+    public static SequencedMap<String, String> layers(Iterable<Path> graphFiles) throws IOException {
+        SequencedMap<String, String> layers = new LinkedHashMap<>();
+        for (Path file : graphFiles) {
+            if (!Files.isRegularFile(file)) {
+                continue;
+            }
+            SequencedProperties properties = SequencedProperties.ofFiles(file);
+            for (String key : properties.stringPropertyNames()) {
+                if (key.startsWith("layer/")) {
+                    layers.putIfAbsent(key.substring("layer/".length()), properties.getProperty(key));
+                }
+            }
+        }
+        return layers;
+    }
 
     public static SequencedMap<String, Resolver.Resolution> graph(Iterable<Path> graphFiles,
                                                                   Iterable<Path> licenseFiles) throws IOException {

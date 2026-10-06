@@ -47,35 +47,58 @@ public final class DependencyTreeReport {
     }
 
     public void render(Resolver.Resolution resolution) {
-        render("Dependency tree:", null, new LinkedHashMap<>(Map.of("", resolution)), false);
+        render("Dependency tree:", null, new LinkedHashMap<>(Map.of("", resolution)), false, Map.of());
     }
 
     public void render(String title, SequencedMap<String, Resolver.Resolution> scopes) {
         if (merged) {
-            render(title, null, scopes, true);
+            render(title, null, scopes, true, Map.of());
         } else {
             scopes.forEach((scope, resolution) -> render(
                     title + "/" + scope,
                     null,
                     new LinkedHashMap<>(Map.of(scope, resolution)),
-                    false));
+                    false,
+                    Map.of()));
         }
     }
 
     public void render(SequencedMap<String, Resolver.Resolution> scopes, String key, Resolver.Vertex root) {
+        render(scopes, key, root, Collections.emptyNavigableMap());
+    }
+
+    public void render(SequencedMap<String, Resolver.Resolution> scopes,
+                       String key,
+                       Resolver.Vertex root,
+                       SequencedMap<String, String> layers) {
         String version = root.resolvedVersion(), coordinate = version == null ? key : key + "/" + version;
+        SequencedMap<String, SequencedSet<String>> grafts = new LinkedHashMap<>(), attachments = new LinkedHashMap<>();
+        if (merged) {
+            layers.forEach((layer, declaring) -> scopes.forEach((scope, resolution) -> {
+                for (Resolver.Edge edge : resolution.edges()) {
+                    Resolver.Vertex node = resolution.vertices().get(vertexKey(edge));
+                    if (!scope.equals(layer) && edge.followed() && node != null
+                            && declaring.equals(vertexKey(edge) + "/" + node.resolvedVersion())) {
+                        attachments.computeIfAbsent(layer, _ -> new LinkedHashSet<>()).add(edge.coordinate());
+                        grafts.computeIfAbsent(edge.coordinate(), _ -> new LinkedHashSet<>()).add(layer);
+                    }
+                }
+            }));
+        }
         SequencedMap<String, Resolver.Resolution> rooted = new LinkedHashMap<>();
         scopes.forEach((scope, resolution) -> {
             if (resolution.edges().isEmpty()) {
                 return;
             }
+            SequencedSet<String> parents = attachments.getOrDefault(scope, new LinkedHashSet<>(List.of(coordinate)));
             List<Resolver.Edge> edges = new ArrayList<>();
             edges.add(new Resolver.Edge(null, coordinate, version, scope, true));
             for (Resolver.Edge edge : resolution.edges()) {
                 if (edge.parent() != null) {
                     edges.add(edge);
                 } else if (edge.followed()) {
-                    edges.add(new Resolver.Edge(coordinate, edge.coordinate(), edge.version(), edge.scope(), true));
+                    parents.forEach(parent -> edges.add(
+                            new Resolver.Edge(parent, edge.coordinate(), edge.version(), edge.scope(), true)));
                 }
             }
             SequencedMap<String, Resolver.Vertex> nodes = new LinkedHashMap<>();
@@ -84,17 +107,22 @@ public final class DependencyTreeReport {
             rooted.put(scope, new Resolver.Resolution(resolution.artifacts(), edges, nodes));
         });
         if (merged) {
-            render(null, key, rooted, true);
+            render(null, key, rooted, true, grafts);
         } else {
             rooted.forEach((scope, resolution) -> render(
                     null,
                     key,
                     new LinkedHashMap<>(Map.of(scope, resolution)),
-                    false));
+                    false,
+                    Map.of()));
         }
     }
 
-    private void render(String title, String root, SequencedMap<String, Resolver.Resolution> scopes, boolean labelled) {
+    private void render(String title,
+                        String root,
+                        SequencedMap<String, Resolver.Resolution> scopes,
+                        boolean labelled,
+                        Map<String, SequencedSet<String>> grafts) {
         SequencedMap<String, Resolver.Resolution> present = new LinkedHashMap<>();
         scopes.forEach((scope, resolution) -> {
             if (!resolution.edges().isEmpty()) {
@@ -109,7 +137,7 @@ public final class DependencyTreeReport {
             builder.append(palette.heading()).append(title).append(palette.reset())
                     .append(System.lineSeparator());
         }
-        builder.append(render(present, labelled));
+        builder.append(render(present, labelled, grafts));
         SequencedMap<Map.Entry<String, Resolver.Vertex>, SequencedSet<String>> resolved = new LinkedHashMap<>();
         present.forEach((scope, resolution) -> resolution.vertices().forEach((coordinate, node) -> {
             if (!coordinate.equals(root) && (internal || !node.internal())) {
@@ -262,7 +290,9 @@ public final class DependencyTreeReport {
                 + System.lineSeparator();
     }
 
-    private String render(SequencedMap<String, Resolver.Resolution> scopes, boolean labelled) {
+    private String render(SequencedMap<String, Resolver.Resolution> scopes,
+                          boolean labelled,
+                          Map<String, SequencedSet<String>> grafts) {
         SequencedMap<String, Map<String, List<Resolver.Edge>>> children = new LinkedHashMap<>();
         SequencedMap<String, List<Resolver.Edge>> roots = new LinkedHashMap<>();
         Map<String, Set<String>> seen = new HashMap<>();
@@ -310,7 +340,7 @@ public final class DependencyTreeReport {
             }
             int treeColor = GRADIENT[colorIndex[0]++ % GRADIENT.length];
             builder.append(label(edge, applied, scopes, labelled, treeColor, true)).append(System.lineSeparator());
-            children(builder, edge.coordinate(), applied, scopes, children, labelled, "", seen, treeColor);
+            children(builder, edge.coordinate(), applied, scopes, children, grafts, labelled, "", seen, treeColor);
         }
         if (!externalRoots.isEmpty()) {
             builder.append(externalSummary(externalRoots.size())).append(System.lineSeparator());
@@ -323,6 +353,7 @@ public final class DependencyTreeReport {
                           SequencedSet<String> applied,
                           SequencedMap<String, Resolver.Resolution> scopes,
                           SequencedMap<String, Map<String, List<Resolver.Edge>>> children,
+                          Map<String, SequencedSet<String>> grafts,
                           boolean labelled,
                           String indent,
                           Map<String, Set<String>> seen,
@@ -330,6 +361,11 @@ public final class DependencyTreeReport {
         SequencedMap<String, List<Resolver.Edge>> next = new LinkedHashMap<>();
         for (String scope : applied) {
             next.put(scope, children.get(scope).getOrDefault(coordinate, List.of()));
+        }
+        for (String scope : grafts.getOrDefault(coordinate, Collections.emptyNavigableSet())) {
+            if (children.containsKey(scope)) {
+                next.putIfAbsent(scope, children.get(scope).getOrDefault(coordinate, List.of()));
+            }
         }
         List<Map.Entry<Resolver.Edge, SequencedSet<String>>> visible = new ArrayList<>();
         Set<String> external = new LinkedHashSet<>();
@@ -372,6 +408,7 @@ public final class DependencyTreeReport {
                         expanded,
                         scopes,
                         children,
+                        grafts,
                         labelled,
                         indent + (last ? "   " : "│  "),
                         seen,
