@@ -50,11 +50,11 @@ public class DependencyTreeReportTest {
         SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
         vertices.put("maven/g/a", new Resolver.Vertex("1.0", null, false, false, List.of()));
         vertices.put("maven/g/b", new Resolver.Vertex("2.0", null, false, false, List.of()));
-        report.render(resolution(List.of(
+        report.render(new LinkedHashMap<>(Map.of("compile", resolution(List.of(
                 new Resolver.Edge(null, "maven/g/a/1.0", "1.0", "compile", true),
                 new Resolver.Edge("maven/g/a/1.0", "maven/g/b/2.0", "2.0", "compile", true),
                 new Resolver.Edge(null, "maven/g/b/2.0", "2.0", "compile", false)),
-                vertices), "module/greeter", "compile", new Resolver.Vertex("1.0",
+                vertices))), "module/greeter", new Resolver.Vertex("1.0",
                 "greeter",
                 false,
                 true,
@@ -65,8 +65,70 @@ public class DependencyTreeReportTest {
                 "   └─ maven/g/b 2.0 [compile]",
                 "",
                 "Resolved dependencies:",
+                "  maven/g/a -> 1.0 [compile]",
+                "  maven/g/b -> 2.0 [compile]");
+    }
+
+    @Test
+    public void merged_tree_names_only_the_scopes_a_node_applies_to() {
+        SequencedMap<String, Resolver.Vertex> compile = new LinkedHashMap<>();
+        compile.put("maven/g/a", new Resolver.Vertex("1.0", null, false, false, List.of()));
+        SequencedMap<String, Resolver.Vertex> runtime = new LinkedHashMap<>(compile);
+        runtime.put("maven/g/b", new Resolver.Vertex("2.0", null, false, false, List.of()));
+        SequencedMap<String, Resolver.Resolution> scopes = new LinkedHashMap<>();
+        scopes.put("compile", resolution(List.of(
+                new Resolver.Edge(null, "maven/g/a/1.0", "1.0", "compile", true)), compile));
+        scopes.put("runtime", resolution(List.of(
+                new Resolver.Edge(null, "maven/g/a/1.0", "1.0", "compile", true),
+                new Resolver.Edge("maven/g/a/1.0", "maven/g/b/2.0", "2.0", "runtime", true)), runtime));
+        report.render(scopes, "module/greeter", new Resolver.Vertex(null, null, false, true, List.of()));
+        assertThat(output().lines().toList()).containsSequence(
+                "module/greeter [compile, runtime] (local)",
+                "└─ maven/g/a 1.0 [compile, runtime]",
+                "   └─ maven/g/b 2.0 [runtime]",
+                "",
+                "Resolved dependencies:",
+                "  maven/g/a -> 1.0 [compile, runtime]",
+                "  maven/g/b -> 2.0 [runtime]");
+    }
+
+    @Test
+    public void merged_tree_keeps_a_node_apart_per_scope_where_its_negotiated_version_differs() {
+        SequencedMap<String, Resolver.Vertex> compile = new LinkedHashMap<>();
+        compile.put("maven/g/a", new Resolver.Vertex("1.0", null, false, false, List.of()));
+        SequencedMap<String, Resolver.Vertex> runtime = new LinkedHashMap<>();
+        runtime.put("maven/g/a", new Resolver.Vertex("2.0", null, false, false, List.of()));
+        SequencedMap<String, Resolver.Resolution> scopes = new LinkedHashMap<>();
+        scopes.put("compile", resolution(List.of(
+                new Resolver.Edge(null, "maven/g/a/1.0", "1.0", "compile", true)), compile));
+        scopes.put("runtime", resolution(List.of(
+                new Resolver.Edge(null, "maven/g/a/1.0", "1.0", "compile", true)), runtime));
+        report.render(scopes, "module/greeter", new Resolver.Vertex(null, null, false, true, List.of()));
+        assertThat(output().lines().toList()).containsSequence(
+                "module/greeter [compile, runtime] (local)",
+                "├─ maven/g/a 1.0 [compile]",
+                "└─ maven/g/a 1.0 -> 2.0 [runtime]");
+    }
+
+    @Test
+    public void separate_trees_render_one_tree_per_scope() {
+        SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
+        vertices.put("maven/g/a", new Resolver.Vertex("1.0", null, false, false, List.of()));
+        SequencedMap<String, Resolver.Resolution> scopes = new LinkedHashMap<>();
+        scopes.put("compile", resolution(List.of(
+                new Resolver.Edge(null, "maven/g/a/1.0", "1.0", "compile", true)), vertices));
+        scopes.put("runtime", resolution(List.of(
+                new Resolver.Edge(null, "maven/g/a/1.0", "1.0", "compile", true)), vertices));
+        report.merged(false).render(scopes, "module/greeter", new Resolver.Vertex(null, null, false, true, List.of()));
+        assertThat(output().lines().toList()).containsSequence(
+                "module/greeter [compile] (local)",
+                "└─ maven/g/a 1.0 [compile]",
+                "",
+                "Resolved dependencies:",
                 "  maven/g/a -> 1.0",
-                "  maven/g/b -> 2.0");
+                "",
+                "module/greeter [runtime] (local)",
+                "└─ maven/g/a 1.0 [compile]");
     }
 
     @Test
