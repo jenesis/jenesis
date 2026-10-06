@@ -133,6 +133,31 @@ crosses the boundary a single class rather than two of the same name.
 is the mechanism a layer is reached through, not a dependency to isolate, and a second copy would
 mean a second `Launcher` class with a cache of its own.
 
+The same picture is in the dependency tree:
+
+    java build/jenesis/Make.java dependencies
+
+prints each layer below the module that declares it, labelled with its group, so the application's
+tree reads the way the layers load:
+
+    maven/demo.layers/demo.layers.app 0-SNAPSHOT [compile, runtime, layer:render, layer:inner]
+    ├─ maven/com.fasterxml.jackson.core/jackson-core 2.18.2 [compile, runtime]
+    └─ maven/demo.layers/demo.layers.library 0-SNAPSHOT [compile, runtime]
+       ├─ maven/demo.layers/demo.layers.impl 0-SNAPSHOT [layer:render]
+       │  ├─ maven/demo.layers/demo.layers.nested 0-SNAPSHOT [layer:inner]
+       │  │  ├─ maven/com.fasterxml.jackson.core/jackson-core 2.13.5 [layer:inner]
+       │  │  └─ maven/demo.layers/demo.layers.spi 0-SNAPSHOT [layer:inner]
+       │  ├─ maven/build.jenesis/build.jenesis.launcher 0.5.3 [layer:render]
+       │  ├─ maven/com.fasterxml.jackson.core/jackson-core 2.15.4 [layer:render]
+       │  └─ maven/demo.layers/demo.layers.spi 0-SNAPSHOT [layer:render]
+       ├─ maven/build.jenesis/build.jenesis.launcher 0.5.3 [compile, runtime]
+       └─ maven/demo.layers/demo.layers.spi 0-SNAPSHOT [compile, runtime]
+
+No `pom.xml` names what a layer holds, because Maven cannot resolve a layer: `demo.layers.library`
+publishes the launcher and the API module, so a consumer resolving it from a repository never finds
+`jackson-core` 2.15.4 on its own path.
+`-Djenesis.tree.merge=false` prints one tree per scope instead, a layer's among them.
+
 Why the API module must be shared
 ---------------------------------
 

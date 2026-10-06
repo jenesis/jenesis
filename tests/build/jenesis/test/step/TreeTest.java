@@ -198,6 +198,45 @@ public class TreeTest {
                 "└─ maven/org.foo/qux 2.0 [runtime]");
     }
 
+    @Test
+    public void hangs_a_layer_below_the_dependency_that_declares_it() throws IOException {
+        assertThat(layered(Map.of())).containsSequence(
+                "module/app [runtime, layer:render] (local ./)",
+                "└─ maven/g/library 1.0 [runtime]",
+                "   └─ maven/g/impl 1.0 [layer:render]");
+    }
+
+    @Test
+    public void heads_a_tree_per_layer_with_the_module_in_that_layer() throws IOException {
+        assertThat(layered(Map.of("tree.merge", "false"))).containsSequence(
+                "module/app [layer:render] (local ./)",
+                "└─ maven/g/impl 1.0 [runtime]");
+    }
+
+    private List<String> layered(Map<String, String> keys) throws IOException {
+        SequencedProperties graph = new SequencedProperties();
+        graph.setProperty("edge/0", "main\truntime\tmaven\ttrue\tcompile\t1.0\t\tmaven/g/library/1.0");
+        graph.setProperty("edge/1", "layer:render\truntime\tmaven\ttrue\truntime\t1.0\t\tmaven/g/impl/1.0");
+        graph.setProperty("vertex/main/runtime/maven/g/library", "1.0\t\tfalse");
+        graph.setProperty("vertex/layer:render/runtime/maven/g/impl", "1.0\t\tfalse");
+        graph.setProperty("layer/render", "maven/g/library/1.0");
+        graph.store(argument.resolve("graph.properties"));
+        SequencedProperties inventory = new SequencedProperties();
+        inventory.setProperty("module.graph.0", "graph.properties");
+        inventory.setProperty("module.identity.0", "module/app");
+        inventory.store(argument.resolve(Inventory.INVENTORY));
+
+        List<String> printed = new ArrayList<>();
+        Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
+                        argument,
+                        Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture().join();
+        return printed.stream().map(line -> line.replaceAll("\033\\[[0-9;]*m", "")).toList();
+    }
+
     private List<String> scoped(Map<String, String> keys) throws IOException {
         SequencedProperties graph = new SequencedProperties();
         graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
