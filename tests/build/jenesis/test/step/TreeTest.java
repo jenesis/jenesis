@@ -171,7 +171,43 @@ public class TreeTest {
     }
 
     @Test
+    public void rejects_an_unknown_tree_scopes_value() {
+        assertThatThrownBy(() -> Tree.ofEnvironment(new Environment(Map.of("tree.scopes", "joined"))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Unknown jenesis.tree.scopes 'joined'")
+                .hasMessageContaining("merged")
+                .hasMessageContaining("separate");
+    }
+
+    @Test
+    public void merges_the_scopes_of_a_module_into_one_tree() throws IOException {
+        List<String> printed = scoped(Map.of());
+        assertThat(printed).containsSequence(
+                "module/foo [compile, runtime] (local ./)",
+                "├─ maven/org.foo/bar 1.0 [compile, runtime]",
+                "└─ maven/org.foo/qux 2.0 [runtime]",
+                "",
+                "Resolved dependencies:",
+                "  maven/org.foo/bar -> 1.0 [compile, runtime]",
+                "  maven/org.foo/qux -> 2.0 [runtime]");
+        assertThat(printed).filteredOn(line -> line.startsWith("module/foo")).hasSize(1);
+    }
+
+    @Test
     public void heads_a_tree_per_scope_with_the_module_in_that_scope() throws IOException {
+        assertThat(scoped(Map.of("tree.scopes", "separate"))).containsSequence(
+                "module/foo [compile] (local ./)",
+                "└─ maven/org.foo/bar 1.0 [compile]",
+                "",
+                "Resolved dependencies:",
+                "  maven/org.foo/bar -> 1.0",
+                "",
+                "module/foo [runtime] (local ./)",
+                "├─ maven/org.foo/bar 1.0 [compile]",
+                "└─ maven/org.foo/qux 2.0 [runtime]");
+    }
+
+    private List<String> scoped(Map<String, String> keys) throws IOException {
         SequencedProperties graph = new SequencedProperties();
         graph.setProperty("edge/0", "main\tcompile\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
         graph.setProperty("edge/1", "main\truntime\tmaven\ttrue\tcompile\t1.0\t\tmaven/org.foo/bar/1.0");
@@ -186,23 +222,14 @@ public class TreeTest {
         inventory.store(argument.resolve(Inventory.INVENTORY));
 
         List<String> printed = new ArrayList<>();
-        Tree.ofEnvironment(Environment.NONE.out(printed::add).err(printed::add)).apply(
+        Tree.ofEnvironment(new Environment(keys, printed::add, printed::add)).apply(
                 Runnable::run,
                 new BuildStepContext(previous, next, supplement),
                 new LinkedHashMap<>(Map.of("argument", new BuildStepArgument(
                         argument,
                         Map.of(Path.of(Inventory.INVENTORY), Checksum.of(ChecksumStatus.ADDED))))))
                 .toCompletableFuture().join();
-        assertThat(printed.stream().map(line -> line.replaceAll("\033\\[[0-9;]*m", "")).toList()).containsSequence(
-                "module/foo [compile] (local ./)",
-                "└─ maven/org.foo/bar 1.0 [compile]",
-                "",
-                "Resolved dependencies:",
-                "  maven/org.foo/bar -> 1.0",
-                "",
-                "module/foo [runtime] (local ./)",
-                "├─ maven/org.foo/bar 1.0 [compile]",
-                "└─ maven/org.foo/qux 2.0 [runtime]");
+        return printed.stream().map(line -> line.replaceAll("\033\\[[0-9;]*m", "")).toList();
     }
 
     @Test

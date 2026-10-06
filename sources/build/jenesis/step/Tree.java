@@ -16,14 +16,14 @@ public class Tree implements BuildStep {
 
     private final transient Consumer<String> out;
     private final transient Palette palette;
-    private final transient boolean compact, tests;
+    private final transient boolean compact, merged, tests;
 
     public Tree() {
-        this(null, Palette.NONE, false, true);
+        this(null, Palette.NONE, false, true, true);
     }
 
     public static Tree ofEnvironment(Environment environment) {
-        Tree tree = new Tree(environment.out(), Palette.ofEnvironment(environment), false, true);
+        Tree tree = new Tree(environment.out(), Palette.ofEnvironment(environment), false, true, true);
         String format = environment.getProperty("tree.format");
         if (format != null) {
             tree = tree.compact(switch (format) {
@@ -33,27 +33,41 @@ public class Tree implements BuildStep {
                         "Unknown jenesis.tree.format '" + format + "', expected 'full' or 'compact'");
             });
         }
+        String scopes = environment.getProperty("tree.scopes");
+        if (scopes != null) {
+            tree = tree.merged(switch (scopes) {
+                case "merged" -> true;
+                case "separate" -> false;
+                default -> throw new IllegalArgumentException(
+                        "Unknown jenesis.tree.scopes '" + scopes + "', expected 'merged' or 'separate'");
+            });
+        }
         Boolean tests = environment.flagOrNull("tree.tests");
         return tests == null ? tree : tree.tests(tests);
     }
 
-    private Tree(Consumer<String> out, Palette palette, boolean compact, boolean tests) {
+    private Tree(Consumer<String> out, Palette palette, boolean compact, boolean merged, boolean tests) {
         this.out = out;
         this.palette = palette;
         this.compact = compact;
+        this.merged = merged;
         this.tests = tests;
     }
 
     public Tree printing(Consumer<String> out, Palette palette) {
-        return new Tree(out, palette, compact, tests);
+        return new Tree(out, palette, compact, merged, tests);
     }
 
     public Tree compact(boolean compact) {
-        return new Tree(out, palette, compact, tests);
+        return new Tree(out, palette, compact, merged, tests);
+    }
+
+    public Tree merged(boolean merged) {
+        return new Tree(out, palette, compact, merged, tests);
     }
 
     public Tree tests(boolean tests) {
-        return new Tree(out, palette, compact, tests);
+        return new Tree(out, palette, compact, merged, tests);
     }
 
     @Override
@@ -93,7 +107,10 @@ public class Tree implements BuildStep {
                 }
             }
         }
-        DependencyTreeReport report = new DependencyTreeReport(out, palette).compact(compact).locations(locations);
+        DependencyTreeReport report = new DependencyTreeReport(out, palette)
+                .compact(compact)
+                .merged(merged)
+                .locations(locations);
         SequencedMap<String, Resolver.Vertex> aggregated = new LinkedHashMap<>();
         for (Map.Entry<Path, String> entry : prefixes.entrySet()) {
             SequencedProperties inventory = inventories.get(entry.getKey());
@@ -116,15 +133,20 @@ public class Tree implements BuildStep {
                 licenses.add(new License(null, null, inventory.value(prefix + "license." + index), null));
             }
             Resolver.Vertex root = new Resolver.Vertex(version, inventory.value(prefix + "module"), false, true, licenses);
+            SequencedMap<String, SequencedMap<String, Resolver.Resolution>> groups = new LinkedHashMap<>();
             Dependencies.graph(
                     Inventory.paths(inventory, entry.getKey(), prefix + "graph"),
                     Inventory.paths(inventory, entry.getKey(), prefix + "licenses")).forEach((groupScope, resolution) -> {
-                if (key == null) {
-                    report.render(resolution, groupScope);
-                } else {
-                    report.render(resolution, key, groupScope.substring(groupScope.indexOf('/') + 1), root);
-                }
+                groups.computeIfAbsent(groupScope.substring(0, groupScope.indexOf('/')), _ -> new TreeMap<>())
+                        .put(groupScope.substring(groupScope.indexOf('/') + 1), resolution);
                 aggregated.putAll(resolution.vertices());
+            });
+            groups.forEach((group, scopes) -> {
+                if (key == null) {
+                    report.render(group, scopes);
+                } else {
+                    report.render(scopes, key, root);
+                }
             });
         }
         report.summary(aggregated);
