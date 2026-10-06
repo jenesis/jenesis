@@ -18,6 +18,7 @@ public class Docker implements BuildStep {
     private static final String MODULE_PATH = "/app/extensions/modulepath",
             CLASS_PATH = "/app/extensions/classpath/*",
             ANNOTATION = "org.opencontainers.image.";
+    private static final long serialVersionUID = 1L;
 
     private final String from;
     private final String group;
