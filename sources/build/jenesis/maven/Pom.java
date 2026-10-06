@@ -70,35 +70,12 @@ public class Pom implements BuildStep {
         SequencedProperties requires = SequencedProperties.ofFolders(folders, resolved ? DEPENDENCIES : REQUIRES);
         SequencedProperties exclusions = SequencedProperties.ofFolders(folders, EXCLUSIONS);
         SequencedProperties metadata = SequencedProperties.ofFolders(folders, METADATA);
-        SequencedMap<String, SequencedSet<String>> held = new LinkedHashMap<>(), declared = new LinkedHashMap<>();
-        for (Path folder : folders) {
-            Path file = folder.resolve(resolved ? DEPENDENCIES : REQUIRES);
-            if (!Files.isRegularFile(file)) {
-                continue;
-            }
-            SequencedSet<String> own = new LinkedHashSet<>(), carried = new LinkedHashSet<>();
-            for (String key : SequencedProperties.ofFiles(file).stringPropertyNames()) {
-                int first = key.indexOf('/'), second = key.indexOf('/', first + 1);
-                String coordinate = key.substring(second + 1);
-                if (key.startsWith(group + "/")) {
-                    own.add(coordinate);
-                } else if (key.startsWith("layer:")) {
-                    carried.add(key.substring(0, first));
-                    held.computeIfAbsent(key.substring(0, first), _ -> new LinkedHashSet<>()).add(coordinate);
-                }
-            }
-            carried.forEach(layer -> declared.computeIfAbsent(layer, _ -> new LinkedHashSet<>()).addAll(own));
-        }
-        SequencedSet<String> isolated = new LinkedHashSet<>();
-        held.forEach((layer, coordinates) -> coordinates.stream()
-                .filter(coordinate -> !declared.get(layer).contains(coordinate))
-                .forEach(isolated::add));
         SequencedMap<String, SequencedSet<String>> coordinateScopes = new LinkedHashMap<>();
         for (String key : requires.stringPropertyNames()) {
             int first = key.indexOf('/');
             int second = key.indexOf('/', first + 1);
             String coordinate = key.substring(second + 1);
-            if (!key.startsWith(group + "/") || isolated.contains(coordinate)) {
+            if (!key.startsWith(group + "/")) {
                 continue;
             }
             coordinateScopes.computeIfAbsent(coordinate, _ -> new LinkedHashSet<>())

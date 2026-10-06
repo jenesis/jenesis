@@ -153,8 +153,9 @@ tree reads the way the layers load:
        ├─ maven/build.jenesis/build.jenesis.launcher 0.5.3 [compile, runtime]
        └─ maven/demo.layers/demo.layers.spi 0-SNAPSHOT [compile, runtime]
 
-What a layer holds stays out of the `pom.xml` of the module that declares it, so a consumer resolving
-`demo.layers.library` from a repository never finds `jackson-core` 2.15.4 on its own path.
+No `pom.xml` names what a layer holds, because Maven cannot resolve a layer: `demo.layers.library`
+publishes the launcher and the API module, so a consumer resolving it from a repository never finds
+`jackson-core` 2.15.4 on its own path.
 `-Djenesis.tree.merge=false` prints one tree per scope instead, a layer's among them.
 
 Why the API module must be shared
