@@ -3,7 +3,7 @@
  * it: there is no checksum to verify the download against, which is what a hardened build rejects.
  *
  * @jenesis.release 25
- * @jenesis.alias org.apache.commons.lang3 org.apache.commons/commons-lang3
+ * @jenesis.pin org.apache.commons.lang3 3.14.0
  * @jenesis.pin org.apache.commons/commons-lang3 3.14.0
  */
 module demo.unpinned {

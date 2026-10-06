@@ -19,21 +19,22 @@ Three projects, one public dependency
 -------------------------------------
 
 Each project is an ordinary modular project that requires `org.apache.commons.lang3` from Maven
-Central. They differ in one line:
+Central. They differ only in their pins, one for the module and one for the Maven coordinate it
+resolves to, as `../demo-02-java-modular` introduced them:
 
 ```java
 /**
- * @jenesis.alias org.apache.commons.lang3 org.apache.commons/commons-lang3
+ * @jenesis.pin org.apache.commons.lang3 3.20.0 SHA-256/69e5c9fa...
  * @jenesis.pin org.apache.commons/commons-lang3 3.20.0 SHA-256/69e5c9fa...
  */
 ```
 
-- **`pinned`** carries the version and the checksum above, and builds.
-- **`unpinned`** carries the version alone.
-- **`tampered`** carries the same version and a checksum of zeroes.
+- **`pinned`** carries the versions and the checksums above, and builds.
+- **`unpinned`** carries the versions alone.
+- **`tampered`** carries the same versions and checksums of zeroes.
 
 Nothing writes these lines by hand: `java build/jenesis/Make.java pin` resolves the closure and
-writes the version and checksum it found, which is how the `pinned` line above was produced.
+writes the versions and checksums it found, which is how the `pinned` lines above were produced.
 
 Whether, and which bytes
 ------------------------
