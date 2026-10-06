@@ -292,34 +292,61 @@ Printing the dependency graph
 -----------------------------
 
 To see what each module resolves, run the `dependencies` selector. It prints one
-tree per module and scope, each starting from the module itself - tagged `local`
-with the folder it is built from - with every node carrying its resolved module
-name and declared license:
+tree per module, each starting from the module itself - tagged `local` with the
+folder it is built from - with every node carrying its resolved module name and
+declared license:
 
     java build/jenesis/Make.java dependencies
 
-    maven/demo.greeter/demo.greeter.test 0-SNAPSHOT [compile] (module demo.greeter.test, local ./greeter-test)
-    ├─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
-    │  └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT}
-    ├─ maven/demo.greeter/demo.greeter.testing 0-SNAPSHOT [compile] (module demo.greeter.testing, local ./greeter-testing)
-    │  ├─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (*)
-    │  └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (*)
-    └─ maven/org.junit.jupiter/junit-jupiter 5.11.3 [compile] (module org.junit.jupiter) {EPL-2.0}
-       ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (module org.junit.jupiter.api) {EPL-2.0}
-       │  ├─ maven/org.opentest4j/opentest4j 1.3.0 [compile] (module org.opentest4j) {Apache-2.0}
-       │  ├─ maven/org.junit.platform/junit-platform-commons 1.11.3 [compile] (module org.junit.platform.commons) {EPL-2.0}
-       │  │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (*)
-       │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (module org.apiguardian.api) {Apache-2.0}
-       ├─ maven/org.junit.jupiter/junit-jupiter-params 5.11.3 [compile] (module org.junit.jupiter.params) {EPL-2.0}
-       │  ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (*)
-       │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (*)
-       └─ maven/org.junit.jupiter/junit-jupiter-engine 5.11.3 [runtime] (module org.junit.jupiter.engine) {EPL-2.0}
-          ├─ maven/org.junit.platform/junit-platform-engine 1.11.3 [runtime] (module org.junit.platform.engine) {EPL-2.0}
-          │  ├─ maven/org.opentest4j/opentest4j 1.3.0 [compile] (*)
-          │  ├─ maven/org.junit.platform/junit-platform-commons 1.11.3 [compile] (*)
-          │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (*)
-          ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile] (*)
-          └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile] (*)
+    maven/demo.greeter/demo.greeter.test 0-SNAPSHOT [compile, runtime] (module demo.greeter.test, local ./greeter-test)
+    ├─ maven/org.junit.platform/junit-platform-console 1.11.3 [runtime] (module org.junit.platform.console) {EPL-2.0}
+    │  ├─ maven/org.junit.platform/junit-platform-reporting 1.11.3 [runtime] (module org.junit.platform.reporting) {EPL-2.0}
+    │  │  ├─ maven/org.junit.platform/junit-platform-launcher 1.11.3 [runtime] (module org.junit.platform.launcher) {EPL-2.0}
+    │  │  │  ├─ maven/org.junit.platform/junit-platform-engine 1.11.3 [runtime] (*)
+    │  │  │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [runtime] (*)
+    │  │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [runtime] (*)
+    │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [runtime] (module org.apiguardian.api) {Apache-2.0}
+    ├─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile, runtime] (module demo.greeter, local ./greeter)
+    │  └─ maven/org.slf4j/slf4j-api 2.0.16 [compile, runtime] (module org.slf4j) {MIT}
+    ├─ maven/demo.greeter/demo.greeter.testing 0-SNAPSHOT [compile, runtime] (module demo.greeter.testing, local ./greeter-testing)
+    │  ├─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile, runtime] (*)
+    │  └─ maven/org.slf4j/slf4j-api 2.0.16 [compile, runtime] (*)
+    └─ maven/org.junit.jupiter/junit-jupiter 5.11.3 [compile, runtime] (module org.junit.jupiter) {EPL-2.0}
+       ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile, runtime] (module org.junit.jupiter.api) {EPL-2.0}
+       │  ├─ maven/org.opentest4j/opentest4j 1.3.0 [compile, runtime] (module org.opentest4j) {Apache-2.0}
+       │  ├─ maven/org.junit.platform/junit-platform-commons 1.11.3 [compile, runtime] (module org.junit.platform.commons) {EPL-2.0}
+       │  │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile, runtime] (*)
+       │  ├─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile, runtime] (module org.apiguardian.api) {Apache-2.0}
+       │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [runtime] (*)
+       ├─ maven/org.junit.jupiter/junit-jupiter-params 5.11.3 [compile, runtime] (module org.junit.jupiter.params) {EPL-2.0}
+       │  ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile, runtime] (*)
+       │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile, runtime] (*)
+       └─ maven/org.junit.jupiter/junit-jupiter-engine 5.11.3 [compile, runtime] (module org.junit.jupiter.engine) {EPL-2.0}
+          ├─ maven/org.junit.platform/junit-platform-engine 1.11.3 [compile, runtime] (module org.junit.platform.engine) {EPL-2.0}
+          │  ├─ maven/org.opentest4j/opentest4j 1.3.0 [compile, runtime] (*)
+          │  ├─ maven/org.junit.platform/junit-platform-commons 1.11.3 [compile, runtime] (*)
+          │  └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile, runtime] (*)
+          ├─ maven/org.junit.jupiter/junit-jupiter-api 5.11.3 [compile, runtime] (*)
+          └─ maven/org.apiguardian/apiguardian-api 1.1.2 [compile, runtime] (*)
+
+Every node names the scopes it is resolved in. JUnit Jupiter is needed both to
+compile the tests and to run them, while the console launcher that runs them is
+resolved for `runtime` alone, and so is everything only it reaches. To see one
+tree per module and scope instead, pass `-Djenesis.tree.scopes=separate`. Each
+tree then starts from the module in that scope, and every node below it carries
+the scope it was declared with:
+
+    java -Djenesis.tree.scopes=separate build/jenesis/Make.java dependencies
+
+    maven/demo.app/demo.app 0-SNAPSHOT [compile] (module demo.app, local ./app)
+    └─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
+       └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT}
+
+    maven/demo.app/demo.app 0-SNAPSHOT [runtime] (module demo.app, local ./app)
+    └─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
+       └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT}
+
+The default `merged` prints one tree per module; any other value is rejected.
 
 Even though every descriptor here is a `module-info.java`, the default
 MODULAR_TO_MAVEN layout resolves each `requires` through Maven, so the tree shows
@@ -339,16 +366,16 @@ external dependencies into counts:
 
     java -Djenesis.tree.format=compact build/jenesis/Make.java dependencies
 
-    maven/demo.greeter/demo.greeter.test 0-SNAPSHOT [compile] (module demo.greeter.test, local ./greeter-test)
-    ├─ maven/demo.greeter/demo.greeter.testing 0-SNAPSHOT [compile] (module demo.greeter.testing, local ./greeter-testing)
+    maven/demo.greeter/demo.greeter.test 0-SNAPSHOT [compile, runtime] (module demo.greeter.test, local ./greeter-test)
+    ├─ maven/demo.greeter/demo.greeter.testing 0-SNAPSHOT [compile, runtime] (module demo.greeter.testing, local ./greeter-testing)
     │  └─ 1 external dependency
-    ├─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
+    ├─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile, runtime] (module demo.greeter, local ./greeter)
     │  └─ 1 external dependency
-    └─ 1 external dependency
+    └─ 2 external dependencies
 
 The local modules keep their place with the external dependencies below them
-collapsed into counts, while the purely external roots - JUnit and its closure -
-become the trailing count. When several trees share the same local module, it is
+collapsed into counts, while the purely external roots - JUnit, the console
+launcher and their closure - become the trailing count. When several trees share the same local module, it is
 printed once inside the largest tree that reaches it and collapsed in the
 others.
 
@@ -358,8 +385,8 @@ project releases, and it does so under either format:
 
     java -Djenesis.tree.format=compact -Djenesis.tree.tests=false build/jenesis/Make.java dependencies
 
-    maven/demo.app/demo.app 0-SNAPSHOT [compile] (module demo.app, local ./app)
-    └─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile] (module demo.greeter, local ./greeter)
+    maven/demo.app/demo.app 0-SNAPSHOT [compile, runtime] (module demo.app, local ./app)
+    └─ maven/demo.greeter/demo.greeter 0-SNAPSHOT [compile, runtime] (module demo.greeter, local ./greeter)
        └─ 1 external dependency
 
 `greeter-test` declares `@jenesis.test demo.greeter` and `greeter-testing`

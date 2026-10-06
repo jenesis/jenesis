@@ -99,9 +99,10 @@ the declared license:
 
     java build/jenesis/Make.java dependencies
 
-    maven/demo.modular/demo.modular 0-SNAPSHOT [compile] (module demo.modular, local ./sources)
-    └─ maven/org.slf4j/slf4j-api 2.0.16 [compile] (module org.slf4j) {MIT}
+    maven/demo.modular/demo.modular 0-SNAPSHOT [compile, runtime] (module demo.modular, local ./sources)
+    └─ maven/org.slf4j/slf4j-api 2.0.16 [compile, runtime] (module org.slf4j) {MIT}
 
 Because this is the default MODULAR_TO_MAVEN layout, `requires org.slf4j` is shown
-as the Maven coordinate it resolves to, with a Maven scope. Under the pure MODULAR
+as the Maven coordinate it resolves to. The brackets name the scopes it is resolved
+in: a `requires` is needed both to compile the module and to run it. Under the pure MODULAR
 layout the same dependency shows as a Java module name (`module/org.slf4j`) instead.

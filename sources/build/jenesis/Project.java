@@ -2915,6 +2915,7 @@ public record Project(
                 test.reporting|false|Write test reports into the module's reports/tests folder
                 stage.tests|false|Stage test-variant artifacts alongside the main ones
                 tree.format|full|full|compact: what the dependencies selector prints
+                tree.scopes|merged|merged|separate: one tree per module whose every node names the scopes it applies to, or one tree per module and scope
                 tree.tests|true|Include test-variant modules in that output
                 execute.module||Module to run, named by its source folder (server/ui or server+ui)
                 execute.main||Main class to run, overriding the module's @jenesis.main
