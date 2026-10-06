@@ -16,58 +16,60 @@ public class Tree implements BuildStep {
 
     private final transient Consumer<String> out;
     private final transient Palette palette;
-    private final transient boolean compact, merged, tests;
+    private final transient boolean compact, merged, internal, tests;
 
     public Tree() {
-        this(null, Palette.NONE, false, true, true);
+        this(null, Palette.NONE, false, true, false, true);
     }
 
     public static Tree ofEnvironment(Environment environment) {
-        Tree tree = new Tree(environment.out(), Palette.ofEnvironment(environment), false, true, true);
+        Tree tree = new Tree(environment.out(),
+                Palette.ofEnvironment(environment),
+                false,
+                environment.flag("tree.merge", true),
+                environment.flag("tree.internal", false),
+                environment.flag("tree.tests", true));
         String format = environment.getProperty("tree.format");
-        if (format != null) {
-            tree = tree.compact(switch (format) {
-                case "full" -> false;
-                case "compact" -> true;
-                default -> throw new IllegalArgumentException(
-                        "Unknown jenesis.tree.format '" + format + "', expected 'full' or 'compact'");
-            });
-        }
-        String scopes = environment.getProperty("tree.scopes");
-        if (scopes != null) {
-            tree = tree.merged(switch (scopes) {
-                case "merged" -> true;
-                case "separate" -> false;
-                default -> throw new IllegalArgumentException(
-                        "Unknown jenesis.tree.scopes '" + scopes + "', expected 'merged' or 'separate'");
-            });
-        }
-        Boolean tests = environment.flagOrNull("tree.tests");
-        return tests == null ? tree : tree.tests(tests);
+        return format == null ? tree : tree.compact(switch (format) {
+            case "full" -> false;
+            case "compact" -> true;
+            default -> throw new IllegalArgumentException(
+                    "Unknown jenesis.tree.format '" + format + "', expected 'full' or 'compact'");
+        });
     }
 
-    private Tree(Consumer<String> out, Palette palette, boolean compact, boolean merged, boolean tests) {
+    private Tree(Consumer<String> out,
+                 Palette palette,
+                 boolean compact,
+                 boolean merged,
+                 boolean internal,
+                 boolean tests) {
         this.out = out;
         this.palette = palette;
         this.compact = compact;
         this.merged = merged;
+        this.internal = internal;
         this.tests = tests;
     }
 
     public Tree printing(Consumer<String> out, Palette palette) {
-        return new Tree(out, palette, compact, merged, tests);
+        return new Tree(out, palette, compact, merged, internal, tests);
     }
 
     public Tree compact(boolean compact) {
-        return new Tree(out, palette, compact, merged, tests);
+        return new Tree(out, palette, compact, merged, internal, tests);
     }
 
     public Tree merged(boolean merged) {
-        return new Tree(out, palette, compact, merged, tests);
+        return new Tree(out, palette, compact, merged, internal, tests);
+    }
+
+    public Tree internal(boolean internal) {
+        return new Tree(out, palette, compact, merged, internal, tests);
     }
 
     public Tree tests(boolean tests) {
-        return new Tree(out, palette, compact, merged, tests);
+        return new Tree(out, palette, compact, merged, internal, tests);
     }
 
     @Override
@@ -110,6 +112,7 @@ public class Tree implements BuildStep {
         DependencyTreeReport report = new DependencyTreeReport(out, palette)
                 .compact(compact)
                 .merged(merged)
+                .internal(internal)
                 .locations(locations);
         SequencedMap<String, Resolver.Vertex> aggregated = new LinkedHashMap<>();
         for (Map.Entry<Path, String> entry : prefixes.entrySet()) {

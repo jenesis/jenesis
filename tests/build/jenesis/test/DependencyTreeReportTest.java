@@ -183,7 +183,7 @@ public class DependencyTreeReportTest {
         vertices.put("maven/g/b", new Resolver.Vertex("1.0", null, false, false, List.of()));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         DependencyTreeReport compact = new DependencyTreeReport(
-                new PrintStream(out, true, StandardCharsets.UTF_8)::println, Palette.ANSI).compact(true);
+                new PrintStream(out, true, StandardCharsets.UTF_8)::println, Palette.ANSI).compact(true).internal(true);
         compact.render(resolution(List.of(
                 new Resolver.Edge(null, "module/foo/1.0", "1.0", "compile", true),
                 new Resolver.Edge("module/foo/1.0", "module/bar/1.0", "1.0", "compile", true),
@@ -207,7 +207,7 @@ public class DependencyTreeReportTest {
         vertices.put("module/qux", new Resolver.Vertex("1.0", "qux", false, true, List.of()));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         DependencyTreeReport compact = new DependencyTreeReport(
-                new PrintStream(out, true, StandardCharsets.UTF_8)::println, Palette.ANSI).compact(true);
+                new PrintStream(out, true, StandardCharsets.UTF_8)::println, Palette.ANSI).compact(true).internal(true);
         compact.render(resolution(List.of(
                 new Resolver.Edge(null, "module/foo/1.0", "1.0", "compile", true),
                 new Resolver.Edge(null, "module/bar/1.0", "1.0", "compile", true),
@@ -229,7 +229,7 @@ public class DependencyTreeReportTest {
         vertices.put("module/log", new Resolver.Vertex("1.0", "log", false, true, List.of()));
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         DependencyTreeReport compact = new DependencyTreeReport(
-                new PrintStream(out, true, StandardCharsets.UTF_8)::println, Palette.ANSI).compact(true);
+                new PrintStream(out, true, StandardCharsets.UTF_8)::println, Palette.ANSI).compact(true).internal(true);
         compact.render(resolution(List.of(
                 new Resolver.Edge(null, "module/core/1.0", "1.0", "compile", true),
                 new Resolver.Edge("module/core/1.0", "module/util/1.0", "1.0", "compile", true),
@@ -255,6 +255,21 @@ public class DependencyTreeReportTest {
         String text = output();
         assertThat(text).contains("Resolved dependencies:");
         assertThat(text).contains("maven/g/a -> 1.0");
+    }
+
+    @Test
+    public void lists_resolved_dependencies_by_name() {
+        SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
+        vertices.put("maven/g/z", new Resolver.Vertex("1.0", null, false, false, List.of()));
+        vertices.put("maven/g/a", new Resolver.Vertex("2.0", null, false, false, List.of()));
+        report.render(resolution(List.of(
+                new Resolver.Edge(null, "maven/g/z/1.0", "1.0", "compile", true),
+                new Resolver.Edge("maven/g/z/1.0", "maven/g/a/2.0", "2.0", "compile", true)),
+                vertices));
+        assertThat(output().lines().toList()).containsSequence(
+                "Resolved dependencies:",
+                "  maven/g/a -> 2.0",
+                "  maven/g/z -> 1.0");
     }
 
     @Test
@@ -313,6 +328,20 @@ public class DependencyTreeReportTest {
         assertThat(text).doesNotContain("GPL-3.0-only");
         assertThat(text).contains("3 licenses implied");
         assertThat(text).contains("1 dependency offers multiple");
+    }
+
+    @Test
+    public void summary_leaves_out_internal_dependencies() {
+        SequencedMap<String, Resolver.Vertex> vertices = new LinkedHashMap<>();
+        vertices.put("maven/g/a", new Resolver.Vertex("1.0", null, false, false, List.of(
+                new License("MIT", "permissive", "MIT License", null))));
+        vertices.put("module/foo", new Resolver.Vertex("1.0", "foo", false, true, List.of(
+                new License("GPL-3.0-only", "strong-copyleft", "GNU GPL v3", null))));
+        report.summary(vertices);
+        String text = output();
+        assertThat(text).doesNotContain("GPL-3.0-only");
+        assertThat(text).containsPattern("named\\s+0 \\(  0%\\)");
+        assertThat(text).containsPattern("non-modular\\s+1 \\(100%\\)");
     }
 
     @Test
