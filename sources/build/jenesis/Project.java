@@ -3213,7 +3213,7 @@ public record Project(
                 source.ktlint|true|ktlint linting, activated by an .editorconfig
                 source.scalastyle|true|Scalastyle, activated by a scalastyle-config.xml
                 source.scalafmt|true|scalafmt checking, activated by a .scalafmt.conf
-                source.codenarc|true|CodeNarc, activated by a codenarc.groovy
+                source.codenarc|true|CodeNarc, activated by a codenarc.xml
                 compile.errorprone|true|Error Prone over the javac plugin declared with @jenesis.plugin javac, activated by an errorprone.properties; javac forks to grant it the compiler internals it reads
                 format.java|true|The Java formatter a javaformat.properties selects
                 format.ktlint|true|ktlint formatting
