@@ -9,35 +9,41 @@ public final class DependencyTreeReport {
 
     private final Consumer<String> out;
     private final Palette palette;
-    private final boolean compact, merged;
+    private final boolean compact, merged, internal;
     private final Map<String, String> locations;
 
     public DependencyTreeReport(Consumer<String> out, Palette palette) {
-        this(out, palette, false, true, Map.of());
+        this(out, palette, false, true, false, Map.of());
     }
 
     private DependencyTreeReport(Consumer<String> out,
                                  Palette palette,
                                  boolean compact,
                                  boolean merged,
+                                 boolean internal,
                                  Map<String, String> locations) {
         this.out = out;
         this.palette = palette;
         this.compact = compact;
         this.merged = merged;
+        this.internal = internal;
         this.locations = locations;
     }
 
     public DependencyTreeReport compact(boolean compact) {
-        return new DependencyTreeReport(out, palette, compact, merged, locations);
+        return new DependencyTreeReport(out, palette, compact, merged, internal, locations);
     }
 
     public DependencyTreeReport merged(boolean merged) {
-        return new DependencyTreeReport(out, palette, compact, merged, locations);
+        return new DependencyTreeReport(out, palette, compact, merged, internal, locations);
+    }
+
+    public DependencyTreeReport internal(boolean internal) {
+        return new DependencyTreeReport(out, palette, compact, merged, internal, locations);
     }
 
     public DependencyTreeReport locations(Map<String, String> locations) {
-        return new DependencyTreeReport(out, palette, compact, merged, locations);
+        return new DependencyTreeReport(out, palette, compact, merged, internal, locations);
     }
 
     public void render(Resolver.Resolution resolution) {
@@ -106,7 +112,7 @@ public final class DependencyTreeReport {
         builder.append(render(present, labelled));
         SequencedMap<Map.Entry<String, Resolver.Vertex>, SequencedSet<String>> resolved = new LinkedHashMap<>();
         present.forEach((scope, resolution) -> resolution.vertices().forEach((coordinate, node) -> {
-            if (!coordinate.equals(root)) {
+            if (!coordinate.equals(root) && (internal || !node.internal())) {
                 resolved.computeIfAbsent(Map.entry(coordinate, node), _ -> new LinkedHashSet<>()).add(scope);
             }
         }));
@@ -115,19 +121,21 @@ public final class DependencyTreeReport {
                     .append(palette.heading()).append("Resolved dependencies:").append(palette.reset())
                     .append(System.lineSeparator());
             Set<String> external = new HashSet<>();
-            resolved.forEach((entry, applied) -> {
-                if (compact && !entry.getValue().internal()) {
-                    external.add(entry.getKey());
-                    return;
-                }
-                builder.append("  ")
-                        .append(entry.getKey())
-                        .append(paint(245, " -> " + entry.getValue().resolvedVersion()));
-                if (labelled) {
-                    builder.append(' ').append(paint(67, "[" + String.join(", ", applied) + "]"));
-                }
-                builder.append(System.lineSeparator());
-            });
+            resolved.entrySet().stream()
+                    .sorted(Comparator.comparing(entry -> entry.getKey().getKey()))
+                    .forEach(entry -> {
+                        if (compact && !entry.getKey().getValue().internal()) {
+                            external.add(entry.getKey().getKey());
+                            return;
+                        }
+                        builder.append("  ")
+                                .append(entry.getKey().getKey())
+                                .append(paint(245, " -> " + entry.getKey().getValue().resolvedVersion()));
+                        if (labelled) {
+                            builder.append(' ').append(paint(67, "[" + String.join(", ", entry.getValue()) + "]"));
+                        }
+                        builder.append(System.lineSeparator());
+                    });
             if (!external.isEmpty()) {
                 builder.append("  ")
                         .append(paint(245, external.size() + " external " + (external.size() == 1 ? "dependency" : "dependencies")))
@@ -139,7 +147,13 @@ public final class DependencyTreeReport {
         }
     }
 
-    public void summary(SequencedMap<String, Resolver.Vertex> nodes) {
+    public void summary(SequencedMap<String, Resolver.Vertex> vertices) {
+        SequencedMap<String, Resolver.Vertex> nodes = new LinkedHashMap<>();
+        vertices.forEach((coordinate, node) -> {
+            if (internal || !node.internal()) {
+                nodes.put(coordinate, node);
+            }
+        });
         if (nodes.isEmpty()) {
             return;
         }
