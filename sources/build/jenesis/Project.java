@@ -1623,6 +1623,9 @@ public record Project(
             if (embed) {
                 synthetics.add(BuildExecutorModule.PREVIOUS + "describe/pom");
             }
+            SequencedSet<String> described = new LinkedHashSet<>();
+            Stream.of(descriptor.sources(), descriptor.manifests(), descriptor.coordinates(), descriptor.artifacts())
+                    .forEach(described::addAll);
             return base.apply(nested.synthetics(synthetics), repositories, resolvers).mapBuild(delegate -> (sub, inherited) -> {
                 sub.addModule("describe",
                         (describe, describeInherited) -> {
@@ -1633,7 +1636,7 @@ public record Project(
                                 describe.addStep("identity", new MavenIdentity(prefix, manifests), "pom", manifests);
                             }
                         },
-                        inherited.sequencedKeySet().stream());
+                        inherited.sequencedKeySet().stream().filter(key -> !resolved || described.contains(key)));
                 sub.addModule("assemble", delegate, Stream.concat(inherited.sequencedKeySet().stream(),
                         embed ? Stream.of("describe/pom") : Stream.empty()));
             });
