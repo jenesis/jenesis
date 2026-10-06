@@ -216,7 +216,8 @@ declared license:
 `local` with the folder it comes from wherever it appears. The test module of
 `greeter` follows under its own coordinate, `…/greeter/jar/tests`. Repeated
 subtrees are dimmed and marked `(*)`, and a `Resolved dependencies:` summary
-after each tree lists the final version chosen for every coordinate.
+after each tree lists, by name, the final version chosen for every coordinate
+the project does not build itself.
 
 Each node shows the property-file key, version, and the scopes it is resolved in; a dependency
 reached more than once is expanded under its first parent and dimmed with `(*)`
