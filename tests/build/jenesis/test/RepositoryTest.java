@@ -3,10 +3,10 @@ package build.jenesis.test;
 import module java.base;
 import module jdk.httpserver;
 import module org.junit.jupiter.api;
+import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.SequencedProperties;
-import build.jenesis.Environment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -188,11 +188,26 @@ public class RepositoryTest {
 
     @Test
     public void open_refuses_a_redirect_to_a_file_uri() throws IOException {
-        settings.put("repository.insecure", "true");
         Path secret = Files.writeString(folder.resolve("secret.txt"), "top-secret");
+        assertRedirectRefused(secret.toUri().toString());
+    }
+
+    @Test
+    public void open_refuses_a_redirect_to_a_jar_uri_that_would_read_a_local_file() throws IOException {
+        Path secret = Files.writeString(folder.resolve("secret.txt"), "top-secret");
+        assertRedirectRefused("jar:" + secret.toUri() + "!/");
+    }
+
+    @Test
+    public void open_refuses_a_redirect_to_any_scheme_but_http_or_https() throws IOException {
+        assertRedirectRefused("ftp://localhost/artifact.jar");
+    }
+
+    private void assertRedirectRefused(String target) throws IOException {
+        settings.put("repository.insecure", "true");
         HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         server.createContext("/", exchange -> {
-            exchange.getResponseHeaders().set("Location", secret.toUri().toString());
+            exchange.getResponseHeaders().set("Location", target);
             exchange.sendResponseHeaders(302, -1);
             exchange.close();
         });
@@ -201,7 +216,8 @@ public class RepositoryTest {
             URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
             assertThatThrownBy(() -> Repository.open(connection().retries(0).backoff(Duration.ofMillis(1)), uri, null).close())
                     .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("file URI");
+                    .hasMessageContaining("Refusing to follow a redirect to " + target)
+                    .hasMessageContaining("only followed to an http or https location");
         } finally {
             server.stop(0);
         }

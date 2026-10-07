@@ -2,6 +2,7 @@ package build.jenesis.maven;
 
 import module java.base;
 import build.jenesis.BuildStep;
+import build.jenesis.Discovery;
 import build.jenesis.Environment;
 import build.jenesis.Palette;
 import build.jenesis.Repository;
@@ -23,6 +24,11 @@ public class MavenDefaultRepository implements MavenRepository {
     }
 
     public static MavenRepository ofEnvironment(Environment environment) {
+        return ofEnvironment(environment,
+                environment.flag("repository.discover") ? Discovery.ofEnvironment(environment) : null);
+    }
+
+    public static MavenRepository ofEnvironment(Environment environment, Discovery discovery) {
         Path local = localRepository(environment);
         Repository.Credential credential = Repository.Credential.of(environment, "maven.token", "MAVEN_REPOSITORY_TOKEN");
         Consumer<String> printing = environment.flag("print.fetch") ? environment.out() : null;
@@ -46,7 +52,9 @@ public class MavenDefaultRepository implements MavenRepository {
         if (repository == null) {
             throw new IllegalStateException("No Maven repository is configured by: " + text);
         }
-        return repository;
+        return discovery == null
+                ? repository
+                : repository.overlay(DiscoveryMavenRepository.ofEnvironment(environment, discovery));
     }
 
     public static MavenRepository of(URI repository, String token) {
@@ -63,7 +71,7 @@ public class MavenDefaultRepository implements MavenRepository {
                 environment.flag("print.fetch") ? environment.out() : null);
     }
 
-    private static Path localRepository(Environment environment) {
+    static Path localRepository(Environment environment) {
         String override = environment.getProperty("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
         if (override == null) {
             Path candidate = Path.of(System.getProperty("user.home"), ".m2", "repository");
@@ -81,21 +89,25 @@ public class MavenDefaultRepository implements MavenRepository {
                                           Path local,
                                           String token,
                                           Consumer<String> printing) {
-        SequencedMap<String, URI> validations = new LinkedHashMap<>();
-        validations.put("SHA512", uri);
-        validations.put("SHA256", uri);
-        validations.put("SHA1", uri);
         Palette palette = Palette.ofEnvironment(environment);
         return ofEnvironment(environment,
                 uri,
                 local,
-                Collections.unmodifiableMap(validations),
+                validations(uri),
                 printing == null ? null : path -> printing.accept("%s%-11s%s %s".formatted(
                         palette.info(),
                         "[FETCHED]",
                         palette.reset(),
                         uri.resolve(path))),
                 token);
+    }
+
+    static Map<String, URI> validations(URI uri) {
+        SequencedMap<String, URI> validations = new LinkedHashMap<>();
+        validations.put("SHA512", uri);
+        validations.put("SHA256", uri);
+        validations.put("SHA1", uri);
+        return Collections.unmodifiableMap(validations);
     }
 
     private static MavenRepository chain(Environment environment,

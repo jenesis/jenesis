@@ -1,8 +1,10 @@
 package build;
 
 import module java.base;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Jpx;
+import build.jenesis.Make;
 import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
@@ -12,8 +14,6 @@ import build.jenesis.maven.MavenModuleResolver;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisRepository;
-import build.jenesis.Environment;
-import build.jenesis.Make;
 
 public class Demo {
 

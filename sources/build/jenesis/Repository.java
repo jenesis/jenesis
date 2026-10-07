@@ -159,12 +159,12 @@ public interface Repository {
                         if (location != null) {
                             http.getInputStream().close();
                             current = current.resolve(location);
-                            if ("file".equals(current.getScheme()) && !"file".equals(uri.getScheme())) {
-                                throw new IllegalStateException("Refusing to follow a redirect to a file URI: "
+                            if (!"https".equals(current.getScheme()) && !"http".equals(current.getScheme())) {
+                                throw new IllegalStateException("Refusing to follow a redirect to "
                                         + current
                                         + " (redirected from "
                                         + uri
-                                        + ")");
+                                        + "): a redirect is only followed to an http or https location");
                             }
                             continue;
                         }

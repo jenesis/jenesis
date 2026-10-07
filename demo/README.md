@@ -116,9 +116,11 @@ Quick index
 | 65 | [`export`](demo-65-export/README.md)                              | Install a build into the local repositories, for other projects to require   | `java build/jenesis/Make.java export`|
 | 66 | [`publishing`](demo-66-publishing/README.md)                      | Assemble a Maven Central ready bundle and resolve it back                    | `java build/Demo.java`            |
 | 67 | [`module-convention`](demo-67-module-convention/README.md)        | Resolve your own modules from your own Maven repository                      | `java build/Demo.java`            |
-| 68 | [`reproducible`](demo-68-reproducible/README.md)                  | Build the same bytes on every machine, checked against a recorded digest     | `java build/Demo.java`            |
-| 69 | [`native-image`](demo-69-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
-| 70 | [`jpx`](demo-70-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
+| 68 | [`discovery-module`](demo-68-discovery-module/README.md)          | Resolve a module by what its domain says it is published as                  | `java build/jenesis/Execute.java` |
+| 69 | [`discovery-maven`](demo-69-discovery-maven/README.md)            | The same for a Maven dependency, from a release or a Maven repository        | `java build/jenesis/Execute.java` |
+| 70 | [`reproducible`](demo-70-reproducible/README.md)                  | Build the same bytes on every machine, checked against a recorded digest     | `java build/Demo.java`            |
+| 71 | [`native-image`](demo-71-native-image/README.md)                  | Compile the application into a GraalVM native binary                         | `java build/jenesis/Make.java`    |
+| 72 | [`jpx`](demo-72-jpx/README.md)                                    | Run a released program without building anything                             | `java build/Demo.java`            |
 
 ## 1. A single Maven project - [`java-pom`](demo-01-java-pom/README.md)
 
@@ -990,7 +992,41 @@ group reaches into the name is configuration too:
 
     jenesis.maven.segments=3
 
-## 50. The same bytes on every machine - [`reproducible`](demo-68-reproducible/README.md)
+## 50. Asking a module's domain how it is published - [`discovery-module`](demo-68-discovery-module/README.md)
+
+A module name is a reversed domain, and `discovery-module` lets that domain say how
+the module is published. With discovery switched on, a `requires build.jenesis` is
+first looked up in the file `jenesis.build` publishes at
+`/.well-known/java-repository.properties`, which says where the module's files are
+and which Maven artifact it is published as:
+
+    jenesis.repository.discover=true
+
+    module=https://github.com/jenesis/jenesis/releases/download/v{version}/{module}-{version}{-classifier}.{type}
+    moduletomaven=build.jenesis:{module}
+
+The demo builds with `jenesis.project.layout=modular`, which asks `module` first and
+downloads the jar from the Jenesis release on GitHub, without a POM and without
+Maven. A build that resolves modules through Maven asks `moduletomaven` first and
+resolves the artifact as any Maven dependency, from where the same file names for
+the group, as the next demo shows - so a domain that publishes the file needs no
+module repository. `<key>.since` and `<key>.suffixes` leave other versions to the
+module repository. A module whose domain publishes nothing resolves as before, and
+the pin still decides what is accepted.
+
+## 51. The same for a Maven dependency - [`discovery-maven`](demo-69-discovery-maven/README.md)
+
+A groupId is a reversed domain too, and `discovery-maven` resolves a `pom.xml`
+dependency on Jenesis from the `maven` key beside the module's:
+
+    maven=https://github.com/jenesis/jenesis/releases/download/v{version}/{artifactId}-{version}{-classifier}.{type}
+    maven.suffixes=none
+
+Its location is a template of each file, as here, or the root of a traditional
+Maven repository, whose metadata is merged with that of the Maven remotes. A file
+the location does not hold is asked of the Maven remotes.
+
+## 52. The same bytes on every machine - [`reproducible`](demo-70-reproducible/README.md)
 
 What you publish, anyone holding the sources should be able to build again and
 get the same bytes. `reproducible` turns that into a check: it builds a module
@@ -1005,7 +1041,7 @@ the time of the release commit - and the recorded digest moves with it:
 
     jenesis.archive.timestamp=2026-09-01T12:00:00Z
 
-## 51. Ahead-of-time native image - [`native-image`](demo-69-native-image/README.md)
+## 53. Ahead-of-time native image - [`native-image`](demo-71-native-image/README.md)
 
 Where `jpackage` bundles your bytecode with a trimmed JVM, GraalVM
 `native-image` compiles the program and the runtime it touches into a single
@@ -1026,7 +1062,7 @@ Native image is an alternative to `jpackage`, not a successor: `jpackage` for a
 faithful bundle of the JVM you tested against, native image when startup and
 footprint dominate. It needs GraalVM, so it is a local exercise.
 
-## 52. Running a released program - [`jpx`](demo-70-jpx/README.md)
+## 54. Running a released program - [`jpx`](demo-72-jpx/README.md)
 
 Every demo so far built something. `jpx` builds nothing: it resolves a published
 module or Maven artifact, installs its runtime closure once under
