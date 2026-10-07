@@ -61,7 +61,7 @@ public class JenesisDnsRepositoryTest {
 
     @Test
     public void maps_every_module_below_a_domain_to_the_maven_coordinate_its_record_names() throws IOException {
-        dns.record("_java.jenesis.build", "\"coordinate=build.jenesis/{module}\"")
+        dns.record("_java.jenesis.build", "\"coordinate=build.jenesis:{module}\"")
                 .file("maven/build/jenesis/build.jenesis.tools/1.0/build.jenesis.tools-1.0.jar", "tools")
                 .file("maven/build/jenesis/build.jenesis.tools/1.0/build.jenesis.tools-1.0-sources.jar", "sources");
 
@@ -73,7 +73,7 @@ public class JenesisDnsRepositoryTest {
 
     @Test
     public void resolves_a_mapped_module_without_a_version_through_the_maven_metadata() throws IOException {
-        dns.record("_java.jenesis.build", "\"coordinate=build.jenesis/{module}\"")
+        dns.record("_java.jenesis.build", "\"coordinate=build.jenesis:{module}\"")
                 .file("maven/build/jenesis/build.jenesis/maven-metadata.xml",
                         "<metadata><versioning><release>2.0</release></versioning></metadata>")
                 .file("maven/build/jenesis/build.jenesis/2.0/build.jenesis-2.0.jar", "release");
@@ -84,7 +84,7 @@ public class JenesisDnsRepositoryTest {
     @Test
     public void applies_a_coordinate_without_the_module_placeholder_only_to_the_module_it_is_published_for()
             throws IOException {
-        dns.record("_java.bytebuddy.net", "\"coordinate=net.bytebuddy/byte-buddy\"")
+        dns.record("_java.bytebuddy.net", "\"coordinate=net.bytebuddy:byte-buddy\"")
                 .file("maven/net/bytebuddy/byte-buddy/1.0/byte-buddy-1.0.jar", "byte-buddy");
 
         JenesisDnsRepository repository = repository();
@@ -97,11 +97,29 @@ public class JenesisDnsRepositoryTest {
 
     @Test
     public void maps_a_module_by_the_record_of_its_own_name_before_that_of_its_domain() throws IOException {
-        dns.record("_java.agent.bytebuddy.net", "\"coordinate=net.bytebuddy/byte-buddy-agent\"")
-                .record("_java.bytebuddy.net", "\"coordinate=net.bytebuddy/byte-buddy\"")
+        dns.record("_java.agent.bytebuddy.net", "\"coordinate=net.bytebuddy:byte-buddy-agent\"")
+                .record("_java.bytebuddy.net", "\"coordinate=net.bytebuddy:byte-buddy\"")
                 .file("maven/net/bytebuddy/byte-buddy-agent/1.0/byte-buddy-agent-1.0.jar", "agent");
 
         assertThat(content(repository().fetch(Runnable::run, "net.bytebuddy.agent/1.0"))).isEqualTo("agent");
+    }
+
+    @Test
+    public void maps_a_module_to_the_extension_and_classifier_its_coordinate_names() throws IOException {
+        dns.record("_java.example.com", "\"coordinate=com.example:tool:jar:shaded\"")
+                .file("maven/com/example/tool/1.0/tool-1.0-shaded.jar", "shaded");
+
+        assertThat(content(repository().fetch(Runnable::run, "com.example/1.0"))).isEqualTo("shaded");
+    }
+
+    @Test
+    public void refuses_a_coordinate_that_is_not_written_with_colons() {
+        dns.record("_java.bytebuddy.net", "\"coordinate=net.bytebuddy/byte-buddy\"");
+
+        assertThatThrownBy(() -> repository().fetch(Runnable::run, "net.bytebuddy/1.0"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("net.bytebuddy/byte-buddy")
+                .hasMessageContaining("<groupId>:<artifactId>[:<extension>[:<classifier>]]");
     }
 
     @Test
@@ -111,13 +129,13 @@ public class JenesisDnsRepositoryTest {
         assertThatThrownBy(() -> repository().fetch(Runnable::run, "net.bytebuddy/1.0"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("_java.bytebuddy.net")
-                .hasMessageContaining("<groupId>/<artifactId>");
+                .hasMessageContaining("<groupId>:<artifactId>");
     }
 
     @Test
     public void resolves_a_mapped_module_from_the_maven_location_its_group_publishes() throws IOException {
         dns.record("_java.jenesis.build",
-                        "\"coordinate=build.jenesis/{module}\"",
+                        "\"coordinate=build.jenesis:{module}\"",
                         "\"maven=" + dns.files() + "release/{artifactId}-{version}{-classifier}.{type}\"")
                 .file("release/build.jenesis-1.0.jar", "fromRelease")
                 .context("/service/", "fromService");
@@ -136,7 +154,7 @@ public class JenesisDnsRepositoryTest {
 
     @Test
     public void serves_the_pom_of_a_mapped_module_where_a_module_is_asked_for_as_an_artifact() throws IOException {
-        dns.record("_java.jenesis.build", "\"coordinate=build.jenesis/{module}\"")
+        dns.record("_java.jenesis.build", "\"coordinate=build.jenesis:{module}\"")
                 .file("maven/build/jenesis/build.jenesis/1.0/build.jenesis-1.0.pom", "<project/>");
 
         assertThat(content(repository().scope(JenesisRepository.Scope.ARTIFACT)
@@ -158,7 +176,7 @@ public class JenesisDnsRepositoryTest {
     @Test
     public void resolves_the_pom_of_a_mapped_module_from_the_maven_location_its_group_publishes() throws IOException {
         dns.record("_java.jenesis.build",
-                        "\"coordinate=build.jenesis/{module}\"",
+                        "\"coordinate=build.jenesis:{module}\"",
                         "\"maven=" + dns.files() + "release/{artifactId}-{version}{-classifier}.{type}\"")
                 .file("release/build.jenesis-1.0.pom", "fromRelease")
                 .context("/service/", "fromService");
@@ -177,7 +195,7 @@ public class JenesisDnsRepositoryTest {
 
     @Test
     public void maps_every_module_of_a_domain_with_one_record_through_the_suffix_of_its_name() throws IOException {
-        dns.record("_java.bytebuddy.net", "\"coordinate=net.bytebuddy/byte-buddy{-suffix}\"")
+        dns.record("_java.bytebuddy.net", "\"coordinate=net.bytebuddy:byte-buddy{-suffix}\"")
                 .file("maven/net/bytebuddy/byte-buddy/1.0/byte-buddy-1.0.jar", "byte-buddy")
                 .file("maven/net/bytebuddy/byte-buddy-agent/1.0/byte-buddy-agent-1.0.jar", "agent");
 

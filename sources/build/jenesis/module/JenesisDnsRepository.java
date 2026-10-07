@@ -101,13 +101,15 @@ public class JenesisDnsRepository implements JenesisRepository {
                 return Optional.empty();
             }
             String text = location.expand(Map.of("module", module, "-suffix", location.suffix(module))).orElseThrow();
-            MavenDependencyKey coordinate;
-            try {
-                coordinate = MavenDependencyKey.parseKey(text);
-            } catch (IllegalArgumentException e) {
+            String[] elements = text.split(":", -1);
+            if (elements.length < 2 || elements.length > 4 || Arrays.stream(elements).anyMatch(String::isEmpty)) {
                 throw new IllegalArgumentException("The TXT record of " + location.name() + " maps " + module
-                        + " to " + text + ", where it expects <groupId>/<artifactId>[/<type>[/<classifier>]]", e);
+                        + " to " + text + ", where it expects <groupId>:<artifactId>[:<extension>[:<classifier>]]");
             }
+            MavenDependencyKey coordinate = new MavenDependencyKey(elements[0],
+                    elements[1],
+                    elements.length > 2 ? elements[2] : "jar",
+                    elements.length > 3 ? elements[3] : null);
             return coordinates.computeIfAbsent(Map.entry(module, coordinate), _ -> new MavenModuleRepository(maven)
                     .mapping(Map.of(module, coordinate))).fetch(executor, module, classifier, version, type);
         }

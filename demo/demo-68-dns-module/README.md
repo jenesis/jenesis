@@ -68,12 +68,13 @@ the other where its files are.
 **Which Maven artifact.** `jenesis.build` publishes its modules to Maven by the
 coordinate convention, and says so:
 
-    _java.jenesis.build. TXT "coordinate=build.jenesis/{module}"
+    _java.jenesis.build. TXT "coordinate=build.jenesis:{module}"
     _java.jenesis.build. TXT "maven=https://github.com/jenesis/jenesis/releases/download/v{version}/{artifactId}-{version}{-classifier}.{type}"
 
-`coordinate=` takes `<groupId>/<artifactId>[/<type>[/<classifier>]]`, and `{module}`
-is the module's name, so this one record maps every module below `jenesis.build`:
-`build.jenesis` is `build.jenesis:build.jenesis`. That artifact is then resolved as
+`coordinate=` takes `<groupId>:<artifactId>[:<extension>[:<classifier>]]`, a Maven
+coordinate as Maven writes one, without its version. `{module}` is the module's name,
+so this one record maps every module below `jenesis.build`: `build.jenesis` is
+`build.jenesis:build.jenesis`. That artifact is then resolved as
 any Maven dependency is, which is where the second record comes in: it is the
 `maven=` record of the group `build.jenesis`, shown in `../demo-69-dns-maven`, and it
 names the GitHub release. Without one, the artifact comes from the Maven remotes,
@@ -86,15 +87,15 @@ follows it: it is the part of the module's name below the record's domain, its
 labels joined by dashes after a leading one, so nothing for `net.bytebuddy` and
 `-agent` for `net.bytebuddy.agent`. One record maps all of Byte Buddy's modules:
 
-    _java.bytebuddy.net. TXT "coordinate=net.bytebuddy/byte-buddy{-suffix}"
+    _java.bytebuddy.net. TXT "coordinate=net.bytebuddy:byte-buddy{-suffix}"
 
 and a module whose suffix names no artifact, `net.bytebuddy.utility` as
 `byte-buddy-utility`, resolves nothing from it. A coordinate without placeholders
 belongs to one module only, the one whose own name holds it, for an artifact that
 follows no pattern:
 
-    _java.example.com.     TXT "coordinate=com.example/example-core"
-    _java.cli.example.com. TXT "coordinate=com.example/command-line"
+    _java.example.com.     TXT "coordinate=com.example:example-core"
+    _java.cli.example.com. TXT "coordinate=com.example:command-line"
 
 **Where its files are.** A module that is not published to Maven names its location
 with `javamodule=` instead, in one of two forms:
@@ -120,14 +121,14 @@ kind, an attribute other than `since`, or a placeholder the kind does not know.
 Either kind can be followed, after a space, by the versions it serves. `since=`
 names the first one:
 
-    _java.jenesis.build. TXT "coordinate=build.jenesis/{module} since=0.15.0"
+    _java.jenesis.build. TXT "coordinate=build.jenesis:{module} since=0.15.0"
 
 and an earlier version is left to the module repository, ordered as Maven orders
 versions, so `1.2.3-rc.1` comes before `1.2.3` and `1.10.0` after it. `suffixes=`
 names the qualifiers it serves, the part of a version after its first dash, with
 `none` for a version without one:
 
-    _java.jenesis.build. TXT "coordinate=build.jenesis/{module} suffixes=none,rc"
+    _java.jenesis.build. TXT "coordinate=build.jenesis:{module} suffixes=none,rc"
 
 serves `1.2.3`, `1.2.3-rc.1` and `1.2.3-RC2`, since a suffix matches the leading
 word of a qualifier ignoring case, and leaves `1.2.3-SNAPSHOT` to the module

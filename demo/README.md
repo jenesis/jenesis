@@ -1001,7 +1001,7 @@ to the Maven artifact it is published as:
 
     jenesis.dns.enabled=true
 
-    _java.jenesis.build. TXT "coordinate=build.jenesis/{module}"
+    _java.jenesis.build. TXT "coordinate=build.jenesis:{module}"
 
 The artifact then resolves as any Maven dependency does - here from the Jenesis
 release on GitHub, which the group's own record names, as the next demo shows - so

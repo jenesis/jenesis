@@ -169,7 +169,7 @@ public class DnsLookupTest {
 
     @Test
     public void reads_whichever_kind_the_most_specific_name_holds() throws IOException {
-        dns.record("_java.agent.bytebuddy.net", "\"coordinate=net.bytebuddy/byte-buddy-agent\"")
+        dns.record("_java.agent.bytebuddy.net", "\"coordinate=net.bytebuddy:byte-buddy-agent\"")
                 .record("_java.bytebuddy.net", "\"javamodule=https://example.com/{module}.jar\"");
 
         DnsLocation agent = dns.lookup().lookup("net.bytebuddy.agent", "javamodule", "coordinate").orElseThrow();
@@ -177,7 +177,7 @@ public class DnsLookupTest {
 
         assertThat(agent.key()).isEqualTo("coordinate");
         assertThat(agent.name()).isEqualTo("_java.agent.bytebuddy.net");
-        assertThat(agent.target()).isEqualTo("net.bytebuddy/byte-buddy-agent");
+        assertThat(agent.target()).isEqualTo("net.bytebuddy:byte-buddy-agent");
         assertThat(other.key()).isEqualTo("javamodule");
         assertThat(other.name()).isEqualTo("_java.bytebuddy.net");
     }
@@ -186,7 +186,7 @@ public class DnsLookupTest {
     public void refuses_two_kinds_of_record_at_one_name() throws IOException {
         dns.record("_java.bytebuddy.net",
                 "\"javamodule=https://example.com/{module}.jar\"",
-                "\"coordinate=net.bytebuddy/byte-buddy\"");
+                "\"coordinate=net.bytebuddy:byte-buddy\"");
 
         assertThatThrownBy(() -> dns.lookup().lookup("net.bytebuddy", "javamodule", "coordinate"))
                 .isInstanceOf(IllegalStateException.class)
@@ -194,7 +194,7 @@ public class DnsLookupTest {
                 .hasMessageContaining("unambiguous");
         assertThat(dns.lookup().lookup("net.bytebuddy", "coordinate").map(DnsLocation::target))
                 .as("asked for one kind alone, the other is no rival")
-                .contains("net.bytebuddy/byte-buddy");
+                .contains("net.bytebuddy:byte-buddy");
     }
 
     @Test
