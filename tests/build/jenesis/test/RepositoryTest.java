@@ -187,6 +187,29 @@ public class RepositoryTest {
     }
 
     @Test
+    public void open_reads_a_file_but_fetches_nothing_over_the_network_while_offline() throws IOException {
+        settings.put("repository.insecure", "true");
+        settings.put("repository.offline", "true");
+        AtomicInteger hits = new AtomicInteger();
+        HttpServer server = serve(_ -> 200, Map.of(), hits);
+        try {
+            URI uri = URI.create("http://localhost:" + server.getAddress().getPort() + "/artifact.jar");
+            assertThatThrownBy(() -> Repository.open(connection(), uri, null).close())
+                    .as("offline reads as a network that cannot be reached, so a cached fallback still answers")
+                    .isInstanceOf(IOException.class)
+                    .hasMessageContaining(uri.toString())
+                    .hasMessageContaining("-Djenesis.repository.offline=true");
+            assertThat(hits.get()).as("no request leaves the machine").isZero();
+        } finally {
+            server.stop(0);
+        }
+        Path file = Files.writeString(folder.resolve("artifact.jar"), "local");
+        try (InputStream stream = Repository.open(connection(), file.toUri(), null)) {
+            assertThat(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("local");
+        }
+    }
+
+    @Test
     public void open_refuses_a_redirect_to_a_file_uri() throws IOException {
         Path secret = Files.writeString(folder.resolve("secret.txt"), "top-secret");
         assertRedirectRefused(secret.toUri().toString());
@@ -376,11 +399,13 @@ public class RepositoryTest {
     @Test
     public void connection_defaults_read_the_keys_they_are_given() {
         assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read.timeout", "5000"))))
-                .isEqualTo(new Repository.Connection(7, Duration.ofMillis(9), false, 10_000, 5_000));
+                .isEqualTo(new Repository.Connection(7, Duration.ofMillis(9), false, 10_000, 5_000, false));
         assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read.timeout", "5000"))).retries(1))
-                .isEqualTo(new Repository.Connection(1, Duration.ofMillis(9), false, 10_000, 5_000));
+                .isEqualTo(new Repository.Connection(1, Duration.ofMillis(9), false, 10_000, 5_000, false));
         assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.retries", "7", "repository.backoff", "9", "repository.read.timeout", "5000"))).backoff(Duration.ofMillis(2)))
-                .isEqualTo(new Repository.Connection(7, Duration.ofMillis(2), false, 10_000, 5_000));
+                .isEqualTo(new Repository.Connection(7, Duration.ofMillis(2), false, 10_000, 5_000, false));
+        assertThat(Repository.Connection.ofEnvironment(new Environment(Map.of("repository.offline", "true"))))
+                .isEqualTo(new Repository.Connection().offline(true));
     }
 
     @Test

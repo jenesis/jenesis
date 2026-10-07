@@ -351,6 +351,9 @@ public class MavenDefaultRepository implements MavenRepository {
                                 store,
                                 path + "." + entry.getKey().toLowerCase(Locale.ROOT),
                                 false);
+                        if (connection.offline() && item instanceof LatentRepositoryItem) {
+                            continue;
+                        }
                         Optional<InputStream> candidate = item.toLazyInputStream();
                         if (candidate.isEmpty()) {
                             continue;

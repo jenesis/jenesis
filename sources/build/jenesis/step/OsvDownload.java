@@ -14,24 +14,26 @@ import build.jenesis.maven.MavenDependencyKey;
 public class OsvDownload implements BuildStep {
 
     private final URI endpoint;
-    private final transient boolean insecure;
+    private final transient boolean insecure, offline;
 
     public OsvDownload() {
-        this(URI.create("https://api.osv.dev"), false);
+        this(URI.create("https://api.osv.dev"), false, false);
     }
 
     public static OsvDownload ofEnvironment(Environment environment) {
         return new OsvDownload(URI.create("https://api.osv.dev"),
-                environment.flag("repository.insecure"));
+                environment.flag("repository.insecure"),
+                environment.flag("repository.offline"));
     }
 
-    private OsvDownload(URI endpoint, boolean insecure) {
+    private OsvDownload(URI endpoint, boolean insecure, boolean offline) {
         this.endpoint = endpoint;
         this.insecure = insecure;
+        this.offline = offline;
     }
 
     public OsvDownload endpoint(URI endpoint) {
-        return new OsvDownload(endpoint, insecure);
+        return new OsvDownload(endpoint, insecure, offline);
     }
 
     @Override
@@ -59,6 +61,11 @@ public class OsvDownload implements BuildStep {
         List<String> coordinates = new ArrayList<>(coordinateSet);
         SequencedProperties feed = new SequencedProperties();
         if (!coordinates.isEmpty()) {
+            if (offline) {
+                throw new IllegalStateException("Cannot ask " + endpoint + " for the advisories of "
+                        + coordinates.size() + " dependencies while offline"
+                        + " (unset -Djenesis.repository.offline, or set -Djenesis.compliance=false)");
+            }
             List<List<String>> identifiers = identifiers(request(endpoint.resolve("/v1/querybatch"), queryBatch(coordinates), insecure));
             SequencedSet<String> distinct = new LinkedHashSet<>();
             for (List<String> ids : identifiers) {

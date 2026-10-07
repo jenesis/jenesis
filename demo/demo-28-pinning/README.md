@@ -14,6 +14,8 @@ Run it
     [ok]      unpinned: a version-only dependency builds by default
     [blocked] unpinned: the same dependency under strict pinning
     [blocked] tampered: a dependency whose pinned checksum does not match
+    [ok]      pinned: rebuilt offline from the artifacts it stored
+    [blocked] pinned: offline, with nothing stored to build from
 
 Three projects, one public dependency
 -------------------------------------
@@ -72,6 +74,23 @@ deliberately:
 consulted; `pin` then writes what that resolution found. Run against `tampered` it would heal the
 wrong checksum by replacing it - which is exactly why that run is the one to review before
 committing.
+
+Building offline
+----------------
+
+A pinned dependency that was downloaded once is stored in `.jenesis/artifacts/`, checked against its
+pin, and every later build takes it from there. Once a build has run, a change to your own code needs
+no network at all, and you can say so:
+
+    java -Djenesis.repository.offline=true build/jenesis/Make.java
+
+Offline, Jenesis downloads nothing: what it needs comes from `.jenesis/artifacts/`, from your local
+Maven repository or from a local module folder, and a file that is in none of them fails the build
+with its URL named rather than being fetched. The demo shows both: the `pinned` project rebuilds
+offline from what its first build stored, and fails once that store is gone and no local Maven
+repository holds the dependency either. A version range or the newest release is answered from the Maven
+metadata an earlier build stored beside the artifacts, at the versions it named then - one more reason
+to pin, since a pin never depends on when it was last resolved.
 
 Layout
 ------
