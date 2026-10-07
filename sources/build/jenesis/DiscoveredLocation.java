@@ -2,6 +2,7 @@ package build.jenesis;
 
 import module java.base;
 import build.jenesis.maven.MavenDefaultVersionNegotiator;
+import build.jenesis.maven.MavenMetadata;
 
 public record DiscoveredLocation(String domain,
                                  URI source,
@@ -14,6 +15,7 @@ public record DiscoveredLocation(String domain,
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{([^{}]*)}");
     private static final Pattern VERSION = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._+-]{0,127}");
     private static final String CLASSIFIER = "-classifier", TYPE = "type";
+    private static final String METADATA = "/maven-metadata.xml";
     private static final List<Map.Entry<String, String>> CHECKSUMS = List.of(Map.entry("sha512", "SHA-512"),
             Map.entry("sha256", "SHA-256"),
             Map.entry("sha1", "SHA-1"));
@@ -84,70 +86,35 @@ public record DiscoveredLocation(String domain,
         return expanded;
     }
 
+    public boolean listsVersions() {
+        return latest != null && latest.endsWith(METADATA);
+    }
+
     public Optional<String> latest(Map<String, String> values, Repository.Connection connection) throws IOException {
         if (latest == null) {
             return Optional.empty();
         }
         URI uri = secured(URI.create(fill(latest, key + ".latest", values).orElseThrow()), connection);
-        HttpURLConnection http = (HttpURLConnection) Repository.connect(uri, connection.insecure());
-        http.setRequestMethod("HEAD");
-        http.setInstanceFollowRedirects(false);
-        http.setRequestProperty("User-Agent", "Jenesis");
-        http.setConnectTimeout(connection.connectTimeout());
-        http.setReadTimeout(connection.readTimeout());
-        try {
-            int status = http.getResponseCode();
-            if (status == HttpURLConnection.HTTP_NOT_FOUND || status == HttpURLConnection.HTTP_GONE) {
-                return Optional.empty();
-            }
-            String announced = http.getHeaderField(key.equals("maven")
-                    ? "Jenesis-MavenVersion"
-                    : "Jenesis-ModuleVersion");
-            String redirect = http.getHeaderField("Location");
-            String version;
-            if (announced != null) {
-                version = announced.strip();
-            } else if (status / 100 == 3 && redirect != null) {
-                String destination = uri.resolve(redirect).toString();
-                int marker = target.indexOf("{version}"), boundary = target.indexOf('/', marker);
-                String shape = target.substring(0, boundary < 0 ? target.length() : boundary);
-                StringBuilder pattern = new StringBuilder();
-                Matcher matcher = PLACEHOLDER.matcher(shape);
-                int last = 0;
-                while (matcher.find()) {
-                    pattern.append(Pattern.quote(shape.substring(last, matcher.start())));
-                    String placeholder = matcher.group(1);
-                    if (placeholder.equals("version")) {
-                        pattern.append(matcher.start() == marker ? "(?<version>[A-Za-z0-9._+-]+)" : "\\k<version>");
-                    } else if (values.get(placeholder) != null) {
-                        pattern.append(Pattern.quote(values.get(placeholder)));
-                    } else if (placeholder.equals(CLASSIFIER) || placeholder.equals(TYPE)) {
-                        pattern.append("[^/?#]*");
-                    } else {
-                        throw new IllegalArgumentException(key + " in " + source + " uses the placeholder {"
-                                + placeholder + "}, which a request without a version cannot fill");
-                    }
-                    last = matcher.end();
-                }
-                pattern.append(Pattern.quote(shape.substring(last))).append("(?:[/?#].*)?");
-                Matcher matched = Pattern.compile(pattern.toString()).matcher(destination);
-                if (!matched.matches()) {
-                    throw new IllegalArgumentException(key + ".latest in " + source + " points to " + uri
-                            + ", which leads to " + destination + " where " + key + " expects " + shape);
-                }
-                version = matched.group("version");
-            } else {
-                throw new IllegalArgumentException(key + ".latest in " + source + " points to " + uri
-                        + ", which answered " + status + " without redirecting to the newest version or naming it");
-            }
-            if (!VERSION.matcher(version).matches()) {
-                throw new IllegalArgumentException(key + ".latest in " + source + " points to " + uri
-                        + ", which names '" + version + "' where it should name the newest version, such as 1.2.3");
-            }
-            return Optional.of(version);
-        } finally {
-            http.disconnect();
+        String version = listsVersions()
+                ? metadata(values, connection).map(MavenMetadata::release).orElse(null)
+                : redirected(uri, values, connection);
+        if (version != null && !VERSION.matcher(version).matches()) {
+            throw new IllegalArgumentException(key + ".latest in " + source + " points to " + uri
+                    + ", which names '" + version + "' where it should name the newest version, such as 1.2.3");
         }
+        return Optional.ofNullable(version);
+    }
+
+    public Optional<MavenMetadata> metadata(Map<String, String> values, Repository.Connection connection)
+            throws IOException {
+        if (!listsVersions()) {
+            return Optional.empty();
+        }
+        byte[] bytes = read(secured(URI.create(fill(latest, key + ".latest", values).orElseThrow()), connection),
+                connection);
+        return bytes == null
+                ? Optional.empty()
+                : Optional.of(MavenMetadata.of(() -> new ByteArrayInputStream(bytes)).filter(this::admits));
     }
 
     public Optional<RepositoryItem> fetch(Map<String, String> values,
@@ -186,6 +153,63 @@ public record DiscoveredLocation(String domain,
             printing.accept("%s%-11s%s %s".formatted(palette.info(), "[FETCHED]", palette.reset(), location));
         }
         return Optional.of(() -> new ByteArrayInputStream(bytes));
+    }
+
+    private String redirected(URI uri, Map<String, String> values, Repository.Connection connection)
+            throws IOException {
+        HttpURLConnection http = (HttpURLConnection) Repository.connect(uri, connection.insecure());
+        http.setRequestMethod("HEAD");
+        http.setInstanceFollowRedirects(false);
+        http.setRequestProperty("User-Agent", "Jenesis");
+        http.setConnectTimeout(connection.connectTimeout());
+        http.setReadTimeout(connection.readTimeout());
+        try {
+            int status = http.getResponseCode();
+            if (status == HttpURLConnection.HTTP_NOT_FOUND || status == HttpURLConnection.HTTP_GONE) {
+                return null;
+            }
+            String announced = http.getHeaderField(key.equals("maven")
+                    ? "Jenesis-MavenVersion"
+                    : "Jenesis-ModuleVersion");
+            String redirect = http.getHeaderField("Location");
+            if (announced != null) {
+                return announced.strip();
+            }
+            if (status / 100 != 3 || redirect == null) {
+                throw new IllegalArgumentException(key + ".latest in " + source + " points to " + uri
+                        + ", which answered " + status + " without redirecting to the newest version or naming it");
+            }
+            String destination = uri.resolve(redirect).toString();
+            int marker = target.indexOf("{version}"), boundary = target.indexOf('/', marker);
+            String shape = target.substring(0, boundary < 0 ? target.length() : boundary);
+            StringBuilder pattern = new StringBuilder();
+            Matcher matcher = PLACEHOLDER.matcher(shape);
+            int last = 0;
+            while (matcher.find()) {
+                pattern.append(Pattern.quote(shape.substring(last, matcher.start())));
+                String placeholder = matcher.group(1);
+                if (placeholder.equals("version")) {
+                    pattern.append(matcher.start() == marker ? "(?<version>[A-Za-z0-9._+-]+)" : "\\k<version>");
+                } else if (values.get(placeholder) != null) {
+                    pattern.append(Pattern.quote(values.get(placeholder)));
+                } else if (placeholder.equals(CLASSIFIER) || placeholder.equals(TYPE)) {
+                    pattern.append("[^/?#]*");
+                } else {
+                    throw new IllegalArgumentException(key + " in " + source + " uses the placeholder {"
+                            + placeholder + "}, which a request without a version cannot fill");
+                }
+                last = matcher.end();
+            }
+            pattern.append(Pattern.quote(shape.substring(last))).append("(?:[/?#].*)?");
+            Matcher matched = Pattern.compile(pattern.toString()).matcher(destination);
+            if (!matched.matches()) {
+                throw new IllegalArgumentException(key + ".latest in " + source + " points to " + uri
+                        + ", which leads to " + destination + " where " + key + " expects " + shape);
+            }
+            return matched.group("version");
+        } finally {
+            http.disconnect();
+        }
     }
 
     private Optional<String> fill(String template, String name, Map<String, String> values) {

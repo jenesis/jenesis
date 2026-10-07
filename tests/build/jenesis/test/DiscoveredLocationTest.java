@@ -206,6 +206,31 @@ public class DiscoveredLocationTest {
     }
 
     @Test
+    public void reads_the_newest_release_from_the_maven_metadata_a_latest_link_names() throws IOException {
+        try (DiscoveryServer server = new DiscoveryServer()) {
+            server.file("meta/tool/maven-metadata.xml", "<metadata><versioning><release>1.5</release><versions><version>1.0</version><version>1.5</version>"
+                    + "<version>2.0-SNAPSHOT</version></versions></versioning></metadata>");
+            DiscoveredLocation location = new DiscoveredLocation("example.com", source("example.com"), "maven",
+                    server.files() + "{artifactId}-{version}.{type}",
+                    null,
+                    null,
+                    server.files() + "meta/{artifactId}/maven-metadata.xml"),
+                    restricted = new DiscoveredLocation("example.com", source("example.com"), "maven",
+                            server.files() + "{artifactId}-{version}.{type}",
+                            "2.0",
+                            null,
+                            server.files() + "meta/{artifactId}/maven-metadata.xml");
+
+            assertThat(location.listsVersions()).isTrue();
+            assertThat(location.latest(Map.of("artifactId", "tool"), CONNECTION)).contains("1.5");
+            assertThat(location.latest(Map.of("artifactId", "missing"), CONNECTION)).isEmpty();
+            assertThat(restricted.latest(Map.of("artifactId", "tool"), CONNECTION))
+                    .as("a snapshot is no release, and the release is older than the key serves")
+                    .isEmpty();
+        }
+    }
+
+    @Test
     public void accepts_a_fetched_file_that_publishes_no_checksum() throws IOException {
         try (DiscoveryServer server = new DiscoveryServer()) {
             server.file("tool-1.0.jar", "jar");

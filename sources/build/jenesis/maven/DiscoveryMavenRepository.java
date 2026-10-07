@@ -108,11 +108,17 @@ public class DiscoveryMavenRepository implements MavenRepository {
         }
         if (location.template()) {
             SAFE_SEGMENT.accept("artifact id", artifactId);
-            String version = checksum == null
-                    ? location.latest(Map.of("groupId", groupId,
-                            "groupPath", groupId.replace('.', '/'),
-                            "artifactId", artifactId), connection).orElse(null)
-                    : null;
+            if (checksum != null) {
+                return Optional.empty();
+            }
+            Map<String, String> values = Map.of("groupId", groupId,
+                    "groupPath", groupId.replace('.', '/'),
+                    "artifactId", artifactId);
+            if (location.listsVersions()) {
+                MavenMetadata listed = location.metadata(values, connection).orElse(null);
+                return listed == null ? Optional.empty() : Optional.of(listed.toItem());
+            }
+            String version = location.latest(values, connection).orElse(null);
             if (version == null || !location.admits(version)) {
                 return Optional.empty();
             }

@@ -195,6 +195,26 @@ public class DiscoveryMavenRepositoryTest {
     }
 
     @Test
+    public void answers_the_metadata_a_template_names_as_its_latest_link_with_the_versions_it_serves()
+            throws IOException {
+        server.domain("bytebuddy.net",
+                        "maven=" + server.files() + "release/{artifactId}-{version}{-classifier}.{type}",
+                        "maven.latest=" + server.files() + "meta/{groupPath}/{artifactId}/maven-metadata.xml",
+                        "maven.since=1.5")
+                .file("meta/net/bytebuddy/byte-buddy/maven-metadata.xml", metadata("2.0", "2.0", null,
+                        "1.0", "1.5", "2.0"));
+
+        String listed = content(repository().fetchMetadata(Runnable::run, "net.bytebuddy", "byte-buddy", null));
+
+        assertThat(listed)
+                .contains("<versions><version>1.5</version><version>2.0</version></versions>")
+                .contains("<release>2.0</release>");
+        assertThat(repository().fetchMetadata(Runnable::run, "net.bytebuddy", "other", null))
+                .as("a metadata file that does not exist lists nothing")
+                .isEmpty();
+    }
+
+    @Test
     public void lists_only_the_versions_a_record_admits_in_the_metadata_of_its_location() throws IOException {
         server.domain("bytebuddy.net", "maven=" + server.files() + "domain/", "maven.since=1.5")
                 .file("domain/net/bytebuddy/byte-buddy/maven-metadata.xml", metadata("2.0", "2.0", null,

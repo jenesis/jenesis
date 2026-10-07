@@ -195,6 +195,18 @@ public class DiscoveryModuleRepositoryTest {
     }
 
     @Test
+    public void resolves_the_newest_release_the_maven_metadata_of_its_latest_link_names() throws IOException {
+        server.domain("bytebuddy.net",
+                        "module=" + server.files() + "{module}-{version}.{type}",
+                        "module.latest=" + server.files() + "meta/{module}/maven-metadata.xml")
+                .file("meta/net.bytebuddy/maven-metadata.xml", "<metadata><versioning><release>1.5</release>"
+                        + "<versions><version>1.0</version><version>1.5</version></versions></versioning></metadata>")
+                .file("net.bytebuddy-1.5.jar", "release");
+
+        assertThat(content(repository().fetch(Runnable::run, "net.bytebuddy"))).isEqualTo("release");
+    }
+
+    @Test
     public void leaves_a_newest_version_its_key_does_not_serve_to_the_module_repository() throws IOException {
         server.domain("bytebuddy.net",
                         "module=" + server.files() + "{module}-{version}.{type}",
