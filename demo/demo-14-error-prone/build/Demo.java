@@ -1,10 +1,10 @@
 package build;
 
 import module java.base;
-import build.jenesis.Project;
-import build.jenesis.project.InferredMultiProjectAssembler;
 import build.jenesis.Environment;
 import build.jenesis.Make;
+import build.jenesis.Project;
+import build.jenesis.project.InferredMultiProjectAssembler;
 
 public class Demo {
 

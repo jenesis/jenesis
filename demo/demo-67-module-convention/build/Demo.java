@@ -1,6 +1,8 @@
 package build;
 
 import module java.base;
+import build.jenesis.Environment;
+import build.jenesis.Make;
 import build.jenesis.Project;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -9,8 +11,6 @@ import build.jenesis.maven.MavenModuleRepository;
 import build.jenesis.maven.MavenRepository;
 import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.JenesisRepository;
-import build.jenesis.Environment;
-import build.jenesis.Make;
 
 /**
  * Resolving a module from a plain Maven repository by the coordinate convention

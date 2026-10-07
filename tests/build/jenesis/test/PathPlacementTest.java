@@ -2,8 +2,8 @@ package build.jenesis.test;
 
 import module java.base;
 import module org.junit.jupiter.api;
-import java.util.jar.Attributes;
 import build.jenesis.PathPlacement;
+import java.util.jar.Attributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

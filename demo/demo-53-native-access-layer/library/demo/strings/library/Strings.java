@@ -1,8 +1,8 @@
 package demo.strings.library;
 
-import java.lang.invoke.MethodHandles;
 import build.jenesis.launcher.Launcher;
 import demo.strings.spi.Length;
+import java.lang.invoke.MethodHandles;
 
 public class Strings {
 

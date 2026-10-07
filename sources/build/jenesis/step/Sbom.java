@@ -1,7 +1,6 @@
 package build.jenesis.step;
 
 import module java.base;
-import java.util.jar.Attributes;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -12,6 +11,7 @@ import build.jenesis.License;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDependencyKey;
+import java.util.jar.Attributes;
 
 public class Sbom implements BuildStep {
 

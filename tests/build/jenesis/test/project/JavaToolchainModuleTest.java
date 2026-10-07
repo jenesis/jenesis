@@ -10,6 +10,7 @@ import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenDefaultRepository;
@@ -18,7 +19,6 @@ import build.jenesis.project.JavaToolchainModule;
 import build.jenesis.project.TestModule;
 import build.jenesis.step.ClassPathCompatibility;
 import sample.Sample;
-import build.jenesis.Environment;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;

@@ -7,8 +7,8 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
-import build.jenesis.Platform;
 import build.jenesis.Pinning;
+import build.jenesis.Platform;
 import build.jenesis.step.Inventory;
 
 public class PinPom implements BuildStep {

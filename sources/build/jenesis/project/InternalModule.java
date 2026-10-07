@@ -1,8 +1,6 @@
 package build.jenesis.project;
 
 import module java.base;
-import build.jenesis.Pinning;
-import build.jenesis.Platform;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
@@ -10,6 +8,8 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Pinning;
+import build.jenesis.Platform;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;

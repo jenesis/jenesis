@@ -4,11 +4,11 @@ import module java.base;
 import module java.xml;
 import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
-import build.jenesis.Repository;
-import build.jenesis.RepositoryItem;
 import build.jenesis.License;
 import build.jenesis.PathPlacement;
 import build.jenesis.Platform;
+import build.jenesis.Repository;
+import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 

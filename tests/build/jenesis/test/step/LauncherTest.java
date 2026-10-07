@@ -10,9 +10,9 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Launcher;
-import build.jenesis.Environment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

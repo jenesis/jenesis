@@ -1,7 +1,7 @@
 package demo.notice;
 
-import module java.base;
 import module build.jenesis;
+import module java.base;
 
 public class NoticeModule implements BuildExecutorModule {
 

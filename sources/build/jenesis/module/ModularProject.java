@@ -1,9 +1,6 @@
 package build.jenesis.module;
 
 import module java.base;
-import java.util.jar.Attributes;
-import build.jenesis.Pinning;
-import build.jenesis.Platform;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
@@ -12,21 +9,24 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
+import build.jenesis.Pinning;
+import build.jenesis.Platform;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 import build.jenesis.maven.MavenModuleRepository;
 import build.jenesis.project.AssemblyDescriptor;
-import build.jenesis.project.ProjectModule;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.MultiProjectDependencies;
 import build.jenesis.project.MultiProjectModule;
+import build.jenesis.project.ProjectModule;
 import build.jenesis.step.Assign;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Dependencies;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Javac;
 import build.jenesis.step.Versions;
+import java.util.jar.Attributes;
 
 import static build.jenesis.project.MultiProjectModule.ARTIFACTS;
 import static build.jenesis.project.MultiProjectModule.ASSIGN;

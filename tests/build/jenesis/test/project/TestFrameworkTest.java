@@ -2,7 +2,6 @@ package build.jenesis.test.project;
 
 import module java.base;
 import module org.junit.jupiter.api;
-import java.util.jar.Attributes;
 import build.jenesis.BuildStep;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.JUnit4;
@@ -10,6 +9,7 @@ import build.jenesis.project.JUnitPlatform;
 import build.jenesis.project.TestFramework;
 import build.jenesis.project.TestNG;
 import build.jenesis.project.TestTags;
+import java.util.jar.Attributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

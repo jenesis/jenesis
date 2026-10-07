@@ -8,8 +8,8 @@ import build.jenesis.Environment;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
-import build.jenesis.step.Bind;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Bind;
 
 public class InferredSourceCodeQualityModule implements BuildExecutorModule {
 

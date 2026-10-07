@@ -1,13 +1,13 @@
 package build.jenesis.step;
 
 import module java.base;
-import java.util.jar.Attributes;
-import build.jenesis.Environment;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
+import build.jenesis.Environment;
 import build.jenesis.SequencedProperties;
+import java.util.jar.Attributes;
 
 public class Jar extends ProcessBuildStep {
 
