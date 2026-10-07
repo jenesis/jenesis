@@ -1,7 +1,6 @@
 package build.jenesis;
 
 import module java.base;
-import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenDefaultVersionNegotiator;
@@ -10,6 +9,7 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.maven.MavenRepository;
 import build.jenesis.module.JenesisRepository;
 import build.jenesis.module.ModularJarResolver;
+import build.jenesis.step.ProcessBuildStep;
 
 public record Jpx(Path storage,
                   Map<String, Repository> repositories,
@@ -31,11 +31,12 @@ public record Jpx(Path storage,
 
     private Jpx(Environment environment, PathPlacement placement) {
         boolean modular = placement == PathPlacement.MODULE_PATH;
+        Discovery discovery = environment.flag("repository.discover") ? Discovery.ofEnvironment(environment) : null;
         Repository module = JenesisRepository.ofEnvironment(environment, modular
                                                                   ? JenesisRepository.Scope.MODULE
-                                                                  : JenesisRepository.Scope.ARTIFACT);
+                                                                  : JenesisRepository.Scope.ARTIFACT, discovery);
         Map<String, Repository> repositories = new LinkedHashMap<>();
-        repositories.put("maven", MavenDefaultRepository.ofEnvironment(environment));
+        repositories.put("maven", MavenDefaultRepository.ofEnvironment(environment, discovery));
         repositories.put("module", module);
         Map<String, Resolver> resolvers = new LinkedHashMap<>();
         MavenPomResolver maven = MavenPomResolver.ofEnvironment(environment);
