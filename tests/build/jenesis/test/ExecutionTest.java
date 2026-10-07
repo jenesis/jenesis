@@ -2,8 +2,8 @@ package build.jenesis.test;
 
 import module java.base;
 import module org.junit.jupiter.api;
-import build.jenesis.Execution;
 import build.jenesis.Environment;
+import build.jenesis.Execution;
 import build.jenesis.Project;
 import build.jenesis.SequencedProperties;
 import sample.Sample;

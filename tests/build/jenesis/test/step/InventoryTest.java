@@ -2,7 +2,6 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
-import java.util.jar.Attributes;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
@@ -12,6 +11,7 @@ import build.jenesis.ChecksumStatus;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Inventory;
+import java.util.jar.Attributes;
 
 
 import static org.assertj.core.api.Assertions.assertThat;

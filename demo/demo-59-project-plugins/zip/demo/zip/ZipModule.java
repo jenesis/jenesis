@@ -1,7 +1,7 @@
 package demo.zip;
 
-import module java.base;
 import module build.jenesis;
+import module java.base;
 
 public class ZipModule implements BuildExecutorModule {
 

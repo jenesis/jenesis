@@ -2,13 +2,13 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
-import build.jenesis.Environment;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.step.Bundle;

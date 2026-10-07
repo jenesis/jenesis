@@ -4,6 +4,7 @@ import module java.base;
 import module org.junit.jupiter.api;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.DependencyScope;
+import build.jenesis.Environment;
 import build.jenesis.License;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
@@ -18,7 +19,6 @@ import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.maven.MavenRepository;
 import build.jenesis.maven.MavenResolver;
 import build.jenesis.step.Dependencies;
-import build.jenesis.Environment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;

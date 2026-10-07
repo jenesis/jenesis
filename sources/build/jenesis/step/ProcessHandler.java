@@ -1,8 +1,8 @@
 package build.jenesis.step;
 
 import module java.base;
-import build.jenesis.SequencedProperties;
 import build.jenesis.Environment;
+import build.jenesis.SequencedProperties;
 
 public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHandler.OfProcess {
 

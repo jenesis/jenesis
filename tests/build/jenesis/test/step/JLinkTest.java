@@ -11,9 +11,9 @@ import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
-import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.JLink;
 import build.jenesis.step.Layers;
+import build.jenesis.step.ProcessHandler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

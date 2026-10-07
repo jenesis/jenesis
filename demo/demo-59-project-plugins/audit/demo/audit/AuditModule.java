@@ -1,7 +1,7 @@
 package demo.audit;
 
-import module java.base;
 import module build.jenesis;
+import module java.base;
 
 public class AuditModule implements BuildExecutorModule {
 

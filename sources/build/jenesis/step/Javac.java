@@ -1,17 +1,17 @@
 package build.jenesis.step;
 
 import module java.base;
-import java.util.jar.Attributes;
-import build.jenesis.Environment;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
 import build.jenesis.SequencedProperties;
 import build.jenesis.module.ModuleInfoParser;
+import java.util.jar.Attributes;
 
 public class Javac extends ProcessBuildStep {
 

@@ -3,9 +3,9 @@ package build.jenesis.module;
 import module java.base;
 import module jdk.compiler;
 import build.jenesis.Platform;
+import com.sun.source.doctree.LiteralTree;
 import javax.lang.model.SourceVersion;
 import javax.tools.ToolProvider;
-import com.sun.source.doctree.LiteralTree;
 
 import static java.util.Objects.requireNonNull;
 

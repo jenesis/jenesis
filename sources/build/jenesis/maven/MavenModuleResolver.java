@@ -3,9 +3,9 @@ package build.jenesis.maven;
 import module java.base;
 import module java.xml;
 import build.jenesis.DependencyScope;
+import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
-import build.jenesis.PathPlacement;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
 

@@ -1,12 +1,12 @@
 package build.jenesis.step;
 
 import module java.base;
-import java.util.jar.Attributes;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.PathPlacement;
+import java.util.jar.Attributes;
 
 public class ClassPathCompatibility implements BuildStep {
 

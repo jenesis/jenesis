@@ -1,9 +1,6 @@
 package build.jenesis.project;
 
 import module java.base;
-import java.lang.annotation.Annotation;
-import java.lang.module.Configuration;
-import java.lang.reflect.Proxy;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildModuleName;
@@ -13,6 +10,9 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import java.lang.annotation.Annotation;
+import java.lang.module.Configuration;
+import java.lang.reflect.Proxy;
 
 class JenesisClassLoaderBridge {
 

@@ -2,12 +2,12 @@ package build.jenesis.test.project;
 
 import module java.base;
 import module org.junit.jupiter.api;
-import build.jenesis.Environment;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.SequencedProperties;
 import build.jenesis.project.InferredSourceCodeQualityModule;

@@ -1,7 +1,7 @@
 package demo.complete;
 
-import module java.base;
 import module build.jenesis;
+import module java.base;
 
 public class CompleteModule implements BuildExecutorModule {
 

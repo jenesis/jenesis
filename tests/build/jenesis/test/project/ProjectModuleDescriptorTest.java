@@ -2,8 +2,8 @@ package build.jenesis.test.project;
 
 import module java.base;
 import module org.junit.jupiter.api;
-import build.jenesis.Pinning;
 import build.jenesis.PathPlacement;
+import build.jenesis.Pinning;
 import build.jenesis.maven.MavenProject.MavenModuleDescriptor;
 import build.jenesis.project.ProjectModule;
 import build.jenesis.project.ProjectModuleDescriptor;

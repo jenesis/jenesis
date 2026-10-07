@@ -1,12 +1,10 @@
 package build.jenesis.test;
 
 import module java.base;
-import module org.junit.jupiter.api;
 import module jdk.httpserver;
-import java.util.jar.Attributes;
-import build.jenesis.docker.DockerizedJava;
-import build.jenesis.HashDigestFunction;
+import module org.junit.jupiter.api;
 import build.jenesis.Environment;
+import build.jenesis.HashDigestFunction;
 import build.jenesis.Jpx;
 import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
@@ -14,11 +12,13 @@ import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
 import build.jenesis.SequencedProperties;
+import build.jenesis.docker.DockerizedJava;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenModuleResolver;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.module.JenesisModuleRepository;
 import build.jenesis.module.ModularJarResolver;
+import java.util.jar.Attributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

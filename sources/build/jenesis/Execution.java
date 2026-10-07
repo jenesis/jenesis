@@ -1,10 +1,10 @@
 package build.jenesis;
 
 import module java.base;
-import build.jenesis.step.ProcessBuildStep;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Layers;
+import build.jenesis.step.ProcessBuildStep;
 
 public record Execution(Project project, String mainClass, String module, Container container) {
 

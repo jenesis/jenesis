@@ -1,16 +1,16 @@
 package build.jenesis.project;
 
 import module java.base;
-import build.jenesis.Pinning;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.Environment;
 import build.jenesis.PathPlacement;
+import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
-import build.jenesis.step.Bind;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Bind;
 
 public class InferredTestObservationModule implements BuildExecutorModule {
 

@@ -1,12 +1,12 @@
 package build;
 
 import module java.base;
+import build.jenesis.Environment;
+import build.jenesis.Make;
 import build.jenesis.Project;
 import build.jenesis.RepositoryItem;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenRepository;
-import build.jenesis.Environment;
-import build.jenesis.Make;
 
 public class Demo {
 

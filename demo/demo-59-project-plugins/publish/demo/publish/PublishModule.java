@@ -1,7 +1,7 @@
 package demo.publish;
 
-import module java.base;
 import module build.jenesis;
+import module java.base;
 
 public class PublishModule implements BuildExecutorModule {
 

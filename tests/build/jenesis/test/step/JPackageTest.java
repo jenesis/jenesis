@@ -11,10 +11,10 @@ import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
 import build.jenesis.SequencedProperties;
-import build.jenesis.step.ProcessHandler;
 import build.jenesis.step.JLink;
 import build.jenesis.step.JPackage;
 import build.jenesis.step.Layers;
+import build.jenesis.step.ProcessHandler;
 import sample.Sample;
 
 import static java.util.Objects.requireNonNull;

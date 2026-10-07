@@ -2,17 +2,17 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
-import build.jenesis.Environment;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
-import java.util.jar.JarOutputStream;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.step.JarSigner;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+import java.util.jar.JarOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

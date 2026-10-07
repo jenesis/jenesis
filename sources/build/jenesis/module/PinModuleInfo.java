@@ -3,19 +3,19 @@ package build.jenesis.module;
 import module java.base;
 import module jdk.compiler;
 import build.jenesis.BuildStep;
-import javax.tools.JavaFileObject;
-import javax.tools.SimpleJavaFileObject;
-import javax.tools.ToolProvider;
 import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Palette;
-import build.jenesis.Platform;
 import build.jenesis.Pinning;
-import build.jenesis.step.Inventory;
+import build.jenesis.Platform;
 import build.jenesis.SequencedProperties;
+import build.jenesis.step.Inventory;
+import javax.tools.JavaFileObject;
+import javax.tools.SimpleJavaFileObject;
+import javax.tools.ToolProvider;
 
 public class PinModuleInfo implements BuildStep {
 

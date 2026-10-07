@@ -6,8 +6,8 @@ import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildExecutorModule;
-import build.jenesis.BuildStepResult;
 import build.jenesis.BuildStepHashFunction;
+import build.jenesis.BuildStepResult;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.project.InferredComplianceModule;
 

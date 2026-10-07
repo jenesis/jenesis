@@ -1,18 +1,18 @@
 package build.jenesis.test.module;
 
 import module java.base;
-import java.util.jar.Attributes;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.DependencyScope;
+import java.util.jar.Attributes;
 import module org.junit.jupiter.api;
+import build.jenesis.Environment;
+import build.jenesis.License;
 import build.jenesis.PathPlacement;
 import build.jenesis.RepositoryItem;
 import build.jenesis.Resolver;
 import build.jenesis.module.ModularJarResolver;
 import build.jenesis.module.ModuleVersionNegotiator;
 import build.jenesis.step.Dependencies;
-import build.jenesis.Environment;
-import build.jenesis.License;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

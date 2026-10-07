@@ -13,10 +13,10 @@ import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.HashFunction;
 import build.jenesis.SequencedProperties;
-import build.jenesis.Environment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

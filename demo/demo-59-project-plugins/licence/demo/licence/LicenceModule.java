@@ -1,7 +1,7 @@
 package demo.licence;
 
-import module java.base;
 import module build.jenesis;
+import module java.base;
 
 public class LicenceModule implements BuildExecutorModule {
 
