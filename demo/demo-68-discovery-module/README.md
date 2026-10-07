@@ -150,7 +150,10 @@ of the newest release, whatever `<name>` is, so the link above names `0.15.4` fo
 `https://repo.jenesis.build/module/{module}/{module}.jar`, names the version in its
 `Jenesis-ModuleVersion` header instead, which is read first. The version is then
 checked against `module.since` and `module.suffixes` like any other, and a link that
-answers `404` leaves the request to the module repository.
+answers `404` leaves the request to the module repository. A link may also name a
+`maven-metadata.xml`, wherever it is hosted, whose release becomes the newest version:
+
+    module.latest=https://repo1.maven.org/maven2/build/jenesis/{module}/maven-metadata.xml
 
 Which versions are served
 -------------------------

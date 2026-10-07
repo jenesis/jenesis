@@ -4,14 +4,14 @@ import module java.base;
 import module java.xml;
 import build.jenesis.RepositoryItem;
 
-record MavenMetadata(String groupId,
+public record MavenMetadata(String groupId,
                      String artifactId,
                      String latest,
                      String release,
                      String lastUpdated,
                      List<String> versions) {
 
-    static MavenMetadata of(RepositoryItem item) throws IOException {
+    public static MavenMetadata of(RepositoryItem item) throws IOException {
         Document document;
         try (InputStream inputStream = item.toInputStream()) {
             document = MavenDefaultVersionNegotiator.toDocumentBuilderFactory().newDocumentBuilder().parse(inputStream);
@@ -47,7 +47,7 @@ record MavenMetadata(String groupId,
                 List.copyOf(merged));
     }
 
-    MavenMetadata filter(Predicate<String> admits) {
+    public MavenMetadata filter(Predicate<String> admits) {
         List<String> admitted = versions.stream().filter(admits).toList();
         return new MavenMetadata(groupId,
                 artifactId,
