@@ -1,7 +1,7 @@
 package demo.lines;
 
-import module java.base;
 import module build.jenesis;
+import module java.base;
 
 public class LinesModule implements BuildExecutorModule {
 

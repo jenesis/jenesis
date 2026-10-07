@@ -2,8 +2,6 @@ package build.jenesis.test.step;
 
 import module java.base;
 import module org.junit.jupiter.api;
-import java.lang.module.Configuration;
-import java.util.jar.Attributes;
 import build.jenesis.BuildExecutor;
 import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
@@ -17,6 +15,8 @@ import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenDefaultVersionNegotiator;
 import build.jenesis.maven.MavenPomResolver;
 import build.jenesis.step.Dependencies;
+import java.lang.module.Configuration;
+import java.util.jar.Attributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;

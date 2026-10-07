@@ -1,7 +1,7 @@
 package demo.checksums;
 
-import module java.base;
 import module build.jenesis;
+import module java.base;
 
 public class ChecksumsModule implements BuildExecutorModule {
 

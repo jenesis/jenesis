@@ -7,12 +7,12 @@ import build.jenesis.BuildExecutorCache;
 import build.jenesis.BuildExecutorCallback;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
+import build.jenesis.Environment;
 import build.jenesis.HashDigestFunction;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
 import build.jenesis.module.ModularJarResolver;
 import build.jenesis.project.InternalModule;
-import build.jenesis.Environment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

@@ -9,8 +9,8 @@ import build.jenesis.BuildExecutorModule;
 import build.jenesis.BuildStep;
 import build.jenesis.BuildStepHashFunction;
 import build.jenesis.BuildStepResult;
-import build.jenesis.HashDigestFunction;
 import build.jenesis.Environment;
+import build.jenesis.HashDigestFunction;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

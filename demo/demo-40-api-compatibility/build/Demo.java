@@ -1,10 +1,10 @@
 package build;
 
 import module java.base;
-import build.jenesis.Project;
-import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.Environment;
 import build.jenesis.Make;
+import build.jenesis.Project;
+import build.jenesis.maven.MavenDefaultRepository;
 
 /**
  * A compatibility check needs something to compare against, and that something has
