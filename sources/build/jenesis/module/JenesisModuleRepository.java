@@ -50,7 +50,9 @@ public class JenesisModuleRepository implements JenesisRepository {
             text = "https://repo.jenesis.build/";
             origin = Repository.Origin.DEFAULT;
         }
-        JenesisRepository repository = chain(environment, text, visited, scope, credential, maven, origin, MODULE, null);
+        JenesisRepository repository = text.isBlank()
+                ? JenesisRepository.of(Repository.empty())
+                : chain(environment, text, visited, scope, credential, maven, origin, MODULE, null);
         if (repository == null) {
             throw new IllegalStateException("No Jenesis module repository is configured by: " + text);
         }

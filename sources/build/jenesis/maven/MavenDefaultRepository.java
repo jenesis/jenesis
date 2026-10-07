@@ -48,7 +48,9 @@ public class MavenDefaultRepository implements MavenRepository {
             text = "https://repo1.maven.org/maven2/";
             origin = Repository.Origin.DEFAULT;
         }
-        MavenRepository repository = chain(environment, text, visited, local, credential, origin, printing, null);
+        MavenRepository repository = text.isBlank()
+                ? MavenRepository.of(Repository.empty())
+                : chain(environment, text, visited, local, credential, origin, printing, null);
         if (repository == null) {
             throw new IllegalStateException("No Maven repository is configured by: " + text);
         }

@@ -1001,6 +1001,8 @@ first looked up in the file `jenesis.build` publishes at
 and which Maven artifact it is published as:
 
     jenesis.repository.discover=true
+    jenesis.maven.uri=
+    jenesis.module.uri=
 
     module=https://github.com/jenesis/jenesis/releases/download/v{version}/{module}-{version}{-classifier}.{type}
     moduletomaven=build.jenesis:{module}
@@ -1010,9 +1012,11 @@ downloads the jar from the Jenesis release on GitHub, without a POM and without
 Maven. A build that resolves modules through Maven asks `moduletomaven` first and
 resolves the artifact as any Maven dependency, from where the same file names for
 the group, as the next demo shows - so a domain that publishes the file needs no
-module repository. `<key>.since` and `<key>.suffixes` leave other versions to the
-module repository. A module whose domain publishes nothing resolves as before, and
-the pin still decides what is accepted.
+module repository. The demo empties `jenesis.maven.uri` and `jenesis.module.uri`,
+which name no remote at all, so nothing but the domain answers and nothing falls
+back. With the remotes in place, `<key>.since` and `<key>.suffixes` leave other
+versions to them and a module whose domain publishes nothing resolves as before; the
+pin still decides what is accepted.
 
 ## 51. The same for a Maven dependency - [`discovery-maven`](demo-69-discovery-maven/README.md)
 
@@ -1024,7 +1028,8 @@ dependency on Jenesis from the `maven` key beside the module's:
 
 Its location is a template of each file, as here, or the root of a traditional
 Maven repository, whose metadata is merged with that of the Maven remotes. A file
-the location does not hold is asked of the Maven remotes.
+the location does not hold is asked of the Maven remotes - here none, as the demo
+names no remote either.
 
 ## 52. The same bytes on every machine - [`reproducible`](demo-70-reproducible/README.md)
 
