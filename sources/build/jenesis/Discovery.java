@@ -43,7 +43,7 @@ public final class Discovery {
     }
 
     public Optional<DiscoveredLocation> lookup(String namespace, String key) throws IOException {
-        if (!NAME.matcher(namespace).matches()) {
+        if (connection.offline() || !NAME.matcher(namespace).matches()) {
             return Optional.empty();
         }
         String[] labels = namespace.split("\\.");

@@ -1,6 +1,7 @@
 package build.jenesis.test.maven;
 
 import module java.base;
+import module jdk.httpserver;
 import module org.junit.jupiter.api;
 import build.jenesis.Environment;
 import build.jenesis.Repository;
@@ -123,6 +124,69 @@ public class MavenDefaultRepositoryTest {
             assertThat(local.resolve("group/artifact/1/artifact-1.jar")).doesNotExist();
         } finally {
             local.toFile().setWritable(true, false);
+        }
+    }
+
+    @Test
+    public void serves_a_cached_file_without_its_remote_checksum_and_downloads_nothing_while_offline()
+            throws IOException {
+        Files.writeString(Files.createDirectories(local.resolve("group/artifact/1")).resolve("artifact-1.jar"), "cached");
+        AtomicInteger hits = new AtomicInteger();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            hits.incrementAndGet();
+            exchange.sendResponseHeaders(404, -1);
+            exchange.close();
+        });
+        server.start();
+        try {
+            URI remote = URI.create("http://localhost:" + server.getAddress().getPort() + "/");
+            MavenDefaultRepository offline = new MavenDefaultRepository(remote, local, Map.of("SHA1", remote), null)
+                    .connection(new Repository.Connection().insecure(true).offline(true));
+
+            try (InputStream inputStream = offline.fetch(Runnable::run, "group", "artifact", "1", "jar", null, null)
+                    .orElseThrow()
+                    .toInputStream()) {
+                assertThat(new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("cached");
+            }
+            assertThatThrownBy(() -> offline.fetch(Runnable::run, "group", "artifact", "2", "jar", null, null))
+                    .isInstanceOf(IOException.class)
+                    .hasMessageContaining(remote + "group/artifact/2/artifact-2.jar")
+                    .hasMessageContaining("while offline");
+            assertThat(hits.get()).as("neither the checksum nor the missing artifact is asked for").isZero();
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void resolves_metadata_offline_from_the_copy_an_earlier_resolution_stored() throws IOException {
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/", exchange -> {
+            byte[] body = "<metadata/>".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        server.start();
+        try {
+            URI remote = URI.create("http://localhost:" + server.getAddress().getPort() + "/");
+            Path store = result.resolve("store");
+            Repository.Connection online = new Repository.Connection().insecure(true);
+            new MavenDefaultRepository(remote, null, Map.of(), null).connection(online).cached(store)
+                    .fetchMetadata(Runnable::run, "group", "artifact", null);
+            server.stop(0);
+
+            try (InputStream inputStream = new MavenDefaultRepository(remote, null, Map.of(), null)
+                    .connection(online.offline(true))
+                    .cached(store)
+                    .fetchMetadata(Runnable::run, "group", "artifact", null)
+                    .orElseThrow()
+                    .toInputStream()) {
+                assertThat(new String(inputStream.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("<metadata/>");
+            }
+        } finally {
+            server.stop(0);
         }
     }
 

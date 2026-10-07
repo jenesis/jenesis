@@ -127,6 +127,12 @@ public interface Repository {
             try {
                 for (int redirect = 0; redirect < 8; redirect++) {
                     String scheme = current.getScheme();
+                    if (settings.offline() && !"file".equals(scheme)) {
+                        throw new IOException("Refusing to fetch "
+                                + current
+                                + " while offline: only what the local caches hold is used"
+                                + " (build once without -Djenesis.repository.offline=true to fill them)");
+                    }
                     if (scheme != null && !scheme.equals("https") && !scheme.equals("file") && !settings.insecure()) {
                         throw new IllegalStateException("Refusing to fetch over insecure scheme '"
                                 + scheme
@@ -313,7 +319,12 @@ public interface Repository {
         }
     }
 
-    record Connection(int retries, Duration backoff, boolean insecure, int connectTimeout, int readTimeout) {
+    record Connection(int retries,
+                      Duration backoff,
+                      boolean insecure,
+                      int connectTimeout,
+                      int readTimeout,
+                      boolean offline) {
 
         public Connection {
             if (retries < 0) {
@@ -343,27 +354,32 @@ public interface Repository {
                  Duration.ofMillis(environment.number("repository.backoff", 125)),
                  environment.flag("repository.insecure"),
                  environment.number("repository.connect.timeout", 10_000),
-                 environment.number("repository.read.timeout", 30_000));
+                 environment.number("repository.read.timeout", 30_000),
+                 environment.flag("repository.offline"));
         }
 
         public Connection retries(int retries) {
-            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout);
+            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout, offline);
         }
 
         public Connection backoff(Duration backoff) {
-            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout);
+            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout, offline);
         }
 
         public Connection insecure(boolean insecure) {
-            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout);
+            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout, offline);
         }
 
         public Connection connectTimeout(int connectTimeout) {
-            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout);
+            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout, offline);
         }
 
         public Connection readTimeout(int readTimeout) {
-            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout);
+            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout, offline);
+        }
+
+        public Connection offline(boolean offline) {
+            return new Connection(retries, backoff, insecure, connectTimeout, readTimeout, offline);
         }
     }
 
