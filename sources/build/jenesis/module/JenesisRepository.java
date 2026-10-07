@@ -1,6 +1,7 @@
 package build.jenesis.module;
 
 import module java.base;
+import build.jenesis.Discovery;
 import build.jenesis.Environment;
 import build.jenesis.Repository;
 import build.jenesis.RepositoryItem;
@@ -99,14 +100,23 @@ public interface JenesisRepository extends Repository {
                                    String type) throws IOException;
 
     static JenesisRepository ofEnvironment(Environment environment, Scope scope) {
+        return ofEnvironment(environment,
+                scope,
+                environment.flag("repository.discover") ? Discovery.ofEnvironment(environment) : null);
+    }
+
+    static JenesisRepository ofEnvironment(Environment environment, Scope scope, Discovery discovery) {
         String source = environment.value("module.source", "service");
-        return switch (source) {
+        JenesisRepository repository = switch (source) {
             case "service" -> JenesisModuleRepository.ofEnvironment(environment, scope);
             case "git" -> JenesisRawGitRepository.ofEnvironment(environment, scope);
             default -> throw new IllegalArgumentException("Unknown jenesis.module.source '"
                     + source
                     + "', expected 'service' for repo.jenesis.build or 'git' for the published index");
         };
+        return discovery == null
+                ? repository
+                : repository.prepend(DiscoveryModuleRepository.ofEnvironment(environment, scope, discovery));
     }
 
     static JenesisRepository of(Repository repository) {

@@ -1,7 +1,6 @@
 package build.jenesis;
 
 import module java.base;
-import javax.lang.model.SourceVersion;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenModuleResolver;
@@ -27,9 +26,9 @@ import build.jenesis.project.InternalModule;
 import build.jenesis.project.MultiProjectAssembler;
 import build.jenesis.project.MultiProjectModule;
 import build.jenesis.project.ProjectModuleDescriptor;
-import build.jenesis.project.ReleaseModule;
-import build.jenesis.project.ProjectWatch;
 import build.jenesis.project.ProjectPlugins;
+import build.jenesis.project.ProjectWatch;
+import build.jenesis.project.ReleaseModule;
 import build.jenesis.step.Bind;
 import build.jenesis.step.Bom;
 import build.jenesis.step.Dependencies;
@@ -38,6 +37,7 @@ import build.jenesis.step.Inventory;
 import build.jenesis.step.ProjectFiles;
 import build.jenesis.step.ReportStaging;
 import build.jenesis.step.Tree;
+import javax.lang.model.SourceVersion;
 
 public record Project(
         Path root,
@@ -307,11 +307,16 @@ public record Project(
             MultiProjectAssembler<? super ProjectModuleDescriptor> bomAware = new BomAwareAssembler(pomAware, project.hashFunction());
             executor.addModule(BUILD, (sub, inherited) -> {
                 Map<String, Repository> repositories = new LinkedHashMap<>(project.repositories());
+                Discovery discovery = project.environment().flag("repository.discover")
+                        ? Discovery.ofEnvironment(project.environment())
+                        : null;
                 repositories.putIfAbsent("maven",
-                        MavenDefaultRepository.ofEnvironment(project.environment())
+                        MavenDefaultRepository.ofEnvironment(project.environment(), discovery)
                                 .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
                 repositories.putIfAbsent("module",
-                        JenesisRepository.ofEnvironment(project.environment(), JenesisRepository.Scope.ARTIFACT)
+                        JenesisRepository.ofEnvironment(project.environment(),
+                                        JenesisRepository.Scope.ARTIFACT,
+                                        discovery)
                                 .cached(project.artifacts() == null ? null : Files.createDirectories(project.artifacts())));
                 repositories.putIfAbsent("OpenPGP", OpenPgpRepository.ofEnvironment(project.environment()));
                 Map<String, Resolver> resolvers = new LinkedHashMap<>(project.resolvers());
@@ -3174,6 +3179,7 @@ public record Project(
                 repository.backoff|125|Initial retry backoff in milliseconds, doubling per attempt
                 repository.connect.timeout|10000|Connect timeout for a repository fetch, in milliseconds
                 repository.read.timeout|30000|Read timeout for a repository fetch, in milliseconds
+                repository.discover|false|Ask the domain a module or Maven group is named after, before the module remotes and before the Maven remotes, how it is published: for net.bytebuddy.agent, as a module or a group, the file at https://<domain>/.well-known/java-repository.properties for bytebuddy.net and, only where it publishes none, for agent.bytebuddy.net, a java.util.Properties file in UTF-8; the first file found speaks for every name below its domain, so a key it does not hold is absent rather than asked of a subdomain, unless it says stop=false, which lets the files of its subdomains answer first and keeps its own entries for a key none of them holds. A module is answered by module=<location>, where its files are, and by moduletomaven=<groupId>:<artifactId>[:<extension>[:<classifier>]], the Maven artifact it is published as, resolved through the Maven remotes and maven= entries; the modular layout asks module= first and the others moduletomaven= first, a key that does not answer leaving the request to the other; a group is answered by maven=<location>. A coordinate may name the module as {module} and the labels of its name below the file's domain, joined by dashes after a leading one, as {-suffix}, and without either applies only to the module whose own domain holds it. <kind>.since=<version> serves only that version and later ones, ordered as Maven orders versions, and <kind>.suffixes=<suffix>[,<suffix>...] only a version whose qualifier after its first dash starts with one of those words, ignoring case, none naming a version without one; a version an entry does not admit is left to the remotes, as is a request naming no version where the entry restricts versions. A location without placeholders is a root, a Jenesis module service for module= and a Maven repository for maven=, whose Maven metadata, limited to the versions the entry admits, is merged with that of the remotes; one with placeholders is a template naming each file, {module} and {-suffix} for module=, {groupId}, {groupPath} and {artifactId} for maven=, and {version}, {-classifier} and {type} for both, where a template without {-classifier} or {type} serves only the plain jar, a file is validated against the .sha512, .sha256 or .sha1 beside it, and no Maven metadata is read, so only a named version resolves, unless <kind>.latest=<link> beside a template naming {version} names a link to the newest version: a request naming no version sends it a HEAD request, follows no redirect, and reads the version from a Jenesis-ModuleVersion or Jenesis-MavenVersion header or else from where the link redirects, matched against the template up to the end of the path segment holding {version}, as GitHub's releases/latest/download/<name> redirects to the newest release, and a maven= template then answers Maven metadata naming that version. Of a key named twice the last one counts, as java.util.Properties reads it; a placeholder a key does not know, a module= that is no location, a moduletomaven= that is no coordinate or a location not read over https fails the build, an unknown key is ignored, and a file that cannot be fetched counts as absent, save where its certificate does not verify
                 maven.uri||Maven remotes, comma-separated and queried left to right; a |<groupId> suffix, repeatable, asks a remote only for that group and the groups below it, and @<name> splices the chain that jenesis.<name> or the environment variable <name> holds (env MAVEN_REPOSITORY_URI)
                 maven.local||Local Maven cache folder (env MAVEN_REPOSITORY_LOCAL); only the command line or ~/.jenesis/jenesis.properties may set it, never a file a project provides
                 maven.token||Authorization header value for the Maven remotes, sent as given, so it names its scheme, as Bearer <token> or Basic <credentials> (env MAVEN_REPOSITORY_TOKEN); only the command line, ~/.jenesis/jenesis.properties or the environment may name one; a token the environment provides is sent only to the remotes the environment names, a remote a project's own files named is never sent one, and neither is the built-in public repository

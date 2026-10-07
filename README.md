@@ -186,8 +186,10 @@ deliberate step, taken in both scripts at once, in the release that supersedes t
 The workflow builds with `jenesis.project.version` set, then hands `target/stage/maven/output/` to
 [JReleaser](https://jreleaser.org) (`jreleaser.yml`), which signs and uploads to Maven Central, publishes the
 `sdk/jenesis-<version>.zip` and `sdk/jpx-<version>.zip` distributions to Homebrew and Scoop, and cuts the
-matching `v<version>` tag. `project.properties` carries the POM metadata that a module declaration cannot
-express. A further step publishes both archives to SDKMAN itself, against the vendor API at
+matching `v<version>` tag. The GitHub release carries the jar, its POM and its sources and javadoc jars beside
+the archives, each with its signature and its own `.sha256`, so the `maven` template that
+`https://jenesis.build/.well-known/java-repository.properties` publishes can name the release as the artifact's
+location. `project.properties` carries the POM metadata that a module declaration cannot express. A further step publishes both archives to SDKMAN itself, against the vendor API at
 `state.sdkman.io`: it logs in with `SDKMAN_EMAIL` and `SDKMAN_PASSWORD` for a ten-minute token, then posts
 each candidate with its download URL, its SHA-256 and the `lts` and `latest` tags that make it the version
 `sdk install` resolves. The token expires quickly and the archives must already be attached to the release,

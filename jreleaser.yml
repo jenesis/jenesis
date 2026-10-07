@@ -29,10 +29,15 @@ release:
     skipTag: false
     tagName: 'v{{projectVersion}}'
 
+checksum:
+  individual: true
+
 files:
   artifacts:
     - path: 'target/stage/maven/output/build/jenesis/build.jenesis/{{projectVersion}}/build.jenesis-{{projectVersion}}.jar'
+    - path: 'target/stage/maven/output/build/jenesis/build.jenesis/{{projectVersion}}/build.jenesis-{{projectVersion}}.pom'
     - path: 'target/stage/maven/output/build/jenesis/build.jenesis/{{projectVersion}}/build.jenesis-{{projectVersion}}-sources.jar'
+    - path: 'target/stage/maven/output/build/jenesis/build.jenesis/{{projectVersion}}/build.jenesis-{{projectVersion}}-javadoc.jar'
 
 # The packager templates live under distribution/ rather than JReleaser's default
 # src/jreleaser/distributions/, because this project has no src/ tree: the sources are
