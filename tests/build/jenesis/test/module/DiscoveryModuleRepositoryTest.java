@@ -366,6 +366,25 @@ public class DiscoveryModuleRepositoryTest {
     }
 
     @Test
+    public void resolves_through_discovery_alone_where_the_module_remotes_are_empty() throws IOException {
+        server.domain("bytebuddy.net", "module=" + server.files() + "{module}-{version}.{type}")
+                .file("net.bytebuddy-1.0.jar", "fromDomain");
+        Environment environment = new Environment(Map.of("repository.insecure", "true",
+                "module.uri", "",
+                "maven.uri", "",
+                "module.local", local.toString()));
+
+        JenesisRepository repository = JenesisRepository.ofEnvironment(environment,
+                JenesisRepository.Scope.MODULE,
+                server.discovery());
+
+        assertThat(content(repository.fetch(Runnable::run, "net.bytebuddy/1.0"))).isEqualTo("fromDomain");
+        assertThat(repository.fetch(Runnable::run, "com.example/1.0"))
+                .as("an empty jenesis.module.uri leaves no remote to fall back to")
+                .isEmpty();
+    }
+
+    @Test
     public void asks_the_domain_before_the_module_repository_where_discovery_is_given() throws IOException {
         server.domain("bytebuddy.net", "module=" + server.files() + "{module}-{version}.{type}")
                 .file("net.bytebuddy-1.0.jar", "fromDomain")

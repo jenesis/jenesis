@@ -229,6 +229,22 @@ public class DiscoveryMavenRepositoryTest {
     }
 
     @Test
+    public void resolves_through_discovery_alone_where_the_maven_remotes_are_empty() throws IOException {
+        server.domain("bytebuddy.net", "maven=" + server.files() + "maven/")
+                .file("maven/net/bytebuddy/byte-buddy/1.0/byte-buddy-1.0.jar", "fromDomain");
+        Environment environment = new Environment(Map.of("repository.insecure", "true", "maven.uri", ""));
+
+        MavenRepository repository = MavenDefaultRepository.ofEnvironment(environment, server.discovery());
+
+        assertThat(content(repository.fetch(Runnable::run, "net.bytebuddy/byte-buddy/1.0"))).isEqualTo("fromDomain");
+        assertThat(repository.fetch(Runnable::run, "com.example/tool/1.0"))
+                .as("an empty jenesis.maven.uri leaves no remote to fall back to")
+                .isEmpty();
+        assertThat(MavenDefaultRepository.ofEnvironment(environment)
+                .fetch(Runnable::run, "net.bytebuddy/byte-buddy/1.0")).isEmpty();
+    }
+
+    @Test
     public void asks_the_domain_before_the_maven_repository_where_discovery_is_given() throws IOException {
         server.domain("bytebuddy.net", "maven=" + server.files() + "maven/")
                 .file("maven/net/bytebuddy/byte-buddy/1.0/byte-buddy-1.0.jar", "fromDomain")

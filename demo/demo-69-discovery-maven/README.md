@@ -5,7 +5,8 @@ The same lookup as `../demo-68-discovery-module`, for a Maven dependency. A grou
 is a reversed domain as well, so `build.jenesis:build.jenesis` belongs to
 `jenesis.build`, whose file names a Maven location for the group before any Maven
 remote is asked. This demo depends on Jenesis itself through its `pom.xml` and
-downloads the jar from the Jenesis release on GitHub.
+downloads the jar from the Jenesis release on GitHub. Like the module demo, it names
+no Maven remote, so nothing but the domain can answer.
 
 Build and run it
 ----------------
@@ -16,14 +17,16 @@ From this directory:
 
 which prints where each file came from and then what the program found:
 
-    [FETCHED]   https://repo1.maven.org/maven2/build/jenesis/build.jenesis/0.15.4/build.jenesis-0.15.4.pom
     [FETCHED]   https://github.com/jenesis/jenesis/releases/download/v0.15.4/build.jenesis-0.15.4.jar
     jenesis-make from build.jenesis-0.15.4.jar
 
-A file the location does not hold is asked of the Maven remotes, and the 0.15.4
-release attaches no POM, so the POM still comes from Maven Central; a release that
-attaches its POM serves both. Each download is checked against the pin in
-`pom.xml`. As in the module demo, a pinned jar is reused from `.jenesis/artifacts/`
+`jenesis.properties` empties `jenesis.maven.uri` and `jenesis.module.uri`, which
+name no remote at all, so a file the location does not hold is found nowhere -
+there is no fallback. The 0.15.4 release attaches no POM, so the dependency is
+resolved without one, as an artifact without dependencies of its own; a release that
+attaches its POM serves that as well. Remove the two lines and what the location
+does not hold comes from Maven Central again. Each download is checked against the
+pin in `pom.xml`. As in the module demo, a pinned jar is reused from `.jenesis/artifacts/`
 once downloaded; delete that folder and `target/` to watch the download again.
 
 Layout
@@ -31,7 +34,7 @@ Layout
 
     demo/demo-69-discovery-maven
     |-- build/jenesis          symlink to ../../../sources/build/jenesis
-    |-- jenesis.properties     jenesis.repository.discover=true
+    |-- jenesis.properties     discovery on, and no repository
     |-- pom.xml                depends on build.jenesis:build.jenesis:0.15.4, pinned
     `-- sources
         `-- demo/discovery/Tools.java    prints the jenesis-make tool and the jar it came from

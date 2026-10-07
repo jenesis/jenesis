@@ -7,7 +7,8 @@ discovery switched on Jenesis reads a small file that the domain publishes befor
 it asks any module repository. This demo requires Jenesis itself and builds on the
 module path alone: `jenesis.build` says where the module's jar is - the Jenesis
 release on GitHub - so the module resolves without the module repository
-`../demo-67-module-convention` resolved from, and without Maven.
+`../demo-67-module-convention` resolved from, and without Maven. The demo names no
+repository at all, so nothing but the domain can answer.
 
 Build and run it
 ----------------
@@ -21,7 +22,12 @@ which prints where each file came from and then what the program found:
     [FETCHED]   https://github.com/jenesis/jenesis/releases/download/v0.15.4/build.jenesis-0.15.4.jar
     jenesis-make from build.jenesis-0.15.4.jar
 
-One file is downloaded, the module's jar, straight from the release. The jar is
+One file is downloaded, the module's jar, straight from the release, and nothing
+else is asked: `jenesis.properties` empties `jenesis.maven.uri` and
+`jenesis.module.uri`, which name no remote at all, so what the domain does not
+answer is found nowhere - there is no fallback. Remove those two lines and a module
+the domain does not answer for resolves from Maven Central and `repo.jenesis.build`
+again, as it would without discovery. The jar is
 checked against the pin in `module-info.java` as any download is, so the domain
 chooses where a module comes from but never what it is. A pinned module that was
 downloaded once is reused from `.jenesis/artifacts/` without asking anyone; delete
@@ -32,7 +38,7 @@ Layout
 
     demo/demo-68-discovery-module
     |-- build/jenesis          symlink to ../../../sources/build/jenesis
-    |-- jenesis.properties     jenesis.repository.discover=true, jenesis.project.layout=modular
+    |-- jenesis.properties     discovery on, the modular layout, and no repository
     `-- sources
         |-- module-info.java             module demo.discovery.module { requires build.jenesis; }
         `-- demo/discovery/Tools.java    prints the jenesis-make tool and the jar it came from
@@ -41,9 +47,13 @@ Switching it on
 ---------------
 
 Discovery is used only where you switch it on, in `jenesis.properties` as here or on
-the command line:
+the command line. This demo's file switches it on, builds on the module path, and
+names no repository beside it:
 
     jenesis.repository.discover=true
+    jenesis.project.layout=modular
+    jenesis.maven.uri=
+    jenesis.module.uri=
 
 Every module and every Maven group the build resolves is then looked up first, and
 one whose domain publishes nothing resolves exactly as it would without the setting.
@@ -115,12 +125,11 @@ default - asks `moduletomaven` first. Run the demo that way:
 
     java -Djenesis.project.layout=modular_to_maven -Djenesis.print.fetch=true build/jenesis/Execute.java
 
-and the module resolves as the Maven artifact it is mapped to, its POM from Maven
-Central, since the 0.15.4 release attaches none, and its jar from the release:
-
-    [FETCHED]   https://repo1.maven.org/maven2/build/jenesis/build.jenesis/0.15.4/build.jenesis-0.15.4.pom
-    [FETCHED]   https://github.com/jenesis/jenesis/releases/download/v0.15.4/build.jenesis-0.15.4.jar
-    jenesis-make from build.jenesis-0.15.4.jar
+and the module resolves as the Maven artifact it is mapped to, `build.jenesis:build.jenesis`,
+whose POM is read before its jar. The `maven` key names where both are, so a release
+that attaches its POM serves the module whole. One that does not fails the build with
+`No POM found for build.jenesis`, since no Maven remote is left to ask - with
+`jenesis.maven.uri` back at its default, the POM would come from Maven Central.
 
 A key that does not answer leaves the request to the other: a template without a
 `module.latest` cannot name the newest release, so a module asked for without a
