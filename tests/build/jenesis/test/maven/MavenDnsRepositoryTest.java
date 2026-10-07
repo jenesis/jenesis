@@ -6,6 +6,7 @@ import build.jenesis.Environment;
 import build.jenesis.RepositoryItem;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenDnsRepository;
+import build.jenesis.maven.MavenRepository;
 import build.jenesis.test.DnsServer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,16 +62,12 @@ public class MavenDnsRepositoryTest {
     public void leaves_a_version_below_the_floor_of_the_record_to_the_maven_remotes() throws IOException {
         dns.record("_java.bytebuddy.net", "\"maven=" + dns.files() + "maven/ since=1.2.3\"")
                 .file("maven/net/bytebuddy/byte-buddy/1.2.2/byte-buddy-1.2.2.jar", "old")
-                .file("maven/net/bytebuddy/byte-buddy/1.2.3/byte-buddy-1.2.3.jar", "floor")
-                .file("maven/net/bytebuddy/byte-buddy/maven-metadata.xml", "<metadata/>");
+                .file("maven/net/bytebuddy/byte-buddy/1.2.3/byte-buddy-1.2.3.jar", "floor");
 
         MavenDnsRepository repository = repository();
 
         assertThat(repository.fetch(Runnable::run, "net.bytebuddy/byte-buddy/1.2.2")).isEmpty();
         assertThat(content(repository.fetch(Runnable::run, "net.bytebuddy/byte-buddy/1.2.3"))).isEqualTo("floor");
-        assertThat(content(repository.fetchMetadata(Runnable::run, "net.bytebuddy", "byte-buddy", null)))
-                .as("the metadata names no single version, so the floor does not withhold it")
-                .isEqualTo("<metadata/>");
     }
 
     @Test
@@ -133,6 +130,49 @@ public class MavenDnsRepositoryTest {
     }
 
     @Test
+    public void merges_the_metadata_of_a_location_with_that_of_the_maven_remotes() throws IOException {
+        dns.record("_java.bytebuddy.net", "\"maven=" + dns.files() + "dns/\"")
+                .file("dns/net/bytebuddy/byte-buddy/maven-metadata.xml", metadata("2.0", "2.0", "20260201000000",
+                        "2.0"))
+                .file("central/net/bytebuddy/byte-buddy/maven-metadata.xml", metadata("1.1", "1.1", "20260101000000",
+                        "1.0", "1.1"));
+        Map<String, String> settings = Map.of("repository.insecure", "true",
+                "dns.enabled", "true",
+                "dns.uri", dns.resolver().toString(),
+                "maven.uri", dns.files() + "central/",
+                "maven.local", local.toString());
+
+        String merged = content(MavenDefaultRepository.ofEnvironment(new Environment(settings))
+                .fetchMetadata(Runnable::run, "net.bytebuddy", "byte-buddy", null));
+
+        assertThat(merged)
+                .as("the versions of both are listed, in Maven's order, and the newest of each is the newest")
+                .contains("<versions><version>1.0</version><version>1.1</version><version>2.0</version></versions>")
+                .contains("<latest>2.0</latest>")
+                .contains("<release>2.0</release>")
+                .contains("<lastUpdated>20260201000000</lastUpdated>");
+    }
+
+    @Test
+    public void lists_only_the_versions_a_record_admits_in_the_metadata_of_its_location() throws IOException {
+        dns.record("_java.bytebuddy.net", "\"maven=" + dns.files() + "dns/ since=1.5\"")
+                .file("dns/net/bytebuddy/byte-buddy/maven-metadata.xml", metadata("2.0", "2.0", null,
+                        "1.0", "2.0"));
+
+        String admitted = content(repository().fetchMetadata(Runnable::run, "net.bytebuddy", "byte-buddy", null));
+
+        assertThat(admitted).contains("<version>2.0</version>").doesNotContain("<version>1.0</version>");
+    }
+
+    @Test
+    public void takes_the_metadata_of_the_overlay_alone_where_a_checksum_is_asked_for() throws IOException {
+        MavenRepository overlay = new MetadataRepository("overlay"), underlying = new MetadataRepository("underlying");
+
+        assertThat(content(underlying.overlay(overlay).fetchMetadata(Runnable::run, "g", "a", "sha1")))
+                .isEqualTo("overlay");
+    }
+
+    @Test
     public void returns_empty_where_no_record_exists() throws IOException {
         assertThat(repository().fetch(Runnable::run, "net.bytebuddy/byte-buddy/1.0")).isEmpty();
         assertThat(repository().fetchMetadata(Runnable::run, "net.bytebuddy", "byte-buddy", null)).isEmpty();
@@ -177,6 +217,38 @@ public class MavenDnsRepositoryTest {
         assertThat(item).isPresent();
         try (InputStream inputStream = item.orElseThrow().toInputStream()) {
             return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private static String metadata(String latest, String release, String lastUpdated, String... versions) {
+        return "<metadata><groupId>net.bytebuddy</groupId><artifactId>byte-buddy</artifactId><versioning>"
+                + "<latest>" + latest + "</latest><release>" + release + "</release><versions>"
+                + Arrays.stream(versions)
+                        .map(version -> "<version>" + version + "</version>")
+                        .collect(Collectors.joining())
+                + "</versions>" + (lastUpdated == null ? "" : "<lastUpdated>" + lastUpdated + "</lastUpdated>")
+                + "</versioning></metadata>";
+    }
+
+    private record MetadataRepository(String content) implements MavenRepository {
+
+        @Override
+        public Optional<RepositoryItem> fetch(Executor executor,
+                                              String groupId,
+                                              String artifactId,
+                                              String version,
+                                              String type,
+                                              String classifier,
+                                              String checksum) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<RepositoryItem> fetchMetadata(Executor executor,
+                                                      String groupId,
+                                                      String artifactId,
+                                                      String checksum) {
+            return Optional.of(() -> new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
         }
     }
 }

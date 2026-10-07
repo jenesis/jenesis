@@ -55,8 +55,9 @@ The location takes the same two forms as a module's:
     a version range is resolved by the Maven remotes alone.
   * a **root**, a URI without placeholders, is a traditional Maven repository: Maven
     Central, a Nexus or Artifactory, or a folder on GitHub Pages in the Maven
-    layout. It is read as `jenesis.maven.uri` reads a remote, with its metadata, its
-    checksums and your local Maven repository:
+    layout. It is read as `jenesis.maven.uri` reads a remote, with its checksums and
+    your local Maven repository, and its metadata is merged with that of the Maven
+    remotes, so a version range or the newest release sees the versions of both:
 
         _java.example.com. TXT "maven=https://maven.example.com/releases/"
 

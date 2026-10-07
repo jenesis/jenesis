@@ -130,6 +130,39 @@ public interface MavenRepository extends Repository {
         };
     }
 
+    default MavenRepository overlay(MavenRepository repository) {
+        MavenRepository prepended = prepend(repository);
+        return new MavenRepository() {
+            @Override
+            public Optional<RepositoryItem> fetch(Executor executor,
+                                                  String groupId,
+                                                  String artifactId,
+                                                  String version,
+                                                  String type,
+                                                  String classifier,
+                                                  String checksum) throws IOException {
+                return prepended.fetch(executor, groupId, artifactId, version, type, classifier, checksum);
+            }
+
+            @Override
+            public Optional<RepositoryItem> fetchMetadata(Executor executor,
+                                                          String groupId,
+                                                          String artifactId,
+                                                          String checksum) throws IOException {
+                if (checksum != null) {
+                    return prepended.fetchMetadata(executor, groupId, artifactId, checksum);
+                }
+                RepositoryItem overlaid = repository.fetchMetadata(executor, groupId, artifactId, null).orElse(null);
+                RepositoryItem underlying = MavenRepository.this.fetchMetadata(executor, groupId, artifactId, null)
+                        .orElse(null);
+                if (overlaid == null || underlying == null) {
+                    return Optional.ofNullable(overlaid == null ? underlying : overlaid);
+                }
+                return Optional.of(MavenMetadata.of(overlaid).merge(MavenMetadata.of(underlying)).toItem());
+            }
+        };
+    }
+
     @Override
     default MavenRepository spilled(Path folder) {
         return new MavenRepository() {

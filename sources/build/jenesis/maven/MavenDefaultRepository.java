@@ -47,7 +47,7 @@ public class MavenDefaultRepository implements MavenRepository {
             throw new IllegalStateException("No Maven repository is configured by: " + text);
         }
         return environment.flag("dns.enabled")
-                ? repository.prepend(MavenDnsRepository.ofEnvironment(environment))
+                ? repository.overlay(MavenDnsRepository.ofEnvironment(environment))
                 : repository;
     }
 

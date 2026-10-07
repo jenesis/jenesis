@@ -99,9 +99,16 @@ public class MavenDnsRepository implements MavenRepository {
                                                   String artifactId,
                                                   String checksum) throws IOException {
         DnsLocation location = dns.lookup(groupId, "maven").orElse(null);
-        return location == null || location.template()
-                ? Optional.empty()
-                : repository(location.root(connection)).fetchMetadata(executor, groupId, artifactId, checksum);
+        if (location == null || location.template()) {
+            return Optional.empty();
+        }
+        Optional<RepositoryItem> metadata = repository(location.root(connection))
+                .fetchMetadata(executor, groupId, artifactId, checksum);
+        if (metadata.isEmpty() || checksum != null || location.since() == null && location.suffixes() == null) {
+            return metadata;
+        }
+        MavenMetadata admitted = MavenMetadata.of(metadata.get()).filter(location::admits);
+        return admitted.versions().isEmpty() ? Optional.empty() : Optional.of(admitted.toItem());
     }
 
     private MavenRepository repository(URI root) {
