@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>build.jenesis.demo</groupId>
+    <artifactId>dns-maven</artifactId>
+    <version>1.0.0</version>
+
+    <properties>
+        <mainClass>demo.dns.Tools</mainClass>
+    </properties>
+
+    <build>
+        <sourceDirectory>sources</sourceDirectory>
+    </build>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>build.jenesis</groupId>
+                <artifactId>build.jenesis</artifactId>
+                <version>0.15.4</version>
+                <!--Checksum/SHA-256/4cc814b3d08839e137b82fb84559381cb1945afdc210964db880051686616236-->
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>build.jenesis</groupId>
+            <artifactId>build.jenesis</artifactId>
+            <version>0.15.4</version>
+        </dependency>
+    </dependencies>
+</project>

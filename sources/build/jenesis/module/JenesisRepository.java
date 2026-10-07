@@ -100,13 +100,16 @@ public interface JenesisRepository extends Repository {
 
     static JenesisRepository ofEnvironment(Environment environment, Scope scope) {
         String source = environment.value("module.source", "service");
-        return switch (source) {
+        JenesisRepository repository = switch (source) {
             case "service" -> JenesisModuleRepository.ofEnvironment(environment, scope);
             case "git" -> JenesisRawGitRepository.ofEnvironment(environment, scope);
             default -> throw new IllegalArgumentException("Unknown jenesis.module.source '"
                     + source
                     + "', expected 'service' for repo.jenesis.build or 'git' for the published index");
         };
+        return environment.flag("dns.enabled")
+                ? repository.prepend(JenesisDnsRepository.ofEnvironment(environment, scope))
+                : repository;
     }
 
     static JenesisRepository of(Repository repository) {

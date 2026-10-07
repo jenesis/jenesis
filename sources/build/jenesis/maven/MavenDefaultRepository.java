@@ -46,7 +46,9 @@ public class MavenDefaultRepository implements MavenRepository {
         if (repository == null) {
             throw new IllegalStateException("No Maven repository is configured by: " + text);
         }
-        return repository;
+        return environment.flag("dns.enabled")
+                ? repository.prepend(MavenDnsRepository.ofEnvironment(environment))
+                : repository;
     }
 
     public static MavenRepository of(URI repository, String token) {
@@ -63,7 +65,7 @@ public class MavenDefaultRepository implements MavenRepository {
                 environment.flag("print.fetch") ? environment.out() : null);
     }
 
-    private static Path localRepository(Environment environment) {
+    static Path localRepository(Environment environment) {
         String override = environment.getProperty("maven.local", System.getenv("MAVEN_REPOSITORY_LOCAL"));
         if (override == null) {
             Path candidate = Path.of(System.getProperty("user.home"), ".m2", "repository");
@@ -81,21 +83,25 @@ public class MavenDefaultRepository implements MavenRepository {
                                           Path local,
                                           String token,
                                           Consumer<String> printing) {
-        SequencedMap<String, URI> validations = new LinkedHashMap<>();
-        validations.put("SHA512", uri);
-        validations.put("SHA256", uri);
-        validations.put("SHA1", uri);
         Palette palette = Palette.ofEnvironment(environment);
         return ofEnvironment(environment,
                 uri,
                 local,
-                Collections.unmodifiableMap(validations),
+                validations(uri),
                 printing == null ? null : path -> printing.accept("%s%-11s%s %s".formatted(
                         palette.info(),
                         "[FETCHED]",
                         palette.reset(),
                         uri.resolve(path))),
                 token);
+    }
+
+    static Map<String, URI> validations(URI uri) {
+        SequencedMap<String, URI> validations = new LinkedHashMap<>();
+        validations.put("SHA512", uri);
+        validations.put("SHA256", uri);
+        validations.put("SHA1", uri);
+        return Collections.unmodifiableMap(validations);
     }
 
     private static MavenRepository chain(Environment environment,

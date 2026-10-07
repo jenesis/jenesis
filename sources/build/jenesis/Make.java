@@ -16,6 +16,8 @@ public final class Make {
     private static final List<String> SHARED = List.of("jenesis.cache.uri",
             "jenesis.maven.local",
             "jenesis.module.local",
+            "jenesis.dns.uri",
+            "jenesis.dns.secure",
             "jenesis.sigstore.uri",
             "jenesis.sigstore.issuers");
     private static final List<String> CONFINED = List.of("jenesis.project.target",
