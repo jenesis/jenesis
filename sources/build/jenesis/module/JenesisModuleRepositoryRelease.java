@@ -86,6 +86,10 @@ public class JenesisModuleRepositoryRelease implements BuildStep {
                                                   BuildStepContext context,
                                                   SequencedMap<String, BuildStepArgument> arguments)
             throws IOException {
+        if (connection.offline()) {
+            throw new IllegalStateException("Cannot release to " + repository
+                    + " while offline (unset -Djenesis.repository.offline to release)");
+        }
         if ("http".equals(repository.getScheme()) && !connection.insecure()) {
             throw new IllegalStateException("Refusing to release over insecure scheme 'http': "
                     + repository

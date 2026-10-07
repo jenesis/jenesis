@@ -40,7 +40,9 @@ public interface BuildExecutor {
             } else {
                 URI uri = URI.create(location);
                 cache = switch (uri.getScheme() == null ? "" : uri.getScheme()) {
-                    case "http", "https" -> Repository.Origin.of(environment, "cache.uri") == Repository.Origin.PROJECT
+                    case "http", "https" -> environment.flag("repository.offline")
+                            ? null
+                            : Repository.Origin.of(environment, "cache.uri") == Repository.Origin.PROJECT
                             ? BuildExecutorHttpCache.ofEnvironment(environment, uri).key(null)
                             : BuildExecutorHttpCache.ofEnvironment(environment, uri);
                     case "file" -> new BuildExecutorFileCache(Path.of(uri));

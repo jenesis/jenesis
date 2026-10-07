@@ -133,6 +133,16 @@ public class DiscoveryTest {
     }
 
     @Test
+    public void asks_no_domain_while_offline() throws IOException {
+        server.domain("bytebuddy.net", "maven=https://maven/");
+
+        assertThat(server.discovery()
+                .connection(server.connection().offline(true))
+                .lookup("net.bytebuddy", "maven")).isEmpty();
+        assertThat(server.queried()).isEmpty();
+    }
+
+    @Test
     public void refuses_a_latest_file_beside_a_root_or_a_coordinate() {
         server.domain("bytebuddy.net", "maven=https://maven/", "maven.latest=https://maven/latest")
                 .domain("jenesis.build", "moduletomaven=build.jenesis:{module}", "moduletomaven.latest=https://x/v");
