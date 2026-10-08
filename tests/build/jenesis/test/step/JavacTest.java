@@ -618,6 +618,40 @@ public class JavacTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
+    public void a_failure_is_reproduced_from_an_argument_file(boolean process) throws IOException {
+        Files.writeString(Files.createDirectories(sources.resolve("process")).resolve("javac.properties"),
+                "--source-path=a b (c)\n");
+        Files.writeString(Files.createDirectories(sources.resolve(BuildStep.SOURCES + "sample")).resolve("Main.java"), """
+                package sample;
+                public class Main {
+                    Missing missing;
+                }
+                """);
+
+        assertThatThrownBy(() -> new Javac(process ? ProcessHandler.Factory.FORK : ProcessHandler.Factory.TOOL).apply(
+                Runnable::run,
+                new BuildStepContext(previous, next, supplement),
+                new LinkedHashMap<>(Map.of("sources", new BuildStepArgument(
+                        sources,
+                        Map.of(Path.of("sources/sample/Main.java"), Checksum.of(ChecksumStatus.ADDED))))))
+                .toCompletableFuture()
+                .join())
+                .rootCause()
+                .as("the sources and options go into a file, so the line stays short and the errors readable")
+                .hasMessageContaining("@" + supplement.resolve("reproduce.args"))
+                .hasMessageNotContaining("a b (c)")
+                .hasMessageContaining("cannot find symbol");
+        assertThat(Files.readAllLines(supplement.resolve("reproduce.args"))).contains("\"a b (c)\"");
+        StringWriter errors = new StringWriter();
+        int code = ToolProvider.findFirst("javac").orElseThrow().run(new PrintWriter(Writer.nullWriter()),
+                new PrintWriter(errors),
+                "@" + supplement.resolve("reproduce.args"));
+        assertThat(code).isNotZero();
+        assertThat(errors.toString()).contains("Main.java:3: error: cannot find symbol");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
     public void modular_compilation_does_not_reach_a_class_path_dependency(boolean process)
             throws IOException {
         plainJar(Files.createDirectories(root.resolve("library")).resolve("plain.jar"));

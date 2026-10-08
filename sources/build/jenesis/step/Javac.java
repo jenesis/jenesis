@@ -528,7 +528,9 @@ public class Javac extends ProcessBuildStep {
                     String errorString = Files.exists(error) ? Files.readString(error) : "";
                     future.completeExceptionally(new IllegalStateException(
                             "Unexpected exit code: " + exitCode + " (multi-release " + release + ")\n"
-                                    + "To reproduce, execute:\n " + String.join(" ", handler.commands())
+                                    + "To reproduce, execute:\n "
+                                    + reproduction(context.supplement().resolve("reproduce-" + release + ".args"),
+                                            handler.commands())
                                     + (outputString.isBlank() ? "" : ("\n\nOutput:\n" + outputString))
                                     + (errorString.isBlank() ? "" : ("\n\nError:\n" + errorString))));
                 }

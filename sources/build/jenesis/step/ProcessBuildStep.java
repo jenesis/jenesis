@@ -15,6 +15,8 @@ public abstract class ProcessBuildStep implements BuildStep {
     public static final String PROCESS = "process/", ENVIRONMENT = "environment/";
     protected static final Charset NATIVE_ENCODING = nativeEncoding();
     private static final ConcurrentMap<Integer, Semaphore> PERMITS = new ConcurrentHashMap<>();
+    private static final Set<String> ARGUMENT_FILES = Set.of("jar", "javac", "javadoc", "jdeps", "jlink", "jmod", "jpackage");
+    private static final Pattern UNQUOTED = Pattern.compile("[A-Za-z0-9_@%+=:,./-]+");
 
     static {
         if (System.getProperty("java.home") == null) {
@@ -253,7 +255,8 @@ public abstract class ProcessBuildStep implements BuildStep {
                             String outputString = Files.exists(output) ? new String(Files.readAllBytes(output), NATIVE_ENCODING) : "";
                             String errorString = Files.exists(error) ? new String(Files.readAllBytes(error), NATIVE_ENCODING) : "";
                             throw new IllegalStateException("Unexpected exit code: " + exitCode + "\n"
-                                    + "To reproduce, execute:\n " + String.join(" ", handler.commands())
+                                    + "To reproduce, execute:\n "
+                                    + reproduction(context.supplement().resolve("reproduce.args"), handler.commands())
                                     + (outputString.isBlank() ? "" : ("\n\nOutput:\n" + outputString))
                                     + (errorString.isBlank() ? "" : ("\n\nError:\n" + errorString)));
                         }
@@ -278,6 +281,27 @@ public abstract class ProcessBuildStep implements BuildStep {
             }
         });
         return result;
+    }
+
+    protected String reproduction(Path file, List<String> commands) throws IOException {
+        List<String> moved = new ArrayList<>(), kept = new ArrayList<>();
+        for (String argument : commands.subList(1, commands.size())) {
+            (argument.startsWith("@") ? kept : moved).add(argument);
+        }
+        if (!ARGUMENT_FILES.contains(command) || moved.isEmpty()) {
+            return shell(commands);
+        }
+        List<String> line = new ArrayList<>();
+        line.add(commands.getFirst());
+        line.add("@" + argumentFile(file, moved));
+        line.addAll(kept);
+        return shell(line);
+    }
+
+    protected static String shell(List<String> words) {
+        return words.stream()
+                .map(word -> UNQUOTED.matcher(word).matches() ? word : "'" + word.replace("'", "'\\''") + "'")
+                .collect(Collectors.joining(" "));
     }
 
     public static List<String> argumentFile(Path file, SequencedMap<String, String> options) throws IOException {
