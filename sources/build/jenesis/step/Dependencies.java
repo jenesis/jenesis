@@ -289,8 +289,12 @@ public class Dependencies implements BuildExecutorModule {
                 }
                 Path bomsFile = argument.folder().resolve(BOMS);
                 if (Files.exists(bomsFile)) {
+                    boolean resolution = Files.exists(argument.folder().resolve(DEPENDENCIES));
                     SequencedProperties properties = SequencedProperties.ofFiles(bomsFile);
                     for (String key : properties.stringPropertyNames()) {
+                        if (resolution && !key.startsWith("entry/")) {
+                            continue;
+                        }
                         String reference = key.startsWith("bom/")
                                 ? key.substring(4)
                                 : key.startsWith("entry/") ? key.substring(6) : null;
