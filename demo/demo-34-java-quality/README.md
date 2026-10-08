@@ -161,7 +161,10 @@ Pinning
 
 Each tool resolves in its own group (`checkstyle`, `pmd`, `spotbugs`,
 `google-java-format`), kept separate from the module's `main`-group
-dependencies, and floats a `RELEASE` version until pinned. Running
+dependencies, and floats a `RELEASE` version until pinned. The `dependencies`
+selector therefore shows none of them as a dependency of the module;
+`-Djenesis.tree.tools=true` prints each tool's closure apart, under a heading
+naming its group. Running
 `java build/jenesis/Make.java pin` records every resolved tool jar with its
 `SHA-256` into `@jenesis.pin` tags, exactly as the other demos pin their
 compilers. These closures are large (PMD's CLI bundle alone pulls in well over a

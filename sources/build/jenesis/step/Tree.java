@@ -16,10 +16,10 @@ public class Tree implements BuildStep {
 
     private final transient Consumer<String> out;
     private final transient Palette palette;
-    private final transient boolean compact, merged, internal, tests;
+    private final transient boolean compact, merged, internal, tests, tools;
 
     public Tree() {
-        this(null, Palette.NONE, false, true, false, true);
+        this(null, Palette.NONE, false, true, false, true, false);
     }
 
     public static Tree ofEnvironment(Environment environment) {
@@ -28,7 +28,8 @@ public class Tree implements BuildStep {
                 false,
                 environment.flag("tree.merge", true),
                 environment.flag("tree.internal", false),
-                environment.flag("tree.tests", true));
+                environment.flag("tree.tests", true),
+                environment.flag("tree.tools", false));
         String format = environment.getProperty("tree.format");
         return format == null ? tree : tree.compact(switch (format) {
             case "full" -> false;
@@ -43,33 +44,39 @@ public class Tree implements BuildStep {
                  boolean compact,
                  boolean merged,
                  boolean internal,
-                 boolean tests) {
+                 boolean tests,
+                 boolean tools) {
         this.out = out;
         this.palette = palette;
         this.compact = compact;
         this.merged = merged;
         this.internal = internal;
         this.tests = tests;
+        this.tools = tools;
     }
 
     public Tree printing(Consumer<String> out, Palette palette) {
-        return new Tree(out, palette, compact, merged, internal, tests);
+        return new Tree(out, palette, compact, merged, internal, tests, tools);
     }
 
     public Tree compact(boolean compact) {
-        return new Tree(out, palette, compact, merged, internal, tests);
+        return new Tree(out, palette, compact, merged, internal, tests, tools);
     }
 
     public Tree merged(boolean merged) {
-        return new Tree(out, palette, compact, merged, internal, tests);
+        return new Tree(out, palette, compact, merged, internal, tests, tools);
     }
 
     public Tree internal(boolean internal) {
-        return new Tree(out, palette, compact, merged, internal, tests);
+        return new Tree(out, palette, compact, merged, internal, tests, tools);
     }
 
     public Tree tests(boolean tests) {
-        return new Tree(out, palette, compact, merged, internal, tests);
+        return new Tree(out, palette, compact, merged, internal, tests, tools);
+    }
+
+    public Tree tools(boolean tools) {
+        return new Tree(out, palette, compact, merged, internal, tests, tools);
     }
 
     @Override
@@ -150,8 +157,10 @@ public class Tree implements BuildStep {
                     String name = scope.equals("runtime") ? group : groupScope;
                     layered.put(name, resolution);
                     layers.put(name, declarations.getOrDefault(group.substring("layer:".length()), key));
-                } else {
+                } else if (key == null || tools || group.equals("main")) {
                     groups.computeIfAbsent(group, _ -> new TreeMap<>()).put(scope, resolution);
+                } else {
+                    return;
                 }
                 aggregated.putAll(resolution.vertices());
             });
@@ -166,7 +175,8 @@ public class Tree implements BuildStep {
                     merged.putAll(layered);
                     report.render(merged, key, root, layers);
                 } else {
-                    report.render(scopes, key, root);
+                    report.render("Group " + group + ", resolved to build "
+                            + (version == null ? key : key + " " + version) + ":", scopes);
                 }
             });
         }
