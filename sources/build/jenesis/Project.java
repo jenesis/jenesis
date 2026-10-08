@@ -785,7 +785,18 @@ public record Project(
                       sdk install jenesis && jenesis-init            the same through SDKMAN
 
                     The build runs on JDK 25 or newer and needs nothing else; the release it compiles
-                    for is a setting of its own, so an older target is no obstacle.
+                    for is a setting of its own, so an older target is no obstacle. Commit
+                    build/jenesis and ignore what a build writes:
+
+                      target/        every step's output; Maven's own target/ is the same folder
+                      .jenesis/      the compiled engine and the artifacts a build fetched
+
+                    A .gitignore line `build` or `build/`, common where Gradle ran, also hides
+                    build/jenesis, and git cannot re-include a file below an ignored folder: write
+                    `/build/*` and `!/build/jenesis/` instead. Gradle's own output is build/ as well,
+                    so `gradle clean` deletes build/jenesis; and `mvn` writes into the target/ this
+                    build reads. Run the old build in a second checkout (`git worktree add`) while
+                    both exist.
 
                     ## 2. Keep or write the build declaration
 
@@ -795,8 +806,9 @@ public record Project(
                     read: write a pom.xml per project, which needs only coordinates, dependencies with
                     their scopes and maven.compiler.release, or a module-info.java per module, which
                     the modular_to_maven layout builds and generates the published POM for. Take
-                    module-info.java where the code is already a named module; skill/layout has the
-                    rest.
+                    module-info.java where the code is already a named module whose tests live in a
+                    module of their own; where the tests share the main packages, as most do, keep a
+                    pom.xml, whose tests run on the class path. skill/layout has the rest.
 
                     ## 3. Know what a pom.xml keeps
 
@@ -808,27 +820,39 @@ public record Project(
                                  maven.compiler.release and maven.compiler.enablePreview; name,
                                  description, url, licenses, developers, organization and scm of the
                                  module's own POM; sourceDirectory, testSourceDirectory and the
-                                 resource directories
+                                 <directory> of each resource
                       ignored    <build><plugins> and <pluginManagement>, <profiles>, <repositories>
-                                 and settings.xml, resource filtering, maven.compiler.source and
-                                 target, system scope, and every packaging but jar - a pom aggregator
-                                 is followed for its modules, a war is not built at all
+                                 and settings.xml, a resource's includes, excludes, targetPath and
+                                 filtering, maven.compiler.source, target and testRelease, system
+                                 scope, the profiles of a dependency's POM, and every packaging but jar
+                                 - a pom aggregator is followed for its modules, a war is not built
+                                 at all, and a src/test/java/module-info.java is a module of its own
+                                 rather than patched into the main one
 
                     Nothing ignored is reported, so list the old build's plugins, profiles and
                     repositories before deleting anything: each needs an answer in step 4.
+                    Metadata a parent outside the project declares (url, scm, developers) goes into
+                    project.properties at the root, which skill/target lists the keys of.
 
                     ## 4. Replace each plugin
 
                     Look every plugin up in skill/registry. Most become a file that switches a
                     built-in tool on, a line of packaging.properties, a @jenesis tag or <!--jenesis-->
-                    comment, or a -Djenesis.* setting; copy the demo it names. Configuration that
-                    lived inside a plugin moves here:
+                    comment, or a -Djenesis.* setting; copy the demo it names. Such a file sits in a
+                    configuration location of the module: in the maven layout <module>/build.jenesis/
+                    for both halves, src/main/build.jenesis/ for the main code alone and
+                    src/test/build.jenesis/ for the tests alone, and build.jenesis/ at the root for
+                    every module. Configuration that lived inside a plugin moves here:
 
                       compilerArgs, options.compilerArgs   process-javac.properties
                       annotationProcessorPaths             @jenesis.plugin, or <type>processor</type>
                       surefire includes and groups         -Djenesis.test.filter, -Djenesis.test.tag
+                      surefire excludes                    a negative look-ahead in the filter,
+                                                           ^(?!.*IntegrationTest$).*
                       argLine, jvmArgs of the tests        process-test.properties
                       environment of the tests             environment-test.properties
+                      a resource outside the resource      -Djenesis.project.resources=
+                      folders, or with a targetPath          <file>:<path in the jar>
                       <profiles>, Gradle properties        jenesis.properties and a
                                                            jenesis-<profile>.properties each, selected
                                                            with -Djenesis.make.profiles
@@ -836,6 +860,21 @@ public record Project(
                                                            its credential, jenesis.maven.token, never
                                                            in a file the project provides
                       a toolchain                          -Djenesis.toolchain.version
+
+                    A process-<tool>.properties line is a flag and its argument, `--release=17`, and a
+                    bare flag has an empty value, `-parameters=`. A flag that holds a `:` or `=` escapes
+                    it, since a properties file splits there: `-Xlint\\:all=`. javac runs without -g, where
+                    Maven and Gradle pass it, so a test reading parameter or local names needs `-g=`
+                    or `-parameters=`. A key of jenesis.properties keeps its prefix,
+                    `jenesis.test.tag=-slow`, as `configuration` prints it.
+
+                    jenesis.test.filter matches the whole class name and replaces the default naming
+                    (Test*, *Test, *Tests, *TestCase, IT*, *IT, *ITCase, never a nested class); a
+                    <module>/<regex> entry reaches that module only, and a module no entry reaches
+                    runs no tests. The tests run against the module's jar, so a test that turns
+                    getResource into a java.io.File fails; read the resource as a stream. A build prints
+                    no test totals: -Djenesis.print.tests streams the runner's summary, and the test
+                    step's supplement/output keeps it.
 
                     A plugin the registry marks as having no built-in is either something done
                     differently here, which the line names, or a plugin to write: skill/extend.
@@ -1270,9 +1309,12 @@ public record Project(
                 case "tools" -> """
                     # Jenesis - Activate a tool
 
-                    A file in the module's build.jenesis location (its META-INF/build.jenesis/ folder
-                    plus the project configuration locations) activates the feature; its contents
-                    configure it. Generators read their inputs from META-INF/build.jenesis/ in the
+                    A file in one of the module's configuration locations activates the feature; its
+                    contents configure it. In the modular layouts that is the META-INF/build.jenesis/
+                    folder of the module's sources, in the maven layout <module>/build.jenesis/ for both
+                    halves of a pom, src/main/build.jenesis/ for its main code and
+                    src/test/build.jenesis/ for its tests, and in every layout build.jenesis/ at the
+                    project root, which reaches every module. Generators read their inputs from META-INF/build.jenesis/ in the
                     sources, which the compiler never copies into the artifact, unless folders=<paths>
                     names other folders; each reads only the file kinds it compiles.
 
@@ -1329,9 +1371,13 @@ public record Project(
                                                 META-INF/services file per provides clause, checking
                                                 each provider can be created there, and
                                                 Enable-Native-Access for a module granting itself
-                      process-<tool>.properties extra arguments for a forked tool (javac, javadoc, jar,
-                                                jlink, jpackage, ...); process-test.properties targets
-                                                the test JVM, merged over process-java.properties
+                      process-<tool>.properties extra arguments for a forked JDK tool (javac, javadoc,
+                                                jar, jlink, jpackage, ...), one flag per key and its
+                                                argument as the value, `-parameters=` for a bare one
+                                                and `-Xlint\\:all=` where the flag holds a : or =;
+                                                process-test.properties targets the test JVM, merged
+                                                over process-java.properties; a linter reads only its
+                                                own configuration file
                       environment-<tool>.properties
                                                 variables for a program the build forks (java, test,
                                                 pitest, native-image), which otherwise sees only
@@ -1360,7 +1406,8 @@ public record Project(
 
                     Each line reads `jenesis.<key>=<value> [set|default|unset] <what it does>`, so
                     the catalogue and the state of the build come out together. jenesis.properties at
-                    the project root sets the same keys, under your own
+                    the project root sets the same keys, written in full as `jenesis.test.tag=-slow`,
+                    under your own
                     ~/.jenesis/jenesis.properties and a -D, and refuses the keys the catalogue marks
                     as the command line's or that file's; `properties` prints only the ones that
                     are set.
