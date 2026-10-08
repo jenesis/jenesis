@@ -889,6 +889,12 @@ public record Project(
                       build-helper add-source / sourceSets
                           -> sourceDirectory in pom.xml, or a plugin at binary/generated
                       multi-release jar configuration -> sources/META-INF/versions/<N>/ (11)
+                      replacer, templating, a generated version class
+                          -> a plugin at binary/generated that writes the source (57)
+                      maven-resources-plugin targetPath, a file outside the resource folders
+                          -> -Djenesis.project.resources=<file>:<path in the jar>
+                      animal-sniffer with a JDK signature -> maven.compiler.release, as javac
+                          checks the API of the release it compiles for; other signatures: none
 
                     ## Check and test
 
@@ -961,6 +967,10 @@ public record Project(
                       git-commit-id, buildnumber -> none; pass -Djenesis.project.revision,
                           project.tag and project.tree, which the POM and SBOM record
                       Spotless beyond Java, Kotlin and Scala -> none
+                      maven-bundle-plugin, bnd / biz.aQute.bnd, an OSGi manifest -> none
+                      gradle-module-metadata -> none; the POM is the published metadata
+                      maven-release-plugin, axion-release -> none; -Djenesis.project.version,
+                          then `release`
                       any other plugin -> write one: skill/extend
 
                     The overview and the other pages: java build/jenesis/Make.java skill/start
