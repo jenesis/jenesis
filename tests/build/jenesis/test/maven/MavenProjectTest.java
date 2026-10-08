@@ -929,7 +929,8 @@ public class MavenProjectTest {
                 .as("copying the project root would copy the build's own output into itself without end")
                 .hasMessageContaining("The resource directory ./")
                 .hasMessageContaining("contains target")
-                .hasMessageContaining("-Djenesis.project.resources=<file>:<path in the jar>");
+                .hasMessageContaining("-Djenesis.project.resources=<file>:<path in the jar>")
+                .hasMessageContaining("move that resource into a <profile> active by default");
     }
 
     @Test
