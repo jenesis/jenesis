@@ -202,6 +202,19 @@ repository. Without these keys, every version is served. A request that names no
 version cannot be checked against either, so a key restricted by one leaves such a
 request to the module repository.
 
+The sources of a release
+------------------------
+
+A release's sources belong to it as much as its jar does, so the file names them
+too, as an archive of the version a build resolved:
+
+    sources[build.jenesis]=https://github.com/jenesis/jenesis/archive/refs/tags/v{version}.zip
+
+`sources` takes `{version}` and the placeholders of `module` and `maven`, and is
+selected as they are. Jenesis lists the archive in the CycloneDX SBOM of a build
+that has one, as the `source-distribution` reference of each dependency the file
+answers for, so whoever reads the SBOM finds the code each jar was built from.
+
 What fails the build
 --------------------
 

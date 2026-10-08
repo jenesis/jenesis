@@ -107,6 +107,27 @@ public class CycloneDx {
                     scope);
         }
 
+        public Component externalReferences(List<ExternalReference> externalReferences) {
+            return new Component(type,
+                    bomRef,
+                    group,
+                    name,
+                    version,
+                    purl,
+                    swhids,
+                    sha256,
+                    licenses,
+                    description,
+                    authors,
+                    externalReferences,
+                    properties,
+                    supplier,
+                    copyright,
+                    manufacturer,
+                    publisher,
+                    scope);
+        }
+
         private SequencedMap<String, Organization> organizations() {
             SequencedMap<String, Organization> organizations = new LinkedHashMap<>();
             if (supplier != null) {
