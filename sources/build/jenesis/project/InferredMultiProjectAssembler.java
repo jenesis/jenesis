@@ -401,7 +401,7 @@ public record InferredMultiProjectAssembler(Function<InferredSourceCodeQualityMo
                         Stream.of(descriptor.sources().stream(), descriptor.manifests().stream(), Stream.of("binary"))
                                 .flatMap(Function.identity()));
             }
-            if (descriptor.documentation()) {
+            if (descriptor.documentation() && (!tests || environment.flag("stage.tests"))) {
                 InferredDocumentationModule documentationModule = InferredDocumentationModule.ofEnvironment(environment,
                                 repositories,
                                 resolvers)

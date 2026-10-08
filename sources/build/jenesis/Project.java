@@ -1142,7 +1142,8 @@ public record Project(
                           the basis of the jar's manifest (12)
                       maven-source-plugin / withSourcesJar() -> -Djenesis.project.sources=true (48, 66)
                       maven-javadoc-plugin / withJavadocJar(), Dokka
-                          -> -Djenesis.project.documentation=true (48, 66); javadoc runs with
+                          -> -Djenesis.project.documentation=true (48, 66), which documents
+                          the main modules, a test module only under jenesis.stage.tests; javadoc runs with
                           -Xdoclint:none unless process-javadoc.properties names an -Xdoclint flag,
                           and fails the build on an error, -Werror= making a warning one;
                           excludePackageNames -> -exclude=<package>[:<package>...] there, which
@@ -3410,7 +3411,7 @@ public record Project(
                 project.artifacts||Folder resolved dependencies and repository metadata are cached in; a file a project provides names only a folder inside the project
                 project.layout|auto|auto|maven|modular|modular_to_maven; auto reads the project
                 project.sources|false|Assemble a sources jar for every module
-                project.documentation|false|Assemble a javadoc jar for every module
+                project.documentation|false|Assemble a javadoc jar for every module, a test module only where jenesis.stage.tests stages it
                 documentation.empty|false|Archive that javadoc jar holding nothing but an INTENTIONALLY_EMPTY file instead of rendering the documentation, for a repository such as Maven Central that requires the jar but not its content
                 project.version||Version stamped onto every produced artifact, a module version that starts with a digit; empty leaves modules unversioned and POMs at 0-SNAPSHOT
                 project.tag||SCM tag recorded in the generated POM and SBOM; empty for none
