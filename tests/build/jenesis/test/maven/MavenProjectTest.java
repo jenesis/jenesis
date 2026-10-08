@@ -989,7 +989,7 @@ public class MavenProjectTest {
                 .hasMessageContaining("The resource directory ./")
                 .hasMessageContaining("contains target")
                 .hasMessageContaining("-Djenesis.project.resources=<file>:<path in the jar>")
-                .hasMessageContaining("move that resource into a <profile> active by default");
+                .hasMessageContaining("move that resource into a <profile> activated by a property");
     }
 
     @Test
